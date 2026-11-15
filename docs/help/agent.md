@@ -10,7 +10,8 @@ LoTaR runs agent CLIs (Claude Code, Codex CLI, Copilot CLI, T3 Code and the othe
 - `lotar agent status <JOB_ID>`
 - `lotar agent logs <JOB_ID>`
 - `lotar agent cancel <JOB_ID>` — stop a job that has started; a ticket still waiting in the queue has no job yet, so remove it with `lotar agent queue remove`
-- `lotar agent queue` — list the tickets waiting in the queue and whether the queue worker runs
+- `lotar agent queue` — list the tickets waiting in the queue and the queue worker's state: `active` (a worker process runs; with tickets left it says what they wait for: a free slot under `agent.worktree.max_parallel_jobs`, or their ticket's running job), `stopped` (tickets wait but no worker process runs) or `idle` (nothing queued). With `--format json` the state is in `worker_state`, the explanation in `reason`. Tickets waiting for prerequisites leave the queue (the ticket is marked blocked), so they aren't listed
+- `lotar agent queue resume` — start the queue worker for the waiting tickets without queueing a job, for example after the worker was killed. With a worker running or nothing queued it changes nothing. A worker that can't start is reported (`error` in JSON, the state stays `stopped`); the command fails only when the queue can't be read. `lotar serve` does the same when it starts and prints a warning if the worker can't start
 - `lotar agent queue remove <TICKET>` — take one ticket out of the queue before its job starts, for example `lotar agent queue remove DEV-501`
 - `lotar agent queue flush` — take every waiting ticket out of the queue; running jobs go on
 - `lotar agent list-running`

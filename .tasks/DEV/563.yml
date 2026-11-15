@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-16T00:42:30.991677+00:00
+modified: 2026-11-16T02:57:02.588516+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -16,6 +16,7 @@ relationships:
   - DEV-564
   - DEV-588
   - DEV-593
+  - DEV-606
 comments:
 - date: 2026-11-15T18:01:34.472793+00:00
   author: claude
@@ -245,6 +246,33 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-16T02:57:02.588516+00:00
+  author: claude
+  text: |-
+    Rebased onto main with DEV-520; the merge-blocking T3 test passes now. Ready for the merge agent.
+
+    - Branch rebased onto `40670683` (DEV-520); no conflicts, no lockfile change. Commit now `adffe220`, signed, content unchanged from `200d70f1`.
+    - `npm run lint:agent` passed.
+    - `npm run test:agent` passed: 2230 Rust tests including `a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads`, which timed out at the last merge; UI 1548, release 60, hooks 7.
+    - `npm run test:smoke:agent`: 404/405. `smoke/tests/ui.board-layout.smoke.spec.ts:58` (click on `Move WontDo`) timed out once; the spec passed 3/3 alone. This change touches no UI: filed as [DEV-606](https://lotar.pyxzl.net/task/DEV-606).
+    - Still open: the firewall/LAN check after the next release; LOCA-385 for local's `skills/lotar-services.md`.
+  report:
+    commits:
+    - hash: adffe220
+      what: DEV-563 rebased onto main 40670683 (DEV-520), no code change
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2230 Rust incl. the dev510 T3 test that hung the merge, 1548 UI, 60 release, 7 hooks
+    - command: npm run test:smoke:agent
+      result: failed
+      reason: 1 of 405, ui.board-layout spec timed out once under load; passed 3/3 alone; filed DEV-606
+    - command: firewall/LAN check after next release
+      result: not_run
+      reason: scheduled for the next version
+    next: 'Merge agent: rebase if main moved, rerun gates, fast-forward'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
@@ -561,5 +589,15 @@ history:
     new: mallox
 - at: 2026-11-16T00:42:30.991677+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:56:33.102201+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606"]}'
+- at: 2026-11-16T02:57:02.588516+00:00
+  actor: claude
   changes:
   - field: comment_added

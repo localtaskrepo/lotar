@@ -7,7 +7,7 @@ use crate::config::manager::ConfigManager;
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::agent_job_service::{self, AgentJobService};
 use crate::services::agent_log_service::AgentLogService;
-use crate::services::agent_queue_service::AgentQueueService;
+use crate::services::agent_queue_service::{AgentQueueService, WorkerState};
 use crate::services::automation_service::AutomationService;
 use crate::services::task_service::TaskService;
 use crate::utils::git::{git_command, verified_common_dir};
@@ -396,15 +396,46 @@ impl AgentHandler {
                 }
                 Ok(())
             }
+            Some(AgentQueueAction::Resume) => {
+                let outcome = AgentQueueService::resume(tasks_dir).map_err(|e| e.to_string())?;
+                let pending = outcome.pending;
+                let state = if outcome.started || AgentQueueService::is_worker_running(tasks_dir) {
+                    WorkerState::Active
+                } else if pending > 0 {
+                    WorkerState::Stopped
+                } else {
+                    WorkerState::Idle
+                };
+                if matches!(renderer.format, OutputFormat::Json) {
+                    renderer.emit_json(&serde_json::json!({
+                        "pending": pending,
+                        "started": outcome.started,
+                        "worker_state": state.as_str(),
+                        "error": outcome.error,
+                    }));
+                } else if let Some(err) = &outcome.error {
+                    renderer.emit_warning(format!("Cannot start the queue worker: {err}; {pending} entries wait in the queue."));
+                } else if outcome.started {
+                    renderer.emit_success(format!("Started the queue worker for {pending} queued entries."));
+                } else if pending == 0 {
+                    renderer.emit_notice("Queue is empty; no worker started.");
+                } else if state == WorkerState::Active {
+                    renderer.emit_notice(format!("The queue worker already runs; {pending} entries wait in the queue."));
+                } else {
+                    renderer.emit_warning("Queue workers are disabled (LOTAR_AGENT_QUEUE_DISABLE_WORKER); no worker started.");
+                }
+                Ok(())
+            }
             None => {
                 // Default: list pending entries + worker status
                 let pending = AgentQueueService::list_pending(tasks_dir).map_err(|e| e.to_string())?;
-                let worker_running = AgentQueueService::is_worker_running(tasks_dir);
                 let mut stats = AgentJobService::queue_stats();
                 // Count jobs other processes run too (DEV-279).
                 stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
                 // And the on-disk queue this command lists (DEV-522).
                 stats.queued = stats.queued.max(pending.len());
+                let (state, reason) = AgentQueueService::worker_state(tasks_dir, pending.len(), stats.running);
+                let worker_running = state == WorkerState::Active;
 
                 if matches!(renderer.format, OutputFormat::Json) {
                     let entries: Vec<_> = pending
@@ -421,18 +452,18 @@ impl AgentHandler {
                     renderer.emit_json(&serde_json::json!({
                         "pending": entries,
                         "worker_running": worker_running,
+                        "worker_state": state.as_str(),
+                        "reason": reason,
                         "running_jobs": stats.running,
                         "queued_jobs": stats.queued,
                     }));
                     return Ok(());
                 }
 
-                renderer.emit_info(format_args!(
-                    "Worker: {}  |  Running: {}  |  Queued: {}",
-                    if worker_running { "active" } else { "idle" },
-                    stats.running,
-                    stats.queued,
-                ));
+                renderer.emit_info(format_args!("Worker: {}  |  Running: {}  |  Queued: {}", state.as_str(), stats.running, stats.queued));
+                if let Some(reason) = reason {
+                    renderer.emit_info(format_args!("Queue: {reason}"));
+                }
 
                 if pending.is_empty() {
                     renderer.emit_notice("No pending entries in queue.");

@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-16T02:29:53.068923+00:00
-modified: 2026-11-16T02:36:20.305255+00:00
+modified: 2026-11-16T02:48:33.619077+00:00
 relationships:
   related:
   - DEV-594
@@ -32,6 +32,9 @@ comments:
     - `running_t3_thread` keeps `-> Option<(String, String)>`; cache is now `T3_THREAD_ANSWERS` (caches idle answers too, lock not held during `t3`).
     - The running test is one `find_map` closure (`status == "running"`): the `activeRunId` / `pendingRequestCount` check goes there.
     - Registry check now runs before `running_t3_thread`.
+- date: 2026-11-16T02:48:27.074179+00:00
+  author: mallox
+  text: 'Answer: A (It holds them; the queue entry comments once why) (answered in INBOX-346)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ad4dd44-6ea0-4933-aaad-8f8d816b2933
 description: |-
@@ -111,3 +114,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T02:48:27.074179+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:48:33.619077+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

@@ -292,6 +292,16 @@ impl CommandHandler for ServeHandler {
         pin_process_tasks_dir(resolver)?;
         // Jobs of a worker or server that exited before they ended (DEV-378).
         crate::services::agent_job_service::AgentJobService::recover_orphaned_jobs(&resolver.path);
+        // Entries a killed worker left behind start now, not at the next
+        // enqueue (DEV-592).
+        match crate::services::agent_queue_service::AgentQueueService::resume(&resolver.path) {
+            Ok(outcome) => {
+                if let Some(err) = outcome.error {
+                    renderer.emit_warning(format_args!("Cannot start the agent queue worker for {} queued entries: {err}", outcome.pending));
+                }
+            }
+            Err(err) => renderer.emit_warning(format_args!("Cannot read the agent queue: {err}")),
+        }
 
         // DEV-305: let launchd/systemd start the upgraded binary.
         if exit_on_upgrade {

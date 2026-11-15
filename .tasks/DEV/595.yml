@@ -1,11 +1,10 @@
 title: Job end fails when the ticket branch is checked out in LoTaR's own agent worktree
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
 created: 2026-11-15T23:22:25.966473+00:00
-modified: 2026-11-16T02:33:11.319116+00:00
+modified: 2026-11-16T03:07:22.643811+00:00
 relationships:
   related:
   - DEV-596
@@ -13,6 +12,10 @@ relationships:
   - DEV-581
   - DEV-601
   - DEV-602
+  - DEV-520
+  - DEV-588
+  - DEV-593
+  - DEV-592
 comments:
 - date: 2026-11-16T00:06:06.962493+00:00
   author: claude
@@ -91,6 +94,65 @@ comments:
     - Reran: `cargo nextest run --workspace dev503` passed (24/24). `cargo clippy -p lotar-lib --all-targets -D warnings` was clean. `rustfmt --check` and `prettier --check` passed on the touched files. I didn't rerun the full test or smoke suites: the merge agent runs those.
     - DEV-596 (`3bd769d5`, Merging) changes other functions in the same file. A rebase may need care, but the two fixes don't conflict in logic.
     - No tickets filed.
+- date: 2026-11-16T02:49:17.261358+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `d4750e91` on main.
+
+    - The three failed jobs (merge, fix, fix-codex) all stopped on API usage limits before doing any work; the fix itself was fine.
+    - Rebased `bdcc0f38` onto main (DEV-596, DEV-520). One conflict in `docs/help/agent.md`: kept DEV-595's rewritten bullet and DEV-596's new bullet. The code merged cleanly and works with DEV-596: a worktree is now detached only when it has changes, and DEV-596 moves those aside.
+    - Amended the pending `.tasks` changes into the merge commit (owner 2026-11-12). No rules or config changed, so no `lotar trust` needed.
+    - No review ran: the review job also failed on a rate limit.
+  report:
+    commits:
+    - hash: d4750e91
+      what: move the ticket branch inside a clean worktree that has it checked out (rebased bdcc0f38, pushed)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: Rust 2231/2231, frontend 1548/1548
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    - command: ticket check (rerun MGP-13 job end)
+      result: not_run
+      reason: covered by the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out
+    next: 'None: Done'
+- date: 2026-11-16T02:51:35.996527+00:00
+  author: claude
+  text: 'Closed by the chief of staff 2026-11-15: merged and pushed as d4750e91 (on main); the open retry question is moot, the failed jobs died on usage limits.'
+- date: 2026-11-16T02:57:19.508357+00:00
+  author: claude
+  text: |-
+    Merge thread: nothing left to merge. `d4750e91` was already on main and pushed by another session.
+
+    - I rebased this thread's branch onto main as `9d40fade` (the same `docs/help/agent.md` resolution) and ran lint, test and smoke on it. All passed.
+    - Main moved while the checks ran. A second rebase dropped my commit as already upstream. Its code is identical to `d4750e91` (`git diff 9d40fade d4750e91 -- crates docs` is empty), so the checks hold for main.
+    - The first test run failed once on `concurrent_transactions_serialize_on_the_coordinated_locks` (2 s sprints lock wait at load ~77). That test isn't touched by this change, and it passed alone. Filed as DEV-601, related to DEV-588.
+    - I didn't amend or push anything. Main has no unpushed commits. The `.tasks` edits in the main checkout came after the pushed commit, so they stay uncommitted.
+    - No rules or config changed, so no `lotar trust` was needed.
+  report:
+    commits:
+    - hash: d4750e91
+      what: DEV-595 fix, already on main and pushed by another session
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2231 Rust, 1548 UI; one earlier run hit an unrelated lock flake, filed DEV-601
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    - command: ticket check on a real T3 job
+      result: not_run
+      reason: covered by the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out
+    next: 'none: Done'
+- date: 2026-11-16T03:07:19.376248+00:00
+  author: claude
+  text: 'Nothing to do: this retry is stale, the fix is already merged and pushed as `d4750e91` on main and the ticket is Done; this worktree has no commits beyond main.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97078b6d-c4b7-4950-a60f-90436c562edc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af985c3f6-1f68-44c2-9afe-d4a312baba44
@@ -100,8 +162,6 @@ references:
 description: 'Found: MGP-13 job job-20261115T212717.075Z-1 (mailgpg) failed at the end: `git branch --force agent/MGP-13 607bcc8` -> ''cannot force update the branch used by worktree at ~/.t3/worktrees/mailgpg/agent-MGP-13-93bc836e8df965ff''. The ticket went back to HelpNeeded although the work was done. Check: a T3 job whose thread branch differs from agent/<ID> while agent/<ID> is checked out in its agent worktree. Done: LoTaR moves the branch in that worktree (reset when clean, or detach first) instead of failing the job.'
 tags:
 - health
-- merge-retried
-- fix-retried
 custom_fields:
   finding: agent-job:branch-force-checked-out
 history:
@@ -246,3 +306,60 @@ history:
   - field: relationships
     old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601"]}'
     new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602"]}'
+- at: 2026-11-16T02:49:17.261358+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:49:18.266685+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520"]}'
+- at: 2026-11-16T02:51:35.996527+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:51:36.580880+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-16T02:51:36.637404+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried, fix-retried
+    new: health
+- at: 2026-11-16T02:57:19.508357+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:57:20.062587+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588"]}'
+- at: 2026-11-16T03:07:19.376248+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:07:19.653714+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-16T03:07:20.176916+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593"]}'
+- at: 2026-11-16T03:07:22.643811+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593","DEV-592"]}'

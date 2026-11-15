@@ -130,6 +130,8 @@ pub enum AgentQueueAction {
         /// The ticket identifier to remove (e.g. PROJ-1)
         ticket: String,
     },
+    /// Start the queue worker for the waiting tickets without queueing a job
+    Resume,
 }
 
 #[derive(Args)]

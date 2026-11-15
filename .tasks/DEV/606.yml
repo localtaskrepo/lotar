@@ -1,0 +1,26 @@
+title: 'Flaky smoke: board columns dialog click on Move WontDo times out under full-suite load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:56:31.049417+00:00
+modified: 2026-11-16T02:56:35.326099+00:00
+relationships:
+  related:
+  - DEV-563
+description: 'Found in the DEV-563 run on 2026-11-15: `npm run test:smoke:agent` failed once at `smoke/tests/ui.board-layout.smoke.spec.ts:58` (moveVia): `locator.click` on `Move WontDo` (a <summary>) timed out after 30 s although the element was visible, enabled and stable. The same spec passed 3 of 3 runs alone (`npm run -s test:smoke:quick:agent tests/ui.board-layout.smoke.spec.ts`). Done when the click no longer depends on load (wait for the dialog state the click needs) and the full smoke passes repeatedly.'
+tags:
+- health
+history:
+- at: 2026-11-16T02:56:33.103722+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-563"]}'
+- at: 2026-11-16T02:56:35.326099+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -51,6 +51,37 @@ pub struct AgentQueueEntry {
 
 pub struct AgentQueueService;
 
+/// What [`AgentQueueService::resume`] found and did.
+#[derive(Debug, Clone)]
+pub struct ResumeOutcome {
+    pub pending: usize,
+    /// A worker process was started.
+    pub started: bool,
+    /// Why no worker could start for the pending entries.
+    pub error: Option<String>,
+}
+
+/// What the queue worker of a tasks directory does (DEV-592).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkerState {
+    /// A worker process runs.
+    Active,
+    /// Entries are queued but no worker process runs.
+    Stopped,
+    /// No entries and no worker.
+    Idle,
+}
+
+impl WorkerState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Stopped => "stopped",
+            Self::Idle => "idle",
+        }
+    }
+}
+
 impl AgentQueueService {
     #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
     pub fn enqueue(tasks_dir: &Path, req: AgentJobCreateRequest) -> LoTaRResult<bool> {
@@ -168,20 +199,45 @@ impl AgentQueueService {
         true
     }
 
-    pub fn ensure_worker(tasks_dir: &Path) -> LoTaRResult<()> {
-        if std::env::var("LOTAR_AGENT_QUEUE_DISABLE_WORKER").is_ok() {
-            return Ok(());
+    /// Start the worker for entries already queued, as `lotar serve` starts
+    /// and for `agent queue resume` (DEV-592): a worker that was killed (a
+    /// restarted launch agent) leaves its entries behind. `Err` only when the
+    /// queue can't be read; a worker that can't start is in the outcome.
+    pub fn resume(tasks_dir: &Path) -> LoTaRResult<ResumeOutcome> {
+        let pending = Self::list_pending(tasks_dir)?.len();
+        let mut outcome = ResumeOutcome { pending, started: false, error: None };
+        if pending == 0 {
+            return Ok(outcome);
         }
-        if let Some(lock_path) = worker_lock_path(tasks_dir) {
-            if let Some(parent) = lock_path.parent() {
-                std::fs::create_dir_all(parent).map_err(LoTaRError::IoError)?;
-            }
-            let file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&lock_path).map_err(LoTaRError::IoError)?;
+        match worker_slot_free(tasks_dir).and_then(|free| if free { spawn_worker(tasks_dir).map(|()| true) } else { Ok(false) }) {
+            Ok(started) => outcome.started = started,
+            Err(err) => outcome.error = Some(err.to_string()),
+        }
+        Ok(outcome)
+    }
 
-            if file.try_lock_exclusive().is_ok() {
-                let _ = file.unlock();
-                let _ = spawn_worker(tasks_dir);
+    /// The worker's state and, with entries queued, what they wait for.
+    /// `running` counts the jobs of every process for this tasks directory.
+    pub fn worker_state(tasks_dir: &Path, pending: usize, running: usize) -> (WorkerState, Option<String>) {
+        if !Self::is_worker_running(tasks_dir) {
+            if pending == 0 {
+                return (WorkerState::Idle, None);
             }
+            return (WorkerState::Stopped, Some("no worker process runs; start one with `lotar agent queue resume`".to_string()));
+        }
+        if pending == 0 {
+            return (WorkerState::Active, None);
+        }
+        let reason = match resolve_max_parallel(tasks_dir).ok().flatten() {
+            Some(max) if running >= max => format!("waiting for a free slot ({running} of agent.worktree.max_parallel_jobs {max} running)"),
+            _ => "waiting for the running jobs of their tickets to end".to_string(),
+        };
+        (WorkerState::Active, Some(reason))
+    }
+
+    pub fn ensure_worker(tasks_dir: &Path) -> LoTaRResult<()> {
+        if worker_slot_free(tasks_dir)? {
+            let _ = spawn_worker(tasks_dir);
         }
         Ok(())
     }
@@ -268,6 +324,25 @@ impl AgentQueueService {
         }
         result
     }
+}
+
+/// True when workers are enabled and no worker holds this tasks directory's lock.
+fn worker_slot_free(tasks_dir: &Path) -> LoTaRResult<bool> {
+    if std::env::var("LOTAR_AGENT_QUEUE_DISABLE_WORKER").is_ok() {
+        return Ok(false);
+    }
+    let Some(lock_path) = worker_lock_path(tasks_dir) else {
+        return Ok(false);
+    };
+    if let Some(parent) = lock_path.parent() {
+        std::fs::create_dir_all(parent).map_err(LoTaRError::IoError)?;
+    }
+    let file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&lock_path).map_err(LoTaRError::IoError)?;
+    if file.try_lock_exclusive().is_err() {
+        return Ok(false);
+    }
+    let _ = file.unlock();
+    Ok(true)
 }
 
 fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-16T00:41:46.266559+00:00
+modified: 2026-11-16T03:07:27.123373+00:00
 relationships:
   related:
   - DEV-351
@@ -623,6 +623,30 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-16T03:07:27.123373+00:00
+  author: claude
+  text: |-
+    Review finding fixed: tickets Blocked under an agent with no held-back job get the DEV rule again.
+
+    - `resume_parked_job` now returns whether the ticket has a held-back job; only then the `unblocked` rules skip it (`automation_service.rs`, also in `automation run` and its dry run).
+    - DEV rule "Prerequisites done" drops `not: { assignee: "@agent" }`; `docs/help/automation.md` says the same.
+    - Test `a_held_back_job_on_a_blocked_ticket_resumes_alone` adds a ticket Blocked under `@fix` with no saved job: it gets the fix agent. Without the code change the held ticket got a second job (test failed before).
+    - Amended into one commit `cf8caa2a` (signed); `agent/DEV-530` moved there from `fb666856` (clean worktree, nothing lost).
+    - Smoke: first full run 400/401, failing spec not captured; rerun 401/401.
+  report:
+    commits:
+    - hash: cf8caa2a
+      what: held-back job skips the unblocked rules only for its own ticket; DEV rule drops @agent
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2180 Rust, 1537 web
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 401/401 on rerun; first run 1 failure not captured (output truncated)
+    next: Review, then merge agent/DEV-530 at cf8caa2a (rebase onto main first)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -1468,5 +1492,9 @@ history:
     new: mallox
 - at: 2026-11-16T00:41:46.266559+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:07:27.123373+00:00
+  actor: claude
   changes:
   - field: comment_added
