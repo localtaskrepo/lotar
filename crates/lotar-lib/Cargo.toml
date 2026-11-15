@@ -1,8 +1,9 @@
-# The lotar library (crate name `lotar`). The root package builds the `lotar`
-# binary from it plus the embedded web UI (DEV-497).
+# The lotar library (crate name `lotar`), built on crates/lotar-core (DEV-499).
+# The root package builds the `lotar` binary from it plus the embedded web UI
+# (DEV-497).
 [package]
 name = "lotar-lib"
-description = "The lotar library: tasks, storage, services, CLI handlers and the web server"
+description = "The lotar library: services, automation, CLI handlers and the web server, on lotar-core"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -26,34 +27,31 @@ workspace = true
 # build.rs compresses the embedded help docs and OpenAPI spec (DEV-221).
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 
-# Optimize dependencies for smaller binaries
 [dependencies]
+lotar-core.workspace = true
 harnessmux.workspace = true
 tokio.workspace = true
-# Unicode-aware \w \d \s \b, case folding and general categories (\p{L}, \p{Lu}…)
-# in every script; script/boolean/age/segment property classes (\p{Greek},
-# \p{Emoji}…) are left out to save ~180 KB (DEV-221).
-regex = { version = "1.13.1", default-features = false, features = ["std", "unicode-perl", "unicode-case", "unicode-gencat"] }
-chrono = { version = "0.4.45", features = ["serde", "clock"], default-features = false }
-serde = { version = "1.0.229", features = ["derive"], default-features = false }
-serde_yaml_ng = "0.10.0"
+regex.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_yaml_ng.workspace = true
 serde_json.workspace = true
 thiserror = "2.0.21"
-dirs = "7.0.0"
+dirs.workspace = true
 clap.workspace = true
 clap_complete = "4.6.11"
-rayon = { version = "1.12.0", default-features = false, optional = true }
-ignore = { version = "0.4.33" }
+ignore.workspace = true
 notify = "8.2.0"
 pulldown-cmark = { version = "0.13.6", default-features = false }
-blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
+blake3.workspace = true
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "ico", "tiff"] }
-base64 = { version = "0.23.1", default-features = false, features = ["std"] }
+base64.workspace = true
 ureq = { version = "3.4.2", features = ["json"] }
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
-libc = "0.2.191"
+libc.workspace = true
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
-fs2 = "0.4.3"
+fs2.workspace = true
+schemars = { workspace = true, optional = true }
 # Not used directly: enables the features assert_cmd turns on, so test targets
 # reuse the library `cargo build` made instead of compiling it again (DEV-495).
 # The extra code is never called; release LTO removes it.
@@ -64,19 +62,15 @@ assert_cmd = "2.2.2"
 # No default features: its regex feature would turn on regex defaults (DEV-495).
 predicates = { version = "3.1.4", default-features = false }
 tempfile.workspace = true
-ctor = "1.0.13"
-dtor = "1.0.6"
+ctor.workspace = true
+dtor.workspace = true
 
 [features]
 default = ["parallel"]
-schema = ["schemars"]
+schema = ["schemars", "lotar-core/schema"]
 
 # Optional features
-parallel = ["dep:rayon"]
-
-[dependencies.schemars]
-version = "1.2.3"
-optional = true
+parallel = ["lotar-core/parallel"]
 
 # DEV-302: one binary for the integration tests (each tests/*.rs file is a
 # module of tests/integration.rs); the guard, the performance budgets and the

@@ -6,7 +6,7 @@ import { renderMarkdownToHtml } from '../utils/markdown'
 // What the server would answer for this repository.
 const repository = new Map([
     ['docs/help/serve.md', 'docs/help/serve.md'],
-    ['api_types.rs', 'crates/lotar-lib/src/api_types.rs'],
+    ['api_types.rs', 'crates/lotar-core/src/api_types.rs'],
     ['view/api/types.ts', 'view/api/types.ts'],
     ['src/x-12.rs', 'src/x-12.rs'],
     ['img/flow.png', 'docs/img/flow.png'],
@@ -81,10 +81,10 @@ describe('file references in markdown', () => {
                 href: '?file=docs/help/serve.md:12',
             },
             {
-                path: 'crates/lotar-lib/src/api_types.rs',
+                path: 'crates/lotar-core/src/api_types.rs',
                 line: undefined,
                 text: 'api_types.rs',
-                href: '?file=crates/lotar-lib/src/api_types.rs',
+                href: '?file=crates/lotar-core/src/api_types.rs',
             },
             { path: 'view/api/types.ts', line: '3', text: 'the types', href: '?file=view/api/types.ts:3-5' },
         ])

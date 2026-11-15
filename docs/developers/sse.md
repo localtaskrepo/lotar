@@ -23,7 +23,7 @@ Combine filters freely: e.g., subscribe to only `task_created` from project `ENG
 
 ## Event kinds & payloads
 
-- `task_created` / `task_updated` — Full `TaskDTO` JSON (see `crates/lotar-lib/src/api_types.rs`). The payload always includes `id`, `title`, `status`, etc., and adds `triggered_by` when identity resolution succeeds.
+- `task_created` / `task_updated` — Full `TaskDTO` JSON (see `crates/lotar-core/src/api_types.rs`). The payload always includes `id`, `title`, `status`, etc., and adds `triggered_by` when identity resolution succeeds.
 - `task_deleted` — `{ "id": "<PROJECT-N>", "triggered_by"?: string }`.
 - `config_updated` — `{ "triggered_by"?: string }`; emitted after `lotar config set`, REST config writes in `crates/lotar-lib/src/routes/config.rs`, and automation `set` in `crates/lotar-lib/src/routes/automation.rs`.
 - `project_changed` — `{ "name": "<PROJECT>" }`; raised by the `.tasks` watcher whenever YAML files are created, modified, or removed under that project.

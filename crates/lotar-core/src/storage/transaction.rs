@@ -39,13 +39,16 @@ use serde::{Deserialize, Serialize};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::safety::{acquire_storage_lock, atomic_write_bytes, atomic_write_file};
 
-pub(crate) const JOURNAL_FILE_NAME: &str = ".txn-pending.json";
+pub const JOURNAL_FILE_NAME: &str = ".txn-pending.json";
 const JOURNAL_VERSION: u32 = 1;
 
 /// Deterministic fault injection for tests. The hook lives under the
 /// transaction primitive only; production code paths cannot trigger it.
-#[cfg(test)]
-pub(crate) mod fault {
+/// lotar-lib's unit tests inject failures too, and `cfg(test)` doesn't reach
+/// across crates (DEV-499), so the checks are always compiled; the setters
+/// those tests use are public and hidden, the rest test-only.
+#[doc(hidden)]
+pub mod fault {
     use std::cell::Cell;
 
     thread_local! {
@@ -54,7 +57,7 @@ pub(crate) mod fault {
 
     /// Fail the commit that publishes staged write `index` (0-based), after any
     /// earlier staged writes in the same commit have already been published.
-    pub(crate) fn fail_publish_at(index: usize) {
+    pub fn fail_publish_at(index: usize) {
         FAIL_PUBLISH_AT.with(|cell| cell.set(Some(index)));
     }
 
@@ -62,13 +65,17 @@ pub(crate) mod fault {
         FAIL_PUBLISH_AT.with(|cell| cell.take())
     }
 
+    // The fsync hooks are read on Unix only and set by this crate's tests.
     thread_local! {
+        #[cfg(any(test, unix))]
         static FAIL_PARENT_SYNC_ONCE: Cell<bool> = const { Cell::new(false) };
         static FAIL_JOURNAL_REMOVAL_TIMES: Cell<u32> = const { Cell::new(0) };
+        #[cfg(any(test, unix))]
         static FAIL_JOURNAL_REMOVAL_FSYNC_ONCE: Cell<bool> = const { Cell::new(false) };
     }
 
     /// Make the next parent-directory fsync fail once (L2 propagation proof).
+    #[cfg(test)]
     pub(crate) fn fail_parent_sync_once() {
         FAIL_PARENT_SYNC_ONCE.with(|cell| cell.set(true));
     }
@@ -81,7 +88,7 @@ pub(crate) mod fault {
     /// Make the next `n` journal-removal unlink attempts fail. A single
     /// failure proves the immediate-rollback invariant; two or more prove the
     /// retained-valid-journal path (review R1).
-    pub(crate) fn fail_journal_removal_times(n: u32) {
+    pub fn fail_journal_removal_times(n: u32) {
         FAIL_JOURNAL_REMOVAL_TIMES.with(|cell| cell.set(n));
     }
 
@@ -99,6 +106,7 @@ pub(crate) mod fault {
 
     /// Make the fsync after the next successful journal-removal rename fail
     /// once; removal already succeeded, so the commit stays acknowledged.
+    #[cfg(test)]
     pub(crate) fn fail_journal_removal_fsync_once() {
         FAIL_JOURNAL_REMOVAL_FSYNC_ONCE.with(|cell| cell.set(true));
     }
@@ -139,7 +147,7 @@ struct PendingJournal {
 /// (sprints lock first, then per-project task locks in sorted prefix order) and
 /// are held until the transaction is committed or dropped.
 #[derive(Debug)]
-pub(crate) struct MultiFileTransaction {
+pub struct MultiFileTransaction {
     root: PathBuf,
     journal_path: PathBuf,
     /// Dropping these files releases the advisory locks (SyncJournal precedent).
@@ -163,7 +171,7 @@ impl MultiFileTransaction {
     /// derived while already holding the sprints lock (the only lock through
     /// which journals are created), so recovery itself never restores a file
     /// whose task lock this transaction does not hold (review M1).
-    pub(crate) fn begin(root: &Path, project_prefixes: &[String]) -> LoTaRResult<Self> {
+    pub fn begin(root: &Path, project_prefixes: &[String]) -> LoTaRResult<Self> {
         let sprints_dir = crate::storage::sprint::Sprint::dir(root);
         fs::create_dir_all(&sprints_dir)?;
         let locks = vec![acquire_storage_lock(&sprints_dir, crate::storage::safety::sprint_lock_name())?];
@@ -174,7 +182,7 @@ impl MultiFileTransaction {
     /// Relationship validation needs the entire local graph, including incoming
     /// assertions in other projects. Discover projects under the coordinator,
     /// then lock all of them before reading or validating any task.
-    pub(crate) fn begin_all(root: &Path, extra: &[String]) -> LoTaRResult<Self> {
+    pub fn begin_all(root: &Path, extra: &[String]) -> LoTaRResult<Self> {
         let sprints_dir = crate::storage::sprint::Sprint::dir(root);
         fs::create_dir_all(&sprints_dir)?;
         let locks = vec![acquire_storage_lock(&sprints_dir, crate::storage::safety::sprint_lock_name())?];
@@ -183,7 +191,7 @@ impl MultiFileTransaction {
         Self::begin_locked(root, &projects, locks)
     }
 
-    pub(crate) fn project_prefixes(root: &Path) -> LoTaRResult<Vec<String>> {
+    pub fn project_prefixes(root: &Path) -> LoTaRResult<Vec<String>> {
         let mut projects = Vec::new();
         let unavailable =
             |error: std::io::Error| LoTaRError::ValidationError(format!("Relationship project inventory unavailable at {}: {error}", root.display()));
@@ -229,7 +237,7 @@ impl MultiFileTransaction {
     /// Callers that discover additional projects after `begin` (from state
     /// read under the coordinated locks) use this to abort and retry with a
     /// wider lock set instead of writing into unlocked projects (review L1).
-    pub(crate) fn ensure_covers(&self, project_prefixes: &[String]) -> LoTaRResult<()> {
+    pub fn ensure_covers(&self, project_prefixes: &[String]) -> LoTaRResult<()> {
         if let Some(missing) = project_prefixes.iter().find(|prefix| !self.locked_prefixes.contains(*prefix)) {
             return Err(LoTaRError::ValidationError(format!(
                 "Transaction holds task locks for [{}] only; refusing writes for unlocked project '{missing}'",
@@ -244,7 +252,7 @@ impl MultiFileTransaction {
     /// a file inside a locked project), and must not traverse or be a symlink.
     /// The file's current bytes are captured as the rollback image; staging a
     /// path twice or staging a no-op write is rejected.
-    pub(crate) fn stage(&mut self, path: &Path, contents: String) -> LoTaRResult<()> {
+    pub fn stage(&mut self, path: &Path, contents: String) -> LoTaRResult<()> {
         if path == self.journal_path {
             return Err(LoTaRError::ValidationError("Transaction cannot stage the recovery journal itself".to_string()));
         }
@@ -281,7 +289,7 @@ impl MultiFileTransaction {
     /// journal. On any publish failure, roll back every published file to its
     /// exact original bytes (removing files this transaction created) and only
     /// then remove the journal.
-    pub(crate) fn commit(mut self) -> LoTaRResult<()> {
+    pub fn commit(mut self) -> LoTaRResult<()> {
         let result = self.publish();
         self.committed = result.is_ok();
         result
@@ -289,11 +297,11 @@ impl MultiFileTransaction {
 
     /// Keep the coordinated locks after publication while a caller captures a
     /// coherent post-commit graph revision. No further staging is possible.
-    pub(crate) fn commit_checked(self, check: impl Fn() -> LoTaRResult<()>) -> LoTaRResult<()> {
+    pub fn commit_checked(self, check: impl Fn() -> LoTaRResult<()>) -> LoTaRResult<()> {
         self.commit_retaining_locks_checked(check).map(drop)
     }
 
-    pub(crate) fn commit_retaining_locks_checked(mut self, check: impl Fn() -> LoTaRResult<()>) -> LoTaRResult<Vec<File>> {
+    pub fn commit_retaining_locks_checked(mut self, check: impl Fn() -> LoTaRResult<()>) -> LoTaRResult<Vec<File>> {
         self.publish_checked(check)?;
         self.committed = true;
         Ok(self._locks)
@@ -322,14 +330,10 @@ impl MultiFileTransaction {
         };
         write_journal(&self.journal_path, &journal)?;
 
-        #[cfg(test)]
         let fail_at = fault::take_fail_publish_at();
         let outcome = (|| -> LoTaRResult<()> {
             for (write_index, write) in self.staged.iter().enumerate() {
                 check()?;
-                // Index only drives the test-only injection below.
-                let _ = write_index;
-                #[cfg(test)]
                 if fail_at == Some(write_index) {
                     return Err(LoTaRError::IoError(std::io::Error::other("injected publish failure")));
                 }
@@ -532,7 +536,6 @@ fn write_journal(journal_path: &Path, journal: &PendingJournal) -> LoTaRResult<(
 /// same window is harmless (files already match their originals, so a
 /// resurrected journal verifies as a no-op).
 fn remove_journal(journal_path: &Path) -> LoTaRResult<()> {
-    #[cfg(test)]
     if fault::take_fail_journal_removal() {
         return Err(std::io::Error::other("injected journal removal failure").into());
     }
@@ -545,7 +548,6 @@ fn remove_journal(journal_path: &Path) -> LoTaRResult<()> {
     if let Some(parent) = journal_path.parent()
         && let Ok(dir) = File::open(parent)
     {
-        #[cfg(test)]
         if fault::take_fail_journal_removal_fsync_once() {
             return Ok(());
         }
@@ -559,7 +561,6 @@ fn remove_journal(journal_path: &Path) -> LoTaRResult<()> {
 fn sync_parent_dir(path: &Path) -> LoTaRResult<()> {
     #[cfg(unix)]
     if let Some(parent) = path.parent() {
-        #[cfg(test)]
         if fault::take_fail_parent_sync_once() {
             return Err(LoTaRError::IoError(std::io::Error::other("injected parent directory sync failure")));
         }

@@ -11,5 +11,5 @@ mod automation_async_run_test;
 mod storage_safety_test;
 mod utils_scan_test;
 
-#[path = "common/env_mutex.rs"]
+#[path = "../../lotar-core/tests/common/env_mutex.rs"]
 mod env_mutex;

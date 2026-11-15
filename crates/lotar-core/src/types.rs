@@ -10,14 +10,14 @@ fn normalize_token(input: &str) -> String {
     input.trim().to_string()
 }
 
-pub(crate) fn canonical_key(input: &str) -> String {
+pub fn canonical_key(input: &str) -> String {
     input.trim().to_ascii_lowercase().replace([' ', '_', '-'], "")
 }
 
 /// Case-, space-, underscore-, and hyphen-insensitive equality for enum-like
 /// tokens (statuses, types, priorities). Shared by task parsing and config
 /// candidate validation so membership checks agree on canonical spellings.
-pub(crate) fn enum_token_eq(a: &str, b: &str) -> bool {
+pub fn enum_token_eq(a: &str, b: &str) -> bool {
     canonical_key(a) == canonical_key(b)
 }
 

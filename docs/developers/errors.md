@@ -29,7 +29,7 @@ HTTP/1.1 400 Bad Request
 ## CLI
 
 - Commands exit with `0` on success and `1` on any error path. The exit points in `src/main.rs` call `std::process::exit(1)` after logging the failure.
-- Errors are rendered through `OutputRenderer::emit_error` (`crates/lotar-lib/src/output/mod.rs`):
+- Errors are rendered through `OutputRenderer::emit_error` (`crates/lotar-core/src/output/mod.rs`):
 	- Text mode writes `❌ message` to `stderr`.
 	- `--format=json` still writes to `stderr`, but the payload becomes `{"status":"error","message":"..."}` so scripts can parse it. Standard output stays clean for successful JSON payloads.
 - Warnings and validation hints also go to `stderr`, so automation should treat `stdout` as the canonical data channel.

@@ -35,7 +35,7 @@ Each section links to relevant source files and tests. Additions should follow t
 - **User help:** [../help/list.md](../help/list.md)
 - **Args & handler:** `TaskSearchArgs` in `crates/lotar-lib/src/cli/args/task.rs`; `SearchHandler` and `TaskPostFilters` in `crates/lotar-lib/src/cli/handlers/task/search.rs`.
 - **Core services:** `storage::manager::Storage` for reads and text/custom-field filtering, the post-filter pipeline in `search.rs`, and the shared `services::task_query` sorting executor.
-- **Features:** alias `ls`, multi-project resolution, the web search syntax as the positional query (`crates/lotar-lib/src/utils/search_syntax.rs`, checked against `crates/lotar-lib/tests/fixtures/search_syntax_cases.json` together with the web parser), value flags that add to it, the shared task query (`crates/lotar-lib/src/services/task_list.rs`), limit/sort combination, text and JSON output. `table`/`markdown`/`md` are text aliases; malformed terms fail before searching.
+- **Features:** alias `ls`, multi-project resolution, the web search syntax as the positional query (`crates/lotar-core/src/utils/search_syntax.rs`, checked against `crates/lotar-core/tests/fixtures/search_syntax_cases.json` together with the web parser), value flags that add to it, the shared task query (`crates/lotar-lib/src/services/task_list.rs`), limit/sort combination, text and JSON output. `table`/`markdown`/`md` are text aliases; malformed terms fail before searching.
 - **Tests:** `crates/lotar-lib/tests/cli_list_alias_test.rs`, `crates/lotar-lib/tests/cli_list_effort_filters_and_sort_test.rs`, `crates/lotar-lib/tests/cli_list_pagination_test.rs`, `crates/lotar-lib/tests/dev75_cli_list_contract_test.rs`.
 
 ### lotar status
@@ -97,7 +97,7 @@ Each section links to relevant source files and tests. Additions should follow t
 
 - **User help:** [../help/config.md](../help/config.md) & [../help/templates.md](../help/templates.md)
 - **Implementation:** Args in `crates/lotar-lib/src/cli/args/config.rs`; handlers under `crates/lotar-lib/src/cli/handlers/config/{show,set,validate,normalize}.rs` and in the `config/init/` directory, plus the renderer utilities in `render.rs`.
-- **Services:** `services::config_service` for persistence + schema validation; template sources under `crates/lotar-lib/src/config/templates/`.
+- **Services:** `services::config_service` for persistence + schema validation; template sources under `crates/lotar-lib/src/cli/handlers/config/init/templates/`.
 - **Tests:** `crates/lotar-lib/tests/config_validation_test.rs`, `crates/lotar-lib/tests/config_integration_test.rs`, `crates/lotar-lib/tests/config_service_branch_alias_test.rs`, `crates/lotar-lib/tests/config_set_categories_tags_test.rs`, `crates/lotar-lib/tests/config_explain_test.rs`.
 
 ### lotar templates
@@ -121,7 +121,7 @@ Each section links to relevant source files and tests. Additions should follow t
 ### lotar scan
 
 - **User help:** [../help/scan.md](../help/scan.md)
-- **Implementation:** Args in `crates/lotar-lib/src/cli/args/scan.rs`; handler in `crates/lotar-lib/src/cli/handlers/scan_handler.rs`; heavy lifting in `crates/lotar-lib/src/scanner.rs` (walkdir + attribute parsing).
+- **Implementation:** Args in `crates/lotar-lib/src/cli/args/scan.rs`; handler in `crates/lotar-lib/src/cli/handlers/scan_handler.rs`; heavy lifting in `crates/lotar-core/src/scanner.rs` (walkdir + attribute parsing).
 - **Features:** include/exclude filters, inline metadata parsing, re-anchoring, dry-run/detailed context.
 - **Tests:** `crates/lotar-lib/tests/scanner_integration_test.rs`, `crates/lotar-lib/tests/scan_bidir_references_test.rs`.
 

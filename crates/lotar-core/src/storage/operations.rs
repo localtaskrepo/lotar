@@ -58,7 +58,7 @@ pub fn allow_archived_writes(force: bool) -> ArchivedWriteGuard {
 }
 
 /// Fail closed when `file` is an archived task and no force guard is open.
-pub(crate) fn ensure_writable(project_path: &Path, file: &Path, id: &str) -> LoTaRResult<()> {
+pub fn ensure_writable(project_path: &Path, file: &Path, id: &str) -> LoTaRResult<()> {
     archived_refusal(project_path, file, id).map_or(Ok(()), |message| Err(LoTaRError::ValidationError(message)))
 }
 
@@ -314,7 +314,7 @@ impl StorageOperations {
     /// Re-reads the current file (merging user-owned YAML extensions) so the
     /// result is safe to stage inside a coordinated transaction that already
     /// holds the project task lock (DEV-55).
-    pub(crate) fn prepare_task_edit(project_path: &Path, id: &str, new_task: &Task) -> Result<(PathBuf, String), Box<dyn std::error::Error>> {
+    pub fn prepare_task_edit(project_path: &Path, id: &str, new_task: &Task) -> Result<(PathBuf, String), Box<dyn std::error::Error>> {
         // Use filesystem-based file path resolution
         let file_path = match Self::get_file_path_for_id(project_path, id) {
             Some(path) => path,
