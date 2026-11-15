@@ -2499,7 +2499,7 @@ exit 0
         .expect("create task");
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@merge".to_string()), ..Default::default() }).expect("assign merge agent");
 
-// The job's end (the agent's deferred handback, worktree cleanup) runs
+        // The job's end (the agent's deferred handback, worktree cleanup) runs
         // after it finishes: wait until its worker is done (DEV-553).
         let jobs = wait_for_ticket_jobs(&created.id, 10_000, |jobs| jobs.iter().any(|job| job.finished_at.is_some() && AgentJobService::job_settled(&job.id)));
         let job = jobs.first().cloned().expect("merge job");
