@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T20:15:01.954526+00:00
-modified: 2026-11-15T21:30:38.601633+00:00
+modified: 2026-11-15T22:06:47.405227+00:00
 relationships:
   blocks:
   - DEV-582
@@ -55,6 +55,33 @@ comments:
     - Job `job-20261115T201131.885Z-1` ran in `t3-e572702e-…` on `t3/sync-automation-yml-config-copy`; the agent committed in the old `agent-FND-12-846d…` worktree on `agent/FND-12` instead.
     - `follow_thread_branch` then failed the job: "agent/FND-12 stays where it is … it has commits that t3/… lacks", although the work was safe on `agent/FND-12`.
     - Whichever fix you pick here should also cover that case (the thread made no commits and the ticket branch moved ahead: not a failure).
+- date: 2026-11-15T22:06:47.405227+00:00
+  author: claude
+  text: |-
+    Fixed in LoTaR only, the way the ticket's "Done" allows: the T3 prompt now says which branch the thread is on and where the earlier work is.
+
+    - Codex's question (extend T3/harnessmux to bind an existing checkout) is not needed for this fix. Binding the existing worktree stays a possible follow-up for the owner.
+    - `job_notes` for T3: "on branch `agent/<ID>` or on a branch T3 Code made from it (`git branch --show-current` names it). Commit to the branch you are on: LoTaR points `agent/<ID>` at it when the job ends."
+    - `t3_thread_notes`: lists every worktree of the ticket's branch, or of its `t3/*` thread branches, that has uncommitted changes. The agent reads them there (`git -C <path> status/diff`) and leaves that worktree alone.
+    - Test `a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: failed before the fix, passes now. The fake T3 now saves each prompt.
+    - Docs: `docs/help/agent.md` ("This job" section).
+    - This job itself ran on `agent/DEV-583`: T3 keeps the given branch when it creates it, and makes a `t3/*` branch only when the ticket's branch exists already.
+  report:
+    commits:
+    - hash: eba9fc33
+      what: T3 job prompt names the thread's real branch and the earlier jobs' uncommitted worktrees
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: 404/404
+    - command: retry a failed T3 fix job live
+      result: not_run
+      reason: covered by a fake-T3 integration test; the merge agent reruns it
+    next: Review on another model, then merge
 description: 'Found 2026-11-15 in standards: a fix job that is retried on another agent or resumed after its prerequisite ("Prerequisites done", "Retry with @fix-codex", "Retry with @fix-fable") starts a new T3 thread in a fresh worktree on a generated branch (`t3/gitleaks-allow-1password-backticks`, `t3/fix-gitleaks-1password-backtick-allowlist`), while its prompt says "You are working in a git worktree on branch `agent/STD-144` ... Don''t switch branches". The first job''s uncommitted work stays in `~/.t3/worktrees/standards/agent-STD-144-…`, out of reach. Seen on STD-144 (jobs `job-20261115T192529.587Z-12` and the 20:12Z retry), STD-140 (`job-20261115T192519.646Z-11`) and STD-149 (the review ran on `t3/std-149-dedupe-finding-tickets` at the rejected commit while the rework was on `agent/STD-149`). Two codex jobs handed back for this alone, and standards has about 30 leftover `t3/` worktrees. Related: DEV-581, DEV-577, DEV-530. Check: retry a failed T3 fix job with another agent; `git branch --show-current` in the new thread prints `agent/<ID>` and `git status` shows the first job''s changes. Done: a retried or resumed T3 job runs in the ticket''s existing `agent/<ID>` worktree (or the prompt names the branch the thread really has and where the earlier work is).'
 tags:
 - health
@@ -139,3 +166,7 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-582"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'
     new: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'
+- at: 2026-11-15T22:06:47.405227+00:00
+  actor: claude
+  changes:
+  - field: comment_added

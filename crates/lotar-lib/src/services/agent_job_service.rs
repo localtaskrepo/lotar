@@ -1282,12 +1282,14 @@ struct WorktreeContext {
     working_dir: std::path::PathBuf,
     worktree_path: Option<std::path::PathBuf>,
     worktree_branch: Option<String>,
+    /// Why the job runs in this worktree, for the job log.
+    note: Option<String>,
 }
 
 fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> LoTaRResult<WorktreeContext> {
     let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
 
-    let mut context = WorktreeContext { working_dir: repo_root.clone(), worktree_path: None, worktree_branch: None };
+    let mut context = WorktreeContext { working_dir: repo_root.clone(), worktree_path: None, worktree_branch: None, note: None };
 
     if !config.agent_worktree.enabled {
         return Ok(context);
@@ -1299,8 +1301,6 @@ fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
     let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &ticket_token);
     // Worktree is per-ticket, not per-job. All phases for a ticket share the same worktree.
     let worktree_path = worktree_root.join(&ticket_token);
-
-    std::fs::create_dir_all(&worktree_root).map_err(LoTaRError::IoError)?;
 
     if !branch_exists(&repo_root, &branch) {
         run_git_command(&repo_root, &["branch", &branch])?;
@@ -1325,6 +1325,23 @@ fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
         return Ok(context);
     }
 
+    // The ticket's branch checked out in another worktree, a T3 Code
+    // thread's (DEV-581): git checks a branch out in one worktree only, so
+    // the job runs there. The thread can continue in it afterwards.
+    if let Some(path) =
+        linked_worktrees(&repo_root)?.into_iter().find_map(|(path, on)| (on.as_deref() == Some(branch.as_str()) && path.is_dir()).then_some(path))
+    {
+        if verified_common_dir(&path).map_err(LoTaRError::IoError)? != repo_common {
+            return Err(LoTaRError::ValidationError("Worktree belongs to a different repository".into()));
+        }
+        context.note = Some(format!("{branch} is checked out in the worktree {}, so this job runs there.", path.display()));
+        context.working_dir = path.clone();
+        context.worktree_path = Some(path);
+        context.worktree_branch = Some(branch);
+        return Ok(context);
+    }
+
+    std::fs::create_dir_all(&worktree_root).map_err(LoTaRError::IoError)?;
     let worktree_arg = worktree_path.to_string_lossy().to_string();
     run_git_command(&repo_root, &["worktree", "add", &worktree_arg, &branch])?;
     if verified_common_dir(&worktree_path).map_err(LoTaRError::IoError)? != repo_common {
@@ -1374,7 +1391,7 @@ fn plan_t3_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
         let base = String::from_utf8_lossy(&head.stdout).trim().to_string();
         T3Worktree { base: if head.status.success() && !base.is_empty() { base } else { "HEAD".to_string() }, branch: Some(branch.clone()) }
     };
-    let context = WorktreeContext { working_dir: repo_root, worktree_path: None, worktree_branch: Some(branch) };
+    let context = WorktreeContext { working_dir: repo_root, worktree_path: None, worktree_branch: Some(branch), note: None };
     Ok((context, plan))
 }
 
@@ -2696,7 +2713,12 @@ fn run_job(
             update_job(&job_id, |state| {
                 record_and_emit(state, "agent_job_progress", Some(msg.clone()));
             });
-            WorktreeContext { working_dir: resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone()), worktree_path: None, worktree_branch: None }
+            WorktreeContext {
+                working_dir: resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone()),
+                worktree_path: None,
+                worktree_branch: None,
+                note: None,
+            }
         }
     };
 
@@ -2739,7 +2761,7 @@ fn run_job(
     if is_merge_job && let Some((_, assignee)) = ticket_state(&tasks_dir, &ticket_id) {
         update_job(&job_id, |state| state.assignee_at_start = Some(assignee.clone()));
     }
-    for note in session_reason.into_iter().chain(moved_note) {
+    for note in session_reason.into_iter().chain(moved_note).chain(worktree_context.note.clone()) {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
@@ -2878,11 +2900,16 @@ fn worktree_context_at(tasks_dir: &std::path::Path, dir: &std::path::Path) -> Wo
     let canonical = |path: &std::path::Path| fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let in_main = resolve_repo_root(tasks_dir).is_none_or(|root| canonical(&root) == canonical(dir));
     if in_main {
-        return WorktreeContext { working_dir: dir.to_path_buf(), worktree_path: None, worktree_branch: None };
+        return WorktreeContext { working_dir: dir.to_path_buf(), worktree_path: None, worktree_branch: None, note: None };
     }
     let head = git_command(dir).args(["symbolic-ref", "--quiet", "--short", "HEAD"]).current_dir(dir).output().ok();
     let branch = head.filter(|output| output.status.success()).map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
-    WorktreeContext { working_dir: dir.to_path_buf(), worktree_path: Some(dir.to_path_buf()), worktree_branch: branch.filter(|branch| !branch.is_empty()) }
+    WorktreeContext {
+        working_dir: dir.to_path_buf(),
+        worktree_path: Some(dir.to_path_buf()),
+        worktree_branch: branch.filter(|branch| !branch.is_empty()),
+        note: None,
+    }
 }
 
 /// The environment of a job's agent: LOTAR_* variables with the task it

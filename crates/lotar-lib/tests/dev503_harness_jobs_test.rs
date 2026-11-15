@@ -474,6 +474,11 @@ fn t3_harness(rework_run: &str) -> (TestFixtures, Vec<EnvVarGuard>) {
 /// A repository whose TEST project runs `profiles` (name, `$FAKE_RUN`, more profile keys four spaces deep) as fake
 /// T3 Code threads in worktrees.
 fn t3_harness_with(profiles: &[(&str, &str, &str)]) -> (TestFixtures, Vec<EnvVarGuard>) {
+    t3_harness_and(profiles, "")
+}
+
+/// `t3_harness_with` plus `more_agents`, profiles on other runners (two spaces deep).
+fn t3_harness_and(profiles: &[(&str, &str, &str)], more_agents: &str) -> (TestFixtures, Vec<EnvVarGuard>) {
     crate::common::require_git();
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path().to_path_buf();
@@ -490,7 +495,7 @@ fn t3_harness_with(profiles: &[(&str, &str, &str)]) -> (TestFixtures, Vec<EnvVar
             root.join("t3-trees").display()
         )
     };
-    let agents: String = profiles.iter().map(profile).collect();
+    let agents: String = profiles.iter().map(profile).collect::<String>() + more_agents;
     fixtures.create_config_in_dir(&fixtures.tasks_root, &format!("default:\n  project: TEST\nagent:\n  worktree:\n    enabled: true\nagents:\n{agents}"));
     TaskService::create(&mut fixtures.create_storage(), TaskCreate { title: "Rework".into(), project: Some("TEST".into()), ..Default::default() }).unwrap();
     git(&root, &["init", "-q", "-b", "main"]);
@@ -581,6 +586,49 @@ fn a_ticket_branch_that_cannot_follow_its_thread_fails_the_job() {
         .stdout(predicate::str::contains("agent/TEST-1 stays where it is, not at t3/topic-1 of the T3 Code thread: git branch --force"));
     assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch is unchanged");
     assert_ne!(rev(root, "t3/topic-1"), fix, "the rework stays on its thread's branch");
+}
+
+/// DEV-581: a T3 Code thread keeps the ticket's branch checked out in its worktree, so a headless job after it failed
+/// on `git worktree add`. The headless review and merge now run in the thread's worktree, the rework continues the
+/// thread there, and Done cleanup removes it.
+#[test]
+fn headless_jobs_run_in_the_t3_threads_worktree_that_has_the_tickets_branch() {
+    let fix = "if [ -f fix.txt ]; then echo again >> fix.txt && git commit -qam TEST-1-rework; else git checkout -q -b agent/TEST-1 && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; fi";
+    let (fixtures, _env) = t3_harness_and(
+        &[("fix", fix, "    session: continue\n")],
+        "  review:\n    runner: command\n    command: /bin/sh\n    args: [\"-c\", \"pwd >> ../../review.log\"]\n  merge:\n    runner: command\n    command: /bin/sh\n    args: [\"-c\", \"pwd >> ../../review.log && git -C ../.. merge -q --ff-only agent/TEST-1\"]\n",
+    );
+    let root = fixtures.get_temp_path();
+    let tree = std::fs::canonicalize(root.join("t3-trees/0")).unwrap_or_else(|_| root.join("t3-trees/0"));
+    let run = |profile: &str| {
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        cmd.current_dir(root).args(["agent", "run", "TEST-1", "Work on it", "--agent", profile, "--wait"]);
+        cmd.assert()
+    };
+    run("fix").success();
+    let tree = std::fs::canonicalize(&tree).unwrap();
+    assert_eq!(rev(&tree, "HEAD"), rev(root, "agent/TEST-1"), "the fix thread works on the ticket's branch");
+    run("review").success();
+    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
+        .collect();
+    assert!(
+        logs.contains("agent/TEST-1 is checked out in the worktree ") && logs.contains("t3-trees/0, so this job runs there."),
+        "the job log names it: {logs}"
+    );
+    run("fix").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 agent/TEST-1 "), "the rework continues the fix thread in its worktree: {log}");
+    assert!(tree.join("fix.txt").is_file() && std::fs::read_to_string(tree.join("fix.txt")).unwrap().contains("again"));
+    run("merge").success();
+    let pwds = std::fs::read_to_string(root.join("review.log")).unwrap();
+    assert_eq!(pwds.lines().map(|line| std::fs::canonicalize(line).unwrap()).collect::<Vec<_>>(), vec![tree.clone(), tree.clone()], "{pwds}");
+    assert_eq!(rev(root, "main"), rev(root, "agent/TEST-1"), "the merge fast-forwarded main");
+    for args in [&["config", "set", "agent_worktree_cleanup_on_done", "true", "--global"][..], &["status", "TEST-1", "Done"]] {
+        crate::common::lotar_cmd().unwrap().current_dir(root).args(args).assert().success();
+    }
+    assert!(!tree.exists(), "Done cleanup removed the thread's worktree");
 }
 
 /// A `fix` thread that commits, then amends, and a `merge` thread that hands the ticket back; both continue their

@@ -1,0 +1,29 @@
+title: After a server restart, a non-empty agent queue stays idle until a new job is enqueued
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T22:38:44.315409+00:00
+modified: 2026-11-15T22:38:44.990878+00:00
+description: |-
+  After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
+
+  ## What happened
+  - `lotar agent queue` in ~/Development/local: `Worker: idle | Running: 0 | Queued: 13`.
+  - The owner allowed a restart of the launch agent `net.pyxzl.lotar.local` (it runs `lotar serve`). After the restart the worker was still idle with the same queue.
+  - It started only when the chief of staff queued LOCA-333's review (`lotar agent run ... --agent review`); then the worker ran the whole queue.
+
+  ## Expected
+  `lotar serve` (and any process that owns the queue worker) starts the worker at startup when the queue isn't empty, as it does after an enqueue.
+
+  ## Done when
+  - [ ] A server started over a non-empty queue starts its worker within seconds; test with a queued entry and no enqueue after the start.
+  - [ ] `lotar agent queue` says why a non-empty queue is idle (no worker process, or waiting for prerequisites), so a check can tell a stopped worker from a waiting one.
+  - [ ] A command to start the worker for a tasks directory without queueing a job (for example `lotar agent queue resume`), for recovery scripts (standards STD-113 proposal).
+history:
+- at: 2026-11-15T22:38:44.990878+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

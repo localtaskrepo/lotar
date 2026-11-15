@@ -1,14 +1,38 @@
 title: 'Flaky smoke: global task actions on desktop fail under full-suite load'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-15T21:35:33.389545+00:00
-modified: 2026-11-15T21:35:35.452500+00:00
+modified: 2026-11-15T22:20:21.642960+00:00
 relationships:
   related:
   - DEV-581
+  - DEV-586
+comments:
+- date: 2026-11-15T22:20:13.755586+00:00
+  author: claude
+  text: |-
+    No change needed: same cause as [DEV-586](https://lotar.pyxzl.net/task/DEV-586), two smoke suites overlapping on one Mac. DEV-586 already fixes that with a run lock.
+
+    - The failing poll is `ui.global-actions.smoke.spec.ts:114-116` (panel "Create task" enabled, 15 s). Stack from DEV-581's `smoke.log`.
+    - Codex's DEV-581 smoke run failed this test 2 minutes earlier (21:32 UTC). 8 other files failed with it, mostly on 30 s Playwright timeouts: the whole machine stalled.
+    - Timed it under full-suite load: across 30 panel opens the panel was ready in at most 293 ms (load 50-212). Random 0-2.5 s API delays didn't break it either, so the app has no stuck state here.
+    - Full smoke passed 4 times in a row (404/404, then 410/410 three times). No commits on `agent/DEV-587`.
+  report:
+    checks:
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 404/404 at load 212
+    - command: npm run test:smoke:quick:agent (x3, with 6 instrumented copies of the desktop test)
+      result: passed
+      reason: 410/410 each
+    - command: npm run lint
+      result: not_run
+      reason: no file changed
+    - command: npm test
+      result: not_run
+      reason: no file changed
 description: 'Found 2026-11-15 in the DEV-581 rework: `npm run smoke` failed 1 of 404, `tests/ui.global-actions.smoke.spec.ts` > ''keeps actions usable and creates in the known project on desktop'' (AssertionError: expected false to be true; Matcher did not succeed in time). The file alone passes (`npx vitest run --config smoke/vitest.config.ts tests/ui.global-actions.smoke.spec.ts`). Check: run the full smoke suite a few times. Done: the test passes under full-suite load.'
 tags:
 - health
@@ -26,3 +50,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T22:06:35.533651+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T22:20:13.755586+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:20:13.892460+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-581"]}'
+    new: '{"related":["DEV-581","DEV-586"]}'
+- at: 2026-11-15T22:20:21.642960+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

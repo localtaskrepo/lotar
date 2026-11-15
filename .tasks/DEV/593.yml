@@ -1,0 +1,29 @@
+title: 'Jobs left in status unknown by a killed process are never taken over: their tickets stall with an agent assignee'
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T22:38:45.433554+00:00
+modified: 2026-11-15T22:38:45.899280+00:00
+description: |-
+  Jobs whose process died right after `agent_job_started` stay in status `unknown` and are never taken over, so their tickets sit InProgress with an agent assignee and no job. docs/help/agent.md says the queue worker for the same tasks directory, or the next `lotar serve`, takes such a job over and ends it. Found 2026-11-15 in local.
+
+  ## What happened
+  - `job-20261115T212720.876Z-1` (LOCA-437), `job-20261115T221338.418Z-1` (LOCA-441), `job-20261115T222242.744Z-1` (LOCA-442), all `@fix` on runner t3: the job log has only `agent_job_started`, no harnessmux session exists for them (`harnessmux list`), and `lotar agent status` says `unknown`.
+  - Likely cause: the local lotar server restart around 22:30 UTC (launch agent `net.pyxzl.lotar.local`, last exit -15).
+  - At 22:38 UTC the restarted server's queue worker was active (Running 3, Queued 4) and the three jobs were still `unknown`; no `job_failed` or `job_completed` rule ran for them.
+  - Restarted by hand with `lotar agent run <ID> "<rule prompt>" --agent fix` (comments on the three tickets).
+
+  ## Expected
+  As documented: the worker or the next `lotar serve` ends such a job (failed, with the reason "process exited before the job ended"), so the `job_failed` rules retry it.
+
+  ## Done when
+  - [ ] A job record left in `unknown` by a killed process is ended by the next worker or server in that tasks directory; its `job_failed` rules run once. Test: kill the job's process between `agent_job_started` and the session start.
+  - [ ] `lotar agent status` and `list-jobs` show such a job as failed with that reason, not `unknown`.
+history:
+- at: 2026-11-15T22:38:45.899280+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

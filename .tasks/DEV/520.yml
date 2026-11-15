@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T21:39:19.847388+00:00
+modified: 2026-11-15T22:19:32.696027+00:00
 relationships:
   related:
   - DEV-501
@@ -23,6 +23,8 @@ relationships:
   - DEV-510
   - DEV-560
   - DEV-588
+  - DEV-586
+  - DEV-590
 comments:
 - date: 2026-11-14T06:11:36.177470+00:00
   author: claude
@@ -319,6 +321,60 @@ comments:
       result: not_run
       reason: rebase conflict
     next: Adapt replay driver to current waiting-for-answer handling, then verify and review
+- date: 2026-11-15T21:57:32.529817+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `51fee8d1` on `main` (`origin/main` too).
+
+    - Branch `t3/agent-job-hang-on-lagged-events-1` had the reviewed fix `66fb3992`; the DEV-550 fix in 0.15.1 worked.
+    - Main moved twice during the run. The second rebase conflicted with DEV-510 in `agent_job_service.rs`: main's setup read `session.status()` for the agent and thread link, but the fix's `drive_turns` only gets a `TurnControl`.
+    - Resolved it by reading the status once in `drive_session` and passing `agent` and `link` through `TurnSettings` (still `Copy`). DEV-510's "waits for an answer" return comes before the fix's `session.idle()`.
+    - Checks reran after the resolution: lint, `npm test` and smoke passed. The flakes were 30 s and 2 s timeouts at load ~100–235, unrelated to this backend change: filed DEV-588 (dev60 lock test); smoke drag timeouts are DEV-586.
+    - No rules or profiles changed, so no `lotar trust`. Pending `.tasks` changes were amended into the commit (owner 2026-11-12).
+    - The amend means the worktree branch (`4d631817`) differs from `51fee8d1` only in `.tasks`.
+  report:
+    commits:
+    - hash: 51fee8d1
+      what: DEV-520 fix, rebased onto main 50cfad9a, merged and pushed
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2227 Rust, 1548 UI; first run hit flaky dev60 lock test (DEV-588), rerun passed
+    - command: npm run smoke
+      result: passed
+      reason: 403/404; ui.backlog-order 1440px timed out at load ~235 (DEV-586), passed alone
+    - command: cargo nextest dev520
+      result: passed
+      reason: 4 tests incl. >1024 events before turn end
+    next: 'None: the ticket goes to Done when this job ends'
+- date: 2026-11-15T22:19:32.696027+00:00
+  author: claude
+  text: |-
+    Fix adapted to main again (owner's INBOX-184 decision for this case); new commit `cdd2141c` on `t3/replay-lagged-session-events`, signed. lotar 0.15.1 is already installed, so the INBOX-241 swap is done.
+
+    - **Conflict** in `agent_job_service.rs`: main added the "waits for an answer" return before the idle check; kept it, followed by the fix's `session.idle()`.
+    - Main's new `session.status()` call in the loop (agent name, link) moved into `drive_session`'s one status read; the link now comes from the log events already read. Both go to `drive_turns` via `TurnSettings`.
+    - **New bug the rebase surfaced:** DEV-510's `a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads` hung about half the time. harnessmux's new owner after a takeover reuses seqs already in the log (log: 1,2,3 then 2,3 again), and the reader dropped them as duplicates.
+    - Fix: before the first event, the reader accepts a seq at or below the log's last (everything read then came after the log's end); gaps still fail the job. Regression test `a_new_owner_that_numbers_events_again_is_followed` fails without it; the takeover tests passed 6/6 after.
+    - The harnessmux bug itself: filed [DEV-590](https://lotar.pyxzl.net/task/DEV-590).
+  report:
+    commits:
+    - hash: cdd2141c
+      what: DEV-520 fix rebased onto main 50cfad9a, conflict resolved, takeover seq fix
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2228 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '404'
+    - command: dev510 takeover tests x6
+      result: passed
+    next: Review cdd2141c on t3/replay-lagged-session-events, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -327,6 +383,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A659f95d0-2e62-4885-a0d2-10c981c23c81
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add19d5e6-d084-4938-b07f-64e12bedc3df
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa3dde28-c4a6-48d9-a0d4-6848aac33a6a
+releases:
+- 6
 description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lotar-lib/src/services/agent_job_service.rs) reads harnessmux''s broadcast channel (capacity 1024, harnessmux 0.1.1 session.rs:127) and on RecvError::Lagged just continues. MessageDelta/ThoughtDelta events come per chunk and lotar''s loop reads the cancel file and takes the registry lock per event, so a chatty turn can lag; if the dropped events include TurnFinished/TurnFailed the loop never sees the turn end and the job runs until someone cancels it. Check: a unit test that feeds more than 1024 events before the turn''s end and expects the job to end. Done: on lag, the missed events (seq after the last one seen) are replayed from the session''s event log (Status.events) through the same handling, the job ends with the right exit code, and the test passes.'
 tags:
 - health
@@ -863,3 +921,28 @@ history:
   - field: relationships
     old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560"]}'
     new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588"]}'
+- at: 2026-11-15T21:57:32.529817+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:57:34.054353+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588"]}'
+    new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586"]}'
+- at: 2026-11-15T21:57:56.173700+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-15T22:18:56.288060+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586"]}'
+    new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586","DEV-590"]}'
+- at: 2026-11-15T22:19:32.696027+00:00
+  actor: claude
+  changes:
+  - field: comment_added

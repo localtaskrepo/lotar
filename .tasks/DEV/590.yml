@@ -1,0 +1,82 @@
+title: 'harnessmux reuses event seqs after a takeover: the new owner counts on from the last saved count'
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-15T22:18:55.853773+00:00
+modified: 2026-11-15T22:37:35.083100+00:00
+relationships:
+  related:
+  - DEV-520
+  - DEV-588
+comments:
+- date: 2026-11-15T22:37:25.311652+00:00
+  author: claude
+  text: |-
+    Fixed in harnessmux: a new owner numbers its events after the log's last seq.
+
+    - Fix: `src/session.rs` `EventLog::last_seq` reads the log's last event; `Session::own` sets `record.events` to the larger of the saved count and that seq before emitting
+    - Test: `tests/cli.rs` `an_owner_that_takes_over_numbers_its_events_after_the_logs_last` kills the owner after an unsaved `message.delta`, resumes, expects seqs 1..n. Before the fix: `[1,2,3,4,5,6,5,6,7,8,9,10]`
+    - Commit `fb28583` on harnessmux branch `agent/DEV-590`, worktree `~/.t3/worktrees/harnessmux/DEV-590`; CHANGELOG under Unreleased
+    - No change in the lotar repo: lotar still uses harnessmux `0.1.9` from crates.io until a release and bump
+  report:
+    commits:
+    - hash: fb28583
+      what: 'harnessmux branch agent/DEV-590 (worktree ~/.t3/worktrees/harnessmux/DEV-590): new owner numbers events after the log''s last seq'
+    checks:
+    - command: cargo nextest run an_owner_that_takes_over_numbers_its_events_after_the_logs_last
+      result: passed
+      reason: failed before the fix with seqs 1..6,5,6,7..
+    - command: cargo nextest run (harnessmux, 44 tests)
+      result: passed
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint / npm test / npm run smoke (lotar)
+      result: not_run
+      reason: no lotar change; lotar still links harnessmux 0.1.9 from crates.io
+    next: Review and merge harnessmux agent/DEV-590 onto harnessmux main; lotar gets it with the next harnessmux release (owner's call) and version bump
+description: 'Found by claude on DEV-520, 2026-11-15: harnessmux 0.1.9 Session::emit (src/session.rs:379) numbers events from record.events, but the record is saved only in set_state. An owner killed mid-turn has logged events after its last save, so the owner that takes the session over gives its first events seqs already in the log (seen in dev510_t3_session_test: log seq 1,2,3 then 2,3 again). lotar''s DEV-520 reader now copes (accepts the first event after open at or below the log''s last seq). Check: a harnessmux test that kills an owner after an unsaved event, resumes the session and expects the next event''s seq to follow the log''s last. Done: a new owner starts counting from the log''s last seq (or the record is saved with every event), so seqs are unique per session, and the test passes.'
+tags:
+- health
+history:
+- at: 2026-11-15T22:18:56.289421+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-520"]}'
+- at: 2026-11-15T22:18:56.577122+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T22:34:21.542145+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520"]}'
+    new: '{"related":["DEV-520","DEV-588"]}'
+- at: 2026-11-15T22:34:29.939524+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T22:37:25.311652+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:37:35.083100+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

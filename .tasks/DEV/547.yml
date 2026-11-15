@@ -5,10 +5,11 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-14T23:29:51.339105+00:00
-modified: 2026-11-15T07:59:21.061244+00:00
+modified: 2026-11-15T22:03:36.951066+00:00
 relationships:
   related:
   - DEV-496
+  - DEV-513
 comments:
 - date: 2026-11-14T23:55:09.559798+00:00
   author: claude
@@ -236,3 +237,9 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-15T22:03:36.951066+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-496"]}'
+    new: '{"related":["DEV-496","DEV-513"]}'

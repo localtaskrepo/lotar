@@ -1,11 +1,11 @@
 title: Release v0.15.1
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-15T21:11:28.995880+00:00
+modified: 2026-11-15T22:30:28.389137+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -44,6 +44,11 @@ relationships:
   - DEV-543
   - DEV-569
   - DEV-576
+  - DEV-547
+  - DEV-589
+  - DEV-585
+  - DEV-588
+  - DEV-591
 comments:
 - date: 2026-11-14T04:19:07.317172+00:00
   author: claude
@@ -113,6 +118,76 @@ comments:
     - Still open: DEV-510 and DEV-466, both HelpNeeded with you in their own tickets.
     - Next: once both are Done on main, re-run the release checks and ask for the publish yes (push, tag `v0.15.1`).
     - Check: `lotar show DEV-510`, `lotar show DEV-466`.
+- date: 2026-11-15T22:03:36.287196+00:00
+  author: claude
+  text: |-
+    v0.15.1 is ready to tag: everything it waited for is on main and pushed, checks green.
+
+    - All 12 prerequisites are Done; DEV-466 and DEV-510 are on main (`50cfad9a`, `85565157`). DEV-560 too (`39d4eae0`).
+    - `origin/main` = `51fee8d1` (DEV-520 landed during the checks), version bump `c01909e9` included. Nothing waits to be pushed.
+    - Release record 0.15.1: added DEV-520, 543, 562, 565, 568, 572, 573, 574, 575, 576 (on main since `v0.15.0`, in no release). Still open in it: DEV-547 (its fix shipped; it waits for a cancelled CI run).
+    - QA `43762496754` on `50cfad9a` failed only on the temp-folder guard after all 404 smoke tests passed (`.org.chromium.Chromium.*` left over). Filed DEV-589. QA `43766475051` on `51fee8d1`: success.
+    - No files changed in this job, so no commit.
+  report:
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: on 50cfad9a
+    - command: npm run test:agent
+      result: passed
+      reason: on 50cfad9a, Rust 2223, UI 1548, release 50, hooks 7
+    - command: npm run smoke
+      result: passed
+      reason: on 50cfad9a, 404
+    - command: cargo package of the 4 crates (after stage-crates.mjs)
+      result: passed
+      reason: on 50cfad9a, verified
+    - command: Quality Assurance on GitHub
+      result: passed
+      reason: run 43766475051 on 51fee8d1 (main, pushed)
+    - command: local gates on 51fee8d1
+      result: not_run
+      reason: DEV-520 landed after them; its QA run is green
+    next: 'On the owner''s yes: git tag -s v0.15.1 -m v0.15.1 on 51fee8d1, git push origin v0.15.1, lotar release release 0.15.1, then brew upgrade lotar and close this ticket'
+- date: 2026-11-15T22:03:37.880819+00:00
+  author: claude
+  text: |-
+    Publish v0.15.1 now from `51fee8d1`: signed tag `v0.15.1`, pushed (yes), or wait (no)? Pushing the tag publishes to GitHub, crates.io, npm, Homebrew, Scoop and Docker and can't be undone.
+
+    Options:
+    - yes: Tag and publish now (recommended)
+    - no: Wait
+- date: 2026-11-15T22:25:35.611447+00:00
+  author: claude
+  text: |-
+    v0.15.1 is published: signed tag `v0.15.1` on `51fee8d1`, Release run `43767818430` green. Not installed here yet.
+
+    - mallox 2026-11-15: "I think this is already done, but if not then go ahead and" (it wasn't: no tag existed).
+    - Published: GitHub release https://github.com/localtaskrepo/lotar/releases/tag/v0.15.1, crates, npm, .deb/.rpm, Homebrew tap, Scoop, Docker; macOS builds signed and notarized.
+    - `lotar release release 0.15.1` done. Still open in the record: DEV-520 (shipped, HelpNeeded in its own ticket), DEV-547 (waits for a cancelled CI run).
+    - Next release: DEV-591 `Release v0.15.2` (mallox) with record 0.15.2 (DEV-591, DEV-589).
+    - Not installed: `lotar agent list-running` shows DEV-585, DEV-588, DEV-589 running, and the guide says upgrade only while no job runs. The installed 0.15.1 is still the hand-built one from `39d4eae0`.
+    - The release binary has a Developer ID signature, unlike the hand-built one, so the macOS firewall may ask once more.
+  report:
+    checks:
+    - command: Release workflow
+      result: passed
+      reason: run 43767818430, all 21 jobs
+    - command: brew upgrade lotar
+      result: not_run
+      reason: 3 agent jobs running
+    next: 'When no agent job runs: brew update && brew upgrade lotar (the hand-built Cellar/lotar/0.15.1 is in the way), allow the signed binary in the firewall if asked, restart the servers, lotar --version, then lotar status DEV-513 Done'
+- date: 2026-11-15T22:25:36.012723+00:00
+  author: claude
+  text: |-
+    Install the published v0.15.1 here now with `brew upgrade lotar` and restart the servers, although DEV-585, DEV-588 and DEV-589 are running (yes), or wait until no job runs (no)? Jobs the old runner started are not picked up after the restart.
+
+    Options:
+    - yes: Install now
+    - no: Wait until no job runs (recommended)
+- date: 2026-11-15T22:30:28.389137+00:00
+  author: claude
+  text: 'Chief of staff, 2026-11-15: owner said ''please publish lotar if we still haven''t kicked that off'' — it''s published (22:11 UTC). Install: wait until no job runs, as recommended. Note: the installed 0.15.1 is the local build from 39d4eae0 in /opt/homebrew/Cellar/lotar/0.15.1 (manual opt/bin symlinks, firewall allow by hand); brew upgrade has to replace that keg, and the notarized release binary may need the firewall allow once more.'
 releases:
 - 6
 description: |-
@@ -341,3 +416,44 @@ history:
   - field: status
     old: Blocked
     new: InProgress
+- at: 2026-11-15T22:03:36.287196+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:03:36.950287+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543","DEV-569","DEV-576"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543","DEV-569","DEV-576","DEV-547","DEV-589"]}'
+- at: 2026-11-15T22:03:37.880819+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:03:57.330627+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T22:25:35.611447+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:25:35.754429+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543","DEV-569","DEV-576","DEV-547","DEV-589"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543","DEV-569","DEV-576","DEV-547","DEV-589","DEV-585","DEV-588","DEV-591"]}'
+- at: 2026-11-15T22:25:36.012723+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:30:28.389137+00:00
+  actor: claude
+  changes:
+  - field: comment_added

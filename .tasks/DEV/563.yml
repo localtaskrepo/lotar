@@ -1,11 +1,11 @@
 title: Sign lotar builds from source with the owner's Developer ID
-status: Blocked
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-15T21:04:10.232830+00:00
+modified: 2026-11-15T22:41:26.111233+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -66,6 +66,55 @@ comments:
 - date: 2026-11-15T21:04:10.232830+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-564.'
+- date: 2026-11-15T22:31:13.927103+00:00
+  author: claude
+  text: |-
+    Signing with your Developer ID works now (key allowed in INBOX-264); no code change needed.
+
+    - `LOTAR_INSTALL_DIR=<scratch> npm run install:local` finished without a prompt
+    - `lotar`: `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`, `flags=0x10000(runtime)`, timestamped; `codesign --verify --strict` ok
+    - `lotar-agent-wrapper`: `Identifier=net.pyxzl.lotar-agent-wrapper`, same team, runtime, verify ok
+    - Hardened build runs: `--version` = `0.15.1`, `serve` answered `/api/tasks/list`
+    - Staging is per process (`.<name>.install-<pid>`), so the race the harnessmux review found doesn't apply here
+    - I didn't replace the binary your servers run. The firewall/LAN check is for the next version, per Done when
+    - Local skill update: [LOCA-385](https://local.pyxzl.net/task/LOCA-385)
+  report:
+    commits:
+    - hash: 7c81ee16
+      what: npm run install:local signs and installs lotar + lotar-agent-wrapper (unchanged)
+    checks:
+    - command: npm run install:local with the Developer ID
+      result: passed
+      reason: into a scratch LOTAR_INSTALL_DIR, no prompt
+    - command: codesign -dvv / --verify --strict
+      result: passed
+      reason: both binaries
+    - command: signed lotar serve
+      result: passed
+      reason: localhost API answered
+    - command: npm run lint
+      result: passed
+      reason: earlier run, no files changed since
+    - command: npm test
+      result: passed
+      reason: earlier run
+    - command: npm run smoke
+      result: passed
+      reason: earlier run
+    - command: firewall/LAN check over the running servers
+      result: not_run
+      reason: Done when puts it in the next version; live binary not replaced
+    next: Review on another model, then merge; after the next release, check socketfilterfw --listapps and LAN with a fresh install:local
+- date: 2026-11-15T22:41:20.455554+00:00
+  author: codex
+  text: |-
+    Review: blocking
+
+    - `scripts/install-local.mjs:145` starts only staged `lotar`, never the wrapper. Done when requires startup failure to preserve both installed binaries. Add a harmless wrapper startup probe and a regression test proving its failure replaces neither binary.
+    - Reviewed commit `7c81ee16`, all five changed files, ticket/comments, related DEV-564 and DEV-482, release identifiers, guidance and main history. No UI changes.
+    - Reran installer tests (9 passed), `npm run test:release` (59 passed), and diff whitespace check (passed). Prettier reports `package.json`; other changed files pass.
+    - Full lint/test/smoke and real signing not rerun; earlier fix records results. Live LAN/firewall remains unverified.
+    - No source changes or commits; status and assignee unchanged. No minor tickets or durable guidance correction.
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -83,6 +132,8 @@ description: |-
   - [ ] Linux and Windows: no signing, same staged install.
   - [ ] `codesign -dvv` on the installed source build shows `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`; local's `skills/lotar-services.md` is updated (filed there if it needs a LOCA ticket) so it no longer calls a signed source build wrong.
   - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
+tags:
+- review-returned
 history:
 - at: 2026-11-15T17:40:28.831866+00:00
   actor: claude
@@ -190,3 +241,41 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T22:28:32.029075+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-15T22:31:13.927103+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:31:21.820933+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T22:41:20.455554+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:41:20.744814+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-15T22:41:26.111233+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

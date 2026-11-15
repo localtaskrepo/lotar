@@ -1,11 +1,11 @@
 title: Full smoke run fails 12 browser tests and leaves three temporary entries
-status: InProgress
+status: Merging
 priority: Medium
 type: Bug
 reporter: codex
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T21:29:20.908261+00:00
-modified: 2026-11-15T21:55:13.599130+00:00
+modified: 2026-11-15T22:34:27.146263+00:00
 relationships:
   related:
   - DEV-132
@@ -17,6 +17,62 @@ relationships:
   - DEV-575
   - DEV-580
   - DEV-530
+  - DEV-520
+  - DEV-587
+comments:
+- date: 2026-11-15T21:57:35.665149+00:00
+  author: claude
+  text: 'Seen again in the DEV-520 merge, 2026-11-15: `ui.backlog-order` 1440px `dragTo` 30 s timeout at load ~235 (and global-actions + backlog-order 390px at load ~100); the spec passed alone.'
+- date: 2026-11-15T22:11:13.010162+00:00
+  author: claude
+  text: |-
+    Fixed: smoke suites no longer overlap, and a timed-out test leaves nothing in the temp folder.
+
+    - **Cause of the 12 failures:** two smoke suites on one machine starve each other's Chromium. They are all 30 s action timeouts or 15 s polls, not wrong values (`ui.question-comments:108` is a poll too).
+      - One suite passed 404/404 at load 286 (another session's 12 `yes` + nextest).
+      - Two suites side by side: one failed, `ui.theming` `fill` timed out waiting for "visible, enabled and editable" (load 246, swap 7.5/9 GB).
+      - DEV-580's run changed only a Rust test, so its tree could not cause UI failures.
+    - **Fix 1:** `smoke/helpers/run-lock.ts` (global setup) holds port `47586` for the run, so a second run waits (30 min max). The OS frees the port when a run dies; nested runs skip the lock via `LOTAR_SMOKE_LOCK_HELD`.
+    - **Cause of the leftovers:** Vitest gives up on a timed-out test, but the test's `finally` hasn't run yet when the run ends. Reproduced the exact 3 entries: `playwright-artifacts-*`, `playwright_chromiumdev_profile-*`, workspace.
+    - **Fix 2:** `smoke/helpers/owed-cleanup.ts`. `withBrowser`, `launchAndWaitReady` and `SmokeWorkspace` register what they open. After a file with a failed test, `setup.ts` closes browsers and servers, then removes workspaces. After a passing file nothing is cleaned, so the guards still catch real leaks.
+    - **Regression test:** `harness.failed-test-cleanup` runs a nested Vitest on `smoke/fixtures/timed-out-test`. It fails without fix 2 (`Tests left 3 entries`) and passes with it.
+    - Two parallel suites with the lock: the second waited, and both passed 405/405.
+  report:
+    commits:
+    - hash: 1a046e9a
+      what: smoke run lock + cleanup of timed-out tests
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2223 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405 twice; two parallel suites also 405/405 each
+    next: Review, then merge
+- date: 2026-11-15T22:34:23.159824+00:00
+  author: codex
+  text: |-
+    Review: passed
+
+    - Reviewed `1a046e9a`, the full diff against main, ticket comments and related-ticket history, smoke guidance, and recent main history for the changed helpers. No blocking or minor findings.
+    - Changes stay within the harness: serialize smoke runs and clean resources still owned by failed tests. The nested timeout fixture exercises the existing temp/server guards; included regression passed.
+    - Fresh build-first `npm run test:smoke:agent` passed `405/405` across `118` files. Fix-agent evidence records repeated full passes and two overlapping invocations serialized successfully.
+    - Initial focused attempt was socket-blocked; approved retry ran before a binary existed. The subsequent build-first full run passed. No tracked files changed; no UI changes or screenshots required. Status and assignee unchanged.
+    - No durable guidance finding.
+  report:
+    checks:
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405, 118 files; approved unsandboxed run
+    - command: npm run lint
+      result: not_run
+      reason: fix-agent pass reviewed; no source edits
+    - command: npm test
+      result: not_run
+      reason: fix-agent pass reviewed; no source edits
+    next: Merge reviewed commit 1a046e9a
 description: |-
   Found 2026-11-15 during DEV-580 merge verification on 175e36d0 (main base f37cbaa0). Approved unsandboxed npm run test:smoke:agent built successfully, then failed 12/404 tests (392 passed, 191.04s). No merge performed. The DEV-466 agent independently passed 404/404 on its different source tree; load is a hypothesis, not a proven cause.
 
@@ -64,3 +120,45 @@ history:
   - field: relationships
     old: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580"]}'
     new: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530"]}'
+- at: 2026-11-15T21:57:34.055762+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530"]}'
+    new: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520"]}'
+- at: 2026-11-15T21:57:35.665149+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:11:13.010162+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:11:23.316926+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T22:20:13.892160+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520"]}'
+    new: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520","DEV-587"]}'
+- at: 2026-11-15T22:34:23.159824+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:34:27.146263+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

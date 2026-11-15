@@ -1,11 +1,11 @@
 title: 'A headless job after a T3 job on the same ticket fails: agent/<ID> is checked out in the T3 thread''s worktree'
-status: Reviewing
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-15T20:09:34.810817+00:00
-modified: 2026-11-15T21:36:32.098928+00:00
+modified: 2026-11-15T22:18:07.117820+00:00
 relationships:
   related:
   - DEV-583
@@ -103,6 +103,18 @@ comments:
       result: passed
       reason: all seven failing files recovered serially
     next: Review amended commit; merge agent integrates
+- date: 2026-11-15T22:17:34.799108+00:00
+  author: claude
+  text: |-
+    Review: passed. `53a4723b` on `agent/DEV-581` does what "Done when" asks, and the previous blocker is fixed.
+
+    - Read: the full diff (3 files), the ticket and its comments, DEV-583/577/579/587, AGENTS.md, and main since the fix (`85565157` DEV-510, `f37cbaa0`, `51fee8d1` touch `agent_job_service.rs`, but not the worktree code; `git merge-tree` merges cleanly).
+    - `prepare_worktree` (`agent_job_service.rs:1328`) reuses its own `<dir>/<ticket>` first, then a linked worktree on `agent/<ID>`. The main checkout is excluded (`linked_worktrees` skips it), so it still fails as before. The worktree is checked to belong to the same repository. The job log names the worktree. `create_dir_all` now runs only before `git worktree add`, which fixes the temp-folder blocker.
+    - Test `headless_jobs_run_in_the_t3_threads_worktree_that_has_the_tickets_branch` covers T3 fix → headless review → T3 rework (continues `thread-0`) → headless merge fast-forwards main → Done removes the worktree. `docs/help/agent.md` (Worktrees) says so.
+    - Reran `RUSTC_WRAPPER= npm run test:rust:agent -- dev503`: 23 passed, exit 0, nothing left in the temp folder.
+    - Without the fix (old `agent_job_service.rs` restored temporarily, then put back): the new test fails with the ticket's `'agent/TEST-1' is already used by worktree` error.
+    - Reran `RUSTC_WRAPPER= npm run lint:agent`: passed. The full `npm test` and `npm run smoke` weren't rerun; the fix agent reports them passing, with smoke flakes tracked in DEV-587.
+    - Not blocking: two leftover copies of the fix are on T3 branches, `t3/reuse-linked-ticket-worktree` (`879ca4ef`) and `-1` (`2fc25a95`, the codex rework). They stay out of the merge, and DEV-583 already tracks this. No new tickets. Worktree clean, status and assignee unchanged.
 description: |-
   Found in standards STD-124 (2026-11-15): reviews and merges are to run headless (claude, codex runners) after a fix on the t3 runner. The t3 fix thread works in T3 Code's worktree (~/.t3/worktrees/<repo>/agent-<ID>-…) with the ticket branch agent/<ID> checked out. A later claude, codex or command job calls prepare_worktree (crates/lotar-lib/src/services/agent_job_service.rs), which runs `git worktree add <dir>/<ticket> agent/<ID>`; git refuses, and the job fails before the agent starts:
 
@@ -227,3 +239,16 @@ history:
   - field: assignee
     old: '@fix-codex'
     new: '@review-claude'
+- at: 2026-11-15T22:17:34.799108+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:18:07.117820+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

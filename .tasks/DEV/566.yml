@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-15T21:34:12.482187+00:00
+modified: 2026-11-15T22:41:06.248790+00:00
 relationships:
   related:
   - DEV-524
@@ -257,6 +257,66 @@ comments:
       result: passed
       reason: on 9b70f43d, ui.backlog-order passed on rerun
     next: Codex review of agent/DEV-566 at 9b70f43d
+- date: 2026-11-15T22:06:25.332575+00:00
+  author: codex
+  text: 'Review: blocking — on 9b70f43d, agent_job_service.rs:4030 guards only profile merge, whereas line 4021 classifies any job on a Merging ticket as a merge job. A direct start with another/no profile on Merging + review-blocked bypasses the guard when worktrees are enabled. Use consistent merge classification and add status-based regression coverage. Whitespace check passed; runtime gates not rerun (target/web-embed absent). No files, status or assignee changed.'
+- date: 2026-11-15T22:06:32.678627+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-15T22:06:49.967099+00:00
+  author: triage
+  text: |-
+    Answer: fix, no new decision needed. The review is real this time, on the right commit `9b70f43d`, and the finding is narrow.
+
+    - Owner 2026-11-15 (quoted in the 20:11 comment): "If they're just try again request can you just tell the waiting threads to try again. Maybe using fable if the problem is difficult". This is a rework request, not a design choice.
+    - To do: use one merge classification in `agent_job_service.rs` (line 4021 treats any job on a Merging ticket as a merge job, line 4030 guards only profile `merge`), and add a status-based regression test: Merging + `review-blocked` + other or no profile does not start.
+- date: 2026-11-15T22:40:57.441479+00:00
+  author: claude
+  text: |-
+    Rework 3: the `review-blocked` guard now covers every job lotar runs as a merge job, not only profile `merge`.
+
+    - **Finding (Merging ticket, other or no profile bypassed the guard):** fixed. `review_blocks_merge` in `crates/lotar-lib/src/services/agent_job_service.rs` uses `is_merge_job_candidate`, the same classification that gives a job the merge worktree and checks. The comment names the job: `The @fix job didn't start: <ID> carries tag review-blocked, …`, or `The merge job …` without a profile.
+    - The queue check in `automation_service.rs` `queued_stage_allows_start` now runs it before the profile early return, so an entry without a profile is covered too.
+    - **Tests:** the unit test adds Merging + `review-blocked` with `@fix` and with no profile. The integration test `merge_job_does_not_start_while_review_blocked` adds a direct `@fix` start on a Merging ticket. Both fail under the old profile-only guard and pass now.
+    - Removed the unit assertion that a `@fix` job on a blocked Merging ticket starts: lotar runs that job as a merge job. The rework rules set @fix and remove the tag together, so a real rework still starts.
+    - `docs/help/agent.md` says which jobs the guard covers.
+    - `agent/DEV-566` (`~/.t3/worktrees/lotar/agent-DEV-566-7288458cdef30afb`) moved to `eadf0315` with `git reset --keep`; `9b70f43d` stays on `t3/fix-blocking-review-end-rule-3`.
+  report:
+    commits:
+    - hash: eadf0315
+      what: the review-blocked guard uses lotar's one merge classification (profile merge or a Merging ticket)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2211 Rust, 1547 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '404'
+    - command: live LOCA-333/STD-45 replay
+      result: not_run
+      reason: needs real fix, review and merge jobs
+    next: Codex review of agent/DEV-566 at eadf0315
 description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
 tags:
 - health
@@ -458,6 +518,61 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-15T21:34:12.482187+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T22:06:25.332575+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:06:25.387192+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-15T22:06:32.489882+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned
+- at: 2026-11-15T22:06:32.678627+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:06:49.967099+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:06:51.108120+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T22:31:22.412333+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T22:40:57.441479+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:41:06.248790+00:00
   actor: claude
   changes:
   - field: status
