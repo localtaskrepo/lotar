@@ -1,11 +1,11 @@
 title: Verification gates intermittently fail on startup and cleanup timing
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: codex
 assignee: mallox
 created: 2026-11-13T19:35:44.905131+00:00
-modified: 2026-11-15T02:09:32.938301+00:00
+modified: 2026-11-15T05:26:26.908575+00:00
 relationships:
   related:
   - DEV-467
@@ -21,6 +21,9 @@ relationships:
   - DEV-408
   - DEV-497
   - DEV-546
+  - DEV-555
+  - DEV-556
+  - DEV-549
 comments:
 - date: 2026-11-13T19:36:50.553507+00:00
   author: claude
@@ -55,6 +58,9 @@ comments:
     - `RUSTC_WRAPPER= npm run lint:agent` exited 2: `view/utils/highlight.ts:15` and other imports cannot resolve `highlight.js/lib/languages/*` and `highlight.js/lib/core`. Log: `/tmp/dev481-merge-lint.log`.
     - Per merge instruction, stopped at the failed gate. Tests, smoke, health recheck, fast-forward and push did not run.
     - May the merge job be retried after dependencies are restored in this worktree?
+- date: 2026-11-15T05:26:26.611920+00:00
+  author: claude
+  text: 'On origin/main: commit `6750bdf0`, pushed 2026-11-14 in `ff7b5229..19b654ff`. The merge job had stopped at a gate, but the commit was already on local main. The full gates on main `19b654ff` passed in a fresh worktree: lint, Rust 2194/2194, UI 1547/1547, smoke 404/404. The `highlight.js` lint failure in merge worktrees came from DEV-549''s new dependency; `npm ci` fixes it (DEV-556). mallox in the DEV-549 thread (2026-11-14): "Comment and set Done".'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c227a71-21a4-46cb-8af4-a68a07438dc9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d3d9395-db72-4a68-a381-985939883471
@@ -208,3 +214,31 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T03:40:08.091526+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491","DEV-493","DEV-516","DEV-348","DEV-395","DEV-408","DEV-497","DEV-546"]}'
+    new: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491","DEV-493","DEV-516","DEV-348","DEV-395","DEV-408","DEV-497","DEV-546","DEV-555"]}'
+- at: 2026-11-15T05:25:05.380912+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491","DEV-493","DEV-516","DEV-348","DEV-395","DEV-408","DEV-497","DEV-546","DEV-555"]}'
+    new: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491","DEV-493","DEV-516","DEV-348","DEV-395","DEV-408","DEV-497","DEV-546","DEV-555","DEV-556"]}'
+- at: 2026-11-15T05:26:26.611920+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:26:26.730221+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491","DEV-493","DEV-516","DEV-348","DEV-395","DEV-408","DEV-497","DEV-546","DEV-555","DEV-556"]}'
+    new: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491","DEV-493","DEV-516","DEV-348","DEV-395","DEV-408","DEV-497","DEV-546","DEV-555","DEV-556","DEV-549"]}'
+- at: 2026-11-15T05:26:26.908575+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done

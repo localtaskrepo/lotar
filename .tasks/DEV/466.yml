@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-15T01:46:32.861346+00:00
+modified: 2026-11-15T06:31:09.477757+00:00
 relationships:
   blocks:
   - DEV-513
@@ -22,6 +22,8 @@ relationships:
   - DEV-525
   - DEV-526
   - DEV-532
+  - DEV-499
+  - DEV-518
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -218,6 +220,43 @@ comments:
       label: I merge it myself
       set:
         status: InProgress
+- date: 2026-11-15T05:30:50.374546+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-181)
+  answer:
+    to: 2026-11-15T01:46:31.769589+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-181)
+- date: 2026-11-15T06:31:06.555866+00:00
+  author: claude
+  text: |-
+    ## Fix rebased onto main: one commit `f10b8197`, all checks pass
+
+    - **The merge conflict:** DEV-518 removed `changeLog`/`syncFromTaskHistory` from `useTaskPanelActivity.ts` and `useTaskPanelState.ts`. Resolved by keeping main's removal and adding only DEV-466's `commitsError`.
+    - **DEV-499 moved `git.rs` into `crates/lotar-core`**, which had `libc` only as a dev-dependency. Moved it to `[dependencies]` in `crates/lotar-core/Cargo.toml`, the same as lotar-lib.
+    - **Squashed** `35883139`, `03db11a4` and `896309c0` into one signed commit on top of `main`. The old head is kept as branch `backup/DEV-466-896309c0`.
+    - **New git calls on main:** DEV-518's timeline gets commits through `AuditService::list_commits_for_task`, so it uses the timeout as well. The audit service has no git call left without it.
+
+    **Checks on `f10b8197`**
+    - Ticket check with a `git` shim that runs `sleep 600`: `/api/tasks/get` 200 in 3 ms. `/api/tasks/history` 500 "git did not finish within 20s" at 20.0 s. 0 `sleep` children left.
+    - `npm run lint:agent` passed, after `npm ci` because main added highlight.js.
+    - `npm run test:agent` passed: Rust 2196/2196, UI 1548/1548, release and hooks tests.
+    - `npm run test:smoke:agent` passed: 404/404.
+
+    **Screenshots:** before is lotar 0.15.0, after is the rebased build, both with a hanging git. The panel now also has main's Timeline tab.
+
+    | Mode and width | Before | After |
+    | --- | --- | --- |
+    | light 1920 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-light-1920.81742d69834fc63e1a1e4be69db731d4.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-light-1920.90ed8d6af17e3b78afb91e81b03a17e6.png) |
+    | light 1440 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-light-1440.500883141d4ff3d51decdd20dd7c76a2.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-light-1440.a494c66fab413c9be83444872f3ac9c3.png) |
+    | light 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-light-390.737133926ccf6d9ca0c29beef5d96f28.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-light-390.f87d0993bbb19d1096a1ab982fb0b93f.png) |
+    | dark 1920 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-1920.dbc4391ac0e3a2318aad6f92adb7edbe.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-dark-1920.083f84016f32c7924736754955531a64.png) |
+    | dark 1440 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-1440.0f8f4df66923895a109e94c8a146c927.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-dark-1440.c44e902012e1d682e222d11b53730561.png) |
+    | dark 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-390.b3a1afadaabb3389ef037d927f96a097.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-dark-390.d9bd32a1ce9647e06b66de030e8dba3a.png) |
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -241,6 +280,12 @@ references:
 - attachment: DEV-466-before-light-1440.500883141d4ff3d51decdd20dd7c76a2.png
 - attachment: DEV-466-before-light-1920.81742d69834fc63e1a1e4be69db731d4.png
 - attachment: DEV-466-before-light-390.737133926ccf6d9ca0c29beef5d96f28.png
+- attachment: DEV-466-rebased-after-dark-1440.c44e902012e1d682e222d11b53730561.png
+- attachment: DEV-466-rebased-after-dark-1920.083f84016f32c7924736754955531a64.png
+- attachment: DEV-466-rebased-after-dark-390.d9bd32a1ce9647e06b66de030e8dba3a.png
+- attachment: DEV-466-rebased-after-light-1440.a494c66fab413c9be83444872f3ac9c3.png
+- attachment: DEV-466-rebased-after-light-1920.90ed8d6af17e3b78afb91e81b03a17e6.png
+- attachment: DEV-466-rebased-after-light-390.f87d0993bbb19d1096a1ab982fb0b93f.png
 releases:
 - 6
 description: |-
@@ -888,3 +933,59 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T05:30:50.374546+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:30:50.376764+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T06:03:56.563102+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:30:53.891908+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-rebased-after-dark-1440.c44e902012e1d682e222d11b53730561.png
+- at: 2026-11-15T06:30:54.053035+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-rebased-after-dark-1920.083f84016f32c7924736754955531a64.png
+- at: 2026-11-15T06:30:54.138444+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-rebased-after-dark-390.d9bd32a1ce9647e06b66de030e8dba3a.png
+- at: 2026-11-15T06:30:54.281878+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-rebased-after-light-1440.a494c66fab413c9be83444872f3ac9c3.png
+- at: 2026-11-15T06:30:54.390473+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-rebased-after-light-1920.90ed8d6af17e3b78afb91e81b03a17e6.png
+- at: 2026-11-15T06:30:54.473902+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-rebased-after-light-390.f87d0993bbb19d1096a1ab982fb0b93f.png
+- at: 2026-11-15T06:31:06.555866+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:31:09.477757+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518"]}'

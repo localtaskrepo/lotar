@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T02:03:18.880529+00:00
+modified: 2026-11-15T06:30:35.499540+00:00
 relationships:
   related:
   - DEV-351
@@ -117,12 +117,62 @@ comments:
       label: I merge it myself
       set:
         status: InProgress
+- date: 2026-11-15T05:30:25.223432+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-188)
+  answer:
+    to: 2026-11-15T02:03:17.829501+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-188)
+- date: 2026-11-15T06:01:42.374842+00:00
+  author: claude
+  text: |-
+    Fixed the race the last review found (codex: resume queued the job, then deleted the parked entry the worker may have just re-parked); amended into `f5a44085` (signed).
+
+    - New `AgentQueueService::unpark` moves the parked job to the pending queue under one queue lock and only then starts the worker. Nothing deletes a parked entry after the hand-off any more. A job the queue refuses stays parked. In the server (jobs start in-process, no worker), the job is taken, started, and parked again if the start fails.
+    - Same race in my last rework, fixed too: an assignment now drops a stale parked job before it queues the new one, not after.
+    - `enqueue` and `unpark` share one entry check (`queue_entry`).
+    - Tests: new `unpark_moves_the_parked_job_to_the_queue`; the 4 `a_parked_job_*` resume tests still pass. The worker interleaving itself has no deterministic test: the fix is structural (no delete after the hand-off).
+    - Checks: `npm run lint:agent`, `test:agent` (2179 Rust, 1537 web), `test:smoke:agent` (401), all pass.
+    - For the merge: the work is on branch `t3/resume-held-jobs-when-unblocked` (`f5a44085`, worktree t3-38403d38). The last merge job ran on `t3/review-dev-530-held-job-resume-1`, which still holds the old `fb7de879`. LoTaR also auto-committed my changes mid-job ("DEV-530: changes from the fix agent"); I folded that into the one commit.
+- date: 2026-11-15T06:30:19.696534+00:00
+  author: codex
+  text: |-
+    Merge held: automation again supplied the obsolete checkout.
+
+    - HEAD is fb7de879 on t3/review-dev-530-held-job-resume-1. The latest fix comment explicitly names f5a44085 on t3/resume-held-jobs-when-unblocked. This job forbids switching branches.
+    - The supplied code still deletes the parked request before successful handoff (automation_service.rs:2687-2710). The latest review also reports an unresolved server handoff failure path in the newer fix.
+    - No rebase, merge, push or trust changes; checks not rerun on obsolete code.
+    - Can this job be routed to the latest implementation branch after the server handoff finding is addressed?
+- date: 2026-11-15T06:30:34.286574+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T062951.347Z-27 failed again (lotar agent logs job-20261115T062951.347Z-27). The fix is on branch t3/review-dev-530-held-job-resume-1. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A848e2532-060c-432c-abb4-27647b484616
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af1bb21fb-c040-49ab-b6d0-e2149f60b2ec
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A13d4a5d5-bb59-43c9-8d98-dcecbd9754ed
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb8d5c99-8e92-4cae-b5d5-505715690428
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -409,6 +459,66 @@ history:
   - field: comment_added
 - at: 2026-11-15T02:03:18.880529+00:00
   actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T05:30:25.223432+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:30:25.225668+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T05:35:29.003379+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T05:59:44.921703+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:01:42.374842+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:20:00.275272+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb8d5c99-8e92-4cae-b5d5-505715690428
+- at: 2026-11-15T06:22:00.093516+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:30:19.696534+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:30:34.286574+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:30:35.499540+00:00
+  actor: claude
   changes:
   - field: status
     old: Merging

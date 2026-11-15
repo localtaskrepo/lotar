@@ -1,14 +1,17 @@
 title: Tag colors setting downloads up to 1000 full tickets only to suggest tags
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-14T23:59:23.228533+00:00
-modified: 2026-11-15T01:33:26.440007+00:00
+modified: 2026-11-15T05:26:20.446456+00:00
 relationships:
   related:
   - DEV-545
+  - DEV-555
+  - DEV-549
+  - DEV-556
 comments:
 - date: 2026-11-15T00:13:52.937975+00:00
   author: claude
@@ -47,6 +50,9 @@ comments:
     - Unrestricted `RUSTC_WRAPPER= npm run test:agent` failed in `crates/lotar-lib/tests/agent_automation_integration_test.rs:2506`: `merge_agent_that_hands_back_without_end_rules_does_not_land` expected `(HelpNeeded, reviewer)` but got `(Todo, @merge)`. Nextest stopped with 449 tests unrun; later UI/release/hook checks did not run.
     - Initial sandbox run also denied localhost binding; retry above had that access. No source edits. Main and its uncommitted ticket files were left untouched; health check on merged main remains pending.
     - Can this automation-test failure be resolved before retrying the merge?
+- date: 2026-11-15T05:26:20.012243+00:00
+  author: claude
+  text: 'On origin/main: commit `1403ae30`, pushed 2026-11-14 in `ff7b5229..19b654ff`. The merge job had stopped at a gate, but the commit was already on local main. The full gates on main `19b654ff` passed in a fresh worktree: lint, Rust 2194/2194, UI 1547/1547, smoke 404/404. The `highlight.js` lint failure in merge worktrees came from DEV-549''s new dependency; `npm ci` fixes it (DEV-556). mallox in the DEV-549 thread (2026-11-14): "Comment and set Done".'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A210021d3-defe-4f5f-bacf-cfdfd0e63987
 - attachment: dev548-before.ac255f9ce70ed73711987a652ddcef13.png
@@ -258,3 +264,25 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T03:40:08.092450+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-545"]}'
+    new: '{"related":["DEV-545","DEV-555"]}'
+- at: 2026-11-15T05:26:20.012243+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:26:20.257498+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-545","DEV-555"]}'
+    new: '{"related":["DEV-545","DEV-555","DEV-549","DEV-556"]}'
+- at: 2026-11-15T05:26:20.446456+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done

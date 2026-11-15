@@ -1,10 +1,11 @@
 title: 'File viewer: images with relative paths in a viewed markdown file don''t load'
-status: Blocked
+status: Done
 priority: Low
 type: Bug
 reporter: claude
+assignee: claude
 created: 2026-11-15T01:49:33.047300+00:00
-modified: 2026-11-15T03:18:43.497116+00:00
+modified: 2026-11-15T05:26:35.855554+00:00
 relationships:
   depends_on:
   - DEV-550
@@ -13,6 +14,8 @@ relationships:
   - DEV-528
   - DEV-516
   - DEV-550
+  - DEV-555
+  - DEV-556
 comments:
 - date: 2026-11-15T02:31:54.897890+00:00
   author: claude
@@ -57,6 +60,9 @@ comments:
     Waits for DEV-550; nothing needed from mallox here.
     - The merge is blocked by the full-test gate, not by this change: DEV-528's fixture (`a3a6f646`) is not on main yet, and its gate fails at `agent_automation_integration_test.rs:2506`, the DEV-516 race that DEV-550 fixes.
     - DEV-550 waits for mallox in INBOX-195. Once it lands, DEV-528 merges, then rebase `2a0fdd92` onto main and retry the merge.
+- date: 2026-11-15T05:26:35.539649+00:00
+  author: claude
+  text: 'On origin/main: commit `2a0fdd92`, pushed 2026-11-14 in `ff7b5229..19b654ff`. The merge job had stopped at a gate, but the commit was already on local main. The full gates on main `19b654ff` passed in a fresh worktree: lint, Rust 2194/2194, UI 1547/1547, smoke 404/404. The `highlight.js` lint failure in merge worktrees came from DEV-549''s new dependency; `npm ci` fixes it (DEV-556). mallox in the DEV-549 thread (2026-11-14): "Comment and set Done".'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2fc16b5-390e-407a-aeb6-1fb944202ed6
 - attachment: dev554-before.22bc901df10b983ea998341421ee40d7.png
@@ -371,3 +377,27 @@ history:
   changes:
   - field: assignee
     old: none
+- at: 2026-11-15T03:40:08.093947+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-550"],"related":["DEV-549","DEV-528","DEV-516","DEV-550"]}'
+    new: '{"depends_on":["DEV-550"],"related":["DEV-549","DEV-528","DEV-516","DEV-550","DEV-555"]}'
+- at: 2026-11-15T05:26:35.539649+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:26:35.660714+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-550"],"related":["DEV-549","DEV-528","DEV-516","DEV-550","DEV-555"]}'
+    new: '{"depends_on":["DEV-550"],"related":["DEV-549","DEV-528","DEV-516","DEV-550","DEV-555","DEV-556"]}'
+- at: 2026-11-15T05:26:35.855554+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Done
+  - field: assignee
+    new: claude

@@ -346,6 +346,10 @@ automation:
               2. Rebase onto main. Resolve a conflict only when you are certain both sides' intent is kept (for
                  example separate hunks in a list); otherwise git rebase --abort, comment the conflicting files and
                  what each side wanted, set the status to HelpNeeded, assign the ticket to mallox and stop.
+                 Then, when git diff --name-only <HEAD before the rebase> HEAD lists a lockfile (package-lock.json,
+                 pnpm-lock.yaml), the worktree's dependencies are stale: run the repo's "install" from
+                 ~/Development/standards/repos.json (npm ci) in your worktree, without asking (lotar DEV-556). It
+                 fails: hand back as above.
               3. Run the checks this repo's AGENTS.md names, in your worktree. One fails: hand back as in step 2.
                  Skip a check the fix or rework comment says passed on the commit that is still HEAD (the rebase
                  changed nothing: same hash before and after), and name it as skipped in your comment.
@@ -687,8 +691,12 @@ automation:
                 says. Commit on your worktree's branch, signed, never with --no-verify, message "${{ticket.id}}
                 ${{ticket.title}}"; don't merge or push: the merge agent does that when your job ends. Don't end your
                 turn while tests still run. Comment the outcome: what you changed, the commit hash, the checks that ran.
-              - It asks something or needs no change: answer in one comment, then set the status back to
-                ${{ticket.status}} and the assignee back to "${{ticket.assignee}}" (empty: none), so no merge follows.
+              - It shows the done criteria are met and nothing is left to do (a triage comment, for example): comment
+                the evidence in one line, then lotar status ${{ticket.id}} Done and lotar assignee ${{ticket.id}}
+                --clear; setting it back would keep it open and the inbox would report it again.
+              - Otherwise it asks something or needs no change: answer in one comment, then set the status back to
+                ${{ticket.status}} and the assignee back to "${{ticket.assignee}}" (empty: lotar assignee ${{ticket.id}}
+                --clear), so no merge follows.
               Never delete work that isn't saved elsewhere, and never decide what only he decides: then comment one
               question, set the status to HelpNeeded, assign the ticket to mallox and stop.
     # What waits for the owner goes to his inbox, project INBOX in standards (owner 2026-11-12, STD-54,

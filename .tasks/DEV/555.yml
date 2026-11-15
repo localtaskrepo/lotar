@@ -1,17 +1,22 @@
 title: Integration test ActiveJob initializer misses required fields
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T03:03:11.380593+00:00
-modified: 2026-11-15T03:32:56.356929+00:00
+modified: 2026-11-15T03:44:27.484397+00:00
 relationships:
   blocks:
   - DEV-553
   related:
   - DEV-553
   - DEV-528
+  - DEV-481
+  - DEV-548
+  - DEV-551
+  - DEV-554
+  - DEV-509
 comments:
 - date: 2026-11-15T03:22:46.047601+00:00
   author: claude
@@ -32,6 +37,16 @@ comments:
     - `RUSTC_WRAPPER= npm run test:agent` passed: 2194 Rust and 1545 UI tests, plus release and hook tests.
     - `RUSTC_WRAPPER= npm run test:smoke:agent` passed: 404 tests, completing the omitted smoke gate.
     - Initial sandbox runs hit permission restrictions; elevated reruns passed. Working tree clean; no files, status or assignee changed. No tickets filed.
+- date: 2026-11-15T03:40:07.689432+00:00
+  author: codex
+  text: |-
+    Merged into main; all required checks passed.
+    - Rebased `fe944c69` to `8d57de19`, fast-forwarded main, then included the authorized `.tasks` snapshot in signed commit `19b654ff`.
+    - Rebased worktree: `RUSTC_WRAPPER= npm run lint:agent`, `RUSTC_WRAPPER= npm run test:agent` and `RUSTC_WRAPPER= npm run test:smoke:agent` passed; none skipped.
+    - Main health check `RUSTC_WRAPPER= npm run lint:agent` passed after `npm ci` restored missing installed dependencies. Original initializer finding is gone.
+    - Changed project config trusted; `lotar trust --status` reports Trusted.
+    - Pushed finished prefix through `ff7b5229`. This fix remains local behind unfinished earlier work, starting with `1403ae30` (DEV-548, HelpNeeded); later pending tickets include DEV-481, DEV-551, DEV-553 and DEV-554.
+    - Main was clean before this outcome comment. Status and assignee left for job automation.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa61bc5fe-22d7-4b4c-b5d6-5a22516685c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d1de6c6-3bd0-4ba5-bde5-b2743abe0fb1
@@ -106,3 +121,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T03:40:07.689432+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:40:08.095108+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-553"],"related":["DEV-553","DEV-528"]}'
+    new: '{"blocks":["DEV-553"],"related":["DEV-553","DEV-528","DEV-481","DEV-548","DEV-551","DEV-554"]}'
+- at: 2026-11-15T03:40:13.776972+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T03:44:27.484397+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-553"],"related":["DEV-553","DEV-528","DEV-481","DEV-548","DEV-551","DEV-554"]}'
+    new: '{"blocks":["DEV-553"],"related":["DEV-553","DEV-528","DEV-481","DEV-548","DEV-551","DEV-554","DEV-509"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-15T03:02:23.296759+00:00
+modified: 2026-11-15T06:29:51.252372+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -22,6 +22,7 @@ relationships:
   - DEV-537
   - DEV-467
   - DEV-550
+  - DEV-555
 comments:
 - date: 2026-11-14T02:16:43.837266+00:00
   author: automation
@@ -161,6 +162,108 @@ comments:
 - date: 2026-11-15T03:02:23.296759+00:00
   author: automation
   text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e024114-ed69-486a-a066-2dc4905c9a0f'
+- date: 2026-11-15T03:44:27.371923+00:00
+  author: claude
+  text: |-
+    Rework done (Fable 5.2): quoted paths can no longer hide a denied command; harnessmux 0.1.6 is released and lotar uses it.
+
+    - **Finding (codex 01:49, \`git -C "/tmp/my repo" push\` passes):** fixed in harnessmux \`src/rules.rs\`. The matcher no longer splits at spaces; a small shell reader handles quotes, backslashes, \`;\` \`&\` \`|\`, subshells, \`\$(…)\`, backticks, redirections, comments, \`eval\`, here-strings and \`sh -c "…"\` (read again as a script). An argument-list command keeps its arguments.
+    - **Test first:** \`denied_commands_are_read_as_the_shell_reads_them\` failed on the old code at the reviewer's line; now 38 refused forms and 10 allowed ones (e.g. \`git commit -m "then git push"\`) pass.
+    - **Limit, documented:** what only the running shell knows isn't seen (\`\$CMD push\`, an alias, a script piped into \`sh\`). Claude's sandbox and its own \`Bash(git push:*)\` deny still apply.
+    - **Release:** you said yes in the thread (options picker, 2026-11-15). harnessmux \`34519ab\` on main, signed tag \`v0.1.6\`, release.yml green, 0.1.6 is on crates.io. harnessmux checks: fmt, clippy, 40/40 tests, \`cargo deny\`, publish dry run.
+    - **lotar:** commit \`dffcbc45\` (amended, signed, rebased onto main \`19b654ff\`): \`Cargo.toml\` and \`Cargo.lock\` on harnessmux 0.1.6 (lock differs from main only in that entry), \`docs/help/agent.md\` says how the line is read.
+    - **Checks:** \`npm run lint:agent\` passed; \`npm run test:agent\` passed (2195 Rust, 1547 UI, release and hook tests); \`npm run test:smoke:agent\` passed (404).
+    - **Note:** main didn't compile its tests when I ran them (DEV-555). I ran the checks with DEV-555's two-line fix applied uncommitted; it landed meanwhile and the branch is rebased onto it, same tree as tested.
+    - No instruction changes.
+- date: 2026-11-15T03:46:48.432562+00:00
+  author: codex
+  text: |-
+    Review: blocking.
+    - harnessmux 0.1.6 `src/rules.rs:322-329` skips command substitutions inside parameter expansions. Public API reproduction: `echo ${unset:-$(git push)}` returns `None` from `Rules::decide`, so default allow approves a push. Parse nested substitutions and add regression coverage, then update the dependency.
+    - Reviewed `dffcbc45`, ticket history, dependency source and main runner history. Quoted paths now covered; lockfile agrees. No UI changes.
+    - Offline reproduction passed. Focused tests hit sandbox sccache denial; wrapper-free retry stopped during compilation after blocker confirmation. No test pass claimed; full gates not rerun.
+    - No files changed, commits or minor tickets. Status and assignee unchanged.
+- date: 2026-11-15T03:46:54.524571+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-15T05:30:13.949488+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent reworks it once more)
+
+    (answered in INBOX-198)
+  answer:
+    to: 2026-11-15T03:46:54.524571+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-198)
+- date: 2026-11-15T06:19:33.382275+00:00
+  author: codex
+  text: |-
+    Review: blocking.
+    - Cargo.toml:21 and Cargo.lock in 47c730cd still select harnessmux 0.1.4. Its src/rules.rs:74 splits quoted paths: git -C "/tmp/my repo" push bypasses the deny at crates/lotar-lib/src/services/agent_runner.rs:296. Reproduced using unchanged matcher functions in a scratch Rust executable; no push executed.
+    - Bring the completed verified rework onto this actual merge branch and update the dependency. Newer dffcbc45 is elsewhere and its further parameter-expansion finding remains unresolved in ticket history.
+    - Read diff, ticket comments, relationships, guidance and main runner history. git diff --check passed. Full gates not rerun after confirming existing blocker. No UI changes, files changed, commits or minor tickets; status and assignee unchanged.
+- date: 2026-11-15T06:19:46.199902+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-15T06:19:54.376704+00:00
+  author: claude
+  text: |-
+    Decision (mallox, 2026-11-15, options picker in the DEV-509 thread): 'Sandbox deny list'. Claude at workspace gets sandbox `network.deniedDomains` for git hosts (github.com, gitlab.com, bitbucket.org) on top of the SSH and filesystem blocks. Jobs can't git fetch/clone from those hosts. The command matcher stays a best-effort layer for agents without a sandbox, with its limit documented, and a bypass found in it no longer blocks on its own.
+
+    Tests behind it (live Claude sessions, read-only calls):
+    - SSH to github.com fails in the sandbox: no DNS, control socket `Operation not permitted`.
+    - HTTPS: the sandbox asks per host (request titled `github.com`), and harnessmux allowed it. With `deniedDomains = ["github.com"]`, `git ls-remote` fails with `CONNECT tunnel failed, response 403` (`host is on the deny list`), no prompt. `api.github.com` still answers 200.
+    - A pre-push hook was rejected: `git push --no-verify` skips it.
+- date: 2026-11-15T06:20:13.076036+00:00
+  author: triage
+  text: |-
+    Triage 2026-11-15 (INBOX-211): the open question (rework, decide or WontDo after codex's 06:19 block) is answered by mallox's decision in the DEV-509 thread, recorded above at 06:19:54: 'Sandbox deny list'.
+    - Carry on with that decision: sandbox `network.deniedDomains` for git hosts at workspace, the matcher stays best-effort with its limit documented, and a bypass found in it (also `${unset:-$(git push)}`) no longer blocks on its own.
+    - Codex's 06:19 finding is about the branch, not the parser: `47c730cd` still selects harnessmux 0.1.4. Bring the verified rework `dffcbc45` (harnessmux 0.1.6) onto the actual merge branch, add the deniedDomains, rerun the gates, then hand back for review.
+    - No new owner question; a further harnessmux release still needs his OK in your session.
+- date: 2026-11-15T06:29:51.252372+00:00
+  author: automation
+  text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d7c2709-cbbd-4287-9947-7c4d01114643'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
@@ -169,6 +272,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A468c2341-53de-4ba3-9431-72827cb55179
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6a68ee-ae5b-4e72-92c3-cd2b38b9b764
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e024114-ed69-486a-a066-2dc4905c9a0f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9d7a1b3-4121-4582-b858-b2c30763f165
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2389602b-c7a5-4f22-912c-9b7dfb265444
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). Before DEV-503, permissions: workspace gave Claude --permission-mode acceptEdits plus its OS sandbox (sandbox.enabled, autoAllowBashIfSandboxed), so shell writes outside the working and extra directories were blocked; Copilot and OpenCode/Kilo at workspace denied git push. Since DEV-503 workspace is the agent''s mode only (Claude acceptEdits) and harnessmux''s default policy allow approves every permission request, so shell commands run unsandboxed. Codex keeps its workspace-write sandbox. The profile keys tools.allowed/tools.disallowed and mcp.allow are no longer passed either (the job log says so). Work, mostly in harnessmux: pass Claude''s sandbox settings with the session, and give the permission policy rules (deny patterns such as git push, allow writes only under cwd and add_dirs, tool allow/deny lists) that lotar fills from permissions, tools and mcp.allow. Done when a workspace Claude job can''t write outside its directories or push, and tools/mcp.allow work again for ACP agents.'
@@ -672,6 +777,145 @@ history:
     old: mallox
     new: claude
 - at: 2026-11-15T03:02:23.296759+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:44:27.371923+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:44:27.483487+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467","DEV-550"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467","DEV-550","DEV-555"]}'
+- at: 2026-11-15T03:44:27.668536+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-15T03:44:28.668268+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9d7a1b3-4121-4582-b858-b2c30763f165
+- at: 2026-11-15T03:46:48.432562+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:46:48.470216+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: fix-retried, blocked, blocked-by:DEV-503, review-returned
+    new: fix-retried, blocked, blocked-by:DEV-503, review-returned, review-blocked
+- at: 2026-11-15T03:46:54.470625+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: fix-retried, blocked, blocked-by:DEV-503, review-returned, review-blocked
+    new: fix-retried, blocked, blocked-by:DEV-503, review-returned
+- at: 2026-11-15T03:46:54.524571+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:30:13.949488+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:30:13.951518+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T05:31:36.353065+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T05:35:25.729245+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:17:57.507908+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2389602b-c7a5-4f22-912c-9b7dfb265444
+- at: 2026-11-15T06:19:33.382275+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:19:33.720036+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: fix-retried, blocked, blocked-by:DEV-503, review-returned
+    new: fix-retried, blocked, blocked-by:DEV-503, review-returned, review-blocked
+- at: 2026-11-15T06:19:45.879099+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: fix-retried, blocked, blocked-by:DEV-503, review-returned, review-blocked
+    new: fix-retried, blocked, blocked-by:DEV-503, review-returned
+- at: 2026-11-15T06:19:46.199902+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:19:54.376704+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:20:13.076036+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:20:17.484678+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T06:28:03.116977+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:29:51.209104+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-15T06:29:51.252372+00:00
   actor: automation
   changes:
   - field: comment_added

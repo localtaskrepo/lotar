@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T00:44:25.587433+00:00
-modified: 2026-11-15T03:18:33.805646+00:00
+modified: 2026-11-15T06:30:37.816699+00:00
 relationships:
   blocks:
   - DEV-554
@@ -17,6 +17,9 @@ relationships:
   - DEV-509
   - DEV-528
   - DEV-554
+  - DEV-499
+  - DEV-549
+  - DEV-556
 comments:
 - date: 2026-11-15T01:49:44.291431+00:00
   author: claude
@@ -80,10 +83,57 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-15T05:30:19.337031+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent reworks it once more)
+
+    (answered in INBOX-195)
+  answer:
+    to: 2026-11-15T03:06:53.596008+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-195)
+- date: 2026-11-15T05:38:53.948964+00:00
+  author: claude
+  text: |-
+    Rework (owner: fix, INBOX-195): second review finding fixed in `6a66c403` (amended).
+
+    - Finding (a session name outlives its thread, so a continued job could take the worktree of the thread it replaced): fixed. Each job's status line now records its T3 thread id (`agent_session`, from the harnessmux session record). `continued_thread_worktree` in `agent_job_service.rs` takes only the session's latest logged job, and only when that job ended in the thread being continued. Otherwise, including a latest log without that data, it fails closed: a new thread on the ticket branch, the log says why, and no other branch is touched.
+    - New test `a_continued_thread_never_takes_the_worktree_of_the_thread_it_replaced` (`tests/dev503_harness_jobs_test.rs`): a `--session new` job replaces the thread, its log is rewritten as an older lotar would have written it, then a continued job runs. Before the fix LoTaR moved the replaced thread's branch `t3/topic-0` and the test failed. Now that branch is unchanged, a new thread starts from the replacement's work, and the ticket branch follows it.
+    - Earlier findings stay fixed; their tests pass.
+    - `docs/help/agent.md` updated.
+    - Checks: `npm run lint:agent` passes. `npm run test:agent` passes (2187 Rust, 1537 UI, 50 release, 7 hooks). `npm run test:smoke:agent` passes (402).
+- date: 2026-11-15T06:20:50.513867+00:00
+  author: codex
+  text: |-
+    Review: passed.
+
+    - No further blocking findings in `6a66c403`; reviewed full diff, criteria/comments, prior findings, harnessmux context and automation continuation rules. Both earlier findings are fixed with regression coverage.
+    - `git diff --check` passed. Focused Rust rerun built web assets but was stopped during fresh compilation before tests executed; interrupted runner reported an `xcrun_db` temp entry. Full gates remain implementation-agent reported, not independently verified.
+    - No UI changes, minor tickets, file edits or commits. Status/assignee unchanged; no checks running.
+- date: 2026-11-15T06:30:08.518552+00:00
+  author: codex
+  text: |-
+    Merge blocked: lint failed after rebase; main was not changed.
+
+    - Rebased to `d9c34341` on current main `1b57f9fc`. Only conflict was equivalent comments around `job_settled` in `agent_automation_integration_test.rs`; kept main’s wording and both sides’ behavior.
+    - `npm run lint:agent` failed frontend typechecking: `view/utils/highlight.ts` cannot resolve `highlight.js` and its language modules in this worktree. No tests or smoke started; no checks running.
+    - Refresh worktree dependencies, then rerun lint/tests/smoke before merging. Should an agent resume the merge after refreshing dependencies?
+    - No fast-forward, task-file amend, trust change or push performed.
+- date: 2026-11-15T06:30:35.732979+00:00
+  author: triage
+  text: |-
+    Yes, resume the merge: run `npm ci` in the merge worktree, then rerun `lint:agent`, tests and smoke, and merge if they pass.
+
+    - The `highlight.js` TS2307 error is stale `node_modules`: DEV-549 added the package to `package-lock.json` on main, and the rebase pulled that in. [DEV-556](https://lotar.pyxzl.net/task/DEV-556) describes the same failure; there `npm ci` was all the merge jobs needed.
+    - Refreshing dependencies in the job's own worktree is reversible and in scope; no owner approval needed (owner rule: don't ask about reversible work in scope).
+    - Review passed on `6a66c403` (codex, 2026-11-15T06:20Z) after the owner's `fix` (INBOX-195). Hand back only if `npm ci` or a check fails for another reason.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9386a119-7c48-40f0-95b1-7872e3db5945
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae864c4e5-e4ce-4c5c-a220-848be6280c22
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a252f40-48b2-4e3a-b760-41dc9a4e9625
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A98489058-2748-48b0-9650-ece04598c02f
 description: |-
   ## Found
 
@@ -105,8 +155,6 @@ description: |-
   - [ ] Regression test: a rework amends the ticket branch, then a continued merge job sees the new commit (and fails without the fix).
   - [ ] `docs/help/agent.md` describes it.
   - [ ] npm run lint, npm test and npm run smoke pass.
-tags:
-- review-returned
 history:
 - at: 2026-11-15T00:44:26.064331+00:00
   actor: claude
@@ -278,3 +326,91 @@ history:
   - field: relationships
     old: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554"]}'
     new: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554"]}'
+- at: 2026-11-15T05:24:39.349303+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554"]}'
+    new: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554","DEV-499"]}'
+- at: 2026-11-15T05:30:19.337031+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:30:19.338746+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T05:32:19.051181+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T05:38:53.948964+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:39:02.866556+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:18:48.736282+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A98489058-2748-48b0-9650-ece04598c02f
+- at: 2026-11-15T06:20:50.513867+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:21:08.902805+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:30:08.518552+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:30:15.934760+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: ''
+- at: 2026-11-15T06:30:16.089271+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T06:30:35.732979+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:30:36.303925+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554","DEV-499"]}'
+    new: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554","DEV-499","DEV-549","DEV-556"]}'
+- at: 2026-11-15T06:30:37.816699+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

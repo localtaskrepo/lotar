@@ -1,0 +1,217 @@
+title: A merge job that rebases onto a new package-lock.json runs its gates with stale node_modules and stops
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-15T05:25:05.242533+00:00
+modified: 2026-11-15T06:30:36.307424+00:00
+relationships:
+  related:
+  - DEV-481
+  - DEV-549
+  - DEV-551
+  - DEV-548
+  - DEV-554
+  - DEV-499
+  - DEV-550
+comments:
+- date: 2026-11-15T05:31:25.842565+00:00
+  author: claude
+  text: |-
+    Fix done in both repos; one question before it can land.
+
+    - The merge prompt lives in standards `configs/lotar/automation.yml` (rule "Review passed: merge"). Step 2 now says: when `git diff --name-only <HEAD before the rebase> HEAD` lists `package-lock.json`/`pnpm-lock.yaml`, run the repo's "install" from `repos.json` (`npm ci`) without asking; it fails: hand back.
+    - Standards: commit `2152e60` on branch `DEV-556-merge-install` (worktree `~/.t3/worktrees/standards/DEV-556-merge-install`): prompt, README line, test in `scripts/automation.test.ts` that simulates the merge rule for @review, @review-claude and @review-light on job_completed and job_failed. `npm run check` passed (failing test first, then green); gate passed on commit.
+    - lotar: `ef4c82ed` on `agent/DEV-556` copies the source into `.tasks/DEV/automation.yml` (also brings in STD-121's wording, which was missing). `lotar automation simulate` shows the new step. lint/test/smoke not run: no code changed.
+    - Other repos' copies follow through the `drift` health check.
+
+    **Question:** may I fast-forward standards main to `2152e60` and push it? Landing it was refused (this job may not merge), and lotar's merge agent only lands `agent/DEV-556`.
+- date: 2026-11-15T05:32:26.115139+00:00
+  author: mallox
+  text: 'Answer: yes (Fast-forward standards main and push) (answered in INBOX-201)'
+- date: 2026-11-15T06:15:46.351870+00:00
+  author: claude
+  text: |-
+    Standards part landed and pushed (answer in INBOX-201); lotar part goes to review.
+
+    - standards: rebased to `1fdcddc`, `npm run check` passed again, fast-forwarded main, other tickets' pending `.tasks` changes amended in as the worktrees skill says: `7e3b7c0`, gate passed, pushed (`8ac0ec4..7e3b7c0`). Temporary worktree and branch removed.
+    - lotar: `ef4c82ed` on `agent/DEV-556`, unchanged; `.tasks/DEV/automation.yml` is byte-identical to standards main (`cmp`).
+    - Not run in lotar: lint/test/smoke (only the rules file changed). After the merge, step 5 of the merge prompt runs `lotar trust` because the rules changed.
+- date: 2026-11-15T06:24:40.652937+00:00
+  author: codex
+  text: |-
+    Review: nothing to review
+
+    - `git log main..HEAD` contains only `ef4c82ed`.
+    - The diff changes only `.tasks/DEV/automation.yml`; stopped at review step 1 as requested.
+    - No files changed, checks run, commits made, or status/assignee changes.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab1f61b60-116a-4422-9498-2b0514b79400
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A827eaab2-89a4-4757-af3f-44fb43f0d7e0
+description: |-
+  Merge jobs rebase their branch onto main and then run the gates in a worktree whose `node_modules` was installed before the rebase. When main changed `package-lock.json`, the gates fail on missing packages and the job stops to ask the owner whether it may run `npm ci`.
+
+  ## Found
+
+  2026-11-14: DEV-549 added `highlight.js`. The merge jobs of DEV-481 and DEV-551 then stopped at `lint:agent` with TS2307 for `highlight.js/lib/core` (see their last comments), and both asked mallox "May I refresh this worktree dependencies with npm ci…?". `npm ci` was all they needed.
+
+  ## Fix
+
+  - After the rebase, a merge job compares `package-lock.json` before and after (or always runs the repo's setup) and refreshes dependencies before the gates, without asking.
+  - Where: the merge prompt lives in standards `configs/lotar/automation.yml` (rule "Review passed: merge", step 2); lotar's `.tasks/DEV/automation.yml` is a copy. The other repos' copies follow through the `drift` health check of `scripts/repos.ts`.
+
+  ## Done when
+
+  - [ ] Merge prompt step 2: after the rebase, when `git diff --name-only <HEAD before the rebase> HEAD` lists a lockfile (`package-lock.json`, `pnpm-lock.yaml`), the agent runs the repo's install from standards `repos.json` (`npm ci`) in its worktree before the checks, without asking
+  - [ ] Lockfile unchanged (or the rebase changed nothing): no install, the checks run as before
+  - [ ] The install fails: hand back as for a failed check (comment, HelpNeeded, mallox), nothing merged
+  - [ ] lotar's `.tasks/DEV/automation.yml` holds the same text as the standards source
+  - [ ] Covered by a test of the merge job flow: standards `scripts/automation.test.ts` checks that the merge rule's prompt carries the install step before the checks
+tags:
+- agent
+history:
+- at: 2026-11-15T05:25:05.382328+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-481","DEV-549","DEV-551"]}'
+- at: 2026-11-15T05:25:05.563218+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T05:25:06.039706+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T05:25:06.855138+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab1f61b60-116a-4422-9498-2b0514b79400
+- at: 2026-11-15T05:26:20.258449+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-481","DEV-549","DEV-551"]}'
+    new: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548"]}'
+- at: 2026-11-15T05:26:35.661346+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548"]}'
+    new: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554"]}'
+- at: 2026-11-15T05:27:07.166735+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Merge jobs rebase their branch onto main and then run the gates in a worktree whose `node_modules` was installed before the rebase. When main changed `package-lock.json`, the gates fail on missing packages and the job stops to ask the owner whether it may run `npm ci`.
+
+      ## Found
+
+      2026-11-14: DEV-549 added `highlight.js`. The merge jobs of DEV-481 and DEV-551 then stopped at `lint:agent` with TS2307 for `highlight.js/lib/core` (see their last comments), and both asked mallox "May I refresh this worktree dependencies with npm ci…?". `npm ci` was all they needed.
+
+      ## Fix
+
+      - After the rebase, a merge job compares `package-lock.json` before and after (or always runs the repo's setup) and refreshes dependencies before the gates, without asking.
+
+      ## Done when
+
+      - [ ] A merge job whose rebase brings in a changed `package-lock.json` runs `npm ci` before its gates
+      - [ ] Covered by a test of the merge job flow
+    new: |-
+      Merge jobs rebase their branch onto main and then run the gates in a worktree whose `node_modules` was installed before the rebase. When main changed `package-lock.json`, the gates fail on missing packages and the job stops to ask the owner whether it may run `npm ci`.
+
+      ## Found
+
+      2026-11-14: DEV-549 added `highlight.js`. The merge jobs of DEV-481 and DEV-551 then stopped at `lint:agent` with TS2307 for `highlight.js/lib/core` (see their last comments), and both asked mallox "May I refresh this worktree dependencies with npm ci…?". `npm ci` was all they needed.
+
+      ## Fix
+
+      - After the rebase, a merge job compares `package-lock.json` before and after (or always runs the repo's setup) and refreshes dependencies before the gates, without asking.
+      - Where: the merge prompt lives in standards `configs/lotar/automation.yml` (rule "Review passed: merge", step 2); lotar's `.tasks/DEV/automation.yml` is a copy. The other repos' copies follow through the `drift` health check of `scripts/repos.ts`.
+
+      ## Done when
+
+      - [ ] Merge prompt step 2: after the rebase, when `git diff --name-only <HEAD before the rebase> HEAD` lists a lockfile (`package-lock.json`, `pnpm-lock.yaml`), the agent runs the repo's install from standards `repos.json` (`npm ci`) in its worktree before the checks, without asking
+      - [ ] Lockfile unchanged (or the rebase changed nothing): no install, the checks run as before
+      - [ ] The install fails: hand back as for a failed check (comment, HelpNeeded, mallox), nothing merged
+      - [ ] lotar's `.tasks/DEV/automation.yml` holds the same text as the standards source
+      - [ ] Covered by a test of the merge job flow: standards `scripts/automation.test.ts` checks that the merge rule's prompt carries the install step before the checks
+- at: 2026-11-15T05:30:33.507658+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554"]}'
+    new: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554","DEV-499"]}'
+- at: 2026-11-15T05:31:25.842565+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:31:35.158636+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T05:32:26.115139+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:32:26.692654+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T06:09:13.888886+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:15:46.351870+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:16:05.435225+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:23:24.847987+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A827eaab2-89a4-4757-af3f-44fb43f0d7e0
+- at: 2026-11-15T06:24:40.652937+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:24:58.173943+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:30:36.307424+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554","DEV-499"]}'
+    new: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554","DEV-499","DEV-550"]}'

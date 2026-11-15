@@ -1,11 +1,10 @@
 title: 'Cargo workspace step 2: the core modules become a crate of their own'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
 created: 2026-11-13T22:21:43.785907+00:00
-modified: 2026-11-15T02:02:58.628449+00:00
+modified: 2026-11-15T06:31:09.489653+00:00
 relationships:
   depends_on:
   - DEV-498
@@ -16,6 +15,10 @@ relationships:
   related:
   - DEV-493
   - DEV-549
+  - DEV-550
+  - DEV-510
+  - DEV-556
+  - DEV-466
 comments:
 - date: 2026-11-15T01:15:04.158766+00:00
   author: claude
@@ -74,9 +77,72 @@ comments:
     - Not rerun: UI and smoke tests (no UI or binary change since the 401-passed smoke run)
 
     **Question:** May I push `agent/DEV-499` and open a draft PR to `main`, so CI gives the after timings before the merge? Or do you accept the after timings from the first green main run after the merge?
+- date: 2026-11-15T05:24:39.218278+00:00
+  author: claude
+  text: |-
+    Rework done: both review findings are resolved, CI is green on draft PR https://github.com/localtaskrepo/lotar/pull/56, and the after timings are recorded.
+
+    - **Owner decision (2026-11-14, his words):** "Yes go ahead and", in answer to whether to push `agent/DEV-499` and open a draft PR for the CI timings.
+    - **CI timings (finding 1):** first measured from a PR run, so the cache may differ from main's.
+      - Linux `Rust Quality Checks`: 254 s, against 187–294 s before (last 3 green main runs).
+      - `Windows Binary Sanity and Portable Smoke`: 349 s, against 168–482 s before.
+      - Both are within the earlier range; one run can't show a trend. The local before/after timings are in the earlier comment.
+    - **Packaging (finding 2):** fixed in the earlier rework. The helpers live in `crates/lotar-core/tests/common/`, and the packaged crate's tests pass standalone (166).
+    - **Commit:** rebased onto `origin/main` `ff7b5229` without conflicts, now `41c4666d`, signed, same message. Force-pushed to `origin/agent/DEV-499`. Not merged.
+    - **Checks after the rebase:**
+      - `npm run lint` (agent variant): passes.
+      - UI tests: 1537 passed.
+      - `test:release` and `test:hooks`: pass.
+      - `npm run smoke`: 402 passed.
+      - All 15 checks on PR #56 pass.
+    - **Rust:** 1 failure, `merge_agent_that_hands_back_without_end_rules_does_not_land`, in 2 full runs. It passes alone. It also fails on a clean checkout of main `ff7b5229`, together with `merge_agent_that_sets_a_status_without_end_rules_still_lands`. That is the known race in DEV-550; I filed no new ticket.
+    - **Before merging:** the first crates.io publish of `lotar-core` needs DEV-552.
+- date: 2026-11-15T05:24:49.047303+00:00
+  author: automation
+  text: The review job job-20261115T052443.751Z-1 failed (lotar agent logs job-20261115T052443.751Z-1); the merge goes ahead without a review.
+- date: 2026-11-15T05:24:52.394356+00:00
+  author: automation
+  text: The merge agent's job job-20261115T052449.299Z-2 failed (lotar agent logs job-20261115T052449.299Z-2); the fix agent retries it on branch t3/cargo-workspace-core-crate-1.
+- date: 2026-11-15T05:30:33.381757+00:00
+  author: claude
+  text: |-
+    Fix after the failed merge: rebased onto main `19b654ff`, now `1b57f9fc` (signed, amended, not pushed). All checks pass.
+
+    - **Why the merge failed:** not the code. The review job and the merge job both ran on Codex and stopped at its usage limit (`lotar agent logs job-20261115T052449.299Z-2`: "You've hit your usage limit … try again at Nov 20th"). No review of `41c4666d` ran.
+    - **Rebase:** my last rebase went onto `origin/main` `ff7b5229`. Main had 10 commits since then, among them DEV-549's file viewer. That rebase had no conflicts either. DEV-549's `FileResolveRequest`, `FileResolveItem` and `FileResolveResponse` came over to `crates/lotar-core/src/api_types.rs`, and `routes/files.rs` reaches them through the re-export.
+    - **Change in this fix:** `view/__tests__/markdownFileReferences.spec.ts` (new from DEV-549) has mock data that points at `crates/lotar-lib/src/api_types.rs`; it now points at `crates/lotar-core/src/api_types.rs`.
+    - **Checks on `1b57f9fc`:**
+      - `npm run lint:agent`: passes.
+      - `npm run test:rust:agent`: 2192 passed. The flaky DEV-550 test passed too.
+      - UI tests: 1547 passed.
+      - `test:release` 50 and `test:hooks` 7: pass.
+      - `npm run smoke`: 404 passed.
+    - **Draft PR #56:** still shows `41c4666d`, the version CI timed. I didn't push the rebased commit.
+    - **Told:** the DEV-510 and DEV-556 threads, about the moved paths.
+- date: 2026-11-15T06:00:33.531592+00:00
+  author: codex
+  text: 'Review: nothing to review'
+- date: 2026-11-15T06:14:12.205091+00:00
+  author: claude
+  text: 'Landed on main without a review: LoTaR fast-forwarded `1b57f9fc` when the fix job ended, so the Codex review found `main..HEAD` empty. Owner decision (2026-11-14, picker answer): "Review on main (Recommended)", i.e. a Codex review of `19b654ff..1b57f9fc` as it is on main. Started.'
+- date: 2026-11-15T06:16:09.496596+00:00
+  author: codex
+  text: |-
+    Review: passed — no blocking or minor findings in `19b654ff..1b57f9fc`.
+
+    - Read ticket/comments, related DEV-493/498/549/550/552, AGENTS.md, diff and touched-file history. Owner approval and recorded Linux/Windows timings resolve the earlier finding.
+    - Checked release/staging tooling, four-crate manifests, CI path filters, re-exports, feature forwarding, packaged helpers and transaction fault callers/Windows cfg gates. Fault setters have only test callers; production defaults are inert. DEV-552 remains the first-publish prerequisite.
+    - Reran release tests: 50 passed; wrapper-disabled core nextest: 166 passed; offline core package and listing: passed (76 files); diff whitespace check passed. Online packaging hit DNS denial; initial listing hit sccache denial, resolved offline with wrapper disabled.
+    - Full lint/UI/smoke, Windows execution and other-crate package builds not independently rerun; implementation results are above. No UI pages changed. No follow-up tickets or guidance findings. Checkout clean; no files edited, commits or pushes. Status/assignee unchanged.
+- date: 2026-11-15T06:22:49.195895+00:00
+  author: claude
+  text: 'Merge: nothing to merge. The main checkout''s `main` already points to `1b57f9fc`, the same commit as `agent/DEV-499`; `git log main..HEAD` is empty. No rebase, checks, merge or push run.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1239325d-9909-4c3c-8d61-dd70c55138f0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c263abc-0b23-4ff8-8295-1cc1bdd6032c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A20426196-9a60-4b49-9b4a-803caf002ef8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abd23dbde-b73c-4b0d-b5c6-6ba340e217ec
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e13854a-0fe4-4f65-afbf-9822f174830f
 description: |-
   Move the core modules into a crate of their own in the cargo workspace (DEV-493; the owner, 2026-11-13: "Yes on all of those ideas"). Changes above core then don't recompile core, and core's tests build in a fraction of the time.
 
@@ -98,7 +164,6 @@ description: |-
   - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
 tags:
 - backend
-- review-returned
 history:
 - at: 2026-11-13T22:21:43.912441+00:00
   actor: claude
@@ -208,3 +273,136 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-15T05:24:39.218278+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:24:39.348848+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549"]}'
+    new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549","DEV-550"]}'
+- at: 2026-11-15T05:24:43.573870+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: mallox
+    new: '@review'
+- at: 2026-11-15T05:24:44.798429+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A20426196-9a60-4b49-9b4a-803caf002ef8
+- at: 2026-11-15T05:24:48.881137+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T05:24:49.047303+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:24:52.222373+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: backend, review-returned
+    new: backend, review-returned, merge-retried
+- at: 2026-11-15T05:24:52.394356+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:24:52.952800+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-15T05:30:33.381757+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:30:33.506105+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549","DEV-550"]}'
+    new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549","DEV-550","DEV-510","DEV-556"]}'
+- at: 2026-11-15T05:30:42.822067+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T05:59:48.507192+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abd23dbde-b73c-4b0d-b5c6-6ba340e217ec
+- at: 2026-11-15T06:00:33.531592+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:00:51.663913+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:14:12.205091+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:16:09.496596+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:16:29.234808+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T06:16:29.412070+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: backend, review-returned, merge-retried
+    new: backend
+- at: 2026-11-15T06:17:18.363146+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-15T06:21:38.743078+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e13854a-0fe4-4f65-afbf-9822f174830f
+- at: 2026-11-15T06:22:49.195895+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:31:09.489653+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549","DEV-550","DEV-510","DEV-556"]}'
+    new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549","DEV-550","DEV-510","DEV-556","DEV-466"]}'

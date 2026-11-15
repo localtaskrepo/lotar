@@ -1,11 +1,11 @@
 title: 'Close the gaps of harnessmux''s t3 agent: resume waits for a running thread, worktree and link in its events, a structured wait for an answer'
-status: HelpNeeded
+status: Todo
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-15T02:37:04.416294+00:00
+modified: 2026-11-15T06:30:41.462600+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -21,6 +21,7 @@ relationships:
   - DEV-521
   - DEV-537
   - DEV-467
+  - DEV-499
 comments:
 - date: 2026-11-14T04:12:50.227687+00:00
   author: claude
@@ -238,6 +239,46 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-15T05:29:23.565250+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent reworks it once more)
+
+    (answered in INBOX-193)
+  answer:
+    to: 2026-11-15T02:37:04.416294+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-193)
+- date: 2026-11-15T06:03:20.989430+00:00
+  author: claude
+  text: |-
+    Rework 3 (mallox: fix, INBOX-193): a failed thread lookup no longer counts as 'no thread'; fixed in harnessmux 0.1.7, which needs your yes to release.
+
+    - Finding (harnessmux 0.1.5 `t3.rs:343-358`): a failed `t3 thread list` (spawn error, non-zero exit, bad JSON) counted as 'no thread', so recovery could start a 2nd thread.
+    - harnessmux `230b9fc` (`agent/DEV-510`, 0.1.7, fast-forwards main `34519ab`): the lookup is found / none / failed. Failures (incl. exit status) are retried 3x, 2 s apart. Still failed: the session starts no thread and fails every turn with the reason until it is resumed again.
+    - Regression tests, both fail without the fix (2nd `thread start`):
+      - harnessmux `a_t3_session_that_cant_look_up_the_interrupted_turns_thread_starts_no_second_one`: 2 prompts fail, 3 `thread list` tries, 1 `thread start`.
+      - lotar `a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads`: job fails with the reason, 1 `thread start`.
+    - lotar `dd1548db` (amended): the test, `docs/help/agent.md`, `Cargo.toml` asks for harnessmux 0.1.7. `Cargo.lock` stays at 0.1.5 until 0.1.7 is published. 0.1.7 also carries 0.1.6 (DEV-509).
+    - Checks:
+      - harnessmux: fmt, clippy, nextest 41/41, deny pass
+      - lotar against local 0.1.7 (temporary patch, removed): `npm run lint:agent`, `npm test` (2177 Rust, 1537 UI, release, hooks), `npm run smoke` (401) pass; dev510 5/5
+      - Not run: a live T3 thread.
+
+    Question: may I release harnessmux 0.1.7? That is: fast-forward harnessmux main to `230b9fc`, push, push the signed tag `v0.1.7`; release.yml publishes it to crates.io, which can't be undone. Then `cargo update -p harnessmux` in lotar, amend `dd1548db` and rerun lint, test and smoke.
+- date: 2026-11-15T06:03:48.507200+00:00
+  author: claude
+  text: |-
+    Your 'fix' (INBOX-193) is already done; only the release question of 06:03 is open.
+
+    - Rework done: harnessmux `230b9fc` (0.1.7, unreleased; main and newest tag still `v0.1.6`), lotar `dd1548db`. Details and checks in the 06:03 comment.
+    - Nothing changed since; no new files, commits or checks in this job.
+
+    Question: may I release harnessmux 0.1.7 (fast-forward harnessmux main to `230b9fc`, push, signed tag `v0.1.7`; crates.io publish can't be undone), then `cargo update -p harnessmux` in lotar, amend `dd1548db` and rerun lint, test and smoke?
+- date: 2026-11-15T06:30:34.785816+00:00
+  author: claude
+  text: 'mallox in the standards thread, 2026-11-15, answering the 06:03 question: "Release 0.1.7". Go ahead: fast-forward harnessmux main to `230b9fc`, push, push the signed tag `v0.1.7` and let release.yml publish it; then `cargo update -p harnessmux` in lotar, amend `dd1548db`, rerun lint, test and smoke, and hand it to review.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
@@ -750,3 +791,58 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T05:29:23.565250+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:29:23.572008+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T05:29:27.874365+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T05:30:33.506597+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499"]}'
+- at: 2026-11-15T06:03:20.989430+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:03:30.125336+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T06:03:48.507200+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:30:34.785816+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:30:39.710863+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-15T06:30:41.462600+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

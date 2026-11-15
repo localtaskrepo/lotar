@@ -1,11 +1,10 @@
 title: A merge job that stops on purpose still lands its branch on main
-status: HelpNeeded
+status: Done
 priority: High
 type: Bug
 reporter: claude
-assignee: mallox
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-15T01:49:10.208647+00:00
+modified: 2026-11-15T06:17:19.036406+00:00
 relationships:
   related:
   - DEV-518
@@ -17,6 +16,7 @@ relationships:
   - DEV-532
   - DEV-536
   - DEV-550
+  - DEV-516
 comments:
 - date: 2026-11-14T07:01:19.890591+00:00
   author: claude
@@ -118,6 +118,39 @@ comments:
       label: I merge it myself
       set:
         status: InProgress
+- date: 2026-11-15T05:29:35.114649+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-182)
+  answer:
+    to: 2026-11-15T01:49:07.364428+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-182)
+- date: 2026-11-15T05:32:08.974940+00:00
+  author: claude
+  text: |-
+    This bug is already fixed on main by DEV-516 (`ff7b5229`). Our branch `agent/DEV-523` (`cc895833`) is a second copy of the same fix, so I didn't rebase or merge it.
+
+    - On main, `ensure_branch_merged` in `agent_job_service.rs` leaves the branch unmerged when the merge agent reassigned the ticket, either as a held-back outcome or directly. It also saves the starting assignee in the job record for takeovers, and still fast-forwards an agent that finished. Test `merge_job_whose_check_fails_on_the_work_does_not_land` covers this. DEV-518 and DEV-514 both reassigned to mallox, so main catches them.
+    - A rebase of `cc895833` onto main conflicts in all 6 files it touches. I aborted the rebase; the branch is unchanged.
+    - One difference is left: a merge job taken over from a record an older lotar wrote, with no saved assignee. Main still fast-forwards it unless an outcome was recorded; `cc895833` leaves main alone and fails the job. This is the third review's finding.
+    - I didn't rerun the checks on main. DEV-550 (merges run on an old checkout) is still being reworked.
+
+    Close DEV-523 as done by DEV-516 and drop `cc895833` (done), or port the fail-closed case onto main's version (port)?
+- date: 2026-11-15T05:33:13.566138+00:00
+  author: mallox
+  text: 'Answer: done (Close DEV-523 as done by DEV-516, drop cc895833) (answered in INBOX-202)'
+- date: 2026-11-15T06:16:42.445276+00:00
+  author: claude
+  text: |-
+    Closed as done by DEV-516, as mallox decided (2026-11-15, INBOX-202: "Close DEV-523 as done by DEV-516, drop cc895833").
+
+    - The fix is on main in `ff7b5229` (DEV-516): `ensure_branch_merged` leaves the branch unmerged when the merge agent hands the ticket back, and still fast-forwards an agent that finished. Test: `merge_job_whose_check_fails_on_the_work_does_not_land`.
+    - `cc895833` on `agent/DEV-523` is not merged. I didn't delete it; the cleanup at Done handles the branch and worktree.
+    - No files changed, no checks run.
 references:
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
@@ -148,8 +181,6 @@ description: |-
   DEV-518's commit stays on main: mallox chose to fix forward (2026-11-14), and its rework is running. Main is not pushed.
 tags:
 - agent
-- review-returned
-- merge-retried
 history:
 - at: 2026-11-14T06:27:22.694029+00:00
   actor: claude
@@ -424,3 +455,72 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T05:29:35.114649+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:29:35.117155+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T05:30:44.488162+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T05:32:08.974940+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:32:09.236285+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513","DEV-532","DEV-536","DEV-550"]}'
+    new: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513","DEV-532","DEV-536","DEV-550","DEV-516"]}'
+- at: 2026-11-15T05:32:16.975464+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T05:33:13.566138+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:33:14.419193+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T06:16:09.187480+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:16:42.445276+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:16:55.424628+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-15T06:17:19.036406+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, review-returned, merge-retried
+    new: agent

@@ -5,7 +5,7 @@ type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-15T03:02:28.306756+00:00
+modified: 2026-11-15T05:32:09.235429+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -23,6 +23,7 @@ relationships:
   - DEV-549
   - DEV-528
   - DEV-554
+  - DEV-523
 comments:
 - date: 2026-11-14T06:02:53.850504+00:00
   author: claude
@@ -529,3 +530,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549","DEV-528"]}'
     new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549","DEV-528","DEV-554"]}'
+- at: 2026-11-15T05:32:09.235429+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549","DEV-528","DEV-554"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549","DEV-528","DEV-554","DEV-523"]}'

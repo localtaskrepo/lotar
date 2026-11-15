@@ -1,10 +1,10 @@
 title: A merge-agent integration test leaves a git worktree in the temp folder, so the Rust test runner fails the run
-status: Blocked
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-15T01:38:07.543705+00:00
-modified: 2026-11-15T03:06:40.838245+00:00
+modified: 2026-11-15T03:44:06.225313+00:00
 relationships:
   depends_on:
   - DEV-555
@@ -44,6 +44,13 @@ comments:
     yes, the merge resumes once DEV-555 is done.
     - You moved this to Merging after the review passed (2026-11-15 02:31), so the merge is approved; only the compile blocker `E0063` in `dev528_agent_reporter_hand_back_test.rs:44` stops it.
     - DEV-555 is queued for the fix agent. It is now a prerequisite; this ticket is Blocked and continues when DEV-555 is done.
+- date: 2026-11-15T03:43:59.506513+00:00
+  author: claude
+  text: |-
+    Done: the fix is on main as `8c2dc7c7` and the check passes there; nothing left to merge.
+    - `agent/DEV-553` rebased onto main `19b654ff` (with DEV-555): `0ec8bbee` dropped as already applied (same patch ID as `8c2dc7c7`), branch = main.
+    - `node scripts/rust-test-runner.mjs --agent merge_agent_that_hands_back_without_end_rules_does_not_land` exits 0, no leftovers.
+    - `node scripts/rust-test-runner.mjs --agent without_end_rules` 10/10 passed; `cargo clippy --all-targets --all-features -- -D warnings` clean (DEV-555's compile error gone).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af97f3561-a2c1-43f6-835a-207fc24ebdc9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e17c4f6-1233-4da2-afe3-5f809dbdd11f
@@ -168,3 +175,26 @@ history:
   changes:
   - field: assignee
     old: claude
+- at: 2026-11-15T03:40:53.261103+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T03:40:55.322379+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-15T03:43:59.506513+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:44:06.225313+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

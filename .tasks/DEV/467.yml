@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-15T01:56:06.625600+00:00
+modified: 2026-11-15T06:28:03.868207+00:00
 relationships:
   blocks:
   - DEV-513
@@ -300,6 +300,53 @@ comments:
       label: I merge it myself
       set:
         status: InProgress
+- date: 2026-11-15T05:30:35.056103+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-186)
+  answer:
+    to: 2026-11-15T01:56:04.552514+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-186)
+- date: 2026-11-15T06:09:02.025076+00:00
+  author: claude
+  text: |-
+    Rebased onto `main` (`1b57f9fc`) and kept DEV-528's hand-back filter. Signed commit `f5ff32cc` on `t3/job-end-rules-t3-outage`, ready for review.
+
+    - `apply_job_event` (`crates/lotar-lib/src/services/automation_service.rs`): main's two-pass rule loop and `rule_assigns` are kept. In the second pass, end actions go to the saved end-action steps, other events apply directly as before.
+    - `end_and_take_outcome` (`agent_active_jobs.rs`) takes a `keep` filter. `apply_job_event` passes DEV-528's `without_agent_reporter_hand_back`, which now runs before the outcome is saved as pending. A dropped outcome leaves no pending file.
+    - Correction to my 01:56 comment: a lock-busy deferral was never the hole, because an outcome is only deferred after it passes the filter. The real gap with a naive merge is narrower: an outcome the filter dropped stayed in its pending file, and `apply_pending_outcomes` applied it, unfiltered, once that process exited.
+    - New test `a_dropped_hand_back_to_an_agent_reporter_is_not_kept_for_later`: a `job_failed` rule assigns `dev`, the agent recorded HelpNeeded and `claude` (the reporter). The pending file is then marked as owned by an exited process, and recovery runs. It fails on the naive merge (`("HelpNeeded", Some("claude"))`) and passes with the fix (`("Todo", Some("dev"))`).
+    - Mechanical: `agent_job_service.rs` (main's `ticket_state` plus the logging of failed end rules) and `docs/help/agent.md` (the recovery paragraph plus main's DEV-528 line).
+    - Checks: `npm run lint` passes; `npm test` passes (2199 Rust, 1547 UI); `npm run smoke` passes (404). The worktree needed `npm ci` first, for main's new `highlight.js`.
+- date: 2026-11-15T06:27:34.065565+00:00
+  author: codex
+  text: 'Review: blocking — verification incomplete. No new source defect identified in f5ff32cc; DEV-528 filtering precedes persistence and removes dropped outcomes. Existing ordering limitation is DEV-543. git diff --check passed. Targeted nextest with RUSTC_WRAPPER= was stopped during cold compilation (exit 130), before any tests ran, after exceeding the few-minute review window. Full lint/test/smoke not independently rerun. Finish recovery/outage tests in a prepared build environment before accepting this review. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-15T06:28:03.868207+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -311,6 +358,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25c568be-e00c-4743-98fb-231701d826f1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4bee1141-77fb-4e65-a470-22f3123e22f3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25c730c7-2cff-42ab-be74-0fe43df13f6e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae85dcff3-69b4-40f4-a334-cba368e5f4ac
 releases:
 - 6
 description: |-
@@ -1065,3 +1113,63 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T05:30:35.056103+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T05:30:35.057533+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T05:39:03.770409+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:09:02.025076+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:09:12.275259+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:22:21.280394+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae85dcff3-69b4-40f4-a334-cba368e5f4ac
+- at: 2026-11-15T06:27:34.065565+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:27:41.509677+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried
+    new: health, review-returned, merge-retried, review-blocked
+- at: 2026-11-15T06:28:03.346916+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, merge-retried, review-blocked
+    new: health, review-returned, merge-retried
+- at: 2026-11-15T06:28:03.868207+00:00
+  actor: automation
+  changes:
+  - field: comment_added
