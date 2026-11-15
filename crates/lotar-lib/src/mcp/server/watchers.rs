@@ -52,8 +52,10 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
         return;
     }
 
+    // The baseline is taken before the server reads its first request, so a
+    // change made after `initialize` always differs from it (DEV-585).
+    let mut previous_hints = gather_enum_hints();
     std::thread::spawn(move || {
-        let mut previous_hints = gather_enum_hints();
         let (tx, rx) = mpsc::channel();
 
         // Best-effort kernel watcher for instant updates. Some runtimes (e.g.

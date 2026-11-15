@@ -582,12 +582,10 @@ fn deferred_list_changed_is_coalesced_and_emitted_after_ready() {
     let initialize = child.request(1, "initialize", valid_initialize_params());
     assert!(initialize.get("error").is_none());
 
-    // Let the watcher take its baseline snapshot (one poll period) BEFORE
-    // the change, so the diff below is deterministic.
-    std::thread::sleep(Duration::from_millis(500));
-
-    // Trigger a tools-hint change (tags list grows) while only initialized,
-    // not ready. Give the poller ample time to observe it.
+    // The watcher took its baseline before the server read `initialize`, so
+    // the change below always differs from it (DEV-585). Trigger a
+    // tools-hint change (tags list grows) while only initialized, not ready,
+    // and give the poller ample time to observe it.
     std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nissue:\n  tags:\n    - alpha\n    - beta\n").unwrap();
     std::thread::sleep(Duration::from_millis(800));
 

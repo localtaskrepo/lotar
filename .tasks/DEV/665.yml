@@ -1,11 +1,11 @@
 title: 'CI failing on the default branch: .github/workflows/ci.yml'
-status: Merging
+status: Done
 priority: High
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T18:11:05.929921+00:00
-modified: 2026-11-17T18:19:34.796830+00:00
+modified: 2026-11-17T18:38:46.415767+00:00
 relationships:
   related:
   - DEV-533
@@ -50,6 +50,32 @@ comments:
     - Policy: `deny.toml` allows an ignore with a reason for an advisory that can't affect LoTaR. "Unmaintained, not unsound" fits that, as with `RUSTSEC-2024-0449` in DEV-122. Follow-up DEV-669 (chrono → jiff/time, then drop the ignore) exists and is in progress.
     - Done when ("latest main run green") can only show after the merge. No test is needed because this is a config change, not a code bug.
     - Findings: none. Tickets filed: none.
+- date: 2026-11-17T18:38:46.022692+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-665` is in `main`.
+
+    - Rebase onto `main` changed nothing (`e03bb43c2b18`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `e03bb43c2b18`
+    - Amended the pending `.tasks` changes into the merged commit: `a17cce1a7f45`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[ci-red:.github/workflows/ci.yml]`
+  report:
+    commits:
+    - hash: a17cce1a7
+      what: 'DEV-665 CI failing on the default branch: .github/workflows/ci.yml'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2686f3d6-f649-404b-bddd-8c3fb4f4795d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A684e8f05-89e2-4687-b9ae-e5183b513653
@@ -141,3 +167,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T18:38:46.022692+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:38:46.415767+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

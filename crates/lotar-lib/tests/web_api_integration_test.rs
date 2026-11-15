@@ -449,23 +449,7 @@ fn read_sse_events(stream: &mut TcpStream, max_events: usize, timeout: Duration,
             Ok(0) => break,
             Ok(n) => {
                 buf.extend_from_slice(&tmp[..n]);
-                while let Some(pos) = buf.windows(2).position(|w| w == b"\n\n" || w == b"\r\n\r\n") {
-                    let chunk = buf.drain(..pos + 2).collect::<Vec<u8>>();
-                    let text = String::from_utf8_lossy(&chunk);
-                    let mut kind = String::new();
-                    let mut data = String::new();
-                    for line in text.lines() {
-                        if let Some(rest) = line.strip_prefix("event: ") {
-                            kind = rest.trim().to_string();
-                        }
-                        if let Some(rest) = line.strip_prefix("data: ") {
-                            data = rest.trim().to_string();
-                        }
-                    }
-                    if !kind.is_empty() {
-                        events.push((kind, data));
-                    }
-                }
+                drain_sse_frames(&mut buf, &mut events);
             }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut {
@@ -479,6 +463,51 @@ fn read_sse_events(stream: &mut TcpStream, max_events: usize, timeout: Duration,
     }
     events
 }
+
+/// Move the complete frames at the start of `buf` into `events`.
+fn drain_sse_frames(buf: &mut Vec<u8>, events: &mut Vec<(String, String)>) {
+    while let Some(pos) = buf.windows(2).position(|w| w == b"\n\n" || w == b"\r\n\r\n") {
+        let chunk = buf.drain(..pos + 2).collect::<Vec<u8>>();
+        let text = String::from_utf8_lossy(&chunk);
+        let mut kind = String::new();
+        let mut data = String::new();
+        for line in text.lines() {
+            if let Some(rest) = line.strip_prefix("event: ") {
+                kind = rest.trim().to_string();
+            }
+            if let Some(rest) = line.strip_prefix("data: ") {
+                data = rest.trim().to_string();
+            }
+        }
+        if !kind.is_empty() {
+            events.push((kind, data));
+        }
+    }
+}
+
+/// Read SSE events until `done` holds for everything read so far, or
+/// `timeout` passes; for events whose arrival time depends on machine load.
+fn read_sse_until(stream: &mut TcpStream, timeout: Duration, mut buf: Vec<u8>, done: impl Fn(&[(String, String)]) -> bool) -> Vec<(String, String)> {
+    let deadline = Instant::now() + timeout;
+    let mut events = Vec::new();
+    drain_sse_frames(&mut buf, &mut events);
+    while !done(&events) && Instant::now() < deadline {
+        let mut tmp = [0u8; 4096];
+        match stream.read(&mut tmp) {
+            Ok(0) => break,
+            Ok(n) => {
+                buf.extend_from_slice(&tmp[..n]);
+                drain_sse_frames(&mut buf, &mut events);
+            }
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {}
+            Err(_) => break,
+        }
+    }
+    events
+}
+
+/// Generous budget for watcher events on a busy machine (DEV-585).
+const WATCH_EVENT_DEADLINE: Duration = Duration::from_secs(15);
 
 fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
@@ -1436,9 +1465,9 @@ fn watcher_reports_config_edits_and_ignores_internal_files() {
     let mut server = start_server();
     let port = server.port();
     let (mut sse, leftover) = open_sse(port, "debounce_ms=0&ready=1");
-    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
-    // FSEvents and the poll watcher need a moment before they report.
-    std::thread::sleep(Duration::from_millis(600));
+    // The ready event waits until the watcher is armed.
+    let ready = read_sse_until(&mut sse, WATCH_EVENT_DEADLINE, leftover, |events| events.iter().any(|(kind, _)| kind == "ready"));
+    assert!(ready.iter().any(|(kind, _)| kind == "ready"), "no ready event: {ready:?}");
 
     std::fs::write(tasks.join(".txn-pending.json"), "{}").unwrap();
     std::fs::write(tasks.join("notes.txt"), "x").unwrap();
@@ -1449,7 +1478,11 @@ fn watcher_reports_config_edits_and_ignores_internal_files() {
     )
     .unwrap();
 
-    let events = read_sse_events(&mut sse, 50, Duration::from_millis(2500), Vec::new());
+    let mut events = read_sse_until(&mut sse, WATCH_EVENT_DEADLINE, Vec::new(), |events| {
+        events.iter().any(|(kind, _)| kind == "config_updated") && events.iter().any(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1"))
+    });
+    // A repeated announcement would follow within a batch or two.
+    events.extend(read_sse_events(&mut sse, 50, Duration::from_millis(1000), Vec::new()));
     server.stop();
     std::env::set_current_dir(prev_cwd).unwrap();
 
@@ -1484,15 +1517,18 @@ fn sprint_changes_announce_the_sprint_and_its_tasks() {
     let mut server = start_server();
     let port = server.port();
     let (mut sse, leftover) = open_sse(port, "debounce_ms=0&kinds=sprint_changed,task_updated&ready=1");
-    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
-    std::thread::sleep(Duration::from_millis(600));
+    let ready = read_sse_until(&mut sse, WATCH_EVENT_DEADLINE, leftover, |events| events.iter().any(|(kind, _)| kind == "ready"));
+    assert!(ready.iter().any(|(kind, _)| kind == "ready"), "no ready event: {ready:?}");
 
     let (status, body) = http_post_json(port, "/api/sprints/create", r#"{"label":"S1"}"#);
     assert!(status < 300, "{}", String::from_utf8_lossy(&body));
     let (status, body) = http_post_json(port, "/api/sprints/add", r#"{"sprint":1,"tasks":["DEMO-1"]}"#);
     assert!(status < 300, "{}", String::from_utf8_lossy(&body));
 
-    let events = read_sse_events(&mut sse, 20, Duration::from_millis(2500), Vec::new());
+    let events = read_sse_until(&mut sse, WATCH_EVENT_DEADLINE, Vec::new(), |events| {
+        events.iter().any(|(kind, data)| kind == "sprint_changed" && data.contains("\"id\":1"))
+            && events.iter().any(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1"))
+    });
     server.stop();
     std::env::set_current_dir(prev_cwd).unwrap();
     assert!(events.iter().any(|(kind, data)| kind == "sprint_changed" && data.contains("\"id\":1")), "{events:?}");

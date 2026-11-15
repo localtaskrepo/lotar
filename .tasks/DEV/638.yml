@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T16:13:44.504007+00:00
+modified: 2026-11-17T18:50:21.131954+00:00
 relationships:
   related:
   - DEV-614
@@ -13,6 +13,7 @@ relationships:
   - DEV-652
   - DEV-634
   - DEV-659
+  - DEV-585
 comments:
 - date: 2026-11-17T02:46:56.322682+00:00
   author: claude
@@ -795,3 +796,9 @@ history:
   - field: tags
     old: health, fix-retried, retry-fix, retry-fable, merge-retried
     new: health
+- at: 2026-11-17T18:50:21.131954+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-614","DEV-644","DEV-652","DEV-634","DEV-659"]}'
+    new: '{"related":["DEV-614","DEV-644","DEV-652","DEV-634","DEV-659","DEV-585"]}'

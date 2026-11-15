@@ -1,0 +1,25 @@
+title: 'A session: continue job resumes another runner''s session: tell_agent''s @review job (runner claude) ran on t3 in the fix thread'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T18:59:30.165294+00:00
+modified: 2026-11-17T18:59:30.420075+00:00
+description: |-
+  Found in standards STD-207 (lotar 0.15.3).
+
+  - STD-206 was Blocked on @review (profile runner: claude). The unblocked rule's tell_agent started job-20261117T183404.304Z-25 with session continue: agent_profile review, but runner t3, resuming the fix profile's T3 thread (standards-04f015-STD-206-fix). Its job_completed rules then ran as the review's and the ticket merged unreviewed.
+  - docs/help/agent.md, Sessions: a profile without a session on the ticket takes the newest one, but 'one of another runner' starts a new session. Here the newest session's runner won over the profile's.
+  - Check: a ticket whose only session is a t3 one, a tell_agent or session: continue job of a claude-runner profile; the job log says it starts a new session and the job's runner is claude.
+  - Done when: that check holds, with a test; or the docs say the session's runner wins, if that is intended.
+tags:
+- health
+custom_fields:
+  finding: e2e:continue-across-runners
+history:
+- at: 2026-11-17T18:59:30.420075+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

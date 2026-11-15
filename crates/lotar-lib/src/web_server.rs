@@ -699,6 +699,9 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
     // Optional readiness event for tests
     let allow_ready = std::env::var("LOTAR_SSE_READY").ok().as_deref() == Some("1");
     if allow_ready && query.get("ready").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false) {
+        // Ready means the watcher reports what the client changes next
+        // (DEV-585): wait until it watches, or gave up.
+        wait_for_watcher_settled(Duration::from_secs(5));
         let _ = stream.write_all(b"event: ready\ndata: {}\n\n");
         let _ = stream.flush();
 
@@ -974,8 +977,32 @@ fn resolve_server_tasks_dir() -> Option<PathBuf> {
     TasksDirectoryResolver::resolve(None, None).ok().and_then(|resolver| resolver.absolute_path().ok())
 }
 
+/// Whether the tasks watcher is watching (or gave up), for the SSE ready event.
+static WATCHER_SETTLED: (Mutex<bool>, std::sync::Condvar) = (Mutex::new(false), std::sync::Condvar::new());
+
+/// Marks the tasks watcher settled when dropped: once it watches and holds
+/// its snapshots, or on any early return.
+struct WatcherSettled;
+
+impl Drop for WatcherSettled {
+    fn drop(&mut self) {
+        if let Ok(mut settled) = WATCHER_SETTLED.0.lock() {
+            *settled = true;
+        }
+        WATCHER_SETTLED.1.notify_all();
+    }
+}
+
+fn wait_for_watcher_settled(max: Duration) {
+    let Ok(settled) = WATCHER_SETTLED.0.lock() else {
+        return;
+    };
+    let _ = WATCHER_SETTLED.1.wait_timeout_while(settled, max, |settled| !*settled);
+}
+
 // Lightweight watcher that monitors the resolved tasks directory and emits project_changed
 fn start_tasks_watcher() {
+    let settled = WatcherSettled;
     // Don't crash server if watcher setup fails
     let tasks_dir = match resolve_server_tasks_dir() {
         Some(path) => path,
@@ -1053,6 +1080,7 @@ fn start_tasks_watcher() {
         // sprint is announced once per burst (DEV-273).
         let mut sprint_members: HashMap<Option<u32>, HashSet<String>> =
             order_snapshots.iter().map(|(id, tasks)| (*id, tasks.iter().cloned().collect())).collect();
+        drop(settled);
         while let Ok(first) = rx.recv() {
             let mut paths: Vec<PathBuf> = Vec::new();
             let mut collect = |res: notify::Result<notify::Event>| {

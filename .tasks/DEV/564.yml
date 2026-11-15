@@ -1,11 +1,11 @@
 title: 'harnessmux: sign local installs with the owner''s Developer ID'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T17:40:29.239703+00:00
-modified: 2026-11-17T18:33:15.760844+00:00
+modified: 2026-11-17T18:50:45.782726+00:00
 relationships:
   blocks:
   - DEV-563
@@ -181,6 +181,10 @@ comments:
     - Assigned lotar checkout `agent/DEV-564` is at main `d6da943ef`: `git log main..HEAD` and `git diff --stat main...HEAD` are empty, and the branch has no newer commits (`git log HEAD..agent/DEV-564` empty).
     - This doesn't approve the harnessmux implementation (rework `9977dec` in the harnessmux repo), which needs a review in its own checkout.
     - No files changed, no checks run; status and assignee unchanged.
+- date: 2026-11-17T18:50:45.486874+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-564` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab6ce3fb4-f5d4-45ab-960f-44260cb4533a
 description: |-
@@ -483,3 +487,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T18:50:45.486874+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:50:45.782726+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
