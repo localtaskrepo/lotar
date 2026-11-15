@@ -71,12 +71,21 @@ describe.concurrent('UI tag colours (DEV-20)', () => {
                         .toContain('tag--colored');
                 });
 
-                // The Config editor offers tags in use for a one-click override.
-                await withPage(`${server.url}/config?section=fields`, async (page) => {
+                // The Config editor offers tags in use for a one-click override,
+                // from the distinct tags rather than whole tasks (DEV-548).
+                await withPage(server.url, async (page) => {
+                    const requests: string[] = [];
+                    page.on('request', (request) => {
+                        const url = new URL(request.url());
+                        if (url.pathname.startsWith('/api/tasks/')) requests.push(url.pathname);
+                    });
+                    await page.goto(`${server.url}/config?section=fields`);
                     const inUse = page.getByTestId('tag-colors-in-use');
                     const plain = inUse.getByRole('button', { name: 'plain', exact: true });
                     await plain.waitFor({ timeout: 15_000 });
                     expect(await inUse.getByRole('button', { name: 'ui', exact: true }).count()).toBe(0);
+                    expect(requests).toContain('/api/tasks/values');
+                    expect(requests).not.toContain('/api/tasks/list');
                     await plain.click();
                     await expect
                         .poll(() =>

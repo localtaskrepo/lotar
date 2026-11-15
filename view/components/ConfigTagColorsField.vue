@@ -144,9 +144,8 @@ const inherited = computed(() =>
 )
 
 // Tags on tasks in this scope (DEV-229), so colours can be set for tags that
-// are in use but not configured. One request; failures just hide the list.
-// Only the newest 1000 tasks are read; a server-side tag listing is a DEV-4
-// follow-up.
+// are in use but not configured. One request for the distinct tags, not whole
+// tasks (DEV-548); failures just hide the list.
 const tagsInUse = ref<string[]>([])
 let tagsRequest = 0
 watch(
@@ -154,15 +153,12 @@ watch(
   async (scope) => {
     const request = ++tagsRequest
     try {
-      const response = await api.listTasks({ project: scope || undefined, has: 'tag', limit: 1000 })
+      const values = await api.taskValues(scope || undefined)
       // A newer scope's request superseded this one.
       if (request !== tagsRequest) return
       const seen = new Map<string, string>()
-      for (const task of response.tasks ?? []) {
-        for (const tag of task.tags ?? []) {
-          const trimmed = tag.trim()
-          if (trimmed && !seen.has(trimmed.toLowerCase())) seen.set(trimmed.toLowerCase(), trimmed)
-        }
+      for (const tag of values.tags) {
+        if (!seen.has(tag.toLowerCase())) seen.set(tag.toLowerCase(), tag)
       }
       tagsInUse.value = [...seen.values()].sort((a, b) => a.localeCompare(b))
     } catch {
