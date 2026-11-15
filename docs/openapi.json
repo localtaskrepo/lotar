@@ -884,7 +884,7 @@
     "/api/tasks/update": {
       "post": {
         "summary": "Update a task by id",
-        "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto.assign_on_status) applies when status transitions via supported channels. While an agent job runs on the ticket, a status or assignee change is not applied: the response carries `deferred` and the job's end applies it (DEV-320).",
+        "description": "Updates task fields. People fields support @me. `status`, `priority` and `type` are validated against the task's project configuration; a status change applies auto-assign on status change (auto.assign_on_status). While an agent job runs on the ticket, a status or assignee change is not applied: the response carries `deferred` and the job's end applies it (DEV-320).",
         "requestBody": {
           "required": true,
           "content": {
