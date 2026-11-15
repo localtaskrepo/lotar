@@ -298,6 +298,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     const {
         commitHistory,
         commitsLoading,
+        commitsError,
         resetActivity,
         loadCommitHistory: loadCommitHistoryFromActivity,
         refreshCommits: refreshCommitsFromActivity,
@@ -758,6 +759,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         activityTab,
         commitHistory,
         commitsLoading,
+        commitsError,
         sprintsLoading,
         assignedSprints,
         hasAssignedSprints,

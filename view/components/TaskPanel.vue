@@ -720,6 +720,7 @@
                     :mode="mode"
                     :commit-history="commitHistory"
                     :commits-loading="commitsLoading"
+                    :commits-error="commitsError"
                     :format-commit="formatCommit"
                     :format-date="formatDate"
                     @refresh="refreshCommits"
@@ -1105,6 +1106,7 @@ const {
   activityTab,
   commitHistory,
   commitsLoading,
+  commitsError,
   sprintsLoading,
   assignedSprints,
   hasAssignedSprints,
@@ -3663,7 +3665,8 @@ textarea {
   background: color-mix(in oklab, var(--color-primary) 18%, transparent);
 }
 
-.task-panel__reference-error {
+.task-panel__reference-error,
+.task-panel__commits-error {
   margin: 0;
   font-size: var(--text-xs, 0.75rem);
   color: var(--color-danger);

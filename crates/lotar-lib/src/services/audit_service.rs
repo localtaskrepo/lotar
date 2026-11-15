@@ -9,39 +9,66 @@ use crate::storage::task::Task;
 use crate::types::{TaskChange, TaskChangeLogEntry};
 
 /// A long-lived `git cat-file --batch` process: each read is one request
-/// line and one response, so reading many blobs costs one spawn.
+/// line and one response, so reading many blobs costs one spawn. A reader
+/// thread parses the responses, so a read can give up after a timeout
+/// (DEV-466).
 pub struct BlobBatch {
     child: std::process::Child,
     stdin: std::process::ChildStdin,
-    stdout: std::io::BufReader<std::process::ChildStdout>,
+    responses: std::sync::mpsc::Receiver<std::io::Result<Option<String>>>,
+    timeout: std::time::Duration,
 }
 
 impl BlobBatch {
     pub fn spawn(repo_root: &Path) -> std::io::Result<Self> {
+        Self::spawn_within(crate::utils::git::git_command(repo_root).args(["cat-file", "--batch"]), crate::utils::git::GIT_TIMEOUT)
+    }
+
+    /// Runs `command` as the batch process; each read waits at most `timeout`.
+    fn spawn_within(command: &mut std::process::Command, timeout: std::time::Duration) -> std::io::Result<Self> {
         use std::process::Stdio;
-        let mut child = crate::utils::git::git_command(repo_root)
-            .args(["cat-file", "--batch"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()?;
+        command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+        let mut child = crate::utils::git::spawn_in_process_group(command)?;
         let stdin = child.stdin.take().ok_or_else(|| std::io::Error::other("no stdin"))?;
         let stdout = child.stdout.take().ok_or_else(|| std::io::Error::other("no stdout"))?;
-        Ok(Self { child, stdin, stdout: std::io::BufReader::new(stdout) })
+        let (sender, responses) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let mut stdout = std::io::BufReader::new(stdout);
+            loop {
+                let response = Self::read_response(&mut stdout);
+                let failed = response.is_err();
+                if sender.send(response).is_err() || failed {
+                    break;
+                }
+            }
+        });
+        Ok(Self { child, stdin, responses, timeout })
     }
 
     /// The blob at `rev:path`, `Ok(None)` when it does not exist there (a
     /// root commit's parent, a file added or deleted by the commit). An `Err`
-    /// means the process is unusable.
+    /// means the process is unusable; `TimedOut` when it did not answer.
     pub fn read(&mut self, rev: &str, path: &str) -> std::io::Result<Option<String>> {
-        use std::io::{BufRead, Read, Write};
+        use std::io::Write;
+        use std::sync::mpsc::RecvTimeoutError;
         if AuditService::ensure_safe_git_rev(rev).is_err() || path.contains('\n') {
             return Ok(None);
         }
         writeln!(self.stdin, "{}:{}", rev, path)?;
         self.stdin.flush()?;
+        match self.responses.recv_timeout(self.timeout) {
+            Ok(response) => response,
+            Err(RecvTimeoutError::Timeout) => {
+                crate::utils::git::kill_process_group(&mut self.child);
+                Err(std::io::Error::new(std::io::ErrorKind::TimedOut, format!("git cat-file did not finish within {}s", self.timeout.as_secs())))
+            }
+            Err(RecvTimeoutError::Disconnected) => Err(std::io::Error::other("git cat-file exited")),
+        }
+    }
+
+    fn read_response(stdout: &mut impl std::io::BufRead) -> std::io::Result<Option<String>> {
         let mut header = String::new();
-        if self.stdout.read_line(&mut header)? == 0 {
+        if stdout.read_line(&mut header)? == 0 {
             return Err(std::io::Error::other("git cat-file exited"));
         }
         let header = header.trim_end();
@@ -53,7 +80,7 @@ impl BlobBatch {
             return Ok(None);
         };
         let mut body = vec![0u8; size + 1];
-        self.stdout.read_exact(&mut body)?;
+        stdout.read_exact(&mut body)?;
         body.truncate(size);
         if kind != "blob" {
             return Ok(None);
@@ -64,8 +91,7 @@ impl BlobBatch {
 
 impl Drop for BlobBatch {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        crate::utils::git::kill_process_group(&mut self.child);
     }
 }
 
@@ -307,7 +333,7 @@ impl AuditService {
             cmd.arg(Self::git_path_arg(path));
         }
 
-        let output = cmd.output().map_err(|e| format!("Failed to run git: {}", e))?;
+        let output = crate::utils::git::output(&mut cmd).map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             // A repository without commits yet (fresh `git init`) has no
             // history; that is an empty result, not an error (DEV-217).
@@ -322,9 +348,7 @@ impl AuditService {
     /// Whether the repository's HEAD points at a commit. Asked of git
     /// directly rather than read from (possibly translated) error text.
     fn has_commits(repo_root: &Path) -> bool {
-        crate::utils::git::git_command(repo_root)
-            .args(["rev-parse", "--verify", "--quiet", "HEAD"])
-            .output()
+        crate::utils::git::output(crate::utils::git::git_command(repo_root).args(["rev-parse", "--verify", "--quiet", "HEAD"]))
             .map(|output| output.status.success())
             .unwrap_or(true)
     }
@@ -343,13 +367,14 @@ impl AuditService {
     /// archive keeps its earlier history; each event carries the file's path
     /// in that commit (DEV-4).
     pub fn list_commits_for_file(repo_root: &Path, file_rel: &Path) -> Result<Vec<FileCommitEvent>, String> {
-        let output = crate::utils::git::git_command(repo_root)
-            .args(["log", "--no-merges", "--follow", "--name-status"])
-            .arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s")
-            .arg("--")
-            .arg(Self::git_path_arg(file_rel))
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
+        let output = crate::utils::git::output(
+            crate::utils::git::git_command(repo_root)
+                .args(["log", "--no-merges", "--follow", "--name-status"])
+                .arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s")
+                .arg("--")
+                .arg(Self::git_path_arg(file_rel)),
+        )
+        .map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             if !Self::has_commits(repo_root) {
                 return Ok(Vec::new());
@@ -465,7 +490,7 @@ impl AuditService {
         let commits = Self::collect_commits(repo_root, since, until, max_commits, path_filters.as_deref().unwrap_or_default())?;
 
         if tasks_tracked {
-            Self::build_tracked_activity_feed(repo_root, tasks_rel, commits, project_filter)
+            Self::build_tracked_activity_feed(repo_root, tasks_rel, commits, project_filter, BlobBatch::spawn(repo_root).ok())
         } else {
             Self::build_untracked_activity_feed(&tasks_root_abs, tasks_rel, commits, since, until, project_filter)
         }
@@ -475,7 +500,7 @@ impl AuditService {
         let mut cmd = crate::utils::git::git_command(repo_root);
         cmd.arg("ls-files");
         cmd.arg(Self::git_path_arg(tasks_rel));
-        match cmd.output() {
+        match crate::utils::git::output(&mut cmd) {
             Ok(output) if output.status.success() => !output.stdout.is_empty(),
             _ => false,
         }
@@ -547,11 +572,11 @@ impl AuditService {
         tasks_rel: &Path,
         commits: Vec<ParsedCommit>,
         project_filter: Option<&str>,
-    ) -> Result<Vec<ActivityFeedItem>, String> {
-        let mut feed: Vec<ActivityFeedItem> = Vec::new();
         // One `git cat-file --batch` process serves every blob in the window
         // instead of two `git show` spawns per (commit, file) (DEV-292).
-        let mut blobs = BlobBatch::spawn(repo_root).ok();
+        mut blobs: Option<BlobBatch>,
+    ) -> Result<Vec<ActivityFeedItem>, String> {
+        let mut feed: Vec<ActivityFeedItem> = Vec::new();
 
         for commit in commits.into_iter() {
             if commit.files.is_empty() {
@@ -575,8 +600,8 @@ impl AuditService {
                     continue;
                 }
 
-                let current_task = Self::load_task_version_batched(&mut blobs, repo_root, &commit.sha, file_rel);
-                let previous_task = Self::load_task_version_batched(&mut blobs, repo_root, &format!("{}^", commit.sha), file_rel);
+                let current_task = Self::load_task_version_batched(&mut blobs, repo_root, &commit.sha, file_rel)?;
+                let previous_task = Self::load_task_version_batched(&mut blobs, repo_root, &format!("{}^", commit.sha), file_rel)?;
 
                 let current_history = current_task.as_ref().map(|task| task.history.clone()).unwrap_or_default();
                 let previous_history = previous_task.as_ref().map(|task| task.history.clone()).unwrap_or_default();
@@ -821,15 +846,17 @@ impl AuditService {
     }
 
     /// Reads through the shared batch process when it is running, and falls
-    /// back to `git show` when it could not start or has failed.
-    fn load_task_version_batched(blobs: &mut Option<BlobBatch>, repo_root: &Path, commit: &str, file_rel: &Path) -> Option<Task> {
+    /// back to `git show` when it could not start or has failed. A batch
+    /// that timed out is an error: git hangs, and `git show` would too.
+    fn load_task_version_batched(blobs: &mut Option<BlobBatch>, repo_root: &Path, commit: &str, file_rel: &Path) -> Result<Option<Task>, String> {
         if let Some(batch) = blobs.as_mut() {
             match batch.read(commit, &Self::git_path_str(file_rel)) {
-                Ok(content) => return content.and_then(|text| Self::parse_task_yaml(&text)),
+                Ok(content) => return Ok(content.and_then(|text| Self::parse_task_yaml(&text))),
+                Err(e) if e.kind() == std::io::ErrorKind::TimedOut => return Err(format!("Failed to run git: {}", e)),
                 Err(_) => *blobs = None,
             }
         }
-        Self::load_task_version(repo_root, commit, file_rel)
+        Ok(Self::load_task_version(repo_root, commit, file_rel))
     }
 
     fn load_task_version(repo_root: &Path, commit: &str, file_rel: &Path) -> Option<Task> {
@@ -880,7 +907,7 @@ impl AuditService {
                 rev.arg("HEAD");
                 rev.arg("--");
                 rev.arg(&rel_path);
-                match rev.output() {
+                match crate::utils::git::output(&mut rev) {
                     Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).trim().parse::<usize>().unwrap_or(1),
                     _ => 1,
                 }
@@ -896,7 +923,8 @@ impl AuditService {
     pub fn show_file_at(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
         let spec = format!("{}:{}", commit, Self::git_path_str(file_rel));
-        let output = crate::utils::git::git_command(repo_root).arg("show").arg(spec).output().map_err(|e| format!("Failed to run git: {}", e))?;
+        let output =
+            crate::utils::git::output(crate::utils::git::git_command(repo_root).arg("show").arg(spec)).map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             return Err(format!("git show failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
         }
@@ -906,12 +934,7 @@ impl AuditService {
     /// Get raw patch for a specific commit restricted to file
     pub fn show_file_diff(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
-        let output = crate::utils::git::git_command(repo_root)
-            .arg("show")
-            .arg(commit)
-            .arg("--")
-            .arg(Self::git_path_arg(file_rel))
-            .output()
+        let output = crate::utils::git::output(crate::utils::git::git_command(repo_root).arg("show").arg(commit).arg("--").arg(Self::git_path_arg(file_rel)))
             .map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             return Err(format!("git show failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
@@ -1200,4 +1223,38 @@ pub struct ActivityItem {
     pub key: String,
     pub count: usize,
     pub last_date: DateTime<Utc>,
+}
+
+#[cfg(all(test, unix))]
+mod blob_batch_tests {
+    use super::*;
+    use std::process::Command;
+    use std::time::{Duration, Instant};
+
+    /// A `git cat-file --batch` that hangs after `git log` answered fails the
+    /// activity feed at the timeout and leaves no process behind (DEV-466).
+    #[test]
+    fn hanging_cat_file_fails_the_activity_feed_at_the_timeout() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let pid_file = dir.path().join("pid");
+        let mut command = Command::new("sh");
+        command.arg("-c").arg(format!("sleep 600 & echo $! > {}; wait", pid_file.display()));
+        let blobs = BlobBatch::spawn_within(&mut command, Duration::from_millis(300)).expect("spawn");
+        let commit = ParsedCommit {
+            sha: "0123456789abcdef0123456789abcdef01234567".to_string(),
+            author: "a".to_string(),
+            email: "a@example.com".to_string(),
+            date: Utc::now(),
+            message: "m".to_string(),
+            files: vec![PathBuf::from(".tasks/DEV/1.yml")],
+        };
+        let started = Instant::now();
+        let error = AuditService::build_tracked_activity_feed(dir.path(), Path::new(".tasks"), vec![commit], None, Some(blobs))
+            .expect_err("a hanging cat-file must fail the feed");
+        assert!(error.contains("did not finish"), "{error}");
+        assert!(started.elapsed() < Duration::from_secs(5), "took {:?}", started.elapsed());
+        let pid = std::fs::read_to_string(&pid_file).expect("pid file");
+        let alive = Command::new("kill").arg("-0").arg(pid.trim()).status().expect("kill -0");
+        assert!(!alive.success(), "the hanging child {pid} is still running");
+    }
 }

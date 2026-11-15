@@ -2,6 +2,7 @@ import type { Ref } from 'vue'
 import { formatDateTime } from '../../utils/date'
 import { onScopeDispose, ref } from 'vue'
 import { api } from '../../api/client'
+import { errorMessage } from '../../utils/errors'
 import { titleCase } from '../../utils/text'
 
 export interface CommitEntry {
@@ -15,6 +16,7 @@ export interface CommitEntry {
 export interface TaskPanelActivityApi {
     commitHistory: Ref<CommitEntry[]>
     commitsLoading: Ref<boolean>
+    commitsError: Ref<string>
     resetActivity: () => void
     loadCommitHistory: (taskId: string, limit?: number) => Promise<void>
     refreshCommits: (taskId: string | undefined, limit?: number) => Promise<void>
@@ -29,11 +31,13 @@ const DEFAULT_HISTORY_LIMIT = 8
 export function useTaskPanelActivity(): TaskPanelActivityApi {
     const commitHistory = ref<CommitEntry[]>([])
     const commitsLoading = ref(false)
+    const commitsError = ref('')
     let generation = 0
 
     const resetActivity = () => {
         generation += 1
         commitsLoading.value = false
+        commitsError.value = ''
         commitHistory.value = []
     }
     onScopeDispose(resetActivity)
@@ -41,13 +45,15 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
     const loadCommitHistory = async (taskId: string, limit = DEFAULT_HISTORY_LIMIT) => {
         const request = ++generation
         commitsLoading.value = true
+        commitsError.value = ''
         try {
             const items = await api.taskHistory(taskId, limit)
             if (request !== generation) return
             commitHistory.value = items
-        } catch {
+        } catch (error: unknown) {
             if (request !== generation) return
             commitHistory.value = []
+            commitsError.value = errorMessage(error) || 'Failed to load commits'
         } finally {
             if (request === generation) commitsLoading.value = false
         }
@@ -84,6 +90,7 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
     return {
         commitHistory,
         commitsLoading,
+        commitsError,
         resetActivity,
         loadCommitHistory,
         refreshCommits,

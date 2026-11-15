@@ -1,11 +1,11 @@
 title: 'harnessmux: sign local installs with the owner''s Developer ID'
-status: Merging
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T17:40:29.239703+00:00
-modified: 2026-11-15T20:51:45.210690+00:00
+modified: 2026-11-15T21:02:46.468425+00:00
 relationships:
   blocks:
   - DEV-563
@@ -92,6 +92,32 @@ comments:
 - date: 2026-11-15T20:51:45.210690+00:00
   author: automation
   text: The review job job-20261115T205134.271Z-52 failed (lotar agent logs job-20261115T205134.271Z-52); the merge goes ahead without a review.
+- date: 2026-11-15T20:59:40.259745+00:00
+  author: codex
+  text: |-
+    Review: blocking — unchanged commit 3a3cfca still has the previously reported staging race.
+
+    - Corrected location: `xtask/src/main.rs:121-125`. Concurrent installs share `.harnessmux.new`; another installer can overwrite verified bytes before rename or delete another install's stage during cleanup. Use unique staging or serialization and an interleaving regression test.
+    - No rework commit exists. Previous successful checks apply to this same commit; no checks rerun this turn. Next-version signing remains unverified.
+    - Main has advanced to `987add9`; the branch needs rebase before integration. The two-dot diff includes newer main changes absent from this older branch, not additional changes authored by this ticket.
+    - Existing review-blocked retained. No source edits, commits, merge, status or assignee changes.
+- date: 2026-11-15T21:02:35.534998+00:00
+  author: codex
+  text: |-
+    Merge: blocked; the reviewed staging race is still present, so nothing was merged.
+
+    - Harnessmux `agent/DEV-564` is still `3a3cfca`; main is `987add9`. No rework commit exists. The assigned lotar branch has no commits beyond its main.
+    - Confirmed `xtask/src/main.rs:122-129` still uses shared `.harnessmux.new`: another installer can overwrite checked bytes before rename or remove another install’s stage during cleanup.
+    - Both blocking reviews remain unresolved. Use unique staging files or serialize installation, with an interleaving regression test, then obtain review before merging.
+    - No rebase, source changes, commits, merge, push, or trust changes. Checks not rerun because they cannot clear this unchanged correctness blocker.
+
+    Question: will you route this second blocking review to a fix agent for the staging race before another review and merge?
+  report:
+    checks:
+    - command: merge checks
+      result: not_run
+      reason: unchanged commit remains review-blocked
+    next: 'Owner routes the second blocking review to rework: unique staging or serialization plus an interleaving regression test, then review before merge.'
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -108,8 +134,6 @@ description: |-
   - [ ] Identity present but codesign (sign or `--verify --strict`) fails, or the staged binary's `--version` fails: the install stops with the error and leaves the installed binary as it was (the new one is staged next to it and renamed over it only after all checks pass).
   - [ ] `cargo install --git https://github.com/localtaskrepo/harnessmux harnessmux` and `cargo install harnessmux` still work (unsigned, as today); README says so.
   - [ ] `codesign -dvv` on the installed binary shows `Identifier=net.pyxzl.harnessmux`, `TeamIdentifier=3HKD37M482`; checked again after the next version's fresh build.
-tags:
-- review-blocked
 history:
 - at: 2026-11-15T17:40:29.643701+00:00
   actor: claude
@@ -286,3 +310,35 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T20:59:40.259745+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:59:45.653014+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-blocked
+    new: ''
+- at: 2026-11-15T21:01:43.816734+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Merging
+- at: 2026-11-15T21:02:35.534998+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:02:46.468425+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

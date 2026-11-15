@@ -1,14 +1,35 @@
 title: 'Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load'
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-15T20:46:21.873348+00:00
+modified: 2026-11-15T21:05:53.816585+00:00
 relationships:
   related:
   - DEV-510
+comments:
+- date: 2026-11-15T20:59:19.246258+00:00
+  author: automation
+  text: The fix agent's job job-20261115T205914.061Z-57 failed (lotar agent logs job-20261115T205914.061Z-57); @fix-codex retries it on branch agent/DEV-585.
+- date: 2026-11-15T21:04:00.487188+00:00
+  author: codex
+  text: 'Investigation incomplete: no source changes or commits. Suspected MCP baseline startup race; tests use fixed sleeps. Suite blocked by sccache permissions; cache-disabled compilation did not reach tests. Lint and smoke not run. Next: resume reproduction and readiness synchronization fix.'
+- date: 2026-11-15T21:05:53.816585+00:00
+  author: codex
+  text: |-
+    The cache-disabled run finished compilation and reached tests; this corrects the earlier handoff.
+
+    - 67 tests passed; `embedded_web_ui_test::serve_sends_the_embedded_index_page` failed with `serve printed no URL`.
+    - Fail-fast left 2151 tests unrun, so this does not verify the watcher fix criteria.
+    - Whether the server failure is caused by sandbox socket restrictions remains unverified.
+  report:
+    checks:
+    - command: RUSTC_WRAPPER= npm run -s test:agent
+      result: failed
+      reason: serve_sends_the_embedded_index_page printed no URL; 2151 tests not run
+    next: Retry server test outside sandbox, then reproduce the three event tests
 description: |-
   Found during the DEV-510 merge (2026-11-15): the first `npm run -s test:agent` in the DEV-510 worktree failed 3 tests; the second full run passed 2218/2218 on the same commit.
 
@@ -21,6 +42,7 @@ description: |-
   Done when the events arrive reliably under load (or the tests wait for them without a fixed window) and repeated full runs pass.
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: npm test:watcher-events-under-load
 history:
@@ -29,3 +51,39 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T20:59:14.194463+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T20:59:19.070294+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-15T20:59:19.246258+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:04:00.487188+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:04:06.602832+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-15T21:05:53.816585+00:00
+  actor: codex
+  changes:
+  - field: comment_added

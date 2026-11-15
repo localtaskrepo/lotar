@@ -1,11 +1,11 @@
 title: A merge job that landed its work fails when the ticket branch is checked out in another worktree
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-codex'
+assignee: mallox
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-15T20:51:33.333669+00:00
+modified: 2026-11-15T21:01:59.418026+00:00
 relationships:
   related:
   - DEV-573
@@ -70,6 +70,9 @@ comments:
 - date: 2026-11-15T20:51:33.333669+00:00
   author: automation
   text: The fix agent's job job-20261115T205121.631Z-51 failed (lotar agent logs job-20261115T205121.631Z-51); @fix-codex retries it on branch agent/DEV-577.
+- date: 2026-11-15T21:01:52.193343+00:00
+  author: codex
+  text: 'Blocked: actual checkout branch is t3/merge-worktree-branch; required agent/DEV-577 is checked out in another worktree. Instructions prohibit switching branches. Please relaunch in the existing agent/DEV-577 worktree. No edits or checks performed; finished-only decision remains to implement.'
 description: |-
   Found: job job-20261115T191640.133Z-8 (standards STD-136) rebased, fast-forwarded main to d0deac4 and pushed, then failed: `git branch --force agent/STD-136 18b8e9c` refused, 'cannot force update the branch used by worktree at .../agent-STD-136-...'. The ticket went back to Merging, assigned to @fix, and a fix agent was started for work already on main.
   Check: run a merge job in a T3 thread whose ticket branch is checked out in a lotar worktree; the job ends failed after the merge.
@@ -175,3 +178,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T21:01:52.193343+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:01:59.418026+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox

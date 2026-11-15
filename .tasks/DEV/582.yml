@@ -1,11 +1,11 @@
 title: Retried fix job on FND-12 still opened its T3 thread on a t3/* branch, not agent/FND-12
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-codex'
+assignee: mallox
 created: 2026-11-15T20:14:32.206471+00:00
-modified: 2026-11-15T20:49:17.809654+00:00
+modified: 2026-11-15T21:01:01.861114+00:00
 relationships:
   related:
   - DEV-573
@@ -13,6 +13,20 @@ comments:
 - date: 2026-11-15T20:49:17.809654+00:00
   author: automation
   text: The fix agent's job job-20261115T204545.499Z-44 failed (lotar agent logs job-20261115T204545.499Z-44); @fix-codex retries it on branch agent/DEV-582.
+- date: 2026-11-15T21:00:57.252763+00:00
+  author: codex
+  text: |-
+    This retry runs on t3/retry-agent-worktree rather than agent/DEV-582. May I implement and commit in this checkout despite the job branch restriction? No files changed; lint, tests and smoke not run.
+
+    Options:
+    - yes: Use current checkout
+    - restart: Restart in agent/DEV-582
+  question:
+    options:
+    - key: yes
+      label: Use current checkout
+    - key: restart
+      label: Restart in agent/DEV-582
 description: 'Found 2026-11-15: the retry of FND-12 (job-20261115T201131.885Z-1), sent after DEV-573 was marked fixed, ran in worktree t3-e572702e-d8af3fdf9ec6a05a on branch t3/sync-automation-yml-config-copy, while agent/FND-12 sat in its own worktree agent-FND-12-846d11fb298b8cd0. The agent worked around it by committing in the agent/FND-12 worktree. Check: git -C <thread cwd> branch --show-current equals agent/<ticket> for a retried fix job. Done: a retry continues in the ticket''s agent/* worktree.'
 tags:
 - health
@@ -48,3 +62,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T21:00:57.252763+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:01:01.861114+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox

@@ -14,6 +14,9 @@
     <template v-if="mode === 'edit'">
       <div class="task-panel__history-scroll" role="region" aria-label="Recent commits">
         <UiLoader v-if="commitsLoading && !commitHistory.length" size="sm">Loading commits…</UiLoader>
+        <p v-else-if="commitsError && !commitHistory.length" class="task-panel__commits-error" role="alert">
+          Couldn't load commits: {{ commitsError }}
+        </p>
         <p v-else-if="!commitHistory.length" class="muted">No commits yet</p>
         <ul v-else class="task-panel__commits-list">
           <li v-for="event in commitHistory" :key="event.commit" class="task-panel__history-item">
@@ -47,6 +50,7 @@ defineProps<{
   mode: 'create' | 'edit'
   commitHistory: CommitEntry[]
   commitsLoading: boolean
+  commitsError: string
   formatCommit: (commit: string) => string
   formatDate: (input: string) => string
 }>()

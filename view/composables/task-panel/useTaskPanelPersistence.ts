@@ -666,8 +666,9 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             if (!current()) return undefined
             applyTaskSnapshot(options.task, data)
             options.applyTask(data)
-            await options.loadCommitHistory(id)
-            if (!current()) return undefined
+            // Commits load on their own: a slow or hanging git must not keep
+            // the task from showing (DEV-466).
+            void options.loadCommitHistory(id)
             options.ready.value = true
             return data
         } catch (error: unknown) {

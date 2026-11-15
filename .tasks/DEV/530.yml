@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-codex'
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T20:48:43.346886+00:00
+modified: 2026-11-15T21:00:53.190304+00:00
 relationships:
   related:
   - DEV-351
@@ -405,6 +405,30 @@ comments:
 - date: 2026-11-15T20:48:43.346886+00:00
   author: automation
   text: The fix agent's job job-20261115T204145.138Z-41 failed (lotar agent logs job-20261115T204145.138Z-41); @fix-codex retries it on branch agent/DEV-530.
+- date: 2026-11-15T21:00:34.287190+00:00
+  author: codex
+  text: 'Confirmed the remaining gap: expired starting claims have no scheduled recovery. Plan: add periodic recovery, regression coverage, then run the required gates.'
+- date: 2026-11-15T21:00:48.201769+00:00
+  author: codex
+  text: |-
+    Implementation remains incomplete; do not advance this job to merge.
+
+    - Confirmed `resume_parked_job` only reconciles claims when called again; the queue worker exits with no pending jobs and does not schedule recovery.
+    - Current HEAD is `4e2f775a`; no files changed and no commit created.
+    - Ticket writes required an approved retry outside the sandbox; that retry succeeded.
+    - A further implementation run is needed to add scheduled recovery and run the required checks.
+  report:
+    checks:
+    - command: npm run lint:agent
+      result: not_run
+      reason: implementation incomplete
+    - command: npm run test:agent
+      result: not_run
+      reason: implementation incomplete
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: implementation incomplete
+    next: Implement scheduled recovery of expired starting claims, with a test that does not manually invoke resume.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -1055,3 +1079,20 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T21:00:34.287190+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:00:48.201769+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:00:53.190304+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox

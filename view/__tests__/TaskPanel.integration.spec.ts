@@ -589,6 +589,26 @@ describe('TaskPanel integration safeguards', () => {
         wrapper.unmount()
     })
 
+    it('shows the task while commit history hangs, then the history error on its own (DEV-466)', async () => {
+        let failHistory: (error: Error) => void = () => {}
+        apiFixtures.taskHistoryMock.mockImplementation(() => new Promise((_, reject) => (failHistory = reject)))
+        const wrapper = await mountTaskPanel()
+        await flushPromises()
+
+        expect(wrapper.find('.task-panel__loading').exists()).toBe(false)
+        const commitsTab = wrapper.findAll('.task-panel__tab').find((tab) => tab.text().includes('Commits'))
+        await commitsTab!.trigger('click')
+        await nextTick()
+        expect(wrapper.text()).toContain('Loading commits…')
+
+        failHistory(new Error('git did not finish within 20s'))
+        await flushPromises()
+        expect(wrapper.find('.task-panel__commits-error').text()).toContain('git did not finish within 20s')
+        expect(wrapper.find('.task-panel__loading').exists()).toBe(false)
+
+        wrapper.unmount()
+    })
+
     it('renders sprint assignments with missing indicators', async () => {
         const wrapper = await mountTaskPanel()
         await flushPromises()

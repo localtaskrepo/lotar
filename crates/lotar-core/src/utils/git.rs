@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command, Output, Stdio};
+use std::sync::mpsc::Receiver;
+use std::time::{Duration, Instant};
 
 /// Anchor Git to the command's working directory, not the invoking process's repo.
 /// Keep SSH/askpass and author/committer identity variables; injected Git config
@@ -44,6 +46,92 @@ pub fn git_command(root: &Path) -> Command {
     command.current_dir(root);
     clear_repository_env(&mut command);
     command
+}
+
+/// How long a read-only git call may take (DEV-466). A git that blocks, for
+/// example on a config file macOS holds behind a permission prompt, must not
+/// hold up a request forever or pile up processes.
+pub const GIT_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// [`Command::output`] that stops the command and its children after
+/// `timeout` and answers with a `TimedOut` error. Stdin is empty. The timeout
+/// covers the output as well: a command that exits while a process it started
+/// keeps stdout or stderr open has not finished.
+pub fn output_within(command: &mut Command, timeout: Duration) -> std::io::Result<Output> {
+    command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = spawn_in_process_group(command)?;
+    let stdout = drain(child.stdout.take());
+    let stderr = drain(child.stderr.take());
+    let deadline = Instant::now() + timeout;
+    let result = collect_until(&mut child, &stdout, &stderr, deadline);
+    if !matches!(result, Ok(Some(_))) {
+        kill_process_group(&mut child);
+    }
+    result?.ok_or_else(|| {
+        let program = command.get_program().to_string_lossy().into_owned();
+        std::io::Error::new(std::io::ErrorKind::TimedOut, format!("{program} did not finish within {}s", timeout.as_secs()))
+    })
+}
+
+/// Reads a pipe to its end on a thread of its own. The thread is never
+/// joined: it ends when the last process holding the pipe open is gone.
+fn drain<R: std::io::Read + Send + 'static>(pipe: Option<R>) -> Receiver<Vec<u8>> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        if let Some(mut pipe) = pipe {
+            let _ = pipe.read_to_end(&mut bytes);
+        }
+        let _ = sender.send(bytes);
+    });
+    receiver
+}
+
+/// The child's exit status and complete output, or `None` when `deadline`
+/// passes first.
+fn collect_until(child: &mut Child, stdout: &Receiver<Vec<u8>>, stderr: &Receiver<Vec<u8>>, deadline: Instant) -> std::io::Result<Option<Output>> {
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            return Ok(None);
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let until_deadline = |pipe: &Receiver<Vec<u8>>| pipe.recv_timeout(deadline.saturating_duration_since(Instant::now())).ok();
+    let (Some(stdout), Some(stderr)) = (until_deadline(stdout), until_deadline(stderr)) else {
+        return Ok(None);
+    };
+    Ok(Some(Output { status, stdout, stderr }))
+}
+
+/// Starts `command` as the leader of its own process group, so that
+/// [`kill_process_group`] also reaches the processes it starts.
+pub fn spawn_in_process_group(command: &mut Command) -> std::io::Result<Child> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    command.spawn()
+}
+
+/// Kills a child started by [`spawn_in_process_group`] together with its
+/// children, and reaps it.
+pub fn kill_process_group(child: &mut Child) {
+    #[cfg(unix)]
+    // SAFETY: plain kill(2) on the child's own process group.
+    unsafe {
+        libc::kill(-(child.id() as i32), libc::SIGKILL);
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// [`output_within`] with [`GIT_TIMEOUT`].
+pub fn output(command: &mut Command) -> std::io::Result<Output> {
+    output_within(command, GIT_TIMEOUT)
 }
 
 /// Repository routing keys removed by [`clear_repository_env`]: presence in
@@ -258,5 +346,54 @@ mod routing_tests {
         for (key, _) in std::env::vars() {
             assert!(!is_repository_routing_key(&key), "routing variable {key} survived the lib-test baseline");
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod timeout_tests {
+    use super::output_within;
+    use std::process::Command;
+    use std::time::{Duration, Instant};
+
+    /// A command that hangs is stopped with its children and answers with an
+    /// error instead of blocking the caller (DEV-466).
+    #[test]
+    fn hanging_command_is_killed_at_the_timeout() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let pid_file = dir.path().join("pid");
+        let mut command = Command::new("sh");
+        command.arg("-c").arg(format!("sleep 600 & echo $! > {}; wait", pid_file.display()));
+        let started = Instant::now();
+        let error = output_within(&mut command, Duration::from_millis(300)).expect_err("hanging command must time out");
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < Duration::from_secs(5), "took {:?}", started.elapsed());
+        let pid = std::fs::read_to_string(&pid_file).expect("pid file");
+        let alive = Command::new("kill").arg("-0").arg(pid.trim()).status().expect("kill -0");
+        assert!(!alive.success(), "the hanging child {pid} is still running");
+    }
+
+    /// A command that exits while a process it started still holds its output
+    /// open: collecting the output must stop at the timeout too (DEV-466).
+    #[test]
+    fn child_holding_the_output_open_is_killed_at_the_timeout() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let pid_file = dir.path().join("pid");
+        let mut command = Command::new("sh");
+        command.arg("-c").arg(format!("sleep 3 & echo $! > {}; exit 0", pid_file.display()));
+        let started = Instant::now();
+        let error = output_within(&mut command, Duration::from_millis(300)).expect_err("open output must time out");
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < Duration::from_secs(2), "took {:?}", started.elapsed());
+        let pid = std::fs::read_to_string(&pid_file).expect("pid file");
+        let alive = Command::new("kill").arg("-0").arg(pid.trim()).status().expect("kill -0");
+        assert!(!alive.success(), "the child {pid} holding the output is still running");
+    }
+
+    #[test]
+    fn finished_command_returns_its_output() {
+        let output = output_within(Command::new("sh").arg("-c").arg("echo out; echo err >&2; exit 3"), Duration::from_secs(10)).expect("output");
+        assert_eq!(output.status.code(), Some(3));
+        assert_eq!(output.stdout, b"out\n");
+        assert_eq!(output.stderr, b"err\n");
     }
 }

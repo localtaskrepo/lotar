@@ -1,16 +1,17 @@
 title: Assigning a review or merge profile by hand starts its agent with the generic prompt, and a reviewer merged and pushed
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:15:01.666242+00:00
-modified: 2026-11-15T20:19:18.780619+00:00
+modified: 2026-11-15T20:58:54.980108+00:00
 relationships:
   related:
   - DEV-580
   - DEV-200
   - DEV-553
+  - DEV-513
 comments:
 - date: 2026-11-15T19:39:24.656316+00:00
   author: claude
@@ -114,13 +115,42 @@ comments:
       result: not_run
       reason: cannot verify current fix
     next: Merge agent may proceed
+- date: 2026-11-15T20:58:37.948448+00:00
+  author: codex
+  text: |-
+    Merged into local main as `f37cbaa0`; not pushed because the release push is held.
+
+    - Rebased reviewed `3b7330ef` onto `85565157` as `dd41ec09`, without conflicts; no npm lockfile changed. Fast-forwarded main, then signed-amended pending `.tasks` updates as instructed. Application code is unchanged by the amendment.
+    - All required gates passed. Tests and lint used approved retries with `RUSTC_WRAPPER=` after sccache permission blocks; smoke passed on its approved run.
+    - Rechecked G-21 job `job-20261115T190911.707Z-1`: it records the original generic-prompt merge. That immutable log remains historical evidence; the passing assignment regression covers review, merge-style and generic fallback for new jobs.
+    - No rules or agent profiles changed, so no trust refresh was required. Preserved DEV-513’s explicit hold on pushing main; no commits can be pushed before its oldest unpushed release commit.
+    - No durable guidance correction. Status and assignee remain for job-end automation.
+  report:
+    commits:
+    - hash: f37cbaa0
+      what: reviewed assignment-prompt fix rebased and landed on main, with pending ticket updates
+    checks:
+    - command: RUSTC_WRAPPER= npm run lint:agent
+      result: passed
+    - command: RUSTC_WRAPPER= npm run test:agent
+      result: passed
+      reason: 2219 Rust, 1547 UI, 50 release and 7 hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 404 tests
+    - command: G-21 historical agent log
+      result: passed
+      reason: confirms original generic-prompt incident; historical records cannot demonstrate a new assignment
+    - command: git push
+      result: not_run
+      reason: oldest unpushed commit c01909e9 belongs to DEV-513, whose release push remains held
+    next: Automation may complete this ticket; DEV-513 owns the held main push
 description: |-
   Found 2026-11-15 by the chief of staff's retry agent: setting G-21's assignee to @review-claude started a review job by itself with lotar's generic 'make concrete changes' prompt; that job merged and pushed 497dd58 to gairola main before the queued review steps ran. (Here the pushed tree equals the reviewed f88bfff, so nothing unchecked landed, but the owner's rule is no merge without a passed review.)
   Check: the job's prompt in lotar agent logs for G-21's @review-claude job.
   Done when: a start triggered by an assignment uses the matching rule's prompt (review, merge), or review/merge profiles carry their own prompt, so a review job never merges or pushes; test for both. Until then: restart reviews only with lotar agent run, not by changing the assignee.
 tags:
 - health
-- review-returned
 custom_fields:
   finding: automation:assign-generic-prompt
 history:
@@ -211,3 +241,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T20:58:37.948448+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:58:39.422354+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-580","DEV-200","DEV-553"]}'
+    new: '{"related":["DEV-580","DEV-200","DEV-553","DEV-513"]}'
+- at: 2026-11-15T20:58:54.980108+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health

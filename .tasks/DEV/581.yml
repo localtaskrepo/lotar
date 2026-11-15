@@ -1,11 +1,11 @@
 title: 'A headless job after a T3 job on the same ticket fails: agent/<ID> is checked out in the T3 thread''s worktree'
-status: Reviewing
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix-codex'
 created: 2026-11-15T20:09:34.810817+00:00
-modified: 2026-11-15T20:43:13.353058+00:00
+modified: 2026-11-15T21:02:03.800403+00:00
 relationships:
   related:
   - DEV-583
@@ -36,6 +36,18 @@ comments:
       result: passed
       reason: 404 tests
     next: Review on another model, then merge
+- date: 2026-11-15T20:58:32.614282+00:00
+  author: codex
+  text: |-
+    Review: blocking — the new regression passes, but its test command fails the temporary-file cleanup gate.
+
+    - At `crates/lotar-lib/tests/dev503_harness_jobs_test.rs:595`, the new test leaves `.lotar-test-scratch` in the runner's temporary directory. `RUSTC_WRAPPER= npm run test:rust:agent -- headless_jobs_run_in_the_t3_threads_worktree_that_has_the_tickets_branch` reports `1 passed` followed by `tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch` and exits 1. Fix the fixture/subprocess cleanup and rerun this command successfully.
+    - Initial sccache denial persisted on approved retry; disabling the wrapper compiled successfully. The sandbox then blocked the fake harness Unix socket; approved execution with the wrapper disabled reached the cleanup failure above.
+    - Read the complete three-file feature diff and commit `879ca4ef`, ticket/comments, related tickets, owner thread-noise decision, reuse/session/cleanup callers and recent main history. No other correctness finding. Main has advanced; merge requires rebase and verification.
+    - `git diff --check` passed; no tracked files changed. Full lint/test/smoke not independently rerun; the fix agent reports passes. No UI changes or minor tickets. Status and assignee unchanged.
+- date: 2026-11-15T21:02:03.800403+00:00
+  author: automation
+  text: The fix agent's job job-20261115T210200.620Z-65 failed (lotar agent logs job-20261115T210200.620Z-65); @fix-codex retries it on branch agent/DEV-581.
 description: |-
   Found in standards STD-124 (2026-11-15): reviews and merges are to run headless (claude, codex runners) after a fix on the t3 runner. The t3 fix thread works in T3 Code's worktree (~/.t3/worktrees/<repo>/agent-<ID>-…) with the ticket branch agent/<ID> checked out. A later claude, codex or command job calls prepare_worktree (crates/lotar-lib/src/services/agent_job_service.rs), which runs `git worktree add <dir>/<ticket> agent/<ID>`; git refuses, and the job fails before the agent starts:
 
@@ -53,6 +65,9 @@ description: |-
   - [ ] A later t3 job with session: continue still continues the fix thread in its worktree (the branch stays checked out there), and a merge job in that worktree still fast-forwards main.
   - [ ] Done cleanup still removes that worktree.
   - [ ] A test covers t3 fix -> headless review -> t3 rework on one ticket; docs/help/agent.md (Worktrees) says so.
+tags:
+- review-returned
+- fix-retried
 history:
 - at: 2026-11-15T20:09:35.013739+00:00
   actor: claude
@@ -96,3 +111,41 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-15T20:58:32.614282+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:58:32.734294+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-15T20:58:43.379877+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-15T21:02:00.890537+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T21:02:03.628995+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: review-returned
+    new: review-returned, fix-retried
+- at: 2026-11-15T21:02:03.800403+00:00
+  actor: automation
+  changes:
+  - field: comment_added

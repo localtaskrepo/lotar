@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-15T18:02:07.177638+00:00
+modified: 2026-11-15T21:04:10.232830+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -63,6 +63,9 @@ comments:
 - date: 2026-11-15T18:02:07.177638+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-563 yet. DEV-563 waits for DEV-564.'
+- date: 2026-11-15T21:04:10.232830+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-564.'
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -180,6 +183,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-15T18:02:07.177638+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:04:10.232830+00:00
   actor: automation
   changes:
   - field: comment_added
