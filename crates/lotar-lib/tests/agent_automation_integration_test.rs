@@ -2438,13 +2438,42 @@ exit 0
         assert!(!fixtures.get_temp_path().join("feature.txt").exists(), "a branch whose check fails must not reach the main checkout");
     }
 
+    /// Removes a fixture's agent worktrees, which live next to the fixture
+    /// repo and outside its temp dir, on every exit path (DEV-553).
+    #[cfg(unix)]
+    struct RemoveWorktrees(PathBuf);
+
+    #[cfg(unix)]
+    impl RemoveWorktrees {
+        fn of(fixtures: &TestFixtures) -> Self {
+            let temp_path = fixtures.get_temp_path();
+            let root = temp_path.parent().unwrap_or(temp_path).join(".lotar-worktrees");
+            Self(root.join(temp_path.file_name().unwrap_or_default()))
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for RemoveWorktrees {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+            if let Some(root) = self.0.parent() {
+                let _ = fs::remove_dir(root); // only once no other fixture uses it
+            }
+        }
+    }
+
     /// Runs a merge job without rules for the job's end: the stub agent commits
     /// on its branch, runs `ticket_commands` (lotar subcommands for the ticket)
     /// and leaves the fast-forward to LoTaR, as a sandboxed agent must. Returns
-    /// the ended job and the ticket (DEV-516).
+    /// the ended job and the ticket (DEV-516); dropping the returned guard
+    /// removes the job's worktree.
     #[cfg(unix)]
-    fn run_merge_without_end_rules(prefix: &str, ticket_commands: &[&str]) -> (TestFixtures, lotar::api_types::AgentJob, lotar::api_types::TaskDTO) {
+    fn run_merge_without_end_rules(
+        prefix: &str,
+        ticket_commands: &[&str],
+    ) -> (TestFixtures, lotar::api_types::AgentJob, lotar::api_types::TaskDTO, RemoveWorktrees) {
         let fixtures = TestFixtures::new();
+        let worktrees = RemoveWorktrees::of(&fixtures);
         init_git_repository(fixtures.get_temp_path());
         let lotar = crate::common::lotar_bin();
         let commands: String = ticket_commands.iter().map(|command| format!("\"{}\" {command} >/dev/null || exit 3\n", lotar.display())).collect();
@@ -2470,10 +2499,12 @@ exit 0
         .expect("create task");
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@merge".to_string()), ..Default::default() }).expect("assign merge agent");
 
-        let jobs = wait_for_ticket_jobs(&created.id, 10_000, |jobs| jobs.iter().any(|job| job.finished_at.is_some()));
+        // The job's end (the agent's deferred handback, worktree cleanup) runs
+        // after it finishes: wait until its worker is done (DEV-553).
+        let jobs = wait_for_ticket_jobs(&created.id, 10_000, |jobs| jobs.iter().any(|job| job.finished_at.is_some() && AgentJobService::job_settled(&job.id)));
         let job = jobs.first().cloned().expect("merge job");
         let task = TaskService::get(&storage, &created.id, None).expect("get task");
-        (fixtures, job, task)
+        (fixtures, job, task, worktrees)
     }
 
     /// Without rules for the job's end, a merge agent sets a status when it
@@ -2485,7 +2516,7 @@ exit 0
         crate::common::require_git();
         let _guard = lock_agent_tests();
         enable_server_mode();
-        let (fixtures, job, task) = run_merge_without_end_rules("NOR", &["status \"$LOTAR_TICKET_ID\" Review"]);
+        let (fixtures, job, task, _worktrees) = run_merge_without_end_rules("NOR", &["status \"$LOTAR_TICKET_ID\" Review"]);
         assert_eq!(job.status, "completed", "{job:?}");
         assert!(fixtures.get_temp_path().join("feature.txt").exists(), "LoTaR fast-forwards the main checkout: {job:?}");
         assert_eq!(task.status.as_str(), "Review");
@@ -2500,8 +2531,13 @@ exit 0
         crate::common::require_git();
         let _guard = lock_agent_tests();
         enable_server_mode();
-        let (fixtures, job, task) = run_merge_without_end_rules("NRH", &["status \"$LOTAR_TICKET_ID\" HelpNeeded", "assignee \"$LOTAR_TICKET_ID\" reviewer"]);
+        let (fixtures, job, task, _worktrees) =
+            run_merge_without_end_rules("NRH", &["status \"$LOTAR_TICKET_ID\" HelpNeeded", "assignee \"$LOTAR_TICKET_ID\" reviewer"]);
         assert_eq!(job.status, "completed", "{job:?}");
+        assert!(
+            job.worktree_path.as_deref().is_some_and(|path| Path::new(path).join("feature.txt").exists()),
+            "the handed-back work stays in its worktree: {job:?}"
+        );
         assert!(!fixtures.get_temp_path().join("feature.txt").exists(), "a handed-back branch must not reach the main checkout: {job:?}");
         assert_eq!((task.status.as_str(), task.assignee.as_deref()), ("HelpNeeded", Some("reviewer")));
     }
