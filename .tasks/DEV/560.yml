@@ -1,19 +1,54 @@
 title: 'Timeline shows only the last 200 events of a held job: DEV-518''s rework never reached main'
-status: InProgress
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T07:59:42.535485+00:00
-modified: 2026-11-15T08:02:38.478765+00:00
+modified: 2026-11-15T08:18:04.518916+00:00
 relationships:
   related:
   - DEV-513
   - DEV-518
   - DEV-523
   - DEV-532
+  - DEV-521
+  - DEV-466
+  - DEV-510
+comments:
+- date: 2026-11-15T08:08:59.391279+00:00
+  author: claude
+  text: |-
+    DEV-518's rework is ported onto main in `68e5d16a`; ready for review.
+
+    - Ported `git diff 0327eb8f 6818cb78` (5 files). One conflict: since DEV-521, `push_event` queues log lines, so `QueuedLogEvent` now carries a `JobLogEntry` with its `sequence`. Also kept main's `takes_over_as_merge_job` in `adopt_orphaned_job`.
+    - Regression test `a_held_job_past_the_event_cap_returns_its_whole_thread_with_live_sequences` gets two `flush_event_log()` calls because of that queue. It fails without the fix (memory-only events) and passes with it.
+    - Callers checked: `routes/jobs.rs` (`/api/jobs/logs`), `task_timeline.rs` (`--threads`, MCP). CLI `agent logs` ignores the new optional field.
+    - Done when now lists each surface and case.
+    - Checks: `npm run lint` ok; `npm run test:agent` 2205 Rust + 1547 UI + release + hooks passed; `npm run smoke` 404 passed.
+    - No UI files changed, so no screenshots.
+- date: 2026-11-15T08:12:44.003157+00:00
+  author: codex
+  text: |-
+    Review: passed. No code findings in `68e5d16a`.
+
+    - Reviewed full diff, ticket/comments and related tickets, owner decisions, guidance, main history and REST/CLI/MCP callers. Sequence merge, memory precedence, legacy logs and orphan numbering match the criteria. No UI changes.
+    - Lint and focused held-job regression passed with `RUSTC_WRAPPER=`; `git diff --check` passed. Before-fix failure is recorded by the fix agent, not repeated by modifying this read-only checkout.
+    - Full tests stopped at embedded server test (serve printed no URL; 2145 tests not run). Smoke built but was stopped after repeated environment failures. Initial attempts hit sandbox-denied sccache. Full tests/smoke were reported passing by the fix agent, not independently reproduced here.
+    - No files changed, commits or tickets filed; status/assignee unchanged. All checks stopped. No durable guidance finding.
+- date: 2026-11-15T08:18:04.381953+00:00
+  author: codex
+  text: |-
+    Merged into local main; publication waits for the owners release decision.
+
+    - Rebased `68e5d16a` cleanly to `47912994`, then fast-forwarded main from `c01909e9`.
+    - Required checks passed after rebase: `lint:agent`, `test:agent` (2206 Rust, 1547 UI, release and hooks), `test:smoke:agent` (404). Used `RUSTC_WRAPPER=` after sccache permission denial; checks ran outside the sandbox. No checks remain running.
+    - No rules/profile changes; trust refresh unnecessary. No health finding to rerun.
+    - Not pushed: the preceding unpushed commit `c01909e9` belongs to unfinished DEV-513. Owner answered no at 08:13:22Z: wait for DEV-560, DEV-510 and DEV-466. No newer commit can be pushed without that release commit.
+    - Pending main-checkout ticket updates are included by the requested amend. No code changes beyond the reviewed fix.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87fcea32-ae7c-4d1f-8d07-1eba751a0d93
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abd6fd208-d47d-49dc-bf9d-e2860495d4cc
 releases:
 - 6
 description: |-
@@ -111,3 +146,50 @@ history:
       - [ ] No log, or one that fails to load: the held events alone, as before.
       - [ ] Regression test `a_held_job_past_the_event_cap_returns_its_whole_thread_with_live_sequences` fails without the fix and passes on main; `docs/help/agent.md`, `docs/help/api-quick-reference.md` and `docs/openapi.json` describe it.
       - [ ] Its review passed.
+- at: 2026-11-15T08:08:59.391279+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:08:59.676339+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-513","DEV-518","DEV-523","DEV-532"]}'
+    new: '{"related":["DEV-513","DEV-518","DEV-523","DEV-532","DEV-521"]}'
+- at: 2026-11-15T08:09:08.673122+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T08:09:09.764661+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abd6fd208-d47d-49dc-bf9d-e2860495d4cc
+- at: 2026-11-15T08:12:44.003157+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:12:51.046361+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T08:18:04.381953+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:18:04.518916+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-513","DEV-518","DEV-523","DEV-532","DEV-521"]}'
+    new: '{"related":["DEV-513","DEV-518","DEV-523","DEV-532","DEV-521","DEV-466","DEV-510"]}'

@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-15T08:06:24.026381+00:00
+modified: 2026-11-15T08:13:22.773279+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -88,6 +88,17 @@ comments:
     - key: no
       label: Wait for DEV-560, DEV-510, DEV-466
     recommended: no
+- date: 2026-11-15T08:13:22.098054+00:00
+  author: mallox
+  text: |-
+    Answer: no (Wait for DEV-560, DEV-510, DEV-466)
+
+    (answered in INBOX-234)
+  answer:
+    to: 2026-11-15T08:06:23.872478+00:00
+    choice:
+    - no
+    note: (answered in INBOX-234)
 releases:
 - 6
 description: |-
@@ -107,6 +118,10 @@ description: |-
   ## Upgrade
 
   Upgrade lotar to this release only while no agent job runs: a job started by the old runner is not picked up by the new one (DEV-510).
+tags:
+- blocked
+- blocked-by:DEV-466
+- blocked-by:DEV-510
 history:
 - at: 2026-11-14T04:17:27.210863+00:00
   actor: claude
@@ -255,3 +270,22 @@ history:
   - field: status
     old: Todo
     new: HelpNeeded
+- at: 2026-11-15T08:13:22.098054+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:13:22.607267+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T08:13:22.773279+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: claude
+  - field: tags
+    old: ''
+    new: blocked, blocked-by:DEV-466, blocked-by:DEV-510

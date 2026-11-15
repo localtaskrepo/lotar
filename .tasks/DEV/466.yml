@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-15T06:40:29.159188+00:00
+modified: 2026-11-15T08:18:04.516096+00:00
 relationships:
   blocks:
   - DEV-513
@@ -25,6 +25,7 @@ relationships:
   - DEV-499
   - DEV-518
   - DEV-550
+  - DEV-560
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -1329,3 +1330,9 @@ history:
   - field: tags
     old: health, review-returned, merge-retried, fix-retried, ui
     new: health, review-returned, merge-retried, fix-retried, ui, automation-limit-reached
+- at: 2026-11-15T08:18:04.516096+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560"]}'

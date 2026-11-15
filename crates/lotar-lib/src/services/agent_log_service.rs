@@ -20,6 +20,10 @@ pub struct JobLogEntry {
     pub at: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub message: Option<String>,
+    /// The event's sequence, as the live stream sent it (DEV-518). Logs of
+    /// older versions have none; their events count by line.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub sequence: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,7 +162,7 @@ impl AgentLogService {
 
     /// Append an event line to the log file.
     /// Only writes if logs_dir is provided.
-    pub fn append_event(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str, kind: &str, at: &str, message: Option<String>) -> LoTaRResult<()> {
+    pub fn append_event(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str, entry: JobLogEntry) -> LoTaRResult<()> {
         let Some(logs_dir) = logs_dir else {
             return Ok(());
         };
@@ -169,7 +173,7 @@ impl AgentLogService {
             return Ok(());
         }
 
-        let entry = JobLogLine::Event(JobLogEntry { kind: kind.to_string(), at: at.to_string(), message });
+        let entry = JobLogLine::Event(entry);
 
         let mut file = OpenOptions::new().append(true).open(&path)?;
         let mut line = serde_json::to_string(&entry).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
@@ -413,6 +417,10 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+    fn entry(kind: &str, at: &str, message: Option<&str>) -> JobLogEntry {
+        JobLogEntry { kind: kind.to_string(), at: at.to_string(), message: message.map(str::to_string), sequence: None }
+    }
+
     #[test]
     fn logs_default_to_the_tasks_dir_and_can_be_turned_off() {
         let tasks = Path::new("/work/.tasks");
@@ -478,15 +486,13 @@ mod tests {
         .unwrap();
 
         // Append events
-        AgentLogService::append_event(workspace_root, Some(logs_dir), "job-test-1", "agent_job_started", "2026-02-03T12:00:01Z", None).unwrap();
+        AgentLogService::append_event(workspace_root, Some(logs_dir), "job-test-1", entry("agent_job_started", "2026-02-03T12:00:01Z", None)).unwrap();
 
         AgentLogService::append_event(
             workspace_root,
             Some(logs_dir),
             "job-test-1",
-            "agent_job_progress",
-            "2026-02-03T12:00:02Z",
-            Some("Reading files...".to_string()),
+            entry("agent_job_progress", "2026-02-03T12:00:02Z", Some("Reading files...")),
         )
         .unwrap();
 
@@ -540,10 +546,10 @@ mod tests {
                 agent_profile: Some("fix".to_string()),
             };
             AgentLogService::init_log(root, Some("logs"), header).unwrap();
-            AgentLogService::append_event(root, Some("logs"), id, "agent_job_message", created, Some("Hello".to_string())).unwrap();
+            AgentLogService::append_event(root, Some("logs"), id, entry("agent_job_message", created, Some("Hello"))).unwrap();
         }
         AgentLogService::write_status(root, Some("logs"), "job-a", "completed", "2026-01-01T00:05:00Z", Some(0), Some("Done".to_string())).unwrap();
-        AgentLogService::append_event(root, Some("logs"), "job-a", "agent_job_progress", "2026-01-01T00:05:01Z", Some("Moved".to_string())).unwrap();
+        AgentLogService::append_event(root, Some("logs"), "job-a", entry("agent_job_progress", "2026-01-01T00:05:01Z", Some("Moved"))).unwrap();
         fs::write(root.join("logs").join("job-broken.jsonl"), "not json\n").unwrap();
 
         let jobs = AgentLogService::load_jobs(root, "logs");

@@ -408,7 +408,7 @@
     "/api/jobs/logs": {
       "get": {
         "summary": "Get agent job logs",
-        "description": "From this server while it holds the job, else from the job's saved log, whose events are numbered by their place in it.",
+        "description": "The job's whole thread: its saved log, where each event keeps the sequence the live stream gave it, joined with the events this server holds (only its last 200). Logs from before sequences were saved count their events by line.",
         "parameters": [
           {
             "name": "id",

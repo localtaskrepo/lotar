@@ -47,9 +47,7 @@ struct QueuedLogEvent {
     workspace_root: std::path::PathBuf,
     logs_dir: Option<String>,
     job_id: String,
-    kind: String,
-    at: String,
-    message: Option<String>,
+    entry: crate::services::agent_log_service::JobLogEntry,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -441,24 +439,21 @@ impl AgentJobService {
         jobs
     }
 
-    /// The job and its events: from this process while it holds the job, else from the job's log (DEV-518).
-    /// Logged events are numbered by their place in the log.
+    /// The job and its whole thread (DEV-518): the job from this process while it holds it, else from its log;
+    /// the events from the log joined with the ones this process holds.
     pub fn job_with_events_in(tasks_dir: &std::path::Path, id: &str) -> Option<(AgentJob, Vec<AgentJobEvent>)> {
+        let saved = saved_job(tasks_dir, id);
         if let Some(job) = get_job_dto(id) {
-            return Some((job, Self::events_for(id)));
+            return Some((job, merged_thread(saved.as_ref(), Self::events_for(id))));
         }
-        let saved = saved_job(tasks_dir, id)?;
+        let saved = saved?;
         let running = crate::services::agent_active_jobs::find(tasks_dir, id).is_some();
         Some((saved_job_dto(&saved, running), saved_events(&saved)))
     }
 
-    /// The job's whole thread for readers (DEV-518): its log holds every event, while this process keeps only
-    /// the last [`EVENT_LOG_LIMIT`].
+    /// The job's whole thread for readers (DEV-518).
     pub fn full_thread_in(tasks_dir: &std::path::Path, id: &str) -> Vec<AgentJobEvent> {
-        match saved_job(tasks_dir, id) {
-            Some(saved) => saved_events(&saved),
-            None => Self::events_for(id),
-        }
+        merged_thread(saved_job(tasks_dir, id).as_ref(), Self::events_for(id))
     }
 
     /// Get queue statistics
@@ -748,13 +743,28 @@ fn saved_job(tasks_dir: &std::path::Path, id: &str) -> Option<crate::services::a
     job_log_dirs(tasks_dir).iter().find_map(|dir| AgentLogService::load_job(&root, dir, id).ok().flatten())
 }
 
+/// A log's events with the sequence the live stream gave them; events of logs from before DEV-518 count by line.
 fn saved_events(saved: &crate::services::agent_log_service::SavedJob) -> Vec<AgentJobEvent> {
     saved
         .events
         .iter()
         .zip(1u64..)
-        .map(|(entry, sequence)| AgentJobEvent { kind: entry.kind.clone(), sequence, at: entry.at.clone(), message: entry.message.clone() })
+        .map(|(entry, line)| AgentJobEvent {
+            kind: entry.kind.clone(),
+            sequence: entry.sequence.unwrap_or(line),
+            at: entry.at.clone(),
+            message: entry.message.clone(),
+        })
         .collect()
+}
+
+/// The job's log and the events this process holds, one per sequence (DEV-518): the log has every event since
+/// it was opened, memory only the last [`EVENT_LOG_LIMIT`], including any from before the log was opened.
+fn merged_thread(saved: Option<&crate::services::agent_log_service::SavedJob>, held: Vec<AgentJobEvent>) -> Vec<AgentJobEvent> {
+    let mut by_sequence: std::collections::BTreeMap<u64, AgentJobEvent> =
+        saved.map(saved_events).unwrap_or_default().into_iter().map(|event| (event.sequence, event)).collect();
+    by_sequence.extend(held.into_iter().map(|event| (event.sequence, event)));
+    by_sequence.into_values().collect()
 }
 
 /// A logged job. One without an end in its log is running when a live process holds it, else it ended with
@@ -1544,6 +1554,12 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
         return;
     }
     let header = agent_logs_dir.as_deref().and_then(|dir| AgentLogService::load_header(&workspace_root, dir, &job.job_id).ok().flatten());
+    // Its events go on after the logged ones, so the log keeps one event per sequence (DEV-518).
+    let logged_sequence = agent_logs_dir
+        .as_deref()
+        .and_then(|dir| AgentLogService::load_job(&workspace_root, dir, &job.job_id).ok().flatten())
+        .and_then(|saved| saved_events(&saved).iter().map(|event| event.sequence).max())
+        .unwrap_or(0);
     let is_merge_job = takes_over_as_merge_job(&job);
     {
         let Ok(mut registry) = JOB_REGISTRY.lock() else {
@@ -1582,7 +1598,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                     is_merge_job,
                 },
                 events: Vec::new(),
-                next_sequence: 0,
+                next_sequence: logged_sequence,
                 runtime: None,
                 cancellation_finalized: false,
                 runner_failed: false,
@@ -4028,9 +4044,12 @@ fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) ->
             workspace_root: state.record.workspace_root.clone(),
             logs_dir: state.record.agent_logs_dir.clone(),
             job_id: state.record.id.clone(),
-            kind: event.kind.clone(),
-            at: event.at.clone(),
-            message: event.message.clone(),
+            entry: crate::services::agent_log_service::JobLogEntry {
+                kind: event.kind.clone(),
+                at: event.at.clone(),
+                message: event.message.clone(),
+                sequence: Some(event.sequence),
+            },
         });
     }
     event
@@ -4046,7 +4065,7 @@ fn flush_event_log() {
         let Some(entry) = EVENT_LOG_QUEUE.lock().ok().and_then(|mut queue| queue.pop_front()) else {
             return;
         };
-        let _ = AgentLogService::append_event(&entry.workspace_root, entry.logs_dir.as_deref(), &entry.job_id, &entry.kind, &entry.at, entry.message);
+        let _ = AgentLogService::append_event(&entry.workspace_root, entry.logs_dir.as_deref(), &entry.job_id, entry.entry);
     }
 }
 
@@ -4690,6 +4709,55 @@ mod tests {
         assert_eq!(next.sequence, total as u64 + 1);
         assert_eq!(state.events.len(), EVENT_LOG_LIMIT);
         assert_eq!(state.events.last().map(|event| event.sequence), Some(next.sequence));
+    }
+
+    #[test]
+    fn a_held_job_past_the_event_cap_returns_its_whole_thread_with_live_sequences() {
+        // DEV-518 review: a job this process holds gave only its last EVENT_LOG_LIMIT events.
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks_dir = tmp.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+        let logs_dir = crate::services::agent_log_service::effective_logs_dir(&tasks_dir, None);
+        let id = "job-dev518-held";
+        let mut state = unit_job_state(id);
+        state.record.tasks_dir = tasks_dir.clone();
+        state.record.workspace_root = tmp.path().to_path_buf();
+        state.record.agent_logs_dir = logs_dir.clone();
+        // An event from before the log was opened lives only in memory, and the cap drops it.
+        push_event(&mut state, "agent_job_progress", Some("before the log".into()));
+        flush_event_log();
+        AgentLogService::init_log(
+            tmp.path(),
+            logs_dir.as_deref(),
+            crate::services::agent_log_service::JobLogHeader {
+                job_id: id.to_string(),
+                ticket_id: "TEST-1".to_string(),
+                runner: "command".to_string(),
+                created_at: Utc::now().to_rfc3339(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: None,
+                effort: None,
+                agent_profile: None,
+            },
+        )
+        .unwrap();
+        let total = EVENT_LOG_LIMIT + 50;
+        for index in 1..total {
+            push_event(&mut state, "agent_job_message", Some(format!("m{index}")));
+        }
+        flush_event_log();
+        assert_eq!(state.events.len(), EVENT_LOG_LIMIT);
+        JOB_REGISTRY.lock().unwrap().jobs.insert(id.to_string(), state);
+
+        let thread = AgentJobService::job_with_events_in(&tasks_dir, id).map(|(_, events)| events);
+        let full = AgentJobService::full_thread_in(&tasks_dir, id);
+        JOB_REGISTRY.lock().unwrap().jobs.remove(id);
+
+        let thread = thread.unwrap();
+        assert_eq!(thread.iter().map(|event| event.sequence).collect::<Vec<_>>(), (2..=total as u64).collect::<Vec<_>>());
+        assert_eq!(thread[0].message.as_deref(), Some("m1"), "the oldest logged events are back");
+        assert_eq!(full.len(), total - 1);
     }
 
     #[cfg(unix)]

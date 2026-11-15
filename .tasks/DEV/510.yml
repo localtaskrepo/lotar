@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-15T06:35:13.991842+00:00
+modified: 2026-11-15T08:18:04.517744+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -26,6 +26,7 @@ relationships:
   - DEV-528
   - DEV-544
   - DEV-550
+  - DEV-560
 comments:
 - date: 2026-11-14T04:12:50.227687+00:00
   author: claude
@@ -910,3 +911,9 @@ history:
   - field: assignee
     old: '@review'
     new: claude
+- at: 2026-11-15T08:18:04.517744+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560"]}'
