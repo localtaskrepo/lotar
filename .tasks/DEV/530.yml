@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-16T00:21:00.159726+00:00
+modified: 2026-11-16T00:30:38.454356+00:00
 relationships:
   related:
   - DEV-351
@@ -574,6 +574,26 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-16T00:30:38.451397+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent reworks it once more)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): rework the newly found legacy-ticket resume gap.
+
+    - Review read the current ticket branch, `agent/DEV-530` at `fb666856`; this is a new code finding, not the earlier stale-checkout or sccache failure.
+    - The previous claim-recovery finding was removed; the subsequent checks all passed at 23:38Z. Latest review: an agent-assigned Blocked ticket without a parked job is excluded by the new rule and never resumes. Preserve its fallback continuation; suppress the rule only when a parked job actually resumes. Add regression coverage and align docs.
+    - No `retry-fix` or `retry-fable` tag was present; this is the first tracked retry for this finding. If it recurs, use the prescribed Fable escalation rather than repeating the same retry.
+  answer:
+    to: 2026-11-16T00:21:00.159726+00:00
+    choice:
+    - fix
+    note: |-
+      Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): rework the newly found legacy-ticket resume gap.
+
+      - Review read the current ticket branch, `agent/DEV-530` at `fb666856`; this is a new code finding, not the earlier stale-checkout or sccache failure.
+      - The previous claim-recovery finding was removed; the subsequent checks all passed at 23:38Z. Latest review: an agent-assigned Blocked ticket without a parked job is excluded by the new rule and never resumes. Preserve its fallback continuation; suppress the rule only when a parked job actually resumes. Add regression coverage and align docs.
+      - No `retry-fix` or `retry-fable` tag was present; this is the first tracked retry for this finding. If it recurs, use the prescribed Fable escalation rather than repeating the same retry.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -611,6 +631,7 @@ tags:
 - review-returned
 - merge-retried
 - fix-retried
+- retry-fix
 history:
 - at: 2026-11-14T07:27:35.590249+00:00
   actor: claude
@@ -1379,3 +1400,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-16T00:30:38.075310+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: review-returned, merge-retried, fix-retried
+    new: review-returned, merge-retried, fix-retried, retry-fix
+- at: 2026-11-16T00:30:38.451397+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:30:38.454356+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

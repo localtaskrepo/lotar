@@ -1,17 +1,46 @@
 title: 'Flaky smoke: global task actions on desktop still time out under full-suite load, now waiting for the Create task panel to close'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-15T23:57:31.115443+00:00
-modified: 2026-11-16T00:17:04.259805+00:00
+modified: 2026-11-16T00:39:02.455756+00:00
 relationships:
   related:
   - DEV-580
   - DEV-587
+comments:
+- date: 2026-11-16T00:25:25.999127+00:00
+  author: automation
+  text: The fix agent's job job-20261116T001703.280Z-24 failed (lotar agent logs job-20261116T001703.280Z-24); @fix-codex retries it on branch agent/DEV-597.
+- date: 2026-11-16T00:38:45.865181+00:00
+  author: codex
+  text: |-
+    No change needed: all five consecutive full smoke runs passed on the existing branch.
+
+    - Each run passed `118` files and `405` tests, including desktop global task creation.
+    - Clean checkout; `git log main..HEAD` is empty. No commit needed.
+    - Built with `RUSTC_WRAPPER=` after normal and elevated builds hit sccache `EPERM`; ran suites elevated after localhost listen was blocked.
+    - Logs: `/tmp/dev597-smoke-retry.log`, `/tmp/dev597-smoke-run-2.log` through `/tmp/dev597-smoke-run-5.log`.
+    - This meets the ticket acceptance criterion; intermittent failure was not reproduced.
+  report:
+    checks:
+    - command: npm run test:smoke:quick:agent
+      result: passed
+      reason: five consecutive full runs, 405 tests each
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: build completed with RUSTC_WRAPPER=; sandbox listen EPERM required elevated quick suite
+    - command: npm run lint
+      result: not_run
+      reason: no file changes
+    - command: npm test
+      result: not_run
+      reason: no file changes
+    next: No review or merge needed; acceptance met without changes
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39ef181f-635e-4413-8f81-6e8c4e45749d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afabaa510-0701-441e-b20d-840d1f764451
 description: 'Found 2026-11-15 in the DEV-580 merge on 4c2ae054''s base: one full npm run test:smoke:agent failed 1 of 405, tests/ui.global-actions.smoke.spec.ts > ''keeps actions usable and creates in the known project on desktop'', TimeoutError at line 121, panel.waitFor({ state: ''detached'' }) after clicking Create (30 s; the ''Create task'' dialog stayed visible). DEV-587 (Done) fixed the earlier poll at lines 114-116; this is the next wait in the same test. The file alone passed 3 of 3 and a second full run passed 405 of 405. Check: run the full smoke suite a few times (npm run test:smoke:quick:agent after one build). Done: the test passes under full-suite load in 5 full runs in a row.'
 tags:
 - health
@@ -40,3 +69,39 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39ef181f-635e-4413-8f81-6e8c4e45749d
+- at: 2026-11-16T00:25:25.657248+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-16T00:25:25.999127+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:26:32.693073+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afabaa510-0701-441e-b20d-840d1f764451
+- at: 2026-11-16T00:38:45.865181+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:39:00.111345+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-codex'
+- at: 2026-11-16T00:39:02.455756+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health

@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-16T00:21:30.680614+00:00
+modified: 2026-11-16T00:39:20.518221+00:00
 relationships:
   blocks:
   - DEV-588
+  - DEV-563
   related:
   - DEV-501
   - DEV-532
@@ -432,6 +433,46 @@ comments:
     - Reran: the DEV-520 tests and the DEV-510 takeover tests (`cargo nextest run --workspace -E 'test(/dev520/) | test(/taken_over_t3_job/) | test(/t3_job_taken_over/)'`), 8 of 8 passed in each of 4 runs. `git diff --check` is clean.
     - Not rerun: `npm run lint`, `npm test`, `npm run smoke`. The fix agent reports them passed on `60a7ad9b`.
     - Main moved on (`a5e77173`, `0bff1e4d`). Neither touches `agent_job_service.rs`, so I expect a clean rebase.
+- date: 2026-11-16T00:27:42.137202+00:00
+  author: codex
+  text: |-
+    Merge rebase is clean; required checks are running on `3643595f`.
+
+    - Rebased reviewed `60a7ad9b` onto main `b2bab7f9`; no conflicts or lockfile changes.
+    - Lint's first attempt hit sandbox-denied sccache; retry is running with approved access.
+- date: 2026-11-16T00:39:20.518221+00:00
+  author: codex
+  text: |-
+    Merged the reviewed fix into main; every required check passed.
+
+    - Rebased `60a7ad9b` cleanly onto `b2bab7f9`, then fast-forwarded main to `3643595f`. No source changes beyond the reviewed fix; no conflicts or lockfile changes.
+    - Full lint, tests and build-first smoke passed. The lag/replay and takeover checks also passed on main: 8 of 8.
+    - Pending `.tasks` updates are included by the requested ticket-only amend. No automation rules or agent profiles changed, so no trust refresh is needed.
+    - No push: the oldest unpushed commit, `ee916064`, belongs to STD-170, which is `HelpNeeded` and assigned to `mallox` for an owner decision. There is no new finished prefix before it to push.
+    - Status and assignee are left for job automation. No durable guidance finding.
+  report:
+    commits:
+    - hash: 3643595f
+      what: reviewed fix rebased and fast-forwarded into main; pending task snapshots will be amended into it
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: approved retry after sandbox-denied sccache
+    - command: npm run test:agent
+      result: passed
+      reason: 2230 Rust, 1548 UI, 50 release and 7 hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 smoke tests
+    - command: cargo nextest run --cargo-profile local --workspace -E 'test(/dev520/) | test(/taken_over_t3_job/) | test(/t3_job_taken_over/)'
+      result: passed
+      reason: rerun in main, 8 tests
+    - command: git diff --check
+      result: passed
+    - command: git push
+      result: not_run
+      reason: oldest unpushed commit ee916064 belongs to STD-170, HelpNeeded awaiting owner
+    next: Automation completes DEV-520; push waits for STD-170 owner decision
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -442,6 +483,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa3dde28-c4a6-48d9-a0d4-6848aac33a6a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af15860d5-2f1a-4ef6-b8bd-7f490dd9d910
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aafa8619b-c86e-4ce4-bc34-698f3afa309e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad48242de-8c43-4034-94b8-a52b351004e1
 releases:
 - 6
 description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lotar-lib/src/services/agent_job_service.rs) reads harnessmux''s broadcast channel (capacity 1024, harnessmux 0.1.1 session.rs:127) and on RecvError::Lagged just continues. MessageDelta/ThoughtDelta events come per chunk and lotar''s loop reads the cancel file and takes the registry lock per event, so a chatty turn can lag; if the dropped events include TurnFinished/TurnFailed the loop never sees the turn end and the job runs until someone cancels it. Check: a unit test that feeds more than 1024 events before the turn''s end and expects the job to end. Done: on lag, the missed events (seq after the last one seen) are replayed from the session''s event log (Status.events) through the same handling, the job ends with the right exit code, and the test passes.'
@@ -1079,3 +1121,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T00:26:09.830952+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad48242de-8c43-4034-94b8-a52b351004e1
+- at: 2026-11-16T00:26:56.068480+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-588"],"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586","DEV-590","DEV-593","DEV-580"]}'
+    new: '{"blocks":["DEV-588","DEV-563"],"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586","DEV-590","DEV-593","DEV-580"]}'
+- at: 2026-11-16T00:27:42.137202+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:39:20.518221+00:00
+  actor: codex
+  changes:
+  - field: comment_added

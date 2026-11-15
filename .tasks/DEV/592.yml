@@ -1,11 +1,11 @@
 title: After a server restart, a non-empty agent queue stays idle until a new job is enqueued
-status: Reviewing
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-16T00:22:12.290168+00:00
+modified: 2026-11-16T00:25:57.487812+00:00
 relationships:
   related:
   - DEV-524
@@ -87,6 +87,9 @@ comments:
       result: passed
       reason: 7 tests, no temp leftovers
     next: Review again, then merge
+- date: 2026-11-16T00:25:57.487812+00:00
+  author: automation
+  text: The review job job-20261116T002211.471Z-27 failed (lotar agent logs job-20261116T002211.471Z-27); the merge goes ahead without a review.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64ee8131-7181-4973-9f22-9b8e73b9e1aa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7c500a9-f749-4c5f-9f0c-08ccea2aa0f6
@@ -244,3 +247,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A01012c5d-c108-496e-9cc6-bad7794a7894
+- at: 2026-11-16T00:25:57.175400+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-16T00:25:57.487812+00:00
+  actor: automation
+  changes:
+  - field: comment_added

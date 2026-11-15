@@ -1,11 +1,11 @@
 title: 'Every job on LOCA-317 fails: T3 worktree add path_already_exists (stale agent-LOCA-317 worktree)'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-15T23:48:39.768341+00:00
-modified: 2026-11-16T00:15:14.364276+00:00
+modified: 2026-11-16T00:25:26.786986+00:00
 relationships:
   related:
   - DEV-583
@@ -121,3 +121,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T00:25:26.786986+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: Done

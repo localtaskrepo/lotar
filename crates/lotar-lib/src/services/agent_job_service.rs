@@ -2925,11 +2925,10 @@ fn link_session(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, link
     }
 }
 
-/// The link of the latest `session.started` in a session's event log.
-fn last_session_link(events: &std::path::Path) -> Option<String> {
-    let log = fs::read_to_string(events).ok()?;
-    log.lines().rev().filter_map(|line| serde_json::from_str::<harnessmux::Event>(line).ok()).find_map(|event| match event.body {
-        harnessmux::EventBody::SessionStarted { link, .. } => Some(link),
+/// The link of the latest `session.started` in a session's events.
+fn last_session_link(events: &[harnessmux::Event]) -> Option<&str> {
+    events.iter().rev().find_map(|event| match &event.body {
+        harnessmux::EventBody::SessionStarted { link, .. } => Some(link.as_deref()),
         _ => None,
     })?
 }
@@ -3342,10 +3341,10 @@ fn drive_session(
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
     let status = block_on(session.status()).map_err(|err| err.to_string());
-    // A resumed session starts before the job listens: its start is only in the log.
-    let link = status.as_ref().ok().and_then(|status| last_session_link(&status.events));
     let agent = status.as_ref().map(|status| status.agent.clone()).unwrap_or_default();
     let (mut events, earlier) = SessionEvents::open(status.map(|status| status.events), || session.events());
+    // A resumed session starts before the job listens: its start is only in the log.
+    let link = last_session_link(&earlier);
     let mut meter = CostMeter::after(&earlier);
     // A job taken over from a stopped process has cost something already.
     meter.job = AgentJobService::get_job(job_id).and_then(|job| job.usage).and_then(|usage| usage.cost_usd).unwrap_or(0.0);
@@ -3353,15 +3352,8 @@ fn drive_session(
         Ok(turn) => turn,
         Err(err) => return RunEnd::Failed(format!("Could not send the prompt to the session {}: {err}", session.name())),
     };
-    drive_turns(
-        job_id,
-        tasks_dir,
-        session,
-        &mut events,
-        TurnSettings { first, prefixes, budget, agent: &agent, link: link.as_deref() },
-        meter,
-        context_messages,
-    )
+    let settings = TurnSettings { first, prefixes, budget, agent: &agent, link };
+    drive_turns(job_id, tasks_dir, session, &mut events, settings, meter, context_messages)
 }
 
 /// What a job's turns run with.
@@ -3371,7 +3363,7 @@ struct TurnSettings<'a> {
     first: u64,
     prefixes: &'a [String],
     budget: Option<f64>,
-    /// The session's agent and link (a T3 Code thread), as far as known when the job starts.
+    /// The session's agent and link when the job started.
     agent: &'a str,
     link: Option<&'a str>,
 }
@@ -3434,7 +3426,8 @@ fn drive_turns(
     let mut reported_cost = false;
     let ticket_id = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.record.ticket_id.clone())).unwrap_or_default();
     let ticket_id = ticket_id.as_str();
-    let (mut agent_name, mut link) = (agent.to_string(), link.map(str::to_string));
+    let mut agent_name = agent.to_string();
+    let mut link = link.map(str::to_string);
     if let Some(link) = link.as_deref() {
         link_session(job_id, tasks_dir, ticket_id, link);
     }
@@ -3611,7 +3604,8 @@ fn drive_turns(
 /// sends more than it holds), the missed ones come from the session's event log
 /// (DEV-520), so the turn's end is never lost. harnessmux numbers events one
 /// after another; a gap the log can't fill (missing, unreadable or malformed)
-/// fails the job.
+/// fails the job. An owner that took the session over counts on from the count
+/// its predecessor last saved, so its first event can repeat a seq in the log.
 struct SessionEvents {
     live: tokio::sync::broadcast::Receiver<harnessmux::Event>,
     /// The log, or why lotar doesn't know where it is.
@@ -3620,6 +3614,8 @@ struct SessionEvents {
     pending: std::collections::BTreeMap<u64, harnessmux::Event>,
     /// The last event handed out, or the log's last when it opened; none while the log is unknown.
     last_seq: Option<u64>,
+    /// Before the first event, nothing read is a duplicate: everything came after the log's end.
+    handed_out: bool,
 }
 
 impl SessionEvents {
@@ -3637,7 +3633,7 @@ impl SessionEvents {
             Ok(log)
         });
         let last_seq = log.is_ok().then(|| earlier.last().map_or(0, |event| event.seq));
-        (Self { live: subscribe(), log, pending: Default::default(), last_seq }, earlier)
+        (Self { live: subscribe(), log, pending: Default::default(), last_seq, handed_out: false }, earlier)
     }
 
     /// The next event, none when nothing came within `wait`. The error ends
@@ -3649,7 +3645,7 @@ impl SessionEvents {
             if let Some(entry) = self.pending.first_entry() {
                 let seq = *entry.key();
                 match self.last_seq {
-                    Some(last) if seq <= last => {
+                    Some(last) if seq <= last && self.handed_out => {
                         entry.remove();
                         continue;
                     }
@@ -3663,6 +3659,7 @@ impl SessionEvents {
                     }
                     _ => {
                         self.last_seq = Some(seq);
+                        self.handed_out = true;
                         return Ok(Some(entry.remove()));
                     }
                 }
@@ -5430,7 +5427,7 @@ mod dev520_session_events_tests {
     }
 
     fn drive(events: &mut SessionEvents, tasks_dir: &Path) -> RunEnd {
-        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, agent: "", link: None };
+        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, agent: "fake", link: None };
         drive_turns("dev520-test", tasks_dir, &Idle, events, settings, CostMeter::default(), &mut Vec::new())
     }
 
@@ -5522,6 +5519,29 @@ mod dev520_session_events_tests {
             seen.push(event.seq);
         }
         assert_eq!(seen, (11..=1515).collect::<Vec<_>>());
+    }
+
+    /// A lotar that took the job over owns the session now; harnessmux's new owner counts on from the count the old one
+    /// last saved, below the log's last seq (DEV-510's takeover). Its events are new all the same.
+    #[test]
+    fn a_new_owner_that_numbers_events_again_is_followed() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("events.jsonl");
+        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        for seq in 1..=3 {
+            writeln!(file, "{}", serde_json::to_string(&delta(seq, 1)).unwrap()).unwrap();
+        }
+        let (tx, rx) = tokio::sync::broadcast::channel(1024);
+        let (mut events, _) = SessionEvents::open(Ok(path.clone()), || rx);
+        for event in [delta(2, 2), event(3, 2, EventBody::TurnFailed { error: "boom".into() })] {
+            writeln!(file, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+            tx.send(event).unwrap();
+        }
+        let mut seen = Vec::new();
+        while let Ok(Some(event)) = events.next(Duration::from_millis(50)) {
+            seen.push((event.seq, event.turn));
+        }
+        assert_eq!(seen, [(2, Some(2)), (3, Some(2))]);
     }
 }
 

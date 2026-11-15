@@ -1,18 +1,20 @@
 title: Sign lotar builds from source with the owner's Developer ID
-status: HelpNeeded
+status: Blocked
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-16T00:16:46.513981+00:00
+modified: 2026-11-16T00:27:25.898470+00:00
 relationships:
   depends_on:
   - DEV-564
+  - DEV-520
   related:
   - standards:STD-138
   - DEV-482
   - DEV-564
+  - DEV-588
+  - DEV-593
 comments:
 - date: 2026-11-15T18:01:34.472793+00:00
   author: claude
@@ -196,6 +198,20 @@ comments:
       result: not_run
       reason: initial build collision; final run withheld after failed test gate
     next: Owner decides how to handle failing T3 session test before retrying merge
+- date: 2026-11-16T00:27:08.512033+00:00
+  author: triage
+  text: |-
+    Waits for DEV-520; no owner decision is needed for the failed merge gate.
+
+    - The merge of `53e25f3c` stopped on `dev510_t3_session_test::a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads`, not the signing change.
+    - DEV-520 records the same timeout on main (3/3 runs, comment 2026-11-15 22:57 UTC); DEV-588 and DEV-593 independently report it too. DEV-520 follow-up `60a7ad9b` passed review and 4 runs of the 8 targeted tests (2026-11-16 00:21 UTC).
+    - Added DEV-520 as a prerequisite and set Blocked, per `docs/decisions/2026-11-15-inbox-triage.md` in standards. Continue through “Prerequisites done” after it lands; rerun all merge gates then. Existing DEV-564 prerequisite is retained.
+- date: 2026-11-16T00:27:09.230108+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-520.'
+- date: 2026-11-16T00:27:09.366523+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-563 yet. DEV-563 waits for DEV-520.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
@@ -422,3 +438,44 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-16T00:26:56.070120+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564"],"related":["standards:STD-138","DEV-482","DEV-564"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564"]}'
+- at: 2026-11-16T00:27:08.237439+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-16T00:27:08.512033+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:27:08.651678+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593"]}'
+- at: 2026-11-16T00:27:09.060328+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-16T00:27:09.230108+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:27:09.366523+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:27:25.898470+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
