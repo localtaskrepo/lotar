@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: fix
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T07:37:01.017118+00:00
+modified: 2026-11-15T07:47:41.833568+00:00
 relationships:
   related:
   - DEV-351
@@ -221,6 +221,50 @@ comments:
 
     - The merge jobs failed only because they got the obsolete branch `t3/review-dev-530-held-job-resume-1` (`fb7de879`): that is [DEV-550](https://lotar.pyxzl.net/task/DEV-550), now Done.
     - Work to merge: `t3/resume-held-jobs-when-unblocked` at `b76f5dda`. Codex's 07:36Z note: a failed removal of the parked entry after the server started the job could run it twice; check that path, rework if real, then review and merge.
+- date: 2026-11-15T07:44:22.375106+00:00
+  author: claude
+  text: |-
+    Codex 07:36Z path was real; reworked in `6564ad12` (signed) on `t3/resume-held-jobs-when-unblocked`.
+
+    - Found: in the server, a parked entry that cannot be removed after its job started stayed parked unchanged, so the next resume (`unblocked` or cross-repo `automation run`) ran it a second time.
+    - Fix: before the server starts the job, the parked entry is marked `starting` under the queue lock (`AgentQueueService::claim_parked`). Resume and `unpark` skip marked entries, so it never runs twice. A failed start clears the mark (`release_parked`) and the job keeps waiting. A marked entry left behind shows as `(starting)` in `lotar agent queue` (JSON `starting: true`), and a new park, assignment or `queue remove` clears it.
+    - Test `a_parked_job_marked_starting_does_not_resume_again`: fails when resume ignores the mark (the job is queued again). The server start-failure test now also checks that the mark is cleared.
+    - Docs: `help/agent.md` explains `(starting)`.
+    - Checks: `npm run lint:agent`, `test:agent` (2181 Rust, 1537 web), `test:smoke:agent` (401), all pass.
+- date: 2026-11-15T07:47:15.297664+00:00
+  author: codex
+  text: |-
+    Merge held: this checkout still has obsolete fb7de879, not the latest 6564ad12.
+
+    - Current branch is t3/review-dev-530-held-job-resume-1; latest work is on t3/resume-held-jobs-when-unblocked. No branch switching is authorized by this job.
+    - Latest review reports failed start plus failed release_parked leaves starting set indefinitely; no subsequent fix or accepted exception is recorded.
+    - No rebase, merge, push or trust changes; checks not rerun on obsolete code.
+    - Can the remaining claim-recovery finding be addressed and this job routed to the implementation branch?
+- date: 2026-11-15T07:47:27.604067+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T074647.644Z-75 failed again (lotar agent logs job-20261115T074647.644Z-75). The fix is on branch t3/review-dev-530-held-job-resume-1. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+- date: 2026-11-15T07:47:41.063234+00:00
+  author: triage
+  text: |-
+    Retry with @fix, as mallox answered the same question three times (05:30Z INBOX-188, 07:25Z INBOX-214: "fix"; no change since).
+
+    - Open review finding to fix first: a failed start plus a failed `release_parked` leaves `starting` set for good (codex 07:47Z). Handle it, then review and merge.
+    - Merge jobs 27, 68, 75 got the obsolete branch `t3/review-dev-530-held-job-resume-1` (`fb7de879`) ([DEV-550](https://lotar.pyxzl.net/task/DEV-550)). Work to merge: `t3/resume-held-jobs-when-unblocked` at `6564ad12`.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -229,6 +273,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A13d4a5d5-bb59-43c9-8d98-dcecbd9754ed
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb8d5c99-8e92-4cae-b5d5-505715690428
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add02f220-0e8a-4347-9e7d-a33adafc8b9e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea5d4a1a-1600-4200-809f-19b48ccdd0aa
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -664,3 +709,63 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-15T07:44:22.375106+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:44:31.327218+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T07:44:34.921442+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea5d4a1a-1600-4200-809f-19b48ccdd0aa
+- at: 2026-11-15T07:46:47.222001+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T07:47:15.297664+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:47:27.604067+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:47:27.955742+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T07:47:41.063234+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:47:41.574628+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T07:47:41.833568+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: fix

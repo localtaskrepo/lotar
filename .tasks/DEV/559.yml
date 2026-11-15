@@ -1,16 +1,34 @@
 title: 'output_after_exit_is_limited fails under full-suite load: the drain ends before its 50 ms limit'
-status: InProgress
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T07:34:39.795147+00:00
-modified: 2026-11-15T07:34:41.686234+00:00
+modified: 2026-11-15T07:47:28.132838+00:00
 relationships:
   related:
   - DEV-467
+comments:
+- date: 2026-11-15T07:42:27.506154+00:00
+  author: claude
+  text: |-
+    Fixed: the drain-limit test no longer depends on a writer thread outpacing the reader.
+    - `output_after_exit_is_limited` now reads from a test-only `NeverDryPipe` (always ready, never empty, nothing unread at exit) instead of a real pipe plus writer thread, and also asserts it ran at least 50 ms
+    - No production code changed (`crates/lotar-lib/src/services/agent_job_service.rs`, tests only)
+    - Commit `9e4827db`
+    - Checks: 50/50 stress runs on 12 busy CPUs (`cargo nextest run -p lotar-lib output_after_exit --stress-count 50`), `npm run lint:agent`, `npm test` (2197 Rust + 1547 UI, release, hooks), `npm run smoke` (404) all pass
+- date: 2026-11-15T07:47:24.009428+00:00
+  author: codex
+  text: |-
+    Review: passed
+    - Reviewed `9e4827db`, full branch diff, ticket/comments, related work and recent main history. No findings; only test code changes.
+    - The fake pipe removes writer scheduling from the timeout assertion; the neighboring test covers buffered output at exit.
+    - Checks: 50/50 nextest stress iterations passed; full `RUSTC_WRAPPER= npm run test:rust:agent` passed (2197 tests) outside the sandbox after sccache/server restrictions; diff check passed.
+    - No files changed or commits. Status/assignee unchanged. UI/lint/smoke not rerun for this test-only review. No durable guidance finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8bbebf79-02c4-4c36-b700-2c0c15cc44ff
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade68dd7f-08ce-48be-be73-4cc718854100
 description: |-
   Found: in DEV-467's full `npm test` (2026-11-15, branch t3/job-end-rules-t3-outage on main f92de862), `services::agent_job_service::tests::output_after_exit_is_limited` (crates/lotar-lib/src/services/agent_job_service.rs ~4717) failed with left: Ok(()) right: Err(TimedOut). It passed 5 of 5 runs alone and in the full rerun. The test's descendant thread writes to the pipe in a loop. Under load it can be descheduled for longer than the 50 ms drain limit, the pipe runs empty, and read_job_output returns Ok before the limit is reached. The branch doesn't touch this code.
 
@@ -44,3 +62,34 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8bbebf79-02c4-4c36-b700-2c0c15cc44ff
+- at: 2026-11-15T07:42:27.506154+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:42:45.009369+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T07:43:16.766505+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade68dd7f-08ce-48be-be73-4cc718854100
+- at: 2026-11-15T07:47:24.009428+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:47:28.132838+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

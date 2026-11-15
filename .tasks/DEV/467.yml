@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-15T07:40:12.196081+00:00
+modified: 2026-11-15T07:41:49.187636+00:00
 relationships:
   blocks:
   - DEV-513
@@ -46,6 +46,10 @@ relationships:
   - DEV-528
   - DEV-559
   - DEV-550
+  - DEV-520
+  - DEV-556
+  - DEV-557
+  - DEV-558
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -383,6 +387,17 @@ comments:
 - date: 2026-11-15T07:40:03.920157+00:00
   author: codex
   text: 'Review evidence correction: reviewed commit f2f7c19f. Shell quoting stripped inline command text from my previous comment and reran the same five tests; that run also passed. The independent checks were git diff --check and targeted nextest recovery/outage tests using the local cargo profile with RUSTC_WRAPPER empty. No tracked files changed.'
+- date: 2026-11-15T07:41:33.933642+00:00
+  author: claude
+  text: |-
+    Merged and pushed. `main` and `origin/main` are at `b67c1d80`.
+
+    - Rebase onto `main` (`f92de862`) changed nothing: HEAD stayed `f2f7c19f`, and no lockfile changed, so no `npm ci` was needed.
+    - Skipped, because they passed on that same commit (07:32 rework comment): `npm run lint`, `npm test` (2204 Rust, 1547 UI), `npm run smoke` (404).
+    - `git merge --ff-only` brought main to `f2f7c19f`. Then I amended the pending `.tasks` changes into it as `b67c1d80` (signed): DEV-467, DEV-509, DEV-520, DEV-530, DEV-550, DEV-556, DEV-557, DEV-558, and the new DEV-559.
+    - No rule or profile files changed, so `lotar trust` wasn't needed.
+    - Pushed `3bbd59b6..b67c1d80`, which also carried DEV-557, DEV-509 and DEV-558 (all Done). The main checkout is clean.
+    - Health check: `lotar agent list-running` shows no running jobs, and STD-85 is WontDo, no longer InProgress @fix.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -425,8 +440,6 @@ description: |-
   - [ ] The tickets above are moved to the state their last comment and branch call for.
 tags:
 - health
-- review-returned
-- merge-retried
 custom_fields:
   finding: comms:job-end-lost-in-t3-outage
 history:
@@ -1273,3 +1286,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T07:41:33.933642+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:41:34.437034+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487","DEV-528","DEV-559","DEV-550"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487","DEV-528","DEV-559","DEV-550","DEV-520","DEV-556","DEV-557","DEV-558"]}'
+- at: 2026-11-15T07:41:49.187636+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned, merge-retried
+    new: health

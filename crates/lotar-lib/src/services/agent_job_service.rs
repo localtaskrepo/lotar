@@ -4712,17 +4712,36 @@ mod tests {
         assert_eq!(lines.last().map(String::as_str), Some("line-19"));
     }
 
-    #[cfg(unix)]
+    /// A pipe a descendant never lets run dry: a real writer thread can be
+    /// descheduled for longer than the drain limit under load (DEV-559).
+    struct NeverDryPipe;
+
+    impl Read for NeverDryPipe {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            let line = b"still-running\n";
+            let count = line.len().min(buffer.len());
+            buffer[..count].copy_from_slice(&line[..count]);
+            Ok(count)
+        }
+    }
+
+    impl JobOutputPipe for NeverDryPipe {
+        fn output_ready(&self) -> std::io::Result<bool> {
+            Ok(true)
+        }
+
+        fn output_available(&self) -> std::io::Result<usize> {
+            Ok(0)
+        }
+    }
+
     #[test]
     fn output_after_exit_is_limited() {
-        let (reader, mut writer) = std::io::pipe().unwrap();
-        writeln!(writer, "last-runner-line").unwrap();
-        // A descendant that keeps the pipe full; it stops once the reader is gone.
-        let descendant = thread::spawn(move || while writeln!(writer, "still-running").is_ok() {});
         let exited = AtomicBool::new(true);
-        let result = read_job_output(reader, &exited, Duration::from_millis(50), |_| thread::sleep(Duration::from_millis(1)));
+        let started = Instant::now();
+        let result = read_job_output(NeverDryPipe, &exited, Duration::from_millis(50), |_| thread::sleep(Duration::from_millis(1)));
         assert_eq!(result.map_err(|error| error.kind()), Err(std::io::ErrorKind::TimedOut));
-        descendant.join().unwrap();
+        assert!(started.elapsed() >= Duration::from_millis(50));
     }
 
     #[test]

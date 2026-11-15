@@ -1,16 +1,17 @@
 title: A job's recorded outcome can apply before its unfinished end-rule steps
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: claude
+assignee: '@review'
 created: 2026-11-14T18:22:28.435938+00:00
-modified: 2026-11-14T18:49:57.791984+00:00
+modified: 2026-11-15T07:52:32.303989+00:00
 relationships:
   depends_on:
   - DEV-467
   related:
   - DEV-467
+  - DEV-528
 comments:
 - date: 2026-11-14T18:49:47.537612+00:00
   author: claude
@@ -22,8 +23,19 @@ comments:
     - Checks: `npm run lint:agent`, `npm run test:agent` (Rust 2140, UI 1515), `npm run smoke` (390): all pass.
     - Blocked: the code this fixes exists only in DEV-467 (`9439eafe`, `887e36ef`, old `src/` layout), which isn't on main and is HelpNeeded after its merge rebase failed. My branch is reset onto `887e36ef`, so it carries those two commits; merging it now would land DEV-467 unreviewed by its port. Depends on DEV-467 now.
     - Next step once DEV-467 is Done: `git rebase --onto main 887e36ef agent/DEV-543`, move the change to `crates/lotar-lib/src/services/automation_service.rs`, rerun lint, test, smoke. Or the DEV-467 port takes `749caaba` with it and this closes.
+- date: 2026-11-15T07:52:22.581710+00:00
+  author: claude
+  text: |-
+    Fix ported onto main after DEV-467 landed (`b67c1d80`): one commit `06c8bd7f` on `agent/DEV-543`, ready for review.
+
+    - Rebased with `git rebase --onto main 887e36ef`: the branch no longer carries DEV-467's old commits. Main still applied the outcome right after a busy end action, so the fix was still needed.
+    - `crates/lotar-lib/src/services/automation_service.rs`: `apply_job_event` defers the outcome while the job's end-action checkpoint exists; `apply_pending_outcomes` replays the checkpoint first and skips outcomes whose checkpoint is still there. New helper `end_action_path`.
+    - Conflicts: next to main's DEV-528 test (kept both tests) and its `docs/help/agent.md` text (kept main's, added the sentence that the outcome waits behind the checkpoint).
+    - Test `pending_outcome_tests::an_outcome_waits_for_the_end_rules_it_follows` frees the lock between the end rule's busy comment and the outcome: it fails without the fix and passes with it.
+    - Checks on `06c8bd7f`: `npm run lint:agent` passed; `npm run test:agent` passed (Rust 2205, UI 1547, release 50, hooks 7); `npm run smoke` passed (404).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1bfdb1c-bef4-4433-aebb-6dac3521f908
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad8c3793-de75-44d7-9042-f03d0b75f97c
 description: 'Found in the DEV-467 review (887e36ef). In AutomationService::apply_job_event (src/services/automation_service.rs ~575-600) the recorded outcome is applied even when apply_durable_end_action returned a busy error and left steps pending. If the lock frees between the two, the outcome and its updated/assigned rules run before the remaining end-rule steps (other set fields, add/remove, comment, run, tell_agent), which replay later. Status/assignee can''t conflict (without_outcome_fields strips them), but previous.* is not ''the ticket after the job''s rules ran'' as docs/help/agent.md says, and a queued agent or updated rule can see the ticket before the end rule''s tags. Done when: the outcome waits behind the job''s pending end-action checkpoint (defer it while the checkpoint exists, replay it after), with a test that frees the lock between the two.'
 history:
 - at: 2026-11-14T18:22:28.644513+00:00
@@ -67,3 +79,39 @@ history:
   - field: assignee
     old: '@fix'
     new: claude
+- at: 2026-11-15T07:42:44.772441+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-15T07:42:45.836455+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-15T07:52:22.581710+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:52:22.808796+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-467"],"related":["DEV-467"]}'
+    new: '{"depends_on":["DEV-467"],"related":["DEV-467","DEV-528"]}'
+- at: 2026-11-15T07:52:30.387932+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T07:52:32.303989+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad8c3793-de75-44d7-9042-f03d0b75f97c
