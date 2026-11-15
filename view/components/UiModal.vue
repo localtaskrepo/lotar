@@ -136,7 +136,8 @@ const props = withDefaults(
     ariaDescribedby?: string
     dismissible?: boolean
     initialFocus?: string
-    size?: 'sm' | 'md' | 'lg' | 'xl'
+    /** `full` fills most of the viewport, with no padding, for content that scrolls itself. */
+    size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
   }>(),
   { dismissible: true },
 )
@@ -257,6 +258,8 @@ const sizeClass = computed(() => {
       return 'ui-modal__card--lg'
     case 'xl':
       return 'ui-modal__card--xl'
+    case 'full':
+      return 'ui-modal__card--full'
     default:
       return 'ui-modal__card--md'
   }
@@ -306,6 +309,16 @@ const sizeClass = computed(() => {
   padding: var(--space-5, 2rem);
 }
 
+.ui-modal__card--full {
+  display: flex;
+  flex-direction: column;
+  width: min(1200px, 100%);
+  height: calc(100vh - 48px);
+  height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+}
+
 @media (max-width: 640px) {
   .ui-modal__overlay {
     padding: 12px;
@@ -314,6 +327,11 @@ const sizeClass = computed(() => {
   .ui-modal__card {
     max-height: calc(100vh - 24px);
     max-height: calc(100dvh - 24px);
+  }
+
+  .ui-modal__card--full {
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
   }
 
   .ui-modal__card--lg,

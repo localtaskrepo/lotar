@@ -231,6 +231,7 @@
 </template>
 
 <script setup lang="ts">
+import { OVERLAY_QUERY_KEYS } from '../utils/overlayQuery'
 import { useProjectNames } from '../composables/useProjectNames'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -319,7 +320,15 @@ const scope = computed(() => ({
 }))
 const scopeKey = computed(() => JSON.stringify(scope.value))
 const project = ref(value('project'))
-const graphQueryKeys = new Set(['root', 'project', 'relationships', 'layers', 'depth', 'isolated', 'taskPanel'])
+const graphQueryKeys = new Set([
+  'root',
+  'project',
+  'relationships',
+  'layers',
+  'depth',
+  'isolated',
+  ...OVERLAY_QUERY_KEYS,
+])
 function routeFilters() {
   return Object.fromEntries(
     Object.entries(route.query).filter(

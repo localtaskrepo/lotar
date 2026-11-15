@@ -1,14 +1,15 @@
 title: A smoke run's lotar serve keeps running after the run is killed
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T23:27:11.643153+00:00
-modified: 2026-11-15T00:27:24.680867+00:00
+modified: 2026-11-15T01:28:23.008639+00:00
 relationships:
   related:
   - DEV-471
+  - DEV-481
 comments:
 - date: 2026-11-14T23:52:38.382539+00:00
   author: claude
@@ -36,6 +37,13 @@ comments:
     - `npm run lint:agent`, `npm run test:agent` (2174 Rust, 1537 UI, release/hooks), and `LOTAR_BIN=/opt/homebrew/bin/lotar npm run test:smoke:agent` (402 tests) passed on final rebased code.
     - SIGKILL cleanup and binary selection regressions passed. No automation/config changes in this fix, so no trust refresh needed.
     - Folding main ticket-store changes into the merge commit as instructed; push follows only if main is clean. No guidance corrections.
+- date: 2026-11-15T00:28:58.276219+00:00
+  author: codex
+  text: |-
+    Merged and pushed: `f1cd408b` is on `origin/main`.
+    - Pre-push Rust and frontend checks passed. Main-checkout targeted regressions passed 23/23, including SIGKILL cleanup.
+    - Main had no built binary: initial quick run failed for missing artifact; retry used `LOTAR_BINARY_PATH` pointing to the freshly built, fully tested worktree binary and passed.
+    - Full final-rebase gates passed: lint, 2174 Rust tests, 1537 UI tests, release/hooks and 402 smoke tests. No trust refresh required (no automation/config change). Status and assignee left to job automation.
 references:
 - file: smoke/helpers/server.ts
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A88d330b2-bc53-4fb8-a29a-a8332054c7e2
@@ -122,3 +130,19 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-15T00:28:58.276219+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:29:05.741416+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T01:28:23.008639+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471"]}'
+    new: '{"related":["DEV-471","DEV-481"]}'

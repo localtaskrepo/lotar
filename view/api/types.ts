@@ -267,6 +267,22 @@ export interface AttachmentInfoResponse {
     items: AttachmentInfo[]
 }
 
+export interface FileResolveRequest {
+    /** Directory of the repository file the references appear in. */
+    base?: string
+    references: string[]
+}
+
+export interface FileResolveItem {
+    reference: string
+    /** Repository-relative path with `/` separators. */
+    path: string
+}
+
+export interface FileResolveResponse {
+    items: FileResolveItem[]
+}
+
 export interface AttachmentRemoveRequest {
     id: string
     stored_path: string

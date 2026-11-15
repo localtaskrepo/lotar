@@ -550,6 +550,7 @@
 </template>
 
 <script setup lang="ts">
+import { OVERLAY_QUERY_KEYS, overlayQuery } from '../utils/overlayQuery'
 import { errorMessage } from '../utils/errors'
 import PageHeader from '../components/PageHeader.vue'
 import {
@@ -886,8 +887,7 @@ const hasTasks = computed(() => shownCount.value > 0)
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageLimit.value)))
 
 async function syncPaginationUrl(nav: 'push' | 'replace' = 'push') {
-  const q: Record<string, string> = { ...filter.value }
-  if (typeof route.query.taskPanel === 'string') q.taskPanel = route.query.taskPanel
+  const q: Record<string, string> = { ...filter.value, ...overlayQuery(route.query) }
   if (pageOffset.value > 0) q.offset = String(pageOffset.value)
   else delete q.offset
   suppressRouteSync = true
@@ -961,8 +961,7 @@ async function applyFilter(raw: Record<string, string>, nav: NavMode = 'push', p
   const q = { ...raw }
   const { serverFilter: builtFilter, normalized: qnorm, extras: extraQuery } = buildServerFilter(q, '')
   if (qnorm.project) builtFilter.project = qnorm.project
-  const nextQuery: Record<string, string> = { ...extraQuery, ...qnorm }
-  if (typeof route.query.taskPanel === 'string') nextQuery.taskPanel = route.query.taskPanel
+  const nextQuery: Record<string, string> = { ...extraQuery, ...qnorm, ...overlayQuery(route.query) }
   if (pageOffset.value > 0) {
     nextQuery.offset = String(pageOffset.value)
   }
@@ -1881,7 +1880,7 @@ onMounted(async () => {
   pageOffset.value = clampOffset(queryInt(route.query.offset, 0))
   const initialFilter = Object.fromEntries(
     Object.entries(route.query)
-      .filter(([key]) => key !== 'offset' && key !== 'taskPanel')
+      .filter(([key]) => key !== 'offset' && !OVERLAY_QUERY_KEYS.has(key))
       .map(([k, v]) => [k, queryString(v)]),
   )
   // An explicit ?sort_by= wins for this visit; otherwise restore the sort
@@ -1961,7 +1960,7 @@ watch(
   () =>
     JSON.stringify(
       Object.entries(route.query)
-        .filter(([key]) => key !== 'taskPanel')
+        .filter(([key]) => !OVERLAY_QUERY_KEYS.has(key))
         .sort(([a], [b]) => a.localeCompare(b)),
     ),
   () => {
@@ -1972,7 +1971,7 @@ watch(
     const nextOffset = clampOffset(queryInt(query.offset, 0))
     const nextFilter = Object.fromEntries(
       Object.entries(query)
-        .filter(([key]) => key !== 'offset' && key !== 'taskPanel')
+        .filter(([key]) => key !== 'offset' && !OVERLAY_QUERY_KEYS.has(key))
         .map(([k, v]) => [k, queryString(v)]),
     )
 

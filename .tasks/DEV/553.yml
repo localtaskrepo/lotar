@@ -1,0 +1,34 @@
+title: A merge-agent integration test leaves a git worktree in the temp folder, so the Rust test runner fails the run
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T01:38:07.543705+00:00
+modified: 2026-11-15T01:38:07.856931+00:00
+relationships:
+  related:
+  - DEV-516
+  - DEV-551
+description: |-
+  Found (2026-11-14, during DEV-551): `merge_agent_that_hands_back_without_end_rules_does_not_land` (crates/lotar-lib/tests/agent_automation_integration_test.rs, added in ff7b5229 / DEV-516) passes alone but leaves `.lotar-test-scratch/<pid>-<nanos>/.lotar-worktrees/.tmpXXXX/NRH-1` (a git worktree with feature.txt, README.md, .git). scripts/rust-test-runner.mjs then fails the run: 'tests left 1 entries in the temp folder: .lotar-test-scratch'. The test's intermittent assertion failure is DEV-516's.
+
+  Check: node scripts/rust-test-runner.mjs --agent merge_agent_that_hands_back_without_end_rules_does_not_land exits 1 with .lotar-test-scratch as the leftover after 1 passed.
+
+  Done when: the test (and the merge job code path it drives, if that is what leaves the worktree) removes the worktree, and the check exits 0.
+tags:
+- health
+custom_fields:
+  finding: rust-test-runner:lotar-worktrees-leftover
+history:
+- at: 2026-11-15T01:38:07.693682+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-516","DEV-551"]}'
+- at: 2026-11-15T01:38:07.856931+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

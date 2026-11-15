@@ -5,7 +5,11 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-11T08:10:29.425313+00:00
-modified: 2026-11-11T08:25:21.088940+00:00
+modified: 2026-11-15T01:05:09.262563+00:00
+relationships:
+  related:
+  - DEV-551
+  - DEV-467
 comments:
 - date: 2026-11-11T08:10:38.711357+00:00
   text: 'Plan: measure each suite with a fresh TMPDIR; fix leaks where created; vitest globalSetup guard (view + smoke) that points TMPDIR at a fresh folder and fails the run on leftovers; verify the guard fails against unfixed code; full npm test + smoke + hooks; one commit, no push.'
@@ -45,3 +49,15 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-15T01:04:18.499213+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-551"]}'
+- at: 2026-11-15T01:05:09.262563+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-551"]}'
+    new: '{"related":["DEV-551","DEV-467"]}'

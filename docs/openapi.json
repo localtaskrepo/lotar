@@ -4413,6 +4413,102 @@
         }
       }
     },
+    "/api/files/content": {
+      "get": {
+        "summary": "Read a repository file",
+        "description": "Bytes of a repository file for the web UI's file viewer. Only files git would track are served (no ignored files, nothing in `.git`, nothing outside the repository, symlinks included), up to 2 MiB. Images and PDFs keep their content type; other text is served as `text/plain`, everything else as `application/octet-stream`.",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Repository-relative path, as returned by `/api/files/resolve`."
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "When 1/true, Content-Disposition forces a download instead of inline display."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "description": "The file is larger than the viewer reads (code FILE_TOO_LARGE)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/files/resolve": {
+      "post": {
+        "summary": "Find repository files named in text",
+        "description": "Looks up file names found in ticket text, for the web UI's file viewer. A reference resolves relative to `base`, then to the repository root (absolute paths inside the repository count), then to the one file whose path ends with it (`api_types.rs`). Only files git would track are visible: ignored files and `.git` are not. Outside a git repository nothing resolves.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The references that name a file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeFileResolveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/attachments/info": {
       "post": {
         "summary": "Size and dimensions of attachments",
@@ -5743,6 +5839,69 @@
           }
         },
         "required": ["id", "attachments"]
+      },
+      "FileResolveRequest": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "string",
+            "description": "Directory of the repository file the references appear in, for relative links inside repository markdown."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "description": "File names as written: paths, absolute paths or bare names."
+          }
+        },
+        "required": [
+          "references"
+        ]
+      },
+      "FileResolveItem": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "The reference as requested."
+          },
+          "path": {
+            "type": "string",
+            "description": "Repository-relative path with `/` separators."
+          }
+        },
+        "required": [
+          "reference",
+          "path"
+        ]
+      },
+      "FileResolveResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileResolveItem"
+            },
+            "description": "One entry per reference that names a visible file; the rest are left out."
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "EnvelopeFileResolveResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FileResolveResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "AttachmentInfoRequest": {
         "type": "object",

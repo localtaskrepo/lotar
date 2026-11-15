@@ -1,4 +1,4 @@
-import { expect, type Page, type Route } from '@playwright/test';
+import { expect, type Locator, type Page, type Route } from '@playwright/test';
 import fs from 'fs-extra';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +11,8 @@ import { SmokeWorkspace } from '../helpers/workspace.js';
 // DEV-61 durable browser coverage for typed reference kinds:
 // - managed attachments (`attachment` key) upload, view, download, and remove
 //   through the managed `/api/attachments` routes only,
-// - repository file references (`file` key) add, preview anchorless through
+// - repository file references (`file` key) add, link only to the file viewer
+//   (DEV-549), preview through
 //   `/api/references/snippet?code=<path>`, and detach without ever hitting the
 //   managed attachment routes or deleting the repository file,
 // - same-basename managed and repository entries stay distinct kinds, a
@@ -109,6 +110,16 @@ function historyChanges(task: Record<string, any>): Array<Record<string, any>> {
 
 async function readParsedTask(workspace: SmokeWorkspace, taskId: string): Promise<any> {
     return parse(await workspace.readTaskYaml(taskId)) as Record<string, any>;
+}
+
+// A repository file row links only to the file viewer, never into the
+// managed attachment routes (DEV-549).
+async function expectViewerLink(page: Page, row: Locator, repoFile: string): Promise<void> {
+    const link = row.locator('a');
+    await expect(link).toHaveCount(1);
+    const href = (await link.getAttribute('href')) ?? '';
+    expect(href).not.toContain('/api/attachments');
+    expect(new URL(href, page.url()).searchParams.get('file')).toBe(repoFile);
 }
 
 async function seedRepoFile(workspace: SmokeWorkspace): Promise<void> {
@@ -278,7 +289,7 @@ describe('UI reference kinds (DEV-61)', () => {
         }
     });
 
-    it('repository file references add, preview anchorless, and detach without managed-store calls', async () => {
+    it('repository file references add, link to the file viewer, and detach without managed-store calls', async () => {
         const workspace = await createRepoAnchoredWorkspace();
         try {
             await seedRepoFile(workspace);
@@ -302,7 +313,7 @@ describe('UI reference kinds (DEV-61)', () => {
                         .filter({ has: page.locator('button[aria-label="Remove repository file"]') });
                     await fileRow.waitFor({ timeout: 15_000 });
                     await expect(fileRow).toContainText(repoFile);
-                    await expect(fileRow.locator('a')).toHaveCount(0);
+                    await expectViewerLink(page, fileRow, repoFile);
 
                     const addCall = apiCalls.find((call) => call.path === '/api/tasks/references/file/add');
                     expect(addCall?.body).toMatchObject({ id: task.id, path: repoFile });
@@ -419,7 +430,7 @@ describe('UI reference kinds (DEV-61)', () => {
                         .locator('.task-panel__reference-item')
                         .filter({ has: page.locator('button[aria-label="Remove repository file"]') });
                     await expect(fileRow).toHaveCount(1);
-                    await expect(fileRow.locator('a')).toHaveCount(0);
+                    await expectViewerLink(page, fileRow, repoFile);
                     await expect(fileRow).toContainText(repoFile);
 
                     const chipNames = panel.locator('.task-panel__attachments .task-panel__attachment-name');

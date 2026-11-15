@@ -1,0 +1,88 @@
+title: The Rust test runner fails a passing run in an agent sandbox because xcrun leaves xcrun_db in its temp folder
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-15T01:04:18.106307+00:00
+modified: 2026-11-15T01:44:56.573187+00:00
+relationships:
+  related:
+  - DEV-315
+  - DEV-467
+  - DEV-478
+  - DEV-479
+  - DEV-487
+  - DEV-524
+  - DEV-553
+  - DEV-516
+comments:
+- date: 2026-11-15T01:44:44.790425+00:00
+  author: claude
+  text: |-
+    Fixed: the runner no longer fails a passing run for the toolchain's `xcrun_db`; real leftovers still fail it. Commit `5dd5d739`.
+    - `scripts/rust-test-runner.mjs`: `runTestsInFreshTemp` ignores the names in `TOOLCHAIN_TEMP_ENTRIES` (`xcrun_db`); exported, with an injectable runner for tests.
+    - `scripts/tests/rust-test-runner.test.mjs`: 4 new tests: empty temp folder passes, `xcrun_db` alone passes, `xcrun_db` + a test leftover fails with only the leftover named, a failing run keeps its exit code. They failed before the fix; 46/46 pass now.
+    - Not reproduced in a sandbox here (this Claude shell isn't sandboxed); the fake run covers it.
+    - Checks: `lint:agent` passed; UI, release, hooks and smoke (403/403) passed. Rust: 2182/2182 passed with `-E 'not test(/without_end_rules/)'`. The full run failed only on `merge_agent_that_hands_back_without_end_rules_does_not_land`, which is already tracked in DEV-516 and is unrelated to this change.
+    - New finding DEV-553: that test also leaks a git worktree under `.lotar-test-scratch/.../.lotar-worktrees` even when it passes, so the runner fails a single-test run.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab71a57bb-a8c9-41b0-bea6-2058af686d22
+description: |-
+  Found: reviews run in codex's sandbox with RUSTC_WRAPPER= (sccache is denied there, DEV-479) end with 'rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: xcrun_db', after all tests passed: DEV-467 (2026-11-15 00:30), DEV-478, DEV-487, DEV-524. xcrun (Apple's cc/ld shim that rustc links through) caches tool lookups in xcrun_db under the per-user temp folder; in a sandbox that folder isn't writable, so it writes TMPDIR, which scripts/rust-test-runner.mjs (runTestsInFreshTemp, DEV-315) points at a fresh folder and requires empty. Not reproduced outside the sandbox: the same relinking run (touch a source file, RUSTC_WRAPPER= npm run test:rust -- pending_outcome_tests) leaves nothing. The file comes from the toolchain at build time, not from a test.
+
+  Check: in a sandboxed agent job, RUSTC_WRAPPER= npm run test:rust -- <filter> exits 1 with xcrun_db as the only leftover.
+
+  Done when: a passing run isn't failed for the toolchain's xcrun_db (for example the runner ignores that one name, or gives the build its own temp folder), real test leftovers still fail the run, and scripts/tests/rust-test-runner.test.mjs covers both.
+tags:
+- health
+custom_fields:
+  finding: checks:rust-runner-xcrun-db
+history:
+- at: 2026-11-15T01:04:18.503501+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-315","DEV-467","DEV-478","DEV-479","DEV-487","DEV-524"]}'
+- at: 2026-11-15T01:04:19.373483+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T01:33:29.340307+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T01:33:31.517959+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab71a57bb-a8c9-41b0-bea6-2058af686d22
+- at: 2026-11-15T01:38:07.693479+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-315","DEV-467","DEV-478","DEV-479","DEV-487","DEV-524"]}'
+    new: '{"related":["DEV-315","DEV-467","DEV-478","DEV-479","DEV-487","DEV-524","DEV-553"]}'
+- at: 2026-11-15T01:44:44.790425+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:44:45.057174+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-315","DEV-467","DEV-478","DEV-479","DEV-487","DEV-524","DEV-553"]}'
+    new: '{"related":["DEV-315","DEV-467","DEV-478","DEV-479","DEV-487","DEV-524","DEV-553","DEV-516"]}'
+- at: 2026-11-15T01:44:56.573187+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

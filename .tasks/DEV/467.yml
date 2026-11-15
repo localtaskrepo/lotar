@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-15T00:27:20.422265+00:00
+modified: 2026-11-15T01:44:25.560732+00:00
 relationships:
   blocks:
   - DEV-513
@@ -38,6 +38,11 @@ relationships:
   - DEV-497
   - DEV-503
   - DEV-514
+  - DEV-509
+  - DEV-510
+  - DEV-551
+  - DEV-315
+  - DEV-487
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -209,6 +214,61 @@ comments:
     - Checks: `npm run lint` passes; `npm test` passes (2180 Rust, 1537 UI); `npm run smoke` passes (401).
     - Done when 2 was already met: all 15 tickets are WontDo or Done.
     - Removed the harnessmux worktree `~/.t3/worktrees/harnessmux/DEV-467` and its merged branch.
+- date: 2026-11-15T00:30:09.803127+00:00
+  author: codex
+  text: 'Review: blocking verification. Reviewed commit 3b983482, its eight-file diff and ticket comments. The pending_outcome_tests retry with RUSTC_WRAPPER empty passed all 3 assertions, but the test runner exited 1 because xcrun_db remained in its temporary folder. Initial attempt was blocked by sccache permissions. Resolve the temp-folder failure and retry verification. Review remains incomplete: outage integration regression, full lint and smoke were not rerun, and historical ticket reconciliation was not refreshed. No new code defect established. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-15T00:30:45.096116+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-15T00:36:16.401048+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent reworks it once more)
+
+    (answered in INBOX-167)
+  answer:
+    to: 2026-11-15T00:30:45.096116+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-167)
+- date: 2026-11-15T01:05:09.025505+00:00
+  author: claude
+  text: |-
+    Rework: the last review found no code defect, only a runner failure in the sandbox. I filed it as DEV-551 and reverified. No code change, HEAD is still `3b983482`.
+
+    - The `xcrun_db` leftover comes from Apple's `xcrun` (the cc/ld shim rustc links through). In a sandbox it can't write its cache to the usual per-user folder, so it writes to the runner's `TMPDIR`, and `scripts/rust-test-runner.mjs` (DEV-315) then fails a passing run. The same thing happened in the DEV-478, DEV-487 and DEV-524 reviews. It doesn't happen outside the sandbox: `RUSTC_WRAPPER= npm run test:rust -- pending_outcome_tests` after a forced relink leaves nothing. Filed as DEV-551 (health, related to DEV-467 and DEV-315), following the owner's INBOX-35 rule: file a ticket for the issues, then retry.
+    - Reran: `npm run test:rust -- pending_outcome_tests retry_while_busy_tests a_taken_outcome_stays_pending a_t3_job_that_loses_the_server dev320`: 14 of 14 passed, runner exit 0. This includes the outage integration test `a_t3_job_that_loses_the_server_completes_from_its_thread_and_runs_its_end_rules`.
+    - Skipped, because they already passed on HEAD `3b983482` (00:17 comment): `npm run lint`, `npm test` (2180 Rust, 1537 UI), `npm run smoke` (401).
+    - Ticket states rechecked: all 15 are WontDo or Done. DEV-464 and G-14 are still assigned to @merge.
+    - For the next review: until DEV-551 lands, run the Rust tests with sccache (approved permissions, as on 2026-11-13 19:18). With `RUSTC_WRAPPER=`, an `xcrun_db` leftover means the sandbox, not the change.
+- date: 2026-11-15T01:43:51.788568+00:00
+  author: codex
+  text: |-
+    Review: passed. No new blocking findings in `3b983482`.
+
+    - Read the eight-file diff against main, ticket comments and owner release decision, recovery/checkpoint callers, relevant related-ticket context (including DEV-543 and DEV-551), and recent main history. Ordered steps preserve configured rule order; harnessmux 0.1.3 supplies outage recovery. No UI changes.
+    - Independently reran `RUSTC_WRAPPER= npm run test:rust -- pending_outcome_tests a_t3_job_that_loses_the_server` with approved execution: all 4 passed, runner exit 0. Sandbox attempts reproduced xcrun_db leftovers and Unix socket denial; these were environment failures.
+    - `git diff --check main...HEAD` passed. No files or commits changed. Full lint, unit and smoke suites were not independently repeated; their passes on this HEAD are fix-agent evidence. Pre-fix failure evidence and reconciliation of the 15 tickets are recorded in earlier comments, not independently reproduced here.
+    - Existing outcome-order follow-up DEV-543 remains relevant and already has its own fix; no duplicate ticket filed. Status and assignee unchanged.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -219,6 +279,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19b85aa7-bc70-4cfa-9b1f-2c60f757c3f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25c568be-e00c-4743-98fb-231701d826f1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4bee1141-77fb-4e65-a470-22f3123e22f3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25c730c7-2cff-42ab-be74-0fe43df13f6e
 releases:
 - 6
 description: |-
@@ -853,3 +914,100 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4bee1141-77fb-4e65-a470-22f3123e22f3
+- at: 2026-11-15T00:30:09.803127+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:30:13.881056+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried
+    new: health, review-returned, merge-retried, review-blocked
+- at: 2026-11-15T00:30:44.828102+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, merge-retried, review-blocked
+    new: health, review-returned, merge-retried
+- at: 2026-11-15T00:30:45.096116+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:36:16.401048+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:36:16.404642+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T00:45:28.938186+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509"]}'
+- at: 2026-11-15T00:47:01.012409+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510"]}'
+- at: 2026-11-15T01:02:27.079005+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T01:04:18.499972+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551"]}'
+- at: 2026-11-15T01:05:09.025505+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:05:09.262846+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487"]}'
+- at: 2026-11-15T01:05:40.481680+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:40:22.819718+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25c730c7-2cff-42ab-be74-0fe43df13f6e
+- at: 2026-11-15T01:43:51.788568+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:44:25.560732+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

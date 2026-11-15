@@ -1,0 +1,326 @@
+title: Open repo files named in descriptions and comments in a read-only viewer
+status: Done
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-15T00:35:59.720844+00:00
+modified: 2026-11-15T01:49:33.185956+00:00
+relationships:
+  related:
+  - DEV-499
+  - DEV-516
+  - DEV-61
+  - DEV-554
+comments:
+- date: 2026-11-15T01:06:05.924384+00:00
+  author: claude
+  text: |-
+    Built on branch `DEV-549` (worktree `~/.t3/worktrees/lotar/DEV-549-file-viewer`), not committed yet.
+
+    - Server: `services/repo_file_service.rs`, routes `POST /api/files/resolve` and `GET /api/files/content` in `routes/files.rs`; only files git would track, symlinks checked, 2 MiB cap.
+    - UI: `FileViewer.vue` (rendered/source markdown, highlight.js 11.12.0 loaded on demand, line selection), links in `utils/markdown.ts`; References tab `file`/`code` entries open the viewer too.
+    - Found and fixed on the way: the task list read `?file=` as a filter; overlay query keys now live in `utils/overlayQuery.ts`.
+    - Checks so far: lint clean; Rust unit + route tests, openapi contract, vitest and the new smoke test pass. Full `npm test` and `npm run smoke` running.
+- date: 2026-11-15T01:37:52.180999+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): "Commit and land" (one commit, rebase onto main, fast-forward, push, then close).'
+- date: 2026-11-15T01:49:25.189272+00:00
+  author: claude
+  text: |-
+    Done: on main as b856f101 (the feature commit; the ticket changes are amended into it).
+
+    - Checks after rebasing onto main: lint clean; Rust 2190/2190 (one test left out: `merge_agent_that_hands_back_without_end_rules_does_not_land`, which also fails on main without this change; tracked in DEV-516); UI 1545/1545; release and hook tests pass; smoke 404/404 including the new `ui.file-viewer.smoke.spec.ts`.
+    - Screenshots before and after (light/dark, 1920/1440/390) are attached: `DEV-549-before-*` and `DEV-549-after-*`.
+    - Changed on the way: DEV-61's tests asserted that repository-file rows have no link; they now assert the row links only to the viewer, never to `/api/attachments`.
+    - Left out: images inside a viewed markdown file with relative paths (`![x](img.png)`) don't load yet; absolute paths of other worktrees don't resolve.
+references:
+- attachment: DEV-549-before-task-1440-dark.1663f15be8d0e2614fd512eeb7fc09ae.png
+- attachment: DEV-549-before-task-1440-light.0c9ee20b2b24710e03e16804405dac0e.png
+- attachment: DEV-549-before-task-390-light.b355b88872bccd29afee3f49e9c849e2.png
+- attachment: DEV-549-after-code-1440-dark.fd739d090662e089cedab4cbad365375.png
+- attachment: DEV-549-after-code-1440-light.549bf4083c8653819a947461bcef0bf0.png
+- attachment: DEV-549-after-code-1920-dark.0d2da45efa925405a7d6bef799141064.png
+- attachment: DEV-549-after-code-1920-light.686e83cc24865caa5b856e8139da602b.png
+- attachment: DEV-549-after-code-390-dark.4a649cab574cf18fe1469a1c620a5a33.png
+- attachment: DEV-549-after-code-390-light.aa36c64ea9171329ae6dbfd7eb487b67.png
+- attachment: DEV-549-after-error-1440-light.36f511cc6fb543e898cc296058bebe2c.png
+- attachment: DEV-549-after-markdown-1440-dark.8ee273ece50520e1e13b88a602500de4.png
+- attachment: DEV-549-after-markdown-1440-light.96ff44f51e3a7a27f35bb7ab2e397275.png
+- attachment: DEV-549-after-markdown-390-dark.24d9b7254fb2b0cdee9859e32eb0d974.png
+- attachment: DEV-549-after-task-1440-dark.5ff7144e07695ba28f12a17ceb8569f2.png
+- attachment: DEV-549-after-task-1440-light.106c4764ea8c4a6ba6b150b7c6fec949.png
+- attachment: DEV-549-after-task-390-light.ff66ddb377dedcef3ce74723335c5a79.png
+- attachment: DEV-549-after-yaml-1440-dark.b1c564f1ef8ad148bc55bb42311f50fa.png
+- file: view/utils/markdown.ts
+- file: crates/lotar-lib/src/services/repo_file_service.rs
+- file: crates/lotar-lib/src/routes/files.rs
+- file: view/components/FileViewer.vue
+- file: view/utils/fileReferences.ts
+description: |-
+  Ticket descriptions and comments name repo files (`docs/help/agent.md`, `src/x.rs:42`, `api_types.rs`), but they are plain text. The owner wants to click one and read the file, also from the phone (mallox 2026-11-14: "Mostly I just need to read files. Maybe we create our own file preview instead and support some common file types for pretty rendering."). So a read-only viewer inside lotar, not launching programs on the server machine.
+
+  ## Plan
+
+  - **Linking** in `view/utils/markdown.ts`, next to task references: paths in text and inline code (`path`, `path:42`, `path#L10-20`), absolute paths inside the repo, markdown links to relative paths.
+  - **Resolve**: one batched `POST /api/files/resolve` per rendered text; only existing files become links. A bare name links when exactly one file in the repo has it.
+  - **Content**: `GET /api/files/content?path=…` serves files of the repo that holds `.tasks`. Refused: outside the repo (symlinks resolved), `.git/`, git-ignored files (keeps `.env` out), over a size cap.
+  - **Viewer** dialog like `AttachmentViewer.vue`: markdown rendered (repo links inside open in the viewer), code/JSON/YAML/TOML with line numbers and lazy-loaded highlighting, referenced line or range highlighted and scrolled to, images shown, other binaries offered as download. Open file kept in the URL (`?file=path:42`).
+  - Contract: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/serve.md`.
+
+  ## Done when
+
+  - [x] File references in descriptions and comments link to existing repo files only
+  - [x] The viewer renders markdown, highlights code and jumps to the line
+  - [x] Paths outside the repo, `.git/`, ignored files and oversized files are refused (Rust tests)
+  - [x] Vitest for linking, Playwright smoke for click → viewer at the line
+  - [x] Before/after screenshots attached
+  - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+tags:
+- web-ui
+- ui
+history:
+- at: 2026-11-15T00:36:06.978374+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T01:06:05.924384+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:13:49.136287+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-before-task-1440-dark.1663f15be8d0e2614fd512eeb7fc09ae.png
+- at: 2026-11-15T01:13:49.492136+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-before-task-1440-light.0c9ee20b2b24710e03e16804405dac0e.png
+- at: 2026-11-15T01:13:49.738342+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-before-task-390-light.b355b88872bccd29afee3f49e9c849e2.png
+- at: 2026-11-15T01:13:49.920760+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-code-1440-dark.fd739d090662e089cedab4cbad365375.png
+- at: 2026-11-15T01:13:50.147951+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-code-1440-light.549bf4083c8653819a947461bcef0bf0.png
+- at: 2026-11-15T01:13:50.432744+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-code-1920-dark.0d2da45efa925405a7d6bef799141064.png
+- at: 2026-11-15T01:13:50.664254+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-code-1920-light.686e83cc24865caa5b856e8139da602b.png
+- at: 2026-11-15T01:13:50.860079+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-code-390-dark.4a649cab574cf18fe1469a1c620a5a33.png
+- at: 2026-11-15T01:13:51.127427+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-code-390-light.aa36c64ea9171329ae6dbfd7eb487b67.png
+- at: 2026-11-15T01:13:51.336673+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-error-1440-light.36f511cc6fb543e898cc296058bebe2c.png
+- at: 2026-11-15T01:13:51.552169+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-markdown-1440-dark.8ee273ece50520e1e13b88a602500de4.png
+- at: 2026-11-15T01:13:51.702248+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-markdown-1440-light.96ff44f51e3a7a27f35bb7ab2e397275.png
+- at: 2026-11-15T01:13:51.884600+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-markdown-390-dark.24d9b7254fb2b0cdee9859e32eb0d974.png
+- at: 2026-11-15T01:13:52.049521+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-task-1440-dark.5ff7144e07695ba28f12a17ceb8569f2.png
+- at: 2026-11-15T01:13:52.194046+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-task-1440-light.106c4764ea8c4a6ba6b150b7c6fec949.png
+- at: 2026-11-15T01:13:52.367563+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-task-390-light.ff66ddb377dedcef3ce74723335c5a79.png
+- at: 2026-11-15T01:13:52.572140+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-549-after-yaml-1440-dark.b1c564f1ef8ad148bc55bb42311f50fa.png
+- at: 2026-11-15T01:14:05.111752+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Ticket descriptions and comments name repo files (`docs/help/agent.md`, `src/x.rs:42`, `api_types.rs`), but they are plain text. The owner wants to click one and read the file, also from the phone (mallox 2026-11-14: "Mostly I just need to read files. Maybe we create our own file preview instead and support some common file types for pretty rendering."). So a read-only viewer inside lotar, not launching programs on the server machine.
+
+      ## Plan
+
+      - **Linking** in `view/utils/markdown.ts`, next to task references: paths in text and inline code (`path`, `path:42`, `path#L10-20`), absolute paths inside the repo, markdown links to relative paths.
+      - **Resolve**: one batched `POST /api/files/resolve` per rendered text; only existing files become links. A bare name links when exactly one file in the repo has it.
+      - **Content**: `GET /api/files/content?path=…` serves files of the repo that holds `.tasks`. Refused: outside the repo (symlinks resolved), `.git/`, git-ignored files (keeps `.env` out), over a size cap.
+      - **Viewer** dialog like `AttachmentViewer.vue`: markdown rendered (repo links inside open in the viewer), code/JSON/YAML/TOML with line numbers and lazy-loaded highlighting, referenced line or range highlighted and scrolled to, images shown, other binaries offered as download. Open file kept in the URL (`?file=path:42`).
+      - Contract: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/serve.md`.
+
+      ## Done when
+
+      - [ ] File references in descriptions and comments link to existing repo files only
+      - [ ] The viewer renders markdown, highlights code and jumps to the line
+      - [ ] Paths outside the repo, `.git/`, ignored files and oversized files are refused (Rust tests)
+      - [ ] Vitest for linking, Playwright smoke for click → viewer at the line
+      - [ ] Before/after screenshots attached
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass
+    new: |-
+      Ticket descriptions and comments name repo files (`docs/help/agent.md`, `src/x.rs:42`, `api_types.rs`), but they are plain text. The owner wants to click one and read the file, also from the phone (mallox 2026-11-14: "Mostly I just need to read files. Maybe we create our own file preview instead and support some common file types for pretty rendering."). So a read-only viewer inside lotar, not launching programs on the server machine.
+
+      ## Plan
+
+      - **Linking** in `view/utils/markdown.ts`, next to task references: paths in text and inline code (`path`, `path:42`, `path#L10-20`), absolute paths inside the repo, markdown links to relative paths.
+      - **Resolve**: one batched `POST /api/files/resolve` per rendered text; only existing files become links. A bare name links when exactly one file in the repo has it.
+      - **Content**: `GET /api/files/content?path=…` serves files of the repo that holds `.tasks`. Refused: outside the repo (symlinks resolved), `.git/`, git-ignored files (keeps `.env` out), over a size cap.
+      - **Viewer** dialog like `AttachmentViewer.vue`: markdown rendered (repo links inside open in the viewer), code/JSON/YAML/TOML with line numbers and lazy-loaded highlighting, referenced line or range highlighted and scrolled to, images shown, other binaries offered as download. Open file kept in the URL (`?file=path:42`).
+      - Contract: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/serve.md`.
+
+      ## Done when
+
+      - [x] File references in descriptions and comments link to existing repo files only
+      - [x] The viewer renders markdown, highlights code and jumps to the line
+      - [x] Paths outside the repo, `.git/`, ignored files and oversized files are refused (Rust tests)
+      - [x] Vitest for linking, Playwright smoke for click → viewer at the line
+      - [x] Before/after screenshots attached
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+
+      ## State
+
+      Built and verified on branch `DEV-549` in `~/.t3/worktrees/lotar/DEV-549-file-viewer`, not committed yet: waiting for the owner's go-ahead to commit and land on main. DEV-499 moves `api_types.rs` to `crates/lotar-core`; if it lands first, rebase and move the three `FileResolve*` DTOs there.
+- at: 2026-11-15T01:14:05.543471+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-499"]}'
+- at: 2026-11-15T01:14:05.819378+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/utils/markdown.ts
+- at: 2026-11-15T01:37:52.180999+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:49:24.974310+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:crates/lotar-lib/src/services/repo_file_service.rs
+- at: 2026-11-15T01:49:25.017792+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:crates/lotar-lib/src/routes/files.rs
+- at: 2026-11-15T01:49:25.061032+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/components/FileViewer.vue
+- at: 2026-11-15T01:49:25.101041+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/utils/fileReferences.ts
+- at: 2026-11-15T01:49:25.142421+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Ticket descriptions and comments name repo files (`docs/help/agent.md`, `src/x.rs:42`, `api_types.rs`), but they are plain text. The owner wants to click one and read the file, also from the phone (mallox 2026-11-14: "Mostly I just need to read files. Maybe we create our own file preview instead and support some common file types for pretty rendering."). So a read-only viewer inside lotar, not launching programs on the server machine.
+
+      ## Plan
+
+      - **Linking** in `view/utils/markdown.ts`, next to task references: paths in text and inline code (`path`, `path:42`, `path#L10-20`), absolute paths inside the repo, markdown links to relative paths.
+      - **Resolve**: one batched `POST /api/files/resolve` per rendered text; only existing files become links. A bare name links when exactly one file in the repo has it.
+      - **Content**: `GET /api/files/content?path=…` serves files of the repo that holds `.tasks`. Refused: outside the repo (symlinks resolved), `.git/`, git-ignored files (keeps `.env` out), over a size cap.
+      - **Viewer** dialog like `AttachmentViewer.vue`: markdown rendered (repo links inside open in the viewer), code/JSON/YAML/TOML with line numbers and lazy-loaded highlighting, referenced line or range highlighted and scrolled to, images shown, other binaries offered as download. Open file kept in the URL (`?file=path:42`).
+      - Contract: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/serve.md`.
+
+      ## Done when
+
+      - [x] File references in descriptions and comments link to existing repo files only
+      - [x] The viewer renders markdown, highlights code and jumps to the line
+      - [x] Paths outside the repo, `.git/`, ignored files and oversized files are refused (Rust tests)
+      - [x] Vitest for linking, Playwright smoke for click → viewer at the line
+      - [x] Before/after screenshots attached
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+
+      ## State
+
+      Built and verified on branch `DEV-549` in `~/.t3/worktrees/lotar/DEV-549-file-viewer`, not committed yet: waiting for the owner's go-ahead to commit and land on main. DEV-499 moves `api_types.rs` to `crates/lotar-core`; if it lands first, rebase and move the three `FileResolve*` DTOs there.
+    new: |-
+      Ticket descriptions and comments name repo files (`docs/help/agent.md`, `src/x.rs:42`, `api_types.rs`), but they are plain text. The owner wants to click one and read the file, also from the phone (mallox 2026-11-14: "Mostly I just need to read files. Maybe we create our own file preview instead and support some common file types for pretty rendering."). So a read-only viewer inside lotar, not launching programs on the server machine.
+
+      ## Plan
+
+      - **Linking** in `view/utils/markdown.ts`, next to task references: paths in text and inline code (`path`, `path:42`, `path#L10-20`), absolute paths inside the repo, markdown links to relative paths.
+      - **Resolve**: one batched `POST /api/files/resolve` per rendered text; only existing files become links. A bare name links when exactly one file in the repo has it.
+      - **Content**: `GET /api/files/content?path=…` serves files of the repo that holds `.tasks`. Refused: outside the repo (symlinks resolved), `.git/`, git-ignored files (keeps `.env` out), over a size cap.
+      - **Viewer** dialog like `AttachmentViewer.vue`: markdown rendered (repo links inside open in the viewer), code/JSON/YAML/TOML with line numbers and lazy-loaded highlighting, referenced line or range highlighted and scrolled to, images shown, other binaries offered as download. Open file kept in the URL (`?file=path:42`).
+      - Contract: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/serve.md`.
+
+      ## Done when
+
+      - [x] File references in descriptions and comments link to existing repo files only
+      - [x] The viewer renders markdown, highlights code and jumps to the line
+      - [x] Paths outside the repo, `.git/`, ignored files and oversized files are refused (Rust tests)
+      - [x] Vitest for linking, Playwright smoke for click → viewer at the line
+      - [x] Before/after screenshots attached
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+- at: 2026-11-15T01:49:25.189272+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:49:25.432147+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499"]}'
+    new: '{"related":["DEV-499","DEV-516","DEV-61"]}'
+- at: 2026-11-15T01:49:25.620843+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-15T01:49:33.185956+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-516","DEV-61"]}'
+    new: '{"related":["DEV-499","DEV-516","DEV-61","DEV-554"]}'

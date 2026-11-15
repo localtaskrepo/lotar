@@ -90,6 +90,7 @@
     <small>Local Task Repo · v{{ version }}</small>
   </footer>
   <TaskPanelHost />
+  <FileViewer />
   <ToastHost />
   <ActivityDrawer :open="activityOpen" @close="activityOpen = false" />
   <CommandPalette
@@ -110,6 +111,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ActivityDrawer from './components/ActivityDrawer.vue'
+import FileViewer from './components/FileViewer.vue'
 import CommandPalette, { type PaletteCommand } from './components/CommandPalette.vue'
 import KeyboardShortcutsDialog from './components/KeyboardShortcutsDialog.vue'
 import IconGlyph from './components/IconGlyph.vue'

@@ -1,16 +1,17 @@
 title: A failed job's hand-back to an agent reporter overrides the retry rule, whose comment still promises the retry
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-14T07:09:13.519705+00:00
-modified: 2026-11-14T07:36:56.030201+00:00
+modified: 2026-11-15T01:30:20.286764+00:00
 relationships:
   related:
   - DEV-320
   - DEV-468
   - DEV-524
+  - DEV-530
 comments:
 - date: 2026-11-14T07:36:46.449030+00:00
   author: claude
@@ -18,8 +19,30 @@ comments:
     Check reproduced: DEV-468 history at 19:40:30Z shows the rule's tag and comment, then Merging->HelpNeeded and @merge->claude in one entry. Cause: AutomationService::apply_job_event (crates/lotar-lib/src/services/automation_service.rs, without_outcome_fields) removes a rule's set.assignee/status when the job recorded one, but still runs the rule's comment, tags and agent. The codex merge agent picked the built-in fallback 'to its reporter (claude)' instead of the merge prompt's 'assign the ticket to mallox'. No other session has a decision (DEV-524's thread only filed this).
 
     Question for mallox: which fix? (A) Recommended: when the job's recorded assignee is the ticket's reporter and that reporter is an agent name (a harness like claude/codex, not a person), the outcome drops that assignee and the end rule's set.assignee (@fix) stands, so the promised retry runs. This covers both 'Done when' items. (B) The outcome keeps winning, but a rule whose set fields the outcome replaced runs no comment/agent, and an agent-named reporter is replaced by mallox in the hand-back so it reaches the inbox. Reply A, B or something else.
+- date: 2026-11-15T00:28:22.337302+00:00
+  author: mallox
+  text: 'Answer: A (A job''s hand-back to the ticket''s agent-named reporter is dropped, the rule''s @fix stands and the retry runs) (answered in INBOX-127)'
+- date: 2026-11-15T00:59:17.522921+00:00
+  author: claude
+  text: |-
+    Fixed as option A (mallox, INBOX-127): a job's hand-back to an agent-named reporter gives way to the end rule's assignee, so the promised retry runs. Commit `b113afca` (signed).
+
+    - `apply_job_event` (`crates/lotar-lib/src/services/automation_service.rs`): when the recorded assignee is the ticket's reporter and that name is an agent runner (`AGENT_RUNNERS`: claude, codex, ...), and a matching end rule sets an assignee, the recorded status and assignee are dropped (`without_agent_reporter_hand_back`). A hand-back to a person still wins (DEV-320). With no rule assigning, the hand-back stays.
+    - Regression test `crates/lotar-lib/tests/dev528_agent_reporter_hand_back_test.rs`: the agent-reporter case fails before the fix (assignee `claude`, expected `fixer`), passes after; the person case passes both.
+    - Docs: `docs/help/agent.md` (status and assignee during a job), `docs/help/automation.md`.
+    - Checks: `npm run lint:agent`, `npm run test:agent` (2156 Rust, 1537 UI, hooks) and `npm run test:smoke:agent` (401) passed; `npm run build:web` ran first in this fresh worktree.
+- date: 2026-11-15T01:29:50.086969+00:00
+  author: codex
+  text: |-
+    Review: passed — no blocking findings in `b113afca`.
+
+    - Read full diff, owner option A, related ticket context, live retry rule, guidance and main history; confirmed DEV-468 history check.
+    - Agent-reporter hand-back yields to the retry rule; human hand-back retains precedence. No UI or stray files.
+    - Both regression tests passed with `RUSTC_WRAPPER= npm run test:rust:agent -- dev528`; runner exited 1 for leftover `xcrun_db`. Initial sccache attempt was sandbox-denied. Web build and diff whitespace check passed.
+    - Full lint/tests/smoke passed per fix agent; not repeated independently. Files, status and assignee unchanged. No durable guidance finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29313446-ef0d-4734-8002-6fe4ae9daf46
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aca68f52e-9504-466a-ba65-fba40cb044a0
 description: |-
   Found while working DEV-524. DEV-468 at 2026-11-13 19:40:30Z: merge job job-20261113T193938.781Z-34 failed. The merge agent (codex) had set HelpNeeded and assigned the reporter `claude` during the job ("Returning to reporter for integration follow-up"; its log says "HelpNeeded, assigned to claude"). At job end the rule "Merge failed: retry with @fix" ran: it added merge-retried and commented "the fix agent retries it on branch ...", but the job's recorded outcome replaced its `assignee: @fix` (DEV-320), so the ticket went to HelpNeeded under claude and no fix agent started. Nothing picks up tickets assigned to an agent's reporter name, so it sat for 11 hours.
 
@@ -74,3 +97,56 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-15T00:28:22.337302+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:28:26.102865+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T00:44:14.496246+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-320","DEV-468","DEV-524"]}'
+    new: '{"related":["DEV-320","DEV-468","DEV-524","DEV-530"]}'
+- at: 2026-11-15T00:45:14.796348+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T00:59:17.522921+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:59:33.476106+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:27:59.280015+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aca68f52e-9504-466a-ba65-fba40cb044a0
+- at: 2026-11-15T01:29:50.086969+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:30:20.286764+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

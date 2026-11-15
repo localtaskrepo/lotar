@@ -21,6 +21,7 @@ pub mod project_service;
 pub mod reference_service;
 pub mod relationships;
 pub mod release_service;
+pub mod repo_file_service;
 pub mod scan_anchor_service;
 pub mod scan_service;
 pub mod sprint_analytics;

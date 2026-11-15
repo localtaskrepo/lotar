@@ -1,0 +1,60 @@
+title: Publish the new lotar-core crate once and register its crates.io trusted publisher
+status: HelpNeeded
+priority: High
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-15T01:14:44.263310+00:00
+modified: 2026-11-15T01:43:31.229044+00:00
+relationships:
+  depends_on:
+  - DEV-499
+comments:
+- date: 2026-11-15T01:43:30.114688+00:00
+  author: mallox
+  text: 'Answer: agent (Have an agent do it, I hand over the token) (answered in INBOX-179)'
+description: |-
+  DEV-499 adds the workspace crate `lotar-core` (lotar-lib depends on it). `release.yml` publish-crates now publishes `lotar-web-assets lotar-core lotar-lib lotar`, through trusted publishing only (docs/release-guide.md, "crates.io trusted publishing setup").
+
+  ## Found
+
+  - `lotar-core` is not on crates.io yet (the API returns 404 on 2026-11-14). The name is free.
+  - Trusted publishing can't create a crate: the first publish needs a token. Until then the next release's publish-crates fails at `lotar-core`, and `lotar-lib` and `lotar` stay unpublished.
+
+  ## Owner steps (before the next release tag)
+
+  1. Publish `lotar-core` once with a token: `npm run build:web && node scripts/stage-crates.mjs && cargo publish --allow-dirty -p lotar-core` (the current workspace version, or the next release's).
+  2. Register its trusted publisher: owner `localtaskrepo`, repository `lotar`, workflow `release.yml`, environment `release`. Turn on "trusted publishing only".
+  3. Revoke the token.
+
+  ## Done when
+
+  - [ ] crates.io lists `lotar-core` with the trusted publisher, and the next release's publish-crates job passes.
+tags:
+- owner
+- release
+- blocked
+- blocked-by:DEV-499
+history:
+- at: 2026-11-15T01:43:30.114688+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:43:31.071751+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T01:43:31.229044+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+  - field: tags
+    old: owner, release
+    new: owner, release, blocked, blocked-by:DEV-499

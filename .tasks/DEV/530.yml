@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-14T18:49:48.958972+00:00
+modified: 2026-11-15T01:48:20.014500+00:00
 relationships:
   related:
   - DEV-351
@@ -15,6 +15,7 @@ relationships:
   - DEV-524
   - DEV-396
   - DEV-535
+  - DEV-528
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -76,11 +77,25 @@ comments:
 - date: 2026-11-14T18:49:48.833419+00:00
   author: automation
   text: The merge agent's job job-20261114T184913.751Z-23 failed (lotar agent logs job-20261114T184913.751Z-23); the fix agent retries it on branch t3/review-dev-530-held-job-resume-1.
+- date: 2026-11-15T00:44:14.213618+00:00
+  author: claude
+  text: 'mallox in the thread 2026-11-14 (stalled-ticket sweep): "Restart the 5 stuck lotar/local jobs". The merge failed at 18:49 and the promised retry never ran (the DEV-528 bug), so the ticket sat with mallox. Back to @fix: codex''s 18:49 finding (automation_service.rs:2687-2710 deletes the parked request before the hand-off succeeds) is the work.'
+- date: 2026-11-15T01:16:59.758629+00:00
+  author: claude
+  text: |-
+    Fixed codex 18:49 finding (parked job lost before the hand-off); amended into `c5fd40f2` (signed, on `c01dfce3`; main has moved, the merge rebases).
+
+    - `resume_parked_job` reads the parked job without removing it, and removes it only after `start_or_enqueue` hands it off. A ticket that cannot be read, a status that cannot be restored (the job is never started under Blocked) or a job the queue refuses: the job stays parked and the reason goes to stderr and `automation_failed`. A ticket given to someone else still drops it.
+    - `start_or_enqueue` now returns the error, so the caller knows the hand-off failed. When an assignment starts its job, it also drops a job still parked for that ticket, so a stale one cannot resume twice later.
+    - Tests: `a_parked_job_resumes_into_the_queue`, `a_parked_job_stays_when_its_ticket_cannot_be_read`, `…_when_the_status_cannot_be_restored`, `…_when_the_queue_refuses_it`. The three "stays" tests fail when the job is removed first, as before.
+    - `help/automation.md`: such a job keeps waiting and the reason is reported.
+    - Checks: `npm run lint:agent`, `test:agent` (2178 Rust, 1537 web), `test:smoke:agent` (401), all pass.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A848e2532-060c-432c-abb4-27647b484616
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af1bb21fb-c040-49ab-b6d0-e2149f60b2ec
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A13d4a5d5-bb59-43c9-8d98-dcecbd9754ed
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -308,3 +323,52 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T00:44:14.213618+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:44:14.496603+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528"]}'
+- at: 2026-11-15T00:44:14.727460+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T01:06:16.607004+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T01:16:59.758629+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:17:09.345982+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:46:41.187591+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A13d4a5d5-bb59-43c9-8d98-dcecbd9754ed
+- at: 2026-11-15T01:48:20.014500+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

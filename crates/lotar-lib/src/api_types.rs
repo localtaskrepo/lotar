@@ -1269,6 +1269,31 @@ pub struct AttachmentInfoResponse {
     pub items: Vec<AttachmentInfo>,
 }
 
+/// File names found in ticket text, to look up in the repository (DEV-549).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FileResolveRequest {
+    /// Directory of the repository file the references appear in, for
+    /// relative links inside repository markdown.
+    #[serde(default)]
+    pub base: Option<String>,
+    pub references: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FileResolveItem {
+    pub reference: String,
+    /// Repository-relative path with `/` separators.
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FileResolveResponse {
+    pub items: Vec<FileResolveItem>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AttachmentRemoveRequest {

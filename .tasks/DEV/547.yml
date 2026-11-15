@@ -1,11 +1,11 @@
 title: Windows CI saves sccache only at the end, so a cancelled run leaves the next push a stale cache
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: claude
 created: 2026-11-14T23:29:51.339105+00:00
-modified: 2026-11-15T00:23:14.547997+00:00
+modified: 2026-11-15T00:57:11.969385+00:00
 relationships:
   related:
   - DEV-496
@@ -46,6 +46,27 @@ comments:
     - Checked in the lotar checkout: `git merge-base --is-ancestor 4fdb29c5 main` is true; `main` is 1 ahead of `origin/main`, that one commit.
     - `.github/workflows/ci.yml` on main: 'sccache stats' and 'Save sccache' (`!cancelled()`, push to main only) sit right after the nextest step and before the portable smoke selection; no cargo step follows. Linux jobs unchanged. Done criteria 1 to 4 are met; not re-run here (the merge job's `lint:agent` passed, `test:agent` was blocked by the sandbox).
     - Left: push `main` (owner rule 2026-11-12, `docs/decisions/2026-11-12-push-finished-work.md`: push when the main checkout is clean and no unpushed commit belongs to unfinished work), then the last box: the next Windows run on main after a cancelled one shows sccache hits. Close the ticket once that run is checked.
+- date: 2026-11-15T00:31:27.737282+00:00
+  author: claude
+  text: |-
+    No change needed: the fix is on main and already pushed; only the last box is left, and it needs a future cancelled run.
+    - `4fdb29c5` is on `origin/main` (behind `f1cd408b`); `git log origin/main..main` is empty, so nothing waits to be pushed.
+    - First run with the fix, `43658334002` (`f1cd408b`): Windows ran 'sccache stats' then 'Save sccache' right after the nextest step (steps 15 to 17), before the smoke selection.
+    - Left: the last box. It needs a main push whose Windows job is cancelled after step 17, then the next run's 'sccache stats' should show hits. No such pair yet (the run before, `43656712504`, succeeded).
+    - Back to HelpNeeded and to mallox so no merge follows; close it once such a run is checked.
+- date: 2026-11-15T00:31:50.793633+00:00
+  author: triage
+  text: |-
+    Nothing here needs the owner: no question is open, and no decision of his is missing.
+    - Done criteria 1 to 4 are met on main and pushed (your comment of 2026-11-15, run `43658334002`).
+    - The last box needs a future main push whose Windows job is cancelled after the nextest step, then the next run's 'sccache stats' with hits. That is a check, not a decision; do it when such a pair shows up, then close the ticket.
+- date: 2026-11-15T00:57:03.630924+00:00
+  author: claude
+  text: |-
+    Waiting on CI, not on the owner: moved to Blocked and assigned to claude.
+    - `gh run list --workflow ci.yml --branch main`: no cancelled run on main since the fix. Newest are `43658334002` (`f1cd408b`) and `43656712504` (`c9c74057`), both success.
+    - Unblocks when a main run's Windows job is cancelled after 'Save sccache' (step 17) and the next run's 'sccache stats' shows hits. Then tick the last box and close as Done.
+    - Nothing to commit; boxes 1 to 4 are met on `origin/main` (`4fdb29c5`).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa64db4c9-e4f9-46e4-80c7-b1a046e9f9af
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0f70add-61af-4232-af9e-35f5d38100a1
@@ -160,3 +181,51 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T00:30:52.484480+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T00:31:27.737282+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:31:33.995806+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T00:31:50.793633+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:31:51.186018+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T00:56:21.739594+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T00:57:03.630924+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:57:11.969385+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+  - field: assignee
+    old: '@fix'
+    new: claude

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-15T00:26:56.952459+00:00
+modified: 2026-11-15T01:45:26.619520+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -20,6 +20,7 @@ relationships:
   - DEV-501
   - DEV-521
   - DEV-537
+  - DEV-467
 comments:
 - date: 2026-11-14T04:12:50.227687+00:00
   author: claude
@@ -171,6 +172,27 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-164)
+- date: 2026-11-15T00:47:00.886264+00:00
+  author: claude
+  text: |-
+    Rework 2: the crash window is closed in harnessmux 0.1.5; it needs your yes to release.
+
+    - Finding (`dev510_t3_session_test.rs:141`): lotar killed after T3 made the thread, before the id was saved, started a 2nd thread. T3's CLI can't take a client-chosen thread id, so it can't be saved first; the resume now reconciles instead.
+    - harnessmux `06129ef` (`agent/DEV-510`, version 0.1.5, fast-forwards main `3c630d0`): an interrupted t3 session with no saved thread id looks in `t3 thread list --json` for the newest thread with the session's title made since the turn began (`last_used`), adopts it and follows its run. No title: nothing to match, as before.
+    - Deterministic tests, both fail without the fix:
+      - harnessmux `a_t3_session_whose_owner_died_before_it_saved_the_thread_finds_the_thread_by_its_title`: kill the owner, remove `agent_session` from the record, resume. Without the fix: 2nd `thread start`.
+      - lotar `a_t3_job_taken_over_before_its_thread_id_was_saved_ends_with_that_thread`: same at job level. Without the fix: summary `Started.`, the review's exact failure.
+    - lotar `52cb2190` (amended): test, `docs/help/agent.md`, `Cargo.toml` asks for harnessmux 0.1.5. `Cargo.lock` stays at 0.1.2 until 0.1.5 is published, so it doesn't build yet.
+    - 0.1.5 also brings 0.1.3 (DEV-467) and 0.1.4 (DEV-509) into lotar; their lotar sides are still open. lotar's checks pass with them.
+    - Checks:
+      - harnessmux: fmt, clippy, nextest 39/39, deny pass
+      - lotar against local 0.1.5 (temporary patch, removed): `npm run lint:agent`, `npm test` (2176 Rust, 1537 UI, release, hooks), `npm run smoke` (401) pass; dev510 4/4
+      - Not run: a live T3 thread.
+
+    Question: may I release harnessmux 0.1.5? That is: fast-forward harnessmux main to `06129ef`, push, push the signed tag `v0.1.5`; release.yml publishes it to crates.io, which can't be undone. Then `cargo update -p harnessmux` in lotar, amend `52cb2190` and rerun lint, test and smoke.
+- date: 2026-11-15T01:45:23.071258+00:00
+  author: mallox
+  text: 'Answer: yes (Release 0.1.5) (answered in INBOX-171)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
@@ -592,6 +614,41 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-15T00:26:56.952459+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T00:32:39.224804+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T00:47:00.886264+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:47:01.013775+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467"]}'
+- at: 2026-11-15T00:47:18.312298+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T01:45:23.071258+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:45:26.619520+00:00
   actor: mallox
   changes:
   - field: assignee

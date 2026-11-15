@@ -1,0 +1,37 @@
+title: 'File viewer: images with relative paths in a viewed markdown file don''t load'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T01:49:33.047300+00:00
+modified: 2026-11-15T01:49:33.345257+00:00
+relationships:
+  related:
+  - DEV-549
+description: |-
+  Left over from DEV-549. In the file viewer, a markdown file renders, but an image it references by a relative path (`![diagram](img/flow.png)`) resolves against the app URL instead of the file's directory, so it shows as broken.
+
+  ## Fix
+
+  - In the viewer's rendered markdown, rewrite relative `img` sources through `/api/files/resolve` (with the file's directory as `base`) to `/api/files/content?path=…`, as `MarkdownContent` already does for links.
+
+  ## Done when
+
+  - [ ] A relative image in a viewed markdown file shows; a missing one stays a broken image without errors
+  - [ ] Test covers it; before and after screenshots attached
+tags:
+- web-ui
+- ui
+history:
+- at: 2026-11-15T01:49:33.186584+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-549"]}'
+- at: 2026-11-15T01:49:33.345257+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

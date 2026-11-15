@@ -299,10 +299,12 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
         expect(attachmentRow!.text()).toContain('notes.txt')
         expect(attachmentRow!.find('.task-panel__reference-kind').attributes('title')).toBe('Attachment reference')
 
-        // Repository file: never an attachment href; rendered as previewable text.
+        // Repository file: never an attachment href; it opens in the file viewer (DEV-549).
         const fileRow = items.find((item) => item.find('button[aria-label="Remove repository file"]').exists())
         expect(fileRow).toBeTruthy()
-        expect(fileRow!.find('a.task-panel__reference-link').exists()).toBe(false)
+        const fileHref = fileRow!.find('a.task-panel__reference-link').attributes('href') ?? ''
+        expect(fileHref).not.toContain('/api/attachments/')
+        expect(fileHref).toContain('file=docs%2Fnotes.txt')
         expect(fileRow!.text()).toContain('docs/notes.txt')
         expect(fileRow!.find('.task-panel__reference-kind').attributes('title')).toBe('Repository file reference')
 
@@ -437,7 +439,7 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
             const attachmentRow = rows.find((row) => row.find('button[aria-label="Remove attachment"]').exists())
             expect(fileRow).toBeTruthy()
             expect(attachmentRow).toBeTruthy()
-            expect(fileRow!.find('a.task-panel__reference-link').exists()).toBe(false)
+            expect(fileRow!.find('a.task-panel__reference-link').attributes('href')).not.toContain('/api/attachments/')
             expect(attachmentRow!.find('a.task-panel__reference-link').attributes('href')).toContain(
                 '/api/attachments/',
             )

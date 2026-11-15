@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-14T18:05:21.652033+00:00
+modified: 2026-11-15T01:46:32.861346+00:00
 relationships:
   blocks:
   - DEV-513
@@ -180,6 +180,44 @@ comments:
     | dark 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-390.b3a1afadaabb3389ef037d927f96a097.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-after-dark-390.42bbd24bc3e9f3d84ed44b8f190371f4.png) |
 
     Tagged `ui`. Next: review on another model, then merge.
+- date: 2026-11-15T00:44:15.255292+00:00
+  author: claude
+  text: 'mallox in the thread 2026-11-14 (stalled-ticket sweep): "Restart the 5 stuck lotar/local jobs". The fix finished at 08:20 (896309c0 on t3/review-dev-466-git-timeouts) but nothing reviewed it, and it sat Reviewing with mallox. Handed to @review.'
+- date: 2026-11-15T01:16:42.758850+00:00
+  author: codex
+  text: |-
+    ## Completed fix restored to this checkout
+
+    Fast-forwarded the clean assigned branch from intermediate 03db11a4 to existing signed completed fix 896309c0. No new source edits or duplicate commit. This restores the deadline through output collection and preserves all previous commits.
+
+    Independent verification: TaskPanel.integration.spec.ts passed 17/17. Focused Rust rerun was interrupted during dependency compilation; it did not execute tests and the runner reported an xcrun_db temporary entry. Full lint/test/smoke were not rerun; earlier ticket evidence reports all passed on this exact commit. Review approval remains pending; no merge or push performed.
+- date: 2026-11-15T01:46:13.707853+00:00
+  author: codex
+  text: |-
+    Merge blocked by conflicts with main; rebase aborted, fix preserved at `896309c0`.
+
+    - Conflicts: `view/composables/task-panel/useTaskPanelActivity.ts` and `view/composables/useTaskPanelState.ts`.
+    - Main removes `changeLog` / `syncFromTaskHistory`; the ticket commit adds `commitsError` beside that state and restores the removed names in conflicting hunks.
+    - Needs a rework that keeps main’s history-state removal and the fix’s independent commit-history error handling, then reruns the required checks.
+    - No merge or push. Checks not run because the rebase did not complete; trust unchanged.
+- date: 2026-11-15T01:46:31.769589+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T014537.427Z-64 failed again (lotar agent logs job-20261115T014537.427Z-64). The fix is on branch t3/task-panel-git-timeout-review. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -810,3 +848,43 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532"]}'
+- at: 2026-11-15T00:44:15.255292+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:44:15.438927+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@review'
+- at: 2026-11-15T01:16:42.758850+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:16:49.896999+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T01:46:13.707853+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:46:31.769589+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:46:32.861346+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

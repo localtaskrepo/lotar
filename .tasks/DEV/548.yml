@@ -1,11 +1,11 @@
 title: Tag colors setting downloads up to 1000 full tickets only to suggest tags
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T23:59:23.228533+00:00
-modified: 2026-11-15T00:23:30.533709+00:00
+modified: 2026-11-15T01:33:26.440007+00:00
 relationships:
   related:
   - DEV-545
@@ -29,10 +29,41 @@ comments:
     - Inspected commits `1270f46f` and inherited `743ba91f`, both tickets/comments and recent main component/test history. No confirmed code defect in the focused replacement. DEV-545 remains unmerged with a blocking review.
     - Ownership unit tests: 6 passed. Targeted tag-colors smoke stopped before startup because `target/smoke/lotar` is missing. No independent screenshots or request-size verification completed.
     - Full lint, Rust and build-first smoke not rerun. No source edits, commits or minor tickets. Supply captures and rerun browser verification before approval.
+- date: 2026-11-15T00:32:52.694449+00:00
+  author: claude
+  text: |-
+    Rework: the full screenshot set is attached. No code change; commit `1270f46f` is unchanged.
+    - Finding "screenshots incomplete": I attached 12 viewport captures of `/config?section=fields` with the tag colours field centred: before and after, light and dark, 1920, 1440 and 390 px wide. Names: `dev548-{before,after}-{light,dark}-{1920,1440,390}.png`. I read them: the field looks the same and has no visible problems at any width or theme.
+    - Before is the installed `/opt/homebrew/bin/lotar`, which is older than main. Its page has no "Fields offered in pickers" section; that difference comes from other commits, not this one.
+    - Network log of the same run: every before capture requests `/api/tasks/list`, every after capture requests `/api/tasks/values` only.
+    - Finding "smoke binary missing": the reviewer's checkout had no build. `npm run test:smoke:agent -- smoke/tests/ui.tag-colors.smoke.spec.ts smoke/tests/ui.task-panel-values.smoke.spec.ts` builds it first; both tests passed here again.
+    - Still open: this branch carries DEV-545's commit `743ba91f`, and DEV-545's own review is blocking. DEV-548 can't merge before DEV-545 does.
+- date: 2026-11-15T01:33:15.355299+00:00
+  author: codex
+  text: |-
+    Merge blocked by a required Rust test failure; nothing merged or pushed.
+    - Rebased cleanly onto `ff7b5229`; HEAD is `1403ae30`, with inherited dependency commit `2839f22d`.
+    - `npm run lint:agent` passed; `npm run test:smoke:agent` passed all 403 tests.
+    - Unrestricted `RUSTC_WRAPPER= npm run test:agent` failed in `crates/lotar-lib/tests/agent_automation_integration_test.rs:2506`: `merge_agent_that_hands_back_without_end_rules_does_not_land` expected `(HelpNeeded, reviewer)` but got `(Todo, @merge)`. Nextest stopped with 449 tests unrun; later UI/release/hook checks did not run.
+    - Initial sandbox run also denied localhost binding; retry above had that access. No source edits. Main and its uncommitted ticket files were left untouched; health check on merged main remains pending.
+    - Can this automation-test failure be resolved before retrying the merge?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A210021d3-defe-4f5f-bacf-cfdfd0e63987
 - attachment: dev548-before.ac255f9ce70ed73711987a652ddcef13.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad0b59f77-255b-4f54-acc0-af142a07e13c
+- attachment: dev548-after-dark-1440.e27fe24cdcc51a75dd0299e6fda17c58.png
+- attachment: dev548-after-dark-1920.e82e7ed8e467ac528bc5cdc432377ab0.png
+- attachment: dev548-after-dark-390.cc44a47641cfc0ddf0dff34e2765a710.png
+- attachment: dev548-after-light-1440.51902b32268dca6cef51ec7931553e06.png
+- attachment: dev548-after-light-1920.f5ee37b412151b4eff6e7c3ff1fbf15e.png
+- attachment: dev548-after-light-390.8ec7bff8f0da41d5680f690025309d38.png
+- attachment: dev548-before-dark-1440.bc9fe9ec37a05f5df24a56fa0b57dd10.png
+- attachment: dev548-before-dark-1920.eda5147d7c8a45750a5f50a21780f228.png
+- attachment: dev548-before-dark-390.820b8a6068587996feeb1152ad0275ee.png
+- attachment: dev548-before-light-1440.7269e5e7206d98704dea7187061f937e.png
+- attachment: dev548-before-light-1920.4d2f5288c94c348b54df85a702c39e39.png
+- attachment: dev548-before-light-390.8acaa4aa443e21754e6977a3c35b5200.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b1f591-b95c-4e02-ab4c-7174dbf4cb8c
 description: |-
   Found while fixing DEV-545: `view/components/ConfigTagColorsField.vue:157` calls `api.listTasks({ project, has: 'tag', limit: 1000 })` and keeps only the tags, so the config page downloads whole tickets (descriptions, comments, history).
 
@@ -42,7 +73,6 @@ description: |-
 tags:
 - health
 - ui
-- review-returned
 custom_fields:
   finding: perf:ConfigTagColorsField
 history:
@@ -116,3 +146,115 @@ history:
   - field: tags
     old: health, ui, review-blocked
     new: health, ui, review-returned
+- at: 2026-11-15T00:31:37.209325+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T00:32:36.895104+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-after-dark-1440.e27fe24cdcc51a75dd0299e6fda17c58.png
+- at: 2026-11-15T00:32:36.945955+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-after-dark-1920.e82e7ed8e467ac528bc5cdc432377ab0.png
+- at: 2026-11-15T00:32:36.989857+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-after-dark-390.cc44a47641cfc0ddf0dff34e2765a710.png
+- at: 2026-11-15T00:32:37.037862+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-after-light-1440.51902b32268dca6cef51ec7931553e06.png
+- at: 2026-11-15T00:32:37.085672+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-after-light-1920.f5ee37b412151b4eff6e7c3ff1fbf15e.png
+- at: 2026-11-15T00:32:37.128625+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-after-light-390.8ec7bff8f0da41d5680f690025309d38.png
+- at: 2026-11-15T00:32:37.174479+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-before-dark-1440.bc9fe9ec37a05f5df24a56fa0b57dd10.png
+- at: 2026-11-15T00:32:37.219647+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-before-dark-1920.eda5147d7c8a45750a5f50a21780f228.png
+- at: 2026-11-15T00:32:37.264525+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-before-dark-390.820b8a6068587996feeb1152ad0275ee.png
+- at: 2026-11-15T00:32:37.307746+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-before-light-1440.7269e5e7206d98704dea7187061f937e.png
+- at: 2026-11-15T00:32:37.354277+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-before-light-1920.4d2f5288c94c348b54df85a702c39e39.png
+- at: 2026-11-15T00:32:37.397824+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-before-light-390.8acaa4aa443e21754e6977a3c35b5200.png
+- at: 2026-11-15T00:32:52.694449+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:33:00.682976+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T00:59:38.964921+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b1f591-b95c-4e02-ab4c-7174dbf4cb8c
+- at: 2026-11-15T01:02:25.828654+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T01:33:15.355299+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:33:26.349688+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, ui, review-returned
+    new: health, ui
+- at: 2026-11-15T01:33:26.440007+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

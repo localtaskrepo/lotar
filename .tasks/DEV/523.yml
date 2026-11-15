@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-14T23:59:34.541277+00:00
+modified: 2026-11-15T01:49:10.208647+00:00
 relationships:
   related:
   - DEV-518
@@ -16,6 +16,7 @@ relationships:
   - DEV-513
   - DEV-532
   - DEV-536
+  - DEV-550
 comments:
 - date: 2026-11-14T07:01:19.890591+00:00
   author: claude
@@ -71,6 +72,52 @@ comments:
       label: I merge it myself
       set:
         status: InProgress
+- date: 2026-11-15T00:27:28.570208+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-162)
+  answer:
+    to: 2026-11-14T23:59:33.323158+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-162)
+- date: 2026-11-15T00:44:38.401265+00:00
+  author: claude
+  text: |-
+    Missing snapshots now fail closed; the fix is `cc895833` (amended) on `agent/DEV-523`.
+
+    - Review finding (an old record without a snapshot can still fast-forward after recovery): fixed. `ensure_branch_merged` in `agent_job_service.rs` leaves main as it was and fails the job when it has no start snapshot, unless a recorded outcome already shows the hand-back.
+    - New test `git_required::an_adopted_merge_job_without_a_snapshot_leaves_main_alone`. It fails under the old rule, where a missing snapshot counted as no change and main was fast-forwarded. It passes now. The adoption test with a snapshot still passes.
+    - `docs/help/agent.md` describes the fail-closed case.
+    - The last merge stopped because its Codex thread's worktree (`t3/merge-job-stop-keeps-main-1`) was still at `81c1488d`. The current work is on `agent/DEV-523`. I did not touch that thread's worktree. Filed as DEV-550.
+    - Checks: `npm run lint` passes. `npm test` passes (2154 Rust + 1537 UI). `npm run smoke` passes (401).
+- date: 2026-11-15T01:48:47.039634+00:00
+  author: codex
+  text: |-
+    Merge blocked: the resumed checkout still contains the obsolete commit.
+    - Current branch `t3/merge-job-stop-keeps-main-1` is at `81c1488d`; reviewed `agent/DEV-523` is at `cc895833`.
+    - This is the checkout mismatch tracked by DEV-550. Merging this checkout would land superseded code.
+    - Please run the merge in the ticket branch checkout. No files changed, checks run, rebase, merge, push or trust changes.
+- date: 2026-11-15T01:49:07.364428+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T014821.628Z-67 failed again (lotar agent logs job-20261115T014821.628Z-67). The fix is on branch t3/merge-job-stop-keeps-main-1. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
 references:
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
@@ -78,6 +125,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac47782a7-867f-405e-9565-79a76add1f40
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A097eaf0c-c157-4721-9a1d-f0a1dfb5bc2b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8093f3df-92b2-4ce7-8048-3d9c05bc5d1f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c86587b-5a87-4f7e-b2f5-3652cef0a8f0
 description: |-
   When a merge job ends, lotar fast-forwards the main checkout to the ticket's branch even when the merge agent decided **not** to merge. Work a review blocked, or work on top of a main that fails its checks, lands on main without anyone noticing. Found on 2026-11-14 while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -302,6 +350,72 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-14T23:59:34.541277+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T00:27:28.570208+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:27:28.619851+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T00:36:05.534821+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T00:44:25.708422+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513","DEV-532","DEV-536"]}'
+    new: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513","DEV-532","DEV-536","DEV-550"]}'
+- at: 2026-11-15T00:44:38.401265+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:45:12.685041+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:22:20.872974+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c86587b-5a87-4f7e-b2f5-3652cef0a8f0
+- at: 2026-11-15T01:24:33.755228+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T01:48:47.039634+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:49:07.364428+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:49:10.208647+00:00
   actor: mallox
   changes:
   - field: status

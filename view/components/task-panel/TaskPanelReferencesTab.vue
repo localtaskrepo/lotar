@@ -81,13 +81,15 @@
             >
               {{ attachmentDisplayName(reference.attachment) }}
             </a>
-            <span
+            <a
               v-else-if="reference.file"
-              class="task-panel__reference-text"
+              class="task-panel__reference-link"
+              :href="fileHref(parseFileLocation(reference.file))"
               :title="`Repository file: ${reference.file}`"
+              @click="openReferenceFile($event, reference.file)"
             >
               {{ reference.file }}
-            </span>
+            </a>
             <a
               v-else-if="reference.github && referenceLink(reference)"
               class="task-panel__reference-text"
@@ -112,9 +114,14 @@
             <span v-else-if="reference.jira" class="task-panel__reference-text">
               {{ reference.jira }}
             </span>
-            <span v-else-if="reference.code" class="task-panel__reference-text">
+            <a
+              v-else-if="reference.code"
+              class="task-panel__reference-text"
+              :href="fileHref(parseFileLocation(reference.code))"
+              @click="openReferenceFile($event, reference.code)"
+            >
               {{ reference.code }}
-            </span>
+            </a>
             <span v-else class="task-panel__reference-text muted" aria-hidden="true">—</span>
 
             <UiButton
@@ -434,6 +441,8 @@ import UiButton from '../UiButton.vue'
 import UiCard from '../UiCard.vue'
 import UiInput from '../UiInput.vue'
 import UiLoader from '../UiLoader.vue'
+import { useFileViewer } from '../../composables/useFileViewer'
+import { parseFileLocation } from '../../utils/fileReferences'
 import { projectPrefixOfTaskId } from '../../utils/text'
 import {
   attachmentDisplayName,
@@ -477,6 +486,15 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'reload'): void; (e: 'updated', task: TaskDTO): void }>()
 
 const taskId = computed(() => (props.task?.id || '').trim())
+
+const { fileHref, openFile } = useFileViewer()
+
+function openReferenceFile(event: MouseEvent, reference: string) {
+  // Let the browser handle new-tab and new-window clicks.
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  void openFile(parseFileLocation(reference))
+}
 
 const configInspect = ref<ConfigInspectResult | null>(null)
 const configInspectProject = ref<string | null>(null)

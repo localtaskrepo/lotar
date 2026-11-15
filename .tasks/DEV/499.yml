@@ -1,20 +1,62 @@
 title: 'Cargo workspace step 2: the core modules become a crate of their own'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T22:21:43.785907+00:00
-modified: 2026-11-15T00:18:58.658241+00:00
+modified: 2026-11-15T01:46:42.567562+00:00
 relationships:
   depends_on:
   - DEV-498
   - DEV-497
   - DEV-496
+  blocks:
+  - DEV-552
   related:
   - DEV-493
+  - DEV-549
+comments:
+- date: 2026-11-15T01:15:04.158766+00:00
+  author: claude
+  text: |-
+    Core is now its own crate `crates/lotar-core`; all checks pass. Commit `284b39b0` on `agent/DEV-499`.
+
+    **Changed**
+    - Moved config, storage, utils, types, output, errors, workspace, project, scanner, api_types and api_events into `crates/lotar-core`. `lotar-lib` re-exports them (`pub use lotar_core::{…}`), so `crate::config` and `lotar::config` still work.
+    - Items used across the border went from `pub(crate)` to `pub`, the narrowest that works. `FindingReport::describe` moved to core, next to its type. The agent config templates moved next to their only user (`cli/handlers/config/init/templates/`).
+    - Transaction fault hooks: `cfg(test)` doesn't reach across crates, and a cargo feature would end up in the release binary through `--all-features`. The checks are now always compiled; the two setters lotar-lib's tests use are `#[doc(hidden)] pub`, the rest stay test-only.
+    - Removed `core_layering_test.rs` (DEV-498): the compiler enforces the layering now, since core can't depend on lotar-lib.
+    - Shared deps went to `[workspace.dependencies]`. lotar-lib's `parallel` and `schema` features forward to core.
+    - `release.yml` and `docs/release-guide.md` now publish `lotar-core` too. Docs, the AGENTS.md contract paths, the skills, the UI and smoke tests that read source paths, and the CI path-filter contract test were updated.
+
+    **Timings** (local, `ci` profile, no incremental, no sccache, machine load 20–50, so wall times are rough; CPU is the steadier number)
+    - Change in services: `cargo build` CPU 151 → 113 s (−25%); `nextest --no-run` CPU 380 → 290 s (−24%).
+    - Change in core: about the same as before (build 150 → 144 s, tests 373 → 352 s CPU).
+    - Core's unit tests alone after a core change: 14 s wall / 88 s CPU (`cargo nextest run -p lotar-core --no-run`).
+    - CI before (the last 3 green main runs): Rust Quality Checks 187–294 s, Windows Binary Sanity 168–482 s. The after numbers need a CI run, so they come after the merge. Next step: compare the first green main run after the merge with these.
+
+    **Checks**
+    - `npm run lint:agent` pass
+    - `npm run test:rust:agent` 2172 passed (166 in lotar-core)
+    - `test:ui:agent` 1537 passed; `test:release` and `test:hooks` pass
+    - `npm run test:smoke:agent` 401 passed
+    - `cargo package --allow-dirty -p lotar-web-assets -p lotar-core -p lotar-lib -p lotar` pass
+    - Not run: a Windows build (no Windows target here). CI covers it.
+
+    **Owner step before the next release:** the new crate has to be published once with a token, then get its trusted publisher: [DEV-552](https://lotar.pyxzl.net/task/DEV-552).
+- date: 2026-11-15T01:46:36.317278+00:00
+  author: codex
+  text: |-
+    Review: blocking — required before/after Windows and Linux CI timings are unfinished, explicitly deferred until after merge without a recorded owner exception. Record branch CI timings or obtain that exception before merge.
+
+    - Read DEV-499, DEV-552, workspace manifests, re-exports, test helper relocation, release workflow/staging and recent main manifest/release history.
+    - Reran npm run test:release: 50 passed; git diff --check main...HEAD passed. No files changed.
+    - Review remains incomplete: remaining related-ticket/history inspection and lint, Rust/UI, smoke reruns were not completed; remaining diff is not approved.
+    - Packaging concern: crates/lotar-core/src/lib.rs:24 and :28 reference sibling lotar-lib test helpers excluded from the core package. Verify standalone packaged unit tests and move helpers inside the package if supported.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1239325d-9909-4c3c-8d61-dd70c55138f0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c263abc-0b23-4ff8-8295-1cc1bdd6032c
 description: |-
   Move the core modules into a crate of their own in the cargo workspace (DEV-493; the owner, 2026-11-13: "Yes on all of those ideas"). Changes above core then don't recompile core, and core's tests build in a fraction of the time.
 
@@ -36,6 +78,7 @@ description: |-
   - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
 tags:
 - backend
+- review-returned
 history:
 - at: 2026-11-13T22:21:43.912441+00:00
   actor: claude
@@ -77,3 +120,52 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1239325d-9909-4c3c-8d61-dd70c55138f0
+- at: 2026-11-15T01:14:05.543201+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"related":["DEV-493"]}'
+    new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"related":["DEV-493","DEV-549"]}'
+- at: 2026-11-15T01:14:44.647023+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"related":["DEV-493","DEV-549"]}'
+    new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549"]}'
+- at: 2026-11-15T01:15:04.158766+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:15:24.197265+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:45:37.384225+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c263abc-0b23-4ff8-8295-1cc1bdd6032c
+- at: 2026-11-15T01:46:36.317278+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:46:36.535917+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend
+    new: backend, review-blocked
+- at: 2026-11-15T01:46:42.567562+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: backend, review-blocked
+    new: backend, review-returned

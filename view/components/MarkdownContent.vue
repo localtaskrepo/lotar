@@ -37,9 +37,19 @@ function loadPreview(id: string, fetch: (id: string) => Promise<TaskDTO>): Promi
 import { computed, inject, shallowRef, watch } from 'vue'
 import { routerKey } from 'vue-router'
 import { api } from '../api/client'
+import { lookupFile } from '../composables/useFileReferences'
+import { useFileViewer } from '../composables/useFileViewer'
 import { useProjectNames } from '../composables/useProjectNames'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { renderMarkdownToHtml, TASK_REFERENCE_ATTRIBUTE, TASK_REFERENCE_CLASS } from '../utils/markdown'
+import {
+  FILE_END_LINE_ATTRIBUTE,
+  FILE_LINE_ATTRIBUTE,
+  FILE_REFERENCE_ATTRIBUTE,
+  FILE_REFERENCE_CLASS,
+  renderMarkdownToHtml,
+  TASK_REFERENCE_ATTRIBUTE,
+  TASK_REFERENCE_CLASS,
+} from '../utils/markdown'
 import { attachmentUrl } from '../utils/taskAttachments'
 import TaskHoverCard from './TaskHoverCard.vue'
 
@@ -52,13 +62,18 @@ const props = withDefaults(
     attachmentTaskId?: string | null
     /** Link task IDs such as `DEV-12` and show their hover card. */
     taskReferences?: boolean
+    /** Link names of repository files to the file viewer. */
+    fileReferences?: boolean
+    /** Directory of the repository file this text comes from, for its relative links. */
+    fileBase?: string
   }>(),
-  { attachmentTaskId: null, taskReferences: true },
+  { attachmentTaskId: null, taskReferences: true, fileReferences: true, fileBase: '' },
 )
 
 const router = inject(routerKey, null)
 const { isProject } = useProjectNames()
 const { navigateTask } = useTaskPanelController()
+const { fileHref, openFile } = useFileViewer()
 
 function taskHref(id: string) {
   const path = `/task/${encodeURIComponent(id)}`
@@ -69,6 +84,9 @@ const html = computed(() =>
   renderMarkdownToHtml(props.source || '', {
     resolveAttachment: props.attachmentTaskId ? (stored) => attachmentUrl(stored, props.attachmentTaskId) : undefined,
     taskReferences: props.taskReferences ? { isProject, href: taskHref } : undefined,
+    fileReferences: props.fileReferences
+      ? { resolve: (reference) => lookupFile(reference, props.fileBase), href: fileHref }
+      : undefined,
   }),
 )
 
@@ -77,25 +95,38 @@ function referenceLink(target: EventTarget | null): HTMLAnchorElement | null {
   return target.closest<HTMLAnchorElement>(`a.${TASK_REFERENCE_CLASS}[${TASK_REFERENCE_ATTRIBUTE}]`)
 }
 
+function fileLink(target: EventTarget | null): HTMLAnchorElement | null {
+  if (!(target instanceof Element)) return null
+  return target.closest<HTMLAnchorElement>(`a.${FILE_REFERENCE_CLASS}[${FILE_REFERENCE_ATTRIBUTE}]`)
+}
+
 // Reference links sit inside clickable areas such as the description, which
 // would otherwise start editing; keep their presses to themselves.
 function onPointerDown(event: PointerEvent) {
-  if (referenceLink(event.target)) event.stopPropagation()
+  if (referenceLink(event.target) || fileLink(event.target)) event.stopPropagation()
 }
 
 function onEnter(event: KeyboardEvent) {
-  if (referenceLink(event.target)) event.stopPropagation()
+  if (referenceLink(event.target) || fileLink(event.target)) event.stopPropagation()
 }
 
 function onClick(event: MouseEvent) {
   const link = referenceLink(event.target)
-  if (!link) return
+  const file = link ? null : fileLink(event.target)
+  if (!link && !file) return
   event.stopPropagation()
   // Let the browser handle new-tab and new-window clicks.
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   event.preventDefault()
   hideCard()
-  const id = link.getAttribute(TASK_REFERENCE_ATTRIBUTE)
+  if (file) {
+    const path = file.getAttribute(FILE_REFERENCE_ATTRIBUTE)
+    const line = Number(file.getAttribute(FILE_LINE_ATTRIBUTE)) || undefined
+    const endLine = Number(file.getAttribute(FILE_END_LINE_ATTRIBUTE)) || undefined
+    if (path) void openFile({ path, line, endLine })
+    return
+  }
+  const id = link?.getAttribute(TASK_REFERENCE_ATTRIBUTE)
   if (id) void navigateTask(id)
 }
 
@@ -182,6 +213,33 @@ watch(html, hideCard)
 
 .markdown-content :deep(a.task-ref) {
   white-space: nowrap;
+}
+
+/* Inline code that names a file reads as a link, not as plain code. */
+.markdown-content :deep(a.file-ref > code) {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+.markdown-content :deep(table) {
+  margin: var(--space-2) 0 var(--space-3);
+  border-collapse: collapse;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-content :deep(th),
+.markdown-content :deep(td) {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.markdown-content :deep(th) {
+  background: var(--color-surface);
 }
 
 .markdown-content :deep(blockquote) {

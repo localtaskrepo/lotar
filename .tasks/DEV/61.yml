@@ -5,12 +5,14 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-09-06T11:10:31.545403+00:00
-modified: 2026-09-13T22:40:22.077066+00:00
+modified: 2026-11-15T01:49:25.432613+00:00
 relationships:
   depends_on:
   - DEV-56
   blocks:
   - DEV-82
+  related:
+  - DEV-549
   parent: DEV-53
 comments:
 - date: 2026-09-13T20:50:37.457387+00:00
@@ -81,3 +83,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-11-15T01:49:25.432613+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-56"],"blocks":["DEV-82"],"parent":"DEV-53"}'
+    new: '{"depends_on":["DEV-56"],"blocks":["DEV-82"],"related":["DEV-549"],"parent":"DEV-53"}'

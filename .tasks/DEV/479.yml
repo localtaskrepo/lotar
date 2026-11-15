@@ -5,11 +5,12 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-13T19:16:59.162304+00:00
-modified: 2026-11-14T18:05:21.669738+00:00
+modified: 2026-11-15T01:04:18.502053+00:00
 relationships:
   related:
   - DEV-467
   - DEV-532
+  - DEV-551
 comments:
 - date: 2026-11-13T19:19:42.775921+00:00
   author: claude
@@ -105,3 +106,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-467"]}'
     new: '{"related":["DEV-467","DEV-532"]}'
+- at: 2026-11-15T01:04:18.502053+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-532"]}'
+    new: '{"related":["DEV-467","DEV-532","DEV-551"]}'

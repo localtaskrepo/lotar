@@ -1,11 +1,11 @@
 title: Restore Claude's sandbox at workspace level and add rule-based answers to permission requests
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@review'
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-14T23:29:37.967246+00:00
+modified: 2026-11-15T01:46:47.005219+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -20,6 +20,7 @@ relationships:
   - DEV-512
   - DEV-532
   - DEV-537
+  - DEV-467
 comments:
 - date: 2026-11-14T02:16:43.837266+00:00
   author: automation
@@ -84,12 +85,36 @@ comments:
 - date: 2026-11-14T23:29:37.967246+00:00
   author: automation
   text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d7c2709-cbbd-4287-9947-7c4d01114643'
+- date: 2026-11-15T00:44:14.903979+00:00
+  author: claude
+  text: 'mallox in the thread 2026-11-14 (stalled-ticket sweep): "Restart the 5 stuck lotar/local jobs". The rework mallox chose at 23:15 (INBOX-134) waited for an answer in a T3 thread that no longer exists, so nothing ran. Back to @fix for that rework: codex''s 08:21 finding (git -C . push and git -c key=value push get past the workspace deny). His note stands: escalate to the Fable fix agent if this round fails again.'
+- date: 2026-11-15T00:45:28.822099+00:00
+  author: claude
+  text: |-
+    Rework done: `git -C . push` and the other push variants are refused now. harnessmux 0.1.4 is published, and lotar uses it in `3c6e725b`.
+
+    - **Finding** (codex: `git -C . push` and `git -c k=v push` got past the deny rule): fixed in harnessmux `src/rules.rs`. The matcher skips git's global options (`-C`, `-c`, `--git-dir`, …), program paths, `env`/`sudo` wrappers and `sh -c "…"`.
+    - **Claude**: workspace sandbox now `autoAllowBashIfSandboxed = false` and `allowUnsandboxedCommands = false`, so every shell command goes through the rules and none can escape the sandbox.
+    - **Release**: OK from mallox in the picker (asked for 0.1.3, then again for 0.1.4 because DEV-467 had already released 0.1.3). harnessmux main `3c630d0`, signed tag `v0.1.4`, Release run `43658581598` all green, crates.io lists 0.1.4.
+    - **lotar**: `Cargo.toml`/`Cargo.lock` on 0.1.4. New assertions in `agent_runner.rs` (`workspace_sessions_refuse_push_and_outside_edits_and_take_the_tool_lists`) fail on 0.1.2 and pass on 0.1.4. `docs/help/agent.md` updated.
+    - **Checks**: harnessmux fmt, clippy, nextest 37/37, deny, `cargo publish --dry-run`. lotar `npm run lint:agent`, `npm test` (2147 Rust, 1536 UI), `npm run smoke` (400): all pass.
+    - **Live Claude check** (workspace): `git -C . push` and `git -c core.pager=cat push` were refused by `rule deny_commands git push`; `touch` outside the repo hit `Operation not permitted`; a write inside the repo worked; the remote stayed empty.
+- date: 2026-11-15T01:21:38.319313+00:00
+  author: claude
+  text: |-
+    Rebased onto main: now `47c730cd` (was `3c6e725b`), conflicts resolved, ready for review.
+
+    - **Why**: main moved (DEV-511 budget/options, DEV-512 command/args, DEV-516). The branch conflicted in `agent_runner.rs`, `agent.md`, `config-reference.md`, `Cargo.toml` and `Cargo.lock`.
+    - **Resolution**: kept main's budget and options work and its command/args docs, plus this ticket's rules. No profile setting is dropped any more, so `session_profile` returns the Profile alone, without a notes list. Its two callers in `agent_job_service.rs` are adjusted. harnessmux stays on 0.1.4, which contains everything main used from 0.1.2.
+    - **Checks**: `npm run lint:agent` ✓, UI tests 1537 ✓, `npm run smoke` 402 ✓. Rust: 2183/2184 pass.
+    - **Rust failure, also on main**: `merge_agent_that_hands_back_without_end_rules_does_not_land` (`agent_automation_integration_test.rs:2506`, `(Todo, @merge)` instead of `(HelpNeeded, reviewer)`) fails under full-suite load. It passes alone. A clean worktree of main `ff7b5229` fails it too, plus `merge_agent_that_sets_a_status_without_end_rules_still_lands`. It's DEV-516's test and is already recorded on DEV-516, so no new ticket.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d7c2709-cbbd-4287-9947-7c4d01114643
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa3c0a4f-6336-4351-afb3-bb97094d46b7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A468c2341-53de-4ba3-9431-72827cb55179
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6a68ee-ae5b-4e72-92c3-cd2b38b9b764
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). Before DEV-503, permissions: workspace gave Claude --permission-mode acceptEdits plus its OS sandbox (sandbox.enabled, autoAllowBashIfSandboxed), so shell writes outside the working and extra directories were blocked; Copilot and OpenCode/Kilo at workspace denied git push. Since DEV-503 workspace is the agent''s mode only (Claude acceptEdits) and harnessmux''s default policy allow approves every permission request, so shell commands run unsandboxed. Codex keeps its workspace-write sandbox. The profile keys tools.allowed/tools.disallowed and mcp.allow are no longer passed either (the job log says so). Work, mostly in harnessmux: pass Claude''s sandbox settings with the session, and give the permission policy rules (deny patterns such as git push, allow writes only under cwd and add_dirs, tool allow/deny lists) that lotar fills from permissions, tools and mcp.allow. Done when a workspace Claude job can''t write outside its directories or push, and tools/mcp.allow work again for ACP agents.'
@@ -470,3 +495,47 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T00:44:14.903979+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:44:15.075565+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-15T00:45:28.822099+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:45:28.939563+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467"]}'
+- at: 2026-11-15T01:07:59.139390+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T01:21:38.319313+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:22:12.136007+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:46:47.005219+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6a68ee-ae5b-4e72-92c3-cd2b38b9b764

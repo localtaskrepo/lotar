@@ -1,0 +1,97 @@
+title: A merge that continues the review's thread checks out the review's old commit, not the rework
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T00:44:25.587433+00:00
+modified: 2026-11-15T01:22:12.721025+00:00
+relationships:
+  related:
+  - DEV-523
+  - DEV-468
+  - DEV-472
+  - DEV-503
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9386a119-7c48-40f0-95b1-7872e3db5945
+description: |-
+  ## Found
+
+  On DEV-523 (2026-11-14 to 2026-11-15), the fix agent amended its rework onto the ticket branch `agent/DEV-523` (`53f61bbd`). The next Codex review and merge ran in the earlier Codex thread, whose T3 worktree is `t3-e406fab9-68e0849856ea5fae` on branch `t3/merge-job-stop-keeps-main-1`, still at the older version `81c1488d`. The merge agent found HEAD at `81c1488d` and stopped (comment 2026-11-14T23:59Z). Automation then reported the fix as being on `t3/merge-job-stop-keeps-main-1`, not on the ticket branch. A third superseded copy sits on `t3/merge-job-stop-keeps-main` (`eca8ccb2`).
+
+  DEV-468 made a rework commit on the ticket branch. A thread that continues (`session: continue` on the merge rule in `.tasks/DEV/automation.yml`) keeps its own worktree branch, so it never sees the amended commit.
+
+  On main since the harnessmux runner (DEV-503) it is worse: a continued T3 job runs with the main checkout as its directory and records no worktree, so LoTaR neither commits what it left uncommitted nor moves the ticket branch to its work (DEV-468), and an amended rework (the rework prompt says "Amend the earlier commit") is refused by the ticket-branch move, since `agent/<ID>` then holds the pre-amend commit.
+
+  ## Done when
+
+  - [ ] A T3 job that continues an earlier thread (`session: continue`, any profile: review, merge, rework) first brings that thread's worktree to the ticket branch's current commit:
+    - worktree already there: nothing changes;
+    - its branch is behind the ticket branch, or still at the commit the ticket branch pointed to when that thread's last job ended (the ticket branch moved on since, e.g. an amended rework): LoTaR moves the thread's branch to the ticket branch's commit and the job log says so;
+    - otherwise (worktree gone, uncommitted changes, commits the ticket branch lacks, or older job logs that don't record the worktree): LoTaR touches nothing, the job starts a new thread on the ticket branch instead, and the job log says why.
+  - [ ] The ticket branch wins over the thread's branch only in the cases above; work only on the thread's branch is never dropped.
+  - [ ] A continued T3 job records its thread's worktree, so leftover work is committed and the ticket branch follows the thread when the job ends, as for a new thread.
+  - [ ] A thread that started from the ticket branch's commit and rewrote it (amend) moves the ticket branch when the ticket branch hasn't moved since the job started; a ticket branch that moved meanwhile still refuses, as today.
+  - [ ] Regression test: a rework amends the ticket branch, then a continued merge job sees the new commit (and fails without the fix).
+  - [ ] `docs/help/agent.md` describes it.
+  - [ ] npm run lint, npm test and npm run smoke pass.
+history:
+- at: 2026-11-15T00:44:26.064331+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T01:17:10.360367+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T01:17:13.991605+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9386a119-7c48-40f0-95b1-7872e3db5945
+- at: 2026-11-15T01:22:12.584474+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      ## Found
+
+      On DEV-523 (2026-11-14 to 2026-11-15), the fix agent amended its rework onto the ticket branch `agent/DEV-523` (`53f61bbd`). The next Codex review and merge ran in the earlier Codex thread, whose T3 worktree is `t3-e406fab9-68e0849856ea5fae` on branch `t3/merge-job-stop-keeps-main-1`, still at the older version `81c1488d`. The merge agent found HEAD at `81c1488d` and stopped (comment 2026-11-14T23:59Z). Automation then reported the fix as being on `t3/merge-job-stop-keeps-main-1`, not on the ticket branch. A third superseded copy sits on `t3/merge-job-stop-keeps-main` (`eca8ccb2`).
+
+      DEV-468 made a rework commit on the ticket branch. A thread that continues (`session: continue` on the merge rule in `.tasks/DEV/automation.yml`) keeps its own worktree branch, so it never sees the amended commit.
+
+      ## Done when
+
+      - [ ] A review or merge job that continues an earlier thread works on the ticket branch's current commit, or the job refuses to start and says why.
+      - [ ] Regression test: a rework amends the ticket branch, then a continued merge job sees the new commit.
+      - [ ] npm run lint, npm test and npm run smoke pass.
+    new: |-
+      ## Found
+
+      On DEV-523 (2026-11-14 to 2026-11-15), the fix agent amended its rework onto the ticket branch `agent/DEV-523` (`53f61bbd`). The next Codex review and merge ran in the earlier Codex thread, whose T3 worktree is `t3-e406fab9-68e0849856ea5fae` on branch `t3/merge-job-stop-keeps-main-1`, still at the older version `81c1488d`. The merge agent found HEAD at `81c1488d` and stopped (comment 2026-11-14T23:59Z). Automation then reported the fix as being on `t3/merge-job-stop-keeps-main-1`, not on the ticket branch. A third superseded copy sits on `t3/merge-job-stop-keeps-main` (`eca8ccb2`).
+
+      DEV-468 made a rework commit on the ticket branch. A thread that continues (`session: continue` on the merge rule in `.tasks/DEV/automation.yml`) keeps its own worktree branch, so it never sees the amended commit.
+
+      On main since the harnessmux runner (DEV-503) it is worse: a continued T3 job runs with the main checkout as its directory and records no worktree, so LoTaR neither commits what it left uncommitted nor moves the ticket branch to its work (DEV-468), and an amended rework (the rework prompt says "Amend the earlier commit") is refused by the ticket-branch move, since `agent/<ID>` then holds the pre-amend commit.
+
+      ## Done when
+
+      - [ ] A T3 job that continues an earlier thread (`session: continue`, any profile: review, merge, rework) first brings that thread's worktree to the ticket branch's current commit:
+        - worktree already there: nothing changes;
+        - its branch is behind the ticket branch, or still at the commit the ticket branch pointed to when that thread's last job ended (the ticket branch moved on since, e.g. an amended rework): LoTaR moves the thread's branch to the ticket branch's commit and the job log says so;
+        - otherwise (worktree gone, uncommitted changes, commits the ticket branch lacks, or older job logs that don't record the worktree): LoTaR touches nothing, the job starts a new thread on the ticket branch instead, and the job log says why.
+      - [ ] The ticket branch wins over the thread's branch only in the cases above; work only on the thread's branch is never dropped.
+      - [ ] A continued T3 job records its thread's worktree, so leftover work is committed and the ticket branch follows the thread when the job ends, as for a new thread.
+      - [ ] A thread that started from the ticket branch's commit and rewrote it (amend) moves the ticket branch when the ticket branch hasn't moved since the job started; a ticket branch that moved meanwhile still refuses, as today.
+      - [ ] Regression test: a rework amends the ticket branch, then a continued merge job sees the new commit (and fails without the fix).
+      - [ ] `docs/help/agent.md` describes it.
+      - [ ] npm run lint, npm test and npm run smoke pass.
+- at: 2026-11-15T01:22:12.721025+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-523","DEV-468","DEV-472"]}'
+    new: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503"]}'

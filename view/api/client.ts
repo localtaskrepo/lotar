@@ -25,6 +25,8 @@ import type {
     AttachmentReorderRequest,
     AttachmentInfoRequest,
     AttachmentInfoResponse,
+    FileResolveRequest,
+    FileResolveResponse,
     BrandingResponse,
     BrandingUploadRequest,
     BrandingUploadResponse,
@@ -348,6 +350,13 @@ export const api = {
     },
     attachmentInfo(payload: AttachmentInfoRequest): Promise<AttachmentInfoResponse> {
         return post('/api/attachments/info', payload)
+    },
+    resolveFiles(payload: FileResolveRequest): Promise<FileResolveResponse> {
+        return post('/api/files/resolve', payload)
+    },
+    /** Raw bytes of a repository file; `fetch` it or use it as an image source. */
+    fileContentUrl(path: string, options: { download?: boolean } = {}): string {
+        return `${BASE}/api/files/content${qs({ path, download: options.download ? '1' : undefined })}`
     },
     removeTaskAttachment(payload: AttachmentRemoveRequest): Promise<AttachmentRemoveResponse> {
         return post('/api/tasks/attachments/remove', payload)

@@ -5,7 +5,7 @@ type: Bug
 reporter: codex
 assignee: '@review'
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-15T00:18:53.933291+00:00
+modified: 2026-11-15T01:49:25.431381+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -17,6 +17,10 @@ relationships:
   - DEV-320
   - DEV-532
   - DEV-521
+  - DEV-481
+  - DEV-553
+  - DEV-551
+  - DEV-549
 comments:
 - date: 2026-11-14T06:02:53.850504+00:00
   author: claude
@@ -98,16 +102,53 @@ comments:
     - Old records without the field: the recorded outcome still counts; a direct change can't be seen there.
     - `docs/help/agent.md` mentions taken-over jobs.
     - Checks: `npm run lint`, `npm test` (2155 Rust + 1536 UI), `npm run smoke` (400) pass; `RUSTC_WRAPPER= cargo nextest run --cargo-profile local -E 'test(merge_) | test(a_taken_over_merge_job)'` 17/17 pass. Live mux run not repeated (no prompt change since).
+- date: 2026-11-15T00:32:15.712667+00:00
+  author: codex
+  text: |-
+    Review: passed.
+
+    - Reviewed `d8498d2e`, full diff, ticket/comments and owner decisions, related tickets, guidance, main history and finalization/takeover paths. No findings or UI changes. Recovery guard now checks recorded handbacks independently and restores the persisted starting assignee.
+    - `RUSTC_WRAPPER= npm run test:rust -- merge_`: 17/17 passed; runner exited 1 for leftover macOS `xcrun_db`. `git diff --check` passed. Checkout clean.
+    - Full lint/UI/smoke and live mux not repeated; prior evidence is above. Release membership/dependency present. No edits, commits or minor tickets; status/assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T01:01:37.107251+00:00
+  author: codex
+  text: |-
+    Merge blocked: required tests fail after rebasing onto current main.
+
+    - Rebased with additive conflict resolutions: retained main merge-job flag and comment guidance alongside assignee persistence and sandbox retries. Added missing optional field to main orphan test fixture.
+    - `RUSTC_WRAPPER= npm run lint:agent` passed. Sandbox test attempt blocked localhost binds; approved outside-sandbox retry reached a real failure.
+    - `merge_agent_that_hands_back_without_end_rules_does_not_land`, `crates/lotar-lib/tests/agent_automation_integration_test.rs:2506`: actual `(Todo, @merge)`, expected `(HelpNeeded, reviewer)`. Retry ran 1670/2183 Rust tests: 1669 passed, 1 failed; remaining cancelled. Runner also reported scratch leftovers.
+    - UI/release/hooks and smoke not run after Rust failed. No merge or push; trust not needed. Rebased work preserved on this thread branch. Can a fix agent reconcile the handback regression with current main before another merge?
+- date: 2026-11-15T01:02:38.385556+00:00
+  author: triage
+  text: |-
+    Yes, a fix agent reconciles the handback regression with current main before the next merge.
+
+    - Owner chose a fix-agent rework twice: 'Answer: fix' on 2026-11-14 23:20 (INBOX-131) and 23:59 (INBOX-161). This is the same work after the rebase.
+    - Failing: `merge_agent_that_hands_back_without_end_rules_does_not_land` (`agent_automation_integration_test.rs:2506`), actual `(Todo, @merge)`, expected `(HelpNeeded, reviewer)`.
+    - Keep the guard, the sandbox retries and main's merge-job flag and comment guidance; no broad full-access default.
+- date: 2026-11-15T01:28:22.624458+00:00
+  author: claude
+  text: 'Seen 2026-11-14 in DEV-481 on main ff7b5229 merged with DEV-481''s commit 167f2a7d. Two findings about the without_end_rules tests. (1) With LOTAR_DEFAULT_REPORTER set in the test''s environment (agent shells set it, e.g. =claude), merge_agent_that_hands_back_without_end_rules_does_not_land fails 5 of 5 runs alone: (Todo, @merge). The fixture relies on the config''s default reporter, and the child lotar process doesn''t get that variable removed. (2) With the variable unset, both tests are intermittent: alone, 1 of 3 runs passed. In a full workspace run, both failed all 3 nextest tries: the hand-back test got (Todo, @merge), and merge_agent_that_sets_a_status_without_end_rules_still_lands got status Todo instead of Review. The rest of the 2183 tests passed.'
+- date: 2026-11-15T01:40:10.086704+00:00
+  author: claude
+  text: |-
+    Fixed the failing handback test on top of main, commit `90672043` (one test file).
+
+    - **Cause:** a timing problem in the test, not the guard. Since DEV-531, an agent's `lotar status`/`assignee` are recorded and applied when the job ends, after `finished_at` is set. `run_merge_without_end_rules` read the ticket as soon as `finished_at` appeared, so it saw `(Todo, @merge)`. The guard worked: `feature.txt` stayed off main.
+    - **Fix:** the helper (`agent_automation_integration_test.rs`) now waits for the expected status and assignee, and on timeout reports what it saw. Both no-rules tests use it.
+    - **Already on main:** LoTaR fast-forwarded main to the rebased `ff7b5229` (main reflog: `merge t3/sandbox-blocked-build-retries`), not pushed. My branch `agent/DEV-516` now sits on main (its old `d8498d2e` is superseded by `ff7b5229`); `90672043` is the one commit beyond main.
+    - **LOTAR_DEFAULT_REPORTER:** the no-rules tests pass 3/3 with it unset and 3/3 with `=claude`. Guard, sandbox retries, main's merge-job flag and comment guidance unchanged.
+    - Checks: `npm run lint`, `LOTAR_DEFAULT_REPORTER=claude npm test` (2183 Rust + 1537 UI), `npm run smoke` (402) pass.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af501c0c4-15b4-4f82-8d97-681b0bda889e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b62941-631a-4782-ae16-737469e6ebf9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adae38dd0-cb48-4704-a861-5ec090a7d16f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad62e3c03-c9f2-49db-a501-a123dad99df1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e3c645f-c8e8-45b9-b686-73fda022134d
 releases:
 - 6
 description: 'Owner requested before v0.15.1 release, 2026-11-14. Repeated DEV-503 runs stopped because sccache was denied by the Codex sandbox; shared Git metadata and main task storage also need scoped access. Latest merge handed back immediately after lint hit sccache despite documented approved retry and RUSTC_WRAPPER fallback. Investigate harnessmux permission plumbing and job instructions together; coordinate with DEV-509. Done when: regression coverage exercises permission-blocked checks and supported retries; sandboxed Codex jobs complete Rust checks through approved cache access or wrapper fallback; shared Git metadata and main tasks use scoped approval or host-side operations; genuine check failures still stop merge; verify end-to-end fix/review/merge with mux. Preserve workspace isolation, no broad full-access default. Add to v0.15.1 and make its release ticket depend on this fix.'
-tags:
-- review-returned
 history:
 - at: 2026-11-14T04:57:31.679572+00:00
   actor: codex
@@ -336,3 +377,97 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-15T00:29:35.118268+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e3c645f-c8e8-45b9-b686-73fda022134d
+- at: 2026-11-15T00:32:15.712667+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:32:29.503091+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T01:01:37.107251+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:02:13.163703+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: review-returned
+    new: ''
+- at: 2026-11-15T01:02:14.517488+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T01:02:38.385556+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:02:38.783068+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T01:28:22.624458+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:28:22.738907+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481"]}'
+- at: 2026-11-15T01:30:57.138986+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T01:38:07.692647+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553"]}'
+- at: 2026-11-15T01:40:10.086704+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:40:18.519423+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:44:45.056435+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551"]}'
+- at: 2026-11-15T01:49:25.431381+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549"]}'

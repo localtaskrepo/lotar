@@ -165,7 +165,7 @@ fn immutable_cache_headers(etag: &str) -> Vec<(String, String)> {
 /// Content type for an attachment's extension. Active document types (HTML,
 /// XML, JS) stay `application/octet-stream` so they are never rendered on the
 /// app's origin.
-fn attachment_content_type(extension: &str) -> &'static str {
+pub(super) fn attachment_content_type(extension: &str) -> &'static str {
     match extension {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -194,7 +194,7 @@ fn attachment_content_type(extension: &str) -> &'static str {
 
 /// `Content-Disposition` with an ASCII fallback name plus the exact UTF-8
 /// name (RFC 6266 / RFC 5987), so "Save as" keeps umlauts and emoji.
-fn content_disposition(disposition: &str, filename: &str) -> String {
+pub(super) fn content_disposition(disposition: &str, filename: &str) -> String {
     let fallback: String = filename.chars().map(|c| if c.is_ascii() && !c.is_ascii_control() && c != '"' && c != '\\' { c } else { '_' }).collect();
     if fallback == filename {
         return format!("{disposition}; filename=\"{filename}\"");

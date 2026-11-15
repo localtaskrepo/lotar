@@ -1,13 +1,24 @@
 title: 'openapi: /api/tasks/update says status is ignored, but the route applies it (and defers it during a job)'
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
+assignee: '@review'
 created: 2026-11-11T19:18:53.444560+00:00
-modified: 2026-11-11T19:18:53.532868+00:00
+modified: 2026-11-15T01:49:15.596553+00:00
 relationships:
   related:
   - DEV-320
+comments:
+- date: 2026-11-15T00:46:54.466785+00:00
+  author: claude
+  text: 'Filed by an agent before the 2026-11-11 rule that starts @fix on new agent tickets, so nobody ever picked it up. Handed to @fix in the stalled-ticket sweep (mallox in the thread 2026-11-14: "Hand the orphaned tickets to @fix").'
+- date: 2026-11-15T01:25:59.981431+00:00
+  author: claude
+  text: 'Rewrote the /api/tasks/update description in docs/openapi.json: dropped the stale ''status is ignored, handled by CLI'' note; it now says status/priority/type are validated against the project config and a status change applies auto.assign_on_status, keeping the DEV-320 deferred-during-job sentence. Matches routes/tasks.rs (status goes through TaskService::update_with_receipt) and the dev54 mutation contract test. Checked: JSON valid, prettier clean, integration openapi tests pass (4/4). Docs-only, so full lint/test/smoke not run.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64a037ea-00db-462b-b857-dbba46c9f927
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d8a9cd5-f245-4d27-bb68-87b3c690fe00
 description: 'Found by the DEV-320 agent on 2026-11-11: docs/openapi.json describes /api/tasks/update as ignoring status, which is stale. Check: grep the route''s description in docs/openapi.json against src/routes. Done: the description matches the behaviour, including the deferred outcome during an agent job.'
 custom_fields:
   finding: docs:openapi-tasks-update-status
@@ -18,3 +29,41 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-320"]}'
+- at: 2026-11-15T00:46:54.466785+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:46:54.780189+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T01:24:35.166175+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T01:24:37.861956+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64a037ea-00db-462b-b857-dbba46c9f927
+- at: 2026-11-15T01:25:59.981431+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:26:07.267390+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T01:49:15.596553+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d8a9cd5-f245-4d27-bb68-87b3c690fe00
