@@ -32,19 +32,6 @@ const WONT_DO_NAMES: &[&str] = &["wontdo", "wontfix", "cancelled", "canceled", "
 /// project and writes one ticket or comment.
 const LOCK_WAIT: Duration = Duration::from_secs(30);
 
-impl FindingReport {
-    /// One line naming the ticket, for text output.
-    pub fn describe(&self, key: &str) -> String {
-        match self.state {
-            FindingState::New => format!("Created {} for finding {key}", self.id),
-            FindingState::Recurred => format!("Created {} for finding {key}; it was fixed before and came back", self.id),
-            FindingState::Open if self.commented => format!("{} already reports finding {key}; added this report as a comment", self.id),
-            FindingState::Open => format!("{} already reports finding {key}; seen again with nothing new, no comment added", self.id),
-            FindingState::Suppressed => format!("{} reported finding {key} and was closed as won't do; nothing created", self.id),
-        }
-    }
-}
-
 /// The newest ticket with a finding key, and what its status means.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Prior {

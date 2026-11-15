@@ -165,8 +165,8 @@ automation:
     }
 }
 
-const AGENT_PIPELINE_TEMPLATE: &str = include_str!("../../../../config/templates/agent-pipeline.yml");
-const AGENT_REVIEWED_TEMPLATE: &str = include_str!("../../../../config/templates/agent-reviewed.yml");
+const AGENT_PIPELINE_TEMPLATE: &str = include_str!("templates/agent-pipeline.yml");
+const AGENT_REVIEWED_TEMPLATE: &str = include_str!("templates/agent-reviewed.yml");
 
 /// The `config:` block of the agent template behind a scaffold, as YAML.
 /// Its statuses, agent profiles and worktree settings are what the

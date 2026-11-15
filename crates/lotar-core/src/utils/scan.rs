@@ -15,20 +15,20 @@ pub struct InlineAttrs {
 /// API scan surfaces. Each surface keeps its own fallback when no
 /// configuration can be read at all.
 #[derive(Debug, Clone)]
-pub(crate) struct ScanConfigSnapshot {
-    pub(crate) signal_words: Vec<String>,
-    pub(crate) ticket_patterns: Option<Vec<String>>,
-    pub(crate) enable_ticket_words: bool,
-    pub(crate) enable_mentions: bool,
-    pub(crate) strip_attributes: bool,
-    pub(crate) issue_type_words: Vec<String>,
+pub struct ScanConfigSnapshot {
+    pub signal_words: Vec<String>,
+    pub ticket_patterns: Option<Vec<String>>,
+    pub enable_ticket_words: bool,
+    pub enable_mentions: bool,
+    pub strip_attributes: bool,
+    pub issue_type_words: Vec<String>,
 }
 
 impl ScanConfigSnapshot {
     /// CLI fallback when no configuration can be read: scanner defaults with
     /// mention tracking left enabled. `strip_attributes` is unused on this
     /// path; the CLI resolves stripping through its own project lookup.
-    pub(crate) fn cli_fallback() -> Self {
+    pub fn cli_fallback() -> Self {
         Self {
             signal_words: Vec::new(),
             ticket_patterns: None,
@@ -41,7 +41,7 @@ impl ScanConfigSnapshot {
 
     /// API service fallback when no configuration can be read: identical to
     /// the CLI fallback except attribute stripping defaults to on.
-    pub(crate) fn service_fallback() -> Self {
+    pub fn service_fallback() -> Self {
         Self { strip_attributes: true, ..Self::cli_fallback() }
     }
 }
@@ -49,7 +49,7 @@ impl ScanConfigSnapshot {
 /// Resolve the shared scanner snapshot from a configuration manager, using
 /// the project override when available and the resolved root config
 /// otherwise. Pure lookup: selection order matches both historical surfaces.
-pub(crate) fn scan_config_from_manager(manager: &crate::config::manager::ConfigManager, project: Option<&str>) -> ScanConfigSnapshot {
+pub fn scan_config_from_manager(manager: &crate::config::manager::ConfigManager, project: Option<&str>) -> ScanConfigSnapshot {
     let resolved = match project {
         Some(project_name) => manager.get_project_config(project_name).unwrap_or_else(|_| manager.get_resolved_config().clone()),
         None => manager.get_resolved_config().clone(),
@@ -68,7 +68,7 @@ pub(crate) fn scan_config_from_manager(manager: &crate::config::manager::ConfigM
 
 /// Merge regular signal words with issue-type words, skipping
 /// case-insensitive duplicates. Shared by the CLI and API scan surfaces.
-pub(crate) fn merge_signal_words(signal_words: &[String], issue_type_words: &[String]) -> Vec<String> {
+pub fn merge_signal_words(signal_words: &[String], issue_type_words: &[String]) -> Vec<String> {
     let mut merged = signal_words.to_vec();
     for word in issue_type_words {
         if !merged.iter().any(|existing| existing.eq_ignore_ascii_case(word)) {
@@ -81,7 +81,7 @@ pub(crate) fn merge_signal_words(signal_words: &[String], issue_type_words: &[St
 /// Build the quote-aware line scanner both surfaces use for comment ranges,
 /// key extraction, and mention analysis. Signal words are applied only when
 /// provided, matching the historical per-surface construction.
-pub(crate) fn configured_line_scanner(ticket_patterns: Option<&[String]>, enable_ticket_words: bool, signal_words: &[String]) -> crate::scanner::Scanner {
+pub fn configured_line_scanner(ticket_patterns: Option<&[String]>, enable_ticket_words: bool, signal_words: &[String]) -> crate::scanner::Scanner {
     let mut scanner = crate::scanner::Scanner::new(std::path::PathBuf::from(".")).with_ticket_detection(ticket_patterns, enable_ticket_words);
     if !signal_words.is_empty() {
         scanner = scanner.with_signal_words(signal_words);
@@ -92,7 +92,7 @@ pub(crate) fn configured_line_scanner(ticket_patterns: Option<&[String]>, enable
 /// Replace a specific 1-based line in the file content and return the new
 /// content. Only that line's text changes: every line keeps its own ending
 /// (`\r\n` or `\n`), and a missing final newline stays missing (DEV-261).
-pub(crate) fn replace_line_contents(contents: &str, line_number_1based: usize, new_line: &str) -> Option<String> {
+pub fn replace_line_contents(contents: &str, line_number_1based: usize, new_line: &str) -> Option<String> {
     if line_number_1based == 0 {
         return None;
     }
@@ -248,7 +248,7 @@ pub fn refresh_code_reference(
 /// plain one. Entries that carry more data are never touched, nor is a
 /// plain anchor that shares its line with such an entry. Returns whether
 /// anything was removed.
-pub(crate) fn dedupe_code_references(references: &mut Vec<crate::types::ReferenceEntry>) -> bool {
+pub fn dedupe_code_references(references: &mut Vec<crate::types::ReferenceEntry>) -> bool {
     let bare = |r: &crate::types::ReferenceEntry| crate::types::ReferenceEntry { code: None, ..r.clone() } == crate::types::ReferenceEntry::default();
     let mut seen = std::collections::HashSet::new();
     let before = references.len();
@@ -264,7 +264,7 @@ pub(crate) fn dedupe_code_references(references: &mut Vec<crate::types::Referenc
 /// for them, while explicit attachments (CLI, REST, MCP, UI) record a
 /// `reference_added` entry. Path-only and ranged references (`path#A-B`)
 /// therefore always count as user-attached.
-pub(crate) fn is_user_attached(history: &[crate::types::TaskChangeLogEntry], code_ref: &str) -> bool {
+pub fn is_user_attached(history: &[crate::types::TaskChangeLogEntry], code_ref: &str) -> bool {
     let Some((_, anchor)) = code_ref.rsplit_once('#') else {
         return true;
     };

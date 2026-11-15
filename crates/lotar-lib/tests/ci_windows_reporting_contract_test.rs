@@ -373,6 +373,7 @@ fn path_filters_pick_the_jobs_each_kind_of_change_needs() {
         ("scripts/release.mjs", vec!["ui_tests", "windows_checks"]),
         ("src/main.rs", vec!["build_artifacts", "rust_checks", "smoke_tests", "windows_checks", "release_targets", "security"]),
         // The workspace crates (DEV-497).
+        ("crates/lotar-core/src/lib.rs", vec!["build_artifacts", "rust_checks", "smoke_tests", "windows_checks", "release_targets", "security"]),
         ("crates/lotar-lib/src/lib.rs", vec!["build_artifacts", "rust_checks", "smoke_tests", "windows_checks", "release_targets", "security"]),
         ("crates/lotar-web-assets/build.rs", vec!["build_artifacts", "rust_checks", "smoke_tests", "windows_checks", "release_targets", "security"]),
         (".github/workflows/ci.yml", every_job.clone()),

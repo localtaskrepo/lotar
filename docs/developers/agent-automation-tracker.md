@@ -55,7 +55,7 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 
 ## Known Gotchas
 
-- **Config format**: Custom statuses must use `issue: states: [...]`, not `statuses: [...]` at the top level. Same for `issue: priorities:` and `issue: types:`. See `crates/lotar-lib/src/config/normalization.rs`.
+- **Config format**: Custom statuses must use `issue: states: [...]`, not `statuses: [...]` at the top level. Same for `issue: priorities:` and `issue: types:`. See `crates/lotar-core/src/config/normalization.rs`.
 - **`MatchMode::OnChange`**: For `updated` events, each field in `when` conditions must have actually changed in the update. Single-field CLI commands only include that one field in the changeset. For `created` events, all fields count as "new".
 - **`default: project:`**: The config's default project is only used in certain code paths. `detect_project_name()` returns a value first (from env → project files → git repo → directory name → "default"). Use `-p <project>` to force prefix.
 - **Wrapper process discovery is per tasks directory**: `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (wrapper-based discovery lets `list-running` work without persistence; see `crates/lotar-lib/src/cli/handlers/agent.rs`) and counts only wrappers whose `--tasks-dir` is this tasks directory (DEV-349). A wrapper from an older build has no `--tasks-dir` and is not counted; its job's record still is (DEV-367). Ticket matching is alias-aware (DEV-56).
@@ -218,15 +218,15 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 | File-backed queue | `crates/lotar-lib/src/services/agent_queue_service.rs` |
 | Automation engine | `crates/lotar-lib/src/services/automation_service.rs`, `crates/lotar-lib/src/services/automation_matching.rs` |
 | Automation types | `crates/lotar-lib/src/automation/types.rs`, `crates/lotar-lib/src/automation/persistence.rs`, `crates/lotar-lib/src/automation/template.rs` |
-| Config types | `crates/lotar-lib/src/config/types.rs` (agent profiles, automation config, worktree config) |
-| Config normalization | `crates/lotar-lib/src/config/normalization.rs` (parses dotted aliases such as `issue.states/types/priorities` listed in `crates/lotar-lib/src/config/fields.rs`) |
+| Config types | `crates/lotar-core/src/config/types.rs` (agent profiles, automation config, worktree config) |
+| Config normalization | `crates/lotar-core/src/config/normalization.rs` (parses dotted aliases such as `issue.states/types/priorities` listed in `crates/lotar-core/src/config/fields.rs`) |
 | CLI args/handlers | `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/src/cli/handlers/agent.rs`, `crates/lotar-lib/src/cli/handlers/mod.rs` |
 | REST routes | `crates/lotar-lib/src/routes/jobs.rs` (job endpoints), `crates/lotar-lib/src/routes/automation.rs` (automation endpoints) |
-| API DTOs | `crates/lotar-lib/src/api_types.rs` |
+| API DTOs | `crates/lotar-core/src/api_types.rs` |
 | MCP handlers | `crates/lotar-lib/src/mcp/server/handlers/agent.rs` |
 | UI page | `view/pages/AgentJobs.vue` |
 | UI types | `view/api/types.ts` |
-| Templates | `crates/lotar-lib/src/config/templates/agent-pipeline.yml`, `crates/lotar-lib/src/config/templates/agent-reviewed.yml` |
+| Templates | `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-pipeline.yml`, `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-reviewed.yml` |
 | Integration tests | `crates/lotar-lib/tests/agent_automation_integration_test.rs`, `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-lib/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs` |
 | Smoke: CLI automation | `smoke/tests/cli.automation.smoke.spec.ts` |
 | Smoke: CLI agent commands | `smoke/tests/cli.agent-commands.smoke.spec.ts` |

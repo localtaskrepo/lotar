@@ -1,0 +1,47 @@
+# The core of the lotar library (DEV-499): config, storage, tasks, output and
+# the REST types. crates/lotar-lib builds services, the CLI and the servers on
+# it and re-exports its modules, so `lotar::config` and the like keep working.
+# It never depends on the layers above it, so a change there doesn't
+# recompile it.
+[package]
+name = "lotar-core"
+description = "The core of the lotar library: config, storage, tasks and the REST types"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+# tests/ holds the unit tests' cases, fixtures and helpers (env_mutex.rs and
+# unit_test_environment.rs, which lotar-lib's tests include too), so the
+# packaged crate's unit tests build on their own.
+include = ["/src/**", "/tests/**"]
+
+[lints]
+workspace = true
+
+[dependencies]
+base64.workspace = true
+blake3.workspace = true
+chrono.workspace = true
+clap.workspace = true
+dirs.workspace = true
+fs2.workspace = true
+ignore.workspace = true
+rayon = { version = "1.12.0", default-features = false, optional = true }
+regex.workspace = true
+schemars = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+
+[dev-dependencies]
+ctor.workspace = true
+dtor.workspace = true
+libc.workspace = true
+tempfile.workspace = true
+
+[features]
+default = ["parallel"]
+schema = ["schemars"]
+parallel = ["dep:rayon"]

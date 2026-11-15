@@ -1,5 +1,7 @@
-// Also included by the library's unit tests via #[path]; each including
-// crate uses a different subset of these helpers.
+// Included via #[path] by the unit tests of lotar-core and lotar-lib and by
+// lotar-lib's integration tests; it lives in lotar-core so that crate's
+// packaged tests build on their own (DEV-499). Each including crate uses a
+// different subset of these helpers.
 #![allow(dead_code, reason = "each including test crate uses a different subset of these helpers")]
 
 use std::collections::HashMap;

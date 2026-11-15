@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 // Re-export shared environment mutex for tests that mutate global env vars.
+#[path = "../../../lotar-core/tests/common/env_mutex.rs"]
 pub mod env_mutex;
 
 // Minimal OpenAPI schema validator for semantic contract tests (DEV-82).

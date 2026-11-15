@@ -177,7 +177,7 @@ pub fn apply_cli_overrides(resolved: &mut ResolvedConfig) {
 /// The explicitly requested serve port from the active `--config` override
 /// layer, if any. Presence comes from the validated normalized pairs, so it
 /// is reported even when the value equals the built-in default.
-pub(crate) fn active_cli_port_override() -> Option<u16> {
+pub fn active_cli_port_override() -> Option<u16> {
     active_cli_override_layer().and_then(|layer| layer.port_override)
 }
 

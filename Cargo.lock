@@ -1392,6 +1392,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "lotar-core"
+version = "0.15.0"
+dependencies = [
+ "base64",
+ "blake3",
+ "chrono",
+ "clap",
+ "ctor",
+ "dirs",
+ "dtor",
+ "fs2",
+ "ignore",
+ "libc",
+ "rayon",
+ "regex",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "tempfile",
+]
+
+[[package]]
 name = "lotar-lib"
 version = "0.15.0"
 dependencies = [
@@ -1411,10 +1434,10 @@ dependencies = [
  "ignore",
  "image",
  "libc",
+ "lotar-core",
  "notify",
  "predicates",
  "pulldown-cmark",
- "rayon",
  "regex",
  "schemars 1.2.3",
  "serde",
