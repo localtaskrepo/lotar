@@ -3,9 +3,9 @@ status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-17T02:04:23.418601+00:00
+modified: 2026-11-17T02:10:20.420256+00:00
 relationships:
   related:
   - DEV-611
@@ -109,6 +109,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82379814-5465-4e30-9664-a8d68148cac7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A231da3c4-3b76-4d3f-aa8a-78b14efd10b0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4aab10b9-d823-4940-9b0a-d794d6939114
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad882e4bc-369e-48f8-86e8-cb22a79054ce
 description: |-
   Found in the review of DEV-611 (`3cf93d5e`).
 
@@ -120,6 +121,8 @@ description: |-
   ## Done when
   - [ ] A test: keeping fails (for example a read-only sessions folder, or a kept name already taken by a directory); the job ends failed with "Could not keep the session …", no new session record exists, and the old record and event log are still there.
   - [ ] A t3 test (`dev510_t3_session_test.rs`): a rework past `continue_within_minutes` whose prompt names the old thread's id.
+tags:
+- merge-retried
 history:
 - at: 2026-11-16T19:55:39.199285+00:00
   actor: claude
@@ -223,3 +226,17 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:08:21.796876+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad882e4bc-369e-48f8-86e8-cb22a79054ce
+- at: 2026-11-17T02:10:20.420256+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: ''
+    new: merge-retried

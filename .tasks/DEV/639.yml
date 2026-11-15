@@ -1,0 +1,28 @@
+title: A resumed T3 thread is taken over while a newer thread of the ticket waits for an answer
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T02:10:24.525264+00:00
+modified: 2026-11-17T02:10:25.266688+00:00
+relationships:
+  related:
+  - DEV-626
+  - DEV-600
+description: |-
+  Found in the DEV-626 review (2026-11-16).
+
+  ## Found
+  - `crates/lotar-lib/src/services/agent_job_service/resumed.rs:169` drops a thread that waits for an answer (`pendingRequestCount > 0`) from the list, and then takes over the next running thread of the ticket.
+  - DEV-600 says a waiting thread holds the ticket: no other job on the ticket starts. With two resumed threads (the newer one waiting, an older one running), lotar takes the older one over beside the waiting one.
+
+  ## Done when
+  - [ ] A ticket whose resumed threads include one that waits for an answer takes over none of them; the others get the "stop it in T3 Code" comment, once per run.
+  - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`.
+history:
+- at: 2026-11-17T02:10:25.266688+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

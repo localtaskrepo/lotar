@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-17T01:38:31.597646+00:00
+modified: 2026-11-17T02:12:20.981296+00:00
 relationships:
   related:
   - DEV-620
@@ -46,6 +46,9 @@ comments:
     - Done when 1: met
     - Done when 2 not met: `docs/help/agent.md:58` says "When no comment is picked (all are automation's, …)" and "automation's comments are left out". In `agent_job_service.rs:1260` (`before_hand_back`) the open question has no automation filter: only `newest_in` (line 1284) skips `automation`. Example: an automation "job failed" comment, then a hand-back to mallox: that comment becomes the `Open question`, and an all-automation ticket gets a pick
     - Fix: in the doc, say automation's comments are left out of the newest fix and review comments only, and give the no-pick case as the code applies it: no comment before the last hand-back to a person (other than that person's), no question comment, no comment written in a fix or review phase. Leaving out automation in `before_hand_back` too would change DEV-620's behaviour: only if the owner wants that
+- date: 2026-11-17T02:12:20.981296+00:00
+  author: claude
+  text: 'Stalled since 2026-11-17T01:38Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Claude"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
@@ -136,3 +139,26 @@ history:
   - field: tags
     old: fix-retried, review-blocked
     new: fix-retried, review-returned
+- at: 2026-11-17T02:11:59.264242+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T02:11:59.983758+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix-retry'
+- at: 2026-11-17T02:12:03.892747+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review-claude'
+- at: 2026-11-17T02:12:20.981296+00:00
+  actor: claude
+  changes:
+  - field: comment_added

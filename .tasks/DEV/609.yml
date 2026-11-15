@@ -1,11 +1,11 @@
 title: No test shows that a job ending on a ticket drops its cached T3 Code answer
-status: HelpNeeded
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-17T02:06:04.940826+00:00
+modified: 2026-11-17T02:09:52.818828+00:00
 relationships:
   related:
   - DEV-599
@@ -390,3 +390,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626"]}'
     new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626","DEV-613"]}'
+- at: 2026-11-17T02:09:52.818828+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done

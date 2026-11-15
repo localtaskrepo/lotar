@@ -131,6 +131,11 @@ looks it up online the first time the binary runs.
 
 The job fails when a secret is missing, so a release never ships unsigned macOS archives.
 
+A build from source installed with `npm run install:local` is signed on the Mac that builds it, with the
+same identity and identifier when that Mac's keychain has the certificate, so it keeps the same grants as a
+release ([Build from source](help/install.md#build-from-source)). It is not notarized: that matters only to
+Gatekeeper for downloaded files, not to a binary built on the same Mac.
+
 ### Secrets
 
 Set in the repository's **Settings → Secrets and variables → Actions**:

@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-17T01:57:47.149593+00:00
+modified: 2026-11-17T02:11:21.479553+00:00
 relationships:
   related:
   - DEV-351
@@ -682,6 +682,41 @@ comments:
       result: not_run
       reason: fix agent reports 401/401
     next: 'Merge: rebase onto main resolves 3 conflicts (DEV-592, DEV-600), then rerun lint, test, smoke'
+- date: 2026-11-17T02:09:52.215690+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T012844.194Z-21 failed or its review thread did (lotar agent logs job-20261117T012844.194Z-21), so the work on branch t3/resume-held-job-when-unblocked isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T02:11:21.421398+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review thread ended 'idle' (job-20261117T012844.194Z-21) after it had posted 'Review passed' at cf8caa2a; not a code error. Rebase onto main is needed anyway (conflicts in agent_queue_service.rs, cli/handlers/agent.rs, docs/help/agent.md; held_by field, agent.md queue line, worker state counts only queued jobs), then send to review again.
+  answer:
+    to: 2026-11-17T02:09:52.215690+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review thread ended ''idle'' (job-20261117T012844.194Z-21) after it had posted ''Review passed'' at cf8caa2a; not a code error. Rebase onto main is needed anyway (conflicts in agent_queue_service.rs, cli/handlers/agent.rs, docs/help/agent.md; held_by field, agent.md queue line, worker state counts only queued jobs), then send to review again.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -1567,3 +1602,26 @@ history:
   - field: relationships
     old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-637"]}'
     new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-637","DEV-592","DEV-600"]}'
+- at: 2026-11-17T02:09:51.985858+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-17T02:09:52.215690+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:11:21.421398+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:11:21.479553+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

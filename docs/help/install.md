@@ -163,10 +163,39 @@ dependencies. Node is needed to build the web UI, not to run the release binary.
 git clone https://github.com/localtaskrepo/lotar
 cd lotar
 npm ci
-npm run build                     # builds the web UI, then `cargo build --release`
-export PATH="$PATH:$(pwd)/target/release"
+npm run install:local             # builds the web UI and both binaries, then installs them
 lotar --version
 ```
+
+`npm run install:local` runs `npm run build` (the web UI, then `cargo build --release`) and installs `lotar`
+and `lotar-agent-wrapper` into `LOTAR_INSTALL_DIR`, by default `~/.local/bin` (Windows:
+`%LOCALAPPDATA%\Programs\lotar`). It prints a warning when that directory is not on `PATH`. To
+replace the `lotar` already on your `PATH`, such as a Homebrew install, install into its directory:
+
+```bash
+LOTAR_INSTALL_DIR="$(dirname "$(realpath "$(command -v lotar)")")" npm run install:local
+```
+
+On macOS the step signs both binaries before installing them, with the hardened runtime and the fixed
+identifiers `net.pyxzl.lotar` (the release binary's) and `net.pyxzl.lotar-agent-wrapper`. macOS ties
+firewall and file-access grants to the signature, so with a stable one every new build keeps the grants
+of the one before:
+
+- It signs with `LOTAR_SIGNING_IDENTITY` when set: an identity's name or SHA-1 hash from
+  `security find-identity -v -p codesigning`, or `-` for an ad-hoc signature. If that identity is not
+  in the keychain, the step stops.
+- Otherwise it signs with the maintainer's `Developer ID Application: Ravi Gairola (3HKD37M482)` when
+  the keychain has it, with a secure timestamp from Apple (so it needs the network). The first time,
+  macOS may ask at the Mac to let `codesign` use the key: choose **Always Allow**. The step waits
+  two minutes for that answer, then stops.
+- Without that identity it signs ad hoc and prints a warning: macOS then treats every build as a new
+  app and asks for its firewall and file-access grants again.
+
+Each binary is signed and checked in a staging file next to its destination, and both are then renamed
+over the installed ones. When signing or the check fails, the step stops with codesign's error and both
+installed binaries stay as they were; a running `lotar serve` keeps running the file it started from.
+On Linux and Windows the binaries are installed unsigned. To only build, run `npm run build`; the
+binaries are in `target/release`.
 
 For development builds, tests, and the smoke suite, see [AGENTS.md](../../AGENTS.md) and
 [docs/developers/](../developers/README.md). Release steps are in the
