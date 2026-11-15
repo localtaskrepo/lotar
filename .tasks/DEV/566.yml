@@ -1,14 +1,15 @@
 title: 'A blocking review is ignored: the fix job''s end rule moves Reviewing on to Merging while the review still runs'
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-15T18:41:50.804636+00:00
+modified: 2026-11-15T19:12:03.577270+00:00
 relationships:
   related:
   - DEV-524
+  - DEV-574
 comments:
 - date: 2026-11-15T18:13:42.492529+00:00
   author: claude
@@ -98,6 +99,51 @@ comments:
     - Its end matched "Review passed: merge" (Merging/@merge). The review job `…072848.852Z-408` then blocked, and its end matched "Merge agent lifecycle": Done, `review-blocked` removed, no merge ran.
     - The first fix (assignee after start rules) doesn't catch this, since the assignee didn't change during the job. The queue-start check (entry @fix, ticket @review) should. Please cover this order in a test.
     - Check: `lotar --tasks-dir ~/Development/standards/.tasks agent logs job-20261115T072832.176Z-373`
+- date: 2026-11-15T19:10:49.361087+00:00
+  author: claude
+  text: 'Restarted after the full disk (DEV-574): the review job failed at workspace setup on ENOSPC; queued the review on agent/DEV-566 (b3168b0f) again.'
+- date: 2026-11-15T19:11:58.589376+00:00
+  author: codex
+  text: |-
+    Review: blocking
+
+    - `crates/lotar-lib/src/services/automation_service.rs:2909` allows a queued merge when the current assignee remains @merge, regardless of `review-blocked`. The new regression at lines 3753–3760 explicitly asserts that a blocked @merge ticket may start. This still violates the second acceptance condition; reassignment protection fixes only one route. Enforce the blocked-review condition at the merge-start boundary (or equivalent configured enforcement) and test rejection until rework.
+    - The external dependency is confirmed: `standards/configs/lotar/automation.yml:378–392` still sends failed reviews to merge without excluding `review-blocked`. Filing STD-139 does not make the required behavior hold in this change.
+    - Read amended commit b3168b0f, service/test/docs diff, ticket comments, DEV-524 and DEV-574, recent main service history and review guidance. The end-rule reassignment guard addresses the original double advance. No UI changes.
+    - Whitespace check passed. Focused Rust rerun was cancelled during a cold compile; no tests completed. Full gates not rerun; implementation reports passes. No source edits, commits, status or assignee changes. No new minor tickets or guidance correction.
+  report:
+    checks:
+    - command: git diff --check main...HEAD
+      result: passed
+    - command: focused Rust regressions
+      result: not_run
+      reason: cancelled during cold compilation; no test results
+    - command: full lint/test/smoke
+      result: not_run
+      reason: review only
+    next: Resolve remaining merge-start acceptance gap before merging
+- date: 2026-11-15T19:12:03.577270+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
 tags:
 - health
@@ -175,5 +221,41 @@ history:
     new: '@review'
 - at: 2026-11-15T18:41:50.804636+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:10:49.361087+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:10:49.850507+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-524"]}'
+    new: '{"related":["DEV-524","DEV-574"]}'
+- at: 2026-11-15T19:11:58.589376+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:11:58.880349+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-15T19:12:03.504619+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned
+- at: 2026-11-15T19:12:03.577270+00:00
+  actor: automation
   changes:
   - field: comment_added

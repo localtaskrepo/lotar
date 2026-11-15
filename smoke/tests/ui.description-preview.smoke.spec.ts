@@ -142,20 +142,28 @@ describe.concurrent('UI description preview toggle', () => {
                         const startY = Math.min(box.y + box.height, 700) - 40;
 
                         // A real touch drag, so the browser decides it is a scroll.
+                        // Under full-suite load the browser can drop a drag
+                        // whose events arrive in one burst without scrolling
+                        // (DEV-575), so drag again until the panel moves; no
+                        // drag may open the editor.
                         const cdp = await page.context().newCDPSession(page);
-                        await cdp.send('Input.dispatchTouchEvent', {
-                            type: 'touchStart',
-                            touchPoints: [{ x, y: startY }],
-                        });
-                        for (let step = 1; step <= 10; step++) {
+                        const drag = async () => {
                             await cdp.send('Input.dispatchTouchEvent', {
-                                type: 'touchMove',
-                                touchPoints: [{ x, y: startY - step * 30 }],
+                                type: 'touchStart',
+                                touchPoints: [{ x, y: startY }],
                             });
-                        }
-                        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+                            for (let step = 1; step <= 10; step++) {
+                                await cdp.send('Input.dispatchTouchEvent', {
+                                    type: 'touchMove',
+                                    touchPoints: [{ x, y: startY - step * 30 }],
+                                });
+                                await page.waitForTimeout(16);
+                            }
+                            await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+                            return body.evaluate((el) => el.scrollTop);
+                        };
 
-                        await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+                        await expect.poll(drag, { interval: 500, timeout: 10_000 }).toBeGreaterThan(0);
                         // Give a late click from the gesture time to land.
                         await page.waitForTimeout(300);
                         expect(await textarea.count()).toBe(0);

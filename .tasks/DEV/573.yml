@@ -1,14 +1,44 @@
 title: T3 agent jobs on one ticket each get their own t3/* branch, so the review and merge miss the fix commit
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T18:46:06.748265+00:00
-modified: 2026-11-15T18:49:00.767561+00:00
+modified: 2026-11-15T19:30:21.075553+00:00
 relationships:
   related:
   - DEV-510
+  - DEV-574
+comments:
+- date: 2026-11-15T19:11:00.407630+00:00
+  author: claude
+  text: 'Restarted after the full disk (DEV-574): the fix job failed at worktree provisioning on ENOSPC before any work; queued the fix again.'
+- date: 2026-11-15T19:30:10.842097+00:00
+  author: claude
+  text: |-
+    Fixed: the ticket branch now follows the T3 thread's commit, also with parallel jobs and a failed job's leftover worktree.
+
+    - Cause (G-21 logs): the failed fix-light job left worktree `agent-G-21-93b8…` on `agent/G-21`. During the fix-codex job other jobs' worktrees appeared too, so `record_t3_worktree` fell back to "the worktree on agent/G-21" and recorded that old one. `follow_thread_branch` then saw thread branch == ticket branch and did nothing.
+    - `record_t3_worktree` now asks `t3 thread show <thread> --json` for `worktreePath`; the fallback only considers worktrees new during the job.
+    - `move_ticket_branch` detaches a linked worktree still holding the ticket branch (else `git branch --force` refuses).
+    - Test: `dev503_harness_jobs_test::the_tickets_branch_follows_its_thread_past_a_parallel_and_a_stale_worktree` failed before (branch stayed at main), passes now; the review starts from the fix.
+    - Aside: with a worktree nested inside the fixture repo, `lotar agent run` said `Task not found: TEST-1`; the test keeps worktrees outside. Not investigated.
+    - G-21 itself still needs its fix landed by hand or a rerun; not touched here.
+  report:
+    commits:
+    - hash: 43c72eec
+      what: ask T3 Code for the thread's worktree; detach a stale worktree holding agent/<ID>
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2212 Rust, 1547 UI
+    - command: npm run smoke
+      result: passed
+      reason: '404'
+    next: Review, then merge
 description: 'Found reviewing G-21 (gairola), 2026-11-15: the fix retry ran on T3 worktree branch t3/sync-lotar-automation-config-copy and committed f88bfff there; its prompt said branch agent/G-21, which stays at main. The review thread got another fresh branch, t3/sync-automation-yml-config-copy, also at main. The merge runs in the reviewer''s thread and checks git log main..HEAD, so it would report nothing to merge and the ticket would close with the drift still there. DEV-510''s merge failed the same way on 2026-11-14. Check: after a fix job on T3, the review and merge worktrees'' HEAD contains the fix commit. Done: every T3 job for a ticket works on agent/<ID> (or lotar hands the next job the branch the previous one committed to).'
 tags:
 - health
@@ -32,3 +62,26 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-15T19:11:00.407630+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:11:00.549819+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510"]}'
+    new: '{"related":["DEV-510","DEV-574"]}'
+- at: 2026-11-15T19:30:10.842097+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:30:21.075553+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

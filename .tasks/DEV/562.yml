@@ -1,14 +1,15 @@
 title: lotar add files a second ticket for a problem an open ticket already has
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T14:04:06.211844+00:00
-modified: 2026-11-15T19:05:32.305957+00:00
+modified: 2026-11-15T19:08:45.715580+00:00
 relationships:
   related:
   - DEV-575
+  - DEV-510
 comments:
 - date: 2026-11-15T14:16:20.673747+00:00
   author: claude
@@ -178,6 +179,45 @@ comments:
 - date: 2026-11-15T19:05:19.702287+00:00
   author: claude
   text: 'Chief of staff, 2026-11-15, with the owner''s OK: cancelled merge job job-20261115T185843.931Z-2, because the 18:44 rework was never reviewed (the review job died on the full disk) and the owner''s rule is no merge without a passed review. Back to Reviewing; review queued on agent/DEV-562.'
+- date: 2026-11-15T19:08:31.217585+00:00
+  author: codex
+  text: |-
+    Review: passed — the 18:44 rework fixes the check-prefix finding; no findings.
+
+    - Reviewed `0b5471a8`, full eight-file diff, ticket comments/relationships, relevant main history, add flow, completion/archive defaults and help. Same-check findings match; different checks are excluded; plain tickets remain eligible as documented. No UI changes.
+    - `RUSTC_WRAPPER= npm run test:rust:agent -- dev562` passed (2/2); `git diff --check main...HEAD` passed. Cache disabled for known sandbox restrictions.
+    - Full lint, Rust and smoke are the rework agent's evidence, not rerun. UI tests not rerun. Files, commits, status and assignee unchanged; no merge. No follow-up tickets or durable guidance findings.
+- date: 2026-11-15T19:08:34.322308+00:00
+  author: claude
+  text: |-
+    Merged into main as `52867b2c`, not pushed.
+
+    - Rebased `58d7d74e` onto `fce2a5bd`. No conflicts, no lockfile change. Fast-forwarded the main checkout, then amended `.tasks` into the commit (signed).
+    - `.tasks/DEV/510.yml` is still uncommitted. The pre-commit secret scan (generic-password) flags a DEV-510 comment, "1Password: `Couldn't find key in agent?`": that's an error message, not a secret. The shared allowlist only covers `1Password: "<item>"` in double quotes. Filed STD-144; no `--no-verify`.
+    - Not pushed: the main checkout isn't clean, and DEV-510 is still InProgress.
+    - No rule or config files changed, so `lotar trust` isn't needed.
+    - Lint passed. Tests: Rust 2211/2211, UI 1547/1547. Smoke: the first run failed one unrelated touch-drag UI test, which passed 3/3 alone and 404/404 on a full rerun. Filed DEV-575.
+    - Ticket check against the merged build (temp workspace): a plain add, and a `--finding` with a new subject, both name the open ticket.
+    - `agent/DEV-562` (other worktree) still points at the old `0b5471a8`. The merged commit came from this thread's branch, `t3/lotar-add-similar-ticket-warning-1`.
+  report:
+    commits:
+    - hash: 52867b2c
+      what: DEV-562 rebased onto main (fce2a5bd), fast-forwarded, ticket files amended in
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: Rust 2211/2211, UI 1547/1547, release 50/50, hooks 7/7
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: first run 403/404 (flaky touch-drag UI test, DEV-575), file alone 3/3, full rerun 404/404
+    - command: ticket check (lotar add similar title, finding with new subject)
+      result: passed
+    - command: git push
+      result: not_run
+      reason: main checkout not clean (.tasks/DEV/510.yml blocked by gitleaks, STD-144)
+    next: Push main once .tasks/DEV/510.yml commits (STD-144)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66037259-7163-419e-97e8-988c801c6ee5
 description: |-
@@ -196,8 +236,6 @@ description: |-
   - A test covers both cases; docs/help says how it matches.
 tags:
 - health
-- fix-retried
-- review-returned
 custom_fields:
   finding: comms:duplicate-ticket-on-add
 history:
@@ -413,3 +451,26 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-575"]}'
+- at: 2026-11-15T19:08:31.217585+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:08:34.322308+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:08:36.329232+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-575"]}'
+    new: '{"related":["DEV-575","DEV-510"]}'
+- at: 2026-11-15T19:08:45.715580+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, review-returned
+    new: health

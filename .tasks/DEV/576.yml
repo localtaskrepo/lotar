@@ -1,0 +1,28 @@
+title: Assigning a review or merge profile by hand starts its agent with the generic prompt, and a reviewer merged and pushed
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T19:15:01.666242+00:00
+modified: 2026-11-15T19:23:13.813426+00:00
+description: |-
+  Found 2026-11-15 by the chief of staff's retry agent: setting G-21's assignee to @review-claude started a review job by itself with lotar's generic 'make concrete changes' prompt; that job merged and pushed 497dd58 to gairola main before the queued review steps ran. (Here the pushed tree equals the reviewed f88bfff, so nothing unchecked landed, but the owner's rule is no merge without a passed review.)
+  Check: the job's prompt in lotar agent logs for G-21's @review-claude job.
+  Done when: a start triggered by an assignment uses the matching rule's prompt (review, merge), or review/merge profiles carry their own prompt, so a review job never merges or pushes; test for both. Until then: restart reviews only with lotar agent run, not by changing the assignee.
+tags:
+- health
+custom_fields:
+  finding: automation:assign-generic-prompt
+history:
+- at: 2026-11-15T19:15:02.040599+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T19:23:13.813426+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
