@@ -1,11 +1,11 @@
 title: After a restart T3 Code resumes cut-off job threads on its own, outside any lotar job, and their tickets stay HelpNeeded
-status: Reviewing
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-17T02:52:38.051170+00:00
+modified: 2026-11-17T02:55:29.213616+00:00
 relationships:
   related:
   - DEV-593
@@ -291,3 +291,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:55:29.213616+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress

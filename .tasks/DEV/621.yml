@@ -1,11 +1,11 @@
 title: DEV-611's failed keep and the t3 handoff's thread line have no test
-status: Merging
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-17T02:14:40.668251+00:00
+modified: 2026-11-17T02:56:35.709111+00:00
 relationships:
   related:
   - DEV-611
@@ -107,12 +107,26 @@ comments:
 - date: 2026-11-17T02:14:40.668251+00:00
   author: automation
   text: The merge agent's job job-20261117T014827.206Z-30 failed (lotar agent logs job-20261117T014827.206Z-30); the fix agent retries it on branch t3/test-failed-keep-t3-handoff.
+- date: 2026-11-17T02:56:35.709111+00:00
+  author: claude
+  text: |-
+    Nothing to do: DEV-621's tests are on `main` as `53e71990`.
+
+    - `1ff99b50` and `84ef6218` on this branch match `53e71990` and `c9802f1d` on `main` outside `.tasks`; `git cherry` only flags them because the `.tasks` files differ.
+    - No new commit, no checks run: nothing changed.
+  report:
+    checks:
+    - command: git diff of branch vs main commits (outside .tasks)
+      result: passed
+      reason: same patches
+    next: 'none: landed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82379814-5465-4e30-9664-a8d68148cac7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A231da3c4-3b76-4d3f-aa8a-78b14efd10b0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4aab10b9-d823-4940-9b0a-d794d6939114
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad882e4bc-369e-48f8-86e8-cb22a79054ce
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ce127ea-d05c-4a52-84df-d603ab0f69c2
 description: |-
   Found in the review of DEV-611 (`3cf93d5e`).
 
@@ -245,5 +259,20 @@ history:
     new: merge-retried
 - at: 2026-11-17T02:14:40.668251+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:55:14.128719+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-17T02:55:18.686001+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ce127ea-d05c-4a52-84df-d603ab0f69c2
+- at: 2026-11-17T02:56:35.709111+00:00
+  actor: claude
   changes:
   - field: comment_added

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-17T01:03:33.051382+00:00
-modified: 2026-11-17T02:47:21.351459+00:00
+modified: 2026-11-17T02:55:23.878768+00:00
 relationships:
   related:
   - DEV-579
@@ -59,6 +59,7 @@ comments:
   text: 'Stalled since 2026-11-17T02:14Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae2a93ce5-f5cd-4e81-80d2-9bba5a154e7a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5774b9d5-2c63-43ab-ae2f-6c3581628f13
 description: |-
   Owner, 2026-11-17, on DEV-579: "I like the idea of copying existing data over, but I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux."
 
@@ -198,3 +199,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:55:23.878768+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5774b9d5-2c63-43ab-ae2f-6c3581628f13

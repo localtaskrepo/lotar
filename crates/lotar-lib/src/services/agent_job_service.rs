@@ -1741,10 +1741,16 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
     if thread_branch == ticket_branch {
         return Ok(());
     }
-    let moved = move_ticket_branch(&repo_root, &ticket_branch, &thread_branch, started_from.as_deref())
+    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &thread_branch, started_from.as_deref())
         .map_err(|err| format!("{ticket_branch} stays where it is, not at {thread_branch} of the T3 Code thread: {err}"))?;
-    if moved {
-        let note = format!("Pointed {ticket_branch} at {thread_branch}, where the T3 Code thread worked, so the ticket's next job starts from its work.");
+    let note = match moved {
+        BranchMove::Already => None,
+        BranchMove::Moved => {
+            Some(format!("Pointed {ticket_branch} at {thread_branch}, where the T3 Code thread worked, so the ticket's next job starts from its work."))
+        }
+        BranchMove::Stayed(why) => Some(why),
+    };
+    if let Some(note) = note {
         update_job(job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
@@ -1835,27 +1841,48 @@ fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &Res
             return Ok(None);
         }
     }
-    let moved = move_ticket_branch(&repo_root, &ticket_branch, &holder, None)
+    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &holder, None)
         .map_err(|err| format!("{ticket_branch} can't move to {holder}, which holds {ticket_id}'s newest work that isn't in the main checkout: {err}"))?;
     let tip = rev_parse(&repo_root, &format!("refs/heads/{holder}")).unwrap_or_default();
-    Ok(moved.then(|| {
-        format!(
+    Ok(match moved {
+        BranchMove::Already => None,
+        BranchMove::Moved => Some(format!(
             "Pointed {ticket_branch} at {holder} ({}), which holds {ticket_id}'s newest work that isn't in the main checkout's branch, so this job starts from it.",
             tip.get(..12).unwrap_or(&tip)
-        )
-    }))
+        )),
+        BranchMove::Stayed(why) => Some(why),
+    })
+}
+
+/// What `move_ticket_branch` did with the ticket's branch.
+enum BranchMove {
+    /// It was at the commit already.
+    Already,
+    Moved,
+    /// It stays where it is, for the reason given: the job's work is in the
+    /// main checkout.
+    Stayed(String),
 }
 
 /// Move `ticket_branch` to the tip of `thread_branch`, or create it there.
-/// `Ok(false)` when it is there already; an error when it holds a commit
+/// `Already` when it is there already; an error when it holds a commit
 /// the thread's branch lacks and the main checkout doesn't have, which
 /// moving it would drop. Unless it is still at `started_from`, the commit
 /// the thread started from: then the thread rewrote that commit (an amend).
-/// A worktree that still has `ticket_branch` checked out (an earlier
-/// thread's, which T3 Code leaves when a later thread takes over the
-/// branch, DEV-573) moves with it when clean, else is detached at its
-/// commit first.
-fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_branch: &str, started_from: Option<&str>) -> Result<bool, String> {
+/// A worktree of a finished job that still has `ticket_branch` checked out
+/// (an earlier thread's, which T3 Code leaves when a later thread takes
+/// over the branch, DEV-573) moves with it when clean, else is detached at
+/// its commit first. Any other worktree on it may be an agent's at work and
+/// stays as it is (owner 2026-11-15, DEV-577): the branch then stays too,
+/// when the thread's work is in the main checkout, as no job needs it then,
+/// and it is an error otherwise.
+fn move_ticket_branch(
+    tasks_dir: &std::path::Path,
+    repo_root: &std::path::Path,
+    ticket_branch: &str,
+    thread_branch: &str,
+    started_from: Option<&str>,
+) -> Result<BranchMove, String> {
     let git_output = |args: &[&str]| -> Result<String, String> {
         let output = git_command(repo_root).args(args).output().map_err(|err| format!("git {}: {err}", args.join(" ")))?;
         if !output.status.success() {
@@ -1868,14 +1895,14 @@ fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_b
         let ticket_ref = format!("refs/heads/{ticket_branch}");
         let ticket_tip = git_output(&["rev-parse", &ticket_ref])?;
         if ticket_tip == tip {
-            return Ok(false);
+            return Ok(BranchMove::Already);
         }
         let lacks = started_from != Some(ticket_tip.as_str()) && git_output(&["cherry", &tip, &ticket_ref])?.lines().any(|line| line.starts_with('+'));
         if lacks && !branch_landed(repo_root, ticket_branch).unwrap_or(false) {
             return Err(format!("it has commits that {thread_branch} lacks"));
         }
         let worktrees = linked_worktrees(repo_root).map_err(|err| err.to_string())?;
-        if let Some((path, _)) = worktrees.iter().find(|(_, on)| on.as_deref() == Some(ticket_branch)) {
+        if let Some((path, _)) = worktrees.iter().find(|(path, on)| on.as_deref() == Some(ticket_branch) && finished_job_worktree(tasks_dir, path)) {
             let in_worktree = |args: &[&str]| -> Result<String, String> {
                 let output = git_command(path).args(args).output().map_err(|err| format!("git {} in {}: {err}", args.join(" "), path.display()))?;
                 if !output.status.success() {
@@ -1887,13 +1914,52 @@ fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_b
             // out, so a later thread on the branch finds it there (DEV-595).
             if in_worktree(&["status", "--porcelain"])?.is_empty() {
                 in_worktree(&["reset", "--quiet", "--keep", &tip])?;
-                return Ok(true);
+                return Ok(BranchMove::Moved);
             }
             in_worktree(&["checkout", "--quiet", "--detach"])?;
         }
     }
-    git_output(&["branch", "--force", ticket_branch, &tip])?;
-    Ok(true)
+    if let Err(err) = git_output(&["branch", "--force", ticket_branch, &tip]) {
+        if !commit_landed(repo_root, &tip, ticket_branch).unwrap_or(false) {
+            return Err(err);
+        }
+        return Ok(BranchMove::Stayed(format!(
+            "{ticket_branch} stays where it is, not at {thread_branch}: the T3 Code thread's work is in the main checkout, and {err}"
+        )));
+    }
+    Ok(BranchMove::Moved)
+}
+
+/// Whether `path` is the worktree of a finished job: an ended job's log
+/// names it, and no job still works there. A job works there while its log
+/// has no end, a running job continues its session, or T3 Code still runs
+/// its thread or waits for an answer in it (DEV-594).
+fn finished_job_worktree(tasks_dir: &std::path::Path, path: &std::path::Path) -> bool {
+    let Ok(path) = fs::canonicalize(path) else {
+        return false;
+    };
+    let names_it = |worktree: Option<&String>| worktree.and_then(|worktree| fs::canonicalize(worktree).ok()).is_some_and(|worktree| worktree == path);
+    let jobs: Vec<_> = saved_jobs(tasks_dir)
+        .into_iter()
+        .filter(|job| names_it(job.header.worktree_path.as_ref()) || names_it(job.status.as_ref().and_then(|status| status.worktree_path.as_ref())))
+        .collect();
+    if jobs.is_empty() || jobs.iter().any(|job| job.status.is_none()) {
+        return false;
+    }
+    let running: Vec<String> = crate::services::agent_active_jobs::list(tasks_dir).into_iter().filter_map(|job| job.session_id).collect();
+    let statuses: Vec<_> = jobs.iter().filter_map(|job| job.status.as_ref()).collect();
+    if statuses.iter().any(|status| status.session_id.as_ref().is_some_and(|session| running.contains(session))) {
+        return false;
+    }
+    let threads: Vec<&str> = statuses.iter().filter_map(|status| status.agent_session.as_deref()).collect();
+    if threads.is_empty() {
+        return true;
+    }
+    let Some((program, env)) = t3_launch() else {
+        return true;
+    };
+    let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
+    !threads.iter().any(|thread| t3_thread_show(&program, &env, &cwd, thread).is_some_and(|shown| t3_thread_busy(&shown)))
 }
 
 /// Take over a job whose process exited before it ended (DEV-378): it runs
@@ -3809,21 +3875,36 @@ fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<T3T
         return answer.clone();
     }
     // Unlocked while `t3` runs, so other tickets' starts don't wait for it.
-    let table = crate::services::agent_runner::agent_table().ok()?;
-    let spec = table.get("t3").ok()?;
-    let (program, _) = block_on(spec.launch_command()).ok()?;
-    let env: Vec<(String, String)> = spec.env.clone().into_iter().collect();
+    let (program, env) = t3_launch()?;
     let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
     let answer = asked.iter().find_map(|thread| {
         let shown = t3_thread_show(&program, &env, &cwd, thread)?;
         let job = threads.iter().find(|(_, known, _)| known == thread).map(|(_, _, job)| job.clone())?;
-        let running = shown.get("status").and_then(|status| status.as_str()) == Some("running") || shown.get("activeRunId").is_some_and(|run| !run.is_null());
-        let waiting = shown.get("pendingRequestCount").and_then(serde_json::Value::as_u64).is_some_and(|count| count > 0);
+        let waiting = t3_thread_waits(&shown);
         let link = shown.get("link").and_then(|link| link.as_str()).filter(|link| !link.is_empty()).map(str::to_string);
-        (running || waiting).then(|| T3ThreadHold { thread: thread.clone(), job, link, waiting })
+        t3_thread_busy(&shown).then(|| T3ThreadHold { thread: thread.clone(), job, link, waiting })
     });
     T3_THREAD_ANSWERS.lock().ok()?.insert(ticket_id.to_string(), (std::time::Instant::now(), asked, answer.clone()));
     answer
+}
+
+/// The `t3` program and env of the agent table, to ask T3 Code about threads.
+fn t3_launch() -> Option<(std::path::PathBuf, Vec<(String, String)>)> {
+    let table = crate::services::agent_runner::agent_table().ok()?;
+    let spec = table.get("t3").ok()?;
+    let (program, _) = block_on(spec.launch_command()).ok()?;
+    Some((program, spec.env.clone().into_iter().collect()))
+}
+
+/// Whether a thread `t3 thread show` describes runs or waits for an answer.
+fn t3_thread_busy(shown: &serde_json::Value) -> bool {
+    shown.get("status").and_then(|status| status.as_str()) == Some("running")
+        || shown.get("activeRunId").is_some_and(|run| !run.is_null())
+        || t3_thread_waits(shown)
+}
+
+fn t3_thread_waits(shown: &serde_json::Value) -> bool {
+    shown.get("pendingRequestCount").and_then(serde_json::Value::as_u64).is_some_and(|count| count > 0)
 }
 
 /// The thread that held the ticket at its last start, as T3 Code answered

@@ -1,11 +1,11 @@
 title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
-status: Done
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-17T02:32:13.714221+00:00
+modified: 2026-11-17T02:56:18.630612+00:00
 relationships:
   depends_on:
   - DEV-602
@@ -15,6 +15,7 @@ relationships:
   - DEV-613
   - DEV-631
   - DEV-637
+  - DEV-627
 comments:
 - date: 2026-11-16T05:29:25.407255+00:00
   author: automation
@@ -170,11 +171,20 @@ comments:
       result: passed
       reason: 405/405
     next: 'None: Done when the job ends'
+- date: 2026-11-17T02:56:18.630612+00:00
+  author: claude
+  text: |-
+    Merge: nothing to merge. The fix is already on `main` and pushed.
+
+    - `git log main..HEAD` is empty: `agent/DEV-612` and this worktree's HEAD both point at `033179f1c`, the main checkout's tip
+    - No later rework: `agent/DEV-612` has no commits that HEAD lacks
+    - The fix landed earlier as `105f027a9` and is on `origin/main`. Nothing is waiting to be pushed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2bfb120b-d5dd-42da-8b97-d8582d5bcefb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09feb0e9-5605-42cb-b08e-a17fad3257e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fc20890-f51a-48b8-9ae3-a0de528543f4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af49fe4f4-6b94-429c-9209-8a27127ba5bf
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad35ee908-ed7f-4453-b6e5-6c4ba844f90d
 description: |-
   Found in the DEV-602 review.
 
@@ -464,3 +474,24 @@ history:
   - field: tags
     old: fix-retried
     new: ''
+- at: 2026-11-17T02:54:53.436716+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: Merging
+- at: 2026-11-17T02:54:57.347689+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad35ee908-ed7f-4453-b6e5-6c4ba844f90d
+- at: 2026-11-17T02:55:16.180083+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613","DEV-631","DEV-637"]}'
+    new: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613","DEV-631","DEV-637","DEV-627"]}'
+- at: 2026-11-17T02:56:18.630612+00:00
+  actor: claude
+  changes:
+  - field: comment_added

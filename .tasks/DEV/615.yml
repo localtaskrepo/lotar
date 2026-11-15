@@ -3,14 +3,15 @@ status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-17T02:44:42.754482+00:00
+modified: 2026-11-17T02:55:16.181774+00:00
 relationships:
   related:
   - DEV-464
   - DEV-611
   - DEV-622
+  - DEV-627
 comments:
 - date: 2026-11-16T06:16:18.867391+00:00
   author: automation
@@ -141,6 +142,9 @@ comments:
       result: passed
       reason: main checkout, 3 of 3, binary from the merge worktree
     next: 'None: ticket goes to Done'
+- date: 2026-11-17T02:54:49.328664+00:00
+  author: automation
+  text: The merge agent's job job-20261117T022707.024Z-42 failed (lotar agent logs job-20261117T022707.024Z-42); the fix agent retries it on branch t3/fix-flaky-add-to-release-smoke.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
@@ -149,6 +153,7 @@ description: 'Found in DEV-611''s `npm run smoke`: `tests/ui.releases.smoke.spec
 tags:
 - health
 - fix-retried
+- merge-retried
 custom_fields:
   finding: smoke:ui-releases-add-to-release
 history:
@@ -253,3 +258,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:54:46.475762+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, merge-retried
+- at: 2026-11-17T02:54:49.328664+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:55:16.181774+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-611","DEV-622"]}'
+    new: '{"related":["DEV-464","DEV-611","DEV-622","DEV-627"]}'

@@ -1,14 +1,18 @@
 title: 'Flaky test: serve_reports_requested_port_exactly loses its reserved port to another process before serve binds it'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:23:19.131862+00:00
-modified: 2026-11-17T01:50:51.493402+00:00
+modified: 2026-11-17T02:55:35.064686+00:00
 relationships:
   related:
   - DEV-624
+  - DEV-612
+  - DEV-613
+  - DEV-615
+  - DEV-620
 comments:
 - date: 2026-11-16T23:54:29.864615+00:00
   author: claude
@@ -56,6 +60,35 @@ comments:
     - Failed before: with `ATTEMPTS = 1` the new test fails with `Address already in use`. I put the file back afterwards.
     - `rustfmt --check` and `cargo clippy --profile local -p lotar-lib --tests -D warnings`: clean.
     - No stray files, nothing for the owner to decide. No tickets filed.
+- date: 2026-11-17T02:55:15.909859+00:00
+  author: claude
+  text: |-
+    Merged and pushed: main is at `033179f1c` (`dcc5d7eb8..033179f1c`).
+
+    - Rebased onto main three times while main moved on (DEV-612, DEV-615). DEV-620's old hash `1227e5bd` was dropped because it landed as `6a78ba884` with the same patch. No conflicts and no lockfile changes.
+    - `rust-test-runner.mjs --agent --no-fail-fast` on `4f040abaf`: 2282/2282 passed. The earlier run on `c5120b1b6` failed once in `dev503_harness_jobs_test::a_queue_entry_held_by_a_waiting_thread_says_so_once`, which also failed 4/10 when run alone. That test is outside this change and is already tracked in DEV-613 (Merging), so I filed no new ticket.
+    - I amended the main checkout's `.tasks` changes into the merged commit. No rules changed, so I didn't run `lotar trust`. Pushed with the hooks (fmt and clippy passed).
+    - Ticket check on main: 20/20 parallel `cli_serve_features_test::` runs passed.
+  report:
+    commits:
+    - hash: 033179f1c
+      what: DEV-627 retry the requested-port serve tests on a fresh port when the reserved one is taken (rebased d973e73b, task files amended in)
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2282 Rust, 1548 UI, release and hooks, on 4f040abaf; an earlier run on c5120b1b6 failed once in dev503 a_queue_entry_held_by_a_waiting_thread_says_so_once (DEV-613)
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: 405 tests
+    - command: 'integration-* cli_serve_features_test:: --test-threads 15, 20 parallel runs on main'
+      result: passed
+      reason: 20/20
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config files changed
+    next: 'None: the job moves the ticket to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e311be2-273f-45ee-8c00-e819945c4d5b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fc88e28-8bca-4ddc-a10e-b907a106023b
@@ -124,3 +157,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T02:55:15.909859+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:55:16.182987+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-624"]}'
+    new: '{"related":["DEV-624","DEV-612","DEV-613","DEV-615","DEV-620"]}'
+- at: 2026-11-17T02:55:35.064686+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

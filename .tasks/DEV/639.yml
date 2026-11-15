@@ -3,9 +3,9 @@ status: InProgress
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T02:52:38.519606+00:00
+modified: 2026-11-17T02:54:54.270176+00:00
 relationships:
   related:
   - DEV-626
@@ -38,6 +38,9 @@ comments:
       result: passed
       reason: 405/405
     next: Land DEV-626 first, then rebase agent/DEV-639 onto main (66fee083f drops or conflicts with DEV-626's amended commit; keep DEV-626's version), then review
+- date: 2026-11-17T02:54:54.270176+00:00
+  author: automation
+  text: The fix agent's job job-20261117T022827.101Z-43 failed (lotar agent logs job-20261117T022827.101Z-43); @fix-retry retries it on branch agent/DEV-639.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
 description: |-
@@ -54,6 +57,8 @@ description: |-
   - [ ] When `t3 thread show` fails for a thread, it counts as not waiting (as before); the next look asks again.
   - [ ] Unchanged: no waiting thread → the newest job's thread is taken over (DEV-626); a queued entry or a done ticket → nothing happens.
   - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`: newer thread waits, older one runs → no job, one comment on the older thread, none after a second look.
+tags:
+- fix-retried
 history:
 - at: 2026-11-17T02:10:25.266688+00:00
   actor: claude
@@ -101,5 +106,18 @@ history:
       - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`: newer thread waits, older one runs → no job, one comment on the older thread, none after a second look.
 - at: 2026-11-17T02:52:38.519606+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:54:53.532980+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T02:54:54.270176+00:00
+  actor: automation
   changes:
   - field: comment_added
