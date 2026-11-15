@@ -7,6 +7,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 import {
     RunnerError,
@@ -20,6 +22,7 @@ import {
     buildInventoryArgs,
     parseListTestNames,
     probeGitCapability,
+    runTestsInFreshTemp,
     main,
 } from '../rust-test-runner.mjs';
 
@@ -486,4 +489,43 @@ test('probe env: owned overrides beat parent values on every platform', () => {
             assert.equal(env.SystemRoot, undefined);
         }
     }
+});
+
+// A fake nextest run that creates the given entries in the temp folder it was handed.
+function leavesInTemp(names, exitCode = 0) {
+    return async (_runArgs, env) => {
+        for (const name of names) {
+            await fs.writeFile(path.join(env.TMPDIR, name), '');
+        }
+        return { exitCode };
+    };
+}
+
+async function freshTempRun(names, exitCode) {
+    let err = '';
+    const outcome = await runTestsInFreshTemp(
+        [],
+        {},
+        { write: (chunk) => (err += chunk) },
+        leavesInTemp(names, exitCode),
+    );
+    return { exitCode: outcome.exitCode, err };
+}
+
+test('fresh temp: an empty temp folder keeps the run passing', async () => {
+    assert.deepEqual(await freshTempRun([]), { exitCode: 0, err: '' });
+});
+
+test('fresh temp: the toolchain xcrun_db cache does not fail a passing run (DEV-551)', async () => {
+    assert.deepEqual(await freshTempRun(['xcrun_db']), { exitCode: 0, err: '' });
+});
+
+test('fresh temp: test leftovers fail a passing run, beside xcrun_db too', async () => {
+    const { exitCode, err } = await freshTempRun(['xcrun_db', 'lotar-leftover']);
+    assert.equal(exitCode, 1);
+    assert.match(err, /tests left 1 entries in the temp folder; remove them where they are created: lotar-leftover\n$/);
+});
+
+test('fresh temp: a failing run keeps its own exit code', async () => {
+    assert.equal((await freshTempRun(['lotar-leftover'], 101)).exitCode, 101);
 });

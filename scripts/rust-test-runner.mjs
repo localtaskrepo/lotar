@@ -541,12 +541,16 @@ async function runTests(runArgs, childEnv) {
     });
 }
 
+// Entries the toolchain, not a test, leaves in TMPDIR: xcrun (macOS cc/ld shim) caches tool lookups in xcrun_db
+// there when the per-user temp folder isn't writable, as in an agent sandbox (DEV-551).
+const TOOLCHAIN_TEMP_ENTRIES = new Set(['xcrun_db']);
+
 // Tests clean up after themselves (DEV-315): nextest runs with a fresh temp folder, and a passing run fails when
 // anything is left in it.
-async function runTestsInFreshTemp(runArgs, childEnv, stderr) {
+export async function runTestsInFreshTemp(runArgs, childEnv, stderr, run = runTests) {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'lotar-rust-temp-'));
-    const outcome = await runTests(runArgs, { ...childEnv, TMPDIR: root, TEMP: root, TMP: root });
-    const leftovers = await fs.readdir(root);
+    const outcome = await run(runArgs, { ...childEnv, TMPDIR: root, TEMP: root, TMP: root });
+    const leftovers = (await fs.readdir(root)).filter((name) => !TOOLCHAIN_TEMP_ENTRIES.has(name));
     await fs.rm(root, { recursive: true, force: true });
     if (leftovers.length === 0) {
         return outcome;
