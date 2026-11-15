@@ -1,0 +1,29 @@
+title: 'Flaky test: a_queue_entry_held_by_a_waiting_thread_says_so_once can call remove while the worker holds the entry'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T05:03:01.259698+00:00
+modified: 2026-11-16T05:03:01.911155+00:00
+relationships:
+  related:
+  - DEV-600
+description: |-
+  Found in the DEV-600 review (`af2e42f2`).
+
+  - `crates/lotar-lib/tests/dev503_harness_jobs_test.rs:689` asserts one `AgentQueueService::remove(...)` returns true ("the entry still waits").
+  - The queue worker (`agent_queue_service.rs`, `run_worker` loop) dequeues the entry on every 300 ms retry, calls `start_entry`, then `requeue_entry_unchanged`. A `remove` that lands in that gap finds no pending entry and returns false.
+  - Seen once in about 40 runs of the dev503/queue tests (`cargo nextest run --workspace -E 'test(/dev503_harness_jobs_test|dev522|dev592|queue/)'`), 6.3 s instead of the usual 2.4 s; passes alone and in the full suite. The panic message wasn't captured, so the cause above is the likely one, not proven.
+
+  ## Done when
+  - [ ] The test removes the entry with `wait_for` (retry until `remove` returns true) or otherwise can't race the worker's dequeue.
+  - [ ] The test passes 30 stress runs under load (`--stress-count 30` beside the rest of the dev503 tests).
+tags:
+- health
+history:
+- at: 2026-11-16T05:03:01.911155+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

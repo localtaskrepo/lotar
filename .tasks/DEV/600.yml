@@ -1,17 +1,18 @@
 title: A T3 thread that waits for an answer holds every later job on its ticket without saying so
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T02:29:53.068923+00:00
-modified: 2026-11-16T04:48:06.647616+00:00
+modified: 2026-11-16T05:03:23.431487+00:00
 relationships:
   related:
   - DEV-594
   - DEV-599
   - DEV-585
   - DEV-503
+  - DEV-613
 comments:
 - date: 2026-11-16T02:33:15.242181+00:00
   author: claude
@@ -67,6 +68,36 @@ comments:
       result: passed
       reason: 46/46 after the last edit; new tests fail on the old source
     next: Review on another model; merge after DEV-599 (drop 76f3bdca if main has it)
+- date: 2026-11-16T05:03:13.987365+00:00
+  author: claude
+  text: |-
+    Review: passed. Option A is built as the owner decided, and every "Done when" item holds.
+
+    - Read: the ticket and its comments, DEV-599/594, harnessmux 0.1.9 `RunState`, and the diff of `af2e42f2`.
+    - A thread holds the ticket when its status is `running`, its `activeRunId` is set, or `pendingRequestCount > 0`. The waiting flag decides the wording.
+    - The link: a real `t3 thread show --json` has `thread.link`, which is what the comment uses.
+    - One comment per entry and thread: `held_by` is saved through `requeue_entry_unchanged`, so a worker restart or a recheck adds no second comment.
+    - The comment is written with `CommentContext::automation()`, so no `on.commented` rule fires.
+    - Both new tests fail on the pre-fix source: `Unexpected success`, and a timeout waiting for the comment.
+    - The branch carries DEV-599's commit as `76f3bdca`, the same patch as `agent/DEV-599` `dcfbccef` (range-diff `=`). DEV-599 is in Merging.
+    - Minor, filed as [DEV-613](https://lotar.pyxzl.net/task/DEV-613): the new queue test failed once in about 40 runs. It probably calls `remove` while the worker has the entry out of the queue (`dev503_harness_jobs_test.rs:689`).
+  report:
+    checks:
+    - command: cargo nextest run --workspace
+      result: passed
+      reason: 2243/2245; the 2 failures are unrelated (no web build here; a watcher test that passes on rerun)
+    - command: cargo nextest dev503/queue tests (46)
+      result: passed
+      reason: 1 failure in about 40 runs, filed as DEV-613
+    - command: new tests on pre-fix source
+      result: passed
+      reason: both fail before af2e42f2
+    - command: npm run lint
+      result: passed
+    - command: npm run smoke
+      result: not_run
+      reason: the change is in the queue and job start only, no UI or API
+    next: Merge after DEV-599; the merge drops its copy 76f3bdca
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ad4dd44-6ea0-4933-aaad-8f8d816b2933
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa06b6ffb-a7f3-4a4a-94c5-7ca758534437
@@ -187,3 +218,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa06b6ffb-a7f3-4a4a-94c5-7ca758534437
+- at: 2026-11-16T05:03:01.537792+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613"]}'
+- at: 2026-11-16T05:03:13.987365+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:03:23.431487+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

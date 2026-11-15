@@ -1,14 +1,16 @@
 title: No test shows that a job ending on a ticket drops its cached T3 Code answer
-status: Todo
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T04:33:14.372985+00:00
+modified: 2026-11-16T05:08:21.013628+00:00
 relationships:
   related:
   - DEV-599
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
 description: |-
   Found in the DEV-599 review (dcfbccef). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs caches T3 Code's answer per ticket for T3_THREAD_RECHECK and keys it on the ticket's earlier threads, so a new earlier thread asks again at once. No test covers that: the DEV-599 test a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing only checks that the cache is used.
 
@@ -26,3 +28,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T05:08:20.232031+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T05:08:21.013628+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a

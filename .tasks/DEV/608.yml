@@ -1,14 +1,47 @@
 title: A T3 job's prompt keeps telling every later job on the ticket to carry over an earlier job's uncommitted changes
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T04:26:06.797877+00:00
-modified: 2026-11-16T04:58:09.772655+00:00
+modified: 2026-11-16T05:07:58.071037+00:00
 relationships:
   related:
   - DEV-583
+comments:
+- date: 2026-11-16T05:07:45.504413+00:00
+  author: claude
+  text: |-
+    Fixed: a T3 merge job no longer hears of earlier uncommitted worktrees, and every other job is told only a fix/rework carries them over.
+
+    - `t3_thread_notes` takes `is_merge_job` and skips the list for merge jobs (profile `merge` or ticket in `Merging`).
+    - Note for other jobs: "A job that takes the work over (a fix or rework) reads them there … and carries over what it still needs; a later job may have carried them over or dropped them already, so check the ticket's commits and comments first. A review job leaves them alone."
+    - LoTaR can't tell a review job from its profile name (repos name them freely), so the wording covers reviews.
+    - Built on DEV-583's `eba9fc33` (cherry-picked as `2f833a1b`), since the code lives only there; DEV-583 has to merge first.
+    - Test: `a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is` now also runs a review and a merge job; fails without the fix.
+    - Docs: `docs/help/agent.md` ("This job").
+  report:
+    commits:
+    - hash: 9849ff77
+      what: merge jobs get no note; other jobs' note says only a fix/rework carries over, may be done already, review leaves it
+    - hash: 2f833a1b
+      what: cherry-pick of DEV-583 eba9fc33 (not on main yet); drops out when the merge rebases after DEV-583 lands
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: 405/405
+    - command: new assertions without the fix
+      result: passed
+      reason: test fails as it should
+    - command: real T3 retry, review, merge end to end
+      result: not_run
+      reason: covered by the fake-T3 integration test
+    next: Review on another model; merge after DEV-583
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4b5016f-4464-4c66-9b06-16db3ff01f88
 description: |-
@@ -53,3 +86,16 @@ history:
       - [ ] Non-T3 runners: unchanged (no such note).
       - [ ] A test covers both: merge-job prompt lacks the note, a later non-merge job's prompt has the new wording.
       - [ ] `docs/help/agent.md` describes it.
+- at: 2026-11-16T05:07:45.504413+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:07:58.071037+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

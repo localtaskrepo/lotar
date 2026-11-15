@@ -475,9 +475,9 @@ while [ $# -gt 0 ]; do
   if [ "$1" = "--worktree" ]; then base=$2; shift; fi
   shift
 done
-cat > /dev/null
 mkdir -p "$FAKE_TREES"
 n=$(ls "$FAKE_TREES" | wc -l | tr -d ' ')
+cat > "$FAKE_LOG.prompt-$n"
 tree="$FAKE_TREES/$n"
 git worktree add -q -b "t3/topic-$n" "$tree" "$base" || exit 1
 printf '%s t3/topic-%s %s\n' "$base" "$n" "$(git -C "$tree" rev-parse HEAD)" >> "$FAKE_LOG"
@@ -631,6 +631,26 @@ fn no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread() {
     run_t3(&fixtures, "review").success();
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("agent/TEST-1 t3/topic-1 {fix}"), "the review starts from the fix: {log}");
+}
+
+/// DEV-583: a retried fix job's thread runs in a new worktree on a branch T3 Code makes from `agent/TEST-1`, while
+/// the failed job's uncommitted work stays in the worktree that has `agent/TEST-1` checked out. The prompt said
+/// "on branch `agent/TEST-1` ... Don't switch branches"; it now says the thread's branch may be one T3 Code made, and
+/// where the earlier work is.
+#[test]
+fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", "")]);
+    let root = fixtures.get_temp_path();
+    let failed = elsewhere.path().join("failed");
+    git(root, &["worktree", "add", "-q", "-b", "agent/TEST-1", failed.to_str().unwrap()]);
+    std::fs::write(failed.join("half-done.txt"), "work").unwrap();
+    run_t3(&fixtures, "fix").success();
+    let prompt = std::fs::read_to_string(root.join("t3.log.prompt-0")).unwrap();
+    assert!(prompt.contains("or on a branch T3 Code made from it"), "{prompt}");
+    let failed = std::fs::canonicalize(&failed).unwrap();
+    assert!(prompt.contains(&format!("uncommitted changes in `{}` (branch `agent/TEST-1`)", failed.display())), "{prompt}");
+    assert!(failed.join("half-done.txt").is_file(), "the earlier work stays where it is");
 }
 
 /// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays

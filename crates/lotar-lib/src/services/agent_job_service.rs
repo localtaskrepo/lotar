@@ -290,9 +290,10 @@ impl AgentJobService {
         // profile's permissions say.
         let read_only = runner_kind != AgentRunnerKind::T3 && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
         let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && crate::services::agent_runner::takes_mcp_servers(runner_kind);
-        let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp);
-        if runner_kind == AgentRunnerKind::T3 {
-            notes.push_str(&t3_thread_notes(tasks_dir));
+        let t3_thread = runner_kind == AgentRunnerKind::T3;
+        let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp, t3_thread);
+        if t3_thread {
+            notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id));
         }
         let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, &ticket_id, req.agent.as_deref()));
         let prompt = build_prompt(&task, &user_prompt, context.as_ref(), earlier.as_deref(), instructions.as_deref(), Some(&notes));
@@ -1086,8 +1087,18 @@ fn instruction_template(
 
 /// What LoTaR knows about how this job runs and ends, so the agent neither
 /// leaves work uncommitted in a worktree nor fights automation over the
-/// ticket's status.
-fn job_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool, read_only: bool, lotar_mcp: bool) -> String {
+/// ticket's status. A T3 Code thread may run on a branch T3 Code made from
+/// the ticket's branch (DEV-583), which LoTaR points the ticket's branch at
+/// when the job ends.
+fn job_notes(
+    tasks_dir: &std::path::Path,
+    config: &ResolvedConfig,
+    ticket_id: &str,
+    is_merge_job: bool,
+    read_only: bool,
+    lotar_mcp: bool,
+    t3_thread: bool,
+) -> String {
     if read_only {
         return "- This job is read-only: you can read files and search, but not edit files or run commands \
 that change anything, including lotar. Don't try to update the ticket. Put your complete result in your \
@@ -1106,11 +1117,20 @@ final answer; LoTaR saves it as the job summary.\n"
     }
     if config.agent_worktree.enabled {
         let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
-        notes.push_str(&format!(
-            "- You are working in a git worktree on branch `{branch}`, separate from the main checkout. \
+        if t3_thread {
+            notes.push_str(&format!(
+                "- You are working in a git worktree separate from the main checkout, on branch `{branch}` or on a branch \
+T3 Code made from it (`git branch --show-current` names it). Commit your work to the branch you are on before you finish: \
+LoTaR points `{branch}` at it when the job ends. If git refuses to commit (for example inside a sandbox), \
+leave the changes in place: LoTaR commits them when the job ends. Don't switch branches.\n"
+            ));
+        } else {
+            notes.push_str(&format!(
+                "- You are working in a git worktree on branch `{branch}`, separate from the main checkout. \
 Commit your work to this branch before you finish. If git refuses to commit (for example inside a sandbox), \
 leave the changes in place: LoTaR commits them when the job ends. Don't switch branches.\n"
-        ));
+            ));
+        }
         if is_merge_job {
             notes.push_str(&format!(
                 "- This is a merge job: it succeeds only if the branch ends up in the main checkout's current branch. \
@@ -1377,15 +1397,47 @@ struct T3Worktree {
 /// folder; in a worktree they would otherwise change the worktree's copy.
 /// `t3 thread start --wait` returns when the turn ends, even while
 /// `t3_background_wait` keeps the thread working (T3 Code 0.1.9, DEV-335).
-fn t3_thread_notes(tasks_dir: &std::path::Path) -> String {
+/// A retried or resumed job's thread starts in a new worktree (DEV-583), so
+/// the notes name the ticket's worktrees that hold uncommitted work.
+fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str) -> String {
     let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
-    format!(
+    let mut notes = format!(
         "- This job runs as a T3 Code thread, which doesn't get LoTaR's environment. Add `--tasks-dir \"{}\"` \
 to every lotar command, so it changes this ticket in the main checkout and not a copy in a worktree.\n\
 - The job ends when your turn ends, even while `t3_background_wait` keeps the thread working. Run tests and other \
 checks in the foreground and finish all work before your final message; don't end your turn to wait for background work.\n",
         dir.display()
-    )
+    );
+    for (path, branch) in uncommitted_ticket_worktrees(tasks_dir, config, ticket_id) {
+        let shown = path.display();
+        notes.push_str(&format!(
+            "- An earlier job on this ticket left uncommitted changes in `{shown}` (branch `{branch}`), outside your worktree. \
+Read them there (`git -C \"{shown}\" status`, `git -C \"{shown}\" diff`) and carry over what you need; leave that worktree as it is.\n"
+        ));
+    }
+    notes
+}
+
+/// The worktrees of the ticket's branch and of the T3 Code thread branches
+/// made from it that have uncommitted changes, with their branches.
+fn uncommitted_ticket_worktrees(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str) -> Vec<(std::path::PathBuf, String)> {
+    if !config.agent_worktree.enabled {
+        return Vec::new();
+    }
+    let Some(repo_root) = resolve_repo_root(tasks_dir) else {
+        return Vec::new();
+    };
+    let ticket_branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
+    let worktrees = agent_worktrees(&repo_root, &config.agent_worktree.branch_prefix).unwrap_or_default();
+    worktrees
+        .into_iter()
+        .filter(|worktree| worktree.ticket_branch == ticket_branch)
+        .filter(|worktree| {
+            let status = git_command(&worktree.path).args(["status", "--porcelain"]).output();
+            status.is_ok_and(|status| status.status.success() && !status.stdout.is_empty())
+        })
+        .map(|worktree| (fs::canonicalize(&worktree.path).unwrap_or(worktree.path), worktree.branch))
+        .collect()
 }
 
 /// The worktree a t3 job asks T3 Code for, as T3 Code runs a thread only in
@@ -4745,7 +4797,7 @@ mod tests {
         .unwrap();
         let mut config = crate::config::resolution::config_for_project(&tasks_dir, Some("NOTE")).unwrap();
 
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false, false);
         assert!(notes.contains("main checkout"), "{notes}");
         assert!(notes.contains("No automation rule"), "{notes}");
 
@@ -4755,14 +4807,14 @@ mod tests {
             "automation:\n  rules:\n    - when:\n        assignee: \"@implement\"\n      on:\n        complete:\n          set:\n            status: Done\n",
         )
         .unwrap();
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false, false);
         assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
         assert!(notes.contains("Commit your work"), "{notes}");
         assert!(notes.contains("move this ticket to the next step"), "{notes}");
         assert!(!notes.contains("final summary"), "LoTaR logs the next step itself: {notes}");
         assert!(notes.contains("hand the ticket back"), "{notes}");
 
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false, false);
         assert!(notes.contains("This job is read-only"), "{notes}");
         assert!(notes.contains("final answer"), "{notes}");
         assert!(!notes.contains("Commit your work"), "{notes}");

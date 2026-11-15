@@ -1,0 +1,28 @@
+title: 'Flaky smoke: relationships reciprocal repair test waits on an element under full-suite load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T05:11:32.664705+00:00
+modified: 2026-11-16T05:11:33.081816+00:00
+relationships:
+  related:
+  - DEV-606
+description: 'Found in the DEV-606 review on 2026-11-15: 1 of 4 full smoke runs (`npm run -s test:smoke:quick:agent`, worktree of agent/DEV-606) failed `smoke/tests/ui.relationships.smoke.spec.ts:313` ''previews safe reciprocal repair without writes and applies only after confirmation'' (log: 2 × waiting for element to be visible, enabled and stable); the other 3 runs passed 405/405. Check: `npm run test:smoke:agent` repeatedly. Done when the test no longer depends on load and the full smoke passes repeatedly.'
+tags:
+- health
+custom_fields:
+  finding: smoke:ui.relationships-reciprocal-repair
+history:
+- at: 2026-11-16T05:11:32.887653+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-606"]}'
+- at: 2026-11-16T05:11:33.081816+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
