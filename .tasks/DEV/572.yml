@@ -1,0 +1,45 @@
+title: 'Done with an open step no ticket tracks: DEV-498'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T18:42:15.622926+00:00
+modified: 2026-11-15T18:45:09.587599+00:00
+relationships:
+  related:
+  - DEV-498
+description: |-
+  DEV-498 (Core modules no longer call up into services and cli) is Done, but a comment names a step still open and no open ticket is linked: "Not done: agent_job_service tests still call cli::handlers::agent (services to cli, outside the core and outside Done w…" (lotar show DEV-498)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-498`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-498]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-498
+history:
+- at: 2026-11-15T18:42:18.440130+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-498"]}'
+- at: 2026-11-15T18:42:22.100919+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T18:45:09.587599+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

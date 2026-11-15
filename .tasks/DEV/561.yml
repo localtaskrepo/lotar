@@ -1,0 +1,136 @@
+title: Archive a job's T3 Code thread when the job ends cleanly, so review and merge threads stop piling up
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-15T08:45:48.801801+00:00
+modified: 2026-11-15T18:45:29.280347+00:00
+relationships:
+  related:
+  - DEV-570
+comments:
+- date: 2026-11-15T08:48:27.865587+00:00
+  author: claude
+  text: |-
+    Blocked: nothing lotar can call archives a T3 Code thread yet.
+    - `t3 thread` (v0.1.9, upstream `pingdotgg/t3code` main) has only `list/start/send/show`; archive is the server's MCP tool `t3_thread_organize`, reachable only with a token the CLI issues in-process.
+    - harnessmux 0.1.8 drives T3 only through that CLI; lotar never calls `t3` itself.
+    - Added the Blocker and a checkbox "Done when" to the description.
+
+    **Question:** may I open a PR on `pingdotgg/t3code` adding `t3 thread archive <thread>` (a ~40-line wrapper over `t3_thread_organize` in `apps/server/src/cli/thread.ts`), then add an archive step to harnessmux's t3 agent and build this ticket on it once a T3 release ships it? Or would you rather have lotar settle threads another way (e.g. the job prompt tells the agent to call `t3_thread_organize` settle on itself, which can't tell a later-failed merge apart)?
+- date: 2026-11-15T14:05:25.169491+00:00
+  author: claude
+  text: 'Related: standards [STD-124](https://standards.pyxzl.net/task/STD-124) ''Reviews and merges run headless, not as T3 threads'' (Blocked) aims at the same pile of review and merge threads by not creating them. Decide the two together (found in standards STD-137).'
+- date: 2026-11-15T18:45:29.280347+00:00
+  author: claude
+  text: |-
+    Still waiting on you: STD-124 and this ticket both aim at the pile of review and merge threads; one choice settles both.
+
+    - STD-124 (Blocked until lotar 0.15.1, now released) runs reviews and merges headless, so their T3 threads never appear.
+    - This ticket archives them after a clean job, but needs `t3 thread archive` first (PR on `pingdotgg/t3code`, see the first comment).
+
+    **Question:** do STD-124 (headless reviews and merges) first and close this ticket WontDo, or also build archiving via the t3code PR?
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeef1cb5f-246e-43c5-bd3a-71cf86e7491b
+description: |-
+  Owner by voice to the chief of staff, 2026-11-15, in his words: "I'm still getting way too many review and merge threads in T3." and "Sure, file the lotar ticket to archive review and merge threads in T3 when their job ends cleanly."
+
+  ## What
+  - When a t3-runner job (review, merge, and other lotar jobs) completes cleanly and its end rules have run, lotar archives its T3 Code thread (T3's thread archive/settle, e.g. via harnessmux or the t3 CLI).
+  - Keep visible: failed or interrupted jobs, jobs that wait for an answer or approval, and jobs whose ticket went HelpNeeded for the owner.
+  - A setting to turn it off per project or profile; the thread stays reachable from the ticket's Timeline link.
+
+  ## Blocker (2026-11-15)
+  - `t3 thread` (v0.1.9 and upstream `pingdotgg/t3code` main) has only `list`, `start`, `send`, `show`. Archive exists only as the server's MCP tool `t3_thread_organize`, which needs a token the CLI issues in-process from T3's auth store.
+  - harnessmux 0.1.8 runs T3 only through that CLI, so it can't archive either. lotar itself never calls `t3`.
+
+  ## Done when
+  - [ ] A way to archive a thread from a process exists (path decided by the owner, see the open question) and lotar uses it through harnessmux's t3 agent.
+  - [ ] A t3 job that ends `completed`, after its `job_completed` rules ran, and whose ticket isn't assigned to a person in a waiting status (HelpNeeded): its thread is archived; the job log says `Archived T3 Code thread <link>`.
+  - [ ] A t3 job that ends failed, cancelled or interrupted, waits for an answer or approval, or completes with the ticket handed back (assignee changed by the agent, or a waiting status): its thread stays as it is.
+  - [ ] Archiving fails (T3 Code unreachable, old `t3` without the command): the job keeps its outcome, the log says why the thread stays, nothing retries.
+  - [ ] Setting `agent.t3_archive_on_completion` (default on), on the profile and the project; the profile's value wins over the project's, the project's over the global one. Off: no thread is archived.
+  - [ ] The Timeline link still opens an archived thread.
+  - [ ] Tests: a clean review job and a clean merge job archive (fake `t3`/harnessmux), a failed job and a handed-back job don't, an archive failure doesn't change the outcome, the setting turns it off.
+  - [ ] `docs/help/agent.md` (T3 Code threads) and `docs/help/config-reference.md` say what is archived, when, and how to turn it off.
+history:
+- at: 2026-11-15T08:45:48.963046+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T08:45:49.474151+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T08:45:50.378722+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeef1cb5f-246e-43c5-bd3a-71cf86e7491b
+- at: 2026-11-15T08:48:19.588953+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner by voice to the chief of staff, 2026-11-15, in his words: "I'm still getting way too many review and merge threads in T3." and "Sure, file the lotar ticket to archive review and merge threads in T3 when their job ends cleanly."
+
+      ## What
+      - When a t3-runner job (review, merge, and other lotar jobs) completes cleanly and its end rules have run, lotar archives its T3 Code thread (T3's thread archive/settle, e.g. via harnessmux or the t3 CLI).
+      - Keep visible: failed or interrupted jobs, jobs that wait for an answer or approval, and jobs whose ticket went HelpNeeded for the owner.
+      - A setting to turn it off per project or profile; the thread stays reachable from the ticket's Timeline link.
+
+      ## Done when
+      - After a clean review or merge job, its thread is archived in T3 Code; a failed one stays.
+      - Tests for both cases; docs/help says what is archived and when.
+    new: |-
+      Owner by voice to the chief of staff, 2026-11-15, in his words: "I'm still getting way too many review and merge threads in T3." and "Sure, file the lotar ticket to archive review and merge threads in T3 when their job ends cleanly."
+
+      ## What
+      - When a t3-runner job (review, merge, and other lotar jobs) completes cleanly and its end rules have run, lotar archives its T3 Code thread (T3's thread archive/settle, e.g. via harnessmux or the t3 CLI).
+      - Keep visible: failed or interrupted jobs, jobs that wait for an answer or approval, and jobs whose ticket went HelpNeeded for the owner.
+      - A setting to turn it off per project or profile; the thread stays reachable from the ticket's Timeline link.
+
+      ## Blocker (2026-11-15)
+      - `t3 thread` (v0.1.9 and upstream `pingdotgg/t3code` main) has only `list`, `start`, `send`, `show`. Archive exists only as the server's MCP tool `t3_thread_organize`, which needs a token the CLI issues in-process from T3's auth store.
+      - harnessmux 0.1.8 runs T3 only through that CLI, so it can't archive either. lotar itself never calls `t3`.
+
+      ## Done when
+      - [ ] A way to archive a thread from a process exists (path decided by the owner, see the open question) and lotar uses it through harnessmux's t3 agent.
+      - [ ] A t3 job that ends `completed`, after its `job_completed` rules ran, and whose ticket isn't assigned to a person in a waiting status (HelpNeeded): its thread is archived; the job log says `Archived T3 Code thread <link>`.
+      - [ ] A t3 job that ends failed, cancelled or interrupted, waits for an answer or approval, or completes with the ticket handed back (assignee changed by the agent, or a waiting status): its thread stays as it is.
+      - [ ] Archiving fails (T3 Code unreachable, old `t3` without the command): the job keeps its outcome, the log says why the thread stays, nothing retries.
+      - [ ] Setting `agent.t3_archive_on_completion` (default on), on the profile and the project; the profile's value wins over the project's, the project's over the global one. Off: no thread is archived.
+      - [ ] The Timeline link still opens an archived thread.
+      - [ ] Tests: a clean review job and a clean merge job archive (fake `t3`/harnessmux), a failed job and a handed-back job don't, an archive failure doesn't change the outcome, the setting turns it off.
+      - [ ] `docs/help/agent.md` (T3 Code threads) and `docs/help/config-reference.md` say what is archived, when, and how to turn it off.
+- at: 2026-11-15T08:48:27.865587+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:48:36.353681+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T14:05:25.169491+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:41:44.320191+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-570"]}'
+- at: 2026-11-15T18:45:29.280347+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,0 +1,108 @@
+title: 'Commits only on this Mac: branches'
+status: HelpNeeded
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-15T18:38:30.477073+00:00
+modified: 2026-11-15T18:41:27.753880+00:00
+relationships:
+  related:
+  - DEV-532
+  - DEV-466
+  - DEV-467
+  - DEV-481
+  - DEV-496
+  - DEV-516
+  - DEV-528
+  - DEV-542
+comments:
+- date: 2026-11-15T18:39:30.794002+00:00
+  author: automation
+  text: The fix agent's job job-20261115T183859.888Z-3 failed (lotar agent logs job-20261115T183859.888Z-3); @fix-codex retries it on branch agent/DEV-567.
+- date: 2026-11-15T18:41:20.146368+00:00
+  author: codex
+  text: |-
+    The finding reproduces; owner permission is needed to preserve local history remotely.
+
+    - Health check reports 23 local-only commits. `main` includes `c01909e9`, `39d4eae0`, `e20a1ff7` outside remote refs.
+    - Clean checkout; `git log main..HEAD` is empty. No code or branches changed; no commit needed.
+    - Asked the other running agent about ownership; reply pending. This job forbids push and merge; no work discarded.
+    - Question: may a follow-up job push the listed local-only branches to the configured remote, without merging or deleting them?
+    - Sandbox blocked initial ticket writes; retried with approval. No durable guidance correction.
+  report:
+    checks:
+    - command: repos.ts localtaskrepo/lotar
+      result: failed
+      reason: 23 local-only commits remain
+    - command: npm run lint
+      result: not_run
+      reason: no code changes
+    - command: npm test
+      result: not_run
+      reason: no code changes
+    - command: npm run smoke
+      result: not_run
+      reason: no code changes
+    next: Owner decides whether to authorize preservation pushes
+description: |-
+  23 commits on no remote, only on this Mac: agent/DEV-466 1, agent/DEV-467 1, agent/DEV-481 1, agent/DEV-496 1, agent/DEV-516 1, agent/DEV-528 1, agent/DEV-542 1, backup/DEV-466-896309c0 3, main 3, t3/job-outcome-server-outage 1, t3/job-outcome-survives-t3-outage 2, t3/job-outcome-t3-outage 1, t3/job-outcome-t3-outage-1 1, t3/job-outcome-t3-outage-2 1, t3/restore-claude-sandbox-permission-rules-3 1, t3/review-dev-510-t3-agent-gaps 1, t3/review-held-job-resume 2, t3/t3-agent-resume-link-wait 1, t3/t3-outage-job-outcome-fix 1, t3/task-panel-git-timeout 1, t3/task-panel-git-timeout-1 1, t3/task-panel-git-timeout-2 2, t3/task-panel-git-timeout-3 2, t3/task-panel-git-timeout-4 2, t3/task-panel-git-timeout-5 2 (git log <branch> --not --remotes)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `unpushed:branches`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+  ## Done when
+
+  git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
+tags:
+- health
+- fix-retried
+custom_fields:
+  finding: unpushed:branches
+history:
+- at: 2026-11-15T18:38:44.634976+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-532"]}'
+    new: '{"related":["DEV-532","DEV-466","DEV-467","DEV-481","DEV-496","DEV-516","DEV-528","DEV-542"]}'
+- at: 2026-11-15T18:38:55.653711+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T18:39:00.297205+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T18:39:30.456073+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-15T18:39:30.794002+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:41:20.146368+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:41:27.753880+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox

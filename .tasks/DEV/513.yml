@@ -1,11 +1,11 @@
 title: Release v0.15.1
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-15T08:13:22.773279+00:00
+modified: 2026-11-15T18:44:02.980831+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -42,6 +42,7 @@ relationships:
   - DEV-530
   - DEV-520
   - DEV-543
+  - DEV-569
 comments:
 - date: 2026-11-14T04:19:07.317172+00:00
   author: claude
@@ -99,6 +100,18 @@ comments:
     choice:
     - no
     note: (answered in INBOX-234)
+- date: 2026-11-15T17:35:09.546627+00:00
+  author: claude
+  text: 'Chief of staff, 2026-11-15 09:45: lotar 0.15.1 built from main (39d4eae0) is installed locally as /opt/homebrew/Cellar/lotar/0.15.1 (opt and bin symlinks repointed; 0.15.0 kept for rollback), the six servers restarted and answer. The owner allowed the binary in the macOS firewall: a new non-Homebrew binary is blocked silently on the LAN until then, so a future local install needs that step too. Not published: tag, crates, GitHub release still wait for the owner''s yes.'
+- date: 2026-11-15T18:44:02.722779+00:00
+  author: claude
+  text: |-
+    Blocked, not waiting for you: your answer of 2026-11-15 ("no", wait) stands.
+
+    - DEV-560 is on main (`39d4eae0`).
+    - Still open: DEV-510 and DEV-466, both HelpNeeded with you in their own tickets.
+    - Next: once both are Done on main, re-run the release checks and ask for the publish yes (push, tag `v0.15.1`).
+    - Check: `lotar show DEV-510`, `lotar show DEV-466`.
 releases:
 - 6
 description: |-
@@ -289,3 +302,23 @@ history:
   - field: tags
     old: ''
     new: blocked, blocked-by:DEV-466, blocked-by:DEV-510
+- at: 2026-11-15T17:35:09.546627+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:41:34.492963+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543","DEV-569"]}'
+- at: 2026-11-15T18:44:02.722779+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:44:02.980831+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked

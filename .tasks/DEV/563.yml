@@ -1,0 +1,185 @@
+title: Sign lotar builds from source with the owner's Developer ID
+status: Blocked
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T17:40:28.569324+00:00
+modified: 2026-11-15T18:02:07.177638+00:00
+relationships:
+  depends_on:
+  - DEV-564
+  related:
+  - standards:STD-138
+  - DEV-482
+  - DEV-564
+comments:
+- date: 2026-11-15T18:01:34.472793+00:00
+  author: claude
+  text: |-
+    Built and committed; signing with your Developer ID waits on one click at the Mac.
+
+    - `npm run install:local` = `npm run build` + `scripts/install-local.mjs`: signs `lotar` (`net.pyxzl.lotar`) and `lotar-agent-wrapper` (`net.pyxzl.lotar-agent-wrapper`), hardened runtime, then renames both into `LOTAR_INSTALL_DIR` (default `~/.local/bin`)
+    - `LOTAR_SIGNING_IDENTITY` wins; set but missing → stops. Developer ID missing → ad hoc + warning. codesign fails or hangs (120 s timeout) → stops, old binaries stay (seen for real)
+    - Docs: `docs/help/install.md#build-from-source` (incl. replacing the Homebrew lotar), `docs/release-guide.md`
+    - local skill: filed [LOCA-385](https://local.pyxzl.net/task/LOCA-385)
+    - Blocker: `codesign --sign "Developer ID Application: Ravi Gairola (3HKD37M482)"` hung 8.5 min here (DEV-564's harnessmux too): macOS is asking whether codesign may use the key
+
+    **Question:** at the Mac, in Terminal, run `cp /bin/ls /tmp/signtest && codesign --force --sign "Developer ID Application: Ravi Gairola (3HKD37M482)" /tmp/signtest` and choose **Always Allow** in the keychain dialog, then answer "done" here? That unblocks lotar and harnessmux both.
+  report:
+    commits:
+    - hash: 7c81ee16
+      what: npm run install:local signs and installs lotar + lotar-agent-wrapper
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2206 Rust + 1547 UI + release/hooks incl. 9 new install-local tests
+    - command: npm run smoke
+      result: passed
+      reason: 404 tests
+    - command: ad-hoc install, real codesign
+      result: passed
+      reason: Identifier=net.pyxzl.lotar, flags adhoc,runtime, --version runs
+    - command: Developer ID install, real codesign
+      result: failed
+      reason: codesign hung 8.5 min, keychain key prompt
+    - command: LAN firewall check in next version
+      result: not_run
+      reason: needs the signed install first
+    next: Owner allows codesign to use the Developer ID key, then agent runs install:local with the Developer ID and checks codesign -dvv
+- date: 2026-11-15T18:02:06.463577+00:00
+  author: triage
+  text: |-
+    Waits for the owner's answer on [INBOX-264](https://standards.pyxzl.net/task/INBOX-264) (same grant).
+
+    - Both DEV-563 and DEV-564 need one click: codesign may use the Developer ID key (Always Allow at the Mac).
+    - One question to the owner, on INBOX-264. DEV-563 is blocked on DEV-564 and continues when it is done.
+- date: 2026-11-15T18:02:07.052130+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-564.'
+- date: 2026-11-15T18:02:07.177638+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-563 yet. DEV-563 waits for DEV-564.'
+description: |-
+  Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
+
+  ## Found
+  - Releases are signed (DEV-482: Developer ID, identifier `net.pyxzl.lotar`, hardened runtime, notarized). A build from source is not: `/opt/homebrew/Cellar/lotar/0.15.1/bin/lotar` (copied in by hand 2026-11-15 01:05, no INSTALL_RECEIPT) shows `Signature=adhoc`, `Identifier=lotar-45c3c39a9986a3af`. The macOS firewall then blocked it on the LAN until the owner added an exception by hand (Cellar 0.15.0, Developer ID signed, was allowed).
+  - There is no documented way to install lotar from source on this Mac; agents improvise it. local's `skills/lotar-services.md` ("Code signature and macOS grants") says "never re-sign the release binary" and treats an ad-hoc build as a release bug.
+  - Identity on this Mac: "Developer ID Application: Ravi Gairola (3HKD37M482)" in the login keychain (`security find-identity -v -p codesigning`). Unchecked: whether codesign may use its key without a prompt; if it asks, an agent's install waits for "Always Allow" at the Mac once.
+
+  ## Done when
+  - [ ] One documented install-from-source step (docs/help/install.md, and the release guide where it applies) builds lotar and `lotar-agent-wrapper` and signs both with that Developer ID, identifier `net.pyxzl.lotar` (and a fixed one for the wrapper), hardened runtime, before it puts them on PATH. No wrapper script around cargo if an npm script or documented command does it.
+  - [ ] `npm run install:local` is that step: `npm run build`, then `scripts/install-local.mjs` installs both binaries into `LOTAR_INSTALL_DIR` (default `~/.local/bin`, as `install.sh`). Wrapper identifier: `net.pyxzl.lotar-agent-wrapper`.
+  - [ ] `LOTAR_SIGNING_IDENTITY` (name or SHA-1 from `security find-identity`, `-` for ad hoc) wins over the Developer ID default. Set but not found in the keychain: the step stops, nothing replaced (an explicit choice is never downgraded to ad hoc).
+  - [ ] Identity missing (another machine, CI): the build is ad-hoc signed and the step prints a warning naming the identity and saying macOS will ask for firewall and file-access grants again. CI and contributors' builds keep working.
+  - [ ] Identity present but codesign fails (locked keychain, denied prompt) or the signed binary doesn't verify or start: the step stops with codesign's error and replaces neither installed binary. Both are signed in staging files first and then renamed over the old ones, so a running server keeps its old file.
+  - [ ] Linux and Windows: no signing, same staged install.
+  - [ ] `codesign -dvv` on the installed source build shows `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`; local's `skills/lotar-services.md` is updated (filed there if it needs a LOCA ticket) so it no longer calls a signed source build wrong.
+  - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
+history:
+- at: 2026-11-15T17:40:28.831866+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-138"]}'
+    new: '{"related":["standards:STD-138","DEV-482"]}'
+- at: 2026-11-15T17:40:29.077769+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T17:40:29.795544+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T17:42:10.370268+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
+
+      ## Found
+      - Releases are signed (DEV-482: Developer ID, identifier `net.pyxzl.lotar`, hardened runtime, notarized). A build from source is not: `/opt/homebrew/Cellar/lotar/0.15.1/bin/lotar` (copied in by hand 2026-11-15 01:05, no INSTALL_RECEIPT) shows `Signature=adhoc`, `Identifier=lotar-45c3c39a9986a3af`. The macOS firewall then blocked it on the LAN until the owner added an exception by hand (Cellar 0.15.0, Developer ID signed, was allowed).
+      - There is no documented way to install lotar from source on this Mac; agents improvise it. local's `skills/lotar-services.md` ("Code signature and macOS grants") says "never re-sign the release binary" and treats an ad-hoc build as a release bug.
+      - Identity on this Mac: "Developer ID Application: Ravi Gairola (3HKD37M482)" in the login keychain (`security find-identity -v -p codesigning`). Unchecked: whether codesign may use its key without a prompt; if it asks, an agent's install waits for "Always Allow" at the Mac once.
+
+      ## Done when
+      - [ ] One documented install-from-source step (docs/help/install.md, and the release guide where it applies) builds lotar and `lotar-agent-wrapper` and signs both with that Developer ID, identifier `net.pyxzl.lotar` (and a fixed one for the wrapper), hardened runtime, before it puts them on PATH. No wrapper script around cargo if an npm script or documented command does it.
+      - [ ] A signing identity set for the install (e.g. `LOTAR_SIGNING_IDENTITY`) wins over the Developer ID default.
+      - [ ] Identity missing (another machine, CI): the build is ad-hoc signed and the step prints a warning naming the identity and saying macOS will ask for firewall and file-access grants again. CI and contributors' builds keep working.
+      - [ ] Identity present but codesign fails: the step stops with codesign's error and does not replace the installed binary.
+      - [ ] `codesign -dvv` on the installed source build shows `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`; local's `skills/lotar-services.md` is updated (filed there if it needs a LOCA ticket) so it no longer calls a signed source build wrong.
+      - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
+    new: |-
+      Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
+
+      ## Found
+      - Releases are signed (DEV-482: Developer ID, identifier `net.pyxzl.lotar`, hardened runtime, notarized). A build from source is not: `/opt/homebrew/Cellar/lotar/0.15.1/bin/lotar` (copied in by hand 2026-11-15 01:05, no INSTALL_RECEIPT) shows `Signature=adhoc`, `Identifier=lotar-45c3c39a9986a3af`. The macOS firewall then blocked it on the LAN until the owner added an exception by hand (Cellar 0.15.0, Developer ID signed, was allowed).
+      - There is no documented way to install lotar from source on this Mac; agents improvise it. local's `skills/lotar-services.md` ("Code signature and macOS grants") says "never re-sign the release binary" and treats an ad-hoc build as a release bug.
+      - Identity on this Mac: "Developer ID Application: Ravi Gairola (3HKD37M482)" in the login keychain (`security find-identity -v -p codesigning`). Unchecked: whether codesign may use its key without a prompt; if it asks, an agent's install waits for "Always Allow" at the Mac once.
+
+      ## Done when
+      - [ ] One documented install-from-source step (docs/help/install.md, and the release guide where it applies) builds lotar and `lotar-agent-wrapper` and signs both with that Developer ID, identifier `net.pyxzl.lotar` (and a fixed one for the wrapper), hardened runtime, before it puts them on PATH. No wrapper script around cargo if an npm script or documented command does it.
+      - [ ] `npm run install:local` is that step: `npm run build`, then `scripts/install-local.mjs` installs both binaries into `LOTAR_INSTALL_DIR` (default `~/.local/bin`, as `install.sh`). Wrapper identifier: `net.pyxzl.lotar-agent-wrapper`.
+      - [ ] `LOTAR_SIGNING_IDENTITY` (name or SHA-1 from `security find-identity`, `-` for ad hoc) wins over the Developer ID default. Set but not found in the keychain: the step stops, nothing replaced (an explicit choice is never downgraded to ad hoc).
+      - [ ] Identity missing (another machine, CI): the build is ad-hoc signed and the step prints a warning naming the identity and saying macOS will ask for firewall and file-access grants again. CI and contributors' builds keep working.
+      - [ ] Identity present but codesign fails (locked keychain, denied prompt) or the signed binary doesn't verify or start: the step stops with codesign's error and replaces neither installed binary. Both are signed in staging files first and then renamed over the old ones, so a running server keeps its old file.
+      - [ ] Linux and Windows: no signing, same staged install.
+      - [ ] `codesign -dvv` on the installed source build shows `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`; local's `skills/lotar-services.md` is updated (filed there if it needs a LOCA ticket) so it no longer calls a signed source build wrong.
+      - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
+- at: 2026-11-15T17:43:16.310184+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-138","DEV-482"]}'
+    new: '{"related":["standards:STD-138","DEV-482","DEV-564"]}'
+- at: 2026-11-15T18:01:34.472793+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:01:48.687007+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T18:02:06.160115+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-138","DEV-482","DEV-564"]}'
+    new: '{"depends_on":["DEV-564"],"related":["standards:STD-138","DEV-482","DEV-564"]}'
+- at: 2026-11-15T18:02:06.463577+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:02:06.829936+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T18:02:07.007240+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-15T18:02:07.052130+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:02:07.177638+00:00
+  actor: automation
+  changes:
+  - field: comment_added

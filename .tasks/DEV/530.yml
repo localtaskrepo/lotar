@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: fix
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T08:00:22.827975+00:00
+modified: 2026-11-15T18:11:04.344356+00:00
 relationships:
   related:
   - DEV-351
@@ -289,6 +289,96 @@ comments:
     No Fable retry for now: @fix is working on it (job `job-20261115T074741.940Z-77`, started 07:47Z, on `t3/resume-held-jobs-when-unblocked`).
     - The earlier merge failures (jobs 27, 68, 75) were lotar checking out the old review branch `t3/review-dev-530-held-job-resume-1`: DEV-550, fixed on main but not in the installed lotar 0.15.0 (it comes with DEV-513, Release v0.15.1). That's infrastructure, not the agent.
     - If this job's merge fails the same way, it waits for the installed lotar with DEV-550, not for another retry. If the fix agent itself fails at the open review finding (`starting` left set after a failed `release_parked`), retry with @fix-fable.
+- date: 2026-11-15T17:37:26.988032+00:00
+  author: claude
+  text: 'Chief of staff, 2026-11-15 09:40 PST: not retried. Its merge failed on a stale review branch (DEV-550), which installed lotar 0.15.0 still has; review and merge wait for the 0.15.1 swap.'
+- date: 2026-11-15T17:40:01.091962+00:00
+  author: codex
+  text: 'Review: blocking. agent/DEV-530 and this checkout still point to obsolete 388d708f, not rework 4e2f775a on t3/resume-held-jobs-when-unblocked. No merge, push or checks. Ticket branch needs the saved rework before review and merge.'
+- date: 2026-11-15T17:46:15.431261+00:00
+  author: triage
+  text: |-
+    Retry with @fix: the wait for the installed lotar is over. Nothing here needs the owner.
+
+    - Installed `lotar` is 0.15.1 (built from main `39d4eae0`, chief of staff 2026-11-15 09:45 PST), which has the DEV-550 fix for stale review branches.
+    - Owner's standing answer on this question: "fix" (INBOX-188, INBOX-214, 2026-11-15).
+    - Work to review and merge: `t3/resume-held-jobs-when-unblocked` at `4e2f775a`. Codex 17:40Z found `agent/DEV-530` still at obsolete `388d708f`: point the ticket branch at `4e2f775a` first, then review and merge.
+- date: 2026-11-15T18:08:09.708141+00:00
+  author: claude
+  text: |-
+    Ticket branch `agent/DEV-530` now points at the rework `4e2f775a`; ready for review and merge.
+
+    - `agent/DEV-530` (worktree `~/.t3/worktrees/lotar/DEV-530`) and this thread's `t3/review-dependency-job-resume` moved from obsolete `388d708f` to `4e2f775a` with `git reset --hard`; both checkouts were clean.
+    - Nothing lost: `388d708f` is the first version of the fix (its parent `500370cd` landed on main as `c01dfce3`) and stays on `t3/resume-held-jobs-when-unblocked-1`.
+    - `4e2f775a` is signed and sits directly on main `39d4eae0`: no rebase needed.
+    - No code change, so lint, test and smoke were not rerun; they passed on this hash per the 07:57Z rework comment.
+  report:
+    commits:
+    - hash: 4e2f775a
+      what: the rework, unchanged; ticket branch now points at it
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: no code change; passed on 4e2f775a (07:57Z rework comment)
+    - command: npm test
+      result: not_run
+      reason: same reason
+    - command: npm run smoke
+      result: not_run
+      reason: same reason
+    next: Review and merge agent/DEV-530 at 4e2f775a
+- date: 2026-11-15T18:09:51.911041+00:00
+  author: codex
+  text: |-
+    Review: blocking on `4e2f775a`.
+
+    - `crates/lotar-lib/src/services/automation_service.rs:2709`: a fresh claim returns without scheduling a retry. After start and release both fail, no caller revisits a local parked job after the grace expires: the local unblocked event already fired, and `run_cross_repo_unblocked` excludes local-only dependencies. The job can still wait indefinitely. Schedule recovery and test it without manually invoking `resume_parked_job` a second time.
+    - `docs/help/agent.md:33` promises recovery a minute later; elapsed time alone currently does nothing.
+    - Compiler-cache attempts blocked by `Operation not permitted`, including escalated retry. Cache-disabled targeted check in progress; final verification follows.
+- date: 2026-11-15T18:10:58.021223+00:00
+  author: codex
+  text: |-
+    Review: blocking; verification finished with no tests executed.
+
+    - Cache-disabled retry required a full dependency build and was stopped during compilation; no check remains running.
+    - `review-blocked` recorded. No source edits or commits; status and assignee unchanged.
+  report:
+    checks:
+    - command: npm run test:rust:agent -- a_parked_job
+      result: not_run
+      reason: sccache denied, including escalated retry
+    - command: RUSTC_WRAPPER= npm run test:rust:agent -- a_parked_job
+      result: not_run
+      reason: stopped dependency compilation; runner also reported xcrun_db cleanup
+    - command: npm run lint:agent
+      result: not_run
+      reason: blocking static finding
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: blocking static finding
+    next: Add scheduled expired-claim recovery and regression coverage, then rerun review.
+- date: 2026-11-15T18:11:04.344356+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -823,3 +913,79 @@ history:
   - field: relationships
     old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513"]}'
     new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520"]}'
+- at: 2026-11-15T17:37:26.988032+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:40:01.091962+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:40:15.373680+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: fix
+    new: mallox
+- at: 2026-11-15T17:46:15.431261+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:46:15.974903+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T18:07:06.792316+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T18:08:09.708141+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:08:17.768298+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T18:09:51.911041+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:09:58.688337+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: review-returned, merge-retried
+    new: review-returned, merge-retried, review-blocked
+- at: 2026-11-15T18:10:58.021223+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:11:04.277318+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: review-returned, merge-retried, review-blocked
+    new: review-returned, merge-retried
+- at: 2026-11-15T18:11:04.344356+00:00
+  actor: automation
+  changes:
+  - field: comment_added

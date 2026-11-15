@@ -145,6 +145,19 @@ The newest ticket of the project with that key decides what happens. The command
 - REST (`/api/tasks/add`) and MCP (`task_create`) take the same key as `finding`; see [API quick reference](api-quick-reference.md) and [MCP tools](mcp-tools.md#task_create).
 - Done means the project's done states (`issue.done_states`, or the inferred ones: see [Done States](config.md#done-states)). A won't-do state is recognized by its name, done or not.
 
+## Similar open tickets
+
+`add` warns on stderr when open tickets of the project have a similar title, and still files the new ticket. The warning names them, so an agent that skipped searching can add to the existing ticket and delete the new one:
+
+```text
+⚠️  Open tickets with a similar title: LOCA-331 "opgate restart while the Mac is locked drops the signing key". If LOCA-333 is the same problem, add to that ticket and delete this one (lotar task delete LOCA-333).
+```
+
+- Two titles are similar when at least 60% of their words match (Dice coefficient over the distinct lowercase words, without words such as `a`, `the`, `is`, `on`). Word order and case don't count.
+- Open means not in a done state and not won't do; archived tickets don't count.
+- It applies with `--finding` too, when no ticket has the same key: a new subject (`opgate:locked-restart`) with a near-identical title gets the same warning. It names only open tickets with the same check (the part before the first `:`, here `opgate`) or without a finding key; a ticket of another check, such as `worktrees:lotar`, is a different problem even with a similar title.
+- With `--format json` the warning is a JSON line on stderr; stdout stays the created ticket.
+
 ## Validation
 
 All task properties are validated against project configuration:

@@ -1,0 +1,70 @@
+title: 'Waiting for the owner without a question: DEV-561'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-15T18:41:41.902547+00:00
+modified: 2026-11-15T18:46:39.680207+00:00
+relationships:
+  related:
+  - DEV-561
+comments:
+- date: 2026-11-15T18:46:30.254668+00:00
+  author: claude
+  text: |-
+    Fixed with a ticket edit only, nothing to commit: DEV-561's last comment now asks one question.
+
+    - Asked: do STD-124 (headless reviews and merges) first and close DEV-561 WontDo, or also archive threads via a t3code PR.
+    - DEV-561 stays HelpNeeded and assigned to mallox.
+    - `repos.ts localtaskrepo/lotar` no longer lists `[question:DEV-561]`.
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no [question:DEV-561]
+description: |-
+  DEV-561 (Archive a job's T3 Code thread when the job ends cleanly, so review and merge threads stop piling up) is HelpNeeded, but its last comment asks no question: "Related: standards [STD-124](https://standards.pyxzl.net/task/STD-124) 'Reviews and merges run headless, not as T3 thre…" (lotar show DEV-561)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-561`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-561]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+custom_fields:
+  finding: question:DEV-561
+history:
+- at: 2026-11-15T18:41:44.331594+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-561"]}'
+- at: 2026-11-15T18:41:46.674068+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T18:44:04.839088+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T18:46:30.254668+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:46:39.680207+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

@@ -1,0 +1,179 @@
+title: 'A blocking review is ignored: the fix job''s end rule moves Reviewing on to Merging while the review still runs'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-15T17:44:03.850220+00:00
+modified: 2026-11-15T18:41:50.804636+00:00
+relationships:
+  related:
+  - DEV-524
+comments:
+- date: 2026-11-15T18:13:42.492529+00:00
+  author: claude
+  text: |-
+    Fixed: a job's end rules no longer move a ticket that was reassigned while the job ran.
+
+    - Cause (LOCA-333): fix job `job-20261115T173815.583Z-7` started with the ticket on `mallox`. The agent ran `lotar automation run "Answered in the thread: review on Codex"`, which sets Reviewing/@review at once (not a deferred job outcome). At the job's end the rules matched the *new* assignee @review, so "Review passed: merge" set Merging/@merge and queued merge job `…174245.273Z-26`. The review job `…174010.077Z-13` was then created while the ticket was Merging, so lotar judged it a merge job.
+    - Fix: every job now records its ticket's assignee after its start rules (before: merge jobs only). `apply_job_event` skips the end rules when the assignee changed since; a recorded outcome still applies. The job log says `… was reassigned (to @review) while the job ran: its end rules don't move it again`.
+    - Second "Done when" item: in this flow the merge job came only from that end rule, so it isn't queued now; the review's end then sees @review plus `review-blocked` and sends it back to @fix.
+    - Files: `crates/lotar-lib/src/services/automation_service.rs` (`reassigned_during_job`), `agent_job_service.rs`, `AutomationJobContext.assignee_at_start`. Docs: `docs/help/agent.md`, `docs/help/automation.md`.
+    - Test: `crates/lotar-lib/tests/dev566_moved_during_job_test.rs`.
+  report:
+    commits:
+    - hash: 1dc53b41
+      what: a job's end rules skip a ticket reassigned while the job ran; start assignee recorded for every job
+    checks:
+    - command: cargo nextest dev566_moved_during_job_test
+      result: passed
+      reason: main case failed with the skip disabled
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2209 Rust, 1547 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 404 tests
+    - command: LOCA-333 replay with the new build
+      result: not_run
+      reason: needs a live fix job that runs lotar automation run
+    next: Review on another model, then merge
+- date: 2026-11-15T18:16:19.539453+00:00
+  author: codex
+  text: |-
+    Review: blocking
+
+    - Missing acceptance condition: `crates/lotar-lib/src/services/agent_job_service.rs:272` admits merge jobs without checking `review-blocked`; `is_merge_job_candidate` at line 4017 accepts any Merging ticket or merge profile. The new guard at `automation_service.rs:602` compares assignees only. A queued/requested merge can therefore still start with a blocked review. Add protection at the merge-start boundary (or equivalent configured enforcement), with a regression proving no merge starts until rework. The implementation comment acknowledges this protection was not added.
+    - Read full `main..HEAD` diff/commit `1dc53b41`, ticket/comments/relationships (none), recent main history for touched services, repo/backend/testing guidance, LOCA-333 history and its project automation. History confirms the reported jump. Review-passed rules exclude the tag, but the job-start boundary does not. No `docs/decisions` exists here.
+    - Focused rerun passed 3 tests with `RUSTC_WRAPPER=` after both initial and approved cache-enabled retries hit sccache permissions. Diff whitespace check passed. Full lint/test/smoke not rerun; implementation reports passed. No UI changes, file edits, commits, minor findings or guidance correction. Status and assignee unchanged.
+  report:
+    checks:
+    - command: RUSTC_WRAPPER= npm run test:rust:agent -- dev566_moved_during_job_test
+      result: passed
+      reason: 3 tests
+    - command: git diff --check main...HEAD
+      result: passed
+    - command: full lint/test/smoke
+      result: not_run
+      reason: focused review; implementation reports passed
+    next: Add merge-start protection for review-blocked and regression coverage
+- date: 2026-11-15T18:23:53.361982+00:00
+  author: claude
+  text: |-
+    Reworked for the review: a queued merge job no longer starts after a blocking review sent the ticket back.
+
+    - Finding (merge starts while `review-blocked`): fixed at the start boundary. On LOCA-333 the merge job `…174245.273Z-26` sat in the agent queue while the review ran, then started after the ticket had gone back to @fix with `review-blocked`. Now the queue worker checks just before it starts an entry (next to DEV-524's prerequisite check): when the ticket is assigned to *another agent profile* than the entry's, the job doesn't start and the ticket gets `The queued @merge job didn't start: <ID> is assigned to @fix now.` Assigned to a person, or still to its own profile: it starts as before.
+    - Why the assignee, not the tag: lotar gives `review-blocked` no meaning. The repo's rules do: "Review passed: merge" already excludes it, and a blocking review always sends the ticket to a fix profile. So "moved to another agent" covers the stale merge without lotar hard-coding a tag.
+    - Gap left in the rules, filed as STD-139 (standards): "Review failed: merge without it" merges a ticket that a failed reviewer had already tagged `review-blocked`. That's a rule change in `configs/lotar/automation.yml`, not lotar.
+    - Code: `queued_stage_allows_start` in `crates/lotar-lib/src/services/automation_service.rs`, called from `start_entry` in `agent_queue_service.rs`. Docs: `docs/help/agent.md` (queue worker). Commit amended.
+  report:
+    commits:
+    - hash: b3168b0f
+      what: end rules skip a ticket reassigned during the job; a queued job doesn't start once its ticket is assigned to another agent profile
+    checks:
+    - command: cargo nextest a_queued_job_does_not_start_after_its_ticket_moved_to_another_agent
+      result: passed
+      reason: failed with the guard disabled
+    - command: cargo nextest dev566_moved_during_job_test
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2210 Rust, 1547 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 404 tests
+    - command: LOCA-333 replay with the new build
+      result: not_run
+      reason: needs live fix, review and merge jobs
+    next: Review again on another model, then merge
+- date: 2026-11-15T18:41:50.804636+00:00
+  author: claude
+  text: |-
+    Another case, other trigger: STD-45 (standards) went to Done unmerged with a blocking review.
+    - Not an `automation run`: a second @fix job `job-20261115T072832.176Z-373` (same owner answer, queued twice) started at 07:28:32.47, 0.3 s after the first fix job's end set Reviewing/@review. So its start assignee was already @review.
+    - Its end matched "Review passed: merge" (Merging/@merge). The review job `…072848.852Z-408` then blocked, and its end matched "Merge agent lifecycle": Done, `review-blocked` removed, no merge ran.
+    - The first fix (assignee after start rules) doesn't catch this, since the assignee didn't change during the job. The queue-start check (entry @fix, ticket @review) should. Please cover this order in a test.
+    - Check: `lotar --tasks-dir ~/Development/standards/.tasks agent logs job-20261115T072832.176Z-373`
+description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: agent-jobs:review-race
+history:
+- at: 2026-11-15T17:44:04.041701+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T17:59:00.995410+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T18:13:42.492529+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:13:53.982699+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T18:16:19.539453+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:16:20.004450+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-15T18:16:24.994417+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-15T18:16:25.868512+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T18:23:53.361982+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:23:53.688391+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-524"]}'
+- at: 2026-11-15T18:24:02.588138+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T18:41:50.804636+00:00
+  actor: claude
+  changes:
+  - field: comment_added

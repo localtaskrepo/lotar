@@ -1,0 +1,34 @@
+title: T3 agent jobs on one ticket each get their own t3/* branch, so the review and merge miss the fix commit
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T18:46:06.748265+00:00
+modified: 2026-11-15T18:49:00.767561+00:00
+relationships:
+  related:
+  - DEV-510
+description: 'Found reviewing G-21 (gairola), 2026-11-15: the fix retry ran on T3 worktree branch t3/sync-lotar-automation-config-copy and committed f88bfff there; its prompt said branch agent/G-21, which stays at main. The review thread got another fresh branch, t3/sync-automation-yml-config-copy, also at main. The merge runs in the reviewer''s thread and checks git log main..HEAD, so it would report nothing to merge and the ticket would close with the drift still there. DEV-510''s merge failed the same way on 2026-11-14. Check: after a fix job on T3, the review and merge worktrees'' HEAD contains the fix commit. Done: every T3 job for a ticket works on agent/<ID> (or lotar hands the next job the branch the previous one committed to).'
+tags:
+- health
+custom_fields:
+  finding: review:t3-job-branch
+history:
+- at: 2026-11-15T18:46:07.005713+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-510"]}'
+- at: 2026-11-15T18:46:07.216644+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T18:49:00.767561+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

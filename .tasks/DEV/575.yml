@@ -1,0 +1,34 @@
+title: 'Flaky smoke: description preview touch drag does not scroll under full-suite load'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T19:05:32.144426+00:00
+modified: 2026-11-15T19:05:32.843719+00:00
+relationships:
+  related:
+  - DEV-562
+description: 'Found: the DEV-562 merge''s full smoke run (2026-11-15) failed smoke/tests/ui.description-preview.smoke.spec.ts:158 ''scrolls on a touch drag and opens the editor on a tap'': expected 0 to be greater than 0 (scrollTop stayed 0). Check: npm run test:smoke:agent; the file alone passed 3/3 and the full suite rerun passed 404/404. Done: the test passes reliably under full-suite load.'
+tags:
+- health
+custom_fields:
+  finding: smoke:ui.description-preview-touch-drag
+history:
+- at: 2026-11-15T19:05:32.306677+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-562"]}'
+- at: 2026-11-15T19:05:32.480684+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T19:05:32.843719+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

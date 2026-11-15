@@ -32,6 +32,7 @@ fn feed_reports_every_task_of_a_bulk_commit() {
     git(root, &["init", "-q"]);
     git(root, &["config", "user.name", "Dev"]);
     git(root, &["config", "user.email", "dev@example.com"]);
+    git(root, &["config", "commit.gpgsign", "false"]);
     for i in 0..12 {
         lotar(root, &["add", &format!("task {i}"), "-p", "DEMO"]);
     }

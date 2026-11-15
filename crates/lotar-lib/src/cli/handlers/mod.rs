@@ -481,6 +481,9 @@ impl AddHandler {
             }
             None => None,
         };
+        // Agents skip searching before they file (DEV-562): name the open
+        // tickets that may already report this problem, and file anyway.
+        let similar = FindingService::similar_open(&storage, &project_for_storage, &task.title, finding_key.as_deref(), &config);
         let task_id = crate::services::task_service::TaskService::commit_prepared_create(
             &storage,
             crate::services::task_service::PreparedTaskCreate {
@@ -495,6 +498,13 @@ impl AddHandler {
         .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
         drop(finding_lock);
         renderer.log_info(format_args!("add: created id={}", task_id));
+        if !similar.is_empty() {
+            let named: Vec<String> = similar.iter().map(|(id, title)| format!("{id} \"{title}\"")).collect();
+            renderer.emit_warning(format_args!(
+                "Open tickets with a similar title: {}. If {task_id} is the same problem, add to that ticket and delete this one (lotar task delete {task_id}).",
+                named.join(", ")
+            ));
+        }
         if args.explain {
             renderer.emit_info(format_args!("Explanation: {project_explanation}."));
         }

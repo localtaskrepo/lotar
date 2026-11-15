@@ -1,0 +1,78 @@
+title: 'Waiting for the owner without a question: DEV-513'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-15T18:41:31.446763+00:00
+modified: 2026-11-15T18:45:01.716137+00:00
+relationships:
+  related:
+  - DEV-513
+  - DEV-466
+  - DEV-510
+  - DEV-560
+comments:
+- date: 2026-11-15T18:44:53.165558+00:00
+  author: claude
+  text: |-
+    Fixed without file changes: DEV-513 is now Blocked, not HelpNeeded.
+
+    - The owner answered on 2026-11-15 ("no": wait for DEV-560, DEV-510, DEV-466). DEV-560 has landed; DEV-510 and DEV-466 wait on him in their own tickets.
+    - DEV-513 depends on both, so it continues when they are Done.
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no [question:DEV-513]
+description: |-
+  DEV-513 (Release v0.15.1) is HelpNeeded, but its last comment asks no question: "Chief of staff, 2026-11-15 09:45: lotar 0.15.1 built from main (39d4eae0) is installed locally as /opt/homebrew/Cellar/…" (lotar show DEV-513)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-513`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-513]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+custom_fields:
+  finding: question:DEV-513
+history:
+- at: 2026-11-15T18:41:34.513068+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-513"]}'
+- at: 2026-11-15T18:41:38.204591+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T18:41:44.717837+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T18:44:53.165558+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:44:53.646755+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-513"]}'
+    new: '{"related":["DEV-513","DEV-466","DEV-510","DEV-560"]}'
+- at: 2026-11-15T18:45:01.716137+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

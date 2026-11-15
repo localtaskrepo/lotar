@@ -1,0 +1,36 @@
+title: 'Worktree builds filled the Mac''s disk: each job''s target/ grows 5-35 GB and is never removed'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T18:58:43.266429+00:00
+modified: 2026-11-15T18:59:23.615640+00:00
+comments:
+- date: 2026-11-15T18:59:23.615640+00:00
+  author: automation
+  text: 'Automation rule ''Health: fix agent lifecycle'' skipped on DEV-574. Skipped its run command: this repository''s automation rules and agent profiles have changed since you last trusted them. Review them with `lotar trust --status`, then run `lotar trust` (or set LOTAR_TRUST_ALL=1 in CI). The rule''s other actions applied.'
+description: |-
+  Found 2026-11-15 by the chief of staff: the Data volume was 100% full (2.3 GB free of 926 GB) and many jobs failed. ~/.t3/worktrees used 280 GB, 243 GB of it lotar worktrees; each worktree's Rust target/ was 5-35 GB (agent-DEV-510 35 GB, t3-38403d38 17 GB, agent-DEV-528 13 GB, ...). Deleting all worktree target/ folders freed ~222 GB (224 GB free now, worktrees 49 GB).
+  Check: du -sh ~/.t3/worktrees/*/*/target; df -h /System/Volumes/Data.
+  Done when: a job's build output doesn't outlive the job (remove target/ at job end or worktree cleanup), or worktrees share one build cache (sccache, already used; or a shared CARGO_TARGET_DIR per repo) so a new worktree doesn't rebuild 5+ GB; and a disk check warns before the volume fills (e.g. under 50 GB free). Applies to harnessmux worktrees too (15 GB).
+tags:
+- health
+custom_fields:
+  finding: disk:worktree-targets
+history:
+- at: 2026-11-15T18:58:43.470652+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T18:59:23.576112+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T18:59:23.615640+00:00
+  actor: automation
+  changes:
+  - field: comment_added

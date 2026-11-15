@@ -28,6 +28,14 @@ const REPORT_PREFIX: &str = "Reported again by ";
 /// spaces, `-`, `_` and `'`).
 const WONT_DO_NAMES: &[&str] = &["wontdo", "wontfix", "cancelled", "canceled", "rejected", "declined"];
 
+/// Titles that share at least this percentage of their words (Dice
+/// coefficient) name the same problem (DEV-562).
+const SIMILAR_TITLE_PERCENT: usize = 60;
+
+/// Words that say nothing about the problem.
+const STOP_WORDS: &[&str] =
+    &["a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have", "in", "is", "it", "its", "of", "on", "or", "the", "to", "when", "with"];
+
 /// A busy finding lock is waited for this long: the holder only checks the
 /// project and writes one ticket or comment.
 const LOCK_WAIT: Duration = Duration::from_secs(30);
@@ -84,6 +92,35 @@ impl FindingService {
         }
         let done = crate::services::completion::effective_done_statuses(config);
         if done.contains(&task.status.as_str().to_ascii_lowercase()) { Prior::Done(id) } else { Prior::Open(id) }
+    }
+
+    /// The open tickets of `project` whose title shares most of its words
+    /// with `title` (DEV-562), as `(id, title)`, lowest ID first. Done and
+    /// won't-do tickets don't count. With a finding key, a ticket whose
+    /// finding has another check prefix doesn't count either.
+    pub fn similar_open(storage: &Storage, project: &str, title: &str, finding: Option<&str>, config: &ResolvedConfig) -> Vec<(String, String)> {
+        let words = title_words(title);
+        if words.is_empty() {
+            return Vec::new();
+        }
+        let same_check = |task: &crate::storage::task::Task| {
+            let Some(check) = finding.map(check_prefix) else {
+                return true;
+            };
+            crate::utils::custom_fields::extract_value_strings(&task.custom_fields, FINDING_FIELD)
+                .is_none_or(|values| values.is_empty() || values.iter().any(|value| check_prefix(value.trim()) == check))
+        };
+        let done = crate::services::completion::effective_done_statuses(config);
+        let filter = TaskFilter { project: Some(project.to_string()), ..Default::default() };
+        let mut similar: Vec<(String, String)> = storage
+            .search(&filter)
+            .into_iter()
+            .filter(|(_, task)| !is_wont_do(task.status.as_str()) && !done.contains(&task.status.as_str().to_ascii_lowercase()))
+            .filter(|(_, task)| same_check(task) && similar_words(&words, &title_words(&task.title)))
+            .map(|(id, task)| (id, task.title))
+            .collect();
+        similar.sort_by_key(|(id, _)| TaskId::parse(id).map(|id| id.number).unwrap_or(0));
+        similar
     }
 
     /// Record a repeated report on the open ticket. A report with news (a
@@ -186,6 +223,20 @@ fn already_reported(task: &TaskDTO, text: &str) -> bool {
     last_report == Some(text)
 }
 
+/// The distinct lowercase words of a title, without stop words.
+fn title_words(title: &str) -> std::collections::BTreeSet<String> {
+    title.split(|ch: char| !ch.is_alphanumeric()).map(str::to_lowercase).filter(|word| !word.is_empty() && !STOP_WORDS.contains(&word.as_str())).collect()
+}
+
+/// The check of a `<check>:<subject>` finding key (the whole key without a `:`).
+fn check_prefix(key: &str) -> &str {
+    key.split_once(':').map_or(key, |(check, _)| check)
+}
+
+fn similar_words(a: &std::collections::BTreeSet<String>, b: &std::collections::BTreeSet<String>) -> bool {
+    !a.is_empty() && !b.is_empty() && 2 * a.intersection(b).count() * 100 >= SIMILAR_TITLE_PERCENT * (a.len() + b.len())
+}
+
 fn is_wont_do(status: &str) -> bool {
     let normalized: String = status.chars().filter(|ch| ch.is_alphanumeric()).flat_map(char::to_lowercase).collect();
     WONT_DO_NAMES.contains(&normalized.as_str())
@@ -203,6 +254,16 @@ mod tests {
         for status in ["Done", "Todo", "Blocked", "Won"] {
             assert!(!is_wont_do(status), "{status}");
         }
+    }
+
+    #[test]
+    fn titles_with_mostly_the_same_words_are_similar() {
+        let similar = |a: &str, b: &str| similar_words(&title_words(a), &title_words(b));
+        let locked = "opgate restart while the Mac is locked drops the signing key";
+        assert!(similar(locked, "opgate restart on a locked Mac drops the signing key"));
+        assert!(similar(locked, "Opgate restart while the Mac is locked drops the signing key"));
+        assert!(!similar(locked, "opgate fails to start after an update"));
+        assert!(!similar("the a", "the a"));
     }
 
     #[test]

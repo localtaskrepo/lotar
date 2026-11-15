@@ -1,0 +1,160 @@
+title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
+status: Done
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-15T18:41:21.086962+00:00
+modified: 2026-11-15T19:01:10.620654+00:00
+relationships:
+  related:
+  - DEV-534
+  - DEV-556
+comments:
+- date: 2026-11-15T18:43:59.727748+00:00
+  author: claude
+  text: |-
+    Synced `.tasks/DEV/automation.yml` to the standard (STD-130 and DEV-556 changes).
+
+    - The copy had no repo additions, so it is now a plain copy of `~/Development/standards/configs/lotar/automation.yml`.
+    - Pulled in: the merge-prompt anchor `&merge-prompt`, and the fresh-session merge after a failed review (STD-130).
+    - Commit `fce2a5bd` on `agent/DEV-568`.
+  report:
+    commits:
+    - hash: fce2a5bd
+      what: .tasks/DEV/automation.yml synced to configs/lotar/automation.yml
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: not_run
+      reason: it reads the main checkout, which still has the old copy until the merge
+    - command: diff configs/lotar/automation.yml .tasks/DEV/automation.yml
+      result: passed
+      reason: identical
+    - command: npx prettier --check .tasks/DEV/automation.yml
+      result: passed
+    - command: lotar automation simulate
+      result: not_run
+      reason: the worktree has no tickets to simulate against
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: only a YAML config copy changed, no code
+    next: Review, then merge; the merge agent reruns the drift check against the main checkout
+- date: 2026-11-15T18:47:23.181828+00:00
+  author: claude
+  text: |-
+    Review: passed
+
+    - Read `git diff main..HEAD` (`fce2a5bd`): only `.tasks/DEV/automation.yml` changes, 11 lines in and 6 out, all of it the STD-130 change (`&merge-prompt` anchor; "Review failed: merge without it" now uses `session: fresh`).
+    - `diff ~/Development/standards/configs/lotar/automation.yml .tasks/DEV/automation.yml` is identical, so "Done when" holds. The old copy had no repo additions, so none were lost.
+    - The standard's only commit since the copy is `f9aaa93` (STD-130). `7e3b7c0` (DEV-556) was already in main's copy.
+    - `session: fresh` is supported by lotar 0.15.1 (`docs/help/automation.md`, `docs/help/agent.md`).
+    - Reran: `npx prettier --check .tasks/DEV/automation.yml` passed, `lotar config validate --project DEV` passed. The worktree is clean afterwards.
+    - Not run: `repos.ts` drift check, because it reads the main checkout and only clears after the merge. The merge agent reruns it.
+    - I did not resolve the anchors through a YAML parser: no js-yaml in the repo, and my Ruby one-liner printed nothing. The file is byte-identical to the standard.
+    - No `npm run lint`/`test`/`smoke`, which is fine for a YAML-only config copy. No UI files, so no screenshots needed.
+    - No minor findings, no tickets filed.
+- date: 2026-11-15T19:01:02.009566+00:00
+  author: claude
+  text: |-
+    Merged: `fce2a5bd` is on main (fast-forward, no rebase needed). Not pushed.
+
+    - **Merge:** the branch already sat on main `e20a1ff7`, so the hash is unchanged and there were no conflicts or lockfile changes.
+    - **Trust:** the merge changed `.tasks/DEV/automation.yml`, so I ran `lotar trust`. `lotar trust --status` says Trusted.
+    - **Drift check:** `repos.ts localtaskrepo/lotar` no longer lists `drift:.tasks/DEV/automation.yml`.
+    - **Ticket files not committed:** the pre-commit secret scan refused the `.tasks` amend. It flags the error text "1Password: `Couldn't find key in agent?`" in a comment in `.tasks/DEV/510.yml` (line 329) as a password. That is a false positive, already filed as STD-140. I unstaged the files again; nothing was lost.
+    - **Not pushed:** the main checkout isn't clean (the `.tasks` changes above), and the push rule needs it clean. Main is 4 commits ahead of origin.
+  report:
+    commits:
+    - hash: fce2a5bd
+      what: 'DEV-568 Config copy behind the standard: .tasks/DEV/automation.yml (fast-forwarded onto main)'
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no drift:.tasks/DEV/automation.yml finding
+    - command: lotar config validate --project DEV
+      result: passed
+      reason: in the main checkout
+    - command: lotar trust --status
+      result: passed
+      reason: Trusted
+    - command: npm run lint
+      result: not_run
+      reason: only lotar's own rules file changed, no code; HEAD fce2a5bd unchanged by the merge
+    - command: npm test
+      result: not_run
+      reason: same reason
+    - command: npm run smoke
+      result: not_run
+      reason: same reason
+    next: Push main after the .tasks ticket files are committed (STD-140 blocks that commit)
+description: |-
+  .tasks/DEV/automation.yml: configs/lotar/automation.yml changed since the copy (1 commits: git -C ~/Development/standards log -- configs/lotar/automation.yml)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `drift:.tasks/DEV/automation.yml`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[drift:.tasks/DEV/automation.yml]` while the problem is there.
+
+  ## Done when
+
+  The copy matches its source in ~/Development/standards/configs again (repo additions kept at its end) and the repo's checks pass.
+tags:
+- health
+- light
+custom_fields:
+  finding: drift:.tasks/DEV/automation.yml
+history:
+- at: 2026-11-15T18:41:27.442594+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-15T18:41:34.951533+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T18:43:59.727748+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:44:00.079426+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-534"]}'
+    new: '{"related":["DEV-534","DEV-556"]}'
+- at: 2026-11-15T18:44:04.273237+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-light'
+    new: '@review-light'
+- at: 2026-11-15T18:47:23.181828+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:47:29.079809+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-light'
+    new: '@merge'
+- at: 2026-11-15T19:01:02.009566+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:01:10.620654+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T08:00:22.827013+00:00
+modified: 2026-11-15T08:35:39.307639+00:00
 relationships:
   related:
   - DEV-501
@@ -19,6 +19,9 @@ relationships:
   - DEV-467
   - DEV-513
   - DEV-530
+  - DEV-466
+  - DEV-510
+  - DEV-560
 comments:
 - date: 2026-11-14T06:11:36.177470+00:00
   author: claude
@@ -241,6 +244,21 @@ comments:
     No Fable retry: the agent isn't failing, lotar is.
     - Merge jobs `job-20261115T073146.012Z-62` and `-65` failed on `fatal: Not possible to fast-forward`: the installed lotar 0.15.0 continues the review's thread on its old checkout `7f943de1` instead of the reviewed `66fb3992` (DEV-550; on main, not installed; it ships with DEV-513, Release v0.15.1).
     - The question above (install lotar from main, or merge `66fb3992` yourself) stays open for the owner.
+- date: 2026-11-15T08:31:51.554846+00:00
+  author: mallox
+  text: 'Answer: install (Install lotar from main (with DEV-550), then an agent retries the merge) (answered in INBOX-227)'
+- date: 2026-11-15T08:35:27.218359+00:00
+  author: claude
+  text: |-
+    Install: lotar 0.15.1 is built from main, but I didn't swap it in, because the swap stops every running agent job.
+    - Built `lotar 0.15.1` from main `39d4eae0` (includes DEV-550 `d9c34341`): `/private/tmp/claude-501/-Users-mallox--t3-worktrees-lotar-agent-DEV-520-bbc23e6398f013e2/f8b41751-21d9-473f-b1e8-46cb5fb46c98/scratchpad/lotar-main/target/release/lotar`. v0.15.1 isn't in the Homebrew tap (DEV-513 waits on DEV-560, DEV-510, DEV-466), so `brew upgrade` can't do it.
+    - The 6 launchd servers (`net.pyxzl.lotar.*`) run `serve --exit-on-upgrade`: replacing the binary restarts them, and they stop running agent jobs first. Right now that's 9 jobs: DEV-510, DEV-520 (this one), LOCA-330, LOCA-329, LOCA-316, STD-131, STD-64, G-11.
+    - Swap, when the jobs are done (atomic, so running `lotar` processes keep the old file):
+      `cp /private/tmp/claude-501/-Users-mallox--t3-worktrees-lotar-agent-DEV-520-bbc23e6398f013e2/f8b41751-21d9-473f-b1e8-46cb5fb46c98/scratchpad/lotar-main/target/release/lotar /opt/homebrew/Cellar/lotar/0.15.0/bin/lotar.new && mv -f /opt/homebrew/Cellar/lotar/0.15.0/bin/lotar.new /opt/homebrew/Cellar/lotar/0.15.0/bin/lotar`
+      Check: `lotar --version` says 0.15.1. Back out: `brew reinstall lotar`. The build is in /tmp; after a reboot, rebuild with `npm ci && npm run build` from main.
+    - After the swap, the merge retry (@fix → review → merge) uses `66fb3992` on `agent/DEV-520`.
+
+    **Question:** will you run the swap when the jobs are idle, or should an agent swap it now and stop the 8 other running jobs?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -697,3 +715,38 @@ history:
   - field: relationships
     old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467"]}'
     new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530"]}'
+- at: 2026-11-15T08:31:51.554846+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:31:52.508903+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T08:31:53.150251+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T08:35:27.218359+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:35:27.483603+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530"]}'
+    new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560"]}'
+- at: 2026-11-15T08:35:39.307639+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

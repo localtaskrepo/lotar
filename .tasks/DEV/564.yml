@@ -1,0 +1,222 @@
+title: 'harnessmux: sign local installs with the owner''s Developer ID'
+status: HelpNeeded
+priority: High
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-15T17:40:29.239703+00:00
+modified: 2026-11-15T19:02:41.804926+00:00
+relationships:
+  blocks:
+  - DEV-563
+  related:
+  - standards:STD-138
+  - DEV-563
+  - DEV-510
+comments:
+- date: 2026-11-15T17:58:44.172268+00:00
+  author: claude
+  text: |-
+    Signed install is built and committed in harnessmux; signing with your Developer ID waits for the keychain to let codesign use the key.
+
+    - `cargo xtask install` (harnessmux `3a3cfca`, branch `agent/DEV-564`): builds, stages `.harnessmux.new` in `HARNESSMUX_INSTALL_DIR` (default `~/.cargo/bin`), signs on macOS (`--options runtime --identifier net.pyxzl.harnessmux`), runs `codesign --verify --strict` and `--version`, then renames over the installed one. Same rules as lotar's `npm run install:local` (DEV-563).
+    - `HARNESSMUX_SIGNING_IDENTITY` wins; set but not in the keychain: stops. Default missing: ad-hoc with a warning. Codesign error or no answer in 120 s: stops, installed binary unchanged (checked end to end).
+    - `cargo install --git ... harnessmux` still works (checked); without the package name cargo now asks for one, because of the `xtask` workspace member. README and CHANGELOG say so.
+    - Ad-hoc run checked: `Identifier=net.pyxzl.harnessmux`, `flags=adhoc,runtime`.
+    - Blocker: `codesign --sign "Developer ID Application: Ravi Gairola (3HKD37M482)"` hangs, also outside the sandbox: the keychain asks at the Mac. DEV-563 hit the same and asks you once.
+    - No lotar files changed: the lotar branch `agent/DEV-564` has no commits; the merge lands harnessmux `agent/DEV-564`.
+
+    **Question:** once you've allowed codesign to use the Developer ID key (Always Allow at the Mac, or `security set-key-partition-list` as asked in [DEV-563](https://lotar.pyxzl.net/task/DEV-563)), answer here, and I'll run `cargo xtask install` and check `codesign -dvv ~/.cargo/bin/harnessmux`. Is that done?
+  report:
+    commits:
+    - hash: 3a3cfca
+      what: harnessmux (branch agent/DEV-564, worktree ~/.t3/worktrees/harnessmux/DEV-564) cargo xtask install, README, CHANGELOG Unreleased, release.yml tag check by package name
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo nextest run --workspace --all-features
+      result: passed
+      reason: 49 tests, 7 new in xtask
+    - command: cargo deny check
+      result: passed
+    - command: cargo xtask install (HARNESSMUX_INSTALL_DIR=scratch)
+      result: failed
+      reason: codesign with the Developer ID hangs on the keychain prompt; stops after 120 s, old binary unchanged, as designed
+    - command: codesign -dvv on installed binary shows TeamIdentifier=3HKD37M482
+      result: not_run
+      reason: needs the key allowed at the Mac
+    next: 'mallox allows the key (DEV-563''s question), then: cd ~/.t3/worktrees/harnessmux/DEV-564 && cargo xtask install, check codesign -dvv ~/.cargo/bin/harnessmux, then review'
+- date: 2026-11-15T18:44:40.731184+00:00
+  author: mallox
+  text: 'Answer: done (Allowed, run cargo xtask install now) (answered in INBOX-264)'
+- date: 2026-11-15T18:59:19.361373+00:00
+  author: codex
+  text: |-
+    Review: nothing to review
+
+    - Assigned LoTaR checkout has no commits in `git log main..HEAD` and no diff in `git diff main...HEAD`; main checkout branch is `main`.
+    - Handoff locates implementation commit `3a3cfca` in the separate harnessmux repository. This is not approval of that implementation.
+    - No files, status, or assignee changed; tests not run because the initial review gate found no changes.
+- date: 2026-11-15T19:02:30.708105+00:00
+  author: claude
+  text: |-
+    Merge: nothing to merge in lotar; the harnessmux commit hasn't been reviewed, so I didn't land it.
+
+    - lotar `main..HEAD` is empty. The work is harnessmux `3a3cfca` on `agent/DEV-564` (9 files, +308), already on top of harnessmux `main` (`c12aa25`).
+    - The Codex review looked only at the lotar checkout and found "nothing to review", so no other model has read `3a3cfca`.
+    - Nothing merged, pushed or trusted; no checks run.
+    - lotar's review and merge jobs only look at the lotar worktree, so a ticket whose work lives in another repo slips through.
+
+    **Question:** should harnessmux `agent/DEV-564` (`3a3cfca`) get a review on Codex in `~/.t3/worktrees/harnessmux/DEV-564` before it merges, or should I fast-forward harnessmux `main` to it now?
+  report:
+    checks:
+    - command: lint/test/smoke
+      result: not_run
+      reason: nothing to merge in lotar
+    next: 'Owner: say whether harnessmux 3a3cfca needs a review first or can merge as is'
+description: |-
+  Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
+
+  ## Found
+  - harnessmux (`~/Development/@localtaskrepo/harnessmux`) is installed with `cargo install --git ...` or from GitHub Releases (README "Install"); `target/release/harnessmux` on this Mac is `Signature=adhoc`, `Identifier=harnessmux-1f053a7de3487cfc`. Release binaries aren't Developer ID signed either. No `harnessmux` on PATH on this Mac (2026-11-15).
+  - lotar embeds harnessmux as a library for its runners, so lotar's own signing (DEV-563) covers that path; this ticket is the standalone `harnessmux` CLI.
+  - Identity on this Mac: "Developer ID Application: Ravi Gairola (3HKD37M482)" in the login keychain.
+  - `cargo install` has no post-install step, so a signed install needs its own command. harnessmux is Rust only (no npm), so it is `cargo xtask install` (an `xtask` workspace member, not published), the Rust twin of lotar's `npm run install:local` (DEV-563).
+
+  ## Done when
+  - [ ] harnessmux's documented local install (README: clone, `cargo xtask install`) builds `harnessmux` and signs it on macOS with that Developer ID, identifier `net.pyxzl.harnessmux`, hardened runtime, before it puts it in `HARNESSMUX_INSTALL_DIR` (default `$CARGO_HOME/bin`, i.e. `~/.cargo/bin`, where `cargo install` puts it).
+  - [ ] `HARNESSMUX_SIGNING_IDENTITY` wins over the Developer ID default.
+  - [ ] Default identity missing (another machine, CI): ad-hoc signed (same identifier) with a warning naming the identity and saying macOS will ask for keychain and firewall grants again. An explicitly set identity that is missing: the install stops, nothing replaced. Linux/Windows: copied unsigned, no warning.
+  - [ ] Identity present but codesign (sign or `--verify --strict`) fails, or the staged binary's `--version` fails: the install stops with the error and leaves the installed binary as it was (the new one is staged next to it and renamed over it only after all checks pass).
+  - [ ] `cargo install --git https://github.com/localtaskrepo/harnessmux harnessmux` and `cargo install harnessmux` still work (unsigned, as today); README says so.
+  - [ ] `codesign -dvv` on the installed binary shows `Identifier=net.pyxzl.harnessmux`, `TeamIdentifier=3HKD37M482`; checked again after the next version's fresh build.
+history:
+- at: 2026-11-15T17:40:29.643701+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T17:40:30.152915+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T17:43:16.024801+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
+
+      ## Found
+      - harnessmux (`~/Development/@localtaskrepo/harnessmux`) is installed with `cargo install --git ...` or from GitHub Releases (README "Install"); `target/release/harnessmux` on this Mac is `Signature=adhoc`, `Identifier=harnessmux-1f053a7de3487cfc`. Release binaries aren't Developer ID signed either.
+      - lotar embeds harnessmux as a library for its runners, so lotar's own signing (sibling DEV ticket) covers that path; this ticket is the standalone `harnessmux` CLI.
+      - Identity on this Mac: "Developer ID Application: Ravi Gairola (3HKD37M482)" in the login keychain.
+
+      ## Done when
+      - [ ] harnessmux's documented local install (README) signs the installed `harnessmux` with that Developer ID, identifier `net.pyxzl.harnessmux`, hardened runtime.
+      - [ ] A signing identity set for the install (e.g. `HARNESSMUX_SIGNING_IDENTITY`) wins over the Developer ID default.
+      - [ ] Identity missing (another machine, CI, Linux/Windows): ad-hoc or unsigned as today, with a warning on macOS naming the identity.
+      - [ ] Identity present but codesign fails: the install stops with codesign's error and leaves the installed binary as it was.
+      - [ ] `codesign -dvv` on the installed binary shows `Identifier=net.pyxzl.harnessmux`, `TeamIdentifier=3HKD37M482`; checked again after the next version's fresh build.
+    new: |-
+      Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
+
+      ## Found
+      - harnessmux (`~/Development/@localtaskrepo/harnessmux`) is installed with `cargo install --git ...` or from GitHub Releases (README "Install"); `target/release/harnessmux` on this Mac is `Signature=adhoc`, `Identifier=harnessmux-1f053a7de3487cfc`. Release binaries aren't Developer ID signed either. No `harnessmux` on PATH on this Mac (2026-11-15).
+      - lotar embeds harnessmux as a library for its runners, so lotar's own signing (DEV-563) covers that path; this ticket is the standalone `harnessmux` CLI.
+      - Identity on this Mac: "Developer ID Application: Ravi Gairola (3HKD37M482)" in the login keychain.
+      - `cargo install` has no post-install step, so a signed install needs its own command. harnessmux is Rust only (no npm), so it is `cargo xtask install` (an `xtask` workspace member, not published), the Rust twin of lotar's `npm run install:local` (DEV-563).
+
+      ## Done when
+      - [ ] harnessmux's documented local install (README: clone, `cargo xtask install`) builds `harnessmux` and signs it on macOS with that Developer ID, identifier `net.pyxzl.harnessmux`, hardened runtime, before it puts it in `HARNESSMUX_INSTALL_DIR` (default `$CARGO_HOME/bin`, i.e. `~/.cargo/bin`, where `cargo install` puts it).
+      - [ ] `HARNESSMUX_SIGNING_IDENTITY` wins over the Developer ID default.
+      - [ ] Default identity missing (another machine, CI): ad-hoc signed (same identifier) with a warning naming the identity and saying macOS will ask for keychain and firewall grants again. An explicitly set identity that is missing: the install stops, nothing replaced. Linux/Windows: copied unsigned, no warning.
+      - [ ] Identity present but codesign (sign or `--verify --strict`) fails, or the staged binary's `--version` fails: the install stops with the error and leaves the installed binary as it was (the new one is staged next to it and renamed over it only after all checks pass).
+      - [ ] `cargo install --git https://github.com/localtaskrepo/harnessmux harnessmux` and `cargo install harnessmux` still work (unsigned, as today); README says so.
+      - [ ] `codesign -dvv` on the installed binary shows `Identifier=net.pyxzl.harnessmux`, `TeamIdentifier=3HKD37M482`; checked again after the next version's fresh build.
+- at: 2026-11-15T17:43:16.310692+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-138"]}'
+    new: '{"related":["standards:STD-138","DEV-563"]}'
+- at: 2026-11-15T17:44:22.522983+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-138","DEV-563"]}'
+    new: '{"related":["standards:STD-138","DEV-563","DEV-510"]}'
+- at: 2026-11-15T17:58:44.172268+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:58:58.515414+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T18:02:06.160856+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-138","DEV-563","DEV-510"]}'
+    new: '{"blocks":["DEV-563"],"related":["standards:STD-138","DEV-563","DEV-510"]}'
+- at: 2026-11-15T18:44:40.731184+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:44:41.358802+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T18:47:39.475373+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T18:49:00.155393+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T18:59:19.361373+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:59:23.175968+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T19:02:30.708105+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:02:41.804926+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

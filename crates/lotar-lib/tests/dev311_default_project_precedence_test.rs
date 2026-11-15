@@ -52,14 +52,15 @@ fn configured_default_beats_the_nearest_package_json() {
     let tmp = workspace();
     let root = tmp.path();
 
-    for dir in [root.to_path_buf(), root.join("site")] {
+    // Distinct titles, so the second add has no similar open ticket (DEV-562).
+    for (dir, title) in [(root.to_path_buf(), "Plain title"), (root.join("site"), "Another ticket")] {
         let out = lotar(&dir, &["add", "Plain title", "--dry-run", "--explain"]);
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert!(out.status.success(), "{stdout}");
         assert!(stdout.contains("in project G "), "{stdout}");
         assert!(stdout.contains("project G from default.project"), "{stdout}");
 
-        let out = lotar(&dir, &["add", "Plain title"]);
+        let out = lotar(&dir, &["add", title]);
         assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
         assert!(out.stderr.is_empty(), "{}", String::from_utf8_lossy(&out.stderr));
     }

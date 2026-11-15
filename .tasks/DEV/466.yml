@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-15T08:18:04.516096+00:00
+modified: 2026-11-15T18:44:53.642605+00:00
 relationships:
   blocks:
   - DEV-513
@@ -26,6 +26,9 @@ relationships:
   - DEV-518
   - DEV-550
   - DEV-560
+  - DEV-520
+  - DEV-567
+  - DEV-569
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -393,6 +396,99 @@ comments:
     - Worktree for review and merge: `/Users/mallox/.t3/worktrees/lotar/t3-339b5809-16d3324c541980e4` (clean, `f10b8197` is the only commit beyond `main`).
     - Every retry that starts in `t3/task-panel-git-timeout-review` (`896309c0`) fails the same way until [DEV-550](https://lotar.pyxzl.net/task/DEV-550) lands.
     - I didn't reset the obsolete branch to `f10b8197`: another thread's worktree has it checked out.
+- date: 2026-11-15T17:37:26.833936+00:00
+  author: claude
+  text: 'Chief of staff, 2026-11-15 09:40 PST: not retried. Its merge failed on a stale review branch (DEV-550), which installed lotar 0.15.0 still has; review and merge wait for the 0.15.1 swap.'
+- date: 2026-11-15T17:40:06.864524+00:00
+  author: codex
+  text: 'Review: blocking — agent/DEV-466 and this checkout hold e40e7eef, the original implementation. src/services/audit_service.rs:20-56 still reads git cat-file without a deadline; src/utils/git.rs:79-97 stops the deadline before joining inherited output pipes. Both previously reported blockers remain. Completed rework f10b8197 is preserved on t3/review-dev-466-git-timeouts and t3/task-panel-git-timeout-6/-7/-8. Restore completed rework to the ticket branch before fresh review. No source changes, merge or push; full tests and screenshot review not run because these established blockers remain.'
+- date: 2026-11-15T17:40:15.402517+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-15T17:45:44.514987+00:00
+  author: triage
+  text: |-
+    ## Triage: no owner question is open, the 17:40 one is already answered
+
+    - **Not a review of the fix:** the 17:40 blocking review read `e40e7eef` (branch `agent/DEV-466`), the first implementation. Both findings it names (`cat-file` deadline, inherited-pipe join) are fixed in `f10b8197`, which it says itself is on `t3/review-dev-466-git-timeouts`.
+    - **Owner, 2026-11-15 05:30** (answered in INBOX-181): retry with @fix. Done: rebased as `f10b8197`, checks pass (06:31 comment).
+    - **Owner, 2026-11-13** (INBOX-29): more rework rounds are fine, so no new decision is needed.
+
+    **Next:** do not rework, do not set WontDo. Review `f10b8197` on `t3/review-dev-466-git-timeouts` (worktree `/Users/mallox/.t3/worktrees/lotar/t3-339b5809-16d3324c541980e4`), then merge. Routing to stale branches is DEV-550; 0.15.1 fixes it. If a review of `f10b8197` blocks, ask him then (INBOX-29).
+- date: 2026-11-15T18:07:05.498706+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261115T180530.899Z-6 failed again (lotar agent logs job-20261115T180530.899Z-6). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-15T18:37:27.206809+00:00
+  author: claude
+  text: |-
+    Rework now on `agent/DEV-466`: `23e9cd75` = `f10b8197` on current main; the old `e40e7eef` is no longer on it.
+
+    - Owner OK in this thread (2026-11-15): "Yes, rebind" — reset this job's branch `t3/review-dev-466-git-timeout-1` to main, cherry-picked `f10b8197`, `git branch -f agent/DEV-466` to it.
+    - `git range-diff`: patch identical to `f10b8197`; clean cherry-pick, signed.
+    - `e40e7eef` stays on `t3/task-panel-git-timeout` and `-9`, nothing lost.
+    - Lockfile changed vs. old base: ran `npm ci` first.
+  report:
+    commits:
+    - hash: 23e9cd75
+      what: f10b8197 cherry-picked onto main e20a1ff7 (range-diff identical)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2212 Rust, 1548 UI, release + hooks
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 404 tests
+    - command: screenshots
+      result: not_run
+      reason: unchanged patch, review job does ui-review
+    next: Review 23e9cd75 on agent/DEV-466, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -1336,3 +1432,84 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560"]}'
+- at: 2026-11-15T08:35:27.480554+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520"]}'
+- at: 2026-11-15T17:37:26.833936+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:40:06.864524+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:40:09.989108+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried, fix-retried, ui, automation-limit-reached
+    new: health, review-returned, merge-retried, fix-retried, ui, automation-limit-reached, review-blocked
+- at: 2026-11-15T17:40:15.326395+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, merge-retried, fix-retried, ui, automation-limit-reached, review-blocked
+    new: health, review-returned, merge-retried, fix-retried, ui, automation-limit-reached
+- at: 2026-11-15T17:40:15.402517+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:45:44.514987+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T17:45:45.102174+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T18:05:31.150323+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T18:07:05.413981+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T18:07:05.498706+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:37:27.206809+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:38:44.370874+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567"]}'
+- at: 2026-11-15T18:44:53.642605+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569"]}'

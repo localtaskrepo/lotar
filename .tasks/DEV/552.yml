@@ -1,14 +1,16 @@
 title: Publish the new lotar-core crate once and register its crates.io trusted publisher
-status: HelpNeeded
+status: Done
 priority: High
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-15T01:14:44.263310+00:00
-modified: 2026-11-15T08:17:37.140398+00:00
+modified: 2026-11-15T08:21:19.459169+00:00
 relationships:
   depends_on:
   - DEV-499
+  related:
+  - DEV-504
 comments:
 - date: 2026-11-15T01:43:30.114688+00:00
   author: mallox
@@ -62,6 +64,12 @@ comments:
 - date: 2026-11-15T08:17:37.140398+00:00
   author: claude
   text: 'mallox by voice to the chief of staff, 2026-11-15: "Don''t tell me to revoke the crates.io token afterwards. I''m keeping it in 1Password for future uses like new crates, and I''ll grant access when it''s needed." Step 3 (revoke the token) is dropped; after the publish, only step 2 (trusted publisher) is his.'
+- date: 2026-11-15T08:19:11.635382+00:00
+  author: claude
+  text: 'Step 1 done (2026-11-15): published lotar-core 0.15.0 to crates.io with cargo publish -p lotar-core from commit 63aa6193, the token read through opgate (op://Agents/Lotar Crates.io Publish Token/credential, the field DEV-504 used, from opgate''s audit log). https://crates.io/crates/lotar-core (API: created 2026-11-15T08:18:59Z, max_version 0.15.0). Question for mallox: please add the trusted publisher on https://crates.io/crates/lotar-core/settings (owner localtaskrepo, repository lotar, workflow release.yml, environment release, trusted publishing only) and revoke the token, then set this Done?'
+- date: 2026-11-15T08:21:19.193070+00:00
+  author: claude
+  text: 'mallox by voice to the chief of staff, 2026-11-15: "I just added the trusted publisher for lotar-core on crates.io. Please note it on DEV-552 and close that out." Checked: crates.io lists lotar-core 0.15.0. Step 2 done by the owner; the token stays in 1Password.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A190b521c-1fa9-4494-bf7a-03c8a002c3bb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa23593af-df4c-4835-a23e-51de6bcd36e0
@@ -220,3 +228,23 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-15T08:19:11.635382+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:19:11.872150+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-499"]}'
+    new: '{"depends_on":["DEV-499"],"related":["DEV-504"]}'
+- at: 2026-11-15T08:21:19.193070+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:21:19.459169+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done

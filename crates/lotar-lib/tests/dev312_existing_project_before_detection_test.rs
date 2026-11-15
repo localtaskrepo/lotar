@@ -65,7 +65,8 @@ fn assert_adds_go_to_fnd(root: &Path, source: &str) {
     let out = lotar(root, &["add", "x", "--dry-run", "--explain"]);
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains(&format!("project FND from {source}")), "{stdout}");
-    for dir in [root.to_path_buf(), root.join("infra")] {
+    // Distinct titles, so the second add has no similar open ticket (DEV-562).
+    for (dir, title) in [(root.to_path_buf(), "Plain title"), (root.join("infra"), "Another ticket")] {
         let out = lotar(&dir, &["add", "Plain title", "--dry-run"]);
         let stdout = String::from_utf8_lossy(&out.stdout);
         let stderr = String::from_utf8_lossy(&out.stderr);
@@ -73,7 +74,7 @@ fn assert_adds_go_to_fnd(root: &Path, source: &str) {
         assert!(stdout.contains("in project FND "), "{stdout}");
         assert!(stderr.is_empty(), "{stderr}");
 
-        let out = lotar(&dir, &["add", "Plain title"]);
+        let out = lotar(&dir, &["add", title]);
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(out.status.success(), "{stderr}");
         assert!(stderr.is_empty(), "{stderr}");

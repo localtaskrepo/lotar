@@ -1,0 +1,71 @@
+title: 'Done with an open step no ticket tracks: DEV-279'
+status: WontDo
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-15T18:41:51.800241+00:00
+modified: 2026-11-15T18:46:14.749181+00:00
+relationships:
+  related:
+  - DEV-539
+  - DEV-279
+comments:
+- date: 2026-11-15T18:46:03.717511+00:00
+  author: claude
+  text: |-
+    WontDo: the open step was dropped on purpose and needs nothing more; no file change.
+
+    - DEV-279 dropped shipping `lotar-agent-wrapper` in release archives: the active-job records (`src/services/agent_active_jobs.rs`) replace it for list-running, status, cross-process cancel and the guards.
+    - DEV-539 already concluded the same (fixed `docs/help/install.md` in `41449409`) but ended Done, not WontDo, so `repos.ts` filed the finding again (it skips only a WontDo finding ticket).
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` still lists `[untracked:DEV-279]` now; it clears once this ticket is WontDo.
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: not_run
+      reason: lists untracked:DEV-279 until this ticket is WontDo
+description: |-
+  DEV-279 (Agent jobs across processes: detection, cancel/status, orphaned MCP jobs, queue drops, Windows cancel) is Done, but a comment names a step still open and no open ticket is linked: "Not done: shipping the wrapper in release archives (no longer needed for these features)." (lotar show DEV-279)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-279`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-279]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-279
+history:
+- at: 2026-11-15T18:42:04.222034+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-539"]}'
+    new: '{"related":["DEV-539","DEV-279"]}'
+- at: 2026-11-15T18:42:09.212318+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T18:44:38.894353+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T18:46:03.717511+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T18:46:14.749181+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+  - field: assignee
+    old: '@fix'
