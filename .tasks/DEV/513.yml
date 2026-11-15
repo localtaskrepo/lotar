@@ -1,11 +1,11 @@
 title: Release v0.15.1
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-15T22:30:28.389137+00:00
+modified: 2026-11-15T22:57:50.475995+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -188,6 +188,9 @@ comments:
 - date: 2026-11-15T22:30:28.389137+00:00
   author: claude
   text: 'Chief of staff, 2026-11-15: owner said ''please publish lotar if we still haven''t kicked that off'' — it''s published (22:11 UTC). Install: wait until no job runs, as recommended. Note: the installed 0.15.1 is the local build from 39d4eae0 in /opt/homebrew/Cellar/lotar/0.15.1 (manual opt/bin symlinks, firewall allow by hand); brew upgrade has to replace that keg, and the notarized release binary may need the firewall allow once more.'
+- date: 2026-11-15T22:57:50.186407+00:00
+  author: claude
+  text: 'Chief of staff, 2026-11-15 14:56 PST, owner''s choice ''Install now'': brew upgrade lotar installed the published 0.15.1 (signed net.pyxzl.lotar, team 3HKD37M482), replacing the local build (kept in the chief of staff''s scratchpad); the six servers restarted and answer; the running jobs'' worker processes kept going. Released and installed: done.'
 releases:
 - 6
 description: |-
@@ -457,3 +460,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-15T22:57:50.186407+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:57:50.475995+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done

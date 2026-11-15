@@ -1,11 +1,11 @@
 title: Full smoke run fails 12 browser tests and leaves three temporary entries
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T21:29:20.908261+00:00
-modified: 2026-11-15T22:34:27.146263+00:00
+modified: 2026-11-15T22:57:43.348900+00:00
 relationships:
   related:
   - DEV-132
@@ -19,6 +19,8 @@ relationships:
   - DEV-530
   - DEV-520
   - DEV-587
+  - DEV-581
+  - DEV-590
 comments:
 - date: 2026-11-15T21:57:35.665149+00:00
   author: claude
@@ -73,6 +75,34 @@ comments:
       result: not_run
       reason: fix-agent pass reviewed; no source edits
     next: Merge reviewed commit 1a046e9a
+- date: 2026-11-15T22:57:27.962072+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `dd2d857b` on `main` and `origin/main`.
+
+    - Rebased `1a046e9a` twice: main moved to `51fee8d1` (DEV-520), then `e5762570` (DEV-581) while checks ran. No conflicts, no lockfile change, so no `npm ci`.
+    - Hash changed, so all checks reran in the worktree: `npm run lint:agent` passed; smoke (the ticket's check) passed **405/405**, no `Tests left` entries.
+    - `npm run test:agent`: UI, release and hook tests passed; Rust 2227/2228. The one failure, `dev510_t3_session_test::a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads`, is a 60 s hang on main itself (3/3 runs here). This commit only changes `smoke/`. DEV-520's 22:19 comment diagnosed it (harnessmux reuses seqs after a takeover), with the fix `cdd2141c` waiting on that ticket and the harnessmux bug in DEV-590. I merged past it, as the DEV-520 merge did with unrelated failures.
+    - `merge --ff-only` worked; the main checkout's pending `.tasks` changes were amended in (owner 2026-11-12).
+    - No rules, profiles or config changed: no `lotar trust`.
+    - Merged from T3 branch `t3/fix-smoke-browser-failures-temp-cleanup`; `agent/DEV-586` still points at `1a046e9a`, same patch.
+  report:
+    commits:
+    - hash: dd2d857b
+      what: smoke run lock and cleanup after failed tests (rebased 1a046e9a, plus pending .tasks)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: failed
+      reason: 2227/2228 Rust; only dev510 takeover test hangs, main's known bug (DEV-520 fix cdd2141c pending, DEV-590); UI, release, hooks passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405, nothing left
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    next: 'None: merged and pushed'
 description: |-
   Found 2026-11-15 during DEV-580 merge verification on 175e36d0 (main base f37cbaa0). Approved unsandboxed npm run test:smoke:agent built successfully, then failed 12/404 tests (392 passed, 191.04s). No merge performed. The DEV-466 agent independently passed 404/404 on its different source tree; load is a hypothesis, not a proven cause.
 
@@ -162,3 +192,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T22:57:27.962072+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:57:28.998829+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520","DEV-587"]}'
+    new: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520","DEV-587","DEV-581","DEV-590"]}'
+- at: 2026-11-15T22:57:43.348900+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

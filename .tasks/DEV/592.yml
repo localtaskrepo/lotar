@@ -1,14 +1,43 @@
 title: After a server restart, a non-empty agent queue stays idle until a new job is enqueued
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-15T22:46:22.695977+00:00
+modified: 2026-11-15T22:58:57.510598+00:00
 relationships:
   related:
   - DEV-524
+comments:
+- date: 2026-11-15T22:58:47.097053+00:00
+  author: claude
+  text: |-
+    Fixed: `lotar serve` now starts the queue worker at startup when entries wait; `lotar agent queue` tells stopped from waiting; new `lotar agent queue resume`.
+
+    - Cause: the worker is a detached process that exits only on an empty queue; a killed worker (launch agent restart) left the queue file, and only an enqueue spawned a new one.
+    - `AgentQueueService::resume` (`agent_queue_service.rs`) runs in `serve_handler.rs` right after orphan recovery; a failure prints a warning and the server serves anyway.
+    - `lotar agent queue`: `Worker: active|stopped|idle`, plus a `Queue:` line saying why entries wait (free slot under `max_parallel_jobs`, ticket's running job, or no worker → run `resume`). JSON adds `worker_state` and `reason`; existing fields unchanged.
+    - Prerequisite waits leave the queue (DEV-524), so they aren't a queue state; written into "Done when".
+    - Tests: `tests/dev592_queue_resumes_after_restart_test.rs` (serve over a queued entry, resume, stopped state). The serve test fails with the hook removed.
+    - Not done: no periodic watchdog while the server runs; a worker killed while serve keeps running still needs `resume` or an enqueue.
+    - Docs: `docs/help/agent.md`.
+  report:
+    commits:
+    - hash: 192801fb
+      what: serve starts the worker over a non-empty queue; agent queue states; agent queue resume
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: one flaky failure under load (dev510 a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads, 60 s), passes alone in 8 s; UI, release, hooks passed
+    - command: npm run smoke
+      result: passed
+    - command: cargo nextest --workspace -E test(dev592)
+      result: passed
+      reason: fails with the serve hook removed
+    next: Review, then merge
 description: |-
   After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
 
@@ -94,3 +123,16 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-524"]}'
+- at: 2026-11-15T22:58:47.097053+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:58:57.510598+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

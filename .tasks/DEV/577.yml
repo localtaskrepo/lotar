@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-15T22:05:55.635181+00:00
+modified: 2026-11-15T22:56:42.931235+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -117,6 +117,14 @@ comments:
     - Job `job-20261115T215050.429Z-20`: `git branch --force agent/STD-157 4fa520f` refused, because `agent/STD-157` is checked out in `agent-STD-157-cfe2c61…`. Main is `c735c26`, which is `4fa520f` plus the `.tasks` amend.
     - `commit_landed` still counts the amended merge as landed: `git cherry c735c26 4fa520f` prints `+` (the patch ids differ), but `git merge-tree --write-tree c735c26 4fa520f` gives `3663be9`, the same tree as `c735c26`, so `merge_adds_nothing` is true.
     - Suggestion: have the regression test also amend a file outside the change (`.tasks`) into the landed commit, the way the merge agent does (owner 2026-11-12).
+- date: 2026-11-15T22:56:42.931235+00:00
+  author: claude
+  text: |-
+    Another case in standards (STD-134): the merge landed and pushed, then the job was marked failed when lotar tried to move the branch.
+
+    - Job `job-20261115T225022.157Z-18`: `git branch --force agent/STD-134 7495f99` refused; `agent/STD-134` is checked out in `~/.t3/worktrees/standards/agent-STD-134-d5f567f950decc57`
+    - `128c3a4` is on `origin/main`; `repos.ts --live` is clean
+    - STD-134 is back in Merging, assigned to `@fix`, with a fix job queued for work that is already on main
 description: |-
   Found: job job-20261115T191640.133Z-8 (standards STD-136) rebased, fast-forwarded main to d0deac4 and pushed, then failed: `git branch --force agent/STD-136 18b8e9c` refused, 'cannot force update the branch used by worktree at .../agent-STD-136-...'. The ticket went back to Merging, assigned to @fix, and a fix agent was started for work already on main.
   Check: run a merge job in a T3 thread whose ticket branch is checked out in a lotar worktree; the job ends failed after the merge.
@@ -266,6 +274,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-15T22:05:55.635181+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:56:42.931235+00:00
   actor: claude
   changes:
   - field: comment_added

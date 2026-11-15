@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T22:18:55.853773+00:00
-modified: 2026-11-15T22:44:47.242766+00:00
+modified: 2026-11-15T22:57:28.999374+00:00
 relationships:
   related:
   - DEV-520
   - DEV-588
+  - DEV-586
 comments:
 - date: 2026-11-15T22:37:25.311652+00:00
   author: claude
@@ -101,3 +102,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T22:57:28.999374+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-588"]}'
+    new: '{"related":["DEV-520","DEV-588","DEV-586"]}'
