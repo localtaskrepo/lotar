@@ -1,12 +1,14 @@
 title: 'Flaky test: concurrent_comments_and_references_preserve_all_writes hits the 2 s storage lock wait under load'
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T21:39:19.080638+00:00
-modified: 2026-11-15T23:22:13.169739+00:00
+modified: 2026-11-15T23:29:42.398242+00:00
 relationships:
+  depends_on:
+  - DEV-520
   related:
   - DEV-520
   - DEV-513
@@ -85,6 +87,20 @@ comments:
       result: passed
       reason: elevated retry after localhost EPERM
     next: Resolve known takeover failure, then retry merge gates
+- date: 2026-11-15T23:29:41.403928+00:00
+  author: triage
+  text: |-
+    Retry the merge once DEV-520 is done; no decision needed from the owner.
+
+    - The merge failed only on the known takeover test `dev510 ..._fails_when_t3_cant_list_its_threads`, not on this ticket's change.
+    - Its fix `cdd2141c` is in DEV-520, which the owner sent to @fix (INBOX-302, "Retry with @fix").
+    - DEV-520 is now this ticket's prerequisite; this ticket continues when it is done ("Prerequisites done").
+- date: 2026-11-15T23:29:42.150524+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-520.'
+- date: 2026-11-15T23:29:42.398242+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-588 yet. DEV-588 waits for DEV-520.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b47411f-c7b8-4f19-ae40-3aaccb34473a
 description: 'Found by claude in the DEV-520 merge, 2026-11-15: `npm run test:agent` failed once at load average ~100 with `concurrent comment: IoError(WouldBlock) Storage lock .../.task.lock is still busy after 2 seconds` (`crates/lotar-lib/tests/dev60_shared_mutation_test.rs:434`); six threads write one ticket and the lock wait is `DEFAULT_STORAGE_LOCK_WAIT` = 2 s (`crates/lotar-core/src/storage/safety.rs:68`). Check: the test passes repeatedly under full-suite load. Done: the test can''t time out on a busy machine (for example a longer lock wait in the test, or fewer writers holding the lock at once) and still checks that no write is lost.'
@@ -166,3 +182,33 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T23:29:40.194598+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-513","DEV-590"]}'
+    new: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590"]}'
+- at: 2026-11-15T23:29:40.959054+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-15T23:29:41.403928+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:29:41.932867+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T23:29:42.150524+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:29:42.398242+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: A retried or resumed T3 job opens in a new t3/<name> worktree, not on the ticket's agent/<ID> branch
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-15T20:15:01.954526+00:00
-modified: 2026-11-15T23:22:22.952626+00:00
+modified: 2026-11-15T23:48:40.482413+00:00
 relationships:
   blocks:
   - DEV-582
@@ -17,6 +17,7 @@ relationships:
   - DEV-510
   - DEV-582
   - DEV-566
+  - DEV-596
 comments:
 - date: 2026-11-15T20:48:30.575159+00:00
   author: automation
@@ -85,6 +86,34 @@ comments:
 - date: 2026-11-15T23:04:51.232247+00:00
   author: mallox
   text: 'Answer: extend (Extend T3/harnessmux to bind the existing checkout) (answered in INBOX-307)'
+- date: 2026-11-15T23:27:32.181248+00:00
+  author: claude
+  text: |-
+    Binding the existing checkout ("extend", INBOX-307) can't be built from our side: T3 Code's CLI has no flag for it, and T3 Code doesn't take feature PRs.
+
+    - T3's server can do it: `t3_thread_launch` takes `workspaceStrategy: {type: existing_worktree, worktreePath}`.
+    - But `t3 thread start` (v0.1.9 and upstream `main` today) maps only `--worktree <base> [--branch]` to a *new* worktree (`launchWorkspaceStrategy` in `apps/server/src/cli/thread.ts`). harnessmux talks to T3 only through that CLI.
+    - Calling `/mcp` directly from harnessmux would mean copying T3's internal auth (the CLI mints a session token through the server's `EnvironmentAuth`). Not a sound route.
+    - pingdotgg/t3code `CONTRIBUTING.md`: "We are explicitly NOT INTERESTED in new feature addition PRs" (auto-closed). No issue asks for this yet.
+    - Already on `agent/DEV-583` (`eba9fc33`, checks passed): the prompt names the branch the thread really runs on and every earlier worktree of the ticket that has uncommitted changes. That is the ticket's second "Done" option.
+
+    Question: how should a retry get the failed job's work?
+    1. **Prompt fix only**: review and merge `eba9fc33` as it is; the agent reads the old worktree.
+    2. **Prompt fix + LoTaR carries it over**: before a retry starts, LoTaR commits the failed job's leftover changes on `agent/<ID>` ("changes from the failed <profile> job"), so the new thread starts with them.
+    3. **Prompt fix + upstream issue**: I draft an issue asking T3 Code to add `t3 thread start --checkout <path>`, show you the draft, then file it and bind the checkout once T3 ships the flag.
+  report:
+    commits:
+    - hash: eba9fc33
+      what: T3 prompt names the thread's real branch and the earlier jobs' uncommitted worktrees
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 404/404
+    next: Owner picks how to carry a failed job's work into its retry
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73be9000-8591-47a5-9ab1-9e4b62fa8267
 description: 'Found 2026-11-15 in standards: a fix job that is retried on another agent or resumed after its prerequisite ("Prerequisites done", "Retry with @fix-codex", "Retry with @fix-fable") starts a new T3 thread in a fresh worktree on a generated branch (`t3/gitleaks-allow-1password-backticks`, `t3/fix-gitleaks-1password-backtick-allowlist`), while its prompt says "You are working in a git worktree on branch `agent/STD-144` ... Don''t switch branches". The first job''s uncommitted work stays in `~/.t3/worktrees/standards/agent-STD-144-…`, out of reach. Seen on STD-144 (jobs `job-20261115T192529.587Z-12` and the 20:12Z retry), STD-140 (`job-20261115T192519.646Z-11`) and STD-149 (the review ran on `t3/std-149-dedupe-finding-tickets` at the rejected commit while the rework was on `agent/STD-149`). Two codex jobs handed back for this alone, and standards has about 30 leftover `t3/` worktrees. Related: DEV-581, DEV-577, DEV-530. Check: retry a failed T3 fix job with another agent; `git branch --show-current` in the new thread prints `agent/<ID>` and `git status` shows the first job''s changes. Done: a retried or resumed T3 job runs in the ticket''s existing `agent/<ID>` worktree (or the prompt names the branch the thread really has and where the earlier work is).'
@@ -196,3 +225,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73be9000-8591-47a5-9ab1-9e4b62fa8267
+- at: 2026-11-15T23:27:32.181248+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:27:41.212732+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T23:48:40.482413+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'
+    new: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596"]}'

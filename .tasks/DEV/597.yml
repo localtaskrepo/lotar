@@ -1,0 +1,29 @@
+title: 'Flaky smoke: global task actions on desktop still time out under full-suite load, now waiting for the Create task panel to close'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T23:57:31.115443+00:00
+modified: 2026-11-15T23:57:31.550468+00:00
+relationships:
+  related:
+  - DEV-580
+  - DEV-587
+description: 'Found 2026-11-15 in the DEV-580 merge on 4c2ae054''s base: one full npm run test:smoke:agent failed 1 of 405, tests/ui.global-actions.smoke.spec.ts > ''keeps actions usable and creates in the known project on desktop'', TimeoutError at line 121, panel.waitFor({ state: ''detached'' }) after clicking Create (30 s; the ''Create task'' dialog stayed visible). DEV-587 (Done) fixed the earlier poll at lines 114-116; this is the next wait in the same test. The file alone passed 3 of 3 and a second full run passed 405 of 405. Check: run the full smoke suite a few times (npm run test:smoke:quick:agent after one build). Done: the test passes under full-suite load in 5 full runs in a row.'
+tags:
+- health
+custom_fields:
+  finding: smoke:ui.global-actions-create-detach
+history:
+- at: 2026-11-15T23:57:31.331593+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-580","DEV-587"]}'
+- at: 2026-11-15T23:57:31.550468+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,0 +1,42 @@
+title: 'Every job on LOCA-317 fails: T3 worktree add path_already_exists (stale agent-LOCA-317 worktree)'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: triage
+assignee: '@fix'
+created: 2026-11-15T23:48:39.768341+00:00
+modified: 2026-11-15T23:48:49.102632+00:00
+relationships:
+  related:
+  - DEV-583
+  - DEV-595
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49ceb12b-687e-4f8a-a475-6b5b32ba3259
+description: 'Found: merge, fix and fix-codex jobs on LOCA-317 (job-20261115T234212.302Z-586, -587, -588) all end with ''git worktree add failed (path_already_exists)'' in /Users/mallox/Development/local. A detached worktree ~/.t3/worktrees/local/agent-LOCA-317-2aa6ebb394abb948 (86751f0) exists, and branch agent/LOCA-317 does not; the work is on t3/opgate-license-readme-security-ci-2 (0a44163). Related: DEV-583, DEV-595. Check: lotar agent job on LOCA-317 starts a thread. Done: a job on LOCA-317 gets a worktree on agent/LOCA-317 holding 0a44163.'
+tags:
+- health
+custom_fields:
+  finding: infra:worktree-exists:LOCA-317
+history:
+- at: 2026-11-15T23:48:40.485777+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-583","DEV-595"]}'
+- at: 2026-11-15T23:48:41.041641+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T23:48:42.437622+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T23:48:49.102632+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49ceb12b-687e-4f8a-a475-6b5b32ba3259

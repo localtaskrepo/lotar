@@ -1,11 +1,16 @@
 title: Job end fails when the ticket branch is checked out in LoTaR's own agent worktree
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T23:22:25.966473+00:00
-modified: 2026-11-15T23:22:26.373919+00:00
+modified: 2026-11-15T23:51:10.919222+00:00
+relationships:
+  related:
+  - DEV-596
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97078b6d-c4b7-4950-a60f-90436c562edc
 description: 'Found: MGP-13 job job-20261115T212717.075Z-1 (mailgpg) failed at the end: `git branch --force agent/MGP-13 607bcc8` -> ''cannot force update the branch used by worktree at ~/.t3/worktrees/mailgpg/agent-MGP-13-93bc836e8df965ff''. The ticket went back to HelpNeeded although the work was done. Check: a T3 job whose thread branch differs from agent/<ID> while agent/<ID> is checked out in its agent worktree. Done: LoTaR moves the branch in that worktree (reset when clean, or detach first) instead of failing the job.'
 tags:
 - health
@@ -17,3 +22,20 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T23:48:40.484930+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-596"]}'
+- at: 2026-11-15T23:51:09.902879+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T23:51:10.919222+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97078b6d-c4b7-4950-a60f-90436c562edc

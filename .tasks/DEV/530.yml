@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T23:12:52.062465+00:00
+modified: 2026-11-15T23:38:44.334349+00:00
 relationships:
   related:
   - DEV-351
@@ -512,6 +512,32 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-316)
+- date: 2026-11-15T23:38:37.124942+00:00
+  author: claude
+  text: |-
+    Rework: the checks the 22:21Z review couldn't run now all pass on `fb666856`. No code change, so no new commit.
+
+    - The review found no code defect. It was blocking only because its tests never ran (sccache refused).
+    - `npm run lint:agent` passed.
+    - `npm run test:agent` passed: 2180 Rust tests (nextest), 1537 web tests, plus the release and hook tests.
+    - The held-job tests by name (`cargo nextest run -E 'test(/parked|held|unblock|prerequisite/)'`): 24/24 passed. Among them `a_held_back_review_job_resumes_with_its_own_prompt_and_status`, `a_queued_job_whose_prerequisite_reopened_is_held_back_again` and `a_parked_job_resumes_into_the_queue_in_the_server_too`.
+    - `npm run test:smoke:agent` passed 401/401, with no `ui.backlog-order` timeout this time.
+    - Main is now at `ee916064`, 21 commits ahead. `git merge-tree main HEAD` shows no conflict, but the merge has to rebase and run the checks again.
+    - Worktree clean, branch `agent/DEV-530` = `fb666856`.
+  report:
+    commits:
+    - hash: fb666856
+      what: held job resumes through the queue (unchanged, no new commit)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2180 Rust, 1537 web, release and hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 401/401
+    next: Review fb666856 against main ee916064, then merge (rebase needed, merge-tree shows no conflict)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -521,6 +547,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb8d5c99-8e92-4cae-b5d5-505715690428
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add02f220-0e8a-4347-9e7d-a33adafc8b9e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea5d4a1a-1600-4200-809f-19b48ccdd0aa
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1bf66bfc-ffd1-44f4-ac29-404c40d16033
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -1254,3 +1281,27 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T23:28:12.067015+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T23:28:15.205697+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1bf66bfc-ffd1-44f4-ac29-404c40d16033
+- at: 2026-11-15T23:38:37.124942+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:38:44.334349+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -4,11 +4,12 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-15T21:35:33.389545+00:00
-modified: 2026-11-15T22:20:21.642960+00:00
+modified: 2026-11-15T23:57:31.331358+00:00
 relationships:
   related:
   - DEV-581
   - DEV-586
+  - DEV-597
 comments:
 - date: 2026-11-15T22:20:13.755586+00:00
   author: claude
@@ -74,3 +75,9 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-15T23:57:31.331358+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-581","DEV-586"]}'
+    new: '{"related":["DEV-581","DEV-586","DEV-597"]}'

@@ -1,11 +1,11 @@
 title: 'Flaky smoke on CI: a Chromium profile folder left in the temp folder fails the run after all tests pass'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T22:03:21.665581+00:00
-modified: 2026-11-15T23:15:26.992311+00:00
+modified: 2026-11-15T23:27:55.769993+00:00
 relationships:
   related:
   - DEV-513
@@ -44,6 +44,33 @@ comments:
     - Reviewed `d094fe8f`, full diff against `main`, ticket/comments, related release ticket, guard/config/browser teardown and main history. No blocking or minor findings.
     - Independently reproduced the original error with main's guard. Regression tests pass (3/3); `npm run test:ui:agent` passes (1548/1548). Chromium leftovers are removed; unrelated leaks still fail.
     - Full lint/Rust/smoke checks were reported passing by implementation and were not repeated in review. No UI changes. No files, status or assignee changed; no durable guidance finding.
+- date: 2026-11-15T23:27:41.934030+00:00
+  author: codex
+  text: |-
+    Merged and pushed to main.
+
+    - Rebased `d094fe8f` onto current main; fast-forwarded and included pending `.tasks` updates as instructed. Final signed commit: `709bd6fe`, pushed to `origin/main`.
+    - All required gates passed; initial overlapping web builds were rerun sequentially. Lint required the documented cache-disabled fallback.
+    - Main regression check passed: Chromium leftovers no longer fail, ordinary leaks still fail, and all leftovers are removed.
+    - No automation/config changes, so no trust update needed. Status and assignee left for job automation; no durable guidance finding.
+  report:
+    commits:
+    - hash: 709bd6fe
+      what: merged Chromium temp guard fix and pending task updates
+    checks:
+    - command: RUSTC_WRAPPER= npm run lint:agent
+      result: passed
+      reason: sccache denied on initial and approved retries
+    - command: npm run test:agent
+      result: passed
+      reason: 2228 Rust, 1548 UI, release and hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests; sequential retry after overlapping builds
+    - command: node --test scripts/tests/vitest-temp-guard.test.mjs
+      result: passed
+      reason: 3 tests on main
+    next: Automation marks Done
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add74092d-e1f9-4e91-96d1-7a64d86581de
 releases:
@@ -107,3 +134,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add74092d-e1f9-4e91-96d1-7a64d86581de
+- at: 2026-11-15T23:27:41.934030+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:27:55.769993+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

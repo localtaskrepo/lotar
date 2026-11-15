@@ -1,11 +1,11 @@
 title: 'Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-15T23:19:49.956911+00:00
+modified: 2026-11-15T23:34:48.963919+00:00
 relationships:
   related:
   - DEV-510
@@ -133,8 +133,18 @@ comments:
       result: passed
       reason: 1.5 s sleep in both watcher threads, 5/5 incl. openapi_spec_served and api_options_preflight
     next: Re-review 1011487e on agent/DEV-585, then merge
+- date: 2026-11-15T23:34:44.457486+00:00
+  author: codex
+  text: |-
+    Review: passed — no findings on `1011487e`.
+
+    - Read four-file diff, ticket/comments, related tickets, main history and sandbox decision. Earlier mismatch resolved: `1011487e` and `dbc105d3` have identical trees; assigned branch and this checkout hold `1011487e`.
+    - Watcher readiness follows registration and snapshots; optional SSE readiness alone waits. MCP baseline precedes requests and polling catches early edits.
+    - Whitespace and rustfmt checks passed independently. Loaded full-suite, UI, smoke and delay-probe passes on this tree are recorded fix-agent evidence, not independent reruns. Local-port tests/smoke not rerun per owner sandbox decision; full lint not rerun.
+    - No UI changes, new findings or tickets. Files, status and assignee unchanged. Next: merge-agent verification and integration.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab03303e3-95f6-4964-b850-05c9841e7ba5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6d0ae523-068a-40cd-9cbb-a988f1097835
 description: |-
   Found during the DEV-510 merge (2026-11-15): the first `npm run -s test:agent` in the DEV-510 worktree failed 3 tests; the second full run passed 2218/2218 on the same commit.
 
@@ -281,3 +291,21 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-15T23:33:49.400258+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6d0ae523-068a-40cd-9cbb-a988f1097835
+- at: 2026-11-15T23:34:44.457486+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:34:48.963919+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

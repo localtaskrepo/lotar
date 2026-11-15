@@ -1,11 +1,11 @@
 title: 'A blocking review is ignored: the fix job''s end rule moves Reviewing on to Merging while the review still runs'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-15T23:08:52.550597+00:00
+modified: 2026-11-15T23:33:34.225981+00:00
 relationships:
   related:
   - DEV-524
@@ -326,12 +326,33 @@ comments:
     - Merge guard now uses the same classification as job creation: profile `merge` or status `Merging`, including queued jobs with other or absent profiles. Reassignment protection addresses the original double advance.
     - Five focused nextest regressions passed with `RUSTC_WRAPPER=` after sandbox sccache denial. Web build and whitespace check passed. Full lint/test/smoke and live incident replay not rerun; implementation reports full gates passed.
     - No source edits, commits, status or assignee changes. No new tickets or guidance finding. Next: normal merge automation for `eadf0315`.
+- date: 2026-11-15T23:33:28.684961+00:00
+  author: codex
+  text: |-
+    Merge blocked by a required test failure; main was not changed.
+
+    - Rebased `eadf0315` to `52098f98`; kept both independent test registrations in the only conflict (`tests/integration.rs`). No lockfile change. Work remains on `t3/stop-end-rule-overriding-review`.
+    - Lint passed. Initial sandbox test stopped in embedded server test; approved retry passed 2213 tests but timed out in `dev510_t3_session_test::a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads` at line 122. Full gates therefore did not pass. Smoke runner stopped; no checks remain running.
+    - No fast-forward, task amend, trust change or push performed. Please resolve the takeover-test timeout before retrying the merge. Live incident replay not run.
+  report:
+    commits:
+    - hash: 52098f98
+      what: reviewed fix rebased onto main; not landed
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: failed
+      reason: approved retry timed out in dev510_t3_session_test takeover test; 2213 passed, 19 not run; UI/release/hooks not reached
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: stopped after test gate failed
+    next: Investigate takeover timeout, rerun gates, then retry merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A90e52aeb-423e-4165-a8d9-6ae2412daa40
 description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
 tags:
 - health
-- review-returned
 custom_fields:
   finding: agent-jobs:review-race
 history:
@@ -610,3 +631,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T23:33:28.684961+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:33:34.109757+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health
+- at: 2026-11-15T23:33:34.225981+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

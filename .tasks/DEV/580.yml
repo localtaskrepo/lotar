@@ -1,11 +1,11 @@
 title: automation_agent_settings_reach_the_job_they_start leaves its fixture in the temp folder now and then
-status: Merging
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T20:04:35.425934+00:00
-modified: 2026-11-15T23:20:05.720507+00:00
+modified: 2026-11-15T23:57:31.330773+00:00
 relationships:
   depends_on:
   - DEV-586
@@ -13,6 +13,7 @@ relationships:
   - DEV-576
   - DEV-586
   - DEV-466
+  - DEV-597
 comments:
 - date: 2026-11-15T20:21:31.567832+00:00
   author: claude
@@ -125,6 +126,8 @@ comments:
 - date: 2026-11-15T23:20:05.720507+00:00
   author: claude
   text: 'Chief of staff: DEV-586 is Done, so the wait is over; merge queued again.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afe34cf3a-d7e6-4574-bba9-1b03d73cc38f
 description: |-
   Found 2026-11-15 in the DEV-576 rework: run alone, the test leaves .lotar-test-scratch (fixture .tmpXXX/.tasks and agent-queue markers) in about 1 of 8 runs, so the runner exits 1. It returns once both jobs are completed but before their workers settle, and the job ends still write into the dropped fixture.
   Check: for i in 1 2 3 4 5 6 7 8; do node scripts/rust-test-runner.mjs --agent -- automation_agent_settings_reach_the_job_they_start; done (any exit 1 with 'tests left 1 entries').
@@ -242,3 +245,20 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-15T23:34:59.632452+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-15T23:35:00.758742+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afe34cf3a-d7e6-4574-bba9-1b03d73cc38f
+- at: 2026-11-15T23:57:31.330773+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466"]}'
+    new: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597"]}'

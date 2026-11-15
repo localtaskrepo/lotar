@@ -523,7 +523,11 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
         .expect("assign implement agent");
 
-    let jobs = wait_for_completed_jobs(&created.id, 2, 10_000);
+    // A job's end still writes into the fixture after it completes: wait
+    // until both workers are done (DEV-580).
+    let jobs = wait_for_ticket_jobs(&created.id, 10_000, |jobs| {
+        jobs.len() == 2 && jobs.iter().all(|job| job.status == "completed" && AgentJobService::job_settled(&job.id))
+    });
     assert_eq!(jobs.len(), 2, "both phases ran: {jobs:?}");
     let job = |agent: &str| jobs.iter().find(|job| job.agent.as_deref() == Some(agent)).unwrap_or_else(|| panic!("{agent} job: {jobs:?}"));
     assert_eq!(job("implement").model.as_deref(), Some("sonnet"));

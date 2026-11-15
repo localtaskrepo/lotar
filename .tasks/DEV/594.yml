@@ -1,16 +1,18 @@
 title: Two T3 fix jobs on DEV-585 ran in parallel on different branches; the reviewer saw a commit the handoff didn't report
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T23:19:28.800463+00:00
-modified: 2026-11-15T23:19:30.142795+00:00
+modified: 2026-11-15T23:30:21.653279+00:00
 relationships:
   related:
   - DEV-573
   - DEV-581
   - DEV-585
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7b10056-3c44-41c2-8994-c511e6ecbf64
 description: 'Found 2026-11-15 on DEV-585: thread worktree t3-feedd691 ran on t3/fix-flaky-watcher-mcp-event-tests (d6dbec07) while its prompt said agent/DEV-585; a second fix job committed 1011487e on agent/DEV-585 (worktree agent-DEV-585-3db9...). The review blocked on the mismatch. Check: one fix job per ticket at a time, and a T3 job''s worktree is on agent/<ID> as its prompt says (see DEV-573, DEV-581). Done when a second fix job can''t start while one runs and the job''s branch matches its prompt.'
 tags:
 - health
@@ -28,3 +30,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T23:30:20.035789+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T23:30:21.653279+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7b10056-3c44-41c2-8994-c511e6ecbf64

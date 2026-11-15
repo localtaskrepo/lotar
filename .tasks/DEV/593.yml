@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-15T22:38:45.433554+00:00
-modified: 2026-11-15T23:25:46.240168+00:00
+modified: 2026-11-15T23:28:46.709422+00:00
 relationships:
   related:
   - DEV-520
@@ -40,6 +40,23 @@ comments:
       result: passed
       reason: fails on main at the missing record
     next: Review, then merge
+- date: 2026-11-15T23:28:39.145116+00:00
+  author: codex
+  text: |-
+    Review: blocking
+
+    - `crates/lotar-lib/src/services/agent_job_service.rs:2754` publishes `agent_job_started` before `register` at line 2766. Killing the process between those operations still leaves a started log without a recovery record: the original unknown/stalled-ticket bug remains. Persist the recovery record before publishing the start event, and test a kill at that boundary. The new test waits until a `job_started` rule runs, after registration, so it misses this case.
+    - Read commit `5c8e1f30`, its full three-file diff, ticket/comments and related DEV-520/DEV-590 context, recovery/adoption code, repository review/testing guidance and recent main history. `docs/decisions` does not exist. No UI changes or minor follow-up tickets.
+    - Targeted kill/recover regression passed (1 test) with `RUSTC_WRAPPER=`; both normal and escalated sccache attempts stopped before compilation with `Operation not permitted`. This pass confirms the rule-time kill case, not the gap above. Full gates were reported passed by the fix agent and were not rerun here.
+    - Added `review-blocked`; status and assignee unchanged. No source edits or commits.
+  report:
+    checks:
+    - command: RUSTC_WRAPPER= npm run test:rust:agent -- a_t3_job_killed_before
+      result: passed
+    - command: full lint, test and smoke
+      result: not_run
+      reason: focused review; implementation reports full passes
+    next: Write the recovery record before publishing agent_job_started and cover that boundary.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7a13f60-c8a7-480f-9a43-18b65593cff9
 description: |-
@@ -57,6 +74,8 @@ description: |-
   ## Done when
   - [ ] A job record left in `unknown` by a killed process is ended by the next worker or server in that tasks directory; its `job_failed` rules run once. Test: kill the job's process between `agent_job_started` and the session start.
   - [ ] `lotar agent status` and `list-jobs` show such a job as failed with that reason, not `unknown`.
+tags:
+- review-returned
 history:
 - at: 2026-11-15T22:38:45.899280+00:00
   actor: claude
@@ -93,3 +112,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7a13f60-c8a7-480f-9a43-18b65593cff9
+- at: 2026-11-15T23:28:09.190915+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-15T23:28:39.145116+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:28:46.709422+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

@@ -1,12 +1,14 @@
 title: An agent job hangs when its session's event stream lags and drops the turn's end
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T23:20:12.976843+00:00
+modified: 2026-11-15T23:50:55.464506+00:00
 relationships:
+  blocks:
+  - DEV-588
   related:
   - DEV-501
   - DEV-532
@@ -390,6 +392,33 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-302)
+- date: 2026-11-15T23:50:46.200168+00:00
+  author: claude
+  text: |-
+    Follow-up on main: the takeover fix from `cdd2141c` is now commit `60a7ad9b` on `t3/review-dev-520-stream-lag`, one commit on top of main `ee916064`.
+
+    - The main fix is already on main as `51fee8d1`. Only its follow-up was missing: with harnessmux 0.1.9, a new owner after a takeover reuses seqs that are already in the log, and the reader dropped them as duplicates. Because of that, DEV-510's `a_t3_job_taken_over_..._cant_list_its_threads` hung on main.
+    - [DEV-590](https://lotar.pyxzl.net/task/DEV-590) fixed this in harnessmux (`fb28583`), but that fix isn't released yet, so lotar still needs the workaround.
+    - I applied the `51fee8d1..cdd2141c` code diff onto main as-is: until the first event comes, the reader accepts a seq at or below the log's last one.
+    - The regression test `a_new_owner_that_numbers_events_again_is_followed` fails without the guard (`left: []`) and passes with it.
+    - The branch pointer moved from `66fb3992` to main. `66fb3992` is still on `agent/DEV-520` and on 2 other branches.
+  report:
+    commits:
+    - hash: 60a7ad9b
+      what: follow the new owner's repeated seqs after a takeover
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2229 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: cargo nextest run --workspace a_t3_job_taken_over
+      result: passed
+      reason: 4 of 4 runs
+    next: Review 60a7ad9b, then merge onto main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -398,6 +427,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A659f95d0-2e62-4885-a0d2-10c981c23c81
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add19d5e6-d084-4938-b07f-64e12bedc3df
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa3dde28-c4a6-48d9-a0d4-6848aac33a6a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af15860d5-2f1a-4ef6-b8bd-7f490dd9d910
 releases:
 - 6
 description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lotar-lib/src/services/agent_job_service.rs) reads harnessmux''s broadcast channel (capacity 1024, harnessmux 0.1.1 session.rs:127) and on RecvError::Lagged just continues. MessageDelta/ThoughtDelta events come per chunk and lotar''s loop reads the cancel file and takes the registry lock per event, so a chatty turn can lag; if the dropped events include TurnFinished/TurnFailed the loop never sees the turn end and the job runs until someone cancels it. Check: a unit test that feeds more than 1024 events before the turn''s end and expects the job to end. Done: on lag, the missed events (seq after the last one seen) are replayed from the session''s event log (Status.events) through the same handling, the job ends with the right exit code, and the test passes.'
@@ -981,3 +1011,33 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T23:29:40.192463+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586","DEV-590","DEV-593"]}'
+    new: '{"blocks":["DEV-588"],"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586","DEV-590","DEV-593"]}'
+- at: 2026-11-15T23:38:59.079842+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T23:39:01.228419+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af15860d5-2f1a-4ef6-b8bd-7f490dd9d910
+- at: 2026-11-15T23:50:46.200168+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:50:55.464506+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
