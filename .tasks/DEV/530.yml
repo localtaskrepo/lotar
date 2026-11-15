@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T06:30:35.499540+00:00
+modified: 2026-11-15T07:25:28.948661+00:00
 relationships:
   related:
   - DEV-351
@@ -166,6 +166,17 @@ comments:
       label: I merge it myself
       set:
         status: InProgress
+- date: 2026-11-15T07:25:06.672049+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-214)
+  answer:
+    to: 2026-11-15T06:30:34.286574+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-214)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -526,3 +537,19 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T07:25:06.672049+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:25:06.673476+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T07:25:28.948661+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

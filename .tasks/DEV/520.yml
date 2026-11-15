@@ -1,11 +1,11 @@
 title: An agent job hangs when its session's event stream lags and drops the turn's end
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T06:32:01.171204+00:00
+modified: 2026-11-15T07:25:02.785770+00:00
 relationships:
   related:
   - DEV-501
@@ -149,6 +149,17 @@ comments:
       label: I merge it myself
       set:
         status: InProgress
+- date: 2026-11-15T07:25:01.958807+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-215)
+  answer:
+    to: 2026-11-15T06:31:56.020936+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-215)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -479,3 +490,19 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T07:25:01.958807+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:25:01.960130+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T07:25:02.785770+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

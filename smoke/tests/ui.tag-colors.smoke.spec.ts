@@ -72,8 +72,9 @@ describe.concurrent('UI tag colours (DEV-20)', () => {
                 });
 
                 // The Config editor offers tags in use for a one-click override,
-                // from the distinct tags rather than whole tasks (DEV-548).
-                await withPage(server.url, async (page) => {
+                // from the distinct tags rather than whole tasks (DEV-548). The page
+                // starts blank: the Tasks page at / would request /api/tasks/list itself.
+                await withPage('about:blank', async (page) => {
                     const requests: string[] = [];
                     page.on('request', (request) => {
                         const url = new URL(request.url());

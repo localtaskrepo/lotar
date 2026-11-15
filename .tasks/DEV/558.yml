@@ -5,7 +5,7 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T06:59:10.494033+00:00
-modified: 2026-11-15T07:12:56.449074+00:00
+modified: 2026-11-15T07:26:42.521460+00:00
 relationships:
   related:
   - DEV-557
@@ -28,6 +28,20 @@ comments:
     - `smoke/helpers/ui.ts:96` returns at DOMContentLoaded. Starting blank prevents the Tasks page fetch leaking into Config observation; both endpoint assertions and selection checks remain. No application UI changes or owner decisions.
     - Approved unrestricted `RUSTC_WRAPPER= npm run test:smoke:agent`: 404/404 passed in 117 files. Prettier and diff whitespace checks pass. Initial sandbox build was denied sccache access. An accidental duplicate sandbox smoke from comment quoting failed localhost binding; it has finished and does not supersede the unrestricted pass.
     - Full lint and npm test not rerun for this smoke-only change. No source edits, commits, status/assignee changes or running checks. No durable guidance finding.
+- date: 2026-11-15T07:26:14.800188+00:00
+  author: codex
+  text: |-
+    Merged locally; all gates passed.
+    - Fast-forwarded main to `bb7b2dbf`. Rebased twice as main advanced; final replay preserves main ticket-only amendment. Code matches verified `873f4495`.
+    - Approved `RUSTC_WRAPPER= npm run lint:agent`, `npm run test:agent` (2197 Rust, 1547 UI, release/hooks), and `npm run test:smoke:agent` (404/404) pass. No skipped gates.
+    - Pending main ticket updates included as instructed. No automation/profile configuration changed; no trust refresh needed.
+    - Push held: preceding DEV-557 remains HelpNeeded, and the previous merge explicitly left it unpushed. No unfinished prefix pushed. No durable guidance finding.
+- date: 2026-11-15T07:26:42.521460+00:00
+  author: codex
+  text: |-
+    Merge verification complete.
+    - Main tag-colour smoke recheck passed (1/1), using `test:smoke:quick:agent` and the verified identical-source smoke binary. Full build-first smoke already passed 404/404 before landing.
+    - Main commit before this evidence update: `24b1e103`; push held behind DEV-557 as recorded. No checks running.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54d556e7-7ef6-4b71-8f8f-9eab806bb0bd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4b2ba4-11db-4618-a6f3-5e3bf6e8fec7
@@ -102,3 +116,11 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T07:26:14.800188+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:26:42.521460+00:00
+  actor: codex
+  changes:
+  - field: comment_added
