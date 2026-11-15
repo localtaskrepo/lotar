@@ -1,11 +1,14 @@
 title: After a server restart, a non-empty agent queue stays idle until a new job is enqueued
-status: Todo
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-15T22:38:44.990878+00:00
+modified: 2026-11-15T22:46:22.695977+00:00
+relationships:
+  related:
+  - DEV-524
 description: |-
   After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
 
@@ -14,16 +17,80 @@ description: |-
   - The owner allowed a restart of the launch agent `net.pyxzl.lotar.local` (it runs `lotar serve`). After the restart the worker was still idle with the same queue.
   - It started only when the chief of staff queued LOCA-333's review (`lotar agent run ... --agent review`); then the worker ran the whole queue.
 
+  ## Cause
+  The worker is a detached `lotar agent worker` process; it exits only when the queue is empty, and only an enqueue (or a worker that exits with entries left) starts one. A worker that is killed (here with the launch agent's restart) leaves the queue file behind, and `lotar serve` didn't look at it at startup.
+
   ## Expected
   `lotar serve` (and any process that owns the queue worker) starts the worker at startup when the queue isn't empty, as it does after an enqueue.
 
   ## Done when
-  - [ ] A server started over a non-empty queue starts its worker within seconds; test with a queued entry and no enqueue after the start.
-  - [ ] `lotar agent queue` says why a non-empty queue is idle (no worker process, or waiting for prerequisites), so a check can tell a stopped worker from a waiting one.
-  - [ ] A command to start the worker for a tasks directory without queueing a job (for example `lotar agent queue resume`), for recovery scripts (standards STD-113 proposal).
+  - [ ] `lotar serve` started over a non-empty queue starts its worker within seconds, with no enqueue after the start (integration test: entries queued with the worker disabled, then a server starts and the job runs). An empty queue starts no worker. A worker already running is left alone (one worker per tasks directory, as before). If the worker can't be started, the server prints a warning and serves anyway.
+  - [ ] `lotar agent queue` says which state the worker is in, so a check can tell a stopped worker from a waiting one:
+    - `active` — a worker process runs; with entries left it says what they wait for (a free slot under `agent.worktree.max_parallel_jobs`, or the ticket's running job).
+    - `stopped` — entries are queued but no worker process runs; it names `lotar agent queue resume`.
+    - `idle` — no entries, no worker.
+    - JSON gets `worker_state` (`active`/`stopped`/`idle`) and `reason` (text or null); the existing fields (`worker_running`, `pending`, `running_jobs`, `queued_jobs`) stay as they are.
+    - Entries waiting for prerequisites leave the queue (DEV-524: the ticket is marked blocked), so they are not a queue state.
+  - [ ] `lotar agent queue resume` starts the worker for the tasks directory without queueing a job (standards STD-113 proposal): with entries and no worker it starts one and says so; with a worker running or an empty queue it changes nothing and says why; exit 0 in these cases, non-zero only when the queue can't be read. JSON: `{"pending": N, "worker_state": ...}`.
+  - [ ] `docs/help/agent.md` describes the states and `resume`.
 history:
 - at: 2026-11-15T22:38:44.990878+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T22:44:48.211002+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T22:46:22.519676+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
+
+      ## What happened
+      - `lotar agent queue` in ~/Development/local: `Worker: idle | Running: 0 | Queued: 13`.
+      - The owner allowed a restart of the launch agent `net.pyxzl.lotar.local` (it runs `lotar serve`). After the restart the worker was still idle with the same queue.
+      - It started only when the chief of staff queued LOCA-333's review (`lotar agent run ... --agent review`); then the worker ran the whole queue.
+
+      ## Expected
+      `lotar serve` (and any process that owns the queue worker) starts the worker at startup when the queue isn't empty, as it does after an enqueue.
+
+      ## Done when
+      - [ ] A server started over a non-empty queue starts its worker within seconds; test with a queued entry and no enqueue after the start.
+      - [ ] `lotar agent queue` says why a non-empty queue is idle (no worker process, or waiting for prerequisites), so a check can tell a stopped worker from a waiting one.
+      - [ ] A command to start the worker for a tasks directory without queueing a job (for example `lotar agent queue resume`), for recovery scripts (standards STD-113 proposal).
+    new: |-
+      After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
+
+      ## What happened
+      - `lotar agent queue` in ~/Development/local: `Worker: idle | Running: 0 | Queued: 13`.
+      - The owner allowed a restart of the launch agent `net.pyxzl.lotar.local` (it runs `lotar serve`). After the restart the worker was still idle with the same queue.
+      - It started only when the chief of staff queued LOCA-333's review (`lotar agent run ... --agent review`); then the worker ran the whole queue.
+
+      ## Cause
+      The worker is a detached `lotar agent worker` process; it exits only when the queue is empty, and only an enqueue (or a worker that exits with entries left) starts one. A worker that is killed (here with the launch agent's restart) leaves the queue file behind, and `lotar serve` didn't look at it at startup.
+
+      ## Expected
+      `lotar serve` (and any process that owns the queue worker) starts the worker at startup when the queue isn't empty, as it does after an enqueue.
+
+      ## Done when
+      - [ ] `lotar serve` started over a non-empty queue starts its worker within seconds, with no enqueue after the start (integration test: entries queued with the worker disabled, then a server starts and the job runs). An empty queue starts no worker. A worker already running is left alone (one worker per tasks directory, as before). If the worker can't be started, the server prints a warning and serves anyway.
+      - [ ] `lotar agent queue` says which state the worker is in, so a check can tell a stopped worker from a waiting one:
+        - `active` — a worker process runs; with entries left it says what they wait for (a free slot under `agent.worktree.max_parallel_jobs`, or the ticket's running job).
+        - `stopped` — entries are queued but no worker process runs; it names `lotar agent queue resume`.
+        - `idle` — no entries, no worker.
+        - JSON gets `worker_state` (`active`/`stopped`/`idle`) and `reason` (text or null); the existing fields (`worker_running`, `pending`, `running_jobs`, `queued_jobs`) stay as they are.
+        - Entries waiting for prerequisites leave the queue (DEV-524: the ticket is marked blocked), so they are not a queue state.
+      - [ ] `lotar agent queue resume` starts the worker for the tasks directory without queueing a job (standards STD-113 proposal): with entries and no worker it starts one and says so; with a worker running or an empty queue it changes nothing and says why; exit 0 in these cases, non-zero only when the queue can't be read. JSON: `{"pending": N, "worker_state": ...}`.
+      - [ ] `docs/help/agent.md` describes the states and `resume`.
+- at: 2026-11-15T22:46:22.695977+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-524"]}'

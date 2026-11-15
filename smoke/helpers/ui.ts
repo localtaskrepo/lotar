@@ -1,4 +1,5 @@
 import { Browser, BrowserContext, BrowserContextOptions, chromium, Page } from '@playwright/test';
+import { oweCleanup } from './owed-cleanup.js';
 
 export interface BrowserSessionOptions {
     readonly headless?: boolean;
@@ -76,13 +77,17 @@ export async function withBrowser<T>(
         headless: options.headless ?? true,
         args: extraLaunchArgs(),
     });
-    const context = await browser.newContext(options.context);
-
+    const release = oweCleanup(() => browser.close());
     try {
-        return await callback(context, browser);
+        const context = await browser.newContext(options.context);
+        try {
+            return await callback(context, browser);
+        } finally {
+            await context.close();
+        }
     } finally {
-        await context.close();
         await browser.close();
+        release();
     }
 }
 

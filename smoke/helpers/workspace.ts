@@ -6,6 +6,7 @@ import { dir, DirectoryResult } from 'tmp-promise';
 import type { CliRunResult } from './cli.js';
 import { runLotar } from './cli.js';
 import { initGitRepository, runGitCommand, type GitCommandOptions } from './git.js';
+import { oweCleanup } from './owed-cleanup.js';
 
 export interface WorkspaceOptions {
     readonly name?: string;
@@ -56,6 +57,8 @@ export class SmokeWorkspace {
         await workspace.bootstrap(options.seedFiles ?? {});
         return workspace;
     }
+
+    private readonly releaseOwed = oweCleanup(() => this.dispose());
 
     private constructor(
         private readonly temporary: DirectoryResult,
@@ -259,6 +262,7 @@ export class SmokeWorkspace {
         // Not tmp-promise's cleanup: it deletes once, and Windows keeps a
         // directory locked briefly after a child process that used it (for
         // example a wait:false automation run) exits (DEV-168).
+        this.releaseOwed();
         await removeWorkspaceDir(this.temporary.path);
     }
 

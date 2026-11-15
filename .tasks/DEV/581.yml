@@ -1,11 +1,11 @@
 title: 'A headless job after a T3 job on the same ticket fails: agent/<ID> is checked out in the T3 thread''s worktree'
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:09:34.810817+00:00
-modified: 2026-11-15T22:18:07.117820+00:00
+modified: 2026-11-15T22:43:41.887612+00:00
 relationships:
   related:
   - DEV-583
@@ -115,6 +115,35 @@ comments:
     - Without the fix (old `agent_job_service.rs` restored temporarily, then put back): the new test fails with the ticket's `'agent/TEST-1' is already used by worktree` error.
     - Reran `RUSTC_WRAPPER= npm run lint:agent`: passed. The full `npm test` and `npm run smoke` weren't rerun; the fix agent reports them passing, with smoke flakes tracked in DEV-587.
     - Not blocking: two leftover copies of the fix are on T3 branches, `t3/reuse-linked-ticket-worktree` (`879ca4ef`) and `-1` (`2fc25a95`, the codex rework). They stay out of the merge, and DEV-583 already tracks this. No new tickets. Worktree clean, status and assignee unchanged.
+- date: 2026-11-15T22:43:33.498838+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `e5762570` is on `main` and `origin/main`.
+
+    - Rebased `53a4723b` (the reviewed commit) onto `main` `51fee8d1` with no conflicts, giving `698fb81e`. No lockfile changed, so I didn't run `npm ci`.
+    - The rebase changed the hash, so I reran all three checks in the worktree: `npm run lint:agent`, `npm run test:agent` (2228 Rust and 1548 UI tests) and `npm run smoke` (404 tests). All passed.
+    - `git merge --ff-only` into the main checkout worked. I then folded the main checkout's `.tasks` changes into that commit with `commit --amend -- .tasks`, giving `e5762570` (signed).
+    - No rules, profiles or config changed, so I didn't run `lotar trust`.
+    - Pushed `51fee8d1..e5762570`. The main checkout is clean and no unpushed commit belongs to unfinished work.
+    - I merged from the T3 branch `t3/headless-job-reuse-linked-worktree`. `agent/DEV-581` is checked out in `agent-DEV-581-38a485c6ab91adfa` and still points at `53a4723b`, with the same patch.
+  report:
+    commits:
+    - hash: e5762570
+      what: DEV-581 fix rebased onto main (was 53a4723b, reviewed), with the main checkout's .tasks changes folded in
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent variant
+    - command: npm test
+      result: passed
+      reason: test:agent, 2228 Rust + 1548 UI + release + hooks
+    - command: npm run smoke
+      result: passed
+      reason: 404 tests
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    next: 'None: merged and pushed; ticket goes to Done'
 description: |-
   Found in standards STD-124 (2026-11-15): reviews and merges are to run headless (claude, codex runners) after a fix on the t3 runner. The t3 fix thread works in T3 Code's worktree (~/.t3/worktrees/<repo>/agent-<ID>-…) with the ticket branch agent/<ID> checked out. A later claude, codex or command job calls prepare_worktree (crates/lotar-lib/src/services/agent_job_service.rs), which runs `git worktree add <dir>/<ticket> agent/<ID>`; git refuses, and the job fails before the agent starts:
 
@@ -132,9 +161,6 @@ description: |-
   - [ ] A later t3 job with session: continue still continues the fix thread in its worktree (the branch stays checked out there), and a merge job in that worktree still fast-forwards main.
   - [ ] Done cleanup still removes that worktree.
   - [ ] A test covers t3 fix -> headless review -> t3 rework on one ticket; docs/help/agent.md (Worktrees) says so.
-tags:
-- review-returned
-- fix-retried
 history:
 - at: 2026-11-15T20:09:35.013739+00:00
   actor: claude
@@ -252,3 +278,16 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-15T22:43:33.498838+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T22:43:41.887612+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned, fix-retried
+    new: ''

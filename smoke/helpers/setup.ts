@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { afterAll, beforeEach } from 'vitest';
 
 import { resolveRepositoryRoot } from './binary.js';
+import { runOwedCleanups } from './owed-cleanup.js';
 
 if (!process.env.LOTAR_TEST_SILENT) {
     process.env.LOTAR_TEST_SILENT = '1';
@@ -26,3 +28,16 @@ for (const name of overrideVars) {
         Reflect.deleteProperty(process.env, name);
     }
 }
+
+// A test Vitest timed out still holds what it opened (DEV-586); close it once the file's other tests are done too.
+let failed = false;
+beforeEach(({ onTestFailed }) => {
+    onTestFailed(() => {
+        failed = true;
+    });
+});
+afterAll(async () => {
+    if (failed) {
+        await runOwedCleanups();
+    }
+});

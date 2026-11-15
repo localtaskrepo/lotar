@@ -5,6 +5,7 @@ import path from 'node:path';
 import { execa, type ResultPromise } from 'execa';
 import getPort from 'get-port';
 import { ensureBinaryExists } from './binary.js';
+import { oweCleanup } from './owed-cleanup.js';
 import { SERVER_REGISTRY_ENV } from './server-guard.js';
 import type { SmokeWorkspace } from './workspace.js';
 
@@ -184,6 +185,10 @@ export async function launchAndWaitReady(
     // goes through the underlying Node child process.
     const node = child.nodeChildProcess;
     registerServer(node);
+    node.once(
+        'exit',
+        oweCleanup(() => stopChildProcess(child, node)),
+    );
 
     const describeStderr = () => (stderrChunks.length > 0 ? `\nstderr:\n${stderrChunks.join('')}` : '');
 

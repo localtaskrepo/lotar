@@ -1,11 +1,11 @@
 title: 'Jobs left in status unknown by a killed process are never taken over: their tickets stall with an agent assignee'
-status: Todo
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T22:38:45.433554+00:00
-modified: 2026-11-15T22:38:45.899280+00:00
+modified: 2026-11-15T22:46:16.133979+00:00
 description: |-
   Jobs whose process died right after `agent_job_started` stay in status `unknown` and are never taken over, so their tickets sit InProgress with an agent assignee and no job. docs/help/agent.md says the queue worker for the same tasks directory, or the next `lotar serve`, takes such a job over and ends it. Found 2026-11-15 in local.
 
@@ -27,3 +27,9 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T22:46:16.133979+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
