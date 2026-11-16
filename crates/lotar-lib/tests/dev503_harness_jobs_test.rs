@@ -81,18 +81,25 @@ struct Harness {
 
 impl Drop for Harness {
     fn drop(&mut self) {
-        wait_for_jobs_to_end(&self.fixtures.tasks_root);
+        // A test that already failed only waits: a second panic while unwinding aborts the binary and hides its message.
+        if std::thread::panicking() {
+            settle(|| jobs_ended(&self.fixtures.tasks_root));
+        } else {
+            wait_for_jobs_to_end(&self.fixtures.tasks_root);
+        }
     }
 }
 
 /// Wait until no job on the fixture runs, in this process or in a queue worker: a job still writes to the tasks folder
 /// after its status reads completed, and a test that ends then has that folder made again after the fixture's removal.
 fn wait_for_jobs_to_end(tasks_dir: &Path) {
-    wait_for("the jobs' end", || {
-        AgentJobService::queue_stats().running == 0
-            && lotar::services::agent_active_jobs::list(tasks_dir).is_empty()
-            && !lotar::services::agent_queue_service::AgentQueueService::is_worker_running(tasks_dir)
-    });
+    wait_for("the jobs' end", || jobs_ended(tasks_dir));
+}
+
+fn jobs_ended(tasks_dir: &Path) -> bool {
+    AgentJobService::queue_stats().running == 0
+        && lotar::services::agent_active_jobs::list(tasks_dir).is_empty()
+        && !lotar::services::agent_queue_service::AgentQueueService::is_worker_running(tasks_dir)
 }
 
 /// A TEST project with a `fixer` profile on the claude runner, run by the fake agent. `extra` adds profile keys
@@ -144,13 +151,20 @@ impl Harness {
     }
 }
 
-fn wait_for(what: &str, mut done: impl FnMut() -> bool) {
-    // Ends as soon as it happens; the bound is for a busy machine.
+fn wait_for(what: &str, done: impl FnMut() -> bool) {
+    assert!(settle(done), "timed out waiting for {what}");
+}
+
+/// Whether `done` holds within the bound. It ends as soon as it happens; the bound is for a busy machine.
+fn settle(mut done: impl FnMut() -> bool) -> bool {
     let deadline = Instant::now() + Duration::from_secs(60);
     while !done() {
-        assert!(Instant::now() < deadline, "timed out waiting for {what}");
+        if Instant::now() >= deadline {
+            return false;
+        }
         std::thread::sleep(Duration::from_millis(25));
     }
+    true
 }
 
 fn status(job_id: &str) -> String {

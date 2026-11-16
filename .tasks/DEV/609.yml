@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-17T01:46:56.550316+00:00
+modified: 2026-11-17T02:06:04.940826+00:00
 relationships:
   related:
   - DEV-599
@@ -13,6 +13,7 @@ relationships:
   - DEV-624
   - DEV-583
   - DEV-626
+  - DEV-613
 comments:
 - date: 2026-11-16T05:21:49.697784+00:00
   author: claude
@@ -178,6 +179,33 @@ comments:
       result: passed
       reason: 405 tests
     next: Review, then merge branch t3/ddced517
+- date: 2026-11-17T02:06:04.645834+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `9ad62dcb` is on `main` and `origin/main`.
+
+    - Rebased onto `main`. The branch's copy of DEV-599 (`45730a7f`) conflicted with the version that landed as `01a9160e`, so I dropped it (`git rebase --skip`); main's version wins. DEV-609's commit applied cleanly as `e5dd8f1e`.
+    - No lockfile changed, so no `npm ci`.
+    - Checks: `npm run lint:agent` passed. `npm run test:agent` passed on the 2nd run (2280 Rust, 1548 UI, release, hooks). The 1st run stopped on `a_queue_entry_held_by_a_waiting_thread_says_so_once`, the known flake [DEV-613](https://lotar.pyxzl.net/task/DEV-613): it failed 1 of 3 runs alone and isn't touched by this change. `npm run test:smoke:agent` passed (405).
+    - `git merge --ff-only`, then amended the open `.tasks` changes into it (`9ad62dcb`), then `git push`. No other unpushed commits.
+    - No rules or config changed, so I didn't run `lotar trust`.
+  report:
+    commits:
+    - hash: 9ad62dcb
+      what: test a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer (main, with .tasks amended in)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2nd run; 1st stopped on the known DEV-613 flake a_queue_entry_held_by_a_waiting_thread_says_so_once
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177bbfb8-8291-4dbc-bae5-a926f125a36d
@@ -352,3 +380,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ba34733-9fe2-4c10-b197-9e6cf571a481
+- at: 2026-11-17T02:06:04.645834+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:06:04.940826+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626"]}'
+    new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626","DEV-613"]}'
