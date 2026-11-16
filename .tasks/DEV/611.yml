@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:47:15.051643+00:00
-modified: 2026-11-16T22:53:23.634249+00:00
+modified: 2026-11-16T23:30:38.507863+00:00
 relationships:
   related:
   - DEV-603
@@ -19,6 +19,9 @@ relationships:
   - DEV-608
   - DEV-624
   - DEV-626
+  - DEV-600
+  - DEV-602
+  - DEV-607
 comments:
 - date: 2026-11-16T05:40:30.225209+00:00
   author: claude
@@ -131,12 +134,41 @@ comments:
     - First run on `e6b2647d` (main `804cb0f9`): lint passed, Rust 2259/2259 with `--no-fail-fast`, UI, release and hooks tests passed. The first full run hit the known DEV-624 flake (`serve_honors_explicit_tasks_dir_for_api_requests`, status 0 under load average 130). It passed alone.
     - Main then gained DEV-606, DEV-605 and DEV-608, so I'm rerunning everything on the rebased HEAD.
     - Side effect: to stop my smoke build I ran `pkill -f 'cargo build --profile smoke'`, which matches that build on the whole machine. Another session's smoke build running then may have been killed too.
+- date: 2026-11-16T23:26:53.388083+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-611 is on main as `c9802f1d` (`bc1e9729..c9802f1d`).
+
+    - Rebased onto main three times while the checks ran: main gained DEV-602, DEV-600, DEV-606, DEV-605, DEV-608, then DEV-607. No conflicts after the first rebase.
+    - The copied DEV-603 commit `685654c4` was dropped: it has the same code diff as main's `17e19601`.
+    - Checks: lint and smoke ran on `bdaad138`. After the last rebase only `smoke/tests/ui.global-actions.smoke.spec.ts` changed. For that file I reran the smoke typecheck, oxlint, Prettier and the spec itself, and all passed.
+    - Rust: one run hit the known DEV-624 flake (`serve_honors_explicit_tasks_dir_for_api_requests`), which passed alone. A second run stopped on an sccache `Connection reset by peer`. The rerun with `RUSTC_WRAPPER=` passed 2271/2271.
+    - Pending `.tasks` changes were amended into the merge commit. No rule or config file changed, so no `lotar trust`.
+    - Told the running DEV-621 thread that DEV-611 is on main.
+    - Side effect (repeated from my earlier comment): `pkill -f 'cargo build --profile smoke'` may have killed another session's smoke build.
+  report:
+    commits:
+    - hash: c9802f1d
+      what: DEV-611 keeps a skipped session's record and log, and the handoff names it (with pending .tasks)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: on bdaad138 (same code as c9802f1d)
+    - command: npm test
+      result: passed
+      reason: Rust 2271/2271 with RUSTC_WRAPPER= after sccache dropped its connection; UI, release and hook tests passed
+    - command: npm run smoke
+      result: passed
+      reason: 405/405 on bdaad138; after the last rebase (DEV-607, one smoke spec) reran ui.global-actions, 2/2
+    next: 'None: done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2315ac2a-047b-4c72-ae46-d62a09fb92e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5c48277-3e75-4eda-a4ad-5c48ac6a045b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa552dbff-68eb-418b-947a-7c56a0902c1f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A766dab5c-03a5-4f61-b567-942f5a8c155b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A955f102b-3b63-44c8-8f6a-4443c1690c35
+releases:
+- 7
 description: |-
   Found in the review of DEV-603 (`d9e58bcb`).
 
@@ -357,3 +389,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620","DEV-605","DEV-606","DEV-608","DEV-624"]}'
     new: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620","DEV-605","DEV-606","DEV-608","DEV-624","DEV-626"]}'
+- at: 2026-11-16T23:26:53.388083+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:26:53.680921+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620","DEV-605","DEV-606","DEV-608","DEV-624","DEV-626"]}'
+    new: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620","DEV-605","DEV-606","DEV-608","DEV-624","DEV-626","DEV-600","DEV-602","DEV-607"]}'
+- at: 2026-11-16T23:30:38.507863+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

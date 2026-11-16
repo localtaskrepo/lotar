@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T23:19:28.800463+00:00
-modified: 2026-11-16T22:53:22.297182+00:00
+modified: 2026-11-16T23:30:37.459921+00:00
 relationships:
   related:
   - DEV-573
@@ -219,6 +219,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6ec441e3-9898-46de-85b0-87558688fd74
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9b4a243-7f8e-4e48-904c-c454ca5b0f24
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93458573-4f9e-4ce6-99a4-2ff1e44e1702
+releases:
+- 7
 description: 'Found 2026-11-15 on DEV-585: thread worktree t3-feedd691 ran on t3/fix-flaky-watcher-mcp-event-tests (d6dbec07) while its prompt said agent/DEV-585; a second fix job committed 1011487e on agent/DEV-585 (worktree agent-DEV-585-3db9...). The review blocked on the mismatch. Check: one fix job per ticket at a time, and a T3 job''s worktree is on agent/<ID> as its prompt says (see DEV-573, DEV-581). Done when a second fix job can''t start while one runs and the job''s branch matches its prompt.'
 tags:
 - health
@@ -457,3 +459,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596","DEV-602","DEV-592","DEV-595","DEV-593","DEV-598","DEV-566","DEV-603","DEV-609","DEV-577"]}'
     new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596","DEV-602","DEV-592","DEV-595","DEV-593","DEV-598","DEV-566","DEV-603","DEV-609","DEV-577","DEV-626"]}'
+- at: 2026-11-16T23:30:37.459921+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

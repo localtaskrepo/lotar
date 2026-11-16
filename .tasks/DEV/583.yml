@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:15:01.954526+00:00
-modified: 2026-11-16T21:38:22.977180+00:00
+modified: 2026-11-16T23:30:37.077707+00:00
 relationships:
   blocks:
   - DEV-582
@@ -207,6 +207,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73be9000-8591-47a5-9ab1-9e4b62fa8267
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adbe7c504-4e53-4892-9047-54e02835095e
+releases:
+- 7
 description: 'Found 2026-11-15 in standards: a fix job that is retried on another agent or resumed after its prerequisite ("Prerequisites done", "Retry with @fix-codex", "Retry with @fix-fable") starts a new T3 thread in a fresh worktree on a generated branch (`t3/gitleaks-allow-1password-backticks`, `t3/fix-gitleaks-1password-backtick-allowlist`), while its prompt says "You are working in a git worktree on branch `agent/STD-144` ... Don''t switch branches". The first job''s uncommitted work stays in `~/.t3/worktrees/standards/agent-STD-144-…`, out of reach. Seen on STD-144 (jobs `job-20261115T192529.587Z-12` and the 20:12Z retry), STD-140 (`job-20261115T192519.646Z-11`) and STD-149 (the review ran on `t3/std-149-dedupe-finding-tickets` at the rejected commit while the rework was on `agent/STD-149`). Two codex jobs handed back for this alone, and standards has about 30 leftover `t3/` worktrees. Related: DEV-581, DEV-577, DEV-530. Check: retry a failed T3 fix job with another agent; `git branch --show-current` in the new thread prints `agent/<ID>` and `git status` shows the first job''s changes. Done: a retried or resumed T3 job runs in the ticket''s existing `agent/<ID>` worktree (or the prompt names the branch the thread really has and where the earlier work is).'
 tags:
 - health
@@ -432,3 +434,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602","DEV-608","DEV-593","DEV-585","DEV-599","DEV-598","DEV-600","DEV-614"]}'
     new: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602","DEV-608","DEV-593","DEV-585","DEV-599","DEV-598","DEV-600","DEV-614","DEV-609"]}'
+- at: 2026-11-16T23:30:37.077707+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

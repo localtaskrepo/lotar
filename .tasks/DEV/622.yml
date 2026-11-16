@@ -1,14 +1,41 @@
 title: The web server treats a failed socket read as end of request and truncates the body
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T20:55:33.664464+00:00
-modified: 2026-11-16T20:55:36.086710+00:00
+modified: 2026-11-16T23:29:12.384950+00:00
 relationships:
   related:
   - DEV-615
+comments:
+- date: 2026-11-16T23:29:00.286128+00:00
+  author: claude
+  text: |-
+    Fixed: a failed socket read no longer counts as end of request.
+
+    - `crates/lotar-lib/src/web_server.rs`: new `read_retrying` retries `Interrupted`; header and body reads in `handle_connection` return (close the connection, no dispatch) on any other error, such as a timeout
+    - body loop moved into `read_body(reader, body, content_length, limit)` so a unit test can drive it
+    - test `body_read_retries_interrupted_and_fails_on_other_errors`: a scripted reader with `Interrupted` mid-body gives the full body; `WouldBlock` gives an error. With the old `unwrap_or_default` read it fails with the cut body `{"a":`
+    - commit `cbfba630`
+  report:
+    commits:
+    - hash: cbfba630
+      what: retry Interrupted socket reads; other read errors close the connection without dispatching
+    checks:
+    - command: cargo nextest run -p lotar-lib -E 'test(body_read_retries)'
+      result: passed
+      reason: fails with the old read (cut body), passes with the fix
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2259 Rust + 1548 UI; reran with RUSTC_WRAPPER= after sccache reset its connection
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: reran with RUSTC_WRAPPER= after sccache reset its connection
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695
 description: 'Found while on DEV-615: `handle_connection` in `crates/lotar-lib/src/web_server.rs` reads headers and body with `stream.read(..).unwrap_or_default()`, so an `Interrupted` or timed-out read counts as EOF and the handler gets a cut body (a misleading 400 `Invalid body`). Check: a unit test feeding a stream that returns `Interrupted` once mid-body. Done: `Interrupted` is retried, other read errors close the connection without dispatching.'
@@ -39,3 +66,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695
+- at: 2026-11-16T23:29:00.286128+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:29:12.384950+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

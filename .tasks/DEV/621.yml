@@ -1,14 +1,41 @@
 title: DEV-611's failed keep and the t3 handoff's thread line have no test
-status: InProgress
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-16T19:58:20.018479+00:00
+modified: 2026-11-16T23:30:13.874720+00:00
 relationships:
   related:
   - DEV-611
+comments:
+- date: 2026-11-16T23:29:57.237179+00:00
+  author: claude
+  text: |-
+    Done: both missing tests added; each fails when the code it covers is broken.
+
+    - `a_failed_keep_fails_the_job_and_starts_no_session` (`dev503_harness_jobs_test.rs`): a folder takes the kept log's name, so the keep fails. The job fails with "Could not keep the session …", no `session/new`, no new or kept record, and the old record and event log are unchanged
+    - `a_t3_handoff_names_the_skipped_sessions_thread` (`dev510_t3_session_test.rs`): a rework 56 min after the last use starts a second thread, and its handoff has `- Its T3 Code thread: t1`. The fake t3 now writes `thread start` prompts to a `prompts` file
+    - Checked: dropping the thread line, or carrying on after a failed keep, makes each test fail
+    - Also fixed a race in DEV-611's own test: `continue_job` now waits until the job leaves the active list (it failed once with "already has an active job" under load)
+    - DEV-611 wasn't on main when I started, so I cherry-picked it as `84ef6218` and told the DEV-611 merge thread. It has landed as `c9802f1d`, so a rebase drops the copy
+  report:
+    commits:
+    - hash: 1ff99b50
+      what: tests for a failed keep and the t3 handoff's thread line
+    - hash: 84ef6218
+      what: copy of DEV-611 3cf93d5e (now on main as c9802f1d); drops on rebase
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test
+      result: passed
+      reason: test:agent failed to compile with the disk full (sccache temp dir); rerun as RUSTC_WRAPPER= cargo nextest run --workspace (2261 passed) + test:ui/release/hooks passed
+    - command: npm run smoke
+      result: passed
+      reason: RUSTC_WRAPPER= npm run test:smoke:agent, 405 passed
+    next: Review, then merge (rebase onto main drops 84ef6218)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
 description: |-
@@ -39,3 +66,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
+- at: 2026-11-16T23:29:57.237179+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:30:13.874720+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

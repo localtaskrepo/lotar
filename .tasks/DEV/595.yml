@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-15T23:22:25.966473+00:00
-modified: 2026-11-16T21:08:04.708452+00:00
+modified: 2026-11-16T23:30:37.573481+00:00
 relationships:
   related:
   - DEV-596
@@ -163,6 +163,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b9f951b-11e8-40a4-80c4-a37903d8e5c6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad001b9e9-93c3-4db1-8a59-c80d1bf9021d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af2574820-8d98-45fe-8db3-33d3791eb2b2
+releases:
+- 7
 description: 'Found: MGP-13 job job-20261115T212717.075Z-1 (mailgpg) failed at the end: `git branch --force agent/MGP-13 607bcc8` -> ''cannot force update the branch used by worktree at ~/.t3/worktrees/mailgpg/agent-MGP-13-93bc836e8df965ff''. The ticket went back to HelpNeeded although the work was done. Check: a T3 job whose thread branch differs from agent/<ID> while agent/<ID> is checked out in its agent worktree. Done: LoTaR moves the branch in that worktree (reset when clean, or detach first) instead of failing the job.'
 tags:
 - health
@@ -391,3 +393,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593","DEV-592","DEV-563","DEV-594","DEV-598"]}'
     new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593","DEV-592","DEV-563","DEV-594","DEV-598","DEV-577"]}'
+- at: 2026-11-16T23:30:37.573481+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

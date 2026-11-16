@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:29:53.068923+00:00
-modified: 2026-11-16T21:35:12.347922+00:00
+modified: 2026-11-16T23:30:37.900546+00:00
 relationships:
   related:
   - DEV-594
@@ -21,6 +21,7 @@ relationships:
   - DEV-604
   - DEV-606
   - DEV-605
+  - DEV-611
 comments:
 - date: 2026-11-16T02:33:15.242181+00:00
   author: claude
@@ -133,6 +134,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ad4dd44-6ea0-4933-aaad-8f8d816b2933
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa06b6ffb-a7f3-4a4a-94c5-7ca758534437
+releases:
+- 7
 description: |-
   Found in the DEV-594 review (043e01bd). T3 Code reports a thread that waits for an answer as status running with pendingRequestCount > 0 (harnessmux 0.1.9 backend/t3.rs RunState). running_t3_thread treats that as running, so after a handback the owner's next job on the ticket (a retry option, a reassignment) waits in the queue until the T3 question is answered, and no comment says why. It also ignores activeRunId, which harnessmux counts as running. Check: leave a thread waiting for an answer, assign the ticket to another profile, see the queue entry wait silently.
 
@@ -327,3 +330,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606"]}'
     new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605"]}'
+- at: 2026-11-16T23:26:53.678968+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605","DEV-611"]}'
+- at: 2026-11-16T23:30:37.900546+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

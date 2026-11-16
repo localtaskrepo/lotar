@@ -536,9 +536,11 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
     assert_eq!(read("fix").matches("\"method\":\"session/new\"").count(), 1, "the rework is the next turn of the fix session");
     assert!(read("fix").contains("\"method\":\"session/resume\""), "resumed with the rework's environment (DEV-565)");
     assert!(fix[1].contains("Review: keep fix.txt but say why 1"), "the rework gets the review: {}", fix[1]);
+    // DEV-620: the prompt carries the newest round only; the review reaches the merge through the ticket's
+    // comments and the review session's log.
     assert!(
-        merge[0].contains("Review: keep fix.txt but say why 1") && merge[0].matches("Fixed: fix.txt holds the fix 1").count() >= 2,
-        "the merge agent gets both: {}",
+        merge[0].contains("Recent context (the newest 2 of 6 prompts and replies") && merge[0].contains("- assistant: Fixed: fix.txt holds the fix 1"),
+        "the merge agent gets the rework: {}",
         merge[0]
     );
     assert!(merge[0].contains("-PIPE-1-review (codex agent"), "and the review session: {}", merge[0]);
@@ -750,7 +752,7 @@ fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
     std::fs::write(failed.join("half-done.txt"), "work").unwrap();
     run_t3(&fixtures, "fix").success();
     let prompt = std::fs::read_to_string(root.join("t3.log.prompt-0")).unwrap();
-    assert!(prompt.contains("or on a branch T3 Code made from it"), "{prompt}");
+    assert!(prompt.contains("or one T3 Code made from it"), "{prompt}");
     let failed = std::fs::canonicalize(&failed).unwrap();
     assert!(prompt.contains(&format!("uncommitted changes in `{}` (branch `agent/TEST-1`)", failed.display())), "{prompt}");
     assert!(failed.join("half-done.txt").is_file(), "the earlier work stays where it is");

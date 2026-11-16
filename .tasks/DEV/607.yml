@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T03:37:27.096061+00:00
-modified: 2026-11-16T23:17:30.608669+00:00
+modified: 2026-11-16T23:30:38.342646+00:00
 relationships:
   related:
   - DEV-597
@@ -17,6 +17,7 @@ relationships:
   - DEV-605
   - DEV-606
   - DEV-608
+  - DEV-611
 comments:
 - date: 2026-11-16T04:08:26.235549+00:00
   author: claude
@@ -192,6 +193,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28ddd3b6-4d53-460f-885b-9eb324f37114
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7924a165-7c21-4943-8ec6-657dc2c32de6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7cc8907-407e-4649-993c-1e11eb51c734
+releases:
+- 7
 description: |-
   `smoke/tests/ui.global-actions.smoke.spec.ts` > "keeps actions usable and creates in the known project on desktop" timed out again in a full `npm run test:smoke:agent` run, after DEV-597 was marked Done.
 
@@ -355,3 +358,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626"]}'
     new: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626","DEV-605","DEV-606","DEV-608"]}'
+- at: 2026-11-16T23:26:53.680342+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626","DEV-605","DEV-606","DEV-608"]}'
+    new: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626","DEV-605","DEV-606","DEV-608","DEV-611"]}'
+- at: 2026-11-16T23:30:38.342646+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T22:53:23.633688+00:00
+modified: 2026-11-16T23:30:29.839050+00:00
 relationships:
   related:
   - DEV-599
@@ -149,6 +149,35 @@ comments:
       result: not_run
       reason: same reason; passed on 02c1cd8a
     next: Review, then merge (the merge agent runs the full checks)
+- date: 2026-11-16T23:30:29.839050+00:00
+  author: claude
+  text: |-
+    Retry done: branch rebased onto main, which now holds DEV-599; the test passes there and every check passes.
+
+    - The earlier review, merge and fix jobs failed on Claude rate limits, not on the work.
+    - Rebase onto `804cb0f9`: I dropped the DEV-599 copy `45730a7f` because main holds DEV-599 (`01a9160e`, reworked, so the copy conflicted). The branch is now one signed commit, `18c14d16`, test file only (+31 lines).
+    - `running_t3_thread` on main still has the `&& *known == asked` check. Without it, the new test fails (6 `t3 thread show` calls, 8 expected).
+    - The disk was full (4.4 GB free) and about 20 lotar builds ran at once, so sccache failed. I deleted my own `target/debug` and reran the tests with `RUSTC_WRAPPER=`.
+  report:
+    commits:
+    - hash: 18c14d16
+      what: test a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer
+    checks:
+    - command: cargo nextest run --workspace -E 'test(/dev503_harness_jobs_test/)'
+      result: passed
+      reason: 35/35
+    - command: 'mutation: drop ''&& *known == asked'''
+      result: passed
+      reason: test fails, 6 shows vs 8
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2259 tests, RUSTC_WRAPPER= after sccache hit the full disk
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    next: Review, then merge branch t3/ddced517
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177bbfb8-8291-4dbc-bae5-a926f125a36d
@@ -313,3 +342,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583"]}'
     new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626"]}'
+- at: 2026-11-16T23:30:29.839050+00:00
+  actor: claude
+  changes:
+  - field: comment_added

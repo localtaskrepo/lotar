@@ -1,17 +1,18 @@
 title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-16T22:53:23.634860+00:00
+modified: 2026-11-16T23:32:03.077905+00:00
 relationships:
   depends_on:
   - DEV-602
   related:
   - DEV-602
   - DEV-626
+  - DEV-613
 comments:
 - date: 2026-11-16T05:29:25.407255+00:00
   author: automation
@@ -76,6 +77,37 @@ comments:
 
     - Both failed jobs' T3 threads came back after the rate limit and started the same fix. This one (`t3/cf3ddb2f`, job `job-20261116T061938.697Z-68`) made no edits or commits.
     - I told the other thread that it owns the ticket and that the status still shows the retry question (HelpNeeded, assigned to mallox).
+- date: 2026-11-16T23:31:03.991893+00:00
+  author: claude
+  text: |-
+    Fixed on top of DEV-602 (now on main): a branch name a ticket's earlier job logged no longer pulls `agent/<ID>` onto another ticket's work.
+
+    - `holds_logged_work` in `crates/lotar-lib/src/services/agent_job_service.rs`: a branch counted only for its logged name must build on a logged `ticket_commit` that main lacks, or hold an unlanded commit whose subject starts with the ticket ID (`TEST-1 fix`, `TEST-1:`, `TEST-1-fix`; not `TEST-10`). `agent/<ID>` and `BranchOwners` branches count as before. A git error skips the branch.
+    - "Done when" sharpened: a logged commit already on main doesn't count, since every branch made from main descends from it.
+    - Test `a_logged_branch_name_another_ticket_reuses_is_not_the_tickets_work` (`dev503_harness_jobs_test.rs`) failed before the fix (`agent/TEST-1` followed `TEST-10 other work`) and passes after it. All 35 tests in the file pass, DEV-602's included.
+    - `docs/help/agent.md`: the job-start rule says so.
+    - Checks: the disk filled up (259 MiB free), which broke sccache and the first smoke build. I deleted only my own worktree's `target/debug`, then reran with `RUSTC_WRAPPER=`. `a_queue_entry_held_by_a_waiting_thread_says_so_once` failed 4 times in 6 runs. That's the known DEV-613 flake: my code isn't on the queue path. The full suite passed.
+  report:
+    commits:
+    - hash: 1f8b1bf5
+      what: a logged branch name counts only while the branch holds the ticket's work
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+      reason: test:rust 2259/2259 with --no-fail-fast, test:ui/release/hooks passed; RUSTC_WRAPPER= after sccache errors
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    next: Review on another model, then merge
+- date: 2026-11-16T23:32:03.077905+00:00
+  author: claude
+  text: |-
+    Retry question settled: the fix is done (`1f8b1bf5` on `agent/DEV-612`), so no retry is needed. Started the review on Codex.
+
+    - Both failed jobs (`job-20261116T061756.329Z-56`, `job-20261116T061938.697Z-68`) hit the rate limit. Their threads resumed afterwards; one did the fix, the other (`t3/cf3ddb2f`) stopped with no changes.
+    - Ran `lotar automation run "Answered in the thread: review on Codex" --select 'id:DEV-612'`: Reviewing, `@review`.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2bfb120b-d5dd-42da-8b97-d8582d5bcefb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09feb0e9-5605-42cb-b08e-a17fad3257e2
@@ -260,3 +292,26 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-602"],"related":["DEV-602"]}'
     new: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626"]}'
+- at: 2026-11-16T23:31:03.991893+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:31:04.149182+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626"]}'
+    new: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613"]}'
+- at: 2026-11-16T23:31:55.012148+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: mallox
+    new: '@review'
+- at: 2026-11-16T23:32:03.077905+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,0 +1,28 @@
+title: Job prompt shows an empty Comments section when no comment is picked
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T23:31:43.159892+00:00
+modified: 2026-11-16T23:31:43.665837+00:00
+relationships:
+  related:
+  - DEV-620
+description: |-
+  Found in the DEV-620 review.
+
+  ## Found
+  - `build_prompt` in `crates/lotar-lib/src/services/agent_job_service.rs` writes the "Comments (N on the ticket; below the open question and the newest fix and review comments …)" header whenever the ticket has comments, even when `prompt_comments` picks none.
+  - That happens when every comment is automation's, or all were written before the ticket was first assigned to an agent profile (no phase), for example the owner's notes on a new ticket before its first fix job.
+  - `docs/help/agent.md` (Context between phases) describes the open question without "not written by that person" and doesn't say how the answer is found, both of which the code and DEV-620's "Done when" have.
+
+  ## Done when
+  - [ ] No comment picked: the prompt's Comments section is a single line with the count and the `lotar show` / `lotar task timeline` commands, without "below the …"; a unit test covers it.
+  - [ ] `docs/help/agent.md` gives the open-question and answer rules as the code applies them.
+history:
+- at: 2026-11-16T23:31:43.665837+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

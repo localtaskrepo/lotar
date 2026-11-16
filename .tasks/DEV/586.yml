@@ -5,7 +5,7 @@ type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T21:29:20.908261+00:00
-modified: 2026-11-16T02:23:28.057428+00:00
+modified: 2026-11-16T23:30:37.144450+00:00
 relationships:
   blocks:
   - DEV-580
@@ -106,6 +106,8 @@ comments:
       result: not_run
       reason: no rules or config changed
     next: 'None: merged and pushed'
+releases:
+- 7
 description: |-
   Found 2026-11-15 during DEV-580 merge verification on 175e36d0 (main base f37cbaa0). Approved unsandboxed npm run test:smoke:agent built successfully, then failed 12/404 tests (392 passed, 191.04s). No merge performed. The DEV-466 agent independently passed 404/404 on its different source tree; load is a hypothesis, not a proven cause.
 
@@ -223,3 +225,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-580"],"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520","DEV-587","DEV-581","DEV-590"]}'
     new: '{"blocks":["DEV-580"],"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520","DEV-587","DEV-581","DEV-590","DEV-597"]}'
+- at: 2026-11-16T23:30:37.144450+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

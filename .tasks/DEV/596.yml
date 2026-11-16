@@ -5,7 +5,7 @@ type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-15T23:48:39.768341+00:00
-modified: 2026-11-16T19:25:28.080867+00:00
+modified: 2026-11-16T23:30:37.662501+00:00
 relationships:
   related:
   - DEV-583
@@ -92,6 +92,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49ceb12b-687e-4f8a-a475-6b5b32ba3259
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91d06f33-b818-4246-b05b-fd996cd0b911
+releases:
+- 7
 description: 'Found: merge, fix and fix-codex jobs on LOCA-317 (job-20261115T234212.302Z-586, -587, -588) all end with ''git worktree add failed (path_already_exists)'' in /Users/mallox/Development/local. A detached worktree ~/.t3/worktrees/local/agent-LOCA-317-2aa6ebb394abb948 (86751f0) exists, and branch agent/LOCA-317 does not; the work is on t3/opgate-license-readme-security-ci-2 (0a44163). Related: DEV-583, DEV-595. Check: lotar agent job on LOCA-317 starts a thread. Done: a job on LOCA-317 gets a worktree on agent/LOCA-317 holding 0a44163.'
 tags:
 - health
@@ -185,3 +187,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580","DEV-594"]}'
     new: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580","DEV-594","DEV-618"]}'
+- at: 2026-11-16T23:30:37.662501+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

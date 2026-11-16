@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:56:31.049417+00:00
-modified: 2026-11-16T23:17:30.608058+00:00
+modified: 2026-11-16T23:30:38.280989+00:00
 relationships:
   related:
   - DEV-563
@@ -195,6 +195,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb16e3cc-20d8-4008-8f95-134c2dcd230d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af363bd91-e584-4ad2-9bb9-11c23f032066
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afc76cf49-37ae-4426-a70e-6c44de68530b
+releases:
+- 7
 description: 'Found in the DEV-563 run on 2026-11-15: `npm run test:smoke:agent` failed once at `smoke/tests/ui.board-layout.smoke.spec.ts:58` (moveVia): `locator.click` on `Move WontDo` (a <summary>) timed out after 30 s although the element was visible, enabled and stable. The same spec passed 3 of 3 runs alone (`npm run -s test:smoke:quick:agent tests/ui.board-layout.smoke.spec.ts`). Done when the click no longer depends on load (wait for the dialog state the click needs) and the full smoke passes repeatedly.'
 tags:
 - health
@@ -363,3 +365,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-563","DEV-575","DEV-614","DEV-617","DEV-600","DEV-602","DEV-605","DEV-611"]}'
     new: '{"related":["DEV-563","DEV-575","DEV-614","DEV-617","DEV-600","DEV-602","DEV-605","DEV-611","DEV-607"]}'
+- at: 2026-11-16T23:30:38.280989+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

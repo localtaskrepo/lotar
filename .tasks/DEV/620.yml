@@ -1,11 +1,11 @@
 title: 'Job prompt: carry the description, the open question and the last fix and review comments; shorter built-in instructions'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T18:42:09.946527+00:00
-modified: 2026-11-16T23:20:38.517865+00:00
+modified: 2026-11-16T23:32:15.522901+00:00
 relationships:
   related:
   - DEV-608
@@ -13,6 +13,8 @@ relationships:
   - DEV-618
   - DEV-563
   - DEV-619
+  - DEV-628
+  - DEV-605
 comments:
 - date: 2026-11-16T20:03:10.910172+00:00
   author: claude
@@ -72,6 +74,33 @@ comments:
 
     - `t3_thread_notes` in `agent_job_service.rs`: keep this branch's shorter first format string and DEV-608's `is_merge_job` parameter, early return and uncommitted-worktrees loop text
     - Agent profile struct in `crates/lotar-core/src/config/types.rs`: keep this branch's `context_entries` and `full_history` and DEV-619's `thread_name`
+- date: 2026-11-16T23:32:01.950545+00:00
+  author: claude
+  text: |-
+    Review: passed. `2c1dfd8b` does what "Done when" asks; one minor follow-up filed as [DEV-628](https://lotar.pyxzl.net/task/DEV-628).
+
+    - Read: the diff `git diff main...HEAD` (6 files), the ticket and its comments, the "Done when", and main's later commits to `agent_job_service.rs` (DEV-605, DEV-608, DEV-611)
+    - `prompt_comments` follows the "Done when" rules: question or hand-back, the answer, phase from the last `@` profile assignment, `@merge` and automation left out; each comment cut at 1,500 characters with " …"; no section when the ticket has no comments
+    - `context_entries` (default 2, `0` none) and `full_history` (wins) are read in `start_job`; no other code lists profile fields, so nothing else needed changing; docs `agent.md` and `config-reference.md` updated
+    - Instructions: `docs/help/agent-instructions.md` 3,943 → 2,434 characters (raw). Same rules, said shorter: the CLI path, heredoc comments, report flags, the sandbox retries, the hand-back. The "Run the LoTaR CLI as" job note stays
+    - Nothing parses the old `Recent context:` header (searched lotar and standards)
+    - Merge: `git merge-tree main HEAD` is clean
+    - Minor, filed as [DEV-628](https://lotar.pyxzl.net/task/DEV-628): the Comments header still prints when no comment is picked (only automation's, or all written before the first agent assignment). `agent.md` also leaves out "not written by that person" and the rule for finding the answer
+    - Branch diff `main..HEAD` looks huge because main has moved on; the branch's own change is only these 6 files
+  report:
+    checks:
+    - command: cargo nextest (prompt, instructions, context, dev503 tests, RUSTC_WRAPPER=)
+      result: passed
+      reason: 65 of 65; the DEV-613 flake a_queue_entry_held_by_a_waiting_thread_says_so_once failed on the first run and alone, passed in the full group
+    - command: npm run lint:agent (RUSTC_WRAPPER=)
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the fix agent ran it; I reran the targeted tests
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change; the fix agent ran it (405 passed)
+    next: 'Merge: rebase onto main (git merge-tree shows no conflicts with DEV-605, DEV-608, DEV-611) and run the gates'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79143270-686a-4330-848d-940b822b946e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acd704542-d988-4f64-b33e-a1f8e3cde077
@@ -220,3 +249,28 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acd704542-d988-4f64-b33e-a1f8e3cde077
+- at: 2026-11-16T23:31:43.331204+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628"]}'
+- at: 2026-11-16T23:32:01.950545+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:32:02.127045+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605"]}'
+- at: 2026-11-16T23:32:15.522901+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

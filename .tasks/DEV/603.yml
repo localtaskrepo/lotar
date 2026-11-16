@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:33:13.636+00:00
-modified: 2026-11-16T18:45:21.389480+00:00
+modified: 2026-11-16T23:30:38.100921+00:00
 relationships:
   related:
   - DEV-602
@@ -99,6 +99,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdbbb661-1e5b-4a66-ac04-a25e682f8972
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3121b39f-806a-4012-9aec-19490594a253
+releases:
+- 7
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
 
@@ -233,3 +235,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-602","DEV-611","DEV-593","DEV-594","DEV-464","DEV-563"]}'
     new: '{"related":["DEV-602","DEV-611","DEV-593","DEV-594","DEV-464","DEV-563","DEV-605"]}'
+- at: 2026-11-16T23:30:38.100921+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

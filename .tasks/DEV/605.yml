@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T23:17:30.607034+00:00
+modified: 2026-11-16T23:32:02.126105+00:00
 relationships:
   related:
   - DEV-577
@@ -21,6 +21,7 @@ relationships:
   - DEV-608
   - DEV-611
   - DEV-607
+  - DEV-620
 comments:
 - date: 2026-11-16T04:16:01.944881+00:00
   author: claude
@@ -273,6 +274,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A00fc84dc-ce84-47c3-958e-479bc82e412f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa01c6d51-0c9d-4628-bedb-1fd0579e56b3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4743dd70-ff62-46df-935d-ab177f4f14cf
+releases:
+- 7
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker. Owner 2026-11-15: this replaces his 2026-11-12 decision to run merges as a turn of the fix thread (standards docs/decisions/2026-11-11-merge-in-fix-thread.md); standards STD-124 (reviews and merges headless) is related.
 
@@ -561,3 +564,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608","DEV-611"]}'
     new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608","DEV-611","DEV-607"]}'
+- at: 2026-11-16T23:30:38.223678+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'
+- at: 2026-11-16T23:32:02.126105+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608","DEV-611","DEV-607"]}'
+    new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608","DEV-611","DEV-607","DEV-620"]}'

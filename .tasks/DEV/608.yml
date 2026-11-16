@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-16T04:26:06.797877+00:00
-modified: 2026-11-16T23:17:30.609168+00:00
+modified: 2026-11-16T23:30:38.426882+00:00
 relationships:
   related:
   - DEV-583
@@ -178,6 +178,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abfed84ea-94c7-430e-9237-f0f29dd7a541
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A738b4fba-435a-47dd-b912-2e9faa02478a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca85fc7-0859-483f-a5eb-7aef9b23e97d
+releases:
+- 7
 description: |-
   Found in the DEV-583 review (eba9fc33). `t3_thread_notes` (`crates/lotar-lib/src/services/agent_job_service.rs`, `uncommitted_ticket_worktrees`) lists every worktree of the ticket with uncommitted changes and says "carry over what you need; leave that worktree as it is". Since the worktree is left as it is, the note stays in every later T3 job on the ticket: the review job (told to change no files) and the merge job (which could pull in changes the fix agent chose to drop). Check: fail a T3 fix job with uncommitted changes, retry it, then start the review: the review prompt still names the old worktree with 'carry over'.
 
@@ -365,3 +367,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-583","DEV-600","DEV-620","DEV-605","DEV-613","DEV-611"]}'
     new: '{"related":["DEV-583","DEV-600","DEV-620","DEV-605","DEV-613","DEV-611","DEV-607"]}'
+- at: 2026-11-16T23:30:38.426882+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

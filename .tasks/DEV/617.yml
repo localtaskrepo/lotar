@@ -1,11 +1,11 @@
 title: A @fix-codex retry after a Claude rate limit ran on Claude and failed the same way
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-16T22:32:22.215577+00:00
+modified: 2026-11-16T23:37:10.605857+00:00
 relationships:
   related:
   - DEV-584
@@ -78,3 +78,9 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-16T23:37:10.605857+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

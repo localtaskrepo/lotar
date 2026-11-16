@@ -302,6 +302,15 @@ pub struct AgentProfileDetail {
     /// 0 never resumes.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub continue_within_minutes: Option<u64>,
+    /// How many of the ticket's newest recent-context entries (prompts and
+    /// replies) the job's prompt carries, each cut (DEV-620). Default 2.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub context_entries: Option<usize>,
+    /// The prompt carries the ticket's history as before DEV-620: every
+    /// stored recent-context entry, uncut, and no comments. Wins over
+    /// `context_entries`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub full_history: Option<bool>,
     /// What the job does when the agent asks for permission.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub on_permission: Option<AgentPermissionPolicy>,

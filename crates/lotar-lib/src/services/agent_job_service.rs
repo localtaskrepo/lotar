@@ -298,7 +298,8 @@ impl AgentJobService {
             notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id, is_merge_job));
         }
         let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, &ticket_id, req.agent.as_deref()));
-        let prompt = build_prompt(&task, &user_prompt, context.as_ref(), earlier.as_deref(), instructions.as_deref(), Some(&notes));
+        let history = PromptHistory { full: profile.full_history.unwrap_or(false), entries: profile.context_entries.unwrap_or(DEFAULT_CONTEXT_ENTRIES) };
+        let prompt = build_prompt(&task, &user_prompt, context.as_ref(), history, earlier.as_deref(), instructions.as_deref(), Some(&notes));
 
         let created_at = Utc::now().to_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
@@ -1132,42 +1133,38 @@ final answer; LoTaR saves it as the job summary.\n"
         let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
         if t3_thread {
             notes.push_str(&format!(
-                "- You are working in a git worktree separate from the main checkout, on branch `{branch}` or on a branch \
-T3 Code made from it (`git branch --show-current` names it). Commit your work to the branch you are on before you finish: \
-LoTaR points `{branch}` at it when the job ends. If git refuses to commit (for example inside a sandbox), \
-leave the changes in place: LoTaR commits them when the job ends. Don't switch branches.\n"
+                "- You work in a git worktree on branch `{branch}` or one T3 Code made from it (`git branch --show-current`). \
+Commit your work to the branch you are on before you finish: LoTaR points `{branch}` at it when the job ends. \
+If git refuses (a sandbox), leave the changes: LoTaR commits them. Don't switch branches.\n"
             ));
         } else {
             notes.push_str(&format!(
-                "- You are working in a git worktree on branch `{branch}`, separate from the main checkout. \
-Commit your work to this branch before you finish. If git refuses to commit (for example inside a sandbox), \
-leave the changes in place: LoTaR commits them when the job ends. Don't switch branches.\n"
+                "- You work in a git worktree on branch `{branch}`, separate from the main checkout. Commit your work to it \
+before you finish; if git refuses (a sandbox), leave the changes: LoTaR commits them when the job ends. Don't switch branches.\n"
             ));
         }
         if is_merge_job {
             notes.push_str(&format!(
                 "- This is a merge job: it succeeds only if the branch ends up in the main checkout's current branch. \
-If git refuses to fast-forward the main checkout (for example inside a sandbox), leave it: LoTaR fast-forwards it when the job ends, \
-as long as the branch is rebased onto it. If you land the work in another form instead (for example you resolve conflicts \
-in the main checkout), start each of those commits' messages with `{ticket_id}`, so LoTaR counts the branch as landed. \
-If you don't land it (for example a check fails on the work), hand the ticket back, assigning it as under \"Clarifications, blockers and feedback\": \
-LoTaR then leaves the branch unmerged.\n"
+If git refuses to fast-forward the main checkout (a sandbox), leave it: LoTaR fast-forwards it when the job ends, if the branch \
+is rebased onto it. If you land the work another way (for example conflicts resolved in the main checkout), start each of those \
+commits' messages with `{ticket_id}`, so LoTaR counts the branch as landed. Not landed (for example a check fails on the work): \
+hand the ticket back as under \"Clarifications, blockers and feedback\"; LoTaR leaves the branch unmerged.\n"
             ));
         }
     } else {
-        notes.push_str("- You are working in the main checkout. Leave your changes uncommitted unless the ticket or your instructions ask for a commit.\n");
+        notes.push_str("- You work in the main checkout. Leave your changes uncommitted unless the ticket or your instructions ask for a commit.\n");
     }
     if AutomationService::handles_job_end(tasks_dir, ticket_id) {
         notes.push_str(
             "- When this job ends, LoTaR's automation rules move this ticket to the next step as if you finished. \
-If you finished, don't change its status or assignee; add a comment that says what you did. \
-If you could not finish (you are blocked, something fails that you can't fix, or you need a decision), \
-hand the ticket back as described under \"Clarifications, blockers and feedback\" so it doesn't move on.\n",
+Finished: leave status and assignee, and comment what you did. Not finished (blocked, a failure you can't fix, a decision needed): \
+hand the ticket back as under \"Clarifications, blockers and feedback\", so it doesn't move on.\n",
         );
     } else {
         notes.push_str(
-            "- No automation rule updates this ticket when the job ends. When you finish, \
-set its status to a configured status that fits the result (for example a review status) and add a comment that says what you did.\n",
+            "- No automation rule updates this ticket when the job ends. When you finish, set a configured status that fits \
+(for example a review status) and comment what you did.\n",
         );
     }
     notes
@@ -1211,10 +1208,96 @@ something you need.\n",
     Some(text)
 }
 
+/// How much of the ticket's history a job's prompt carries (DEV-620).
+#[derive(Clone, Copy)]
+struct PromptHistory {
+    /// As before DEV-620: every stored recent-context entry, uncut, and no comments.
+    full: bool,
+    /// The newest recent-context entries the prompt carries.
+    entries: usize,
+}
+
+/// The previous job's prompt and reply: its comments carry the rest.
+const DEFAULT_CONTEXT_ENTRIES: usize = 2;
+/// Where a comment or recent-context entry in the prompt is cut.
+const PROMPT_EXCERPT_CHARS: usize = 1500;
+
+fn excerpt(text: &str) -> String {
+    let text = text.trim();
+    let mut out: String = text.chars().take(PROMPT_EXCERPT_CHARS).collect();
+    if text.chars().count() > PROMPT_EXCERPT_CHARS {
+        out.push_str(" …");
+    }
+    out
+}
+
+/// The comments a job's prompt carries (DEV-620), oldest first: the open
+/// question (the newest comment before the ticket was last handed to a
+/// person, not by that person, or the newest with a question), the answer
+/// to it, and the newest fix and review comments. A comment's phase is the
+/// profile the ticket was last assigned to when it was written (a person
+/// working on it continues that profile's phase): `@review…` is a review,
+/// `@merge…` neither, any other profile a fix. Automation's comments are
+/// left out.
+fn prompt_comments(task: &crate::api_types::TaskDTO) -> Vec<(&'static str, &crate::types::TaskComment)> {
+    let assignments: Vec<(&str, &str)> = task
+        .history
+        .iter()
+        .flat_map(|entry| {
+            entry.changes.iter().filter(|change| change.field == "assignee").map(|change| (entry.at.as_str(), change.new.as_deref().unwrap_or("").trim()))
+        })
+        .collect();
+    let is_person = |name: &str| !name.is_empty() && !name.starts_with('@');
+    let phase_at = |date: &str| {
+        let profile = assignments.iter().take_while(|(at, _)| *at <= date).filter(|(_, name)| name.starts_with('@')).last();
+        profile.map(|(_, name)| name.to_ascii_lowercase()).unwrap_or_default()
+    };
+
+    let handed_back = assignments.iter().rev().find(|(_, name)| is_person(name));
+    let before_hand_back = handed_back.and_then(|(at, name)| {
+        task.comments.iter().rposition(|comment| comment.date.as_str() <= *at && comment.author.as_deref().map(str::trim) != Some(*name))
+    });
+    let with_question = task.comments.iter().rposition(|comment| comment.question.is_some());
+    let question = before_hand_back.max(with_question);
+    let answer = question.and_then(|index| {
+        // The person the question's phase handed the ticket to: the hand-back can be logged just before the comment.
+        let date = task.comments[index].date.as_str();
+        let phase_start = assignments.iter().rposition(|(at, name)| *at <= date && name.starts_with('@')).unwrap_or(0);
+        let asked = assignments.iter().skip(phase_start).find(|(_, name)| is_person(name)).map(|(_, name)| *name);
+        task.comments
+            .iter()
+            .enumerate()
+            .skip(index + 1)
+            .find_map(|(i, comment)| (comment.answer.is_some() || (asked.is_some() && comment.author.as_deref().map(str::trim) == asked)).then_some(i))
+    });
+    let newest_in = |review: bool| {
+        let in_phase = |comment: &crate::types::TaskComment| {
+            let phase = phase_at(&comment.date);
+            let is_review = comment.review.is_some() || phase.starts_with("@review");
+            !phase.is_empty() && !phase.starts_with("@merge") && is_review == review && comment.author.as_deref() != Some("automation")
+        };
+        task.comments.iter().enumerate().rev().find(|(i, comment)| Some(*i) != question && in_phase(comment)).map(|(i, _)| i)
+    };
+
+    let mut picked: Vec<(usize, &'static str)> = Vec::new();
+    let question_label = if answer.is_some() { "Question" } else { "Open question" };
+    for (index, label) in [(question, question_label), (answer, "Answer"), (newest_in(false), "Newest fix comment"), (newest_in(true), "Newest review comment")]
+    {
+        if let Some(index) = index
+            && !picked.iter().any(|(i, _)| *i == index)
+        {
+            picked.push((index, label));
+        }
+    }
+    picked.sort_by_key(|(index, _)| *index);
+    picked.into_iter().map(|(index, label)| (label, &task.comments[index])).collect()
+}
+
 fn build_prompt(
     task: &crate::api_types::TaskDTO,
     user_prompt: &str,
     context: Option<&crate::services::agent_context_service::AgentContextFile>,
+    history: PromptHistory,
     earlier_sessions: Option<&str>,
     instructions: Option<&str>,
     job_notes: Option<&str>,
@@ -1275,12 +1358,37 @@ fn build_prompt(
         }
     }
 
+    if !history.full && !task.comments.is_empty() {
+        out.push_str(&format!(
+            "\nComments ({} on the ticket; below the open question and the newest fix and review comments, each cut at {PROMPT_EXCERPT_CHARS} characters. \
+All of them: `lotar show {id}`; the history: `lotar task timeline {id}`):\n",
+            task.comments.len(),
+            id = task.id
+        ));
+        for (label, comment) in prompt_comments(task) {
+            let author = comment.author.as_deref().unwrap_or("unknown");
+            out.push_str(&format!("- {label}, by {author}, {}:\n{}\n", comment.date, excerpt(&comment.text)));
+        }
+    }
+
     if let Some(ctx) = context
         && !ctx.messages.is_empty()
     {
-        out.push_str("\nRecent context:\n");
-        for msg in &ctx.messages {
-            out.push_str(&format!("- {}: {}\n", msg.role, msg.content));
+        if history.full {
+            out.push_str("\nRecent context:\n");
+            for msg in &ctx.messages {
+                out.push_str(&format!("- {}: {}\n", msg.role, msg.content));
+            }
+        } else if history.entries > 0 {
+            let start = ctx.messages.len().saturating_sub(history.entries);
+            out.push_str(&format!(
+                "\nRecent context (the newest {} of {} prompts and replies, each cut at {PROMPT_EXCERPT_CHARS} characters):\n",
+                ctx.messages.len() - start,
+                ctx.messages.len()
+            ));
+            for msg in &ctx.messages[start..] {
+                out.push_str(&format!("- {}: {}\n", msg.role, excerpt(&msg.content)));
+            }
         }
     }
     if let Some(sessions) = earlier_sessions {
@@ -1418,10 +1526,10 @@ struct T3Worktree {
 fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool) -> String {
     let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
     let mut notes = format!(
-        "- This job runs as a T3 Code thread, which doesn't get LoTaR's environment. Add `--tasks-dir \"{}\"` \
-to every lotar command, so it changes this ticket in the main checkout and not a copy in a worktree.\n\
-- The job ends when your turn ends, even while `t3_background_wait` keeps the thread working. Run tests and other \
-checks in the foreground and finish all work before your final message; don't end your turn to wait for background work.\n",
+        "- A T3 Code thread doesn't get LoTaR's environment: add `--tasks-dir \"{}\"` to every lotar command, \
+so it changes the ticket in the main checkout, not a worktree copy.\n\
+- The job ends with your turn, even while `t3_background_wait` keeps the thread working: run checks in the foreground \
+and finish before your final message.\n",
         dir.display()
     );
     if is_merge_job {
@@ -5035,10 +5143,129 @@ mod tests {
         }
     }
 
+    const BRIEF: PromptHistory = PromptHistory { full: false, entries: DEFAULT_CONTEXT_ENTRIES };
+
+    fn comment(date: &str, author: &str, text: &str) -> crate::types::TaskComment {
+        crate::types::TaskComment::new(date.to_string(), Some(author.to_string()), text.to_string())
+    }
+
+    fn assigned(at: &str, old: Option<&str>, new: &str) -> crate::types::TaskChangeLogEntry {
+        crate::types::TaskChangeLogEntry {
+            at: at.to_string(),
+            actor: Some("claude".to_string()),
+            changes: vec![crate::types::TaskChange { field: "assignee".to_string(), old: old.map(str::to_string), new: Some(new.to_string()) }],
+            ..Default::default()
+        }
+    }
+
+    /// DEV-620: a ticket that went fix, question, answer, fix, review, rework and review again. The prompt carries
+    /// the question and its answer and the newest fix and review comments, cut, and says how to read the rest.
+    fn churned_task() -> crate::api_types::TaskDTO {
+        let mut task = sample_task();
+        task.comments = vec![
+            comment("2026-11-16T01:00:00Z", "claude", "Plan: old fix progress"),
+            comment("2026-11-16T02:00:00Z", "claude", "Question: A or B?"),
+            comment("2026-11-16T03:00:00Z", "mallox", "Answer: A"),
+            comment("2026-11-16T04:00:00Z", "claude", "Done as decided: first fix"),
+            comment("2026-11-16T05:00:00Z", "codex", "Review: blocked, first review"),
+            comment("2026-11-16T06:00:00Z", "claude", &format!("Reworked: {}", "x".repeat(2000))),
+            comment("2026-11-16T07:00:00Z", "codex", "Review: passed"),
+        ];
+        task.history = vec![
+            assigned("2026-11-16T00:30:00Z", None, "@fix"),
+            assigned("2026-11-16T02:00:10Z", Some("@fix"), "mallox"),
+            assigned("2026-11-16T03:00:05Z", Some("mallox"), "@fix"),
+            assigned("2026-11-16T04:00:10Z", Some("@fix"), "@review-codex"),
+            assigned("2026-11-16T05:00:10Z", Some("@review-codex"), "@fix"),
+            assigned("2026-11-16T06:00:10Z", Some("@fix"), "@review-codex"),
+            assigned("2026-11-16T07:00:10Z", Some("@review-codex"), "@merge"),
+        ];
+        task
+    }
+
+    #[test]
+    fn the_prompt_carries_the_question_and_the_newest_fix_and_review_comments() {
+        let task = churned_task();
+        let picked: Vec<(&str, &str)> = prompt_comments(&task).into_iter().map(|(label, comment)| (label, comment.date.as_str())).collect();
+        assert_eq!(
+            picked,
+            vec![
+                ("Question", "2026-11-16T02:00:00Z"),
+                ("Answer", "2026-11-16T03:00:00Z"),
+                ("Newest fix comment", "2026-11-16T06:00:00Z"),
+                ("Newest review comment", "2026-11-16T07:00:00Z"),
+            ]
+        );
+
+        let prompt = build_prompt(&task, "merge it", None, BRIEF, None, None, None);
+        assert!(prompt.contains("Comments (7 on the ticket;"), "{prompt}");
+        assert!(prompt.contains("`lotar show TEST-1`") && prompt.contains("`lotar task timeline TEST-1`"), "{prompt}");
+        assert!(prompt.contains("- Question, by claude, 2026-11-16T02:00:00Z:\nQuestion: A or B?"), "{prompt}");
+        assert!(!prompt.contains("old fix progress") && !prompt.contains("first review") && !prompt.contains("first fix"), "{prompt}");
+        assert!(prompt.contains(&format!("Reworked: {} …", "x".repeat(PROMPT_EXCERPT_CHARS - "Reworked: ".len()))), "cut at the set length");
+    }
+
+    /// DEV-620, as on DEV-563: the fix agent works on while the owner holds the ticket after a hand-back, with
+    /// automation comments in between, and the hand-back is logged just before its question.
+    #[test]
+    fn work_after_a_hand_back_counts_for_the_phase_before_it() {
+        let mut task = sample_task();
+        let mut question = comment("2026-11-16T02:00:00.5Z", "automation", "Retry with which agent?");
+        question.question = serde_json::from_value(serde_json::json!({"options": []})).ok();
+        task.comments = vec![
+            comment("2026-11-16T01:00:00Z", "claude", "first fix report"),
+            question,
+            comment("2026-11-16T02:30:00Z", "mallox", "Answer: retry"),
+            comment("2026-11-16T03:00:00Z", "claude", "Rebased and checked"),
+            comment("2026-11-16T03:30:00Z", "automation", "The fix agent's job failed"),
+        ];
+        task.history = vec![assigned("2026-11-16T00:30:00Z", None, "@fix"), assigned("2026-11-16T02:00:00.1Z", Some("@fix"), "mallox")];
+        let picked: Vec<(&str, &str)> = prompt_comments(&task).into_iter().map(|(label, comment)| (label, comment.text.as_str())).collect();
+        assert_eq!(picked, vec![("Question", "Retry with which agent?"), ("Answer", "Answer: retry"), ("Newest fix comment", "Rebased and checked")]);
+    }
+
+    #[test]
+    fn a_question_without_an_answer_is_the_open_question() {
+        let mut task = churned_task();
+        task.comments.truncate(2);
+        task.history.truncate(2);
+        let picked: Vec<&str> = prompt_comments(&task).into_iter().map(|(label, _)| label).collect();
+        assert_eq!(picked, vec!["Newest fix comment", "Open question"]);
+    }
+
+    #[test]
+    fn recent_context_keeps_the_newest_entries_cut_and_full_history_brings_back_the_old_prompt() {
+        use crate::services::agent_context_service::{AgentContextFile, build_assistant_message, build_user_message};
+        let task = churned_task();
+        let context = AgentContextFile {
+            ticket_id: task.id.clone(),
+            updated_at: "now".to_string(),
+            messages: vec![
+                build_user_message("oldest prompt"),
+                build_assistant_message("old reply"),
+                build_user_message("newest prompt"),
+                build_assistant_message(&"r".repeat(3000)),
+            ],
+        };
+
+        let brief = build_prompt(&task, "go", Some(&context), BRIEF, None, None, None);
+        assert!(brief.contains("Recent context (the newest 2 of 4 prompts and replies"), "{brief}");
+        assert!(!brief.contains("oldest prompt") && brief.contains("- user: newest prompt"), "{brief}");
+        assert!(brief.contains(&format!("- assistant: {} …\n", "r".repeat(PROMPT_EXCERPT_CHARS))), "{brief}");
+
+        let none = build_prompt(&task, "go", Some(&context), PromptHistory { full: false, entries: 0 }, None, None, None);
+        assert!(!none.contains("Recent context"), "{none}");
+
+        let full = build_prompt(&task, "go", Some(&context), PromptHistory { full: true, entries: 0 }, None, None, None);
+        assert!(full.contains("\nRecent context:\n- user: oldest prompt\n"), "{full}");
+        assert!(full.contains(&format!("- assistant: {}\n", "r".repeat(3000))), "uncut");
+        assert!(!full.contains("Comments ("), "no comment excerpts: {full}");
+    }
+
     #[test]
     fn build_prompt_includes_ticket_and_request() {
         let task = sample_task();
-        let prompt = build_prompt(&task, "ship it", None, None, None, None);
+        let prompt = build_prompt(&task, "ship it", None, BRIEF, None, None, None);
         assert!(prompt.contains("TEST-1"));
         assert!(prompt.contains("ship it"));
     }
@@ -5046,7 +5273,7 @@ mod tests {
     #[test]
     fn build_prompt_includes_instructions() {
         let task = sample_task();
-        let prompt = build_prompt(&task, "ship it", None, None, Some("Use the tools"), Some("- Commit to the branch."));
+        let prompt = build_prompt(&task, "ship it", None, BRIEF, None, Some("Use the tools"), Some("- Commit to the branch."));
         assert!(prompt.contains("Agent instructions:"));
         assert!(prompt.contains("Use the tools"));
         let notes_at = prompt.find("This job:\n- Commit to the branch.").unwrap();
@@ -5075,14 +5302,14 @@ mod tests {
 
         let config = ResolvedConfig::from_global(GlobalConfig::default());
         let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap().unwrap();
-        assert!(resolved.contains("LoTaR CLI quick reference"), "built-in text kept");
+        assert!(resolved.contains("## LoTaR CLI\n"), "built-in text kept");
         assert!(resolved.ends_with("You are in the TESTING phase."));
 
         let mut config = ResolvedConfig::from_global(GlobalConfig::default());
         config.agent_instructions = Some(AgentInstructionsConfig::Inline("Follow AGENTS.md.".to_string()));
         let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap().unwrap();
         assert!(resolved.starts_with("Follow AGENTS.md."));
-        assert!(!resolved.contains("LoTaR CLI quick reference"));
+        assert!(!resolved.contains("## LoTaR CLI\n"));
         assert!(resolved.ends_with("You are in the TESTING phase."));
 
         config.agent_instructions = crate::config::normalization::parse_global_from_yaml_str("agent:\n  instructions: \"\"\n").unwrap().agent_instructions;
@@ -5420,6 +5647,12 @@ mod tests {
         ] {
             assert!(text.contains(phrase), "missing: {phrase}");
         }
+    }
+
+    /// DEV-620: the built-in instructions were 3.9k characters in every job; they say the same in two thirds.
+    #[test]
+    fn built_in_instructions_stay_short() {
+        assert!(DEFAULT_AGENT_INSTRUCTIONS.chars().count() <= 2600, "{} characters", DEFAULT_AGENT_INSTRUCTIONS.chars().count());
     }
 
     #[test]

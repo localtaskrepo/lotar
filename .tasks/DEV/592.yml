@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-16T04:20:30.947790+00:00
+modified: 2026-11-16T23:30:37.327857+00:00
 relationships:
   related:
   - DEV-524
@@ -253,6 +253,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A140b7670-fbae-43e1-b402-26593e485856
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29000f68-1ede-4764-b872-7846b217c776
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b2c8ec3-be3e-4315-b91e-3843b9a329a9
+releases:
+- 7
 description: |-
   After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
 
@@ -544,3 +546,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-524","DEV-595","DEV-594","DEV-593","DEV-598"]}'
     new: '{"related":["DEV-524","DEV-595","DEV-594","DEV-593","DEV-598","DEV-563"]}'
+- at: 2026-11-16T23:30:37.327857+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

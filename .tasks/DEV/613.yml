@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-16T22:37:12.959721+00:00
+modified: 2026-11-16T23:31:42.230629+00:00
 relationships:
   related:
   - DEV-600
@@ -13,6 +13,7 @@ relationships:
   - DEV-608
   - DEV-619
   - DEV-607
+  - DEV-612
 comments:
 - date: 2026-11-16T05:51:33.176016+00:00
   author: claude
@@ -100,9 +101,20 @@ comments:
     Seen again 2026-11-16 in the DEV-607 merge (load ~120): `dev503_harness_jobs_test.rs:769` `the entry still waits`.
 
     - `npm run test:agent`, worktree `t3-a42a9c69`, on `74796683`; alone it passed 5/5, and the next full run passed 2258/2258.
+- date: 2026-11-16T23:31:30.392482+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix isn't on `agent/DEV-613`, so the merge would land nothing and the flake stays on main.
+
+    - `git log main..agent/DEV-613` is empty: the branch sits at `804cb0f9`. Main still has `assert!(remove(...), "the entry still waits")` at `crates/lotar-lib/tests/dev503_harness_jobs_test.rs:814`.
+    - The fix exists twice, outside the review branch: commit `989c0a39` on `t3/6ec6d3a3` (worktree `t3-6ec6d3a3-2e432a0fe3f41fa2`), and the same change uncommitted in the `agent/DEV-613` worktree (`agent-DEV-613-435bae192ccea1c1`).
+    - The change itself is right and covers "Done when": `wait_for("the waiting entry's removal", || remove(...))`, using the file's existing `wait_for` (line 147).
+    - Fix: commit the change on `agent/DEV-613` (on current main, line 814), signed, then drop the copy on `t3/6ec6d3a3` once that's saved, so only one branch holds it.
+    - Not rerun: the stress check. There's nothing on the branch to run it on.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37610913-1767-4f04-b961-4185aa0051da
 description: |-
   Found in the DEV-600 review (`af2e42f2`).
 
@@ -116,6 +128,7 @@ description: |-
 tags:
 - health
 - fix-retried
+- review-returned
 history:
 - at: 2026-11-16T05:03:01.911155+00:00
   actor: claude
@@ -234,3 +247,33 @@ history:
   - field: relationships
     old: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619"]}'
     new: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607"]}'
+- at: 2026-11-16T23:30:31.156042+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37610913-1767-4f04-b961-4185aa0051da
+- at: 2026-11-16T23:31:04.149688+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607"]}'
+    new: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612"]}'
+- at: 2026-11-16T23:31:30.392482+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:31:30.425054+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, review-blocked
+- at: 2026-11-16T23:31:42.230629+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, fix-retried, review-blocked
+    new: health, fix-retried, review-returned

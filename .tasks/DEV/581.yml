@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:09:34.810817+00:00
-modified: 2026-11-16T21:33:23.107279+00:00
+modified: 2026-11-16T23:30:37.019292+00:00
 relationships:
   related:
   - DEV-583
@@ -148,6 +148,8 @@ comments:
       result: not_run
       reason: no rules or config changed
     next: 'None: merged and pushed; ticket goes to Done'
+releases:
+- 7
 description: |-
   Found in standards STD-124 (2026-11-15): reviews and merges are to run headless (claude, codex runners) after a fix on the t3 runner. The t3 fix thread works in T3 Code's worktree (~/.t3/worktrees/<repo>/agent-<ID>-…) with the ticket branch agent/<ID> checked out. A later claude, codex or command job calls prepare_worktree (crates/lotar-lib/src/services/agent_job_service.rs), which runs `git worktree add <dir>/<ticket> agent/<ID>`; git refuses, and the job fails before the agent starts:
 
@@ -319,3 +321,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-583","DEV-579","DEV-510","DEV-587","DEV-586","DEV-594","DEV-595"]}'
     new: '{"related":["DEV-583","DEV-579","DEV-510","DEV-587","DEV-586","DEV-594","DEV-595","DEV-591"]}'
+- at: 2026-11-16T23:30:37.019292+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

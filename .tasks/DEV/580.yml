@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:04:35.425934+00:00
-modified: 2026-11-16T02:10:48.430080+00:00
+modified: 2026-11-16T23:30:36.963512+00:00
 relationships:
   depends_on:
   - DEV-586
@@ -179,6 +179,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afe34cf3a-d7e6-4574-bba9-1b03d73cc38f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b176c1c-6cc6-439b-aa66-4eba0c1ae194
+releases:
+- 7
 description: |-
   Found 2026-11-15 in the DEV-576 rework: run alone, the test leaves .lotar-test-scratch (fixture .tmpXXX/.tasks and agent-queue markers) in about 1 of 8 runs, so the runner exits 1. It returns once both jobs are completed but before their workers settle, and the job ends still write into the dropped fixture.
   Check: for i in 1 2 3 4 5 6 7 8; do node scripts/rust-test-runner.mjs --agent -- automation_agent_settings_reach_the_job_they_start; done (any exit 1 with 'tests left 1 entries').
@@ -366,3 +368,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597","DEV-520","DEV-587"]}'
     new: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597","DEV-520","DEV-587","DEV-596"]}'
+- at: 2026-11-16T23:30:36.963512+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

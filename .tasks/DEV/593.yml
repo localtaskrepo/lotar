@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-15T22:38:45.433554+00:00
-modified: 2026-11-16T22:53:22.296186+00:00
+modified: 2026-11-16T23:30:37.381071+00:00
 relationships:
   related:
   - DEV-520
@@ -238,6 +238,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d8303cb-7c3a-400a-b103-d506cbf72b4a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A121e8ec4-974c-49f8-902d-8760d5c70955
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adda55600-2046-4125-9910-c27bb82afb58
+releases:
+- 7
 description: |-
   Jobs whose process died right after `agent_job_started` stay in status `unknown` and are never taken over, so their tickets sit InProgress with an agent assignee and no job. docs/help/agent.md says the queue worker for the same tasks directory, or the next `lotar serve`, takes such a job over and ends it. Found 2026-11-15 in local.
 
@@ -507,3 +509,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595","DEV-607","DEV-592","DEV-594","DEV-597","DEV-602","DEV-566","DEV-583","DEV-603"]}'
     new: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595","DEV-607","DEV-592","DEV-594","DEV-597","DEV-602","DEV-566","DEV-583","DEV-603","DEV-626"]}'
+- at: 2026-11-16T23:30:37.381071+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

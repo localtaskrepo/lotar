@@ -1,0 +1,24 @@
+title: The resolved config sent by /api/config/show has agent_memory_gate, view/api/types.ts doesn't list it
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T23:36:18.364771+00:00
+modified: 2026-11-16T23:36:19.058580+00:00
+relationships:
+  related:
+  - DEV-623
+description: |-
+  ## Found (claude, review of DEV-623, 2026-11-16)
+  - DEV-623 added `agent_memory_gate` to `ResolvedConfig` (`crates/lotar-core/src/config/types.rs`), which `config_service.rs:39` serializes for `GET /api/config/show`, so the REST reply now carries it.
+  - `view/api/types.ts` (~line 1385) lists `agent_worktree` but not `agent_memory_gate`; AGENTS.md wants api_types.rs, types.ts and openapi.json to agree.
+
+  ## Done when
+  - [ ] `view/api/types.ts` types `agent_memory_gate?` (enabled?, max_swap_percent, settle_seconds) next to `agent_worktree`, or the field is kept out of the REST reply; the UI still shows nothing new (DEV-623).
+history:
+- at: 2026-11-16T23:36:19.058580+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

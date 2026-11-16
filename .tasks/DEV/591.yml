@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-15T22:25:18.384081+00:00
-modified: 2026-11-16T22:53:23.618681+00:00
+modified: 2026-11-16T23:39:57.331184+00:00
 relationships:
   related:
   - DEV-513
@@ -15,6 +15,18 @@ comments:
 - date: 2026-11-16T21:33:22.376872+00:00
   author: claude
   text: 'Owner 2026-11-16 (options picker): "Yes, release it": publish lotar 0.15.2 with what is on main (DEV-581 and the fixes since 0.15.1), so STD-124 can move reviews and merges off T3 threads.'
+- date: 2026-11-16T23:39:57.331184+00:00
+  author: claude
+  text: |-
+    Version bump to 0.15.2 pushed to main; waiting for QA.
+
+    - `d525fb55` DEV-591 Release v0.15.2 (`Cargo.toml`, `Cargo.lock`)
+    - No tickets block this release (`--kind blocks` empty)
+    - Release record 0.15.2: added the 22 tickets merged since v0.15.1 that were in no release
+    - Local gates green with `RUSTC_WRAPPER=` (sccache blocked by sandbox): `npm run lint:agent`, `npm run test:agent` (2271 Rust, 1548 UI), `npm run test:smoke:agent` (405)
+    - QA: https://github.com/localtaskrepo/lotar/actions/runs/43981152570
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3c02d887-954e-4552-8fbb-fcd95c2704df
 releases:
 - 7
 description: |-
@@ -55,3 +67,12 @@ history:
   - field: relationships
     old: '{"related":["DEV-513","DEV-581"]}'
     new: '{"related":["DEV-513","DEV-581","DEV-626"]}'
+- at: 2026-11-16T23:29:37.016569+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3c02d887-954e-4552-8fbb-fcd95c2704df
+- at: 2026-11-16T23:39:57.331184+00:00
+  actor: claude
+  changes:
+  - field: comment_added

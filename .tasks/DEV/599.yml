@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:29:49.963817+00:00
-modified: 2026-11-16T05:43:32.524593+00:00
+modified: 2026-11-16T23:30:37.792897+00:00
 relationships:
   related:
   - DEV-594
@@ -103,6 +103,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb8bc697-69d5-449f-896d-839c94b42ef2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb88551c-d16a-47b2-bce2-4d8e3a0512c6
+releases:
+- 7
 description: |-
   Found in the DEV-594 review (043e01bd). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs (start_job_with_tasks_dir_mode, line ~300) runs before the registry/active-job check and caches only a running thread. While a ticket's queue entry waits for a running non-T3 job (DEV-279), or its earlier threads have all ended, each 300 ms worker poll runs t3 thread show once per earlier thread (about 0.5 s each), with the global RUNNING_T3_THREADS mutex held, so other tickets' job starts wait behind those calls. Check: queue an entry for a ticket with several ended T3 threads while a codex job runs on it; count t3 processes.
 
@@ -230,3 +232,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-594","DEV-279","DEV-600","DEV-609","DEV-583","DEV-611","DEV-598"]}'
     new: '{"related":["DEV-594","DEV-279","DEV-600","DEV-609","DEV-583","DEV-611","DEV-598","DEV-563"]}'
+- at: 2026-11-16T23:30:37.792897+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'

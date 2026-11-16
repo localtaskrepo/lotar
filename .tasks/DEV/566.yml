@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-16T18:45:21.375312+00:00
+modified: 2026-11-16T23:30:36.901698+00:00
 relationships:
   related:
   - DEV-524
@@ -394,6 +394,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A90e52aeb-423e-4165-a8d9-6ae2412daa40
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab0cc5eb6-2dfb-40ad-8b24-76fbe4ebbfbc
+releases:
+- 7
 description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
 tags:
 - health
@@ -756,3 +758,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-524","DEV-574","DEV-582","DEV-583","DEV-588","DEV-593","DEV-594","DEV-601"]}'
     new: '{"related":["DEV-524","DEV-574","DEV-582","DEV-583","DEV-588","DEV-593","DEV-594","DEV-601","DEV-605"]}'
+- at: 2026-11-16T23:30:36.901698+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#7'
