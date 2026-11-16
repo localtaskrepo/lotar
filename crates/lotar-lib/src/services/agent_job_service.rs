@@ -1707,7 +1707,30 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
         crate::services::agent_active_jobs::unregister(tasks_dir, &job.job_id);
         return;
     }
-    let header = agent_logs_dir.as_deref().and_then(|dir| AgentLogService::load_header(&workspace_root, dir, &job.job_id).ok().flatten());
+    let profile = job
+        .agent
+        .as_deref()
+        .and_then(|name| config.agent_profiles.get(name).cloned())
+        .unwrap_or_else(|| AgentProfileDetail { runner: job.runner.clone(), ..Default::default() });
+    let mut header = agent_logs_dir.as_deref().and_then(|dir| AgentLogService::load_header(&workspace_root, dir, &job.job_id).ok().flatten());
+    // Killed during its worktree setup, it has no log yet; the takeover
+    // writes one with what the record knows (DEV-598).
+    if job.in_setup && header.is_none() {
+        let setup_header = crate::services::agent_log_service::JobLogHeader {
+            job_id: job.job_id.clone(),
+            ticket_id: ticket_id.clone(),
+            runner: runner_kind.as_str().to_string(),
+            created_at: job.started_at.clone(),
+            worktree_path: None,
+            worktree_branch: None,
+            model: profile.model.clone(),
+            effort: profile.effort.clone(),
+            agent_profile: job.agent.clone(),
+        };
+        if AgentLogService::init_log(&workspace_root, agent_logs_dir.as_deref(), setup_header.clone()).is_ok() {
+            header = Some(setup_header);
+        }
+    }
     // Its events go on after the logged ones, so the log keeps one event per sequence (DEV-518).
     let logged_sequence = agent_logs_dir
         .as_deref()
@@ -1769,11 +1792,6 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
             format!("The lotar process that ran this job (pid {}) exited before it ended; process {} took it over.", orphan.owner_pid, std::process::id());
         record_and_emit(state, "agent_job_progress", Some(note));
     });
-    let profile = job
-        .agent
-        .as_deref()
-        .and_then(|name| config.agent_profiles.get(name).cloned())
-        .unwrap_or_else(|| AgentProfileDetail { runner: job.runner.clone(), ..Default::default() });
     let tasks_dir = tasks_dir.to_path_buf();
     thread::spawn(move || finish_orphaned_job(&job, runner_kind, &profile, &tasks_dir, &ticket_id, &config));
 }
@@ -1791,6 +1809,12 @@ fn finish_orphaned_job(
 ) {
     let job_id = job.job_id.as_str();
     let _slot = RunningJobSlot { job_id, ticket_id, tasks_dir };
+    // Its process exited during the worktree setup, before any runner (DEV-598).
+    if job.in_setup {
+        let message = "The lotar process running the job exited while it set up the job's worktree, before the job started.".to_string();
+        update_job_failure(job_id, ticket_id, message, tasks_dir);
+        return;
+    }
     let Some(agent) = harness_agent(runner_kind) else {
         let message = format!("The lotar process running the job exited before the {} runner finished, so its result is unknown.", job.runner);
         update_job_failure(job_id, ticket_id, message, tasks_dir);
@@ -2764,6 +2788,17 @@ fn run_job(
     if should_stop_job(&job_id) {
         return;
     }
+    // A process killed during the worktree setup leaves this record, so the
+    // next worker or server ends the job (DEV-598).
+    let setup_record = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry.jobs.get(&job_id).map(|state| crate::services::agent_active_jobs::ActiveJob {
+            in_setup: true,
+            ..active_record_of(state, &ticket_id, &Utc::now().to_rfc3339(), None)
+        })
+    });
+    if let Some(record) = setup_record.as_ref() {
+        crate::services::agent_active_jobs::register(&tasks_dir, record);
+    }
     let agent = harness_agent(runner_kind);
     let agent_profile = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(&job_id).and_then(|state| state.record.agent_profile.clone()));
     let project = crate::services::agent_runner::session_project(&tasks_dir);
@@ -2833,6 +2868,8 @@ fn run_job(
         }
         Err(err) => {
             if config.agent_worktree.enabled {
+                // The failure goes to the job's log, so `agent status` shows it.
+                init_job_log(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &Utc::now().to_rfc3339(), None, None);
                 update_job_failure(&job_id, &ticket_id, format!("Worktree setup failed: {err}"), &tasks_dir);
                 return;
             }
@@ -4430,6 +4467,7 @@ fn active_record_of(state: &AgentJobState, ticket_id: &str, started_at: &str, se
         session_id,
         merge: state.record.is_merge_job,
         assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
+        in_setup: false,
     }
 }
 
@@ -5154,6 +5192,7 @@ mod tests {
             started_at: Utc::now().to_rfc3339(),
             session_id: Some("thread-1".to_string()),
             assignee_at_start: None,
+            in_setup: false,
             merge,
         }
     }

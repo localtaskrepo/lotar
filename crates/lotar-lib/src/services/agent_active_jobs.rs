@@ -38,6 +38,10 @@ pub struct ActiveJob {
     /// ticket back (DEV-516) or something moved it on (DEV-566).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee_at_start: Option<String>,
+    /// The job sets up its worktree and has no job log yet, so a takeover
+    /// fails it for that and writes the log (DEV-598).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub in_setup: bool,
 }
 
 /// What a ticket should be when its job ends, set while the job ran
@@ -385,6 +389,7 @@ mod tests {
             session_id: None,
             merge: false,
             assignee_at_start: None,
+            in_setup: false,
         };
         register(tasks.path(), &job);
         assert_eq!(for_ticket(tasks.path(), "T-1"), Some(job.clone()));

@@ -1125,6 +1125,7 @@ fn build_output_stays_while_another_job_runs_in_the_worktree() {
         session_id: None,
         merge: false,
         assignee_at_start: None,
+        in_setup: false,
     };
     agent_active_jobs::register(&fixture.tasks_root, &elsewhere);
     fs::write(&go, "").unwrap();

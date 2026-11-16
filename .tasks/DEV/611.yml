@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T04:47:15.051643+00:00
-modified: 2026-11-16T05:25:11.966807+00:00
+modified: 2026-11-16T05:27:16.444976+00:00
 relationships:
   related:
   - DEV-603
+  - DEV-599
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2315ac2a-047b-4c72-ae46-d62a09fb92e2
 description: |-
@@ -83,3 +84,9 @@ history:
       - [ ] Later jobs' "Earlier agent sessions" list the kept round like any other earlier session.
       - [ ] Other replacements (`session: new`/`fresh`, a closed or unusable session) still replace the old session as before: out of scope.
       - [ ] A test: a fix rework past `continue_within_minutes` whose prompt names the kept event log, which exists and holds the first round; the next job's earlier sessions list it.
+- at: 2026-11-16T05:27:16.444976+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603"]}'
+    new: '{"related":["DEV-603","DEV-599"]}'

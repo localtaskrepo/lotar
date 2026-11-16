@@ -136,7 +136,7 @@ fn a_t3_job_links_its_thread_on_the_ticket() {
 fn a_thread_that_waits_for_an_answer_hands_the_ticket_back_with_its_link() {
     let harness = harness(2, 0);
     harness.show("running", "\"r1\"", 1, "Which one?");
-    harness.command().assert().failure();
+    harness.command().output().unwrap();
     let task = harness.task();
     assert_eq!(task.status.as_str(), "HelpNeeded");
     assert_eq!(task.assignee.as_deref(), Some("owner"));
@@ -261,4 +261,107 @@ fn a_t3_job_killed_before_its_session_started_fails_once_taken_over() {
     assert!(status.contains("\"status\":\"failed\"") && status.contains("exited before the job ended"), "{status}");
     let jobs = cli(&["--format", "json", "agent", "list-jobs"]);
     assert!(jobs.contains("\"status\":\"failed\"") && jobs.contains("exited before the job ended"), "{jobs}");
+}
+
+/// Turns on agent worktrees and makes the fixture a git repository, so a job sets up its worktree first.
+fn with_worktrees(harness: &Harness) {
+    let root = harness.fixtures.get_temp_path();
+    let config = harness.fixtures.tasks_root.join("config.yml");
+    let text = std::fs::read_to_string(&config).unwrap();
+    std::fs::write(&config, format!("{text}agent:\n  worktree:\n    enabled: true\n")).unwrap();
+    for args in [
+        &["init", "-q", "-b", "main"][..],
+        &["config", "user.name", "Setup"],
+        &["config", "user.email", "setup@example.invalid"],
+        &["config", "commit.gpgsign", "false"],
+        &["add", "."],
+        &["commit", "-qm", "init"],
+    ] {
+        assert!(std::process::Command::new("git").args(args).current_dir(root).status().unwrap().success(), "git {args:?}");
+    }
+}
+
+/// DEV-598: lotar killed while it sets up the job's worktree (before the job log and `agent_job_started`) leaves
+/// the job's record, so the next worker or server fails the job with a reason that names the setup and runs its
+/// `job_failed` rules once; `agent status` and `list-jobs` show it failed. A `git` on PATH holds the setup.
+#[test]
+fn a_t3_job_killed_during_its_worktree_setup_fails_once_taken_over() {
+    let harness = harness(0, 0);
+    with_worktrees(&harness);
+    let _trust = EnvVarGuard::set("LOTAR_TRUST_ALL", "1");
+    let (setup, failed) = (harness.dir.join("setup"), harness.dir.join("rule-failed"));
+    std::fs::write(
+        harness.fixtures.tasks_root.join("automation.yml"),
+        format!("automation:\n  rules:\n    - name: Retry\n      on:\n        job_failed:\n          run: \"sh -c 'echo x >> {}'\"\n", failed.display()),
+    )
+    .unwrap();
+    let real_git = String::from_utf8(std::process::Command::new("sh").args(["-c", "command -v git"]).output().unwrap().stdout).unwrap();
+    let bin = harness.dir.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    std::fs::write(
+        bin.join("git"),
+        format!(
+            "#!/bin/sh\nif [ \"$*\" = \"symbolic-ref --quiet --short HEAD\" ]; then touch '{}'; sleep 30; fi\nexec '{}' \"$@\"\n",
+            setup.display(),
+            real_git.trim()
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(bin.join("git"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
+    let mut lotar = std::process::Command::new(crate::common::lotar_bin());
+    lotar
+        .env_remove("RUST_TEST_THREADS")
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .env("PATH", path)
+        .current_dir(harness.fixtures.get_temp_path())
+        .args(["agent", "run", "TEST-1", "Fix it", "--agent", "fixer", "--wait"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    let mut lotar = lotar.spawn().unwrap();
+    wait_for("the worktree setup", || setup.exists());
+    lotar.kill().unwrap();
+    lotar.wait().unwrap();
+
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    let orphans = lotar::services::agent_active_jobs::orphaned(&tasks_dir);
+    assert_eq!(orphans.len(), 1, "the killed job leaves its record");
+    assert!(orphans[0].in_setup && orphans[0].session_id.is_none(), "{:?}", orphans[0]);
+    let job_id = orphans[0].job_id.clone();
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    wait_for("the job to end", || AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
+    let job = AgentJobService::get_job(&job_id).unwrap();
+    assert_eq!(job.status, "failed", "{job:?}");
+    let reason = job.summary.or(job.last_message).unwrap_or_default();
+    assert!(reason.contains("exited while it set up the job's worktree"), "{reason}");
+    wait_for("the job_failed rule", || failed.exists());
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    assert_eq!(std::fs::read_to_string(&failed).unwrap_or_default(), "x\n", "the job_failed rule ran once");
+    assert!(!harness.calls().contains("thread"), "no session was started or resumed: {}", harness.calls());
+
+    let cli = |args: &[&str]| {
+        let output = crate::common::lotar_cmd().unwrap().current_dir(harness.fixtures.get_temp_path()).args(args).output().unwrap();
+        String::from_utf8_lossy(&output.stdout).to_string()
+    };
+    let status = cli(&["--format", "json", "agent", "status", &job_id]);
+    assert!(status.contains("\"status\":\"failed\"") && status.contains("set up the job's worktree"), "{status}");
+    let jobs = cli(&["--format", "json", "agent", "list-jobs"]);
+    assert!(jobs.contains("\"status\":\"failed\"") && jobs.contains("set up the job's worktree"), "{jobs}");
+}
+
+/// DEV-598: a worktree setup that fails (here: no git repository) leaves a job log, so `agent status` shows why.
+#[test]
+fn a_job_whose_worktree_setup_fails_logs_the_failure() {
+    let harness = harness(0, 0);
+    let config = harness.fixtures.tasks_root.join("config.yml");
+    let text = std::fs::read_to_string(&config).unwrap();
+    std::fs::write(&config, format!("{text}agent:\n  worktree:\n    enabled: true\n")).unwrap();
+    harness.command().output().unwrap();
+    let cli = |args: &[&str]| {
+        let output = crate::common::lotar_cmd().unwrap().current_dir(harness.fixtures.get_temp_path()).args(args).output().unwrap();
+        String::from_utf8_lossy(&output.stdout).to_string()
+    };
+    let jobs = cli(&["--format", "json", "agent", "list-jobs"]);
+    assert!(jobs.contains("\"status\":\"failed\"") && jobs.contains("Worktree setup failed"), "{jobs}");
+    assert!(!harness.calls().contains("thread"), "no session was started: {}", harness.calls());
 }

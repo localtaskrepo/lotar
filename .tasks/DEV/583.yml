@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:15:01.954526+00:00
-modified: 2026-11-16T05:14:47.344978+00:00
+modified: 2026-11-16T05:27:16.443735+00:00
 relationships:
   blocks:
   - DEV-582
@@ -22,6 +22,7 @@ relationships:
   - DEV-608
   - DEV-593
   - DEV-585
+  - DEV-599
 comments:
 - date: 2026-11-15T20:48:30.575159+00:00
   author: automation
@@ -397,3 +398,9 @@ history:
   - field: tags
     old: health, fix-retried
     new: health
+- at: 2026-11-16T05:27:16.443735+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602","DEV-608","DEV-593","DEV-585"]}'
+    new: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602","DEV-608","DEV-593","DEV-585","DEV-599"]}'

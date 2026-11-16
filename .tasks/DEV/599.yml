@@ -1,17 +1,19 @@
 title: The busy-ticket check calls t3 for every earlier thread on each queue retry
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:29:49.963817+00:00
-modified: 2026-11-16T04:34:08.247031+00:00
+modified: 2026-11-16T05:27:24.248695+00:00
 relationships:
   related:
   - DEV-594
   - DEV-279
   - DEV-600
   - DEV-609
+  - DEV-583
+  - DEV-611
 comments:
 - date: 2026-11-16T03:15:04.430118+00:00
   author: claude
@@ -66,6 +68,36 @@ comments:
       - Rebase with only `dcfbccef` onto main: that applies cleanly (checked with `git merge-tree`).
       - `agent/DEV-599` and `t3/cache-busy-ticket-t3-checks` point at the same commit, so there is no second copy of the fix.
     - **Minor:** no test shows that a new earlier thread (a job that ended) drops the cached answer. Filed as [DEV-609](https://lotar.pyxzl.net/task/DEV-609).
+- date: 2026-11-16T05:27:16.112977+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-599 is on `main` as `01a9160e`.
+
+    - **Rebase:** dropped the DEV-594 copy `5550d54d` (the same changed lines as `bab2586f` on main) with `git rebase --onto main 5550d54d`.
+    - **Second rebase:** main moved on while the checks ran (DEV-583 `18314609`), so I rebased again.
+      - `dev503_harness_jobs_test.rs` conflicted: both sides add a new test at the same spot. I kept both tests.
+      - The rebased commit is `facd7d70`; amending the main checkout's pending `.tasks` changes into it gave `01a9160e`.
+    - **Checks on `facd7d70`, all passed:**
+      - `npm run lint:agent`
+      - `npm run test:agent`: 2249 Rust tests, 1548 UI tests, release and hook tests
+      - `npm run test:smoke:agent`: 405/405
+    - **Lockfiles and rules:** no lockfile changed, so no `npm ci`. No rules or config changed, so no `lotar trust`.
+    - **Push:** `git push` sent `18314609..01a9160e`. The pre-push hooks passed. DEV-611 is in progress but has no commits on main.
+    - **Branches:** `agent/DEV-599` still points at `dcfbccef`. It is checked out in LoTaR's worktree `agent-DEV-599-6144a08eff499af6`, so git wouldn't move it. The landed commit starts with `DEV-599`.
+  report:
+    commits:
+    - hash: 01a9160e
+      what: DEV-599 fix on main (rebased dcfbccef, .tasks amended in)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2249 Rust, 1548 UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    next: 'None: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb8bc697-69d5-449f-896d-839c94b42ef2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb88551c-d16a-47b2-bce2-4d8e3a0512c6
@@ -168,3 +200,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T05:27:16.112977+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:27:16.444519+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-279","DEV-600","DEV-609"]}'
+    new: '{"related":["DEV-594","DEV-279","DEV-600","DEV-609","DEV-583","DEV-611"]}'
+- at: 2026-11-16T05:27:24.248695+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
