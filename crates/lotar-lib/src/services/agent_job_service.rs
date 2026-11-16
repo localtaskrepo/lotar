@@ -21,6 +21,8 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod merge;
+
 const EVENT_LOG_LIMIT: usize = 200;
 /// How long a runner's descendants may keep its output streams busy after it exits.
 const OUTPUT_DRAIN_LIMIT: Duration = Duration::from_secs(5);
@@ -2849,11 +2851,11 @@ fn init_job_log(
 fn run_job(
     job_id: String,
     runner_kind: AgentRunnerKind,
-    profile: AgentProfileDetail,
+    mut profile: AgentProfileDetail,
     tasks_dir: std::path::PathBuf,
     ticket_id: String,
-    prompt: String,
-    user_prompt: String,
+    mut prompt: String,
+    mut user_prompt: String,
     config: ResolvedConfig,
 ) {
     update_job(&job_id, |state| state.worker_running = true);
@@ -2871,6 +2873,52 @@ fn run_job(
     });
     if let Some(record) = setup_record.as_ref() {
         crate::services::agent_active_jobs::register(&tasks_dir, record);
+    }
+    let mut followed_note = match follow_ticket_work(&tasks_dir, &ticket_id, &config) {
+        Ok(note) => note,
+        Err(err) => {
+            update_job_failure(&job_id, &ticket_id, format!("Worktree setup failed: {err}"), &tasks_dir);
+            return;
+        }
+    };
+    // A merge job of a repository with `agent.merge` merges without an
+    // agent first (DEV-605); the agent starts only on a hand-off, in a new
+    // session that reads why.
+    let mut merge_started_at = None;
+    if let Some(settings) = config.agent_merge.as_ref().filter(|_| merge::is_merge_job(&job_id)) {
+        if crate::config::trust::TrustService::allows_commands(&tasks_dir) {
+            let started_at = Utc::now().to_rfc3339();
+            if !start_job(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &started_at, None) {
+                return;
+            }
+            if let Some(note) = followed_note.take() {
+                update_job(&job_id, |state| {
+                    record_and_emit(state, "agent_job_progress", Some(note.clone()));
+                });
+            }
+            let summary = match merge::run(&job_id, &tasks_dir, &ticket_id, &config, settings) {
+                merge::Outcome::Cancelled => return,
+                merge::Outcome::Completed(summary) => {
+                    let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(&ticket_id));
+                    update_job(&job_id, |state| state.record.worktree_branch = Some(branch.clone()));
+                    comment_merge(&job_id, &tasks_dir, &ticket_id, &summary);
+                    finalize_job(&job_id, &ticket_id, Some(0), &[], &tasks_dir, &config);
+                    return;
+                }
+                merge::Outcome::HandOff(summary) => summary,
+            };
+            comment_merge(&job_id, &tasks_dir, &ticket_id, &summary);
+            let hand_off = merge::hand_off_prompt(&summary);
+            prompt.insert_str(0, &hand_off);
+            user_prompt.insert_str(0, &hand_off);
+            profile.session = Some(AgentSession::Fresh);
+            merge_started_at = Some(started_at);
+        } else {
+            let note = crate::config::trust::TrustService::untrusted_message(&tasks_dir, "lotar's own merge (agent.merge)");
+            update_job(&job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+        }
     }
     let agent = harness_agent(runner_kind);
     let agent_profile = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(&job_id).and_then(|state| state.record.agent_profile.clone()));
@@ -2909,13 +2957,6 @@ fn run_job(
                 Some(format!("Continuing the session {}, last used {minutes} minutes ago (within continue_within_minutes, {limit}).", record.name));
         }
     }
-    let followed_note = match follow_ticket_work(&tasks_dir, &ticket_id, &config) {
-        Ok(note) => note,
-        Err(err) => {
-            update_job_failure(&job_id, &ticket_id, format!("Worktree setup failed: {err}"), &tasks_dir);
-            return;
-        }
-    };
     let t3_worktrees = runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled;
     let mut thread_worktree = None;
     if t3_worktrees && continued.is_some() {
@@ -2985,43 +3026,18 @@ fn run_job(
         }
     };
 
-    let started_at = Utc::now().to_rfc3339();
-
-    let worktree_path_str = worktree_context.worktree_path.as_ref().map(|p| p.to_string_lossy().to_string());
-    init_job_log(
-        &job_id,
-        runner_kind,
-        &profile,
-        &tasks_dir,
-        &ticket_id,
-        &config,
-        &started_at,
-        worktree_path_str.clone(),
-        worktree_context.worktree_branch.clone(),
-    );
-
-    let mut cancelled = false;
-    update_job(&job_id, |state| {
-        if state.record.status == AgentJobStatus::Cancelled {
-            cancelled = true;
-            return;
+    let started_at = match merge_started_at {
+        Some(started_at) => started_at,
+        None => {
+            let started_at = Utc::now().to_rfc3339();
+            let worktree = (worktree_context.worktree_path.as_ref().map(|p| p.to_string_lossy().to_string()), worktree_context.worktree_branch.clone());
+            if !start_job(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &started_at, Some(worktree)) {
+                return;
+            }
+            started_at
         }
-        mark_started(state, &tasks_dir, &ticket_id, &started_at);
-    });
-
-    if cancelled {
-        return;
-    }
-
-    let _ = AutomationService::apply_job_event(tasks_dir.as_path(), &ticket_id, AutomationEvent::JobStarted, job_context_for(&job_id));
-
-    let is_merge_job = JOB_REGISTRY.lock().ok().is_some_and(|registry| registry.jobs.get(&job_id).is_some_and(|state| state.record.is_merge_job));
-    if is_merge_job && let Some(head) = resolve_repo_root(&tasks_dir).and_then(|root| rev_parse(&root, "HEAD")) {
-        update_job(&job_id, |state| state.main_head_at_start = Some(head.clone()));
-    }
-    if let Some((_, assignee)) = ticket_state(&tasks_dir, &ticket_id) {
-        update_job(&job_id, |state| state.assignee_at_start = Some(assignee.clone()));
-    }
+    };
+    let is_merge_job = merge::is_merge_job(&job_id);
     for note in followed_note.into_iter().chain(session_reason).chain(moved_note).chain(worktree_context.note.clone()) {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
@@ -3110,6 +3126,67 @@ fn handoff_text(tasks_dir: &std::path::Path, ticket_id: &str, ticket_ref: &str, 
         out.push_str(&format!("- Comment by {author}, {}:\n{}\n", comment.date, text));
     }
     out
+}
+
+/// Write the job's log header, mark it running and apply the `job_started`
+/// rules; `false` when it was cancelled meanwhile. `worktree` is the log
+/// header's (path, branch). A job records the ticket's assignee as it
+/// starts, a merge job also the main checkout's commit.
+#[expect(clippy::too_many_arguments, reason = "the job's independent inputs from run_job")]
+fn start_job(
+    job_id: &str,
+    runner_kind: AgentRunnerKind,
+    profile: &AgentProfileDetail,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    started_at: &str,
+    worktree: Option<(Option<String>, Option<String>)>,
+) -> bool {
+    let (worktree_path, worktree_branch) = worktree.unwrap_or_default();
+    init_job_log(job_id, runner_kind, profile, tasks_dir, ticket_id, config, started_at, worktree_path, worktree_branch);
+
+    let mut cancelled = false;
+    update_job(job_id, |state| {
+        if state.record.status == AgentJobStatus::Cancelled {
+            cancelled = true;
+            return;
+        }
+        mark_started(state, tasks_dir, ticket_id, started_at);
+    });
+    if cancelled {
+        return false;
+    }
+
+    let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, AutomationEvent::JobStarted, job_context_for(job_id));
+
+    if merge::is_merge_job(job_id)
+        && let Some(head) = resolve_repo_root(tasks_dir).and_then(|root| rev_parse(&root, "HEAD"))
+    {
+        update_job(job_id, |state| state.main_head_at_start = Some(head.clone()));
+    }
+    if let Some((_, assignee)) = ticket_state(tasks_dir, ticket_id) {
+        update_job(job_id, |state| state.assignee_at_start = Some(assignee.clone()));
+    }
+    true
+}
+
+/// Comment lotar's merge outcome on the ticket, and keep it as the job's
+/// last message.
+fn comment_merge(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, summary: &merge::Summary) {
+    let mut storage = Storage::new(tasks_dir);
+    let context =
+        crate::services::task_service::CommentContext { report: Some(summary.report.clone()), ..crate::services::task_service::CommentContext::automation() };
+    if let Err(err) = TaskService::add_comment_with_context(&mut storage, ticket_id, &summary.text, context) {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(format!("Could not comment the merge on {ticket_id}: {err}")));
+        });
+    }
+    let first = summary.text.lines().next().unwrap_or_default().to_string();
+    update_job(job_id, |state| {
+        state.record.last_message = Some(first.clone());
+        record_and_emit(state, "agent_job_progress", Some(summary.text.clone()));
+    });
 }
 
 /// How a job's runner ended.

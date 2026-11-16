@@ -1292,6 +1292,14 @@ export interface AgentWorktreeConfig {
     cleanup_paths?: string[]
 }
 
+/** `agent.merge` (DEV-605): lotar merges a merge job's branch itself; absent = the merge agent merges. */
+export interface AgentMergeConfig {
+    checks?: string[]
+    install?: string | null
+    push?: boolean
+    finding_check?: string | null
+}
+
 export interface SprintDefaultsConfig {
     capacity_points?: number | null
     capacity_hours?: number | null
@@ -1383,6 +1391,7 @@ export interface ResolvedConfigDTO {
     agent_logs_dir?: string | null
     agent_instructions?: AgentInstructionsValue
     agent_worktree?: AgentWorktreeConfig
+    agent_merge?: AgentMergeConfig | null
     sprint_defaults?: SprintDefaultsConfig
     sprint_notifications?: { enabled: boolean }
     remotes?: Record<string, SyncRemoteConfig>
@@ -1487,6 +1496,7 @@ export interface ProjectConfigRaw {
     agent_logs_dir?: string
     agent_instructions?: AgentInstructionsValue
     agent_worktree?: Partial<AgentWorktreeConfig>
+    agent_merge?: AgentMergeConfig | null
     scan_signal_words?: string[]
     scan_ticket_patterns?: string[]
     scan_enable_ticket_words?: boolean

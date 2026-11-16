@@ -667,6 +667,9 @@ pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: Global
     if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
         base.agent_worktree = override_config.agent_worktree;
     }
+    if override_config.agent_merge.is_some() {
+        base.agent_merge = override_config.agent_merge;
+    }
     if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
@@ -855,6 +858,9 @@ pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override
     }
     if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
         resolved.agent_worktree = override_config.agent_worktree;
+    }
+    if override_config.agent_merge.is_some() {
+        resolved.agent_merge = override_config.agent_merge;
     }
     if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
@@ -1104,6 +1110,9 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(worktree) = project_config.agent_worktree {
         apply_agent_worktree_override(&mut resolved.agent_worktree, worktree);
     }
+    if let Some(merge) = project_config.agent_merge {
+        resolved.agent_merge = Some(merge);
+    }
     // Overlay project-level branch alias maps (if provided)
     if let Some(m) = project_config.branch_type_aliases
         && !m.is_empty()
@@ -1223,6 +1232,7 @@ impl ResolvedConfig {
             agent_instructions: global.agent_instructions,
             agent_profiles: global.agents.into_iter().map(|(k, v)| (k, v.to_detail())).collect(),
             agent_worktree: global.agent_worktree,
+            agent_merge: global.agent_merge,
             remotes: global.remotes,
             ui: crate::config::types::UiSettings {
                 theme: global.ui_theme,

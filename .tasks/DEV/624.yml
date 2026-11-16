@@ -1,0 +1,40 @@
+title: 'Flaky test: cli_serve_features_test serve tests get no response within the 1.5 s read timeout under load'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T21:05:30.352250+00:00
+modified: 2026-11-16T21:05:31.170172+00:00
+relationships:
+  related:
+  - DEV-609
+  - DEV-354
+  - DEV-359
+description: |-
+  Found in the DEV-609 merge (2026-11-16): `npm run test:agent` failed twice on `2b7224a0` (main `804cb0f9` plus one test in another file) while the Mac's load average was 140-170.
+
+  - `serve_honors_explicit_tasks_dir_for_api_requests` (`crates/lotar-lib/tests/cli_serve_features_test.rs:532`): status 0, expected 201. Failed in both full runs and in 3 of 3 runs of `cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'`.
+  - `serve_with_project_data_lists_exact_tasks` (`:496`): status 0, expected 200. Second full run only.
+  - Passes alone, and all 15 serve tests pass with `-j 1`.
+  - Status 0 is what `http_request` returns when the server sends no header within the 1_500 ms `set_read_timeout`: the first request after `spawn_serve` waits on a busy server.
+
+  ## Done when
+  - [ ] The serve tests' read wait no longer fails a request a loaded machine answers late (like DEV-354 and DEV-359 did for the web API tests), and a test or a run under load shows it.
+  - [ ] `cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'` passes 5 times in a row in parallel.
+tags:
+- health
+custom_fields:
+  finding: npm-test:cli_serve_features_test read timeout
+history:
+- at: 2026-11-16T21:05:30.930709+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-609"]}'
+    new: '{"related":["DEV-609","DEV-354","DEV-359"]}'
+- at: 2026-11-16T21:05:31.170172+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

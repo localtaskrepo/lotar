@@ -358,7 +358,33 @@ When enabled:
 - Merge-profile jobs require worktrees so merges happen on isolated branches
 - When worktrees are enabled, setup failure fails the job; the runner never falls back to the repository checkout.
 - Git setup, checks, cleanup, and runners discard inherited/profile repository-selection overrides (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, object/discovery overrides, and `GIT_CONFIG*`). Worktree top-level and common-directory identity are verified. SSH/askpass and author/committer identity environment variables are retained.
+- With `agent.merge`, a merge job merges without an agent when it can; see [lotar's own merge](#lotars-own-merge)
 - Merge-profile jobs are serialized one-at-a-time even when `max_parallel_jobs` allows more general agent concurrency
+
+### lotar's own merge
+
+With `agent.merge` in the config, a merge job (profile `merge`, or a ticket in `Merging`) merges without an agent first, the steps a merge agent's prompt names:
+
+```yaml
+agent:
+  merge:
+    checks: [npm run lint, npm test]   # run in the ticket's worktree, in order
+    install: npm ci                    # after a rebase that changed a lockfile, or in a new worktree
+    push: true                         # push the main checkout's branch after landing
+    finding_check: node scripts/health.js   # a finding ticket's check; must no longer print [<key>]
+```
+
+1. The ticket branch (`agent/<TICKET>`) holds no commits beyond the main checkout's current branch, or its work is there already: lotar comments "Nothing to merge" and the job completes.
+2. In the worktree that has the branch checked out (it must be clean), else in a new worktree of its own, lotar rebases the branch onto the main checkout's branch, runs `install` when needed and each check. A check is skipped when the rebase changed nothing and the ticket's latest report on that commit (`lotar comment --commit ... --check "<command>=passed"`) lists it as passed.
+3. It fast-forwards the main checkout. When main moved on meanwhile it rebases and checks again, at most 3 rounds.
+4. Pending changes of the tasks directory in the main checkout are amended into the merged commit while it is still main's tip.
+5. When the merge changed rules, agent profiles or `agent.merge` of a trusted repository, lotar trusts them again (`lotar trust`); an untrusted one stays untrusted.
+6. With `push: true`, it pushes when the main checkout is clean and its unpushed commits are all this merge's. It never passes `--no-verify`.
+7. For a ticket with a finding key, `finding_check` runs in the main checkout with the key in `LOTAR_FINDING`; its output must no longer contain `[<key>]`.
+
+lotar comments the outcome with a report (the commits landed, the checks) and the job completes, so `job_completed` rules close the ticket; no agent starts. A step that needs judgment stops there: a rebase conflict (lotar aborts the rebase), a failed install or check, a dirty worktree or checks that changed files, a fast-forward git refuses, unpushed commits of others, no upstream or a refused push, a failed trust, a finding check that still lists the finding. lotar comments why, and the merge agent starts in a new session (`fresh`, whatever the rule or profile says) on the profile's model, with lotar's comment before its prompt; work lotar landed already stays landed. The job then ends as any merge job does.
+
+The commands run without LoTaR's `LOTAR_*` environment, so a check that runs lotar doesn't change the workspace. What a command leaves running in the background (a server a test started) is stopped 5 seconds after the command exits, so it can't hold up later merges. `agent.merge` runs commands from the repository: `lotar trust` covers it, and in an untrusted repository the merge agent merges as before.
 
 ### Managing worktrees
 

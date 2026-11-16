@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-16T19:42:22.323629+00:00
+modified: 2026-11-16T20:55:42.991716+00:00
 relationships:
   related:
   - DEV-464
   - DEV-611
+  - DEV-622
 comments:
 - date: 2026-11-16T06:16:18.867391+00:00
   author: automation
@@ -72,6 +73,35 @@ comments:
       result: not_run
       reason: test-only TypeScript change, and no binary of this checkout could be built
     next: Review, then merge; the merge agent reruns the check against main's build
+- date: 2026-11-16T20:55:42.991716+00:00
+  author: claude
+  text: |-
+    Fixed: the DEV-464 row-menu test now waits for the release create instead of failing on the first refusal.
+
+    - Earlier jobs failed on Claude rate limits, not the work
+    - I couldn't reproduce the refusal: the test passed in 1 full smoke run and 3 UI-only runs at load 40–200 (other UI tests flaked instead)
+    - `smoke/tests/ui.releases.smoke.spec.ts`: the `POST /api/releases/create` runs inside `expect.poll` (15 s); on timeout the failure shows the last `status body`, so a real server error stays visible
+    - Possible cause, filed as [DEV-622](https://lotar.pyxzl.net/task/DEV-622): `web_server.rs` treats a failed socket read as end of request (`unwrap_or_default`), so a slow or interrupted read cuts the body and gives a 400
+  report:
+    commits:
+    - hash: 892eb10d
+      what: the row-menu test retries the release create and fails with the last status and body
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts
+      result: passed
+      reason: 3 of 3
+    - command: npm run test:smoke:quick:agent
+      result: passed
+      reason: 405 of 405, load ~200
+    - command: npm run lint:frontend, oxlint, fmt:js:check, cargo fmt --check
+      result: passed
+    - command: cargo clippy (lint:backend)
+      result: not_run
+      reason: no Rust change, machine overloaded (63 min smoke build)
+    - command: npm test
+      result: not_run
+      reason: no Rust or view change; the edit is a smoke spec only
+    next: Review, then merge; the merge agent reruns the check command on main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
@@ -136,6 +166,16 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-16T19:42:22.323629+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T20:55:33.923799+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-611"]}'
+    new: '{"related":["DEV-464","DEV-611","DEV-622"]}'
+- at: 2026-11-16T20:55:42.991716+00:00
   actor: claude
   changes:
   - field: comment_added

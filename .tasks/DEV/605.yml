@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T18:45:21.392890+00:00
+modified: 2026-11-16T21:32:15.016584+00:00
 relationships:
   related:
   - DEV-577
@@ -175,6 +175,34 @@ comments:
       result: not_run
       reason: no clean rebase
     next: Fix agent rebases 25188cfe onto main 804cb0f9, runs lotar's merge after follow_ticket_work, gets it reviewed, then merge
+- date: 2026-11-16T21:32:15.016584+00:00
+  author: claude
+  text: |-
+    Help needed: two jobs did the same DEV-605 rebase at once, and the work has no passed review. Should the merge thread land it, or should it be reviewed first?
+
+    - All the earlier job failures were Claude rate limits, not problems with the work (`lotar agent logs job-20261116T061807.870Z-57`, `…062203.726Z-82`).
+    - The review never ran. The rule then sent the ticket to merge anyway ("the merge goes ahead without a review"). That breaks "no merge without a passed review" (standards STD-133 step 1).
+    - The DEV-605 merge thread (`t3/e772ca7a`) is still running. It rebased onto main as `a9d99539` and is running lint, test and smoke, so it can land it.
+    - This fix job made the same rebase as `e6c9070c` on `t3/1e8def17`. Main's DEV-598/602/603 changes conflicted in `agent_job_service.rs`. In both rebases `follow_ticket_work` runs before lotar's own merge, so the merge sees the fix's newest branch, and every job records the ticket's assignee. Only one doc comment line differs. 135 targeted tests passed.
+    - I stopped my lint/test/smoke and moved no branch. `agent/DEV-605` is still at the old `25188cfe`. I told the merge thread.
+    - Choose: (a) the merge thread lands `a9d99539` as is, or (b) review `a9d99539` on Codex first.
+  report:
+    commits:
+    - hash: e6c9070c
+      what: DEV-605 rebased onto main 804cb0f9 (duplicate of the merge thread's a9d99539)
+    checks:
+    - command: cargo nextest (135 targeted merge/trust/job/session/worktree tests)
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: stopped, the merge thread runs it on a9d99539
+    - command: npm test
+      result: not_run
+      reason: stopped, as above
+    - command: npm run smoke
+      result: not_run
+      reason: stopped, as above
+    next: 'Owner: pick one: let the merge thread land a9d99539 as is, or review it on another model first'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27aa3d95-a2c7-4dd5-b654-19819c5d68c0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa42985b0-da6c-4375-89b2-40b1447a986e
@@ -434,3 +462,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588"]}'
     new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603"]}'
+- at: 2026-11-16T21:32:15.016584+00:00
+  actor: claude
+  changes:
+  - field: comment_added

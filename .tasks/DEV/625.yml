@@ -1,0 +1,37 @@
+title: 'A dev503 test that times out under heavy load aborts its binary: Harness''s Drop panics again while unwinding'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T21:08:52.852170+00:00
+modified: 2026-11-16T21:08:53.417785+00:00
+relationships:
+  related:
+  - DEV-613
+description: |-
+  Found in the DEV-613 stress run (`--stress-count 30` of `test(/dev503_harness_jobs_test/)`), iteration 30, load average about 110.
+
+  - `cancelling_a_job_cancels_its_sessions_turn` timed out on `wait_for("the held prompt")`; while unwinding, `impl Drop for Harness` (`dev503_harness_jobs_test.rs:82`) calls `wait_for_jobs_to_end`, which panicked again ("the jobs' end"): "panic in a destructor during cleanup", SIGABRT.
+  - `a_ticket_hands_its_context_from_harness_to_harness_through_its_states` timed out on "the merged ticket" after 602 s (`wait_for`'s bound is 60 s, so single steps stalled for minutes).
+  - The other 29 iterations passed; both tests pass at normal load.
+
+  ## Done when
+  - [ ] `Harness::drop` doesn't panic while the thread is already panicking (`std::thread::panicking()`), so the first timeout is the reported failure.
+  - [ ] Decided whether the 60 s `wait_for` bound needs to grow for loaded machines, or the stall is the machine's.
+tags:
+- health
+custom_fields:
+  finding: test:dev503-harness-drop-abort
+history:
+- at: 2026-11-16T21:08:53.148235+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-613"]}'
+- at: 2026-11-16T21:08:53.417785+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

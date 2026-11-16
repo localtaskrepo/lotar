@@ -1,0 +1,41 @@
+title: The web server treats a failed socket read as end of request and truncates the body
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T20:55:33.664464+00:00
+modified: 2026-11-16T20:55:36.086710+00:00
+relationships:
+  related:
+  - DEV-615
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695
+description: 'Found while on DEV-615: `handle_connection` in `crates/lotar-lib/src/web_server.rs` reads headers and body with `stream.read(..).unwrap_or_default()`, so an `Interrupted` or timed-out read counts as EOF and the handler gets a cut body (a misleading 400 `Invalid body`). Check: a unit test feeding a stream that returns `Interrupted` once mid-body. Done: `Interrupted` is retried, other read errors close the connection without dispatching.'
+tags:
+- health
+custom_fields:
+  finding: review:web-server-read-errors
+history:
+- at: 2026-11-16T20:55:33.924305+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-615"]}'
+- at: 2026-11-16T20:55:34.136214+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T20:55:35.074320+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T20:55:36.086710+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695

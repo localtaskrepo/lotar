@@ -555,6 +555,9 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
     if cfg.agent_worktree != defaults.agent_worktree {
         agent.insert(Y::String("worktree".into()), serde_yaml_ng::to_value(&cfg.agent_worktree).unwrap_or(Y::Null));
     }
+    if let Some(merge) = &cfg.agent_merge {
+        agent.insert(Y::String("merge".into()), serde_yaml_ng::to_value(merge).unwrap_or(Y::Null));
+    }
     if !agent.is_empty() {
         root.insert(Y::String("agent".into()), Y::Mapping(agent));
     }
@@ -1004,6 +1007,12 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         let entry = root.entry(Y::String("agent".into())).or_insert_with(|| Y::Mapping(serde_yaml_ng::Mapping::new()));
         if let Y::Mapping(map) = entry {
             map.insert(Y::String("worktree".into()), serde_yaml_ng::to_value(worktree).unwrap_or(Y::Null));
+        }
+    }
+    if let Some(merge) = &cfg.agent_merge {
+        let entry = root.entry(Y::String("agent".into())).or_insert_with(|| Y::Mapping(serde_yaml_ng::Mapping::new()));
+        if let Y::Mapping(map) = entry {
+            map.insert(Y::String("merge".into()), serde_yaml_ng::to_value(merge).unwrap_or(Y::Null));
         }
     }
     if let Some(profiles) = &cfg.agents {

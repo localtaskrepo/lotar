@@ -5,13 +5,15 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:56:31.049417+00:00
-modified: 2026-11-16T18:41:21.573976+00:00
+modified: 2026-11-16T20:53:29.547257+00:00
 relationships:
   related:
   - DEV-563
   - DEV-575
   - DEV-614
   - DEV-617
+  - DEV-600
+  - DEV-602
 comments:
 - date: 2026-11-16T04:27:17.687118+00:00
   author: claude
@@ -122,6 +124,69 @@ comments:
       result: not_run
       reason: passed 3/3 on 7c3253dd, reviewer 4 runs; merge agent reruns
     next: Review is done (passed); merge 5ea7b340 into main
+- date: 2026-11-16T20:38:19.205795+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `862c9b28` is on `main` and `origin/main`.
+
+    - Rebased twice: main moved on with DEV-602 and then DEV-600. No conflicts and no lockfile changes. After the second rebase I reran lint, tests and smoke on `5ea7b340`, and all passed.
+    - Smoke took about an hour because 73 lotar rustc processes from other sessions were compiling at the same time and the machine was swapping. The suite itself ran in 195 s.
+    - Main fast-forwarded `804cb0f9..5ea7b340`. I then amended the pending `.tasks` changes into the merged commit (`862c9b28`) and pushed `804cb0f9..862c9b28`, the only unpushed commit.
+    - The earlier question "Retry with which agent, or WontDo?" no longer needs an answer: this merge job resumed after the session limit and finished.
+  report:
+    commits:
+    - hash: 862c9b28
+      what: DEV-606 test fix (5ea7b340 rebased onto 804cb0f9) with .tasks amended in, on main and pushed
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: on 5ea7b340
+    - command: npm run test:agent
+      result: passed
+      reason: 2258 Rust + 1548 UI on 5ea7b340
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405 on 5ea7b340, fresh smoke build; this is the ticket's check, and its code matches 862c9b28 (only .tasks differs)
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config file changed
+    next: 'None: merged and pushed; the open retry question is moot'
+- date: 2026-11-16T20:53:29.547257+00:00
+  author: claude
+  text: |-
+    Fix unchanged and ready to merge: `5ea7b340` is the reviewed fix `7c3253dd`, rebased onto current main `804cb0f9`.
+
+    - The earlier merge and retry jobs failed only because of the Claude rate limit, not because of the work (`lotar agent logs job-20261116T060008.302Z-48`).
+    - Branch `t3/c4bef463` (= `agent/DEV-606`) is 1 commit ahead of main, with the same diff: `smoke/tests/ui.board-layout.smoke.spec.ts` +20/−1.
+    - On `5ea7b340`: format, oxlint and smoke typecheck pass, and the board-layout spec passed 3 of 3 against a fresh smoke build.
+    - Full lint wasn't rerun: it hit the 30 min limit at load ~120. It and the full smoke passed on `7c3253dd`.
+  report:
+    commits:
+    - hash: 5ea7b340
+      what: 7c3253dd rebased onto main 804cb0f9 (DEV-600), same one-file diff
+    checks:
+    - command: npx prettier --check smoke/tests/ui.board-layout.smoke.spec.ts
+      result: passed
+    - command: npx oxlint smoke/tests/ui.board-layout.smoke.spec.ts
+      result: passed
+    - command: npx tsc --project smoke/tsconfig.json --noEmit
+      result: passed
+    - command: npm run -s build:smoke
+      result: passed
+      reason: 56 min under load ~120
+    - command: npm run -s test:smoke:quick:agent tests/ui.board-layout.smoke.spec.ts
+      result: passed
+      reason: 3 of 3 on 5ea7b340
+    - command: npm run lint:agent
+      result: not_run
+      reason: stopped at the 30 min limit, load ~120 from parallel clippy runs; passed on 7c3253dd
+    - command: npm run test:agent
+      result: not_run
+      reason: passed on 7c3253dd; the rebase adds only main's commits
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: full suite passed 7 times on 7c3253dd (fix 3, review 4); merge agent reruns it on main
+    next: Merge 5ea7b340 (branch t3/c4bef463, already on main 804cb0f9) and rerun the full smoke on main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A894e9f23-1f2b-42fe-8f92-1146d26ffe1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb16e3cc-20d8-4008-8f95-134c2dcd230d
@@ -260,6 +325,20 @@ history:
     old: '{"related":["DEV-563","DEV-575","DEV-614"]}'
     new: '{"related":["DEV-563","DEV-575","DEV-614","DEV-617"]}'
 - at: 2026-11-16T18:41:21.573976+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T20:38:19.205795+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T20:38:22.937560+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-563","DEV-575","DEV-614","DEV-617"]}'
+    new: '{"related":["DEV-563","DEV-575","DEV-614","DEV-617","DEV-600","DEV-602"]}'
+- at: 2026-11-16T20:53:29.547257+00:00
   actor: claude
   changes:
   - field: comment_added

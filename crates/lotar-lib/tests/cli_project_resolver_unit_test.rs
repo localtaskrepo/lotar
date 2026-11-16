@@ -60,6 +60,7 @@ fn make_resolver() -> ProjectResolver {
         agent_instructions: None,
         agent_profiles: Default::default(),
         agent_worktree: Default::default(),
+        agent_merge: None,
         remotes: Default::default(),
         ui: Default::default(),
     };

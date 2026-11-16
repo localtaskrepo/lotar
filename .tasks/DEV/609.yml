@@ -5,11 +5,12 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T06:21:40.776485+00:00
+modified: 2026-11-16T21:05:45.071514+00:00
 relationships:
   related:
   - DEV-599
   - DEV-594
+  - DEV-624
 comments:
 - date: 2026-11-16T05:21:49.697784+00:00
   author: claude
@@ -79,6 +80,33 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-16T21:05:45.071514+00:00
+  author: claude
+  text: |-
+    Merge stopped: `npm run test:agent` fails on two serve tests that this change doesn't touch.
+
+    - Rebased onto main `804cb0f9`: DEV-599 had landed (`01a9160e`), so I dropped the branch's copy `45730a7f`. The DEV-609 test is now `2b7224a0`, the same diff (`git range-diff` shows `=`), signed.
+    - `npm run lint:agent` passed.
+    - `npm run test:agent` failed twice. `serve_honors_explicit_tasks_dir_for_api_requests` (`cli_serve_features_test.rs:532`) got status 0 in both runs, and `serve_with_project_data_lists_exact_tasks` (`:496`) in the second. Status 0 means no response inside the 1.5 s read timeout. The Mac's load average was 140-170 from other sessions.
+    - Both pass alone, and all 15 serve tests pass with `-j 1`. The DEV-609 commit only adds a test to `dev503_harness_jobs_test.rs`, so main fails the same way.
+    - Filed DEV-624 (health) for the flaky serve tests.
+    - Smoke not run. Nothing merged, pushed or trusted.
+
+    Question: merge `2b7224a0` anyway, or wait until DEV-624 is fixed?
+  report:
+    commits:
+    - hash: 2b7224a0
+      what: DEV-609 test, rebased onto main 804cb0f9 (not merged)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: failed
+      reason: 2 serve tests in cli_serve_features_test.rs, not in this change, see DEV-624
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: stopped after test failure
+    next: 'Owner: merge 2b7224a0 now despite the unrelated flaky serve tests, or wait for DEV-624'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177bbfb8-8291-4dbc-bae5-a926f125a36d
@@ -211,5 +239,15 @@ history:
     new: mallox
 - at: 2026-11-16T06:21:40.776485+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T21:05:30.570329+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-599","DEV-594"]}'
+    new: '{"related":["DEV-599","DEV-594","DEV-624"]}'
+- at: 2026-11-16T21:05:45.071514+00:00
+  actor: claude
   changes:
   - field: comment_added

@@ -421,6 +421,29 @@ pub struct AgentWorktreeConfig {
     pub cleanup_paths: Vec<String>,
 }
 
+/// lotar's own merge in a merge job (DEV-605): it rebases the ticket's
+/// branch onto the main checkout's branch, runs `checks`, fast-forwards and
+/// pushes, and starts the merge agent only for what needs judgment. Without
+/// it the merge agent merges. A project's section replaces the global one.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentMergeConfig {
+    /// Commands run in the ticket's worktree after the rebase, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub checks: Vec<String>,
+    /// Runs before the checks when the rebase changed a lockfile or the
+    /// worktree is new.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub install: Option<String>,
+    /// Push the main checkout's branch once the work landed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub push: bool,
+    /// Runs in the main checkout after landing a ticket with a finding key;
+    /// its output must no longer list `[<key>]`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub finding_check: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentWorktreeConfigOverride {
@@ -791,6 +814,8 @@ pub struct ProjectConfig {
     pub agent_automation: Option<crate::types::CustomFieldValue>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_worktree: Option<AgentWorktreeConfigOverride>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_merge: Option<AgentMergeConfig>,
 
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub remotes: BTreeMap<String, SyncRemoteConfig>,
@@ -851,6 +876,7 @@ impl ProjectConfig {
             agents: None,
             agent_automation: None,
             agent_worktree: None,
+            agent_merge: None,
             remotes: BTreeMap::new(),
             auth_profiles: BTreeMap::new(),
         }
@@ -1007,6 +1033,8 @@ pub struct GlobalConfig {
     pub agent_automation: Option<crate::types::CustomFieldValue>,
     #[serde(default)]
     pub agent_worktree: AgentWorktreeConfig,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_merge: Option<AgentMergeConfig>,
 
     /// Web UI branding (DEV-218): default theme, display name, and logo/icon
     /// images given as paths relative to the repository.
@@ -1117,6 +1145,8 @@ pub struct ResolvedConfig {
     #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
     pub agent_profiles: BTreeMap<String, AgentProfileDetail>,
     pub agent_worktree: AgentWorktreeConfig,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_merge: Option<AgentMergeConfig>,
 
     #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
     pub remotes: BTreeMap<String, SyncRemoteConfig>,
@@ -1376,6 +1406,7 @@ impl Default for GlobalConfig {
             agents: BTreeMap::new(),
             agent_automation: None,
             agent_worktree: AgentWorktreeConfig::default(),
+            agent_merge: None,
             ui_theme: None,
             ui_name: None,
             ui_logo: None,

@@ -1,0 +1,105 @@
+title: The queue starts no new job while the Mac is short of memory
+status: InProgress
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T20:57:48.292642+00:00
+modified: 2026-11-16T21:00:56.248007+00:00
+relationships:
+  related:
+  - DEV-604
+  - DEV-378
+  - DEV-525
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
+description: |-
+  Owner 2026-11-16, after the Mac crashed (picked option 2 of 4 from the options picker): "Memory gate": lotar starts no new job while swap is nearly full or macOS reports memory pressure.
+
+  ## Found (chief of staff, 2026-11-16)
+  - The Mac (24 GB, 14 cores) went down at 23:13 on 2026-11-15 (hardware watchdog, no panic log saved); at the logins next morning WindowServer missed its 120 s watchdog check-in (panic 10:26) while every job resumed at once.
+  - Memory exhaustion before and after: JetsamEvent 20:45 (fseventsd 2.7 GB) and 12:33 the next day (rustc about 35 GB, 150 MB free, 11.7 GB compressed); swap 9.9 of 10 GB; about ten lotar worktrees compiling while lotar ran 3 jobs.
+
+  ## Done when
+  - [ ] Before a queue worker starts a job it reads the Mac's memory state: macOS memory pressure (sysctl kern.memorystatus_vm_pressure_level: warn or critical) and swap use (vm.swapusage, used over a configurable share of total, default 85%). Either one holds the job in the queue.
+    - Both start paths: the queue worker (`lotar agent worker`, on-disk queue) takes no entry while the gate holds; `lotar serve` queues a new job (status `queued`) instead of starting it, and its pending jobs start only once the gate opens.
+    - Jobs already running and jobs taken over after a restart (DEV-378) keep running: the gate only holds new starts.
+    - Swap with total 0 (no swap file yet) counts as normal. Pressure level 1 is normal, 2 warn, 4 critical.
+    - A reading that fails (sysctl missing or unparsable) holds nothing; `lotar agent queue` says the reading failed.
+  - [ ] A held job starts once both are back to normal for a configurable time (default 2 minutes); the queue checks again every 30 s. `lotar agent queue` and list-jobs say why it waits and since when; a job is never failed or retried for this.
+    - Reason text names the reading, e.g. `memory pressure warn` or `swap 9.4 of 10.0 GB used (94%, limit 85%)`, and the time the hold began; during the settle time it says since when memory is normal again.
+    - Shared state in the queue directory (`memory-gate-<hash>.json`), so the worker, the server and `lotar agent queue` in another process show the same hold.
+    - Held entries keep their `attempts`; nothing is commented on tickets. In `lotar serve` a queued job's waiting reason (DEV-525) names the memory hold, and a 30 s tick starts pending jobs once the gate opens (no job end needed).
+  - [ ] Configurable in the agents config (thresholds, on/off), on by default on macOS; other systems: off unless configured.
+    - Global config `agent.memory_gate`: `enabled` (unset: on on macOS, off elsewhere; an explicit value wins), `max_swap_percent` (default 85), `settle_seconds` (default 120).
+    - Other systems with `enabled: true`: swap from `/proc/meminfo` on Linux; no pressure reading there.
+  - [ ] Tests with fake readings (pressure warn, swap high, back to normal); docs in docs/help/agent.md (queue).
+    - Unit tests on the gate's decision: pressure warn holds, critical holds, swap over limit holds, normal for less than the settle time still holds, normal for the settle time opens, swap total 0 is normal, failed reading holds nothing, disabled holds nothing; readings reused for 30 s while held.
+    - Parsing tests for `vm.swapusage` output and `/proc/meminfo`.
+    - Docs: `docs/help/agent.md` (queue) and `docs/help/config-reference.md`.
+  - Not in this ticket: threads that run outside lotar jobs, and a build cap (the owner didn't pick those). No REST or UI change: the web UI's config page does not show the new keys.
+history:
+- at: 2026-11-16T20:57:48.879647+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T20:57:49.654357+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T20:57:50.677730+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
+- at: 2026-11-16T21:00:55.878328+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner 2026-11-16, after the Mac crashed (picked option 2 of 4 from the options picker): "Memory gate": lotar starts no new job while swap is nearly full or macOS reports memory pressure.
+
+      ## Found (chief of staff, 2026-11-16)
+      - The Mac (24 GB, 14 cores) went down at 23:13 on 2026-11-15 (hardware watchdog, no panic log saved); at the logins next morning WindowServer missed its 120 s watchdog check-in (panic 10:26) while every job resumed at once.
+      - Memory exhaustion before and after: JetsamEvent 20:45 (fseventsd 2.7 GB) and 12:33 the next day (rustc about 35 GB, 150 MB free, 11.7 GB compressed); swap 9.9 of 10 GB; about ten lotar worktrees compiling while lotar ran 3 jobs.
+
+      ## Done when
+      - [ ] Before a queue worker starts a job it reads the Mac's memory state: macOS memory pressure (sysctl kern.memorystatus_vm_pressure_level: warn or critical) and swap use (vm.swapusage, used over a configurable share of total, default 85%). Either one holds the job in the queue.
+      - [ ] A held job starts once both are back to normal for a configurable time (default 2 minutes); the queue checks again every 30 s. `lotar agent queue` and list-jobs say why it waits and since when; a job is never failed or retried for this.
+      - [ ] Configurable in the agents config (thresholds, on/off), on by default on macOS; other systems: off unless configured.
+      - [ ] Tests with fake readings (pressure warn, swap high, back to normal); docs in docs/help/agent.md (queue).
+      - Not in this ticket: threads that run outside lotar jobs, and a build cap (the owner didn't pick those).
+    new: |-
+      Owner 2026-11-16, after the Mac crashed (picked option 2 of 4 from the options picker): "Memory gate": lotar starts no new job while swap is nearly full or macOS reports memory pressure.
+
+      ## Found (chief of staff, 2026-11-16)
+      - The Mac (24 GB, 14 cores) went down at 23:13 on 2026-11-15 (hardware watchdog, no panic log saved); at the logins next morning WindowServer missed its 120 s watchdog check-in (panic 10:26) while every job resumed at once.
+      - Memory exhaustion before and after: JetsamEvent 20:45 (fseventsd 2.7 GB) and 12:33 the next day (rustc about 35 GB, 150 MB free, 11.7 GB compressed); swap 9.9 of 10 GB; about ten lotar worktrees compiling while lotar ran 3 jobs.
+
+      ## Done when
+      - [ ] Before a queue worker starts a job it reads the Mac's memory state: macOS memory pressure (sysctl kern.memorystatus_vm_pressure_level: warn or critical) and swap use (vm.swapusage, used over a configurable share of total, default 85%). Either one holds the job in the queue.
+        - Both start paths: the queue worker (`lotar agent worker`, on-disk queue) takes no entry while the gate holds; `lotar serve` queues a new job (status `queued`) instead of starting it, and its pending jobs start only once the gate opens.
+        - Jobs already running and jobs taken over after a restart (DEV-378) keep running: the gate only holds new starts.
+        - Swap with total 0 (no swap file yet) counts as normal. Pressure level 1 is normal, 2 warn, 4 critical.
+        - A reading that fails (sysctl missing or unparsable) holds nothing; `lotar agent queue` says the reading failed.
+      - [ ] A held job starts once both are back to normal for a configurable time (default 2 minutes); the queue checks again every 30 s. `lotar agent queue` and list-jobs say why it waits and since when; a job is never failed or retried for this.
+        - Reason text names the reading, e.g. `memory pressure warn` or `swap 9.4 of 10.0 GB used (94%, limit 85%)`, and the time the hold began; during the settle time it says since when memory is normal again.
+        - Shared state in the queue directory (`memory-gate-<hash>.json`), so the worker, the server and `lotar agent queue` in another process show the same hold.
+        - Held entries keep their `attempts`; nothing is commented on tickets. In `lotar serve` a queued job's waiting reason (DEV-525) names the memory hold, and a 30 s tick starts pending jobs once the gate opens (no job end needed).
+      - [ ] Configurable in the agents config (thresholds, on/off), on by default on macOS; other systems: off unless configured.
+        - Global config `agent.memory_gate`: `enabled` (unset: on on macOS, off elsewhere; an explicit value wins), `max_swap_percent` (default 85), `settle_seconds` (default 120).
+        - Other systems with `enabled: true`: swap from `/proc/meminfo` on Linux; no pressure reading there.
+      - [ ] Tests with fake readings (pressure warn, swap high, back to normal); docs in docs/help/agent.md (queue).
+        - Unit tests on the gate's decision: pressure warn holds, critical holds, swap over limit holds, normal for less than the settle time still holds, normal for the settle time opens, swap total 0 is normal, failed reading holds nothing, disabled holds nothing; readings reused for 30 s while held.
+        - Parsing tests for `vm.swapusage` output and `/proc/meminfo`.
+        - Docs: `docs/help/agent.md` (queue) and `docs/help/config-reference.md`.
+      - Not in this ticket: threads that run outside lotar jobs, and a build cap (the owner didn't pick those). No REST or UI change: the web UI's config page does not show the new keys.
+- at: 2026-11-16T21:00:56.248007+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604"]}'
+    new: '{"related":["DEV-604","DEV-378","DEV-525"]}'

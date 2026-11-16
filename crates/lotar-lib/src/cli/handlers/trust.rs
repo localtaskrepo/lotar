@@ -86,6 +86,10 @@ fn describe(tasks_dir: &Path) -> Vec<String> {
                     lines.push(format!("{}: rule '{rule}' on {event} runs {command}", source.path));
                 }
             }
+            "merge" => {
+                let detail = source.content().trim().replace('\n', ", ");
+                lines.push(format!("{}: lotar's merge runs ({detail})", source.path));
+            }
             _ => {
                 let Ok(serde_yaml_ng::Value::Mapping(map)) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(source.content()) else {
                     continue;
