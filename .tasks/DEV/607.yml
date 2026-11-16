@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T03:37:27.096061+00:00
-modified: 2026-11-16T22:53:23.618958+00:00
+modified: 2026-11-16T23:17:30.608669+00:00
 relationships:
   related:
   - DEV-597
@@ -14,6 +14,9 @@ relationships:
   - DEV-624
   - DEV-613
   - DEV-626
+  - DEV-605
+  - DEV-606
+  - DEV-608
 comments:
 - date: 2026-11-16T04:08:26.235549+00:00
   author: claude
@@ -157,6 +160,33 @@ comments:
       result: not_run
       reason: this worktree had no smoke binary; npm run build:smoke was stopped at the 30 min limit (load ~120 from other agents' builds)
     next: Review, then merge
+- date: 2026-11-16T23:17:29.787627+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `bc1e9729` is on `main` and `origin/main`.
+
+    - Rebased twice: main moved to `b1cd11a1` (DEV-606, DEV-605, DEV-608) during the first round of checks. No conflicts, no lockfile change.
+    - Checks ran on the final rebased commit. Smoke passed 405/405 at load ~165, so the fix held under load.
+    - Flakes seen in earlier full runs, unrelated to this change: DEV-613 (`the entry still waits`, 2 times), DEV-624 (serve output timeout). I added today's sightings to both.
+    - Two runs were cut short from outside, a SIGTERM and an sccache reset; I reran both.
+    - Pending `.tasks` changes are committed into `bc1e9729`. No rule or config change, so `lotar trust` wasn't needed.
+  report:
+    commits:
+    - hash: bc1e9729
+      what: close the Create task panel with the button's click event (with pending .tasks)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2270 Rust, 1548 UI, 50 release, 7 hooks; an earlier run hit the DEV-613 flake
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405 at load ~165, rerun with RUSTC_WRAPPER= after sccache reset the connection
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config file changed
+    next: 'None: Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0caf1a38-2a26-4a65-bd1f-173cb4151cb4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28ddd3b6-4d53-460f-885b-9eb324f37114
@@ -315,3 +345,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613"]}'
     new: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626"]}'
+- at: 2026-11-16T23:17:29.787627+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:17:30.608669+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626"]}'
+    new: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626","DEV-605","DEV-606","DEV-608"]}'

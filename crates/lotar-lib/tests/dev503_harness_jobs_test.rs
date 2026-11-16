@@ -241,6 +241,42 @@ fn session_continue_starts_a_new_session_with_a_handoff_after_the_time() {
     assert!(log.contains("Handoff:") && log.contains("Review: blocking, the test is missing"), "the handoff reaches the agent: {log}");
 }
 
+/// DEV-611: the new session takes the skipped one's name, so the skipped round's event log is kept under
+/// `<name>.<last used>` first. The handoff names it, and the next job's earlier sessions list it.
+#[test]
+fn a_skipped_session_is_kept_and_the_handoff_names_its_event_log() {
+    let harness = harness("    continue_within_minutes: 30\n", &[("FAKE_REPLY", "First round".into())]);
+    harness.run(&[]).success();
+    age_session(&harness, 31);
+    continue_job(&harness);
+    let sessions = harness.root().join("harnessmux/state/sessions");
+    let kept = std::fs::read_dir(&sessions)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.to_string_lossy().strip_suffix(".events.jsonl").is_some_and(|name| name.contains("-TEST-1-fixer.")))
+        .expect("the skipped session's event log is kept");
+    assert!(std::fs::read_to_string(&kept).unwrap().contains("First round 1"), "the kept log holds the first round's reply");
+    let kept_name = kept.file_name().unwrap().to_string_lossy().trim_end_matches(".events.jsonl").to_string();
+    let record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(sessions.join(format!("{kept_name}.json"))).unwrap()).unwrap();
+    assert_eq!(record["state"], "ended", "nobody resumes a kept round: {record:#}");
+    let kept_path = kept.display().to_string();
+    let log = harness.log();
+    assert!(
+        log.contains("Handoff:")
+            && log.contains(&format!(
+                "Its event log, one JSON object per line (`message` events are the agent's replies, `tool.started` its tool calls): {kept_path}"
+            )),
+        "{log}"
+    );
+
+    // The next job, within the time, resumes the new session and lists the kept round among the earlier ones.
+    continue_job(&harness);
+    let log = harness.log();
+    let last_prompt = log.lines().rfind(|line| line.contains("\"method\":\"session/prompt\"")).unwrap_or_default();
+    assert!(last_prompt.contains("Earlier agent sessions on this ticket") && last_prompt.contains(&format!("{kept_name} (claude agent")), "{last_prompt}");
+    assert!(!last_prompt.contains("Handoff:"), "{last_prompt}");
+}
+
 /// The second review of DEV-503: session names are machine-wide, so two repositories with the same ticket and profile
 /// must not share one. `continue` in the second checkout starts its own session.
 #[test]

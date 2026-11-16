@@ -1,17 +1,18 @@
 title: 'Job prompt: carry the description, the open question and the last fix and review comments; shorter built-in instructions'
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T18:42:09.946527+00:00
-modified: 2026-11-16T22:48:01.615299+00:00
+modified: 2026-11-16T23:20:38.517865+00:00
 relationships:
   related:
   - DEV-608
   - DEV-611
   - DEV-618
   - DEV-563
+  - DEV-619
 comments:
 - date: 2026-11-16T20:03:10.910172+00:00
   author: claude
@@ -36,8 +37,44 @@ comments:
     - Instructions + notes for a T3 fix job: 5,230 → 3,475 (66%); instructions alone 3,935 → 2,421
     - Recent context default 2 entries: stored prompts are median 2.5k (the rule's boilerplate, p90 3.3k), replies median 1.0k (p90 2.3k), across 276 `.context` files; the comments now carry the older rounds
     - The picks on DEV-563: open question (automation's retry question), newest fix report, newest review
+- date: 2026-11-16T23:19:56.091466+00:00
+  author: claude
+  text: |-
+    Done: job prompts carry the open question and the newest fix and review comments instead of the whole history; about two thirds shorter on DEV-563.
+
+    - `build_prompt` / `prompt_comments` in `crates/lotar-lib/src/services/agent_job_service.rs`: a "Comments" section (question, answer, newest fix, newest review, each cut at 1,500 characters, with `lotar show` / `lotar task timeline` for the rest); recent context keeps the newest 2 entries, cut
+    - Profile settings in `crates/lotar-core/src/config/types.rs`: `context_entries` (default 2, `0` none) and `full_history: true` (the old prompt; wins over `context_entries`). No REST or UI change
+    - `docs/help/agent-instructions.md` 3,935 → 2,421 characters; "This job" notes shortened too: 5,230 → 3,475 together (66%)
+    - Docs: `docs/help/agent.md`, `docs/help/config-reference.md`
+    - Tests updated where they pinned old phrasing: `dev503_harness_jobs_test.rs` (T3 branch line; the merge now gets the newest round, the review reaches it through comments)
+    - Caution: I ran `pkill -f rust-test-runner.mjs` to stop my own run; it may also have stopped another session's `npm test` runner around 20:10 UTC
+  report:
+    commits:
+    - hash: 2c1dfd8b
+      what: Comments section, recent context cut to 2 entries, profile settings context_entries and full_history, shorter instructions and job notes
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: Rust 2262, UI 1548, release and hooks; the last prompt_comments rework was rechecked with the lib tests only (24 passed)
+    - command: npm run smoke
+      result: passed
+      reason: 405; rerun with RUSTC_WRAPPER= after sccache dropped its connection under load 140
+    - command: measurement on DEV-563
+      result: passed
+      reason: with a temporary test, removed before the commit
+    next: 'Review: check the comment picks in prompt_comments against a few real tickets'
+- date: 2026-11-16T23:20:28.377430+00:00
+  author: claude
+  text: |-
+    Merge note: DEV-608 (`9849ff77`) and DEV-619 edit lines next to this branch's; keep both sides on a conflict.
+
+    - `t3_thread_notes` in `agent_job_service.rs`: keep this branch's shorter first format string and DEV-608's `is_merge_job` parameter, early return and uncommitted-worktrees loop text
+    - Agent profile struct in `crates/lotar-core/src/config/types.rs`: keep this branch's `context_entries` and `full_history` and DEV-619's `thread_name`
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79143270-686a-4330-848d-940b822b946e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acd704542-d988-4f64-b33e-a1f8e3cde077
 description: |-
   Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposals 3 and 5.
 
@@ -155,3 +192,31 @@ history:
       - [ ] Built-in instructions plus "This job" notes are at most two thirds of before (≤ 3.47k of 5.2k characters, expanded for a T3 fix job), saying the same; the tests that pin their phrases pass.
       - [ ] Measured before and after on a fix, review and merge prompt of the same ticket; numbers in the ticket.
       - [ ] docs/help/agent.md and config-reference.md describe the sections and both settings.
+- at: 2026-11-16T23:19:56.091466+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:20:10.809309+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T23:20:28.377430+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:20:28.654722+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619"]}'
+- at: 2026-11-16T23:20:38.517865+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acd704542-d988-4f64-b33e-a1f8e3cde077

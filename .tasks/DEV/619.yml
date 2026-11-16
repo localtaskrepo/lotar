@@ -5,10 +5,11 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-16T22:25:33.253710+00:00
+modified: 2026-11-16T23:20:28.654384+00:00
 relationships:
   related:
   - DEV-613
+  - DEV-620
 comments:
 - date: 2026-11-16T22:25:19.837146+00:00
   author: claude
@@ -124,3 +125,9 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-16T23:20:28.654384+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613"]}'
+    new: '{"related":["DEV-613","DEV-620"]}'

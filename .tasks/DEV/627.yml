@@ -1,0 +1,28 @@
+title: 'Flaky test: serve_reports_requested_port_exactly loses its reserved port to another process before serve binds it'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T23:23:19.131862+00:00
+modified: 2026-11-16T23:23:20.535672+00:00
+relationships:
+  related:
+  - DEV-624
+description: 'Found in DEV-624 (2026-11-16): 1 of 11 parallel runs of `target/local/deps/integration-* cli_serve_features_test:: --test-threads 15` at load ~140 failed in `serve_reports_requested_port_exactly` (`crates/lotar-lib/tests/cli_serve_features_test.rs:333`): panic at `:48`, serve exited before a readiness banner. Likely cause: `reserve_ephemeral_port` binds port 0, drops the listener, then serve binds the number; another test or process can take it in between (`serve_short_port_flag_sets_requested_port` uses the same pattern). Check: run that command 20 times under load. Done when the requested-port tests no longer fail when the reserved port is taken first (retry with a new port, or another way that still tests an explicit --port).'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:serve_reports_requested_port_exactly
+history:
+- at: 2026-11-16T23:23:19.685683+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-624"]}'
+- at: 2026-11-16T23:23:20.535672+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

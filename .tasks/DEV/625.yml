@@ -1,14 +1,16 @@
 title: 'A dev503 test that times out under heavy load aborts its binary: Harness''s Drop panics again while unwinding'
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T21:08:52.852170+00:00
-modified: 2026-11-16T21:08:53.417785+00:00
+modified: 2026-11-16T23:24:20.343412+00:00
 relationships:
   related:
   - DEV-613
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66
 description: |-
   Found in the DEV-613 stress run (`--stress-count 30` of `test(/dev503_harness_jobs_test/)`), iteration 30, load average about 110.
 
@@ -35,3 +37,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T23:24:12.651039+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T23:24:20.343412+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66

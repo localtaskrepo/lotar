@@ -114,7 +114,7 @@ pub fn session_to_continue(project: &std::path::Path, ticket_id: &str, agent_pro
 }
 
 /// The ticket's other sessions in this repository, oldest first, for the prompt of a job: their agents' replies and
-/// tool calls are in their event logs.
+/// tool calls are in their event logs. Kept rounds ([`keep_session`]) are among them.
 pub fn earlier_sessions(project: &std::path::Path, ticket_id: &str, current: &str) -> Vec<(harnessmux::SessionRecord, std::path::PathBuf)> {
     let registry = registry();
     let prefix = session_prefix(project, ticket_id);
@@ -122,7 +122,10 @@ pub fn earlier_sessions(project: &std::path::Path, ticket_id: &str, current: &st
         .list(None)
         .unwrap_or_default()
         .into_iter()
-        .filter(|record| record.name != current && (record.name == prefix || record.name.starts_with(&format!("{prefix}-"))))
+        .filter(|record| {
+            record.name != current
+                && (record.name == prefix || record.name.starts_with(&format!("{prefix}-")) || record.name.starts_with(&format!("{prefix}.")))
+        })
         .map(|record| {
             let events = registry.events_path(&record.name);
             (record, events)
@@ -131,6 +134,32 @@ pub fn earlier_sessions(project: &std::path::Path, ticket_id: &str, current: &st
         .collect();
     sessions.sort_by(|a, b| a.0.last_used.cmp(&b.0.last_used));
     sessions
+}
+
+/// Keeps a session that a new one of the same name is about to replace (DEV-611): its record and event log move to
+/// `<name>.<last used>`, closed, so the next job's prompt can still point at that round. Returns the kept record and
+/// its event log.
+pub fn keep_session(name: &str) -> Result<(harnessmux::SessionRecord, std::path::PathBuf), String> {
+    let registry = registry();
+    let mut record = registry.load(name).map_err(|err| err.to_string())?;
+    let stamp = chrono::DateTime::parse_from_rfc3339(&record.last_used)
+        .map(|at| at.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|_| chrono::Utc::now())
+        .format("%Y%m%dT%H%M%SZ")
+        .to_string();
+    let base: String = name.chars().take(64 - stamp.len() - 1).collect();
+    let kept = format!("{base}.{stamp}");
+    let events = registry.events_path(&kept);
+    let old_events = registry.events_path(name);
+    if old_events.is_file() {
+        std::fs::rename(&old_events, &events).map_err(|err| format!("keeping {}: {err}", old_events.display()))?;
+    }
+    record.name = kept;
+    record.state = harnessmux::SessionState::Ended;
+    record.owner_pid = None;
+    registry.save(&record).map_err(|err| err.to_string())?;
+    registry.remove(name).map_err(|err| err.to_string())?;
+    Ok((record, events))
 }
 
 /// Hands `message` to a session another process owns, as its next turn. False when no process owns it.

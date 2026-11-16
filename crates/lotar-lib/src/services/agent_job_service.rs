@@ -3068,12 +3068,29 @@ fn run_job(
         crate::services::agent_active_jobs::register(&tasks_dir, record);
     }
 
+    let mut context_messages = vec![build_user_message(&user_prompt)];
+    // The new session replaces a skipped one of its own name: keep that
+    // round's log for the handoff and later jobs (DEV-611).
+    let handoff_from = match handoff_from {
+        Some(record) if record.name == name => match crate::services::agent_runner::keep_session(&name) {
+            Ok(kept) => Some(kept),
+            Err(err) => {
+                let end = RunEnd::Failed(format!("Could not keep the session {name} before a new one replaces it: {err}"));
+                end_job(&job_id, &ticket_id, end, &context_messages, &tasks_dir, &config);
+                return;
+            }
+        },
+        Some(record) => {
+            let events = crate::services::agent_runner::registry().events_path(&record.name);
+            Some((record, events))
+        }
+        None => None,
+    };
     let prompt = match handoff_from.as_ref() {
-        Some(record) => format!("{prompt}{}", handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record)),
+        Some((record, events)) => format!("{prompt}{}", handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record, events)),
         None => prompt,
     };
     let env = job_env(&job_id, &tasks_dir, &ticket_id, &config);
-    let mut context_messages = vec![build_user_message(&user_prompt)];
     let end = match agent {
         None => run_command(&job_id, &profile, &prompt, env, &worktree_context.working_dir, &tasks_dir, &ticket_id, active_record),
         Some(agent) => {
@@ -3106,14 +3123,26 @@ fn idle_since(last_used: &str) -> Option<chrono::Duration> {
 /// What a job that starts a new session instead of resuming an idle one
 /// (DEV-603) tells its agent: the session it didn't continue, the ticket's
 /// branch and newest commit, and the ticket's newest comments, where the
-/// earlier rounds' handoffs and reviews are.
-fn handoff_text(tasks_dir: &std::path::Path, ticket_id: &str, ticket_ref: &str, record: &harnessmux::SessionRecord) -> String {
+/// earlier rounds' handoffs and reviews are. `events` is that session's
+/// event log, kept when the new session takes its name (DEV-611).
+fn handoff_text(tasks_dir: &std::path::Path, ticket_id: &str, ticket_ref: &str, record: &harnessmux::SessionRecord, events: &std::path::Path) -> String {
     const COMMENTS: usize = 3;
     const COMMENT_CHARS: usize = 1500;
     let mut out = format!(
         "\nHandoff:\nThis job would have continued the session {} ({} agent, last used {}), but it was idle too long, so it starts a new one. Pick up from the earlier rounds below.\n",
         record.name, record.agent, record.last_used
     );
+    if events.is_file() {
+        out.push_str(&format!(
+            "- Its event log, one JSON object per line (`message` events are the agent's replies, `tool.started` its tool calls): {}\n",
+            events.display()
+        ));
+    }
+    if record.agent == AgentRunnerKind::T3.as_str()
+        && let Some(thread) = record.agent_session.as_deref()
+    {
+        out.push_str(&format!("- Its T3 Code thread: {thread}\n"));
+    }
     let branch = ticket_ref.trim_start_matches("refs/heads/");
     let newest = resolve_repo_root(tasks_dir).and_then(|root| {
         let output = git_command(&root).args(["log", "-1", "--format=%h %s", ticket_ref, "--"]).current_dir(&root).output().ok()?;

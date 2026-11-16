@@ -1,11 +1,11 @@
 title: 'Flaky test: cli_serve_features_test serve tests get no response within the 1.5 s read timeout under load'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T21:05:30.352250+00:00
-modified: 2026-11-16T22:49:03.860154+00:00
+modified: 2026-11-16T23:23:47.817048+00:00
 relationships:
   related:
   - DEV-609
@@ -13,6 +13,7 @@ relationships:
   - DEV-359
   - DEV-607
   - DEV-611
+  - DEV-627
 comments:
 - date: 2026-11-16T22:37:11.900989+00:00
   author: claude
@@ -20,6 +21,43 @@ comments:
     Seen again 2026-11-16 in the DEV-607 merge (load ~60): `serve_honors_explicit_tasks_dir_for_api_requests` failed at `cli_serve_features_test.rs:169`, `output capture did not finish: Err(Timeout)`.
 
     - `npm run test:agent`, worktree `t3-a42a9c69`, on `74796683`; the next full run passed 2258/2258.
+- date: 2026-11-16T23:23:29.772740+00:00
+  author: claude
+  text: |-
+    Fixed: serve tests now wait up to 15 s for a response, not 1.5 s.
+
+    - `crates/lotar-lib/tests/cli_serve_features_test.rs`: new `RESPONSE_TIMEOUT` (15 s) in `http_request`, as DEV-354/DEV-359 did for `web_api_integration_test.rs`. A real hang still fails within that.
+    - Status 0 only happened when no header came within the per-read wait; a late answer now counts.
+    - Before check not reproduced: with the old 1.5 s, 3 runs at load ~140 also passed (tests finish in 0.3 s now), so the evidence is the 5 passes after the fix plus the code path.
+    - Found while testing: `serve_reports_requested_port_exactly` failed 1 in 11 parallel runs (reserved port taken before serve binds it). Filed as DEV-627.
+  report:
+    commits:
+    - hash: 10cadb71
+      what: serve tests wait up to 15 s per read (RESPONSE_TIMEOUT) instead of 1.5 s
+    checks:
+    - command: cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'
+      result: passed
+      reason: 5 of 5 in a row at load ~137-140
+    - command: 'integration binary cli_serve_features_test:: --test-threads 15 under extra CPU load'
+      result: passed
+      reason: target tests 11 of 11; 1 unrelated failure filed as DEV-627
+    - command: npm run test:rust:agent
+      result: passed
+      reason: 2270 of 2270
+    - command: cargo clippy --all-targets --all-features -D warnings
+      result: passed
+    - command: cargo fmt --all --check
+      result: passed
+    - command: npm run lint (frontend, oxlint, eslint, prettier)
+      result: not_run
+      reason: test-only Rust change
+    - command: npm run test:ui, test:release, test:hooks
+      result: not_run
+      reason: test-only Rust change
+    - command: npm run smoke
+      result: not_run
+      reason: test-only Rust change
+    next: Review, then merge and rerun the check against main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97fc7517-3464-4ef3-a807-2a602fdbf376
 description: |-
@@ -76,3 +114,22 @@ history:
   - field: relationships
     old: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607"]}'
     new: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611"]}'
+- at: 2026-11-16T23:23:19.685175+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611"]}'
+    new: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611","DEV-627"]}'
+- at: 2026-11-16T23:23:29.772740+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:23:47.817048+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
