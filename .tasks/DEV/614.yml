@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-17T01:43:26.246232+00:00
+modified: 2026-11-17T01:58:58.488239+00:00
 relationships:
   related:
   - DEV-606
   - DEV-600
   - DEV-616
   - DEV-583
+  - DEV-638
 comments:
 - date: 2026-11-16T06:01:43.302227+00:00
   author: claude
@@ -108,6 +109,17 @@ comments:
       result: not_run
       reason: smoke-only change
     next: Review, then rerun the full smoke on a quiet machine before merge
+- date: 2026-11-17T01:58:58.488239+00:00
+  author: claude
+  text: |-
+    Review: passed. `2f6dd0eb` fixes the flaky repair-preview tests at their cause, and the full smoke passed twice at load ~100.
+
+    - Read: the diff (`smoke/tests/ui.relationships.smoke.spec.ts` only), the ticket and its comments, [DEV-616](https://lotar.pyxzl.net/task/DEV-616) (Done, points to this commit), `view/pages/Dependencies.vue` `changed()`, the watcher and SSE code in `crates/lotar-lib/src/web_server.rs`, and AGENTS.md.
+    - The cause holds up: any `task_*` SSE event clears an open preview, and the watcher can report fixture writes from before the server started. The helper waits for SSE `open` (the server subscribes before it sends headers), writes the file, then waits for that task's `task_updated`. The watcher emits in arrival order and the SSE buffer keeps that order, so no older event arrives after it.
+    - The test still checks the same thing: `before` is now read after the write, so "no writes until confirm" is still asserted. Nothing outside the test changed. There is no second branch with the same fix (no `agent/DEV-616`).
+    - Reran: `npm run build:smoke`; the relationships spec 3× (19/19 each); `npm run -s test:smoke:quick:agent` 2× (405/405 each, load avg 93–119); `npx prettier --check`, `npx oxlint` and `npx tsc -p smoke/tsconfig.json` on the spec all passed. `git status` was clean afterwards.
+    - The branch is 15 commits behind `main` and none of them touch this spec, so the rebase is up to the merge agent.
+    - Minor, filed: [DEV-638](https://lotar.pyxzl.net/task/DEV-638). The server announces files written before it started as `task_updated`. That is the product side of this flake: the test now works around it, the server still does it.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a918fc-ce4e-4947-96ea-4af19c6d46ae
@@ -213,3 +225,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aed0f9dc4-bccc-4e79-bf30-dcaa0a4f3441
+- at: 2026-11-17T01:58:29.511403+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-606","DEV-600","DEV-616","DEV-583"]}'
+    new: '{"related":["DEV-606","DEV-600","DEV-616","DEV-583","DEV-638"]}'
+- at: 2026-11-17T01:58:58.488239+00:00
+  actor: claude
+  changes:
+  - field: comment_added

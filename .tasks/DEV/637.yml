@@ -1,0 +1,35 @@
+title: A job held back for prerequisites stays parked when its ticket is closed by hand
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T01:56:54.001918+00:00
+modified: 2026-11-17T01:56:56.411984+00:00
+relationships:
+  related:
+  - DEV-530
+description: |-
+  Found in the DEV-530 review (`cf8caa2a`).
+
+  ## Found
+
+  - `resume_parked_job` drops a parked job only when the `unblocked` event fires or the agent is assigned again. `fire_unblocked_dependents` skips a dependent that is done itself, so a held ticket set to Done or WontDo by hand keeps its parked entry for good.
+  - It stays listed in `lotar agent queue`, and `ensure_no_agent_work` (`task_move.rs`) refuses to move the ticket ("running or queued") until `lotar agent queue remove` takes it out.
+
+  ## Done when
+
+  - [ ] A ticket with a parked job that reaches a done state drops the job (test fails before).
+  - [ ] `lotar agent queue` no longer lists it, and the ticket can be moved.
+history:
+- at: 2026-11-17T01:56:54.623012+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-530"]}'
+- at: 2026-11-17T01:56:56.411984+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

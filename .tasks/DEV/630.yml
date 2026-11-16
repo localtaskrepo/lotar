@@ -5,10 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T01:46:56.773725+00:00
+modified: 2026-11-17T02:03:11.559276+00:00
 relationships:
   related:
   - DEV-626
+comments:
+- date: 2026-11-17T02:03:11.559276+00:00
+  author: claude
+  text: 'Fix written: the worker takes each entry by its project''s limit, counting the project''s jobs in all processes; new test fails before, passes after. Running lint/test/smoke.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
@@ -45,3 +49,7 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
+- at: 2026-11-17T02:03:11.559276+00:00
+  actor: claude
+  changes:
+  - field: comment_added

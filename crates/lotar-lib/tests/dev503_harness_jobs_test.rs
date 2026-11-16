@@ -898,6 +898,37 @@ fn a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing() {
     AgentJobService::cancel_job(&job.id).unwrap();
 }
 
+/// DEV-609: the idle answer counts only for the threads it was found for. A T3 job that ends on the ticket after it
+/// adds a thread, and the next start asks T3 Code again, well within `T3_THREAD_RECHECK`.
+#[test]
+fn a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let shows = || std::fs::read_to_string(root.join("t3-show.log")).unwrap_or_default().lines().count();
+    let config_path = fixtures.tasks_root.join("config.yml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    // No free slot: an in-process start only queues its job, and no thread starts.
+    let no_slots = || std::fs::write(&config_path, config.replace("    enabled: true\n", "    enabled: true\n    max_parallel_jobs: 0\n")).unwrap();
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let start = || {
+        let req = AgentJobCreateRequest { ticket_id: "TEST-1".into(), prompt: "Review it".into(), agent: Some("review".into()), ..Default::default() };
+        AgentJobService::start_job_with_tasks_dir(req, fixtures.tasks_root.as_path()).unwrap()
+    };
+    no_slots();
+    let before = shows();
+    AgentJobService::cancel_job(&start().id).unwrap();
+    assert_eq!(shows(), before + 1, "the first start asks about the fix's thread and caches the idle answer");
+    std::fs::write(&config_path, &config).unwrap();
+    run_t3(&fixtures, "review").success();
+    no_slots();
+    let before = shows();
+    AgentJobService::cancel_job(&start().id).unwrap();
+    assert_eq!(shows(), before + 2, "with the review's thread added, the next start asks about both threads again");
+    AgentJobService::cancel_job(&start().id).unwrap();
+    assert_eq!(shows(), before + 2, "and caches that answer");
+}
+
 /// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays
 /// where it was, so automation doesn't hand the ticket to a job that would read it.
 #[test]

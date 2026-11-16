@@ -1,11 +1,11 @@
 title: 'Lotar build and development use too much disk and time per job: optimize, with measurements'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:57:40.271694+00:00
-modified: 2026-11-17T01:21:18.338718+00:00
+modified: 2026-11-17T01:51:30.354260+00:00
 relationships:
   related:
   - DEV-499
@@ -18,6 +18,7 @@ relationships:
   - DEV-510
   - DEV-589
   - DEV-621
+  - DEV-622
 comments:
 - date: 2026-11-15T20:40:48.024583+00:00
   author: claude
@@ -149,6 +150,40 @@ comments:
       result: not_run
       reason: runs at merge
     next: Merge e2f4698d onto main (merge-tree is clean)
+- date: 2026-11-17T01:51:05.685977+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `547b748e` is on main and on `origin/main`.
+
+    - Main moved 3 times during the merge, so I rebased 3 times, each without conflicts: onto DEV-622, DEV-621 (rewritten later with the 0.15.2 version bump), then STD-195.
+    - No lockfile changed, so `npm ci` wasn't needed.
+    - Lint, tests and smoke ran on `f6ea1284`, after the version bump. The last rebase, onto STD-195, changed only `.tasks/DEV/automation.yml`, and `git diff f6ea1284 HEAD -- . ':!.tasks'` is empty, so I didn't rerun them.
+    - The main checkout's pending `.tasks` changes are amended into the merged commit (owner 2026-11-12). The main checkout is clean, and nothing is left unpushed.
+    - No automation or config file changed, so `lotar trust` wasn't needed.
+    - Worktrees branched before this commit still build with `--cargo-profile local` until they rebase. Their own `Cargo.toml` still has that profile, so nothing breaks.
+  report:
+    commits:
+    - hash: 547b748e
+      what: one local build profile (dev), local and smoke removed; on main and pushed
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: on f6ea1284, the same code tree as 547b748e
+    - command: npm run test:agent
+      result: passed
+      reason: 2279 Rust, 1548 UI, on f6ea1284
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 of 405, on f6ea1284
+    - command: pre-push hook
+      result: passed
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config file changed
+    - command: CI
+      result: not_run
+      reason: runs on the push
+    next: 'None: goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177f2d09-0dcb-419d-a0f0-ad691d43efb0
@@ -348,3 +383,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589"]}'
     new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621"]}'
+- at: 2026-11-17T01:51:05.685977+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:51:05.966878+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622"]}'
+- at: 2026-11-17T01:51:30.354260+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

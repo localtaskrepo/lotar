@@ -1,11 +1,11 @@
 title: A merge job that landed its work fails when the ticket branch is checked out in another worktree
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-17T01:47:04.219160+00:00
+modified: 2026-11-17T01:48:12.930939+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -440,3 +440,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T01:48:12.930939+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

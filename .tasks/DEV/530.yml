@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-17T01:43:20.869942+00:00
+modified: 2026-11-17T01:57:47.149593+00:00
 relationships:
   related:
   - DEV-351
@@ -25,6 +25,9 @@ relationships:
   - DEV-576
   - DEV-577
   - DEV-588
+  - DEV-637
+  - DEV-592
+  - DEV-600
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -647,6 +650,38 @@ comments:
       result: passed
       reason: 401/401 on rerun; first run 1 failure not captured (output truncated)
     next: Review, then merge agent/DEV-530 at cf8caa2a (rebase onto main first)
+- date: 2026-11-17T01:57:46.798720+00:00
+  author: claude
+  text: |-
+    Review: passed for DEV-530 at `cf8caa2a`. The previous blocking finding is fixed, and the merge can go ahead after a careful rebase.
+
+    - **Previous finding fixed:** `resume_parked_job` now returns `true` only when the ticket has a held-back job, and only then do `fire_unblocked_dependents` and `automation run` (also its dry run, via `holds_parked_job`) skip the `unblocked` rules. The DEV rule (`.tasks/DEV/automation.yml:587`) no longer has `not: { assignee: "@agent" }`. DEV-588 and DEV-577, which are Blocked under `@fix` without a saved job, still get the rule.
+    - **Done when:** a held-back review resumes with its own agent and prompt and gets its status back (`a_held_back_review_job_resumes_with_its_own_prompt_and_status`). A queued job whose prerequisite reopened is held back again (`a_queued_job_whose_prerequisite_reopened_is_held_back_again`). `a_held_back_job_on_a_blocked_ticket_resumes_alone` covers the tickets blocked by hand, handed to a person, and legacy-blocked under the agent. `help/automation.md` and the DEV rule comment agree.
+    - **Reran:** the 24 held-job and prerequisite tests passed. `cargo clippy -D warnings` and `cargo fmt --check` are clean. The full `cargo nextest` run passed 2179 of 2180; the one failure, `embedded_web_ui_test`, happened only because I ran it without `build:web`. Worktree unchanged.
+    - **For the merge:** main is 76 commits ahead, and `git merge-tree` now finds conflicts in `agent_queue_service.rs`, `cli/handlers/agent.rs` and `docs/help/agent.md`, all from DEV-592 and DEV-600. To resolve them:
+      - `AgentQueueEntry::from_request` needs main's new `held_by: None`.
+      - The `lotar agent queue` doc line on main says tickets waiting for prerequisites "aren't listed", which is no longer true. Merge it with this branch's wording.
+      - `worker_state` and `resume` should keep counting only `pending`, not parked jobs.
+    - **Minor, filed:** [DEV-637](https://lotar.pyxzl.net/task/DEV-637): a parked job stays forever when its ticket is closed by hand, it is still listed in `lotar agent queue`, and it blocks `task move`.
+  report:
+    checks:
+    - command: cargo nextest run -E 'test(/parked|held|unpark|prerequisite|unblocked/)'
+      result: passed
+      reason: 24/24
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo nextest run --workspace
+      result: passed
+      reason: 2179/2180; embedded_web_ui_test fails only because build:web did not run first
+    - command: npm run test:ui
+      result: not_run
+      reason: no frontend change
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: fix agent reports 401/401
+    next: 'Merge: rebase onto main resolves 3 conflicts (DEV-592, DEV-600), then rerun lint, test, smoke'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -1516,3 +1551,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e5b0b9-b153-4cf4-8bda-3e0919bd23c2
+- at: 2026-11-17T01:56:54.617904+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-637"]}'
+- at: 2026-11-17T01:57:46.798720+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:57:47.149593+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-637"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-637","DEV-592","DEV-600"]}'

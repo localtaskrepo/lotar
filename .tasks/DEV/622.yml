@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T20:55:33.664464+00:00
-modified: 2026-11-17T01:21:18.340662+00:00
+modified: 2026-11-17T01:57:36.778307+00:00
 relationships:
   related:
   - DEV-615
@@ -13,6 +13,7 @@ relationships:
   - DEV-620
   - DEV-624
   - DEV-621
+  - DEV-579
 comments:
 - date: 2026-11-16T23:29:00.286128+00:00
   author: claude
@@ -104,11 +105,36 @@ comments:
       result: not_run
       reason: merge agent ran them on b0d4d84e, same web_server.rs
     next: 'Nothing to merge again: the fix is on main as b0d4d84e; cbfba630 on this branch is its pre-rebase copy'
+- date: 2026-11-17T01:56:31.670501+00:00
+  author: claude
+  text: |-
+    Nothing to merge: the fix is already on `main` and pushed, as `486377fc`.
+
+    - `486377fc` (the earlier merge, rebased onto `origin/main`) is in `origin/main`
+    - `cbfba630` on this branch was the pre-rebase copy: `git rebase main` dropped it as "patch contents already upstream"; the branch now equals `main` `547b748e`
+    - No merge, no push, no `lotar trust` needed (no rule or config change)
+    - Ticket check `body_read_retries_interrupted_and_fails_on_other_errors` passes on `547b748e`
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-lib body_read_retries_interrupted
+      result: passed
+      reason: on main 547b748e
+    - command: npm run lint
+      result: not_run
+      reason: nothing to merge, passed on 486377fc at the earlier merge
+    - command: npm test
+      result: not_run
+      reason: nothing to merge
+    - command: npm run smoke
+      result: not_run
+      reason: nothing to merge
+    next: 'None: the fix is on main and origin/main'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adbac5943-5053-4239-a351-333ab440b5b5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b57ccc8-faa0-45dd-882c-3bfdcf2c4ebe
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97311ebc-5de8-4aba-8a30-299833e99d18
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7d549f7-09b6-44a9-bf7f-6b7bf7b38330
 description: 'Found while on DEV-615: `handle_connection` in `crates/lotar-lib/src/web_server.rs` reads headers and body with `stream.read(..).unwrap_or_default()`, so an `Interrupted` or timed-out read counts as EOF and the handler gets a cut body (a misleading 400 `Invalid body`). Check: a unit test feeding a stream that returns `Interrupted` once mid-body. Done: `Interrupted` is retried, other read errors close the connection without dispatching.'
 tags:
 - health
@@ -219,3 +245,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-615","DEV-591","DEV-620","DEV-624"]}'
     new: '{"related":["DEV-615","DEV-591","DEV-620","DEV-624","DEV-621"]}'
+- at: 2026-11-17T01:51:05.967584+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-615","DEV-591","DEV-620","DEV-624","DEV-621"]}'
+    new: '{"related":["DEV-615","DEV-591","DEV-620","DEV-624","DEV-621","DEV-579"]}'
+- at: 2026-11-17T01:56:31.670501+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:57:36.778307+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7d549f7-09b6-44a9-bf7f-6b7bf7b38330

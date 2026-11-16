@@ -1,0 +1,28 @@
+title: lotar serve announces task files written before it started as task_updated
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T01:58:28.742090+00:00
+modified: 2026-11-17T01:58:30.379406+00:00
+relationships:
+  related:
+  - DEV-614
+description: 'Found in the DEV-614 review on 2026-11-16: the tasks watcher (crates/lotar-lib/src/web_server.rs start_tasks_watcher) can still report files written just before the server started (FSEvents delivers recent history), and its ''announced'' fingerprint map starts empty, so it emits task_updated for unchanged files. On the Dependencies page (view/pages/Dependencies.vue changed()) such an event clears an open safe repair preview with ''Task data changed''. DEV-614 worked around it in the smoke test only. Check: start lotar serve right after writing a task file, open /api/events, watch for a task_updated of that file without a new write. Done when the watcher seeds its fingerprints at start (or ignores events for content it saw at start) and a test shows no event for pre-start writes.'
+tags:
+- health
+custom_fields:
+  finding: review:serve-watcher-replays-prestart-writes
+history:
+- at: 2026-11-17T01:58:29.512085+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-614"]}'
+- at: 2026-11-17T01:58:30.379406+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

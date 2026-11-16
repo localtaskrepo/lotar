@@ -1,11 +1,10 @@
 title: 'Flaky test: cli_serve_features_test serve tests get no response within the 1.5 s read timeout under load'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-16T21:05:30.352250+00:00
-modified: 2026-11-17T01:31:12.389476+00:00
+modified: 2026-11-17T01:50:55.607586+00:00
 relationships:
   related:
   - DEV-609
@@ -307,3 +306,11 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T01:50:55.607586+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

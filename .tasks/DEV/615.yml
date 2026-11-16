@@ -1,11 +1,11 @@
 title: 'Flaky smoke: offers Add to release in the row menu once a release appears (DEV-464) fails under the full suite'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-17T01:44:27.806714+00:00
+modified: 2026-11-17T02:03:30.323104+00:00
 relationships:
   related:
   - DEV-464
@@ -102,6 +102,17 @@ comments:
       result: not_run
       reason: no Rust or view change; the edit is a smoke spec only
     next: Review, then merge; the merge agent reruns the check command on main
+- date: 2026-11-17T01:50:38.798184+00:00
+  author: claude
+  text: |-
+    Review: passed. `892eb10d` makes the DEV-464 test wait out a refused release create; it fits "or the test waits for it".
+
+    - Read: the ticket and its comments, [DEV-622](https://lotar.pyxzl.net/task/DEV-622) (possible root cause, filed), `ReleaseService::create`, `smoke/vitest.config.ts`, AGENTS.md. No commits to the spec on main since `9b5c09e8`
+    - Change: test only (`smoke/tests/ui.releases.smoke.spec.ts:107-124`). Workspace and server are per test, so retrying version `0.16.0` can't collide with another test. On timeout the poll reports the last `status body`, so a real server error still shows
+    - No failing-before test: the fix agent couldn't reproduce the flake, says so, and filed the suspected cause as DEV-622. Fine for a flaky test
+    - Note: it retries every non-ok answer, also a deterministic 400, which only delays that failure by 15 s. Not blocking
+    - Note for the merge: the earlier attempt `3c4bbaa6` is still on branch `t3/28cf1eef` (it retried only 503 and lock errors). Merge `agent/DEV-615` only; that branch is obsolete
+    - Reran: `npm run test:smoke:agent -- tests/ui.releases.smoke.spec.ts` passed (3 of 3), and `npx prettier --check` on the spec is clean. Full `npm run smoke` not rerun
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
@@ -197,3 +208,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9b7e6ec-8dbc-4540-85ab-3d42b116bd62
+- at: 2026-11-17T01:50:38.798184+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:03:30.323104+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

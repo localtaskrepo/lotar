@@ -1,11 +1,11 @@
 title: 'Flaky test: serve_reports_requested_port_exactly loses its reserved port to another process before serve binds it'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T23:23:19.131862+00:00
-modified: 2026-11-17T01:32:08.655008+00:00
+modified: 2026-11-17T01:50:51.493402+00:00
 relationships:
   related:
   - DEV-624
@@ -115,3 +115,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T01:50:51.493402+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
