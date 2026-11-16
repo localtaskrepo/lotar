@@ -1632,6 +1632,77 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
     Ok(())
 }
 
+/// The branch of a ticket, other than `except`, whose work missing from the
+/// main checkout's branch is newest: `ticket_branch`, a branch traced to it
+/// (`BranchOwners`) or one a job of the ticket logged (T3 Code may rename
+/// the branch it was given), newest tip first, the ticket's branch on a
+/// tie. A branch whose work landed, also rebased, doesn't count, nor does
+/// one main supersedes (`superseded_removal`): a merge that rebased and
+/// amended the fix leaves earlier copies whose content differs.
+fn unlanded_ticket_branch(tasks_dir: &std::path::Path, ticket_id: &str, prefix: &str, except: Option<&str>) -> Option<String> {
+    let repo_root = resolve_repo_root(tasks_dir)?;
+    let ticket_branch = build_worktree_branch(prefix, &sanitize_worktree_token(ticket_id));
+    let refs = git_stdout(&repo_root, &["for-each-ref", "--format=%(committerdate:unix) %(refname:short)", "refs/heads/"]).ok()?;
+    let main = git_stdout(&repo_root, &["symbolic-ref", "--quiet", "--short", "HEAD"]).ok().map(|branch| branch.trim().to_string());
+    let owners = BranchOwners::load(&repo_root, prefix);
+    let logged: Vec<String> = saved_jobs(tasks_dir)
+        .into_iter()
+        .filter(|job| job.header.ticket_id == ticket_id)
+        .flat_map(|job| [job.header.worktree_branch, job.status.and_then(|status| status.worktree_branch)])
+        .flatten()
+        .collect();
+    refs.lines()
+        .filter_map(|line| line.split_once(' '))
+        .filter(|(_, branch)| main.as_deref() != Some(*branch) && except != Some(*branch))
+        .filter(|(_, branch)| {
+            *branch == ticket_branch
+                || logged.iter().any(|logged| logged == branch)
+                || owners.ticket_branch_of(branch).as_deref() == Some(ticket_branch.as_str())
+        })
+        .filter(|(_, branch)| !branch_landed(&repo_root, branch).unwrap_or(true))
+        .filter(|(_, branch)| {
+            rev_parse(&repo_root, &format!("refs/heads/{branch}")).is_some_and(|tip| superseded_removal(&repo_root, &tip, ticket_id, branch).is_none())
+        })
+        .max_by_key(|(date, branch)| (date.parse::<i64>().unwrap_or(0), *branch == ticket_branch))
+        .map(|(_, branch)| branch.to_string())
+}
+
+/// Point the ticket's branch at the ticket's branch with the newest work
+/// missing from the main checkout (DEV-602), before a job plans its
+/// worktree: a thread may commit on an earlier thread's branch (`t3/<topic>`)
+/// while the ticket's branch stays behind, and the review and merge then
+/// start from nothing. The ticket's branch stays when it has work of its
+/// own that the newer branch doesn't build on. `Ok(Some(note))` when it
+/// moved; `Err` when git refused to move it.
+fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Result<Option<String>, String> {
+    if !config.agent_worktree.enabled {
+        return Ok(None);
+    }
+    let Some(repo_root) = resolve_repo_root(tasks_dir) else {
+        return Ok(None);
+    };
+    let prefix = &config.agent_worktree.branch_prefix;
+    let ticket_branch = build_worktree_branch(prefix, &sanitize_worktree_token(ticket_id));
+    let Some(holder) = unlanded_ticket_branch(tasks_dir, ticket_id, prefix, None).filter(|holder| *holder != ticket_branch) else {
+        return Ok(None);
+    };
+    if let Some(ticket_tip) = rev_parse(&repo_root, &format!("refs/heads/{ticket_branch}")) {
+        let builds_on = git_command(&repo_root).args(["merge-base", "--is-ancestor", &ticket_tip, &format!("refs/heads/{holder}")]).status();
+        if !builds_on.is_ok_and(|status| status.success()) && !branch_landed(&repo_root, &ticket_branch).unwrap_or(false) {
+            return Ok(None);
+        }
+    }
+    let moved = move_ticket_branch(&repo_root, &ticket_branch, &holder, None)
+        .map_err(|err| format!("{ticket_branch} can't move to {holder}, which holds {ticket_id}'s newest work that isn't in the main checkout: {err}"))?;
+    let tip = rev_parse(&repo_root, &format!("refs/heads/{holder}")).unwrap_or_default();
+    Ok(moved.then(|| {
+        format!(
+            "Pointed {ticket_branch} at {holder} ({}), which holds {ticket_id}'s newest work that isn't in the main checkout's branch, so this job starts from it.",
+            tip.get(..12).unwrap_or(&tip)
+        )
+    }))
+}
+
 /// Move `ticket_branch` to the tip of `thread_branch`, or create it there.
 /// `Ok(false)` when it is there already; an error when it holds a commit
 /// the thread's branch lacks and the main checkout doesn't have, which
@@ -2836,6 +2907,13 @@ fn run_job(
                 Some(format!("Continuing the session {}, last used {minutes} minutes ago (within continue_within_minutes, {limit}).", record.name));
         }
     }
+    let followed_note = match follow_ticket_work(&tasks_dir, &ticket_id, &config) {
+        Ok(note) => note,
+        Err(err) => {
+            update_job_failure(&job_id, &ticket_id, format!("Worktree setup failed: {err}"), &tasks_dir);
+            return;
+        }
+    };
     let t3_worktrees = runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled;
     let mut thread_worktree = None;
     if t3_worktrees && continued.is_some() {
@@ -2942,7 +3020,7 @@ fn run_job(
     if let Some((_, assignee)) = ticket_state(&tasks_dir, &ticket_id) {
         update_job(&job_id, |state| state.assignee_at_start = Some(assignee.clone()));
     }
-    for note in session_reason.into_iter().chain(moved_note).chain(worktree_context.note.clone()) {
+    for note in followed_note.into_iter().chain(session_reason).chain(moved_note).chain(worktree_context.note.clone()) {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
@@ -4153,8 +4231,11 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// merged branch's commit is recorded as landed, so cleanup at Done can
 /// remove it (DEV-411). Jobs that are not merge jobs, and states git can't
 /// judge, pass. A job whose agent handed the ticket back (it reassigned the
-/// ticket) is not fast-forwarded: it passes with the branch unmerged.
-fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path) -> Result<Option<String>, String> {
+/// ticket) is not fast-forwarded: it passes with the branch unmerged. A
+/// branch that had nothing beyond main when the job started fails while
+/// another of the ticket's branches (`prefix` names them) holds work main
+/// lacks (DEV-602): the merge missed the fix.
+fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, prefix: &str) -> Result<Option<String>, String> {
     let Some((branch, start, assignee_at_start)) =
         JOB_REGISTRY.lock().ok().and_then(|registry| {
             registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| {
@@ -4169,6 +4250,14 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
     };
     match merged_landed(&repo_root, tasks_dir, &branch) {
         Ok(true) => {
+            let brought_nothing = start.as_deref().is_some_and(|start| {
+                git_stdout(&repo_root, &["cherry", start, &format!("refs/heads/{branch}")]).is_ok_and(|out| !out.lines().any(|line| line.starts_with('+')))
+            });
+            if brought_nothing && let Some(holder) = unlanded_ticket_branch(tasks_dir, ticket_id, prefix, Some(&branch)) {
+                return Err(format!(
+                    "Merge job finished, but {branch} has nothing beyond the main checkout's branch, while {holder} holds {ticket_id}'s work that isn't in it: the merge missed the fix"
+                ));
+            }
             record_landing(&repo_root, &branch);
             return Ok(None);
         }
@@ -4318,7 +4407,7 @@ fn finalize_job(
     // fast-forwards when the agent couldn't, and fails the job otherwise so
     // automation doesn't treat the ticket as merged.
     let failure_note = if success {
-        match ensure_branch_merged(job_id, ticket_id, tasks_dir) {
+        match ensure_branch_merged(job_id, ticket_id, tasks_dir, &config.agent_worktree.branch_prefix) {
             Ok(Some(message)) => {
                 update_job(job_id, |state| {
                     record_and_emit(state, "agent_job_progress", Some(message.clone()));
@@ -5130,7 +5219,7 @@ mod tests {
             crate::api_types::TaskUpdate { assignee: Some("reviewer".to_string()), ..Default::default() },
         )
         .unwrap();
-        let note = ensure_branch_merged("job-tko-direct", "TKO-1", &tasks_dir).unwrap();
+        let note = ensure_branch_merged("job-tko-direct", "TKO-1", &tasks_dir, "agent/").unwrap();
         assert_eq!(note.as_deref(), Some("The agent handed TKO-1 back (to reviewer): LoTaR leaves agent/TKO-1 unmerged"));
         assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
     }
@@ -5140,7 +5229,7 @@ mod tests {
         let (dir, tasks_dir) = taken_over_merge_job("job-tko-recorded", None);
         let outcome = crate::api_types::JobOutcome { job_id: "job-tko-recorded".to_string(), assignee: Some("reviewer".to_string()), ..Default::default() };
         crate::services::agent_active_jobs::record_outcome(&tasks_dir, &outcome).unwrap();
-        let note = ensure_branch_merged("job-tko-recorded", "TKO-1", &tasks_dir).unwrap();
+        let note = ensure_branch_merged("job-tko-recorded", "TKO-1", &tasks_dir, "agent/").unwrap();
         assert_eq!(note.as_deref(), Some("The agent handed TKO-1 back (to reviewer): LoTaR leaves agent/TKO-1 unmerged"));
         assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
     }
@@ -5148,7 +5237,7 @@ mod tests {
     #[test]
     fn a_taken_over_merge_job_that_finished_is_fast_forwarded() {
         let (dir, tasks_dir) = taken_over_merge_job("job-tko-done", restored_assignee(Some("sam".to_string())));
-        let note = ensure_branch_merged("job-tko-done", "TKO-1", &tasks_dir).unwrap();
+        let note = ensure_branch_merged("job-tko-done", "TKO-1", &tasks_dir, "agent/").unwrap();
         assert_eq!(note.as_deref(), Some("Fast-forwarded the main checkout to agent/TKO-1"));
         assert!(dir.path().join("feature.txt").exists());
     }

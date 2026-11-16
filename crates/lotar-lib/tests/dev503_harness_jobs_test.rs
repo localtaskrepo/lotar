@@ -969,6 +969,72 @@ fn a_continued_thread_never_takes_the_worktree_of_the_thread_it_replaced() {
     assert_eq!(rev(root, "t3/topic-2~1"), rev(root, "t3/topic-1"), "it started from the replacement thread's work: {log}");
 }
 
+/// DEV-602 (standards STD-133): the fix thread committed on an earlier thread's branch `t3/x`, created from
+/// `agent/TEST-1`, so the ticket's branch stayed at main. The review and the merge threads started from it on new
+/// `t3/*` branches, found nothing, and the merge counted as landed with the fix not on main. A job now starts from
+/// the ticket's branch with the newest work missing from main.
+#[test]
+fn review_and_merge_start_from_the_branch_that_holds_the_fix() {
+    let elsewhere = tempfile::tempdir().unwrap();
+    let earlier = elsewhere.path().join("earlier");
+    let fix = format!("cd {} && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", earlier.display());
+    let (fixtures, _env) = t3_harness_with(&[("fix", &fix, ""), ("review", "", ""), ("merge", "", "")]);
+    let root = fixtures.get_temp_path();
+    git(root, &["branch", "agent/TEST-1"]);
+    git(root, &["worktree", "add", "-q", "-b", "t3/x", earlier.to_str().unwrap(), "agent/TEST-1"]);
+    let start = rev(root, "main");
+    run_t3(&fixtures, "fix").success();
+    let fix = rev(root, "t3/x");
+    assert_ne!(fix, start, "the fix committed on t3/x");
+    run_t3(&fixtures, "review").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("agent/TEST-1 t3/topic-1 {fix}"), "the review starts from the fix: {log}");
+    run_t3(&fixtures, "merge").success();
+    assert_eq!(rev(root, "main"), fix, "the merge landed the fix on main");
+}
+
+/// DEV-602: a merge whose branch has nothing beyond main fails, naming the ticket's branch with the fix, so the
+/// ticket can't go Done through the merge step without its fix on main.
+#[test]
+fn a_merge_that_brings_nothing_while_the_ticket_has_unlanded_work_fails() {
+    let (fixtures, _env) =
+        t3_harness_with(&[("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""), ("merge", "git reset -q --hard main", "")]);
+    let root = fixtures.get_temp_path();
+    let start = rev(root, "main");
+    run_t3(&fixtures, "fix").success();
+    run_t3(&fixtures, "merge").failure().stdout(predicate::str::contains(
+        "Merge job finished, but t3/topic-1 has nothing beyond the main checkout's branch, while t3/topic-0 holds TEST-1's work that isn't in it",
+    ));
+    assert_eq!(rev(root, "main"), start, "main stays where it was");
+}
+
+/// DEV-602, as the DEV-593 merge left it: main holds the fix rebased and amended under a new hash, and an earlier
+/// thread's `t3/old` still holds a copy whose content differs. That copy is not the ticket's newest work: a job
+/// leaves the ticket's branch on main, and a merge that brings nothing passes.
+#[test]
+fn a_leftover_copy_of_a_fix_that_main_supersedes_is_not_unlanded_work() {
+    let (fixtures, _env) = t3_harness_with(&[("merge", "", "")]);
+    let root = fixtures.get_temp_path();
+    let commit = |message: &str, date: &str| {
+        let status = std::process::Command::new("git").args(["commit", "-qam", message]).env("GIT_COMMITTER_DATE", date).current_dir(root).status().unwrap();
+        assert!(status.success());
+    };
+    git(root, &["checkout", "-q", "-b", "agent/TEST-1"]);
+    std::fs::write(root.join("fix.txt"), "fix\n").unwrap();
+    git(root, &["add", "fix.txt"]);
+    commit("TEST-1 fix", "2026-11-15T10:00:00Z");
+    git(root, &["branch", "t3/old", "agent/TEST-1"]);
+    git(root, &["checkout", "-q", "main"]);
+    std::fs::write(root.join("fix.txt"), "fix, reworked in the merge\n").unwrap();
+    git(root, &["add", "fix.txt"]);
+    commit("TEST-1 fix", "2026-11-15T11:00:00Z");
+    git(root, &["branch", "-f", "agent/TEST-1", "main"]);
+    let main = rev(root, "main");
+    run_t3(&fixtures, "merge").success();
+    assert_eq!(rev(root, "agent/TEST-1"), main, "the ticket's branch stays on main, not at the old copy");
+    assert_eq!(rev(root, "main"), main);
+}
+
 /// `t3` whose server stops answering: `thread start` names thread-1 and exits 1 with T3's error, and `thread show`
 /// fails the same way while `$FAKE_DOWN` holds a number above 0, then shows the thread completed.
 const FAKE_T3_OUTAGE: &str = r#"#!/bin/sh

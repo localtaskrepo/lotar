@@ -1,11 +1,11 @@
 title: Merge without an agent when the branch rebases cleanly and the checks pass
-status: Reviewing
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T04:54:41.894264+00:00
+modified: 2026-11-16T05:43:50.509643+00:00
 relationships:
   related:
   - DEV-577
@@ -228,3 +228,9 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-16T05:43:50.509643+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress

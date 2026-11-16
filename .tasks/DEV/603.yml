@@ -1,17 +1,19 @@
 title: A rework, review or merge round after more than 55 idle minutes starts a fresh session with a handoff
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:33:13.636+00:00
-modified: 2026-11-16T04:47:52.959237+00:00
+modified: 2026-11-16T05:43:32.524997+00:00
 relationships:
   related:
   - DEV-602
   - DEV-611
   - DEV-593
   - DEV-594
+  - DEV-464
+  - DEV-563
 comments:
 - date: 2026-11-16T03:40:37.686895+00:00
   author: claude
@@ -67,6 +69,32 @@ comments:
       result: not_run
       reason: backend-only change, fix agent's run 404/405 with an unrelated UI flake
     next: Merge
+- date: 2026-11-16T05:42:26.149586+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-603 is on `main` as `17e19601`.
+
+    - Rebased twice: main moved on to `DEV-599` and then `DEV-598`, which also changes `agent_job_service.rs`. No conflicts and no lockfile changes
+    - Lint, tests and smoke passed on the final rebase `8bdd15cc` (and on the first, `e2930243`)
+    - Fast-forwarded the main checkout, then amended the open `.tasks` changes (DEV-464, 583, 598, 599, 604, 611, new 615) into the commit, as the owner ruled on 2026-11-12
+    - No rules or agent profiles changed, so no `lotar trust` was needed
+    - Pushed `18c745f3..17e19601` (`git push`, hooks ran). The main checkout is clean, with nothing unpushed
+    - My branch is `t3/continue-session-idle-handoff`. The old `agent/DEV-603` worktree still points at `d9e58bcb`, whose content is now on main
+  report:
+    commits:
+    - hash: 17e19601
+      what: DEV-603 on main (rebased from d9e58bcb, then amended with .tasks)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on 8bdd15cc
+    - command: npm test
+      result: passed
+      reason: test:agent on 8bdd15cc, 2253 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405/405 on 8bdd15cc
+    next: 'None: the ticket goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdbbb661-1e5b-4a66-ac04-a25e682f8972
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3121b39f-806a-4012-9aec-19490594a253
@@ -176,3 +204,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T05:42:26.149586+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:42:26.378069+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-602","DEV-611","DEV-593","DEV-594"]}'
+    new: '{"related":["DEV-602","DEV-611","DEV-593","DEV-594","DEV-464"]}'
+- at: 2026-11-16T05:42:34.379952+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-16T05:43:32.524997+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-602","DEV-611","DEV-593","DEV-594","DEV-464"]}'
+    new: '{"related":["DEV-602","DEV-611","DEV-593","DEV-594","DEV-464","DEV-563"]}'

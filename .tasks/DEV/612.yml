@@ -1,29 +1,56 @@
 title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
-status: HelpNeeded
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: claude
+assignee: mallox
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-16T05:29:25.407255+00:00
+modified: 2026-11-16T05:47:36.260176+00:00
 relationships:
+  depends_on:
+  - DEV-602
   related:
   - DEV-602
 comments:
 - date: 2026-11-16T05:29:25.407255+00:00
   author: automation
   text: 'The t3 session waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2bfb120b-d5dd-42da-8b97-d8582d5bcefb'
+- date: 2026-11-16T05:47:33.174499+00:00
+  author: claude
+  text: |-
+    Blocked on DEV-602: no code yet, by the owner's choice.
+
+    - The code to fix (`unlanded_ticket_branch`, `follow_ticket_work`, the DEV-602 part of `ensure_branch_merged`) exists only on `agent/DEV-602` (`67499e12`), which is in Merging and 7 commits behind main.
+    - Owner 2026-11-15 (options picker): "Wait for DEV-602" (instead of cherry-picking `67499e12` onto this branch).
+    - Added depends-on DEV-602 and sharpened "Done when": a saved job's `ticket_commit` plus a ticket-ID subject check, with the ID boundary (`DEV-6120`), scope (logged names only) and git-failure case.
+    - `agent/DEV-612` has no commits beyond main.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: no code change, waits for DEV-602
+    - command: npm test
+      result: not_run
+      reason: no code change
+    - command: npm run smoke
+      result: not_run
+      reason: no code change
+    next: 'When DEV-602 is on main: rebase agent/DEV-612 onto main and implement the Done when'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2bfb120b-d5dd-42da-8b97-d8582d5bcefb
 description: |-
   Found in the DEV-602 review.
 
   ## Found
-  - `unlanded_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` counts every branch whose *name* a saved job of the ticket logged (`.tasks/@agent-logs`), with no check that the branch is still the one the job worked on.
+  - `unlanded_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` (on `agent/DEV-602`, not yet on main) counts every branch whose *name* a saved job of the ticket logged (`.tasks/@agent-logs`), with no check that the branch is still the one the job worked on.
   - Done cleanup deletes `t3/<topic>` branches, and T3 Code can give the freed name to another ticket's thread. When the first ticket is reopened, `follow_ticket_work` can point `agent/<ID>` at the other ticket's work (when `agent/<ID>` has none of its own). And `ensure_branch_merged` can then fail a good merge, naming that branch.
+  - Builds on DEV-602 (owner 2026-11-15, options picker: "Wait for DEV-602"): start only once DEV-602 is on main.
 
   ## Done when
-  - [ ] A logged branch counts only while it still descends from the commit the job logged, or holds a commit whose subject starts with the ticket ID. Otherwise it is skipped.
+  - [ ] A branch counted only because a saved job logged its name counts only while its tip descends from a `ticket_commit` a job of the ticket logged, or one of its commits missing from the main checkout's branch has a subject that starts with the ticket ID (`DEV-612` followed by a non-alphanumeric character or the end, so `DEV-6120` doesn't match). Otherwise it is skipped. A job that logged no `ticket_commit` relies on the subject check alone.
+  - [ ] `agent/<ID>` itself and branches traced to it (`BranchOwners`) count as before: the check covers logged names only.
+  - [ ] Both callers get it: `follow_ticket_work` leaves `agent/<ID>` where it is, and `ensure_branch_merged` doesn't fail a merge naming the skipped branch.
+  - [ ] A step fails: a git call that can't answer (missing ref, git error) skips the branch, as an unknown owner.
   - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
 history:
 - at: 2026-11-16T04:47:33.913722+00:00
@@ -55,3 +82,53 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-16T05:47:24.301837+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-602 review.
+
+      ## Found
+      - `unlanded_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` counts every branch whose *name* a saved job of the ticket logged (`.tasks/@agent-logs`), with no check that the branch is still the one the job worked on.
+      - Done cleanup deletes `t3/<topic>` branches, and T3 Code can give the freed name to another ticket's thread. When the first ticket is reopened, `follow_ticket_work` can point `agent/<ID>` at the other ticket's work (when `agent/<ID>` has none of its own). And `ensure_branch_merged` can then fail a good merge, naming that branch.
+
+      ## Done when
+      - [ ] A logged branch counts only while it still descends from the commit the job logged, or holds a commit whose subject starts with the ticket ID. Otherwise it is skipped.
+      - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
+    new: |-
+      Found in the DEV-602 review.
+
+      ## Found
+      - `unlanded_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` (on `agent/DEV-602`, not yet on main) counts every branch whose *name* a saved job of the ticket logged (`.tasks/@agent-logs`), with no check that the branch is still the one the job worked on.
+      - Done cleanup deletes `t3/<topic>` branches, and T3 Code can give the freed name to another ticket's thread. When the first ticket is reopened, `follow_ticket_work` can point `agent/<ID>` at the other ticket's work (when `agent/<ID>` has none of its own). And `ensure_branch_merged` can then fail a good merge, naming that branch.
+      - Builds on DEV-602 (owner 2026-11-15, options picker: "Wait for DEV-602"): start only once DEV-602 is on main.
+
+      ## Done when
+      - [ ] A branch counted only because a saved job logged its name counts only while its tip descends from a `ticket_commit` a job of the ticket logged, or one of its commits missing from the main checkout's branch has a subject that starts with the ticket ID (`DEV-612` followed by a non-alphanumeric character or the end, so `DEV-6120` doesn't match). Otherwise it is skipped. A job that logged no `ticket_commit` relies on the subject check alone.
+      - [ ] `agent/<ID>` itself and branches traced to it (`BranchOwners`) count as before: the check covers logged names only.
+      - [ ] Both callers get it: `follow_ticket_work` leaves `agent/<ID>` where it is, and `ensure_branch_merged` doesn't fail a merge naming the skipped branch.
+      - [ ] A step fails: a git call that can't answer (missing ref, git error) skips the branch, as an unknown owner.
+      - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
+- at: 2026-11-16T05:47:24.771771+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-602"]}'
+    new: '{"depends_on":["DEV-602"],"related":["DEV-602"]}'
+- at: 2026-11-16T05:47:33.174499+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:47:34.769856+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-16T05:47:36.260176+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: mallox
