@@ -1151,33 +1151,12 @@ mod tests {
         });
     }
 
-    /// `begin` for the concurrency test only: retry the bounded 2s
-    /// lock-contention timeout (io `WouldBlock`, "still busy after 2
-    /// seconds") a few extra times. Under heavy IO/fsync load one worker's
-    /// commit (multiple fsyncs) can legitimately outlast the other worker's
-    /// contention window; that is coordination working as designed, not a
-    /// lost serialization guarantee. Retrying only that error keeps the
-    /// read-back-your-own-write assertion meaningful while removing
-    /// wall-clock sensitivity; every other failure surfaces unchanged, and
-    /// the dedicated lock-timeout test below keeps asserting the 2s bound.
-    fn begin_retrying_contention(root: &Path, prefixes: &[String]) -> LoTaRResult<MultiFileTransaction> {
-        let mut busy_retries = 6u32;
-        loop {
-            match MultiFileTransaction::begin(root, prefixes) {
-                Ok(txn) => return Ok(txn),
-                Err(LoTaRError::IoError(io_err)) if io_err.kind() == std::io::ErrorKind::WouldBlock => {
-                    if busy_retries == 0 {
-                        return Err(LoTaRError::IoError(io_err));
-                    }
-                    busy_retries -= 1;
-                }
-                Err(err) => return Err(err),
-            }
-        }
-    }
-
     #[test]
     fn concurrent_transactions_serialize_on_the_coordinated_locks() {
+        // The polling lock lets one worker take it back right after each
+        // commit, so the other may wait out all of its rounds; on a busy
+        // machine that outlasts the 2 s default (DEV-601).
+        let _lock_wait = crate::test_env::EnvVarGuard::set(crate::storage::safety::STORAGE_LOCK_WAIT_ENV, "60000");
         let (_tmp, root) = workspace();
         let file = root.join("DEV").join("1.yml");
         fs::create_dir_all(root.join("DEV")).unwrap();
@@ -1193,7 +1172,7 @@ mod tests {
                 let file = file.clone();
                 scope.spawn(move || {
                     for round in 0..25u32 {
-                        let mut txn = begin_retrying_contention(&root, &["DEV".to_string()]).expect("begin under contention");
+                        let mut txn = MultiFileTransaction::begin(&root, &["DEV".to_string()]).expect("begin under contention");
                         let next = format!("{}-{}", worker, round);
                         txn.stage(&file, next.clone()).unwrap();
                         txn.commit().unwrap();

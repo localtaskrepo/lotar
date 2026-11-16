@@ -1,18 +1,55 @@
 title: A T3 job's prompt keeps telling every later job on the ticket to carry over an earlier job's uncommitted changes
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T04:26:06.797877+00:00
-modified: 2026-11-16T04:26:08.423464+00:00
+modified: 2026-11-16T04:58:09.772655+00:00
 relationships:
   related:
   - DEV-583
-description: 'Found in the DEV-583 review (eba9fc33). `t3_thread_notes` (`crates/lotar-lib/src/services/agent_job_service.rs`, `uncommitted_ticket_worktrees`) lists every worktree of the ticket with uncommitted changes and says "carry over what you need; leave that worktree as it is". Since the worktree is left as it is, the note stays in every later T3 job on the ticket: the review job (told to change no files) and the merge job (which could pull in changes the fix agent chose to drop). Check: fail a T3 fix job with uncommitted changes, retry it, then start the review: the review prompt still names the old worktree with ''carry over''. Done: the note reaches only jobs that should take the work over (fix/rework), or says the work may already be carried over and a review or merge job leaves it alone.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4b5016f-4464-4c66-9b06-16db3ff01f88
+description: |-
+  Found in the DEV-583 review (eba9fc33). `t3_thread_notes` (`crates/lotar-lib/src/services/agent_job_service.rs`, `uncommitted_ticket_worktrees`) lists every worktree of the ticket with uncommitted changes and says "carry over what you need; leave that worktree as it is". Since the worktree is left as it is, the note stays in every later T3 job on the ticket: the review job (told to change no files) and the merge job (which could pull in changes the fix agent chose to drop). Check: fail a T3 fix job with uncommitted changes, retry it, then start the review: the review prompt still names the old worktree with 'carry over'.
+
+  ## Done when
+  - [ ] A T3 merge job (profile `merge` or ticket in `Merging`) gets no note about earlier worktrees' uncommitted changes.
+  - [ ] Every other T3 job still names each such worktree (path, branch, `git -C` commands), but says only a job that takes the work over (fix, rework) carries over what it still needs; the changes may be carried over or dropped already (check the ticket's commits and comments first); a review job leaves them alone; nobody changes that worktree.
+  - [ ] LoTaR doesn't guess a review job from its profile name (repos name review profiles freely): the wording covers it.
+  - [ ] Non-T3 runners: unchanged (no such note).
+  - [ ] A test covers both: merge-job prompt lacks the note, a later non-merge job's prompt has the new wording.
+  - [ ] `docs/help/agent.md` describes it.
 history:
 - at: 2026-11-16T04:26:08.423464+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T04:56:30.384040+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T04:56:33.250266+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4b5016f-4464-4c66-9b06-16db3ff01f88
+- at: 2026-11-16T04:58:09.772655+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found in the DEV-583 review (eba9fc33). `t3_thread_notes` (`crates/lotar-lib/src/services/agent_job_service.rs`, `uncommitted_ticket_worktrees`) lists every worktree of the ticket with uncommitted changes and says "carry over what you need; leave that worktree as it is". Since the worktree is left as it is, the note stays in every later T3 job on the ticket: the review job (told to change no files) and the merge job (which could pull in changes the fix agent chose to drop). Check: fail a T3 fix job with uncommitted changes, retry it, then start the review: the review prompt still names the old worktree with ''carry over''. Done: the note reaches only jobs that should take the work over (fix/rework), or says the work may already be carried over and a review or merge job leaves it alone.'
+    new: |-
+      Found in the DEV-583 review (eba9fc33). `t3_thread_notes` (`crates/lotar-lib/src/services/agent_job_service.rs`, `uncommitted_ticket_worktrees`) lists every worktree of the ticket with uncommitted changes and says "carry over what you need; leave that worktree as it is". Since the worktree is left as it is, the note stays in every later T3 job on the ticket: the review job (told to change no files) and the merge job (which could pull in changes the fix agent chose to drop). Check: fail a T3 fix job with uncommitted changes, retry it, then start the review: the review prompt still names the old worktree with 'carry over'.
+
+      ## Done when
+      - [ ] A T3 merge job (profile `merge` or ticket in `Merging`) gets no note about earlier worktrees' uncommitted changes.
+      - [ ] Every other T3 job still names each such worktree (path, branch, `git -C` commands), but says only a job that takes the work over (fix, rework) carries over what it still needs; the changes may be carried over or dropped already (check the ticket's commits and comments first); a review job leaves them alone; nobody changes that worktree.
+      - [ ] LoTaR doesn't guess a review job from its profile name (repos name review profiles freely): the wording covers it.
+      - [ ] Non-T3 runners: unchanged (no such note).
+      - [ ] A test covers both: merge-job prompt lacks the note, a later non-merge job's prompt has the new wording.
+      - [ ] `docs/help/agent.md` describes it.

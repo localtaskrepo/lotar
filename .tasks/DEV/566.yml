@@ -1,11 +1,11 @@
 title: 'A blocking review is ignored: the fix job''s end rule moves Reviewing on to Merging while the review still runs'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-16T04:21:33.617599+00:00
+modified: 2026-11-16T04:55:47.554341+00:00
 relationships:
   related:
   - DEV-524
@@ -361,6 +361,34 @@ comments:
 
     - No code change: the reviewed work is `52098f98` on `agent/DEV-566` (rebased `eadf0315`, review passed).
     - `main` moved on since (`1b6c7857`, 10 commits incl. DEV-593, DEV-594, DEV-588), so the merge job rebases and reruns the checks; the earlier failure was a timeout in `dev510_t3_session_test` after 2213 passes, not in this ticket's tests.
+- date: 2026-11-16T04:55:40.320661+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `8da72b93` on GitHub.
+
+    - Rebased `52098f98` onto `1b6c7857`. The one conflict was in `docs/help/agent.md`: main (DEV-593/594) and this fix had each added a sentence to the same queue paragraph. I kept both.
+    - No lockfile changed. Lint, test (2247 Rust, 1548 UI) and smoke (405) all passed on the rebased commit `9eea131b`. The T3 test that timed out last time passed.
+    - `git merge --ff-only` landed it. I amended the open `.tasks` changes into the commit, then pushed `1b6c7857..8da72b93`, the only unpushed commit.
+    - No rules or config files changed, so `lotar trust` wasn't needed.
+    - No check to rerun: the ticket's check (`lotar show LOCA-333` history) only records the incident. The new regression tests cover the finding.
+    - `agent/DEV-566` now points at `8da72b93`.
+  report:
+    commits:
+    - hash: 8da72b93
+      what: DEV-566 fix, rebased onto 1b6c7857, with the open .tasks changes amended in
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2247 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '405'
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    next: 'None: Done when this job ends'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A90e52aeb-423e-4165-a8d9-6ae2412daa40
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab0cc5eb6-2dfb-40ad-8b24-76fbe4ebbfbc
@@ -704,3 +732,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-16T04:55:40.320661+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:55:47.554341+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
