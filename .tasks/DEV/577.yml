@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-15T22:56:42.931235+00:00
+modified: 2026-11-16T00:20:38.967870+00:00
 relationships:
   depends_on:
   - DEV-583
   related:
   - DEV-573
   - DEV-583
+  - DEV-530
 comments:
 - date: 2026-11-15T19:51:52.799436+00:00
   author: claude
@@ -281,3 +282,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T00:20:38.967870+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530"]}'

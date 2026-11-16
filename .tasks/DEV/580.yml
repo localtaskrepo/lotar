@@ -1,11 +1,11 @@
 title: automation_agent_settings_reach_the_job_they_start leaves its fixture in the temp folder now and then
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T20:04:35.425934+00:00
-modified: 2026-11-15T23:57:31.330773+00:00
+modified: 2026-11-16T00:21:59.777728+00:00
 relationships:
   depends_on:
   - DEV-586
@@ -14,6 +14,8 @@ relationships:
   - DEV-586
   - DEV-466
   - DEV-597
+  - DEV-520
+  - DEV-587
 comments:
 - date: 2026-11-15T20:21:31.567832+00:00
   author: claude
@@ -126,8 +128,49 @@ comments:
 - date: 2026-11-15T23:20:05.720507+00:00
   author: claude
   text: 'Chief of staff: DEV-586 is Done, so the wait is over; merge queued again.'
+- date: 2026-11-15T23:58:21.014655+00:00
+  author: claude
+  text: |-
+    Merged: `0bff1e4d` is on main. Not pushed.
+
+    - Rebased the reviewed fix (`175e36d0`, same patch as `c0c6ad79`) onto main twice, because main moved on to `a5e77173` (STD-165, only `.gitleaks.toml` changed). No conflicts, no lockfile change. Hook tests passed again after the second rebase.
+    - `npm test`: the first run failed in `dev510_t3_session_test::…fails_when_t3_cant_list_its_threads` (60 s timeout). That test also fails on main without this change. Its fix is DEV-520's `cdd2141c`, which isn't merged yet. A full `cargo nextest --no-fail-fast` rerun passed 2228/2228.
+    - Smoke: the first full run failed `ui.global-actions` desktop at line 121 (Create task panel never closed). DEV-587, which is Done, fixed an earlier wait in the same test. Filed as DEV-597. The rerun passed 405/405.
+    - Ticket check: `automation_agent_settings_reach_the_job_they_start` passed 10 of 10 runs with nothing left in `.lotar-test-scratch`.
+    - `.tasks` changes amended into `0bff1e4d`. The merge changed `.tasks/DEV/config.yml`, so I ran `lotar trust`; status: Trusted.
+    - No push: the unpushed commits start with STD-170's `ee916064`, and STD-170 is HelpNeeded, waiting for the owner's OK. `0bff1e4d` can't be pushed without it.
+  report:
+    commits:
+    - hash: 0bff1e4d
+      what: test waits for job_settled on both jobs (rebased 175e36d0 onto a5e77173, .tasks amended in)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on b243fe70; main then only added .gitleaks.toml
+    - command: npm test
+      result: passed
+      reason: first run hit the known DEV-510 takeover flake (DEV-520 cdd2141c, DEV-590); full Rust rerun 2228/2228, UI, release, hooks passed
+    - command: npm run smoke
+      result: passed
+      reason: first full run 1/405 failed (ui.global-actions, filed DEV-597); rerun 405/405
+    - command: ticket check x10
+      result: passed
+      reason: 10/10 exit 0, no .lotar-test-scratch
+    - command: git push
+      result: not_run
+      reason: STD-170 ee916064 is the oldest unpushed commit and waits for the owner's OK
+    next: Push main once STD-170 is approved
+- date: 2026-11-16T00:21:51.495526+00:00
+  author: claude
+  text: |-
+    Review: nothing to review
+
+    - The fix is already on `main` as `0bff1e4d`. The test change in `crates/lotar-lib/tests/agent_automation_integration_test.rs` is identical, the same blob `e8ce620a`.
+    - This branch (`t3/dev-580-agent-settings-test-fixture-cleanup`, also `agent/DEV-580` and `t3/automation-test-wait-job-settled`) holds `4c2ae054`, the copy from before the amend. Against `main` it only differs in older `.tasks` files: `git diff main HEAD` shows 16 `.tasks` files, 558 lines deleted.
+    - Don't merge this branch: it would undo ticket updates on `main`. These branches can be deleted.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afe34cf3a-d7e6-4574-bba9-1b03d73cc38f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b176c1c-6cc6-439b-aa66-4eba0c1ae194
 description: |-
   Found 2026-11-15 in the DEV-576 rework: run alone, the test leaves .lotar-test-scratch (fixture .tmpXXX/.tasks and agent-queue markers) in about 1 of 8 runs, so the runner exits 1. It returns once both jobs are completed but before their workers settle, and the job ends still write into the dropped fixture.
   Check: for i in 1 2 3 4 5 6 7 8; do node scripts/rust-test-runner.mjs --agent -- automation_agent_settings_reach_the_job_they_start; done (any exit 1 with 'tests left 1 entries').
@@ -262,3 +305,40 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466"]}'
     new: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597"]}'
+- at: 2026-11-15T23:58:21.014655+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:58:21.329264+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597"]}'
+    new: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597","DEV-520","DEV-587"]}'
+- at: 2026-11-15T23:58:31.155327+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T00:21:16.668631+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b176c1c-6cc6-439b-aa66-4eba0c1ae194
+- at: 2026-11-16T00:21:51.495526+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:21:59.777728+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

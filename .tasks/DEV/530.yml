@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T23:38:44.334349+00:00
+modified: 2026-11-16T00:21:00.159726+00:00
 relationships:
   related:
   - DEV-351
@@ -21,6 +21,10 @@ relationships:
   - DEV-520
   - DEV-583
   - DEV-586
+  - DEV-543
+  - DEV-576
+  - DEV-577
+  - DEV-588
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -538,6 +542,38 @@ comments:
       result: passed
       reason: 401/401
     next: Review fb666856 against main ee916064, then merge (rebase needed, merge-tree shows no conflict)
+- date: 2026-11-16T00:20:38.632659+00:00
+  author: claude
+  text: |-
+    Review: blocking for DEV-530 at `fb666856`: tickets already Blocked under an agent would never continue after the merge.
+
+    - **Finding:** `.tasks/DEV/automation.yml:591` adds `not: { assignee: "@agent" }` to "Prerequisites done". The rule file applies as soon as it lands on main, but the parked jobs only exist for tickets blocked by the new code. DEV-588 (waits for DEV-520) and DEV-577 (waits for DEV-583) are Blocked under `@fix` right now, blocked by DEV-524's code with no parked job (`lotar agent queue` lists none). When their prerequisite closes, `resume_parked_job` (`automation_service.rs:2698`) finds nothing, and the rule now skips them, so they stay Blocked for good. The same happens to every ticket the installed 0.15.1 blocks between this merge and the next install.
+    - **Fix:** let the code skip the `unblocked` rules only for a ticket whose parked job it just resumed (for example `resume_parked_job` returns whether it moved a job, and `apply_unblocked_event` / `run_cross_repo_unblocked` skip the rules then), and drop the `not: { assignee: "@agent" }` from the DEV rule and from `docs/help/automation.md:480-489`. Add a test: a ticket Blocked under `@fix` with no parked job still gets the rule when its prerequisite is done.
+    - **Otherwise checked:** the park, unpark and re-check paths do what "Done when" asks, and the earlier claim-recovery finding is gone (no `starting` mark left). The changes main made since the base (DEV-576, DEV-528, DEV-543) don't touch these paths, and `git merge-tree` shows no conflicts.
+    - **Reran:** `cargo nextest run --workspace -E 'test(/parked|held_back|unpark|prerequisite|unblocked/)'`: 14 of 14 passed. I didn't rerun the full lint, test or smoke suites.
+    - No minor tickets filed.
+- date: 2026-11-16T00:21:00.159726+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -548,6 +584,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add02f220-0e8a-4347-9e7d-a33adafc8b9e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea5d4a1a-1600-4200-809f-19b48ccdd0aa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1bf66bfc-ffd1-44f4-ac29-404c40d16033
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af46a62c4-7f4a-428e-abf0-9925649bab5d
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -1305,3 +1342,40 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T00:16:35.325240+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af46a62c4-7f4a-428e-abf0-9925649bab5d
+- at: 2026-11-16T00:20:38.632659+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:20:38.965042+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588"]}'
+- at: 2026-11-16T00:20:39.648330+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned, merge-retried, fix-retried
+    new: review-returned, merge-retried, fix-retried, review-blocked
+- at: 2026-11-16T00:21:00.074095+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: review-returned, merge-retried, fix-retried, review-blocked
+    new: review-returned, merge-retried, fix-retried
+- at: 2026-11-16T00:21:00.159726+00:00
+  actor: automation
+  changes:
+  - field: comment_added

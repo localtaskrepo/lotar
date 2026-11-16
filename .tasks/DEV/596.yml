@@ -1,17 +1,61 @@
 title: 'Every job on LOCA-317 fails: T3 worktree add path_already_exists (stale agent-LOCA-317 worktree)'
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T23:48:39.768341+00:00
-modified: 2026-11-15T23:48:49.102632+00:00
+modified: 2026-11-16T00:15:14.364276+00:00
 relationships:
   related:
   - DEV-583
   - DEV-595
+  - DEV-573
+comments:
+- date: 2026-11-16T00:08:55.974040+00:00
+  author: claude
+  text: |-
+    Fixed: a T3 job for a ticket whose branch is gone moves a detached leftover worktree out of T3 Code's way first.
+
+    - Cause: T3 Code always puts a new branch's worktree at the same path, `<repo>/<branch, / as ->-<sha256(git common dir + NUL + branch)[..16]>`. `sha256("/Users/mallox/Development/local/.git\0agent/LOCA-317")` gives `2aa6ebb394abb948`, the leftover's name.
+    - The leftover was detached from `agent/LOCA-317` (DEV-573 take-over), then the branch was deleted, so every job asking for a new `agent/LOCA-317` hit `path_already_exists`.
+    - Fix: `plan_t3_worktree` calls the new `move_aside_detached_t3_worktree`, which runs `git worktree move <path> <path>-detached-<n>` for a detached worktree of that ticket at T3's path, changes included, and logs a note. Docs: `docs/help/agent.md`.
+    - LOCA-317 unblocked now: moved its leftover by hand to `~/.t3/worktrees/local/agent-LOCA-317-2aa6ebb394abb948-detached-1`. Nothing was deleted. Its staged changes are an older draft of `0a44163`, which is already on `main` in `local`.
+  report:
+    commits:
+    - hash: 3bd769d5
+      what: T3 jobs move a detached leftover worktree off T3 Code's path for a new ticket branch
+    checks:
+    - command: cargo nextest run -p lotar-lib --lib a_detached_worktree_at_the_t3_path
+      result: passed
+      reason: fails without the fix
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2229 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: lotar agent job on LOCA-317 starts a thread
+      result: not_run
+      reason: would start a real agent job; the merge agent reruns it
+    next: Review, then merge; rerun the check on LOCA-317 (its work 0a44163 is already on main)
+- date: 2026-11-16T00:15:03.759893+00:00
+  author: claude
+  text: |-
+    Review: passed. `3bd769d5` fixes the cause and LOCA-317 is unblocked; no findings.
+
+    - Read: the diff (`agent_job_service.rs`, `docs/help/agent.md`), the ticket and fix comment, DEV-573/583/595, recent commits to both files on `main`.
+    - T3 path rule checked against T3 Code's own code (`app.asar`, `createWorktree`): a stem of at most 23 bytes, `-`, then the first 16 hex chars of `sha256(<git common dir>\0<branch>)`. `move_aside_detached_t3_worktree` matches it, and it only moves a worktree that is detached from that same ticket branch.
+    - Only the new-branch path changed. When the branch exists, T3 gets `base` only, as before. The note shows up in the job log (`agent_job_service.rs:2804`).
+    - LOCA-317: the leftover is at `~/.t3/worktrees/local/agent-LOCA-317-2aa6ebb394abb948-detached-1`. Its reflog says it was detached from `agent/LOCA-317`. `agent/LOCA-317` is gone and `0a44163` is on `main` in `local`, so a new ticket branch made from main holds it.
+    - Reran: `cargo nextest run -p lotar-lib dev596` passed, `cargo clippy -p lotar-lib --all-targets -D warnings` was clean, and `rustfmt --check` and `prettier --check` passed on the touched files. I didn't rerun full test, smoke or the LOCA-317 job check: the merge agent runs those.
+    - No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49ceb12b-687e-4f8a-a475-6b5b32ba3259
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91d06f33-b818-4246-b05b-fd996cd0b911
 description: 'Found: merge, fix and fix-codex jobs on LOCA-317 (job-20261115T234212.302Z-586, -587, -588) all end with ''git worktree add failed (path_already_exists)'' in /Users/mallox/Development/local. A detached worktree ~/.t3/worktrees/local/agent-LOCA-317-2aa6ebb394abb948 (86751f0) exists, and branch agent/LOCA-317 does not; the work is on t3/opgate-license-readme-security-ci-2 (0a44163). Related: DEV-583, DEV-595. Check: lotar agent job on LOCA-317 starts a thread. Done: a job on LOCA-317 gets a worktree on agent/LOCA-317 holding 0a44163.'
 tags:
 - health
@@ -40,3 +84,40 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49ceb12b-687e-4f8a-a475-6b5b32ba3259
+- at: 2026-11-16T00:08:55.974040+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:08:56.860787+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-595"]}'
+    new: '{"related":["DEV-583","DEV-595","DEV-573"]}'
+- at: 2026-11-16T00:09:15.982700+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T00:09:35.079646+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91d06f33-b818-4246-b05b-fd996cd0b911
+- at: 2026-11-16T00:15:03.759893+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:15:14.364276+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

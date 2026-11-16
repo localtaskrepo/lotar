@@ -1,11 +1,11 @@
 title: Sign lotar builds from source with the owner's Developer ID
-status: Merging
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-15T23:30:06.172904+00:00
+modified: 2026-11-16T00:16:46.513981+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -172,6 +172,30 @@ comments:
       result: not_run
       reason: scheduled after next release
     next: Merge; verify live firewall/LAN after next release
+- date: 2026-11-16T00:16:39.815941+00:00
+  author: codex
+  text: |-
+    Merge blocked by a failing Rust test; main was not changed.
+
+    - Rebased `200d70f1` onto main as `53e25f3c`; no conflicts or lockfile changes. No push, amend or trust change.
+    - Sandbox sccache denial persisted on approved retry; documented `RUSTC_WRAPPER=` fallback compiled successfully. Lint passed.
+    - `npm run test:agent` failed at `crates/lotar-lib/tests/dev510_t3_session_test.rs:122`: `a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads` timed out waiting for the job to end. 28 tests were not run; UI/release/hooks were not reached.
+    - Initial parallel smoke build collided with test web-asset generation; both processes ended. No final smoke run after the failed merge gate. No checks remain running.
+    - Question: how should we handle this failing T3 session test before retrying the merge?
+  report:
+    commits:
+    - hash: 53e25f3c
+      what: rebased reviewed source-signing change onto main; not merged
+    checks:
+    - command: RUSTC_WRAPPER= npm run lint:agent
+      result: passed
+    - command: RUSTC_WRAPPER= npm run test:agent
+      result: failed
+      reason: dev510_t3_session_test timeout; 28 Rust tests unrun, later suites not reached
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: initial build collision; final run withheld after failed test gate
+    next: Owner decides how to handle failing T3 session test before retrying merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
@@ -192,8 +216,6 @@ description: |-
   - [ ] Linux and Windows: no signing, same staged install.
   - [ ] `codesign -dvv` on the installed source build shows `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`; local's `skills/lotar-services.md` is updated (filed there if it needs a LOCA ticket) so it no longer calls a signed source build wrong.
   - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
-tags:
-- review-returned
 history:
 - at: 2026-11-15T17:40:28.831866+00:00
   actor: claude
@@ -381,3 +403,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T00:16:39.815941+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:16:46.463538+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: ''
+- at: 2026-11-16T00:16:46.513981+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

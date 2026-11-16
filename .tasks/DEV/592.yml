@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-15T23:25:23.989594+00:00
+modified: 2026-11-16T00:22:12.290168+00:00
 relationships:
   related:
   - DEV-524
@@ -62,8 +62,35 @@ comments:
       result: not_run
       reason: blocking findings; no UI changes
     next: Fix resume error contract and test cleanup, add missing boundary coverage, rerun gates
+- date: 2026-11-16T00:10:05.201606+00:00
+  author: claude
+  text: |-
+    Rework done: all three review findings fixed in amended `ed1eb876`.
+
+    - **Exit code on worker-start failure:** `AgentQueueService::resume` returns `Err` only when the queue can't be read; a lock or spawn failure goes into `ResumeOutcome.error`. `agent queue resume` exits 0, prints a warning, JSON `worker_state: "stopped"` plus `error`. `lotar serve` warns and serves on.
+    - **Temp leftovers:** the detached worker outlived the tests and wrote after the fixture was gone. `Workspace` now waits on drop until the worker is gone and no job runs; the guarded runner passes with no leftovers.
+    - **Coverage added** (`dev592_queue_resumes_after_restart_test.rs`): empty queue at serve start → no worker; worker can't start (lock dir read-only) → serve warns and keeps running, `resume` exits 0 with `error`; running worker → `resume` leaves it alone (`started: false`, "already runs"); active reason "waiting for a free slot … max_parallel_jobs 1".
+    - Docs: `docs/help/agent.md` mentions the failure case.
+  report:
+    commits:
+    - hash: ed1eb876
+      what: amended; resume reports worker-start failures with exit 0, tests wait for the worker, boundary tests
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2235 Rust tests incl. temp-folder gate, UI, release, hooks
+    - command: npm run smoke
+      result: passed
+    - command: node scripts/rust-test-runner.mjs --agent -E test(/^dev592_/)
+      result: passed
+      reason: 7 tests, no temp leftovers
+    next: Review again, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64ee8131-7181-4973-9f22-9b8e73b9e1aa
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7c500a9-f749-4c5f-9f0c-08ccea2aa0f6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A01012c5d-c108-496e-9cc6-bad7794a7894
 description: |-
   After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
 
@@ -188,3 +215,32 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-15T23:58:53.638232+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T23:58:54.150557+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7c500a9-f749-4c5f-9f0c-08ccea2aa0f6
+- at: 2026-11-16T00:10:05.201606+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:10:14.910079+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T00:22:12.290168+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A01012c5d-c108-496e-9cc6-bad7794a7894

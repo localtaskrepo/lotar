@@ -1,16 +1,45 @@
 title: Job end fails when the ticket branch is checked out in LoTaR's own agent worktree
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T23:22:25.966473+00:00
-modified: 2026-11-15T23:51:10.919222+00:00
+modified: 2026-11-16T00:21:43.510129+00:00
 relationships:
   related:
   - DEV-596
+  - DEV-573
+comments:
+- date: 2026-11-16T00:06:06.962493+00:00
+  author: claude
+  text: |-
+    Fixed: the ticket branch now moves inside a clean worktree that has it checked out, and that worktree stays on the branch.
+
+    - Cause: the MGP-13 job (21:27Z) ran a lotar build from before DEV-573 (`e0f88162`, released in 0.15.1 at 13:56 local), which had no step to detach that worktree. 0.15.1 detaches it, but a detached `agent-<ID>` worktree is the leftover that DEV-596 runs into.
+    - Change: `move_ticket_branch` in `agent_job_service.rs` runs `git reset --keep <tip>` in the worktree when `git status --porcelain` is empty. A worktree with changes is still detached first, as before.
+    - Tests: new `the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out` (it failed before the fix: the worktree ended detached). The DEV-573 test's stale worktree now has an untracked file, so it still covers the detach.
+    - Docs: updated `docs/help/agent.md` in place (it still said a branch checked out in another worktree fails the job).
+  report:
+    commits:
+    - hash: bdcc0f38
+      what: move the ticket branch inside a clean worktree that has it checked out
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: Rust 2228/2229; the one failure, dev510 a_t3_job_taken_over_..._cant_list_its_threads, is the known 60 s hang under load (DEV-520/DEV-590), passed alone 2/2
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    - command: ticket check (rerun MGP-13 job end)
+      result: not_run
+      reason: covered by new test the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97078b6d-c4b7-4950-a60f-90436c562edc
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af985c3f6-1f68-44c2-9afe-d4a312baba44
 description: 'Found: MGP-13 job job-20261115T212717.075Z-1 (mailgpg) failed at the end: `git branch --force agent/MGP-13 607bcc8` -> ''cannot force update the branch used by worktree at ~/.t3/worktrees/mailgpg/agent-MGP-13-93bc836e8df965ff''. The ticket went back to HelpNeeded although the work was done. Check: a T3 job whose thread branch differs from agent/<ID> while agent/<ID> is checked out in its agent worktree. Done: LoTaR moves the branch in that worktree (reset when clean, or detach first) instead of failing the job.'
 tags:
 - health
@@ -39,3 +68,27 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97078b6d-c4b7-4950-a60f-90436c562edc
+- at: 2026-11-16T00:06:06.962493+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:06:07.425781+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596"]}'
+    new: '{"related":["DEV-596","DEV-573"]}'
+- at: 2026-11-16T00:06:18.905144+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T00:21:43.510129+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af985c3f6-1f68-44c2-9afe-d4a312baba44

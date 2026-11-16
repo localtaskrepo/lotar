@@ -1,16 +1,47 @@
 title: Two T3 fix jobs on DEV-585 ran in parallel on different branches; the reviewer saw a commit the handoff didn't report
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T23:19:28.800463+00:00
-modified: 2026-11-15T23:30:21.653279+00:00
+modified: 2026-11-16T00:15:11.189294+00:00
 relationships:
   related:
   - DEV-573
   - DEV-581
   - DEV-585
+  - DEV-584
+comments:
+- date: 2026-11-16T00:14:57.744466+00:00
+  author: claude
+  text: |-
+    Fixed: no job on a ticket starts while T3 Code still runs an earlier job's thread on it.
+
+    - Cause (job logs and T3 thread `mcp:c6c8c4b1…`): job `…205914.061Z-57` hit the Claude usage limit and failed after 4 s. T3 Code had only *paused* the turn, then resumed it at 21:10 ("Continue where you left off."). That thread ran outside any lotar job until 22:07 and committed `1011487e` on `agent/DEV-585`.
+    - At 21:55 the next @fix job saw that worktree's uncommitted changes, so it started a new thread. `agent/DEV-585` was checked out there, so T3 put the new thread on `t3/fix-flaky-watcher-mcp-event-tests` → `d6dbec07`.
+    - Fix (`agent_job_service.rs`, `running_t3_thread`): before a job starts, lotar runs `t3 thread show` for the ticket's earlier t3 jobs' threads. If one is `running`, the job gets "already has an active job: T3 Code still runs the thread … of the job …". The queue keeps the entry until the thread ends (and checks again every 30 s). When the thread ends, the next fix job continues it on `agent/<ID>`, so the branch matches the prompt.
+    - Test `no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread` (`dev503_harness_jobs_test.rs`): fails before the fix.
+    - Test cleanup: the extra start-up work exposed an existing race in 4 harness tests. They ended while a job still finished writing, which left `.lotar-test-scratch` behind. They now wait for jobs and the queue worker to end (`wait_for_jobs_to_end`); 0/8 leaks per test after the change, 2–6/8 before.
+    - Docs: `docs/help/agent.md` (T3 section, queue).
+    - Not covered: during T3's pause the thread reads `failed`, so the @fix-codex retry can still start then. That is the usage-limit pause in [DEV-584](https://lotar.pyxzl.net/task/DEV-584) (Blocked); I added this evidence there.
+  report:
+    commits:
+    - hash: 043e01bd
+      what: no job on a ticket starts while T3 Code still runs an earlier job's thread on it
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2229 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    - command: npm run test:rust:agent -- -E test(/no_job_starts_while/)
+      result: passed
+      reason: fails without the fix
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7b10056-3c44-41c2-8994-c511e6ecbf64
 description: 'Found 2026-11-15 on DEV-585: thread worktree t3-feedd691 ran on t3/fix-flaky-watcher-mcp-event-tests (d6dbec07) while its prompt said agent/DEV-585; a second fix job committed 1011487e on agent/DEV-585 (worktree agent-DEV-585-3db9...). The review blocked on the mismatch. Check: one fix job per ticket at a time, and a T3 job''s worktree is on agent/<ID> as its prompt says (see DEV-573, DEV-581). Done when a second fix job can''t start while one runs and the job''s branch matches its prompt.'
@@ -41,3 +72,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7b10056-3c44-41c2-8994-c511e6ecbf64
+- at: 2026-11-16T00:14:23.676114+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-581","DEV-585"]}'
+    new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584"]}'
+- at: 2026-11-16T00:14:57.744466+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:15:11.189294+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

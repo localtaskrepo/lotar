@@ -1383,16 +1383,56 @@ checks in the foreground and finish all work before your final message; don't en
 fn plan_t3_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> LoTaRResult<(WorktreeContext, T3Worktree)> {
     let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
     let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
+    let mut note = None;
     let plan = if branch_exists(&repo_root, &branch) {
         T3Worktree { base: branch.clone(), branch: None }
     } else {
+        note = move_aside_detached_t3_worktree(&repo_root, &config.agent_worktree.branch_prefix, &branch)?;
         let head =
             git_command(&repo_root).args(["symbolic-ref", "--quiet", "--short", "HEAD"]).current_dir(&repo_root).output().map_err(LoTaRError::IoError)?;
         let base = String::from_utf8_lossy(&head.stdout).trim().to_string();
         T3Worktree { base: if head.status.success() && !base.is_empty() { base } else { "HEAD".to_string() }, branch: Some(branch.clone()) }
     };
-    let context = WorktreeContext { working_dir: repo_root, worktree_path: None, worktree_branch: Some(branch), note: None };
+    let context = WorktreeContext { working_dir: repo_root, worktree_path: None, worktree_branch: Some(branch), note };
     Ok((context, plan))
+}
+
+/// T3 Code puts a new branch's worktree at the same path every time:
+/// `<repo>/<branch, / as ->-<hash of repository and branch>`. A worktree an
+/// earlier thread left there, detached from the ticket's branch when a
+/// later thread took the branch over (DEV-573), stays after the branch is
+/// deleted, and every later thread then fails with `path_already_exists`
+/// (DEV-596). It moves aside with its changes; Done cleanup finds it there.
+fn move_aside_detached_t3_worktree(repo_root: &std::path::Path, prefix: &str, branch: &str) -> LoTaRResult<Option<String>> {
+    let mut stem = String::new();
+    for character in branch.replace('/', "-").chars() {
+        if stem.len() + character.len_utf8() > 23 {
+            break;
+        }
+        stem.push(character);
+    }
+    let repo_name = repo_root.file_name();
+    let t3_path = |path: &std::path::Path| {
+        path.parent().and_then(std::path::Path::file_name) == repo_name
+            && path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .and_then(|name| name.strip_prefix(stem.as_str())?.strip_prefix('-'))
+                .is_some_and(|hash| hash.len() == 16 && hash.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+    };
+    let Some(stale) =
+        agent_worktrees(repo_root, prefix)?.into_iter().find(|worktree| worktree.detached && worktree.ticket_branch == branch && t3_path(&worktree.path))
+    else {
+        return Ok(None);
+    };
+    let name = stale.path.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default();
+    let target = (1..).map(|n| stale.path.with_file_name(format!("{name}-detached-{n}"))).find(|path| !path.exists()).unwrap_or_default();
+    run_git_command(repo_root, &["worktree", "move", &stale.path.to_string_lossy(), &target.to_string_lossy()])?;
+    Ok(Some(format!(
+        "Moved the worktree {} that an earlier T3 Code thread left detached from {branch} to {}, so T3 Code can make the new thread's worktree there.",
+        stale.path.display(),
+        target.display()
+    )))
 }
 
 /// The worktree of the T3 Code thread a `session: continue` job sends its
@@ -5482,5 +5522,43 @@ mod dev520_session_events_tests {
             seen.push(event.seq);
         }
         assert_eq!(seen, (11..=1515).collect::<Vec<_>>());
+    }
+}
+
+#[cfg(test)]
+mod dev596_t3_worktree_tests {
+    use super::move_aside_detached_t3_worktree;
+    use std::fs;
+
+    /// DEV-596: T3 Code makes a new ticket branch's worktree at a fixed path, where an earlier thread's worktree
+    /// stayed detached after the branch was deleted. It moves aside with its staged change; another ticket's stays.
+    #[test]
+    fn a_detached_worktree_at_the_t3_path_of_a_new_ticket_branch_moves_aside() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        let git = |dir: &std::path::Path, args: &[&str]| {
+            let output = crate::utils::git::git_command(dir).args(args).current_dir(dir).output().unwrap();
+            assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+        };
+        fs::create_dir_all(&repo).unwrap();
+        git(&repo, &["init", "-q", "-b", "main"]);
+        git(&repo, &["-c", "user.name=T", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "init"]);
+        let trees = tmp.path().join("t3").join("repo");
+        let stale = trees.join("agent-TEST-1-0123456789abcdef");
+        let other = trees.join("agent-TEST-2-0123456789abcdef");
+        git(&repo, &["worktree", "add", "-q", "-b", "agent/TEST-1", &stale.to_string_lossy()]);
+        git(&repo, &["worktree", "add", "-q", "-b", "agent/TEST-2", &other.to_string_lossy()]);
+        git(&other, &["checkout", "-q", "--detach"]);
+        fs::write(stale.join("draft.txt"), "draft").unwrap();
+        git(&stale, &["add", "draft.txt"]);
+        git(&stale, &["checkout", "-q", "--detach"]);
+        git(&repo, &["branch", "-D", "agent/TEST-1"]);
+
+        let note = move_aside_detached_t3_worktree(&repo, "agent", "agent/TEST-1").unwrap();
+        let moved = trees.join("agent-TEST-1-0123456789abcdef-detached-1");
+        assert!(note.is_some_and(|note| note.contains(&moved.display().to_string())));
+        assert!(!stale.exists() && fs::read_to_string(moved.join("draft.txt")).unwrap() == "draft", "the draft moved along");
+        assert!(other.is_dir(), "another ticket's worktree stays");
+        assert!(move_aside_detached_t3_worktree(&repo, "agent", "agent/TEST-1").unwrap().is_none(), "nothing left at the path");
     }
 }

@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T22:38:45.433554+00:00
-modified: 2026-11-15T23:28:46.709422+00:00
+modified: 2026-11-16T00:16:54.180354+00:00
 relationships:
   related:
   - DEV-520
@@ -57,8 +57,37 @@ comments:
       result: not_run
       reason: focused review; implementation reports full passes
     next: Write the recovery record before publishing agent_job_started and cover that boundary.
+- date: 2026-11-16T00:16:42.798449+00:00
+  author: claude
+  text: |-
+    Rework: the record is now saved before `agent_job_started` is logged. Amended as `89b0ebff`.
+
+    - Finding (record written after the start event): fixed. The new `mark_started` in `agent_job_service.rs` sets Running, saves the record (no session), then records `agent_job_started`. It does all three inside the same registry update as the cancel check, so a cancelled job gets no record.
+    - Boundary test: no test hook can kill lotar between two lines. Two unit tests cover it instead:
+      - `a_job_saves_its_record_before_its_start_is_logged`: the start step leaves the record (no session) next to `agent_job_started`.
+      - `a_job_killed_before_its_session_started_fails_when_taken_over`: a record with a log that has only its header (killed after the record, before the start was logged) is taken over and failed with "…exited before the job ended, before it started the t3 session."
+    - The integration test from the first pass (kill during a `job_started` rule, `job_failed` once, `agent status`/`list-jobs` show `failed`) is unchanged and passes.
+    - The known DEV-520/DEV-590 flake (`…fails_when_t3_cant_list_its_threads`) failed in a targeted run and passed in the full run.
+  report:
+    commits:
+    - hash: 89b0ebff
+      what: record saved before agent_job_started is logged; takeover fails a job killed before its session started
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, Rust 2231/2231, UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 404/404
+    - command: cargo nextest DEV-593 unit and integration tests
+      result: passed
+    next: Review again, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7a13f60-c8a7-480f-9a43-18b65593cff9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A099de4f8-9b37-463b-906a-cd98e6116716
 description: |-
   Jobs whose process died right after `agent_job_started` stay in status `unknown` and are never taken over, so their tickets sit InProgress with an agent assignee and no job. docs/help/agent.md says the queue worker for the same tasks directory, or the next `lotar serve`, takes such a job over and ends it. Found 2026-11-15 in local.
 
@@ -131,3 +160,27 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-16T00:06:32.186189+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-16T00:06:32.648272+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A099de4f8-9b37-463b-906a-cd98e6116716
+- at: 2026-11-16T00:16:42.798449+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:16:54.180354+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

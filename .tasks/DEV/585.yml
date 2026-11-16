@@ -1,16 +1,17 @@
 title: 'Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: claude
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-15T23:34:48.963919+00:00
+modified: 2026-11-16T00:16:25.636863+00:00
 relationships:
   related:
   - DEV-510
   - DEV-513
   - DEV-594
+  - DEV-584
 comments:
 - date: 2026-11-15T20:59:19.246258+00:00
   author: automation
@@ -142,6 +143,29 @@ comments:
     - Watcher readiness follows registration and snapshots; optional SSE readiness alone waits. MCP baseline precedes requests and polling catches early edits.
     - Whitespace and rustfmt checks passed independently. Loaded full-suite, UI, smoke and delay-probe passes on this tree are recorded fix-agent evidence, not independent reruns. Local-port tests/smoke not rerun per owner sandbox decision; full lint not rerun.
     - No UI changes, new findings or tickets. Files, status and assignee unchanged. Next: merge-agent verification and integration.
+- date: 2026-11-16T00:16:21.235846+00:00
+  author: codex
+  text: |-
+    Merge paused before landing: rebased successfully, but fresh runtime verification requires a Claude job.
+
+    - Main advanced since `1011487e`; rebase onto current `main` succeeded without conflicts. The hash changed, so prior passing checks cannot be skipped under this merge request.
+    - Owner decision `standards/docs/decisions/2026-11-14-codex-sandbox-network.md` and triage's earlier answer explicitly require Claude for watcher/MCP local-port tests; do not retry under Codex.
+    - No main checkout files changed, no fast-forward, amendment or push performed. Please route the merge to Claude for required checks on the rebased head and final integration.
+  report:
+    checks:
+    - command: git rebase main
+      result: passed
+      reason: retried with approval after sandbox metadata denial
+    - command: npm run lint
+      result: not_run
+      reason: merge verification handed to Claude
+    - command: npm test under load
+      result: not_run
+      reason: owner sandbox decision requires Claude for local-port tests
+    - command: npm run smoke
+      result: not_run
+      reason: owner sandbox decision requires Claude for local-port tests
+    next: 'Claude merge job: verify rebased head, run required checks and repeated loaded tests, then fast-forward main and handle tasks/push'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab03303e3-95f6-4964-b850-05c9841e7ba5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6d0ae523-068a-40cd-9cbb-a988f1097835
@@ -157,8 +181,6 @@ description: |-
   Done when the events arrive reliably under load (or the tests wait for them without a fixed window) and repeated full runs pass.
 tags:
 - health
-- fix-retried
-- review-returned
 custom_fields:
   finding: npm test:watcher-events-under-load
 history:
@@ -309,3 +331,28 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T00:14:23.675520+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-513","DEV-594"]}'
+    new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584"]}'
+- at: 2026-11-16T00:16:21.235846+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:16:25.570591+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried, review-returned
+    new: health
+- at: 2026-11-16T00:16:25.636863+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: claude

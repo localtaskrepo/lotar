@@ -4,9 +4,22 @@ priority: High
 type: Feature
 reporter: claude
 created: 2026-11-15T20:32:09.848672+00:00
+modified: 2026-11-16T00:14:23.675196+00:00
 relationships:
   depends_on:
   - standards:STD-133
+  related:
+  - DEV-585
+  - DEV-594
+comments:
+- date: 2026-11-16T00:14:23.282323+00:00
+  author: claude
+  text: |-
+    More evidence from DEV-585 (2026-11-15, see DEV-594): T3 Code pauses a turn at the usage limit and resumes it on its own.
+
+    - Job `job-20261115T205914.061Z-57` failed after 4 s: `t3` exited 1, "Thread mcp:c6c8c4b1… stopped with status failed: Claude API rate limit reached".
+    - T3 Code had noted "This turn is paused until the 5-hour limit resets in 11m" and sent "Continue where you left off." at 21:10; the thread then worked till 22:07 and committed `1011487e`, outside any lotar job.
+    - Meanwhile the @fix-codex retry and a second @fix job ran. DEV-594 now holds back a job while an earlier job's thread is `running`, but during the pause the thread reads `failed`, so the retry still starts then. A t3 job that waits through T3's pause would close that gap.
 description: |-
   Step 2 of standards STD-133 (owner 2026-11-15: "Detect usage-limit and quota failures as their own state and pause cleanly instead of looping @fix retries or blaming code bugs; stop asking me the same question repeatedly."). Waits for step 1 (STD-133: no merge without a passed review), in the owner's order.
 
@@ -20,3 +33,14 @@ description: |-
   - [ ] Which wins: a limit message and a real failure in the same job: the limit (the job didn't get to run). A requeued job that hits the limit again pauses again, with no cap on owner questions because none is asked.
   - [ ] Rules can match the new event (for example `job_paused`), so standards' rules can comment once instead of asking.
   - [ ] Tests with a fake t3 that prints Codex's message, as in standards `scripts/automation.test.ts` (STD-130).
+history:
+- at: 2026-11-16T00:14:23.282323+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:14:23.675196+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594"]}'
