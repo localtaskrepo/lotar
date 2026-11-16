@@ -11,14 +11,14 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-/// `t3 thread start` names thread t1, prints "Started." and exits with `start-exit` after `start-sleep` seconds;
+/// `t3 thread start` appends its prompt to `prompts`, names thread t1, prints "Started." and exits with `start-exit` after `start-sleep` seconds;
 /// `thread send` prints "Sent."; `thread show` prints `show.json`; `thread list` prints `list.json` (or fails while
 /// `list-fail` exists). Every call goes to `calls`.
 const FAKE_T3: &str = r#"#!/bin/sh
 dir=$(dirname "$0")
 echo "$1 $2" >> "$dir/calls"
 case "$1 $2" in
-  "thread start") cat > /dev/null; echo "Thread t1" >&2; sleep "$(cat "$dir/start-sleep")"; echo "Started."; exit "$(cat "$dir/start-exit")" ;;
+  "thread start") cat >> "$dir/prompts"; echo "Thread t1" >&2; sleep "$(cat "$dir/start-sleep")"; echo "Started."; exit "$(cat "$dir/start-exit")" ;;
   "thread send") cat > /dev/null; echo "Sent." ;;
   "thread show") cat "$dir/show.json" ;;
   "thread list") if [ -f "$dir/list-fail" ]; then echo "Could not reach the T3 Code server" >&2; exit 1; fi; cat "$dir/list.json" ;;
@@ -130,6 +130,31 @@ fn a_t3_job_links_its_thread_on_the_ticket() {
     harness.show("completed", "null", 0, "Started.");
     harness.command().assert().success();
     assert!(harness.linked(), "{:?}", harness.task().references);
+}
+
+/// DEV-621: a rework past `continue_within_minutes` starts a new thread, and its handoff names the old thread.
+#[test]
+fn a_t3_handoff_names_the_skipped_sessions_thread() {
+    let harness = harness(0, 0);
+    harness.show("completed", "null", 0, "Started.");
+    harness.command().assert().success();
+    assert!(harness.thread_saved());
+    let sessions = harness.fixtures.get_temp_path().join("harnessmux/state/sessions");
+    let path = std::fs::read_dir(&sessions)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.to_string_lossy().ends_with("-TEST-1-fixer.json"))
+        .expect("the fixer session");
+    let mut record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let at = chrono::Utc::now() - chrono::Duration::minutes(56);
+    record["last_used"] = serde_json::Value::String(at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+    std::fs::write(&path, record.to_string()).unwrap();
+
+    harness.command().args(["--session", "continue"]).assert().success();
+    let prompts = std::fs::read_to_string(harness.dir.join("prompts")).unwrap_or_default();
+    let handoff = prompts.split("Handoff:").nth(1).unwrap_or_default();
+    assert!(handoff.contains("- Its T3 Code thread: t1\n"), "{prompts}");
+    assert_eq!(harness.calls().matches("thread start").count(), 2, "{}", harness.calls());
 }
 
 #[test]

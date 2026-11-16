@@ -1,11 +1,11 @@
 title: 'Flaky smoke: global task actions on desktop still time out closing the Create task panel after DEV-597'
-status: HelpNeeded
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T03:37:27.096061+00:00
-modified: 2026-11-17T00:25:42.256330+00:00
+modified: 2026-11-17T01:13:38.037545+00:00
 relationships:
   related:
   - DEV-597
@@ -189,6 +189,9 @@ comments:
       result: not_run
       reason: no rule or config file changed
     next: 'None: Done'
+- date: 2026-11-17T01:13:37.906457+00:00
+  author: claude
+  text: 'Chief of staff: merged and on origin/main (see the merge comment above); closed. It sat at HelpNeeded because the job ran in a thread T3 resumed outside lotar, or a later duplicate thread commented.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0caf1a38-2a26-4a65-bd1f-173cb4151cb4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28ddd3b6-4d53-460f-885b-9eb324f37114
@@ -207,9 +210,6 @@ description: |-
   ## Done when
   - [ ] The test waits for the panel to finish its open transition (or closes it in a way that doesn't need a stable box) so a slow full-suite run can't time out here.
   - [ ] Several full smoke runs under load pass this test.
-tags:
-- merge-retried
-- fix-retried
 history:
 - at: 2026-11-16T03:37:27.767129+00:00
   actor: claude
@@ -376,3 +376,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626","DEV-605","DEV-606","DEV-608","DEV-611"]}'
     new: '{"related":["DEV-597","DEV-593","DEV-588","DEV-624","DEV-613","DEV-626","DEV-605","DEV-606","DEV-608","DEV-611","DEV-632"]}'
+- at: 2026-11-17T01:13:37.906457+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:13:37.964302+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-17T01:13:38.037545+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: merge-retried, fix-retried
+    new: ''

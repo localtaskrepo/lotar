@@ -1,11 +1,11 @@
 title: 'Flaky smoke: offers Add to release in the row menu once a release appears (DEV-464) fails under the full suite'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-16T20:55:42.991716+00:00
+modified: 2026-11-17T01:16:26.293555+00:00
 relationships:
   related:
   - DEV-464
@@ -179,3 +179,15 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T01:16:25.676092+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+- at: 2026-11-17T01:16:26.293555+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@review'

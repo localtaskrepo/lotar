@@ -1,11 +1,11 @@
 title: 'Lotar build and development use too much disk and time per job: optimize, with measurements'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-15T19:57:40.271694+00:00
-modified: 2026-11-17T01:06:33.101142+00:00
+modified: 2026-11-17T01:18:36.802201+00:00
 relationships:
   related:
   - DEV-499
@@ -15,6 +15,8 @@ relationships:
   - DEV-634
   - DEV-635
   - DEV-636
+  - DEV-510
+  - DEV-589
 comments:
 - date: 2026-11-15T20:40:48.024583+00:00
   author: claude
@@ -117,6 +119,35 @@ comments:
       result: not_run
       reason: runs at merge
     next: Review e2f4698d, then merge; follow-ups DEV-634, DEV-635, DEV-636
+- date: 2026-11-17T01:18:24.716134+00:00
+  author: claude
+  text: |-
+    Review: passed. `e2f4698d` does what "Done when" asks, and all checks pass again here.
+
+    - **Read:** the branch diff (13 files, `git diff main...HEAD`), the ticket and its comments, DEV-634/635/636, AGENTS.md and testing-strategy. Main is 35 commits ahead, but only DEV-589 and DEV-510 touch these files, and `git merge-tree` merges cleanly.
+    - **Callers:** `git grep` on the branch finds no `--profile smoke`, `--cargo-profile local`, `target/smoke/lotar` or `[profile.local]` left (only `target/smoke-report` and `target/smoke-artifacts`, which are output folders, not profiles). CI uses only `ci` and `release`. The smoke agent wrapper resolves next to `target/debug/lotar`. Nothing in harnessmux or `~/Development/standards` uses the old profiles.
+    - **Claim checked, "build:smoke builds nothing after npm test":** after `cargo nextest run --cargo-profile dev --no-run` (1m50s from cold, 2.0 GB), `cargo build --bins --tests` finished in 0.39 s with nothing compiled. Inside `npm run smoke` it took 2.35 s, because `build:web` writes `web-embed` again. Lint + tests + smoke: `target/debug` 2.4 GB, no other profile folder.
+    - **Reran:** lint passed (1m50s on a warm build, the lint "after" number the measurements comment lacked), tests passed (2212 Rust, 1547 UI, no MCP timeout this time), smoke passed (404 of 404), runner script tests 46 of 46. The working tree is clean afterwards.
+    - **Owner decisions:** STD-95 is unchanged. Option A and the two follow-ups are filed as the owner said (DEV-634, DEV-635 without T3-made worktrees, DEV-636 once measurements are in).
+    - **Findings:** none blocking, none minor. No tickets filed.
+  report:
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: 1m50s on a warm target/debug
+    - command: npm run test:agent
+      result: passed
+      reason: 2212 Rust, 1547 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 404 of 404, build step 2.35 s
+    - command: node --test scripts/tests/rust-test-runner.test.mjs
+      result: passed
+      reason: 46 of 46
+    - command: CI
+      result: not_run
+      reason: runs at merge
+    next: Merge e2f4698d onto main (merge-tree is clean)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177f2d09-0dcb-419d-a0f0-ad691d43efb0
@@ -291,3 +322,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177f2d09-0dcb-419d-a0f0-ad691d43efb0
+- at: 2026-11-17T01:18:24.716134+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:18:25.134968+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589"]}'
+- at: 2026-11-17T01:18:36.802201+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

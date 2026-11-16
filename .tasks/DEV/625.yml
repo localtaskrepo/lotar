@@ -1,11 +1,11 @@
 title: 'A dev503 test that times out under heavy load aborts its binary: Harness''s Drop panics again while unwinding'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T21:08:52.852170+00:00
-modified: 2026-11-17T01:12:08.821901+00:00
+modified: 2026-11-17T01:12:57.498486+00:00
 relationships:
   related:
   - DEV-613
@@ -173,3 +173,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T01:12:57.498486+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

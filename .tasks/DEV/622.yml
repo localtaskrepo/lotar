@@ -1,14 +1,17 @@
 title: The web server treats a failed socket read as end of request and truncates the body
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T20:55:33.664464+00:00
-modified: 2026-11-17T00:50:15.357332+00:00
+modified: 2026-11-17T01:20:12.109708+00:00
 relationships:
   related:
   - DEV-615
+  - DEV-591
+  - DEV-620
+  - DEV-624
 comments:
 - date: 2026-11-16T23:29:00.286128+00:00
   author: claude
@@ -39,10 +42,72 @@ comments:
 - date: 2026-11-16T23:55:07.883916+00:00
   author: automation
   text: The review job job-20261116T235505.265Z-14 failed (lotar agent logs job-20261116T235505.265Z-14); the merge goes ahead without a review.
+- date: 2026-11-17T01:15:01.711279+00:00
+  author: claude
+  text: |-
+    Merged into `main` as `b0d4d84e`; not pushed yet, the push waits on the main/origin split that DEV-620 and DEV-624 fix.
+
+    - Rebased twice: onto `f0350293`, then onto `a7715fae` after DEV-624 landed. No conflicts, no lockfile change
+    - Checks on the final commit: `npm run lint:agent`, `npm run test:agent` (2277 Rust, 1548 UI), `npm run test:smoke:agent` (405) all passed
+    - `git merge --ff-only` landed it; 16 pending `.tasks` files amended into `b0d4d84e`; main checkout clean
+    - No rule or config file changed, so no `lotar trust`
+    - Ticket check `body_read_retries_interrupted_and_fails_on_other_errors` passes on the merged code
+    - Push not run: `origin/main` has `d525fb55` "DEV-591 Release v0.15.2", which local `main` lacks (`git push --dry-run` rejected). Triage answered DEV-620/DEV-624 at 01:06 UTC: rebase local main onto origin/main and push. Both fix jobs are queued, so I left main alone rather than rewrite it alongside them; their push takes DEV-622 along
+    - The review job had failed earlier (automation comment), so this merged without a review
+  report:
+    commits:
+    - hash: b0d4d84e
+      what: DEV-622 rebased onto a7715fae (DEV-624) and fast-forwarded into main; pending .tasks amended in
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2277 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '405'
+    - command: cargo nextest run -p lotar-lib --lib body_read_retries_interrupted
+      result: passed
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config file changed
+    - command: git push
+      result: not_run
+      reason: origin/main has d525fb55 (DEV-591 Release v0.15.2), local main lacks it
+    next: The DEV-620/DEV-624 fix jobs (queued) rebase local main onto origin/main and push; that push takes b0d4d84e along
+- date: 2026-11-17T01:20:05.874687+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix does what "Done" asks; it is already on main as `b0d4d84e`
+
+    - Reviewed `b0d4d84e` (on main, merged before this review because the first review job failed). Its `web_server.rs` is identical to the branch's `cbfba630`
+    - `read_retrying` retries `Interrupted`; header and body reads `return` on any other error, so the connection closes and nothing is dispatched. Both "Done" points are met, nothing beyond the ticket
+    - Test `body_read_retries_interrupted_and_fails_on_other_errors` covers `Interrupted` mid-body and a `WouldBlock` timeout. The old `unwrap_or_default` read would have cut the body to `{"a":`, so the test fails before the fix
+    - On shutdown, peer connections read EOF (`Ok(0)`) rather than an error, so shutdown works as before
+    - Reran: web_server unit tests (13 passed) and every `serve` test in the workspace except the embedded-UI one (307 passed). The embedded-UI test needs `npm run build:web`, which this worktree doesn't have
+    - Note for the merge step: `cbfba630` on `agent/DEV-622` is the pre-rebase copy. Don't merge it again
+    - No findings, no tickets filed
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-lib --lib -E 'test(body_read_retries) | test(web_server)'
+      result: passed
+      reason: 13 tests
+    - command: cargo nextest run --workspace -E 'test(serve) & !test(embedded)'
+      result: passed
+      reason: 307 tests
+    - command: embedded_web_ui_test
+      result: not_run
+      reason: needs npm run build:web, no web build in this worktree
+    - command: npm run lint/test/smoke
+      result: not_run
+      reason: merge agent ran them on b0d4d84e, same web_server.rs
+    next: 'Nothing to merge again: the fix is on main as b0d4d84e; cbfba630 on this branch is its pre-rebase copy'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adbac5943-5053-4239-a351-333ab440b5b5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b57ccc8-faa0-45dd-882c-3bfdcf2c4ebe
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97311ebc-5de8-4aba-8a30-299833e99d18
 description: 'Found while on DEV-615: `handle_connection` in `crates/lotar-lib/src/web_server.rs` reads headers and body with `stream.read(..).unwrap_or_default()`, so an `Interrupted` or timed-out read counts as EOF and the handler gets a cut body (a misleading 400 `Invalid body`). Check: a unit test feeding a stream that returns `Interrupted` once mid-body. Done: `Interrupted` is retried, other read errors close the connection without dispatching.'
 tags:
 - health
@@ -119,3 +184,31 @@ history:
   - field: assignee
     old: '@merge'
     new: '@review'
+- at: 2026-11-17T01:14:29.509621+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97311ebc-5de8-4aba-8a30-299833e99d18
+- at: 2026-11-17T01:15:01.711279+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:15:01.915668+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-615"]}'
+    new: '{"related":["DEV-615","DEV-591","DEV-620","DEV-624"]}'
+- at: 2026-11-17T01:20:05.874687+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:20:12.109708+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

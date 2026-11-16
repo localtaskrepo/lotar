@@ -1,11 +1,11 @@
 title: 'Flaky smoke: board columns dialog click on Move WontDo times out under full-suite load'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:56:31.049417+00:00
-modified: 2026-11-16T23:30:38.280989+00:00
+modified: 2026-11-17T01:13:28.040199+00:00
 relationships:
   related:
   - DEV-563
@@ -190,6 +190,9 @@ comments:
       result: not_run
       reason: full suite passed 7 times on 7c3253dd (fix 3, review 4); merge agent reruns it on main
     next: Merge 5ea7b340 (branch t3/c4bef463, already on main 804cb0f9) and rerun the full smoke on main
+- date: 2026-11-17T01:13:27.931567+00:00
+  author: claude
+  text: 'Chief of staff: merged and on origin/main (see the merge comment above); closed. It sat at HelpNeeded because the job ran in a thread T3 resumed outside lotar, or a later duplicate thread commented.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A894e9f23-1f2b-42fe-8f92-1146d26ffe1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb16e3cc-20d8-4008-8f95-134c2dcd230d
@@ -200,8 +203,6 @@ releases:
 description: 'Found in the DEV-563 run on 2026-11-15: `npm run test:smoke:agent` failed once at `smoke/tests/ui.board-layout.smoke.spec.ts:58` (moveVia): `locator.click` on `Move WontDo` (a <summary>) timed out after 30 s although the element was visible, enabled and stable. The same spec passed 3 of 3 runs alone (`npm run -s test:smoke:quick:agent tests/ui.board-layout.smoke.spec.ts`). Done when the click no longer depends on load (wait for the dialog state the click needs) and the full smoke passes repeatedly.'
 tags:
 - health
-- merge-retried
-- fix-retried
 history:
 - at: 2026-11-16T02:56:33.103722+00:00
   actor: claude
@@ -370,3 +371,19 @@ history:
   changes:
   - field: releases
     new: '#7'
+- at: 2026-11-17T01:13:27.931567+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:13:27.982806+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-17T01:13:28.040199+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried, fix-retried
+    new: health

@@ -207,6 +207,8 @@ fn continue_job(harness: &Harness) -> Vec<String> {
     };
     let job = AgentJobService::start_job_with_tasks_dir(req, harness.fixtures.tasks_root.as_path()).unwrap().id;
     wait_for("the job's end", || status(&job) == "completed");
+    // The ticket's active job ends after its status reads completed; the next job on it would be refused until then.
+    wait_for_jobs_to_end(&harness.fixtures.tasks_root);
     AgentJobService::events_for(&job).into_iter().filter(|event| event.kind == "agent_job_progress").filter_map(|event| event.message).collect()
 }
 
@@ -275,6 +277,47 @@ fn a_skipped_session_is_kept_and_the_handoff_names_its_event_log() {
     let last_prompt = log.lines().rfind(|line| line.contains("\"method\":\"session/prompt\"")).unwrap_or_default();
     assert!(last_prompt.contains("Earlier agent sessions on this ticket") && last_prompt.contains(&format!("{kept_name} (claude agent")), "{last_prompt}");
     assert!(!last_prompt.contains("Handoff:"), "{last_prompt}");
+}
+
+/// DEV-621: keeping the skipped session fails (its kept event log's name is taken by a folder), so the job fails and
+/// starts no session, and the old session's record and event log stay where they are.
+#[test]
+fn a_failed_keep_fails_the_job_and_starts_no_session() {
+    let harness = harness("    continue_within_minutes: 30\n", &[("FAKE_REPLY", "First round".into())]);
+    harness.run(&[]).success();
+    age_session(&harness, 31);
+    let sessions = harness.root().join("harnessmux/state/sessions");
+    let old = std::fs::read_dir(&sessions)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.to_string_lossy().ends_with("-TEST-1-fixer.json"))
+        .expect("the fixer session");
+    let record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&old).unwrap()).unwrap();
+    let name = record["name"].as_str().unwrap().to_string();
+    let stamp = chrono::DateTime::parse_from_rfc3339(record["last_used"].as_str().unwrap()).unwrap().format("%Y%m%dT%H%M%SZ").to_string();
+    let base: String = name.chars().take(64 - stamp.len() - 1).collect();
+    std::fs::create_dir(sessions.join(format!("{base}.{stamp}.events.jsonl"))).unwrap();
+
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let req = AgentJobCreateRequest {
+        ticket_id: "TEST-1".into(),
+        prompt: "Rework it".into(),
+        agent: Some("fixer".into()),
+        session: Some(lotar::config::types::AgentSession::Continue),
+        ..Default::default()
+    };
+    let job = AgentJobService::start_job_with_tasks_dir(req, harness.fixtures.tasks_root.as_path()).unwrap().id;
+    wait_for("the job's failure", || status(&job) == "failed");
+    let message = AgentJobService::get_job(&job).and_then(|job| job.last_message).unwrap_or_default();
+    assert!(message.starts_with(&format!("Could not keep the session {name} before a new one replaces it: ")), "{message}");
+    assert_eq!(harness.log().matches("\"method\":\"session/new\"").count(), 1, "no new session starts");
+    let records: Vec<PathBuf> =
+        std::fs::read_dir(&sessions).unwrap().map(|entry| entry.unwrap().path()).filter(|path| path.extension().is_some_and(|ext| ext == "json")).collect();
+    assert_eq!(records, vec![old.clone()], "no new or kept session record");
+    let after: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&old).unwrap()).unwrap();
+    assert_eq!(after, record, "the old record is unchanged");
+    let events = std::fs::read_to_string(sessions.join(format!("{name}.events.jsonl"))).unwrap();
+    assert!(events.contains("First round 1"), "the old event log stays: {events}");
 }
 
 /// The second review of DEV-503: session names are machine-wide, so two repositories with the same ticket and profile
