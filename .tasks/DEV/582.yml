@@ -3,8 +3,9 @@ status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
+assignee: '@fix'
 created: 2026-11-15T20:14:32.206471+00:00
-modified: 2026-11-15T21:55:56.630948+00:00
+modified: 2026-11-16T05:14:51.181337+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -161,3 +162,8 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-16T05:14:51.181337+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

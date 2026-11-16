@@ -1,14 +1,33 @@
 title: 'DEV-598 weakened a test: the waits-for-an-answer T3 job''s exit code is no longer checked'
-status: Todo
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-16T04:40:49.304245+00:00
-modified: 2026-11-16T04:40:51.379864+00:00
+modified: 2026-11-16T05:20:39.572259+00:00
 relationships:
   related:
   - DEV-598
+comments:
+- date: 2026-11-16T05:20:28.322365+00:00
+  author: claude
+  text: |-
+    Blocked: the weakened line isn't on main, only on DEV-598's unmerged branch.
+
+    - `3629b79a` (DEV-598, status Merging, `@merge`) is on `agent/DEV-598` only; main's `dev510_t3_session_test.rs:139` still has `.assert().failure()`.
+    - `agent/DEV-610` starts from main, so there's nothing to fix here. Fast-forwarding it onto `agent/DEV-598` was refused by my permission check.
+    - The fix is one line: `harness.command().output().unwrap();` → `harness.command().assert().failure();`.
+
+    **Question:** where should it go? (a) Allow DEV-610 to build on `agent/DEV-598` (ff to `3629b79a`, then fix) and merge after DEV-598; (b) amend it into DEV-598's commit before its merge; or (c) wait until DEV-598 is on main, then rerun DEV-610.
+  report:
+    checks:
+    - command: cargo nextest run --test integration dev510
+      result: not_run
+      reason: nothing to change on this branch yet
+    next: Owner picks where the one-line fix goes
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A34966937-bfab-4d5a-882e-01ef9581052e
 description: |-
   Found 2026-11-15 in the review of DEV-598.
 
@@ -28,3 +47,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T05:19:31.751658+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T05:19:32.595746+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A34966937-bfab-4d5a-882e-01ef9581052e
+- at: 2026-11-16T05:20:28.322365+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:20:39.572259+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

@@ -453,9 +453,11 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// made from the `--worktree` base, runs `$FAKE_RUN` there and logs `<base> <branch> <commit it started from>` to
 /// `$FAKE_LOG`. `thread send thread-<n>` runs `$FAKE_RUN` in that thread's worktree and logs
 /// `send thread-<n> <branch> <commit it started from>`. `thread show thread-<n>` answers with that thread's worktree,
-/// and with status `running` while a file `running-thread-<n>` is next to the script.
+/// and with status `running` while a file `running-thread-<n>` is next to the script; it logs `show thread-<n>` to
+/// `t3-show.log` there.
 const FAKE_T3: &str = r#"#!/bin/sh
 if [ "$1 $2" = "thread show" ]; then
+  echo "show $3" >> "$(dirname "$0")/t3-show.log"
   status=completed
   [ -f "$(dirname "$0")/running-$3" ] && status=running
   printf '{"thread":{"threadId":"%s","status":"%s","worktreePath":"%s"}}\n' "$3" "$status" "$FAKE_TREES/${3#thread-}"
@@ -651,6 +653,35 @@ fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
     let failed = std::fs::canonicalize(&failed).unwrap();
     assert!(prompt.contains(&format!("uncommitted changes in `{}` (branch `agent/TEST-1`)", failed.display())), "{prompt}");
     assert!(failed.join("half-done.txt").is_file(), "the earlier work stays where it is");
+}
+
+/// DEV-599: a queue entry waiting for the ticket's running job, or for nothing after its earlier threads ended, asked
+/// T3 Code about each earlier thread on every retry. Now the active job is checked first, and the answer that no thread
+/// runs counts for a while too.
+#[test]
+fn a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let shows = || std::fs::read_to_string(root.join("t3-show.log")).unwrap_or_default().lines().filter(|line| *line == "show thread-0").count();
+    let before = shows();
+    // No free slot: the job waits in this process's registry, and no thread starts.
+    let config = std::fs::read_to_string(fixtures.tasks_root.join("config.yml")).unwrap();
+    std::fs::write(fixtures.tasks_root.join("config.yml"), config.replace("    enabled: true\n", "    enabled: true\n    max_parallel_jobs: 0\n")).unwrap();
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let start = || {
+        let req = AgentJobCreateRequest { ticket_id: "TEST-1".into(), prompt: "Review it".into(), agent: Some("review".into()), ..Default::default() };
+        AgentJobService::start_job_with_tasks_dir(req, fixtures.tasks_root.as_path())
+    };
+    let job = start().unwrap();
+    assert_eq!(shows(), before + 1, "the first start asks about the fix's thread");
+    let err = start().unwrap_err();
+    assert!(err.to_string().contains("already has an active job"), "{err}");
+    assert_eq!(shows(), before + 1, "a start on a ticket with an active job doesn't ask");
+    AgentJobService::cancel_job(&job.id).unwrap();
+    let job = start().unwrap();
+    assert_eq!(shows(), before + 1, "a start soon after the idle answer doesn't ask again");
+    AgentJobService::cancel_job(&job.id).unwrap();
 }
 
 /// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays

@@ -1,14 +1,46 @@
 title: No test shows that a job ending on a ticket drops its cached T3 Code answer
-status: InProgress
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T05:08:21.013628+00:00
+modified: 2026-11-16T05:21:58.455120+00:00
 relationships:
   related:
   - DEV-599
+  - DEV-594
+comments:
+- date: 2026-11-16T05:21:49.697784+00:00
+  author: claude
+  text: |-
+    Added the test: a T3 job ending on the ticket drops the cached idle answer.
+
+    - Branch builds on DEV-599 (`dcfbccef`, still in Merging): cherry-picked as `45730a7f`, as DEV-599 did with DEV-594. The cache this tests exists only there.
+    - New test `a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: fix job, in-process start caches the idle answer, `review` T3 job ends (thread-1), next start runs `t3 thread show` for both threads, a third start runs none.
+    - With `&& *known == asked` removed from `running_t3_thread`, the test fails (6 shows, 8 expected).
+    - Only test code changed: no docs or UI.
+  report:
+    commits:
+    - hash: 45730a7f
+      what: DEV-599 dcfbccef cherry-picked (the code under test, not on main yet; drops out on rebase once DEV-599 lands)
+    - hash: 02c1cd8a
+      what: new test a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer
+    checks:
+    - command: cargo nextest run --workspace -E test(/a_t3_job_ending|a_start_on_a_busy_ticket|no_job_starts_while/)
+      result: passed
+    - command: same test with '&& *known == asked' removed
+      result: failed
+      reason: as intended, 6 shows vs 8 expected
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2249 Rust tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    next: Review, then merge after DEV-599 lands
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
 description: |-
@@ -39,3 +71,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
+- at: 2026-11-16T05:21:49.697784+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:21:49.984782+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-599"]}'
+    new: '{"related":["DEV-599","DEV-594"]}'
+- at: 2026-11-16T05:21:58.455120+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

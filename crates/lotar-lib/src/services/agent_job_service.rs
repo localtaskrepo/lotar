@@ -302,6 +302,15 @@ impl AgentJobService {
         let tasks_dir_buf = tasks_dir.to_path_buf();
         let (job_model, job_effort) = (profile.model.clone(), profile.effort.clone());
 
+        let has_active_job = |registry: &JobRegistry| {
+            registry.active_by_ticket.contains_key(&ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, &ticket_id).is_some()
+        };
+        let active_job_error = || LoTaRError::ValidationError(format!("Ticket '{}' already has an active job", ticket_id));
+        // Before T3 Code is asked: a queue entry waiting for the ticket's
+        // running job retries every few hundred milliseconds (DEV-599).
+        if has_active_job(&*JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?) {
+            return Err(active_job_error());
+        }
         if let Some((thread, job)) = running_t3_thread(tasks_dir, &ticket_id) {
             return Err(LoTaRError::ValidationError(format!(
                 "Ticket '{ticket_id}' already has an active job: T3 Code still runs the thread {thread} of the job {job}"
@@ -312,8 +321,8 @@ impl AgentJobService {
         {
             let mut registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
 
-            if registry.active_by_ticket.contains_key(&ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, &ticket_id).is_some() {
-                return Err(LoTaRError::ValidationError(format!("Ticket '{}' already has an active job", ticket_id)));
+            if has_active_job(&registry) {
+                return Err(active_job_error());
             }
 
             // Update max_parallel_jobs from config (allows runtime changes)
@@ -3314,15 +3323,17 @@ fn t3_thread_show(program: &std::path::Path, env: &[(String, String)], cwd: &std
     shown.get_mut("thread").map(serde_json::Value::take)
 }
 
-/// How long a ticket found busy with a running T3 Code thread counts as
-/// busy before T3 Code is asked again: the queue tries a waiting ticket
-/// every few hundred milliseconds, and each `t3` call takes about half a second.
+/// How long the answer for a ticket counts before T3 Code is asked again,
+/// while the ticket's earlier threads stay the same: the queue tries a waiting
+/// ticket every few hundred milliseconds, and each `t3` call takes about half
+/// a second (DEV-599).
 const T3_THREAD_RECHECK: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Per ticket: when its running thread was found, the thread and its job.
-type RunningThreads = HashMap<String, (std::time::Instant, String, String)>;
+/// Per ticket: when T3 Code was asked, about which earlier threads, and the
+/// running one with its job, if any.
+type T3ThreadAnswers = HashMap<String, (std::time::Instant, Vec<String>, Option<(String, String)>)>;
 
-static RUNNING_T3_THREADS: LazyLock<Mutex<RunningThreads>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static T3_THREAD_ANSWERS: LazyLock<Mutex<T3ThreadAnswers>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// A T3 Code thread of an earlier job on the ticket that T3 Code still runs,
 /// with that job's id (DEV-594). A thread can run on after its job ended:
@@ -3331,13 +3342,6 @@ static RUNNING_T3_THREADS: LazyLock<Mutex<RunningThreads>> = LazyLock::new(|| Mu
 /// beside it, its own thread on a branch of its own, as T3 Code checks the
 /// ticket's branch out in one worktree only.
 fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<(String, String)> {
-    let mut cache = RUNNING_T3_THREADS.lock().ok()?;
-    if let Some((at, thread, job)) = cache.get(ticket_id)
-        && at.elapsed() < T3_THREAD_RECHECK
-    {
-        return Some((thread.clone(), job.clone()));
-    }
-    cache.remove(ticket_id);
     let mut threads: Vec<_> = saved_jobs(tasks_dir)
         .into_iter()
         .filter(|job| job.header.runner == AgentRunnerKind::T3.as_str() && crate::storage::identity::aliases_match(&job.header.ticket_id, ticket_id))
@@ -3347,25 +3351,31 @@ fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<(St
         return None;
     }
     threads.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut asked: Vec<String> = Vec::new();
+    for (_, thread, _) in &threads {
+        if !asked.contains(thread) {
+            asked.push(thread.clone());
+        }
+    }
+    if let Some((at, known, answer)) = T3_THREAD_ANSWERS.lock().ok()?.get(ticket_id)
+        && at.elapsed() < T3_THREAD_RECHECK
+        && *known == asked
+    {
+        return answer.clone();
+    }
+    // Unlocked while `t3` runs, so other tickets' starts don't wait for it.
     let table = crate::services::agent_runner::agent_table().ok()?;
     let spec = table.get("t3").ok()?;
     let (program, _) = block_on(spec.launch_command()).ok()?;
     let env: Vec<(String, String)> = spec.env.clone().into_iter().collect();
     let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
-    let mut asked = Vec::new();
-    for (_, thread, job) in threads {
-        if asked.contains(&thread) {
-            continue;
-        }
-        let running =
-            t3_thread_show(&program, &env, &cwd, &thread).is_some_and(|shown| shown.get("status").and_then(|status| status.as_str()) == Some("running"));
-        if running {
-            cache.insert(ticket_id.to_string(), (std::time::Instant::now(), thread.clone(), job.clone()));
-            return Some((thread, job));
-        }
-        asked.push(thread);
-    }
-    None
+    let answer = asked.iter().find_map(|thread| {
+        let shown = t3_thread_show(&program, &env, &cwd, thread)?;
+        let job = threads.iter().find(|(_, known, _)| known == thread).map(|(_, _, job)| job.clone())?;
+        (shown.get("status").and_then(|status| status.as_str()) == Some("running")).then(|| (thread.clone(), job))
+    });
+    T3_THREAD_ANSWERS.lock().ok()?.insert(ticket_id.to_string(), (std::time::Instant::now(), asked, answer.clone()));
+    answer
 }
 
 /// Make the session the job's runtime, unless the job was cancelled meanwhile.

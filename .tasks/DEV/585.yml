@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-16T02:33:15.916645+00:00
+modified: 2026-11-16T05:14:39.788884+00:00
 relationships:
   related:
   - DEV-510
@@ -13,6 +13,7 @@ relationships:
   - DEV-594
   - DEV-584
   - DEV-600
+  - DEV-583
 comments:
 - date: 2026-11-15T20:59:19.246258+00:00
   author: automation
@@ -363,3 +364,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584"]}'
     new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600"]}'
+- at: 2026-11-16T05:14:39.788884+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600"]}'
+    new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583"]}'
