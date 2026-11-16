@@ -1,11 +1,11 @@
 title: 'A job killed during its worktree setup leaves no log or record: its ticket keeps the agent assignee and no job'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:27:02.391806+00:00
-modified: 2026-11-16T04:41:14.677633+00:00
+modified: 2026-11-16T05:40:30.530737+00:00
 relationships:
   related:
   - DEV-593
@@ -14,6 +14,9 @@ relationships:
   - DEV-595
   - DEV-605
   - DEV-610
+  - DEV-583
+  - DEV-599
+  - DEV-611
 comments:
 - date: 2026-11-16T03:13:34.213619+00:00
   author: claude
@@ -82,6 +85,32 @@ comments:
     - Minor, filed as [DEV-610](https://lotar.pyxzl.net/task/DEV-610): `dev510_t3_session_test.rs:139` dropped `.assert().failure()` for no reason. The original assertion passes on this code in 5 out of 5 runs.
     - Not tested, but the code covers it: the `command` runner and a cancel during setup. The takeover branch doesn't depend on the runner, and the slot drop is unchanged.
     - No UI change, and no decision that is the owner's to make.
+- date: 2026-11-16T05:32:51.565446+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-598 is on `main` as `18c745f3`.
+
+    - I rebased twice: onto DEV-583 `18314609`, then onto DEV-599 `01a9160e`, which landed in the meantime. Both rebases had no conflicts and no lockfile changes.
+    - I reran all checks on the rebased commit `a29bc22f`, since DEV-599 changed `agent_job_service.rs`. `lint:agent`, `test:agent` (Rust 2251/2251, UI 1548/1548) and `test:smoke:agent` (405/405) passed.
+    - Fast-forwarded the main checkout, then amended the pending `.tasks` changes into the commit (`DEV/583`, `599`, `611`, `612`), which made it `18c745f3`.
+    - No rule or config files changed, so no `lotar trust` was needed.
+    - Pushed `01a9160e..18c745f3` to `origin/main`. This commit was the only unpushed one, and the main checkout is clean.
+    - `agent/DEV-598` is checked out in `agent-DEV-598-a120496ded38761a`, so I couldn't move it. It still points to the pre-rebase `3629b79a`. The commit landed from `t3/dev-598-job-killed-worktree-setup`.
+  report:
+    commits:
+    - hash: 18c745f3
+      what: DEV-598 fix, on main and pushed
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on a29bc22f
+    - command: npm test
+      result: passed
+      reason: test:agent, Rust 2251/2251, UI 1548/1548
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent 405/405
+    next: 'None: the ticket goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2505bb09-8e58-4b77-8936-77e599e8c58a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ada38f03c-c949-401b-bba6-a9846ae2eedc
@@ -191,3 +220,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T05:32:51.565446+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:32:51.969898+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-593","DEV-592","DEV-594","DEV-595","DEV-605","DEV-610"]}'
+    new: '{"related":["DEV-593","DEV-592","DEV-594","DEV-595","DEV-605","DEV-610","DEV-583","DEV-599"]}'
+- at: 2026-11-16T05:32:59.400613+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-16T05:40:30.530737+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-593","DEV-592","DEV-594","DEV-595","DEV-605","DEV-610","DEV-583","DEV-599"]}'
+    new: '{"related":["DEV-593","DEV-592","DEV-594","DEV-595","DEV-605","DEV-610","DEV-583","DEV-599","DEV-611"]}'

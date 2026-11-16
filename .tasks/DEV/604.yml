@@ -1,11 +1,11 @@
 title: Commit-signing and full-disk failures pause the queue instead of failing every job; a signing failure retries only the commit
-status: Reviewing
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T02:33:15.288469+00:00
-modified: 2026-11-16T04:48:44.777640+00:00
+modified: 2026-11-16T05:41:16.560591+00:00
 relationships:
   related:
   - DEV-584
@@ -195,3 +195,9 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-16T05:41:16.560591+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress

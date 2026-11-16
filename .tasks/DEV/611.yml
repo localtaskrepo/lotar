@@ -1,15 +1,49 @@
 title: The DEV-603 handoff names a session whose event log the new session already deleted
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T04:47:15.051643+00:00
-modified: 2026-11-16T05:27:16.444976+00:00
+modified: 2026-11-16T05:40:43.521800+00:00
 relationships:
   related:
   - DEV-603
   - DEV-599
+  - DEV-615
+  - DEV-598
+comments:
+- date: 2026-11-16T05:40:30.225209+00:00
+  author: claude
+  text: |-
+    Done: a skipped idle session is kept as `<name>.<last used>` before the new session takes its name; the handoff names that log (and the T3 Code thread for `t3`).
+
+    - `agent_runner::keep_session`: moves the record and `.events.jsonl` to `<name>.<YYYYMMDDTHHMMSSZ>` (name cut to 64), state `ended`, no owner
+    - `run_job`: keeps only when the skipped session has the new session's name; a merge skipping the review's session keeps nothing (nothing is replaced) and names that session's log. Keeping fails → the job fails, no session starts
+    - `handoff_text`: adds the event log path and, for `t3`, `agent_session` (the thread)
+    - `earlier_sessions` also matches `<prefix>.…`, so later jobs list the kept round
+    - Test `a_skipped_session_is_kept_and_the_handoff_names_its_event_log` (`dev503_harness_jobs_test.rs`); `docs/help/agent.md` updated
+    - Built on DEV-603, which isn't on main yet: cherry-picked `d9e58bcb` as `685654c4`
+    - Running threads DEV-598, DEV-599 merges: not about sessions/handoff, not contacted
+  report:
+    commits:
+    - hash: 3cf93d5e
+      what: keep a skipped session's record and log, handoff names it
+    - hash: 685654c4
+      what: DEV-603 (d9e58bcb) cherry-picked to build on; patch-identical, drops on rebase once DEV-603 lands
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test
+      result: passed
+      reason: 2251 Rust, 1548 UI, release and hook tests
+    - command: npm run smoke
+      result: failed
+      reason: 404 of 405; unrelated flaky ui.releases Add to release (DEV-464) passed 2 of 2 alone, filed DEV-615
+    - command: new test on the unfixed code
+      result: failed
+      reason: as expected, no kept event log
+    next: Review; merge after DEV-603 lands (this branch carries its commit)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2315ac2a-047b-4c72-ae46-d62a09fb92e2
 description: |-
@@ -90,3 +124,28 @@ history:
   - field: relationships
     old: '{"related":["DEV-603"]}'
     new: '{"related":["DEV-603","DEV-599"]}'
+- at: 2026-11-16T05:40:03.864846+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-599"]}'
+    new: '{"related":["DEV-603","DEV-599","DEV-615"]}'
+- at: 2026-11-16T05:40:30.225209+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:40:30.531180+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-599","DEV-615"]}'
+    new: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598"]}'
+- at: 2026-11-16T05:40:43.521800+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

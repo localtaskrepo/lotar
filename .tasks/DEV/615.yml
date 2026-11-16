@@ -1,0 +1,29 @@
+title: 'Flaky smoke: offers Add to release in the row menu once a release appears (DEV-464) fails under the full suite'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T05:40:03.604990+00:00
+modified: 2026-11-16T05:40:04.133417+00:00
+relationships:
+  related:
+  - DEV-464
+  - DEV-611
+description: 'Found in DEV-611''s `npm run smoke`: `tests/ui.releases.smoke.spec.ts` > offers Add to release (DEV-464) failed at line 112, `expect(created.ok).toBe(true)` (creating the release returned not ok). Check: `npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts` passes alone (2 of 2). Done: the release creation in that test succeeds under the full suite''s load, or the test waits for it.'
+tags:
+- health
+custom_fields:
+  finding: smoke:ui-releases-add-to-release
+history:
+- at: 2026-11-16T05:40:03.865106+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-464","DEV-611"]}'
+- at: 2026-11-16T05:40:04.133417+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

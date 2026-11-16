@@ -180,6 +180,66 @@ fn session_continue_resumes_the_tickets_session_from_another_process() {
     assert_eq!(harness.log().matches("\"method\":\"session/new\"").count(), 2, "without continue a job starts a new session");
 }
 
+/// Sets `last_used` of the ticket's fixer session `minutes` ago, as if its last turn ended then.
+fn age_session(harness: &Harness, minutes: i64) {
+    let sessions = harness.root().join("harnessmux/state/sessions");
+    let path = std::fs::read_dir(&sessions)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.to_string_lossy().ends_with("-TEST-1-fixer.json"))
+        .expect("the fixer session");
+    let mut record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let at = chrono::Utc::now() - chrono::Duration::minutes(minutes);
+    record["last_used"] = serde_json::Value::String(at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+    std::fs::write(&path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
+}
+
+/// Runs a `session: continue` job in this process and returns its job log's progress notes.
+fn continue_job(harness: &Harness) -> Vec<String> {
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let req = AgentJobCreateRequest {
+        ticket_id: "TEST-1".into(),
+        prompt: "Rework it".into(),
+        agent: Some("fixer".into()),
+        session: Some(lotar::config::types::AgentSession::Continue),
+        ..Default::default()
+    };
+    let job = AgentJobService::start_job_with_tasks_dir(req, harness.fixtures.tasks_root.as_path()).unwrap().id;
+    wait_for("the job's end", || status(&job) == "completed");
+    AgentJobService::events_for(&job).into_iter().filter(|event| event.kind == "agent_job_progress").filter_map(|event| event.message).collect()
+}
+
+/// DEV-603: a session idle for less than `continue_within_minutes` (default 55) resumes, and the job log says so.
+#[test]
+fn session_continue_resumes_a_session_used_within_the_time() {
+    let harness = harness("", &[]);
+    harness.run(&[]).success();
+    age_session(&harness, 50);
+    let notes = continue_job(&harness);
+    assert!(notes.iter().any(|note| note.contains("last used 50 minutes ago (within continue_within_minutes, 55)")), "{notes:?}");
+    let log = harness.log();
+    assert_eq!(log.matches("\"method\":\"session/new\"").count(), 1, "{log}");
+    assert!(log.contains("\"method\":\"session/resume\"") && !log.contains("Handoff:"), "{log}");
+}
+
+/// DEV-603: a session idle for longer than `continue_within_minutes` is not resumed: the job starts a new session and
+/// its prompt carries a handoff with the ticket's newest comments.
+#[test]
+fn session_continue_starts_a_new_session_with_a_handoff_after_the_time() {
+    let harness = harness("    continue_within_minutes: 30\n", &[]);
+    harness.run(&[]).success();
+    let mut storage = harness.fixtures.create_storage();
+    TaskService::add_comment(&mut storage, "TEST-1", "Review: blocking, the test is missing").unwrap();
+    age_session(&harness, 31);
+    let notes = continue_job(&harness);
+    let fresh = "last used 31 minutes ago, not within continue_within_minutes (30); this job starts a new one with a handoff";
+    assert!(notes.iter().any(|note| note.contains(fresh)), "{notes:?}");
+    let log = harness.log();
+    assert_eq!(log.matches("\"method\":\"session/new\"").count(), 2, "{log}");
+    assert!(!log.contains("\"method\":\"session/resume\""), "{log}");
+    assert!(log.contains("Handoff:") && log.contains("Review: blocking, the test is missing"), "the handoff reaches the agent: {log}");
+}
+
 /// The second review of DEV-503: session names are machine-wide, so two repositories with the same ticket and profile
 /// must not share one. `continue` in the second checkout starts its own session.
 #[test]

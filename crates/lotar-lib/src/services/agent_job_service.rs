@@ -2817,6 +2817,25 @@ fn run_job(
             Err(reason) => (None, Some(reason)),
         },
     };
+    // A session idle past the agent's prompt cache costs a full cache write
+    // to resume; a new one with a handoff is cheaper (DEV-603).
+    let mut handoff_from = None;
+    if let Some(record) = continued.as_ref()
+        && let Some(idle) = idle_since(&record.last_used)
+    {
+        let limit = profile.continue_within_minutes.unwrap_or(DEFAULT_CONTINUE_WITHIN_MINUTES);
+        let minutes = idle.num_minutes();
+        if idle >= chrono::Duration::minutes(i64::try_from(limit).unwrap_or(i64::MAX)) {
+            session_reason = Some(format!(
+                "The session {} was last used {minutes} minutes ago, not within continue_within_minutes ({limit}); this job starts a new one with a handoff.",
+                record.name
+            ));
+            handoff_from = continued.take();
+        } else {
+            session_reason =
+                Some(format!("Continuing the session {}, last used {minutes} minutes ago (within continue_within_minutes, {limit}).", record.name));
+        }
+    }
     let t3_worktrees = runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled;
     let mut thread_worktree = None;
     if t3_worktrees && continued.is_some() {
@@ -2945,6 +2964,10 @@ fn run_job(
         crate::services::agent_active_jobs::register(&tasks_dir, record);
     }
 
+    let prompt = match handoff_from.as_ref() {
+        Some(record) => format!("{prompt}{}", handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record)),
+        None => prompt,
+    };
     let env = job_env(&job_id, &tasks_dir, &ticket_id, &config);
     let mut context_messages = vec![build_user_message(&user_prompt)];
     let end = match agent {
@@ -2963,6 +2986,50 @@ fn run_job(
         }
     };
     end_job(&job_id, &ticket_id, end, &context_messages, &tasks_dir, &config);
+}
+
+/// How long a `session: continue` job resumes its session after the
+/// session's last turn ended, unless its profile says otherwise: under the
+/// agent's one-hour prompt cache (DEV-603).
+const DEFAULT_CONTINUE_WITHIN_MINUTES: u64 = 55;
+
+/// How long ago a session's `last_used` was; `None` when it doesn't parse.
+fn idle_since(last_used: &str) -> Option<chrono::Duration> {
+    let at = chrono::DateTime::parse_from_rfc3339(last_used).ok()?;
+    Some(Utc::now().signed_duration_since(at.with_timezone(&Utc)).max(chrono::Duration::zero()))
+}
+
+/// What a job that starts a new session instead of resuming an idle one
+/// (DEV-603) tells its agent: the session it didn't continue, the ticket's
+/// branch and newest commit, and the ticket's newest comments, where the
+/// earlier rounds' handoffs and reviews are.
+fn handoff_text(tasks_dir: &std::path::Path, ticket_id: &str, ticket_ref: &str, record: &harnessmux::SessionRecord) -> String {
+    const COMMENTS: usize = 3;
+    const COMMENT_CHARS: usize = 1500;
+    let mut out = format!(
+        "\nHandoff:\nThis job would have continued the session {} ({} agent, last used {}), but it was idle too long, so it starts a new one. Pick up from the earlier rounds below.\n",
+        record.name, record.agent, record.last_used
+    );
+    let branch = ticket_ref.trim_start_matches("refs/heads/");
+    let newest = resolve_repo_root(tasks_dir).and_then(|root| {
+        let output = git_command(&root).args(["log", "-1", "--format=%h %s", ticket_ref, "--"]).current_dir(&root).output().ok()?;
+        output.status.success().then(|| String::from_utf8_lossy(&output.stdout).trim().to_string()).filter(|line| !line.is_empty())
+    });
+    if let Some(newest) = newest {
+        out.push_str(&format!("- Branch {branch}, newest commit {newest}\n"));
+    }
+    let comments =
+        Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, ticket_id, None).ok()).map(|task| task.comments).unwrap_or_default();
+    let start = comments.len().saturating_sub(COMMENTS);
+    for comment in comments.iter().skip(start) {
+        let mut text: String = comment.text.trim().chars().take(COMMENT_CHARS).collect();
+        if comment.text.trim().chars().count() > COMMENT_CHARS {
+            text.push_str(" …");
+        }
+        let author = comment.author.as_deref().unwrap_or("unknown");
+        out.push_str(&format!("- Comment by {author}, {}:\n{}\n", comment.date, text));
+    }
+    out
 }
 
 /// How a job's runner ended.

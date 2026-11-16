@@ -296,6 +296,12 @@ pub struct AgentProfileDetail {
     /// `continue` runs the job in the ticket's session of this profile.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub session: Option<AgentSession>,
+    /// A `continue` job resumes the session only when its last turn ended at
+    /// most this many minutes ago, else it starts a new one with a handoff
+    /// (DEV-603): the agent's prompt cache has expired by then. Default 55;
+    /// 0 never resumes.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub continue_within_minutes: Option<u64>,
     /// What the job does when the agent asks for permission.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub on_permission: Option<AgentPermissionPolicy>,
