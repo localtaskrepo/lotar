@@ -1,11 +1,11 @@
 title: Merge without an agent when the branch rebases cleanly and the checks pass
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T23:32:02.126105+00:00
+modified: 2026-11-17T01:12:38.892361+00:00
 relationships:
   related:
   - DEV-577
@@ -267,6 +267,9 @@ comments:
     - The rerun with `--workspace` was stopped after 50 min: under load 40-150 the compiler got about 0.1% CPU. The first try was also stuck in `sccache` for 23 min.
     - I didn't rerun `npm run lint`, `npm test` or `npm run smoke` for the same reason. The fix agent reports them passed on `25188cfe`.
     - I changed no files. No tickets filed.
+- date: 2026-11-17T01:12:38.335516+00:00
+  author: claude
+  text: 'Chief of staff: merged and on origin/main (see the merge comment above); closed. It sat at HelpNeeded because the job ran in a thread T3 resumed outside lotar, or a later duplicate thread commented.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27aa3d95-a2c7-4dd5-b654-19819c5d68c0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa42985b0-da6c-4375-89b2-40b1447a986e
@@ -298,10 +301,6 @@ description: |-
   - [ ] No merge without a passed review stays true (standards STD-133 step 1): lotar's merge runs only inside a merge job, which the rules start after a passed review; it adds no other way to start one.
   - [ ] Tests (real git repos, command-runner merge profile that records whether it ran): clean path lands and pushes with no agent; nothing to merge; each hand-off (conflict, failed check, others' unpushed commits, refused push) starts the agent fresh with the hand-off in its prompt; untrusted repo and no `agent.merge` keep today's behaviour; config parses and trust covers `agent.merge`.
   - [ ] Docs: `docs/help/agent.md`, `docs/help/config-reference.md`. Standards adopts it in its own ticket (configs per repo, merge profile model, prompt): filed and linked here.
-tags:
-- review-returned
-- merge-retried
-- fix-retried
 history:
 - at: 2026-11-16T02:33:21.180617+00:00
   actor: claude
@@ -575,3 +574,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608","DEV-611","DEV-607"]}'
     new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608","DEV-611","DEV-607","DEV-620"]}'
+- at: 2026-11-17T01:12:38.335516+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:12:38.781153+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-17T01:12:38.892361+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned, merge-retried, fix-retried
+    new: ''

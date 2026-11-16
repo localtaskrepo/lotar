@@ -1,17 +1,20 @@
 title: 'Lotar build and development use too much disk and time per job: optimize, with measurements'
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T19:57:40.271694+00:00
-modified: 2026-11-17T01:02:20.862154+00:00
+modified: 2026-11-17T01:06:33.101142+00:00
 relationships:
   related:
   - DEV-499
   - DEV-574
   - DEV-581
   - DEV-604
+  - DEV-634
+  - DEV-635
+  - DEV-636
 comments:
 - date: 2026-11-15T20:40:48.024583+00:00
   author: claude
@@ -87,8 +90,36 @@ comments:
 - date: 2026-11-17T01:00:40.161379+00:00
   author: mallox
   text: "Okay, A sounds good. \nAnd then, as follow-ups: I like the idea of copying existing data over, but I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux.\nAnd yes I agree with a ticket once measurements are in"
+- date: 2026-11-17T01:04:16.340004+00:00
+  author: claude
+  text: |-
+    Owner's answers filed as three follow-up tickets; the code change stays `e2f4698d`, ready for review.
+
+    - Split, option A ("Okay, A sounds good", 2026-11-17): [DEV-634](https://lotar.pyxzl.net/task/DEV-634), crate `lotar-agent` for agent jobs, queue, runner and automation, measured before and after.
+    - Copy builds over, not with T3-made worktrees ("not really willing to let t3 handle worktrees again"): [DEV-635](https://lotar.pyxzl.net/task/DEV-635). lotar's own `prepare_worktree` clones `target/` with `cp -c` from the ticket's earlier worktree or the main checkout; a failed clone falls back to a cold build; STD-95 unchanged.
+    - harnessmux ("a ticket once measurements are in"): [DEV-636](https://lotar.pyxzl.net/task/DEV-636), measure first, then dev profile without debug info, kept only if smaller and not slower.
+    - No new file changes, so the checks from `e2f4698d` stand; not rerun.
+  report:
+    commits:
+    - hash: e2f4698d
+      what: one local build profile (dev), tests, clippy and smoke share target/debug
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: run on e2f4698d, nothing changed since
+    - command: npm test
+      result: passed
+      reason: run on e2f4698d
+    - command: npm run smoke
+      result: passed
+      reason: 404/404 on e2f4698d
+    - command: CI
+      result: not_run
+      reason: runs at merge
+    next: Review e2f4698d, then merge; follow-ups DEV-634, DEV-635, DEV-636
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177f2d09-0dcb-419d-a0f0-ad691d43efb0
 description: |-
   Owner, 2026-11-15, in his words: "we need to find a solution for the space being used up. Tasks need to clean up after them properly. At least on lotar we need to do something to optimize the build and development process." Related standing rule (owner 2026-11-15, STD-131): keep projects small and focused; lotar is the example of one that got so big it's hard to change, with long build times.
 
@@ -224,3 +255,39 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36
+- at: 2026-11-17T01:03:29.380354+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634"]}'
+- at: 2026-11-17T01:03:34.558127+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635"]}'
+- at: 2026-11-17T01:03:39.096612+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636"]}'
+- at: 2026-11-17T01:04:16.340004+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:05:42.459295+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T01:06:33.101142+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177f2d09-0dcb-419d-a0f0-ad691d43efb0

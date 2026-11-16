@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-16T18:42:09.946527+00:00
-modified: 2026-11-16T23:41:22.339946+00:00
+modified: 2026-11-17T01:06:50.340365+00:00
 relationships:
   related:
   - DEV-608
@@ -17,6 +17,8 @@ relationships:
   - DEV-605
   - DEV-591
   - DEV-629
+  - DEV-624
+  - DEV-632
 comments:
 - date: 2026-11-16T20:03:10.910172+00:00
   author: claude
@@ -135,6 +137,9 @@ comments:
       result: failed
       reason: rejected, origin has d525fb55
     next: 'Owner: say how main gets d525fb55 (rebase main onto origin/main, or the DEV-591 release session does it), then push'
+- date: 2026-11-17T01:06:46.913824+00:00
+  author: triage
+  text: 'Same question as DEV-624, same answer: Answer: yes, rebase and push. Push is already decided (owner 2026-11-12, standards docs/decisions/2026-11-12-push-finished-work.md: "Up to where the git tree is clean and we dont have pending work on a commit anymore we can push in general"; repos.json has push: true for lotar). Rebasing your own unpushed commits (1227e5bd DEV-620, f0350293 DEV-632, a7715fae DEV-624) onto origin/main d525fb55 is the step the push needs. Go ahead in the main checkout: git status first, git rebase --autostash origin/main, never touch others changes, rerun the ticket check, push. If unsure, ask the DEV-591 release thread (owner 2026-11-12: ask the thread that was working on it).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79143270-686a-4330-848d-940b822b946e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acd704542-d988-4f64-b33e-a1f8e3cde077
@@ -327,3 +332,25 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-17T01:04:46.137061+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624"]}'
+- at: 2026-11-17T01:06:46.913824+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:06:47.765670+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632"]}'
+- at: 2026-11-17T01:06:50.340365+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

@@ -1,0 +1,35 @@
+title: 'harnessmux builds too much debug info per worktree: dev profile without debug info, measured first'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T01:03:37.707996+00:00
+modified: 2026-11-17T01:03:40.683118+00:00
+relationships:
+  related:
+  - DEV-579
+description: |-
+  Owner, 2026-11-17, on DEV-579's harnessmux proposal: "yes I agree with a ticket once measurements are in". So this ticket measures first, then changes.
+
+  ## Found (DEV-579)
+  - harnessmux (`~/Development/@localtaskrepo/harnessmux`) has one dev profile with full debug info: 0.9 to 1.6 GB per worktree, 5.7 GB in the main checkout.
+  - lotar's fix in DEV-579: `[profile.dev] debug = false`, dependencies at opt-level 2, nextest with `--cargo-profile dev` so cargo's `test` profile doesn't rebuild dependencies.
+
+  ## Done when
+  - [ ] Before: `target/` size and time for a cold and a warm `cargo nextest run` and clippy, in a comment.
+  - [ ] `Cargo.toml` `[profile.dev]` turns debug info off (or `line-tables-only` if backtraces need lines); tests and clippy share `target/debug`; AGENTS.md names the test command.
+  - [ ] After: the same measurements; the change is kept only if it is smaller and not slower.
+  - [ ] harnessmux checks from its AGENTS.md pass.
+history:
+- at: 2026-11-17T01:03:39.097365+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-579"]}'
+- at: 2026-11-17T01:03:40.683118+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,11 +1,11 @@
 title: 'Flaky test: cli_serve_features_test serve tests get no response within the 1.5 s read timeout under load'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-16T21:05:30.352250+00:00
-modified: 2026-11-17T00:46:38.135878+00:00
+modified: 2026-11-17T01:06:46.480757+00:00
 relationships:
   related:
   - DEV-609
@@ -15,6 +15,11 @@ relationships:
   - DEV-611
   - DEV-627
   - DEV-632
+  - DEV-591
+  - DEV-613
+  - DEV-620
+  - DEV-621
+  - DEV-633
 comments:
 - date: 2026-11-16T22:37:11.900989+00:00
   author: claude
@@ -73,6 +78,45 @@ comments:
     - Reran `cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'` 5 times: 15/15 passed each time (load ~6, so no load proof from me). `rustfmt --check` clean.
     - No test failed before the fix (the fix agent couldn't reproduce it at load ~140 either); "a run under load" is what the ticket accepts.
     - Minor, not covered here: the comment's DEV-607-merge failure (`output capture did not finish: Err(Timeout)`, `:169`) is the 5 s `STOP_TIMEOUT` wait in `stop()`, not the read wait. Filed as DEV-632.
+- date: 2026-11-17T01:04:45.505843+00:00
+  author: claude
+  text: |-
+    Merged into local `main` as `a7715fae`, not pushed: local `main` and `origin/main` have diverged.
+
+    - Rebase conflict in `crates/lotar-lib/tests/cli_serve_features_test.rs`: DEV-632 (`f0350293`) and this fix each add a constant in the same spot. I kept both, `OUTPUT_CAPTURE_TIMEOUT` and `RESPONSE_TIMEOUT`. No lockfile changed
+    - `git merge --ff-only` landed it. The 14 pending `.tasks` files are amended into `a7715fae` (new: DEV-633). The main checkout is clean
+    - Checks on the rebased commit: lint, the full Rust suite (2276), UI, release, hooks and smoke (405) all passed
+    - Two `npm run test:agent` runs each stopped on a known flake, neither in this file: `a_skipped_session_is_kept_and_the_handoff_names_its_event_log` ("already has an active job", 2 of 5 runs alone; DEV-621 fixes it) and `a_queue_entry_held_by_a_waiting_thread_says_so_once` (DEV-613)
+    - The ticket's check ran 5 times in the main checkout at load ~67: 15/15 passed each time
+    - Push not run: `origin/main` has `d525fb55` "DEV-591 Release v0.15.2", which local `main` lacks. Unpushed: `1227e5bd` DEV-620, `f0350293` DEV-632, `a7715fae` DEV-624. I may not rebase the main checkout
+
+    **Question:** same as DEV-620: should I rebase local `main` onto `origin/main` and push all three commits?
+  report:
+    commits:
+    - hash: a7715fae
+      what: DEV-624 rebased onto f0350293 (was 10cadb71, then 3af7a659), pending .tasks amended in
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2 full runs stopped on the known flakes DEV-621 (continue_job race) and DEV-613; then cargo nextest --no-fail-fast 2276/2276, UI, release and hooks passed
+    - command: npm run smoke
+      result: passed
+      reason: 405 of 405
+    - command: cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'
+      result: passed
+      reason: 5 of 5 in the main checkout, load ~67
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config file changed
+    - command: git push
+      result: not_run
+      reason: origin/main has d525fb55 (DEV-591 Release v0.15.2), local main doesn't; same block as DEV-620
+    next: 'Owner: answer DEV-620''s question (rebase local main onto origin/main, then push); that push takes DEV-624 along'
+- date: 2026-11-17T01:06:45.707536+00:00
+  author: triage
+  text: 'Answer: yes, rebase and push. Push is already decided (owner 2026-11-12, standards docs/decisions/2026-11-12-push-finished-work.md: "Up to where the git tree is clean and we dont have pending work on a commit anymore we can push in general"; repos.json has push: true for lotar). Rebasing your own unpushed commits (1227e5bd DEV-620, f0350293 DEV-632, a7715fae DEV-624) onto origin/main d525fb55 is the step the push needs. Go ahead in the main checkout: git status first, git rebase --autostash origin/main, never touch others changes, rerun the ticket check, push. If unsure, ask the DEV-591 release thread (owner 2026-11-12: ask the thread that was working on it).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97fc7517-3464-4ef3-a807-2a602fdbf376
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea92c758-bcce-498d-bf82-98c5c78a5bd4
@@ -183,3 +227,32 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2108886e-a33a-4c82-95eb-9cb7e6df900c
+- at: 2026-11-17T01:04:45.505843+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:04:46.138901+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611","DEV-627","DEV-632"]}'
+    new: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611","DEV-627","DEV-632","DEV-591","DEV-613","DEV-620","DEV-621","DEV-633"]}'
+- at: 2026-11-17T01:06:09.095067+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-17T01:06:45.707536+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:06:46.480757+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

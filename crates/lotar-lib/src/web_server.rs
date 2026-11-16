@@ -289,6 +289,35 @@ fn accept_loop<'scope, 'env>(
     shutdown_peer_connections(peers, None);
 }
 
+/// Read once, retrying reads a signal interrupted.
+fn read_retrying(reader: &mut impl Read, buf: &mut [u8]) -> std::io::Result<usize> {
+    loop {
+        match reader.read(buf) {
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            other => return other,
+        }
+    }
+}
+
+/// Read the rest of a `Content-Length` body into `body`, stopping early at
+/// EOF or past `body_limit`. A read error (a timeout) is returned so the
+/// connection closes instead of dispatching a cut body.
+fn read_body(reader: &mut impl Read, body: &mut Vec<u8>, content_length: usize, body_limit: usize) -> std::io::Result<()> {
+    let mut buf = [0u8; 1024];
+    while body.len() < content_length {
+        let n = read_retrying(reader, &mut buf)?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&buf[..n]);
+        if body.len() > body_limit {
+            break;
+        }
+    }
+    body.truncate(content_length.min(body_limit));
+    Ok(())
+}
+
 /// Service exactly one HTTP request on an accepted connection, then return
 /// (the socket closes; one-shot responses advertise `Connection: close`).
 fn handle_connection(
@@ -305,7 +334,11 @@ fn handle_connection(
         let mut head_buf: Vec<u8> = Vec::new();
         let mut buf = [0u8; 1024];
         loop {
-            let n: usize = stream.read(&mut buf).unwrap_or_default();
+            // A read error is not end of request: dispatching what arrived
+            // so far handed handlers a cut request (DEV-622).
+            let Ok(n) = read_retrying(&mut stream, &mut buf) else {
+                return;
+            };
             if n == 0 {
                 break;
             }
@@ -361,18 +394,10 @@ fn handle_connection(
             reject_oversized_body(stream, body_limit);
             return;
         }
-        if let Some(cl) = declared_length {
-            while body.len() < cl {
-                let n: usize = stream.read(&mut buf).unwrap_or_default();
-                if n == 0 {
-                    break;
-                }
-                body.extend_from_slice(&buf[..n]);
-                if body.len() > body_limit {
-                    break;
-                }
-            }
-            body.truncate(cl.min(body_limit));
+        if let Some(cl) = declared_length
+            && read_body(&mut stream, &mut body, cl, body_limit).is_err()
+        {
+            return;
         }
         if body.len() > body_limit {
             reject_oversized_body(stream, body_limit);
@@ -1266,6 +1291,37 @@ fn emit_watched_sprint(
 #[cfg(test)]
 mod tests {
     use super::{content_type_for, host_is_allowed, is_safe_rel_path, parse_path_and_query, reason_phrase, url_decode};
+
+    /// Hands out scripted reads: bytes or an error kind per call, then EOF.
+    struct ScriptedReader(std::collections::VecDeque<Result<&'static [u8], std::io::ErrorKind>>);
+
+    impl std::io::Read for ScriptedReader {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            match self.0.pop_front() {
+                Some(Ok(bytes)) => {
+                    buf[..bytes.len()].copy_from_slice(bytes);
+                    Ok(bytes.len())
+                }
+                Some(Err(kind)) => Err(kind.into()),
+                None => Ok(0),
+            }
+        }
+    }
+
+    #[test]
+    fn body_read_retries_interrupted_and_fails_on_other_errors() {
+        // DEV-622: a failed read counted as EOF and dispatched a cut body.
+        use std::io::ErrorKind;
+        let mut reader = ScriptedReader([Ok(&b"{\"a\":"[..]), Err(ErrorKind::Interrupted), Ok(&b"1}"[..])].into());
+        let mut body = Vec::new();
+        super::read_body(&mut reader, &mut body, 7, 1024).expect("interrupted read is retried");
+        assert_eq!(body, b"{\"a\":1}");
+
+        let mut reader = ScriptedReader([Ok(&b"{\"a\":"[..]), Err(ErrorKind::WouldBlock)].into());
+        let mut body = Vec::new();
+        let err = super::read_body(&mut reader, &mut body, 7, 1024).expect_err("timed-out read is an error");
+        assert_eq!(err.kind(), ErrorKind::WouldBlock);
+    }
 
     #[test]
     fn query_values_decode_as_utf8() {

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-17T00:59:56.231012+00:00
+modified: 2026-11-17T01:04:46.135700+00:00
 relationships:
   depends_on:
   - DEV-631
@@ -17,6 +17,7 @@ relationships:
   - DEV-607
   - DEV-612
   - DEV-631
+  - DEV-624
 comments:
 - date: 2026-11-16T05:51:33.176016+00:00
   author: claude
@@ -404,3 +405,9 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T01:04:46.135700+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631"]}'
+    new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624"]}'

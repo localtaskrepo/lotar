@@ -1,11 +1,11 @@
 title: Job prompt shows an empty Comments section when no comment is picked
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-codex'
+assignee: '@review-claude'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-17T00:59:17.832310+00:00
+modified: 2026-11-17T01:06:48.368289+00:00
 relationships:
   related:
   - DEV-620
@@ -14,6 +14,28 @@ comments:
 - date: 2026-11-17T00:08:46.341868+00:00
   author: automation
   text: The fix agent's job job-20261117T000835.458Z-2 failed (lotar agent logs job-20261117T000835.458Z-2); @fix-codex retries it on branch agent/DEV-628.
+- date: 2026-11-17T01:06:14.534451+00:00
+  author: claude
+  text: |-
+    Fixed: no comment picked → the Comments section is one line with the count and the commands.
+
+    - `build_prompt` in `crates/lotar-lib/src/services/agent_job_service.rs`: with no pick it writes `Comments (N on the ticket. All of them: lotar show ID; the history: lotar task timeline ID)`, no "below the …", no colon
+    - New test `no_comment_picked_leaves_one_comments_line`: owner note before the first `@fix` assignment plus an automation comment
+    - `docs/help/agent.md` (Context between phases): open question "not by that person", the newer of that and the newest question comment; the answer is the first later answer comment or one by the person the phase handed the ticket to; `Question` / `Open question` labels; the one-line case
+  report:
+    commits:
+    - hash: bc9ba04c
+      what: one Comments line when none is picked; agent.md open-question and answer rules
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2277 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 description: |-
@@ -65,3 +87,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-620"]}'
     new: '{"related":["DEV-620","DEV-631"]}'
+- at: 2026-11-17T01:06:14.534451+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:06:48.368289+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-codex'
+    new: '@review-claude'

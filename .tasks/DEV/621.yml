@@ -5,10 +5,11 @@ type: Chore
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-17T00:49:53.833102+00:00
+modified: 2026-11-17T01:07:43.011364+00:00
 relationships:
   related:
   - DEV-611
+  - DEV-624
 comments:
 - date: 2026-11-16T23:29:57.237179+00:00
   author: claude
@@ -43,6 +44,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82379814-5465-4e30-9664-a8d68148cac7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A231da3c4-3b76-4d3f-aa8a-78b14efd10b0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4aab10b9-d823-4940-9b0a-d794d6939114
 description: |-
   Found in the review of DEV-611 (`3cf93d5e`).
 
@@ -119,3 +121,14 @@ history:
   - field: assignee
     old: '@merge'
     new: '@review'
+- at: 2026-11-17T01:04:46.138285+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-611"]}'
+    new: '{"related":["DEV-611","DEV-624"]}'
+- at: 2026-11-17T01:07:43.011364+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4aab10b9-d823-4940-9b0a-d794d6939114

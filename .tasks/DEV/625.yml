@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T21:08:52.852170+00:00
-modified: 2026-11-17T00:48:49.393709+00:00
+modified: 2026-11-17T01:12:08.821901+00:00
 relationships:
   related:
   - DEV-613
@@ -50,9 +50,36 @@ comments:
     - `job-20261117T001051.648Z-6`: T3 setup script exited 1, then the end rules hit `No space left on device`, so the ticket sat at Reviewing/@review with no job.
     - With 205 GiB free again: `status InProgress`, `assignee --clear`, `automation run "Answered in the thread: review on Codex" --select id:DEV-625` (same steps as repos.ts recovery). Queued for `review`.
     - The missing retry is filed as DEV-633 (LOCA-493).
+- date: 2026-11-17T01:12:08.821901+00:00
+  author: claude
+  text: |-
+    Review: passed. `8af10186` does what "Done when" asks, test file only; no findings, no tickets filed.
+
+    - `Harness::drop` (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs:82`): under `std::thread::panicking()` it only waits via `settle` (same 60 s bound, no assert), so the first timeout is the reported failure. Otherwise unchanged behaviour; `wait_for` asserts on `settle` with the same message.
+    - 60 s bound kept: reasonable call, a test parameter, not an owner decision. Stalls of minutes at load 110 are the machine's.
+    - No durable regression test: the fix agent's 60 s probe showed SIGABRT on main, a normal FAIL with the fix; a panic in `Drop` while unwinding aborting is standard Rust behaviour, so I accept that.
+    - Branch is behind main (main moved on, also in this file: `1227e5bd`, `c9802f1d`), but `git merge-tree main HEAD` is clean; the diff vs main beyond the commit is only main's newer work.
+    - No UI change, no stray files.
+  report:
+    checks:
+    - command: cargo nextest run -E 'test(/dev503_harness_jobs_test/)'
+      result: passed
+      reason: 34/34
+    - command: cargo clippy --tests -p lotar
+      result: passed
+    - command: rustfmt --check dev503_harness_jobs_test.rs
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: test-only change, fix agent ran them
+    - command: stress run --stress-count 30
+      result: not_run
+      reason: needs a loaded machine
+    next: Merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeec445cf-bb38-4f44-b052-6a4d7d637810
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab0c2dd98-94bd-48cb-8629-0001a77e3447
 description: |-
   Found in the DEV-613 stress run (`--stress-count 30` of `test(/dev503_harness_jobs_test/)`), iteration 30, load average about 110.
 
@@ -134,6 +161,15 @@ history:
     old: '{"related":["DEV-613"]}'
     new: '{"related":["DEV-613","DEV-633"]}'
 - at: 2026-11-17T00:48:49.393709+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:07:19.771188+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab0c2dd98-94bd-48cb-8629-0001a77e3447
+- at: 2026-11-17T01:12:08.821901+00:00
   actor: claude
   changes:
   - field: comment_added

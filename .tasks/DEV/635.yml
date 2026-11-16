@@ -1,0 +1,48 @@
+title: A new job worktree starts from a copy-on-write clone of an existing build instead of a cold build
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T01:03:33.051382+00:00
+modified: 2026-11-17T01:04:13.444900+00:00
+relationships:
+  related:
+  - DEV-579
+  - DEV-581
+description: |-
+  Owner, 2026-11-17, on DEV-579: "I like the idea of copying existing data over, but I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux."
+
+  ## Why
+  - Each new job worktree builds cold: 1 to 2 min and about 2.3 GB for lint + tests + smoke (DEV-579).
+  - On APFS `cp -c` (clonefile) copies `target/` without using disk until a file changes.
+
+  ## What
+  - When lotar's `prepare_worktree` (`crates/lotar-lib/src/services/agent_job_service.rs`) creates a new worktree, it clones `target/` from the ticket's earlier worktree if one exists, else from the main checkout, before the agent starts.
+  - Only worktrees lotar creates (headless claude, codex, command jobs over harnessmux). T3 Code worktrees are not touched and no job moves back to T3-made worktrees.
+
+  ## Done when
+  - [ ] A new lotar job worktree has a `target/` cloned from the earlier worktree of the ticket, else from the main checkout's; with neither, it starts empty as today. The job log names the source.
+  - [ ] Clone fails (other filesystem, no `target/`, copy error): the job logs it and goes on with a cold build; it never fails the job.
+  - [ ] On a filesystem without clonefile it does not fall back to a full copy (that costs the disk it saves).
+  - [ ] Measured: first `npm test` in a new worktree, time and added disk, cold vs cloned.
+  - [ ] A test covers clone and the fallback; `docs/help/agent.md` (Worktrees) says so.
+  - [ ] STD-95 (build output stays until Done) unchanged.
+history:
+- at: 2026-11-17T01:03:34.558839+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-579"]}'
+- at: 2026-11-17T01:03:36.137465+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T01:04:13.444900+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-579"]}'
+    new: '{"related":["DEV-579","DEV-581"]}'
