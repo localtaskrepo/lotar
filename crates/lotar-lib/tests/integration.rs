@@ -170,6 +170,7 @@ mod dev592_queue_resumes_after_restart_test;
 mod dev605_merge_without_agent_test;
 mod dev60_shared_mutation_test;
 mod dev61_reference_kinds_test;
+mod dev623_memory_gate_test;
 mod dev626_resumed_t3_threads_test;
 mod dev630_queue_project_parallel_limit_test;
 mod dev646_serve_shared_job_limits_test;

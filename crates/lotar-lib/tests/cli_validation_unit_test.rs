@@ -59,6 +59,7 @@ fn cfg() -> ResolvedConfig {
         agent_profiles: Default::default(),
         agent_worktree: Default::default(),
         agent_merge: None,
+        agent_memory_gate: Default::default(),
         remotes: Default::default(),
         ui: Default::default(),
     }

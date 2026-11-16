@@ -670,6 +670,9 @@ pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: Global
     if override_config.agent_merge.is_some() {
         base.agent_merge = override_config.agent_merge;
     }
+    if keys.has("agent_memory_gate") || override_config.agent_memory_gate != defaults.agent_memory_gate {
+        base.agent_memory_gate = override_config.agent_memory_gate;
+    }
     if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
@@ -861,6 +864,9 @@ pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override
     }
     if override_config.agent_merge.is_some() {
         resolved.agent_merge = override_config.agent_merge;
+    }
+    if keys.has("agent_memory_gate") || override_config.agent_memory_gate != defaults.agent_memory_gate {
+        resolved.agent_memory_gate = override_config.agent_memory_gate;
     }
     if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
@@ -1233,6 +1239,7 @@ impl ResolvedConfig {
             agent_profiles: global.agents.into_iter().map(|(k, v)| (k, v.to_detail())).collect(),
             agent_worktree: global.agent_worktree,
             agent_merge: global.agent_merge,
+            agent_memory_gate: global.agent_memory_gate,
             remotes: global.remotes,
             ui: crate::config::types::UiSettings {
                 theme: global.ui_theme,

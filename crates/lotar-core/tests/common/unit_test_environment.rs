@@ -27,6 +27,11 @@ unsafe fn isolate_tmpdir_under_owned_scratch() {
     unsafe {
         std::env::set_var("LOTAR_IGNORE_HOME_CONFIG", "1");
     }
+    // The memory gate (DEV-623) would hold jobs whenever the machine running
+    // the tests is short of memory, as `tests/common` sets too.
+    unsafe {
+        std::env::set_var("LOTAR_MEMORY_READING", "normal");
+    }
     if OWNED_SCRATCH.get().is_some() {
         return;
     }

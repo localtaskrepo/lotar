@@ -242,6 +242,12 @@ pub fn reset_lotar_test_environment() {
     unsafe {
         std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue_dir);
     }
+    // The memory gate (DEV-623) would hold jobs whenever the machine running
+    // the tests is short of memory; memory gate tests set their own reading.
+    let _guard = env_mutex::lock_var("LOTAR_MEMORY_READING");
+    unsafe {
+        std::env::set_var("LOTAR_MEMORY_READING", "normal");
+    }
 }
 
 /// Create an isolated temp directory without mutating the process

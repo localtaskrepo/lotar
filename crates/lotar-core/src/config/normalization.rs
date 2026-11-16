@@ -558,6 +558,9 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
     if let Some(merge) = &cfg.agent_merge {
         agent.insert(Y::String("merge".into()), serde_yaml_ng::to_value(merge).unwrap_or(Y::Null));
     }
+    if cfg.agent_memory_gate != defaults.agent_memory_gate {
+        agent.insert(Y::String("memory_gate".into()), serde_yaml_ng::to_value(&cfg.agent_memory_gate).unwrap_or(Y::Null));
+    }
     if !agent.is_empty() {
         root.insert(Y::String("agent".into()), Y::Mapping(agent));
     }

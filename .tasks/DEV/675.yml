@@ -1,11 +1,11 @@
 title: 'A fix job fails when its ticket branch agent/<ID> is checked out in another worktree: git branch --force refuses'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: triage
 assignee: '@merge'
 created: 2026-11-17T20:51:41.239885+00:00
-modified: 2026-11-17T21:12:24.233235+00:00
+modified: 2026-11-17T21:23:59.998398+00:00
 relationships:
   blocks:
   - DEV-623
@@ -13,6 +13,7 @@ relationships:
   - DEV-623
   - DEV-573
   - DEV-577
+  - DEV-676
 comments:
 - date: 2026-11-17T20:53:20.312383+00:00
   author: claude
@@ -60,6 +61,32 @@ comments:
     - Scope: a worktree that no job log names still stops the move. That matches the DEV-577 decision, so I don't count it as missing work.
     - Reran: `npm ci`, `npm run lint:agent`, `npm run test:agent` (2331 Rust, 1548 UI), `npm run test:smoke:agent` (405). Worktree left clean.
     - No UI change. No tickets filed.
+- date: 2026-11-17T21:16:18.055355+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-675` is in `main`.
+
+    - Rebased `agent/DEV-675` onto `main` (`5d658bff29e6`): `cffd407c154b`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `cffd407c154b`
+    - Amended the pending `.tasks` changes into the merged commit: `c9a5bae3b8cb`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[infra:branch-in-worktree:DEV-623]`
+  report:
+    commits:
+    - hash: c9a5bae3b
+      what: 'DEV-675 A fix job fails when its ticket branch agent/<ID> is checked out in another worktree: git branch --force refuses'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb8ee33f-ec17-499f-892b-84afeba5dd1e
 description: |-
@@ -135,3 +162,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T21:16:18.055355+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:16:18.219285+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-17T21:23:59.998398+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-623"],"related":["DEV-623","DEV-573","DEV-577"]}'
+    new: '{"blocks":["DEV-623"],"related":["DEV-623","DEV-573","DEV-577","DEV-676"]}'

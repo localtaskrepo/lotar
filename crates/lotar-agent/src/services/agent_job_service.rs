@@ -357,6 +357,8 @@ impl AgentJobService {
             )));
         }
 
+        // Short of memory: the job waits as queued (DEV-623).
+        let memory_hold = matches!(mode, JobStartMode::RespectLimits) && crate::services::memory_gate::check(tasks_dir).is_some();
         let should_queue: bool;
         {
             let registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
@@ -373,7 +375,7 @@ impl AgentJobService {
             };
             let merge_slot_busy = is_merge_job && has_active_merge_job(&registry);
 
-            should_queue = matches!(mode, JobStartMode::RespectLimits) && (slot_wait.is_some() || merge_slot_busy);
+            should_queue = matches!(mode, JobStartMode::RespectLimits) && (memory_hold || slot_wait.is_some() || merge_slot_busy);
             registry.max_parallel_jobs =
                 crate::config::resolution::config_for_project(tasks_dir, None).ok().and_then(|global| global.agent_worktree.max_parallel_jobs);
 
@@ -545,6 +547,10 @@ impl AgentJobService {
     /// `None` once it runs (DEV-525). A waiting job has no log yet and
     /// `lotar agent queue` doesn't list it, so its ticket has to say so.
     pub fn waiting_reason(job_id: &str) -> Option<String> {
+        let tasks_dir = JOB_REGISTRY.lock().ok()?.pending_queue.iter().find(|pending| pending.job_id == job_id)?.tasks_dir.clone();
+        if let Some(hold) = crate::services::memory_gate::status(&tasks_dir).hold {
+            return Some(format!("it waits for memory: {}", hold.describe()));
+        }
         let registry = JOB_REGISTRY.lock().ok()?;
         let pending = registry.pending_queue.iter().find(|pending| pending.job_id == job_id)?;
         let merge_busy = registry
@@ -5274,8 +5280,12 @@ fn process_pending_queue() {
         loop {
             let merge_busy = has_dispatched_merge_job(&registry);
             // A config that can't be read keeps the job waiting.
+            // Short of memory, the job waits too; the queue watch reads
+            // memory again every 30 s (DEV-623).
             let next = registry.pending_queue.iter().position(|pending| {
-                !(pending.is_merge_job && merge_busy) && matches!(slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id), Ok(None))
+                !(pending.is_merge_job && merge_busy)
+                    && matches!(slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id), Ok(None))
+                    && crate::services::memory_gate::check(&pending.tasks_dir).is_none()
             });
             let Some(pending) = next.and_then(|index| registry.pending_queue.remove(index)) else {
                 break;
@@ -5865,6 +5875,32 @@ mod tests {
             .add(&crate::storage::task::Task::new(tasks_dir.clone(), "Padded job target".to_string(), crate::types::Priority::from("Medium")), "AJB", None)
             .unwrap();
         (tmp, tasks_dir)
+    }
+
+    #[test]
+    fn a_held_job_waits_for_memory_even_with_a_free_slot() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks_dir = tmp.path().join("main").join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(
+            crate::utils::paths::global_config_path(&tasks_dir),
+            "default:\n  project: AJB\nagent:\n  memory_gate:\n    enabled: true\n  worktree:\n    enabled: false\n",
+        )
+        .unwrap();
+        Storage::new(&tasks_dir)
+            .add(&crate::storage::task::Task::new(tasks_dir.clone(), "Held job".to_string(), crate::types::Priority::from("Medium")), "AJB", None)
+            .unwrap();
+        // SAFETY: test-local override of the queue directory (nextest runs
+        // each test in its own process).
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", tmp.path().join("queue")) };
+        crate::services::memory_gate::hold_for_test(&tasks_dir, "macOS reports memory pressure warn");
+
+        // No slot limit: only the hold keeps the job queued, also when the
+        // queue is tried again (DEV-623).
+        let job = AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-1"), &tasks_dir).unwrap();
+        assert_eq!(job.status, "queued");
+        process_pending_queue();
+        assert!(AgentJobService::waiting_reason(&job.id).unwrap().starts_with("it waits for memory: macOS reports memory pressure warn"));
     }
 
     fn dev56_job_request(ticket: &str) -> AgentJobCreateRequest {

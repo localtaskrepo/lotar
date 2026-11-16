@@ -312,10 +312,18 @@ impl AgentHandler {
     }
 
     fn list_jobs(args: &AgentListJobsArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        // New jobs that wait for memory have no log yet (DEV-623).
+        let memory_hold = crate::services::memory_gate::status(&resolver.path).hold;
+        let hold_json = memory_hold.as_ref().map(crate::services::memory_gate::MemoryHold::to_json);
+        if let Some(hold) = &memory_hold
+            && !matches!(renderer.format, OutputFormat::Json)
+        {
+            renderer.emit_info(format_args!("Queue: new jobs wait for memory: {}", hold.describe()));
+        }
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [] }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found (agent logging is off).");
@@ -326,7 +334,7 @@ impl AgentHandler {
 
         if job_ids.is_empty() {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [] }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found.");
@@ -355,7 +363,7 @@ impl AgentHandler {
         }
 
         if matches!(renderer.format, OutputFormat::Json) {
-            renderer.emit_json(&serde_json::json!({ "jobs": jobs }));
+            renderer.emit_json(&serde_json::json!({ "jobs": jobs, "memory_hold": hold_json }));
             return Ok(());
         }
 
@@ -441,6 +449,7 @@ impl AgentHandler {
                 stats.queued = stats.queued.max(pending.len());
                 let (state, reason) = AgentQueueService::worker_state(tasks_dir, &pending);
                 let worker_running = state == WorkerState::Active;
+                let memory = crate::services::memory_gate::status(tasks_dir);
 
                 if matches!(renderer.format, OutputFormat::Json) {
                     let entries: Vec<_> = pending
@@ -459,6 +468,8 @@ impl AgentHandler {
                         "worker_running": worker_running,
                         "worker_state": state.as_str(),
                         "reason": reason,
+                        "memory_hold": memory.hold.as_ref().map(crate::services::memory_gate::MemoryHold::to_json),
+                        "memory_error": memory.error,
                         "running_jobs": stats.running,
                         "queued_jobs": stats.queued,
                     }));
@@ -468,6 +479,9 @@ impl AgentHandler {
                 renderer.emit_info(format_args!("Worker: {}  |  Running: {}  |  Queued: {}", state.as_str(), stats.running, stats.queued));
                 if let Some(reason) = reason {
                     renderer.emit_info(format_args!("Queue: {reason}"));
+                }
+                if let Some(error) = &memory.error {
+                    renderer.emit_warning(format!("The memory reading failed, so the queue doesn't wait for memory: {error}"));
                 }
 
                 if pending.is_empty() {

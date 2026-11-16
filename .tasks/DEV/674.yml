@@ -1,11 +1,11 @@
 title: 't3 worktree setup: a leftover or same-commit record can give a job''s Claude settings to the wrong worktree'
-status: HelpNeeded
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T20:09:56.418127+00:00
-modified: 2026-11-17T21:02:32.579334+00:00
+modified: 2026-11-17T21:33:36.091566+00:00
 relationships:
   related:
   - DEV-618
@@ -23,6 +23,9 @@ comments:
     - Options: fast-forward (recommended; the merge agent lands both in order), or wait until DEV-618 is on main.
     - Answer in the fix thread: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c (it waits on this question).
     - Handed to mallox by LOCA-510: the ticket was HelpNeeded but assigned to claude, so it showed in nobody's inbox.
+- date: 2026-11-17T21:33:35.615020+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c of the job job-20261117T201713.382Z-33 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T213335.564Z-5: DEV-674 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c
 description: |-
@@ -77,3 +80,19 @@ history:
   - field: assignee
     old: claude
     new: mallox
+- at: 2026-11-17T21:33:35.385754+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T21:33:35.615020+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:33:36.091566+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

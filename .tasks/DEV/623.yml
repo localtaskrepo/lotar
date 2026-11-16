@@ -1,13 +1,15 @@
 title: The queue starts no new job while the Mac is short of memory
-status: Blocked
+status: Merging
 priority: High
 type: Feature
 reporter: claude
+assignee: '@merge'
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-17T20:51:52.323317+00:00
+modified: 2026-11-17T21:32:41.026557+00:00
 relationships:
   depends_on:
   - DEV-675
+  - DEV-676
   blocks:
   - DEV-645
   related:
@@ -22,6 +24,9 @@ relationships:
   - DEV-655
   - DEV-669
   - DEV-675
+  - DEV-661
+  - DEV-662
+  - DEV-676
 comments:
 - date: 2026-11-16T22:24:43.617057+00:00
   author: claude
@@ -270,6 +275,94 @@ comments:
 - date: 2026-11-17T20:51:49.074979+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-623 yet. DEV-623 waits for DEV-675.'
+- date: 2026-11-17T21:23:28.873015+00:00
+  author: claude
+  text: |-
+    Unblocked by DEV-675: the memory gate is rebased onto current main and passes every check, ready for review.
+
+    - The work itself was done in `3c5d8a729`; this job only rebased it onto main `c9a5bae3b` (DEV-661, DEV-662, DEV-675 landed meanwhile). There were no conflicts, and the new signed commit is `b7d7ca4de`
+    - Checked that it still fits DEV-661's taken-entry handling: the worker checks the gate before `dequeue_startable` (`agent_queue_service.rs:307`), and `restore_taken` only moves entries back to pending, so a hold takes nothing and loses nothing
+    - `agent/DEV-623` is still at `3c5d8a729` in `agent-DEV-623-fdc58bb7d25a0a16`; lotar moves it to this branch when the job ends (DEV-675)
+  report:
+    commits:
+    - hash: b7d7ca4de
+      what: memory gate, rebased onto main c9a5bae3b
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: as lint:agent
+    - command: npm test
+      result: passed
+      reason: as test:agent, 2345 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review b7d7ca4de
+- date: 2026-11-17T21:23:37.737788+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T211619.086Z-47 failed again or on a rate limit (lotar agent logs job-20261117T211619.086Z-47). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T21:24:05.630857+00:00
+  author: triage
+  text: |-
+    Blocked on [DEV-676](https://lotar.pyxzl.net/task/DEV-676): the last job failed on the checkout again, not the work. It continues when that ticket is done.
+
+    - `job-20261117T211619.086Z-47` rebased the gate to `b7d7ca4de` (all checks passed), then `git branch --force agent/DEV-623` was refused: the branch is checked out in `/Users/mallox/.t3/worktrees/lotar/agent-DEV-623-fdc58bb7d25a0a16`, though DEV-675 is Done
+    - Retrying would fail the same way; no question for the owner
+- date: 2026-11-17T21:24:06.246432+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-676.'
+- date: 2026-11-17T21:24:06.419535+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-623 yet. DEV-623 waits for DEV-676.'
+- date: 2026-11-17T21:29:05.253089+00:00
+  author: claude
+  text: |-
+    DEV-676 is done, and `agent/DEV-623` now points at the finished commit `b7d7ca4de`: ready for review, no new changes.
+
+    - `agent/DEV-623` (worktree `agent-DEV-623-fdc58bb7d25a0a16`) is at `b7d7ca4de`, the commit the last job couldn't move it to
+    - Main is still `c9a5bae3b`: `git log HEAD..main` is empty, so no rebase was needed
+    - Lint, tests and smoke passed on this same commit and base in the last job; with nothing changed, I didn't rerun them
+  report:
+    commits:
+    - hash: b7d7ca4de
+      what: memory gate on main c9a5bae3b
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent, on b7d7ca4de in job-20261117T211619.086Z-47, not rerun (no change since)
+    - command: npm test
+      result: passed
+      reason: test:agent, on b7d7ca4de in job-20261117T211619.086Z-47, not rerun (no change since)
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests, on b7d7ca4de in job-20261117T211619.086Z-47, not rerun (no change since)
+    next: Review b7d7ca4de
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2723c3a0-e508-468f-a410-efcf7e0b6d36
@@ -277,6 +370,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8184bbe9-c261-4464-99cd-a5af4cdbc6e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A11f5df5e-1737-4f6f-864e-32ac5ee9ae7d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04178823-779d-4c96-812a-fc207a75fbe5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cef5b56-d5ff-4e0b-95fc-075776c798dc
 description: |-
   Owner 2026-11-16, after the Mac crashed (picked option 2 of 4 from the options picker): "Memory gate": lotar starts no new job while swap is nearly full or macOS reports memory pressure.
 
@@ -631,3 +725,116 @@ history:
   changes:
   - field: assignee
     old: '@fix'
+- at: 2026-11-17T21:16:18.708295+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T21:16:23.152846+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T21:16:23.944709+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cef5b56-d5ff-4e0b-95fc-075776c798dc
+- at: 2026-11-17T21:23:28.873015+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:23:29.131891+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-675"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675"]}'
+    new: '{"depends_on":["DEV-675"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675","DEV-661","DEV-662"]}'
+- at: 2026-11-17T21:23:37.667974+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-17T21:23:37.737788+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:24:00.349857+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-675"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675","DEV-661","DEV-662"]}'
+    new: '{"depends_on":["DEV-675"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675","DEV-661","DEV-662","DEV-676"]}'
+- at: 2026-11-17T21:24:04.952622+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-675"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675","DEV-661","DEV-662","DEV-676"]}'
+    new: '{"depends_on":["DEV-675","DEV-676"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675","DEV-661","DEV-662","DEV-676"]}'
+- at: 2026-11-17T21:24:05.350720+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-17T21:24:05.630857+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:24:06.047748+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T21:24:06.246432+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:24:06.419535+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:24:08.934233+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T21:28:46.707654+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T21:28:51.307907+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T21:29:05.253089+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:29:10.232037+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T21:32:41.026557+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

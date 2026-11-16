@@ -243,6 +243,9 @@ impl AgentQueueService {
         if pending.is_empty() {
             return (WorkerState::Active, None);
         }
+        if let Some(hold) = crate::services::memory_gate::status(tasks_dir).hold {
+            return (WorkerState::Active, Some(format!("waiting for memory: {}", hold.describe())));
+        }
         let reason = job_slots(tasks_dir, pending, AgentJobService::active_jobs())
             .ok()
             .and_then(|slots| pending.iter().find_map(|entry| slots.wait_reason(entry_project(entry).as_deref())))
@@ -300,7 +303,8 @@ impl AgentQueueService {
                     // Threads T3 Code runs again with no job (DEV-626).
                     AgentJobService::adopt_resumed_t3_threads(tasks_dir);
                 }
-                if !upgraded {
+                // Short of memory: entries stay queued, unchanged (DEV-623).
+                if !upgraded && pending_count(tasks_dir)? > 0 && crate::services::memory_gate::check(tasks_dir).is_none() {
                     let entries = dequeue_startable(tasks_dir)?;
                     for entry in entries {
                         match start_entry(tasks_dir, entry.clone()) {

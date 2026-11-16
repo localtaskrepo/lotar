@@ -1,0 +1,97 @@
+title: Job end still can't move agent/DEV-623 to the thread's branch after DEV-675 (worktree agent-DEV-623-fdc58bb7d25a0a16)
+status: Done
+priority: Medium
+type: Feature
+reporter: triage
+created: 2026-11-17T21:23:59.799509+00:00
+modified: 2026-11-17T21:28:46.226646+00:00
+relationships:
+  blocks:
+  - DEV-623
+  related:
+  - DEV-675
+  - DEV-623
+  - DEV-661
+comments:
+- date: 2026-11-17T21:28:37.042352+00:00
+  author: claude
+  text: |-
+    agent/DEV-623 is at `b7d7ca4de` now; no code change needed.
+
+    - Cause: the job ran on the installed `lotar 0.15.3` (`/opt/homebrew/bin/lotar`, installed 08:00). DEV-675's fix `c9a5bae3b` came later (`v0.15.3-21-gc9a5bae3b`), so that build still ran `git branch --force`.
+    - The worktree had the case DEV-675 handles: `job-20261117T001050.777Z-5` has an end event but no status line.
+    - I did what DEV-675's code does. The worktree `agent-DEV-623-fdc58bb7d25a0a16` was clean and nothing had it open (`lsof`), so I ran `git -C <worktree> reset --keep b7d7ca4de`. It stays checked out there.
+    - Nothing lost: `3c5d8a729` → `b7d7ca4de` is a rebase onto main. `git range-diff` shows only DEV-661's docs context changed.
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists no DEV-623 finding. Once a release ships DEV-675, jobs do this on their own.
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no DEV-623 or branch-in-worktree finding
+    - command: git rev-parse agent/DEV-623
+      result: passed
+      reason: b7d7ca4de
+    - command: npm run lint
+      result: not_run
+      reason: no file changed
+    - command: npm test
+      result: not_run
+      reason: no file changed
+    - command: npm run smoke
+      result: not_run
+      reason: no file changed
+    next: 'DEV-623 can continue: its branch is on the rebased gate'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A298cc003-7d38-4bcc-ba7d-d214087330b4
+description: 'Found: job-20261117T211619.086Z-47 ended with ''cannot force update the branch agent/DEV-623 used by worktree /Users/mallox/.t3/worktrees/lotar/agent-DEV-623-fdc58bb7d25a0a16'' although DEV-675 (Done, in main c9a5bae3b) fixed this case. Check: the running lotar build may predate DEV-675, or the worktree is held for another reason (the old job''s log). Done when: agent/DEV-623 = b7d7ca4de (t3/queue-memory-gate-1) and the finding check no longer lists infra:branch-in-worktree:DEV-623.'
+tags:
+- health
+custom_fields:
+  finding: infra:branch-in-worktree:DEV-623
+history:
+- at: 2026-11-17T21:24:00.350870+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-675"]}'
+    new: '{"related":["DEV-675","DEV-623"]}'
+- at: 2026-11-17T21:24:00.566215+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T21:24:02.038896+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T21:24:02.816010+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A298cc003-7d38-4bcc-ba7d-d214087330b4
+- at: 2026-11-17T21:24:04.953768+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-675","DEV-623"]}'
+    new: '{"blocks":["DEV-623"],"related":["DEV-675","DEV-623"]}'
+- at: 2026-11-17T21:28:37.042352+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:28:37.217459+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-623"],"related":["DEV-675","DEV-623"]}'
+    new: '{"blocks":["DEV-623"],"related":["DEV-675","DEV-623","DEV-661"]}'
+- at: 2026-11-17T21:28:46.226646+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

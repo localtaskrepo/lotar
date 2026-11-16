@@ -10,7 +10,7 @@ LoTaR runs agent CLIs (Claude Code, Codex CLI, Copilot CLI, T3 Code and the othe
 - `lotar agent status <JOB_ID>`
 - `lotar agent logs <JOB_ID>`
 - `lotar agent cancel <JOB_ID>` — stop a job that has started; a ticket still waiting in the queue has no job yet, so remove it with `lotar agent queue remove`
-- `lotar agent queue` — list the tickets waiting in the queue and the queue worker's state: `active` (a worker process runs; with tickets left it says what they wait for: a free slot under the global or their project's `agent.worktree.max_parallel_jobs`, or their ticket's running job), `stopped` (tickets wait but no worker process runs) or `idle` (nothing queued). With `--format json` the state is in `worker_state`, the explanation in `reason`. Tickets waiting for prerequisites leave the queue (the ticket is marked blocked), so they aren't listed
+- `lotar agent queue` — list the tickets waiting in the queue and the queue worker's state: `active` (a worker process runs; with tickets left it says what they wait for: a free slot under the global or their project's `agent.worktree.max_parallel_jobs`, or their ticket's running job), `stopped` (tickets wait but no worker process runs) or `idle` (nothing queued). While the machine is short of memory the reason says so and since when ([memory gate](#memory-gate)). With `--format json` the state is in `worker_state`, the explanation in `reason`, a memory hold in `memory_hold` (`reason`, `since`) and a failed memory reading in `memory_error`. Tickets waiting for prerequisites leave the queue (the ticket is marked blocked), so they aren't listed
 - `lotar agent queue resume` — start the queue worker for the waiting tickets without queueing a job, for example after the worker was killed. With a worker running or nothing queued it changes nothing. A worker that can't start is reported (`error` in JSON, the state stays `stopped`); the command fails only when the queue can't be read. `lotar serve` does the same when it starts and prints a warning if the worker can't start
 - `lotar agent queue remove <TICKET>` — take one ticket out of the queue before its job starts, for example `lotar agent queue remove DEV-501`
 - `lotar agent queue flush` — take every waiting ticket out of the queue; running jobs go on
@@ -422,6 +422,27 @@ Worktrees with active jobs are never removed, even with `--all`. Cleanup refuses
 Default CLI cleanup and all automatic cleanup require a readable, valid ticket in a configured done state. Missing, malformed, unreadable, or unknown-status tickets are preserved, even with `--all`. Failure/cancellation cleanup settings only enable cleanup when that same done-state and Git safety check succeeds.
 
 The queue worker drains pending entries and waits for dispatched jobs, including finalization, before exiting. It runs in its own process group, so it outlives the command that started it, also when that command's group is killed (a launch agent's run ends, a terminal closes). It also waits for dispatched jobs if queue/config processing fails. There is no single-poll `--once` mode. An entry the worker took stays in the queue file until its job is registered: a worker killed in between leaves it for the next worker, which starts it first. Start failures retain the existing bounded retry policy (three retries); an entry that exhausts them leaves the queue with a comment on its ticket that gives the error (`The queued @implement job did not start after 4 tries and left the queue: …`). Failed runner jobs are terminal rather than automatically rerun. A ticket whose previous job is still running (in any process), or whose earlier job's T3 Code thread still runs or waits for an answer, is not a failure: the entry waits in the queue until that job or thread ends. An entry held by a T3 Code thread says so in one comment on the ticket. When the entry comes up and its ticket is now assigned to another agent profile (a merge queued while the review ran, whose blocking review sent the ticket back to `@fix`), the job doesn't start: the ticket has moved past that stage, and its comment says so (`The queued @merge job didn't start: DEV-1 is assigned to @fix now.`). A merge job (profile `merge`, or any job on a ticket in `Merging`) never starts, queued or not, while its ticket carries the tag `review-blocked`: a blocking review set it, and only its rework removes it. The ticket's comment says so (`The @merge job didn't start: DEV-1 carries tag review-blocked, and no rework has removed it.`). When the `lotar` binary the worker was started from is replaced (an upgrade or reinstall), the worker takes no new entries; once its running jobs end it exits and a new worker, started from the upgraded binary, runs the rest of the queue.
+
+### Memory gate
+
+LoTaR starts no new job while the machine is short of memory: macOS reports memory pressure (`sysctl kern.memorystatus_vm_pressure_level` is warn or critical), or swap use is over `agent.memory_gate.max_swap_percent` of the swap total (default 85%). Either one holds new jobs; running jobs go on, and so do jobs taken over from a process that died.
+
+- The queue worker takes no entry while the gate holds: entries stay queued with their attempts unchanged, and no ticket gets a comment. In `lotar serve` a new job waits as `queued`, and its waiting reason names the memory hold.
+- While held, the queue reads memory again every 30 s. Held jobs start once memory has been normal for `agent.memory_gate.settle_seconds` (default 120); short of memory again during that time, the wait starts over. A job is never failed or retried for this.
+- `lotar agent queue` and `lotar agent list-jobs` say why jobs wait and since when, for example `waiting for memory: swap 9.4 of 10.0 GB used (94%, limit 85%) (held since 2026-11-16T21:30:00Z)`. With `--format json` both print `memory_hold`.
+- A memory reading that fails holds nothing; `lotar agent queue` warns about it.
+- On by default on macOS, off elsewhere. `agent.memory_gate.enabled: true` turns it on elsewhere too; on Linux it then reads swap from `/proc/meminfo` (there is no pressure level there).
+
+```yaml
+# .tasks/config.yml
+agent:
+  memory_gate:
+    enabled: true          # unset: on on macOS only
+    max_swap_percent: 85
+    settle_seconds: 120
+```
+
+The last reading is kept next to the agent queue (`memory-gate-<hash>.json`), so the worker, `lotar serve` and `lotar agent queue` share it. Tests set `LOTAR_MEMORY_READING` to replace the reading: `normal`, or for example `pressure=warn,swap=9.5/10` (swap in GB).
 
 Cancelling a dispatched job requests termination immediately, but cancellation automation and reassignment wait until process/output teardown and context persistence finish. The job retains its capacity slot through finalization, so a replacement is queued safely and cancellation automation runs once. Cancelling an undispatched queued job finalizes immediately.
 

@@ -500,6 +500,43 @@ impl Default for AgentWorktreeConfig {
     }
 }
 
+/// When the agent queue holds new jobs because the machine is short of
+/// memory (DEV-623): `agent.memory_gate` in the global config.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentMemoryGateConfig {
+    /// Unset: on on macOS, off elsewhere.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub enabled: Option<bool>,
+    /// Swap use, in percent of the swap total, from which new jobs wait.
+    #[serde(default = "default_memory_gate_max_swap_percent")]
+    pub max_swap_percent: u8,
+    /// How long memory has to stay normal before held jobs start.
+    #[serde(default = "default_memory_gate_settle_seconds")]
+    pub settle_seconds: u64,
+}
+
+impl Default for AgentMemoryGateConfig {
+    fn default() -> Self {
+        Self { enabled: None, max_swap_percent: default_memory_gate_max_swap_percent(), settle_seconds: default_memory_gate_settle_seconds() }
+    }
+}
+
+impl AgentMemoryGateConfig {
+    /// Whether the gate reads memory on this system.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.unwrap_or(cfg!(target_os = "macos"))
+    }
+}
+
+const fn default_memory_gate_max_swap_percent() -> u8 {
+    85
+}
+
+const fn default_memory_gate_settle_seconds() -> u64 {
+    120
+}
+
 impl SyncConfig {
     pub fn is_empty(&self) -> bool {
         self.remotes.is_empty() && self.auth_profiles.is_empty()
@@ -1049,6 +1086,8 @@ pub struct GlobalConfig {
     pub agent_worktree: AgentWorktreeConfig,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_merge: Option<AgentMergeConfig>,
+    #[serde(default)]
+    pub agent_memory_gate: AgentMemoryGateConfig,
 
     /// Web UI branding (DEV-218): default theme, display name, and logo/icon
     /// images given as paths relative to the repository.
@@ -1161,6 +1200,8 @@ pub struct ResolvedConfig {
     pub agent_worktree: AgentWorktreeConfig,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_merge: Option<AgentMergeConfig>,
+    #[serde(default)]
+    pub agent_memory_gate: AgentMemoryGateConfig,
 
     #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
     pub remotes: BTreeMap<String, SyncRemoteConfig>,
@@ -1421,6 +1462,7 @@ impl Default for GlobalConfig {
             agent_automation: None,
             agent_worktree: AgentWorktreeConfig::default(),
             agent_merge: None,
+            agent_memory_gate: AgentMemoryGateConfig::default(),
             ui_theme: None,
             ui_name: None,
             ui_logo: None,

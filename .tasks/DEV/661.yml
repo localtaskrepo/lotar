@@ -5,12 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-17T21:07:43.099870+00:00
+modified: 2026-11-17T21:28:37.216798+00:00
 relationships:
   depends_on:
   - local:LOCA-501
   related:
   - DEV-660
+  - DEV-623
+  - DEV-676
 comments:
 - date: 2026-11-17T17:21:46.437045+00:00
   author: automation
@@ -445,3 +447,15 @@ history:
   - field: tags
     old: health, fix-retried, retry-fix
     new: health
+- at: 2026-11-17T21:23:29.132831+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-501"],"related":["DEV-660"]}'
+    new: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623"]}'
+- at: 2026-11-17T21:28:37.216798+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623"]}'
+    new: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676"]}'
