@@ -5,10 +5,11 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T21:08:52.852170+00:00
-modified: 2026-11-17T00:10:54.656711+00:00
+modified: 2026-11-17T00:48:49.393709+00:00
 relationships:
   related:
   - DEV-613
+  - DEV-633
 comments:
 - date: 2026-11-16T23:41:38.923229+00:00
   author: claude
@@ -41,6 +42,14 @@ comments:
       result: not_run
       reason: needs a loaded machine
     next: Review, then merge
+- date: 2026-11-17T00:48:49.393709+00:00
+  author: claude
+  text: |-
+    Review restarted: the earlier review job failed while the disk was full, and its end rules never ran.
+
+    - `job-20261117T001051.648Z-6`: T3 setup script exited 1, then the end rules hit `No space left on device`, so the ticket sat at Reviewing/@review with no job.
+    - With 205 GiB free again: `status InProgress`, `assignee --clear`, `automation run "Answered in the thread: review on Codex" --select id:DEV-625` (same steps as repos.ts recovery). Queued for `review`.
+    - The missing retry is filed as DEV-633 (LOCA-493).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeec445cf-bb38-4f44-b052-6a4d7d637810
@@ -99,3 +108,32 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeec445cf-bb38-4f44-b052-6a4d7d637810
+- at: 2026-11-17T00:48:00.960562+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T00:48:01.018306+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-17T00:48:01.097154+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-17T00:48:35.656369+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613"]}'
+    new: '{"related":["DEV-613","DEV-633"]}'
+- at: 2026-11-17T00:48:49.393709+00:00
+  actor: claude
+  changes:
+  - field: comment_added

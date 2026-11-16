@@ -1,11 +1,11 @@
 title: The web server treats a failed socket read as end of request and truncates the body
-status: Merging
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@review'
 created: 2026-11-16T20:55:33.664464+00:00
-modified: 2026-11-16T23:55:07.883916+00:00
+modified: 2026-11-17T00:50:15.357332+00:00
 relationships:
   related:
   - DEV-615
@@ -42,6 +42,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adbac5943-5053-4239-a351-333ab440b5b5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b57ccc8-faa0-45dd-882c-3bfdcf2c4ebe
 description: 'Found while on DEV-615: `handle_connection` in `crates/lotar-lib/src/web_server.rs` reads headers and body with `stream.read(..).unwrap_or_default()`, so an `Interrupted` or timed-out read counts as EOF and the handler gets a cut body (a misleading 400 `Invalid body`). Check: a unit test feeding a stream that returns `Interrupted` once mid-body. Done: `Interrupted` is retried, other read errors close the connection without dispatching.'
 tags:
 - health
@@ -101,3 +102,20 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T00:46:39.106604+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b57ccc8-faa0-45dd-882c-3bfdcf2c4ebe
+- at: 2026-11-17T00:50:15.191666+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Reviewing
+- at: 2026-11-17T00:50:15.357332+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@review'

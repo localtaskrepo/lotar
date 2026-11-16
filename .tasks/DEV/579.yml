@@ -1,11 +1,11 @@
 title: 'Lotar build and development use too much disk and time per job: optimize, with measurements'
-status: HelpNeeded
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T19:57:40.271694+00:00
-modified: 2026-11-16T02:33:17.084005+00:00
+modified: 2026-11-17T01:02:20.862154+00:00
 relationships:
   related:
   - DEV-499
@@ -84,6 +84,11 @@ comments:
 
     - It changes `prepare_worktree` in `agent_job_service.rs` so that a headless job reuses the T3 thread's worktree that already has `agent/<ID>` checked out, which leaves one worktree and one `target/` per ticket in that case.
     - `e2f4698d` doesn't touch that file, so the two don't conflict.
+- date: 2026-11-17T01:00:40.161379+00:00
+  author: mallox
+  text: "Okay, A sounds good. \nAnd then, as follow-ups: I like the idea of copying existing data over, but I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux.\nAnd yes I agree with a ticket once measurements are in"
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36
 description: |-
   Owner, 2026-11-15, in his words: "we need to find a solution for the space being used up. Tasks need to clean up after them properly. At least on lotar we need to do something to optimize the build and development process." Related standing rule (owner 2026-11-15, STD-131): keep projects small and focused; lotar is the example of one that got so big it's hard to change, with long build times.
 
@@ -198,3 +203,24 @@ history:
   - field: relationships
     old: '{"related":["DEV-499","DEV-574","DEV-581"]}'
     new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604"]}'
+- at: 2026-11-17T01:00:40.161379+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:01:10.455918+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T01:02:08.945856+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T01:02:20.862154+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36

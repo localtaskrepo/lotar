@@ -23,6 +23,10 @@ const STOP_TIMEOUT: Duration = Duration::from_secs(5);
 /// It starts after the reap, so a child that exits late still gets the full
 /// window (DEV-632).
 const OUTPUT_CAPTURE_TIMEOUT: Duration = Duration::from_secs(15);
+// Per-read wait for a response. Generous so a loaded machine (full suite,
+// other worktrees' runs) still gets its answer (DEV-624); a real hang still
+// fails the test instead of stalling the run.
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(15);
 
 struct ServeChild {
     child: Option<Child>,
@@ -179,7 +183,7 @@ impl ServeChild {
 
     fn http_request(&self, method: &str, path: &str, body: Option<&str>) -> (u16, Vec<u8>) {
         let mut stream = self.connect();
-        stream.set_read_timeout(Some(Duration::from_millis(1_500))).unwrap();
+        stream.set_read_timeout(Some(RESPONSE_TIMEOUT)).unwrap();
         let payload = body.unwrap_or("");
         let req =
             format!("{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}", self.host, payload.len());

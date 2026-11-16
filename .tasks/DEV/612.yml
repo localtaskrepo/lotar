@@ -1,11 +1,11 @@
 title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
-status: Merging
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@review'
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-17T00:08:44.425583+00:00
+modified: 2026-11-17T00:59:17.831788+00:00
 relationships:
   depends_on:
   - DEV-602
@@ -13,6 +13,7 @@ relationships:
   - DEV-602
   - DEV-626
   - DEV-613
+  - DEV-631
 comments:
 - date: 2026-11-16T05:29:25.407255+00:00
   author: automation
@@ -337,3 +338,21 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T00:50:16.083639+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Reviewing
+- at: 2026-11-17T00:50:16.327072+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@review'
+- at: 2026-11-17T00:59:17.831788+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613"]}'
+    new: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613","DEV-631"]}'

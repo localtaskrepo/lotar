@@ -1,16 +1,37 @@
 title: 'A fix job on a branch whose worktree has uncommitted changes fails: git worktree add says the branch is already used'
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@fix'
 created: 2026-11-17T00:09:17.368337+00:00
-modified: 2026-11-17T00:09:25.863213+00:00
+modified: 2026-11-17T00:59:53.217814+00:00
 relationships:
   blocks:
   - DEV-613
   related:
   - DEV-613
+  - DEV-572
+  - DEV-585
+  - DEV-612
+  - DEV-628
+comments:
+- date: 2026-11-17T00:59:17.676750+00:00
+  author: claude
+  text: |-
+    No code change: the job failed because the disk was full, not because of the dirty worktree.
+
+    - All three t3 jobs started at 00:08 (`job-20261117T000834.721Z-1` DEV-613, `...835.458Z-2` DEV-628, `...836.539Z-3` DEV-612) failed with the same `git worktree add failed`. DEV-628 and DEV-612 had no dirty worktree.
+    - DEV-628's log the same second: `No space left on device (os error 28)`. The disk has 190 GB free now.
+    - Jobs that got this same "uncommitted changes, which LoTaR leaves alone" refusal started their new thread fine: `job-20261115T191140.785Z-9` (DEV-572), `job-20261115T215558.036Z-74` (DEV-585). T3 Code puts the new thread on a `t3/<id>` branch of its own, so the held `agent/<ID>` doesn't block it.
+    - First step for DEV-613 is done: its one-line fix is committed, signed, on `agent/DEV-613` as `51144732`.
+  report:
+    checks:
+    - command: start a fix job on a ticket whose branch worktree has uncommitted changes
+      result: not_run
+      reason: would start a real agent job; DEV-572 and DEV-585 logs already show it working
+    next: 'None: DEV-613 continues from 51144732'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af3e602dc-979e-4b35-b086-5a77ac7f079b
 description: 'Found: DEV-613 job-20261117T000834.721Z-1 (`lotar agent logs job-20261117T000834.721Z-1`). LoTaR leaves the dirty worktree `agent-DEV-613-435bae192ccea1c1` alone and starts a new T3 thread on `agent/DEV-613`; `git worktree add` fails because the branch is checked out in that worktree. Check: start a fix job on a ticket whose branch worktree has uncommitted changes. Done when: that job continues in the existing worktree (or commits the change) instead of failing. First step for DEV-613: the uncommitted one-line fix in that worktree (`dev503_harness_jobs_test.rs`) gets committed, signed, on `agent/DEV-613`.'
 tags:
 - health
@@ -34,3 +55,32 @@ history:
   - field: relationships
     old: '{"related":["DEV-613"]}'
     new: '{"blocks":["DEV-613"],"related":["DEV-613"]}'
+- at: 2026-11-17T00:50:57.222784+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T00:50:58.871489+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af3e602dc-979e-4b35-b086-5a77ac7f079b
+- at: 2026-11-17T00:59:17.676750+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:59:17.832570+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-613"],"related":["DEV-613"]}'
+    new: '{"blocks":["DEV-613"],"related":["DEV-613","DEV-572","DEV-585","DEV-612","DEV-628"]}'
+- at: 2026-11-17T00:59:53.217814+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

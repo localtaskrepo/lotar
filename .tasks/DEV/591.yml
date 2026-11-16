@@ -1,11 +1,11 @@
 title: Release v0.15.2
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-15T22:25:18.384081+00:00
-modified: 2026-11-16T23:41:12.715188+00:00
+modified: 2026-11-17T00:46:25.991608+00:00
 relationships:
   related:
   - DEV-513
@@ -26,6 +26,9 @@ comments:
     - Release record 0.15.2: added the 22 tickets merged since v0.15.1 that were in no release
     - Local gates green with `RUSTC_WRAPPER=` (sccache blocked by sandbox): `npm run lint:agent`, `npm run test:agent` (2271 Rust, 1548 UI), `npm run test:smoke:agent` (405)
     - QA: https://github.com/localtaskrepo/lotar/actions/runs/43981152570
+- date: 2026-11-17T00:46:25.946778+00:00
+  author: claude
+  text: 'Released: GitHub Release workflow passed (run 43982231114), Homebrew and crates.io have 0.15.2. The job''s last steps died on the Mac''s full disk; closed by the chief of staff.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3c02d887-954e-4552-8fbb-fcd95c2704df
 releases:
@@ -83,3 +86,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-513","DEV-581","DEV-626"]}'
     new: '{"related":["DEV-513","DEV-581","DEV-626","DEV-620"]}'
+- at: 2026-11-17T00:46:25.946778+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:46:25.991608+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
