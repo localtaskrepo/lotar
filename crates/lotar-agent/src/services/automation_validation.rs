@@ -87,6 +87,9 @@ fn validate_condition_group(group: &AutomationConditionGroup, config: &ResolvedC
             }
         }
     }
+    if let Some(error) = group.job.as_ref().and_then(|job| job.error.as_ref()) {
+        validate_condition_value("job.error", error, config, result);
+    }
     for (field, condition) in group.fields.iter() {
         validate_condition_value(field, condition, config, result);
     }

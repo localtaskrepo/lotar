@@ -240,6 +240,7 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         }),
     )
     .unwrap();
@@ -329,6 +330,7 @@ fn setting_the_current_value_back_lets_the_job_completed_rule_decide() {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         }),
     )
     .unwrap();
@@ -501,6 +503,7 @@ fn the_outcome_fires_the_updated_and_assigned_rules() {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         }),
     )
     .unwrap();

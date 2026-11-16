@@ -949,6 +949,7 @@ fn job_context_for(id: &str) -> Option<AutomationJobContext> {
         worktree_branch: state.record.worktree_branch.clone(),
         usage: state.record.usage.clone(),
         assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
+        error: state.record.summary.clone().filter(|_| state.record.status == AgentJobStatus::Failed),
     })
 }
 
@@ -1209,6 +1210,7 @@ fn instruction_template(
         worktree_branch: branch,
         usage: None,
         assignee_at_start: None,
+        error: None,
     };
     let workspace_root = repo_root.unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
     let lotar_bin = current_lotar_binary().map(|bin| bin.to_string_lossy().to_string()).unwrap_or_else(|| "lotar".to_string());

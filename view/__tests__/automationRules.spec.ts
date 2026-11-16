@@ -102,6 +102,20 @@ describe('automationRules utilities', () => {
         expect(describeConditions(rule.when).items).toEqual(['comment author is mallox'])
     })
 
+    it('flags job error conditions as yaml-only and describes them', () => {
+        const rule = {
+            name: 'Limit',
+            when: { job: { error: { matches: 'rate limit' } } },
+            on: { job_failed: { add: { tags: ['limited'] } } },
+        }
+        const state = getEditableRuleState(rule)
+
+        expect(state.editable).toBe(false)
+        expect(state.unsupportedReasons).toEqual(['Job error conditions are currently YAML-only.'])
+        expect(summarizeAutomationRule(rule).conditions).toEqual(['job error matches rate limit'])
+        expect(describeConditions(rule.when).items).toEqual(['job error matches /rate limit/'])
+    })
+
     it('describes tell_agent actions and keeps them yaml-only', () => {
         const rule = {
             name: 'Comments reach the agent',

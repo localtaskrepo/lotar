@@ -789,6 +789,53 @@ fn command_runner_failure_fires_job_failed() {
     assert!(refreshed.tags.iter().any(|t| t == "cmd-error"));
 }
 
+/// DEV-617: a `job: { error: ... }` condition sees why a job failed, so a
+/// job that failed on a rate limit isn't retried on the same provider.
+#[cfg(unix)]
+#[test]
+fn job_error_condition_tells_a_rate_limit_from_other_failures() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+
+    let limited =
+        write_stub_agent_script(fixtures.get_temp_path(), "limited.sh", "#!/bin/sh\necho 'Claude API rate limit reached. Try again later.'\nexit 1\n");
+    let broken = write_stub_agent_script(fixtures.get_temp_path(), "broken.sh", "#!/bin/sh\necho 'build failed'\nexit 1\n");
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "agents:\n  limited:\n    runner: command\n    command: \"{}\"\n  broken:\n    runner: command\n    command: \"{}\"\n",
+            limited.to_string_lossy(),
+            broken.to_string_lossy()
+        ),
+    );
+    let automation_yaml = "automation:\n  rules:\n    - name: Retry\n      when:\n        not: { job: { error: { matches: '(?i)rate limit|usage limit' } } }\n      on:\n        job_failed:\n          set: { assignee: \"@reporter\" }\n          add: { tags: [retried] }\n    - name: Limit\n      when:\n        job: { error: { matches: '(?i)rate limit|usage limit' } }\n      on:\n        job_failed:\n          set: { assignee: \"@reporter\" }\n          add: { tags: [limited] }\n";
+    AutomationService::set(&fixtures.tasks_root, None, automation_yaml).expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    for (agent, tag) in [("limited", "limited"), ("broken", "retried")] {
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate { title: format!("{agent} job"), project: Some("LIM".to_string()), reporter: Some("bob".to_string()), ..Default::default() },
+        )
+        .expect("create task");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent}")), ..Default::default() }).expect("update assignee");
+        let job = job_for_ticket(&created.id);
+        assert!(wait_for_job_status(&job.id, "failed", 3000), "{agent} job did not fail in time");
+
+        let start = Instant::now();
+        let task = loop {
+            let task = TaskService::get(&storage, &created.id, None).expect("get task");
+            if task.assignee.as_deref() == Some("bob") {
+                break task;
+            }
+            assert!(start.elapsed() < Duration::from_millis(3000), "job_failed rules did not run for {agent}: assignee={:?}", task.assignee);
+            sleep(Duration::from_millis(50));
+        };
+        assert_eq!(task.tags, vec![tag.to_string()], "{agent}");
+    }
+}
+
 /// Template expansion in automation `run` commands — `${{ticket.id}}` and `${{ticket.title}}`.
 ///
 /// Completion barrier: the run command's artifact, never job status. The
@@ -2072,6 +2119,7 @@ fn clarification_handoff_to_reporter_survives_job_failure() {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         }),
     )
     .expect("apply job failure");

@@ -70,6 +70,7 @@ const FIELD_NAMES: Record<string, string> = {
     release: 'release',
     releases: 'release',
     'comment.author': 'comment author',
+    'job.error': 'job error',
 }
 
 export function triggerText(event: AutomationEventKey): string {
@@ -165,6 +166,11 @@ export function describeConditions(when: unknown): { join: 'all' | 'any'; items:
             if (key === 'comment' && inner && typeof inner === 'object') {
                 const comment = inner as AutomationRecord
                 if (comment.author != null) items.push(describeCondition('comment.author', comment.author))
+                continue
+            }
+            if (key === 'job' && inner && typeof inner === 'object') {
+                const job = inner as AutomationRecord
+                if (job.error != null) items.push(describeCondition('job.error', job.error))
                 continue
             }
             items.push(describeCondition(key, inner))

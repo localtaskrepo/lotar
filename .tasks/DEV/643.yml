@@ -1,11 +1,11 @@
 title: lotar CLI writes fail with 'Storage lock still busy' for 40 s and more while the agent worker holds the lock
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:28:55.661113+00:00
-modified: 2026-11-18T05:48:44.527549+00:00
+modified: 2026-11-18T06:11:11.370039+00:00
 relationships:
   related:
   - DEV-632
@@ -160,6 +160,32 @@ comments:
     - command: ticket's load check
       result: not_run
       reason: the running worker is the old build
+- date: 2026-11-18T06:11:11.188450+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-643` is in `main`.
+
+    - Rebased `agent/DEV-643` onto `main` (`c763f96e9dbe`): `e8f910aed1d2`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `e8f910aed1d2`
+    - Amended the pending `.tasks` changes into the merged commit: `77b3b3ed474f`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[lotar-comment:storage-lock-wait]`
+  report:
+    commits:
+    - hash: 77b3b3ed4
+      what: DEV-643 lotar CLI writes fail with 'Storage lock still busy' for 40 s and more while the agent worker holds the lock
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5de768b9-c6ac-46bb-94a9-f73089fd03a4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80304b10-8469-4561-93fc-5bb7518d560c
@@ -167,7 +193,6 @@ references:
 description: 'Found: during the DEV-632 merge job (2026-11-16 ~18:27 PT, load ~60-70), 19 attempts in a row of `lotar --tasks-dir .../lotar/.tasks comment DEV-632 ...` failed with ''Storage lock .tasks/DEV/.task.lock is still busy after 2 seconds; mutation was not run''. lsof showed the lock held by `lotar ... agent worker` (pid 44303, running 1h40m); the 20th try went in. Filing this ticket then hit the same on `.tasks/@sprints/.sprints.lock`. Agent jobs get failed writes and must retry themselves. Check: under load, run lotar comment or add in DEV while the agent worker runs; it should not fail for tens of seconds. Done: the worker holds the locks only briefly, or CLI writes wait long enough, so a write goes in on the first try.'
 tags:
 - health
-- retry-fix
 custom_fields:
   finding: lotar-comment:storage-lock-wait
 history:
@@ -303,3 +328,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T06:11:11.188450+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:11:11.370039+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, retry-fix
+    new: health

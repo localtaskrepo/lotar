@@ -157,6 +157,10 @@ pub struct AutomationConditionGroup {
     /// never match on other events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comment: Option<AutomationCommentCondition>,
+    /// Conditions on the agent job of a job event (DEV-617). They never
+    /// match on other events.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job: Option<AutomationJobCondition>,
     #[serde(default)]
     pub custom_fields: HashMap<String, AutomationFieldCondition>,
     #[serde(flatten)]
@@ -178,6 +182,15 @@ pub struct AutomationCommentCondition {
     /// Comments that review nothing have no value (`exists: false`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review: Option<AutomationFieldCondition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AutomationJobCondition {
+    /// Why a failed job failed: its last message, such as the runner's
+    /// error (DEV-617). Jobs that didn't fail have no value (`exists: false`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<AutomationFieldCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

@@ -515,6 +515,7 @@ mod tests {
                 ..Default::default()
             }),
             assignee_at_start: None,
+            error: None,
         };
         let ctx = TemplateContext::new().with_job(Some(&job));
         assert_eq!(ctx.expand("${{agent.cost_usd}} / ${{agent.input_tokens}} / ${{agent.output_tokens}} / ${{agent.turns}}"), "0.0123 / 1200 / 300 / 3");

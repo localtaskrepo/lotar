@@ -274,6 +274,10 @@ pub struct AutomationJobContext {
     /// while it ran (DEV-566).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee_at_start: Option<String>,
+    /// Why a failed job failed, its last message (for `job: { error: ... }`
+    /// conditions, DEV-617); `None` for a job that didn't fail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -606,9 +610,10 @@ impl AutomationService {
         let rules = if moved { &[][..] } else { automation.automation.rules() };
 
         let active_sprints = compute_active_sprint_ids(&storage);
+        let changes = ChangeSet::job_event(&task, action_context.job.as_ref().and_then(|job| job.error.as_deref()));
         let mut actions = Vec::new();
         for (rule_idx, rule) in rules.iter().enumerate() {
-            if !matches_rule(rule, &task, &ChangeSet::empty(&task), MatchMode::Current, &config, &active_sprints) {
+            if !matches_rule(rule, &task, &changes, MatchMode::Current, &config, &active_sprints) {
                 continue;
             }
             let rk = rule_identity(rule, rule_idx);
@@ -3676,6 +3681,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
         let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
@@ -3713,6 +3719,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
         let lock = crate::storage::safety::acquire_storage_lock(&tasks_dir.join("PX"), "task").unwrap();
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
@@ -3743,6 +3750,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
         drop(held.borrow_mut().take());
@@ -3786,6 +3794,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
         let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job)).unwrap_err();
         assert!(err.to_string().contains("kept"), "{err}");
@@ -3835,6 +3844,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
         checkpoint_fault::set_disk_full(true);
         let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job("kept"))).unwrap_err();
@@ -3891,6 +3901,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
 
         AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job)).unwrap();
@@ -3955,6 +3966,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
         let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).unwrap_err();
         assert!(err.to_string().contains("waits for its end rules"), "{err}");
@@ -3998,6 +4010,7 @@ mod pending_outcome_tests {
             worktree_branch: None,
             usage: None,
             assignee_at_start: None,
+            error: None,
         };
         let status = || TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().status.as_str().to_string();
 

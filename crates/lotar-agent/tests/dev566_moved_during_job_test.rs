@@ -70,6 +70,7 @@ fn end_job(assignee_at_start: Option<&str>, moved_to: Option<&str>) -> (String, 
             worktree_branch: None,
             usage: None,
             assignee_at_start: assignee_at_start.map(str::to_string),
+            error: None,
         }),
     )
     .unwrap();

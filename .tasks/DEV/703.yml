@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-18T05:30:51.047164+00:00
-modified: 2026-11-18T06:01:56.100438+00:00
+modified: 2026-11-18T06:11:12.134002+00:00
 relationships:
   related:
   - DEV-697
@@ -35,6 +35,18 @@ comments:
     - command: cargo nextest run -p lotar-agent dev21_ticket_done_state_tests
       result: passed
     next: Review on another model, then merge
+- date: 2026-11-18T06:11:04.439834+00:00
+  author: claude
+  text: |-
+    Review: blocking. `b5d8f1c9a` conflicts with DEV-697 on main, and resolving it the branch's way brings the DEV-697 bug back.
+
+    - **Read:** the ticket, its comment, DEV-697/DEV-693, `docs/help/agent.md` (job history), `git log -5 main` for `agent_job_service.rs`. `npm ci` passed in this worktree.
+    - **Base is stale:** the branch forks at `f0fc02a1f`. Main has gained `c763f96e9` (DEV-697) since, which rewrote `ticket_keeps_its_jobs` (`crates/lotar-agent/src/services/agent_job_service.rs:3133` on main) so that `TaskLookupError::Ambiguous` → keep. Applying `b5d8f1c9a` to main gives a content conflict in that function and in the test module.
+    - **Bug if the branch's side wins:** at `agent_job_service.rs:3134` the branch does `let Ok(location) = …resolve_task_location(..) else { return false };`, which also drops the logs of an ID held by several roots. Checked in a scratch copy of main with the branch's function: `old_job_log_of_an_ambiguous_ticket_stays` fails. It also contradicts main's `docs/help/agent.md:485` ("… or whose ID several tasks roots hold" is never removed).
+    - **The fix itself is right:** with main's function, the new test `old_job_logs_of_archived_and_malformed_tickets_go` fails (the archived Todo ticket's log stays), so the bug is real and the test catches it.
+    - **Fix:** rebase onto main and merge the two versions: match on `resolve_task_location` first: `Ok(location) => !location.archived && ticket_done_state(..).is_none_or(|done| !done)`, `Err(Ambiguous { .. }) => true`, `Err(NotFound(_) | Invalid(_)) => false`. Keep both tests and DEV-697's doc comment wording plus "archived whatever its status". In a scratch copy of main this version passed all 4 `dev21_ticket_done_state_tests`.
+    - **"Done when" gap:** item 4 should also say that jobs of an ID held by several roots still stay (DEV-697), so the rework can't lose it.
+    - **Reran:** `cargo nextest run -p lotar-agent dev21_ticket_done_state_tests` on the branch passed (3/3). I didn't rerun full lint/test/smoke: the branch needs a rebase before they mean anything. No UI changes; no stray files.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3a7b67a-a3b1-4fc0-b101-30ecf4ca26de
 description: |-
@@ -50,6 +62,8 @@ description: |-
   - [ ] A test shows a 15-day-old log whose header ticket ID is malformed (e.g. `not-a-ticket`) is removed.
   - [ ] Both fail when `ticket_keeps_its_jobs` returns true for that case.
   - [ ] `ticket_keeps_its_jobs` drops an archived ticket's jobs whatever its status; open tickets' and unreadable tickets' jobs still stay.
+tags:
+- review-returned
 history:
 - at: 2026-11-18T05:30:51.670854+00:00
   actor: claude
@@ -113,3 +127,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T06:11:04.439834+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:11:04.665579+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-18T06:11:12.134002+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

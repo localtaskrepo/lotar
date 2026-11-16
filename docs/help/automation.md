@@ -71,6 +71,7 @@ Supported combinators:
 - `changes`: explicit from/to checks
 - `current`: conditions on the task as it is now
 - `comment`: conditions on the comment of a `commented` event
+- `job`: conditions on the agent job of a job event
 
 A field condition can also test the value with a regular expression, e.g. `title: { matches: '^\[ops\]' }`. Patterns use the same syntax as [search text](list.md#search-text); an invalid pattern is rejected when the rules are saved through LoTaR.
 
@@ -188,6 +189,23 @@ when:
 ```
 
 `lotar automation simulate --event commented` checks comment conditions against the ticket's latest comment and says whose it is (`Checked against the latest comment, by mallox.`).
+
+### Job conditions
+
+`job: { error: ... }` checks why an agent job failed: the job's last message, such as the runner's error (`t3 exited with exit status: 1: ... Claude API rate limit reached. Try again later.`). It takes any field condition; `matches` is case-sensitive, so add `(?i)` to ignore case. A job that didn't fail has no error and matches only `exists: false`. `job` conditions never match on other events, so put them only on rules with job hooks. This rule retries a failed job on another agent unless it failed on a usage limit, which the same provider would hit again:
+
+```yaml
+- name: Retry on another agent
+  when:
+    all:
+      - assignee: "@fix"
+      - not: { job: { error: { matches: '(?i)rate limit|usage limit' } } }
+  on:
+    job_failed:
+      set: { assignee: "@fix-retry" }
+```
+
+`lotar automation simulate` has no job to check, so a `job` condition doesn't match there.
 
 ### Special assignee placeholders
 

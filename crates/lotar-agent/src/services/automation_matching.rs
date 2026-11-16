@@ -1,5 +1,5 @@
 use crate::api_types::TaskDTO;
-use crate::automation::types::{AutomationCommentCondition, AutomationConditionGroup, AutomationFieldCondition, AutomationRule};
+use crate::automation::types::{AutomationCommentCondition, AutomationConditionGroup, AutomationFieldCondition, AutomationJobCondition, AutomationRule};
 use crate::config::types::ResolvedConfig;
 use crate::utils::tags::normalize_tags;
 use crate::utils::time;
@@ -23,6 +23,14 @@ pub(crate) struct ChangeSet {
     custom_fields: HashMap<String, FieldChange>,
     /// The comment of a `commented` event (DEV-383).
     comment: Option<CommentFacts>,
+    /// The agent job of a job event (DEV-617).
+    job: Option<JobFacts>,
+}
+
+#[derive(Debug, Clone)]
+struct JobFacts {
+    /// Why the job failed; `None` when it didn't.
+    error: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -89,7 +97,7 @@ impl ChangeSet {
             }
         }
 
-        Self { fields, custom_fields, comment: None }
+        Self { fields, custom_fields, comment: None, job: None }
     }
 
     pub(crate) fn empty(current: &TaskDTO) -> Self {
@@ -104,6 +112,12 @@ impl ChangeSet {
             verdict: comment.and_then(|comment| comment.review.as_ref()).map(|review| review.verdict.clone()),
         };
         Self { comment: Some(facts), ..Self::empty(current) }
+    }
+
+    /// No field changes: an agent job of `current` started or ended, and a
+    /// failed one failed for `error`.
+    pub(crate) fn job_event(current: &TaskDTO, error: Option<&str>) -> Self {
+        Self { job: Some(JobFacts { error: error.map(str::to_string) }), ..Self::empty(current) }
     }
 
     fn changed_field(&self, field: &str) -> Option<&FieldChange> {
@@ -145,7 +159,7 @@ impl ChangeSet {
     /// as `current`. The values before the update are unknown.
     fn only(current: &TaskDTO, fields: &[String]) -> Self {
         let mut all = Self::new(None, current);
-        let mut out = Self { fields: HashMap::new(), custom_fields: HashMap::new(), comment: None };
+        let mut out = Self { fields: HashMap::new(), custom_fields: HashMap::new(), comment: None, job: None };
         for field in fields {
             let key = change_key(field);
             if let Some(change) = all.fields.remove(&key) {
@@ -329,6 +343,12 @@ fn matches_group(
         return false;
     }
 
+    if let Some(job) = group.job.as_ref()
+        && !matches_job(job, changes)
+    {
+        return false;
+    }
+
     if !matches_field_map(&group.fields, current, changes, mode, config, state) {
         return false;
     }
@@ -382,6 +402,13 @@ fn matches_comment(condition: &AutomationCommentCondition, changes: &ChangeSet, 
     let author = comment.author.as_deref();
     matches_assignee_placeholder_str(author_condition, author, config)
         || matches_value_condition(author_condition, author.map(|value| AutomationValue::String(value.to_string())).as_ref())
+}
+
+fn matches_job(condition: &AutomationJobCondition, changes: &ChangeSet) -> bool {
+    let Some(job) = changes.job.as_ref() else {
+        return false;
+    };
+    condition.error.as_ref().is_none_or(|error_condition| matches_value_condition(error_condition, job.error.clone().map(AutomationValue::String).as_ref()))
 }
 
 fn matches_field_map(
