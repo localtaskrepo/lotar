@@ -5,10 +5,11 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-11T19:27:16.036194+00:00
-modified: 2026-11-17T17:56:05.704598+00:00
+modified: 2026-11-18T18:55:56.734953+00:00
 relationships:
   related:
   - DEV-663
+  - DEV-709
 comments:
 - date: 2026-11-11T19:46:26.433353+00:00
   text: 'Upstream already has it: issue https://github.com/pingdotgg/t3code/issues/29863 (CLI: add --effort to t3 thread start and send) and PR https://github.com/pingdotgg/t3code/pull/27189 (open, not reviewed yet as of 2026-11-11), which adds ''t3 thread start --effort <level>'' together with --provider/--model. Once it ships: pass the profile''s/run''s effort as --effort (the runner already passes provider and model), drop the job note. No new upstream request needed.'
@@ -72,3 +73,9 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-663"]}'
+- at: 2026-11-18T18:55:56.734953+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-663"]}'
+    new: '{"related":["DEV-663","DEV-709"]}'

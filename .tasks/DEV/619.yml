@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-18T02:34:23.662047+00:00
+modified: 2026-11-18T18:55:31.686674+00:00
 relationships:
   related:
   - DEV-613
@@ -17,6 +17,9 @@ relationships:
   - DEV-669
   - DEV-672
   - DEV-652
+  - DEV-709
+  - standards:STD-240
+  - standards:STD-189
 comments:
 - date: 2026-11-16T22:25:19.837146+00:00
   author: claude
@@ -402,3 +405,21 @@ history:
   - field: relationships
     old: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672"]}'
     new: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672","DEV-652"]}'
+- at: 2026-11-18T18:06:46.625516+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672","DEV-652"]}'
+    new: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672","DEV-652","DEV-709"]}'
+- at: 2026-11-18T18:55:31.087336+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672","DEV-652","DEV-709"]}'
+    new: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672","DEV-652","DEV-709","standards:STD-240"]}'
+- at: 2026-11-18T18:55:31.686674+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672","DEV-652","DEV-709","standards:STD-240"]}'
+    new: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672","DEV-652","DEV-709","standards:STD-240","standards:STD-189"]}'

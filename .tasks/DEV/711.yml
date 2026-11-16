@@ -1,0 +1,32 @@
+title: Usage-limit pause reads harnessmux 0.2.0's typed failures before the text match
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T19:41:49.921653+00:00
+modified: 2026-11-18T19:52:45.218211+00:00
+relationships:
+  depends_on:
+  - DEV-683
+  related:
+  - DEV-584
+description: |-
+  Follow-up of DEV-584, which pauses a job on a provider's usage limit by matching the failure text (`crates/lotar-agent/src/services/usage_limit.rs`). harnessmux 0.2.0 (DEV-683) is not released yet: crates.io has 0.1.10, which reports `TurnFailed { error }` with no kind or reset time.
+
+  ## Done when
+  - [ ] harnessmux bumped to 0.2.0 in `Cargo.toml`.
+  - [ ] `agent_job_service.rs` matches `EventBody::TurnFailed { error, .. }` and reads `kind` (rate_limited, quota) and `resets_at` before `usage_limit::find`; the text match stays as the fallback for runners that give no kind.
+  - [ ] A test with a fake harness that reports a typed rate-limit failure pauses the job until its `resets_at`.
+history:
+- at: 2026-11-18T19:41:50.540576+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-683"]}'
+    new: '{"depends_on":["DEV-683"],"related":["DEV-584"]}'
+- at: 2026-11-18T19:52:45.218211+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'

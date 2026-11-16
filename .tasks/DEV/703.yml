@@ -1,11 +1,11 @@
 title: 'Job-log pruning: no test that archived and malformed-ID tickets'' logs go'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T05:30:51.047164+00:00
-modified: 2026-11-18T06:23:30.669009+00:00
+modified: 2026-11-18T06:30:50.502364+00:00
 relationships:
   related:
   - DEV-697
@@ -81,6 +81,36 @@ comments:
     - **Tests:** the new `old_job_logs_of_archived_and_malformed_tickets_go` (archived Todo, `not-a-ticket`, open control) and DEV-697's ambiguous test are both present. The first review showed that main's function fails the new test
     - **Reran:** `npm ci` passed; `cargo nextest run -p lotar-agent dev21_ticket_done_state_tests` passed (4/4); `rustfmt --edition 2024 --check` on the file passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` passed. I didn't rerun full `npm test`/`npm run smoke`: the fix agent reports them passed, and the change touches one private function plus a test
     - **No findings:** no stray files, no second branch, nothing that needs the owner's decision. The worktree is clean
+- date: 2026-11-18T06:30:50.332573+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-703` is in `main`.
+
+    - Rebase onto `main` changed nothing (`bc017cd58f1f`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-703` onto `main` (`fc0d40d3fb7d`): `7d05bfa6a62c`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `7d05bfa6a62c`
+    - Amended the pending `.tasks` changes into the merged commit: `ee4e35a4ae92`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: fc0d40d3f
+      what: DEV-701 Agent action queues no job when the ticket's assignee is already that agent
+    - hash: ee4e35a4a
+      what: 'DEV-703 Job-log pruning: no test that archived and malformed-ID tickets'' logs go'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3a7b67a-a3b1-4fc0-b101-30ecf4ca26de
 description: |-
@@ -96,8 +126,6 @@ description: |-
   - [ ] A test shows a 15-day-old log whose header ticket ID is malformed (e.g. `not-a-ticket`) is removed.
   - [ ] Both fail when `ticket_keeps_its_jobs` returns true for that case.
   - [ ] `ticket_keeps_its_jobs` drops an archived ticket's jobs whatever its status; open tickets' and unreadable tickets' jobs still stay.
-tags:
-- review-returned
 history:
 - at: 2026-11-18T05:30:51.670854+00:00
   actor: claude
@@ -212,3 +240,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T06:30:50.332573+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:30:50.502364+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned
+    new: ''

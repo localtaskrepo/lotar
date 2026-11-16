@@ -1,11 +1,11 @@
 title: A job that fails on a provider's usage limit pauses until the reset instead of failing into retries and owner questions
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-18T03:18:26.778204+00:00
+modified: 2026-11-18T20:10:08.926261+00:00
 relationships:
   depends_on:
   - standards:STD-133
@@ -16,6 +16,11 @@ relationships:
   - DEV-617
   - DEV-663
   - DEV-683
+  - DEV-708
+  - DEV-686
+  - DEV-653
+  - DEV-711
+  - DEV-626
 comments:
 - date: 2026-11-16T00:14:23.282323+00:00
   author: claude
@@ -44,8 +49,65 @@ comments:
 - date: 2026-11-17T18:18:24.794329+00:00
   author: automation
   text: 'Automation rule ''Inbox: file what waits for the owner'' skipped on DEV-584. Skipped its run command: this repository''s automation rules and agent profiles have changed since you last trusted them. Review them with `lotar trust --status`, then run `lotar trust` (or set LOTAR_TRUST_ALL=1 in CI). The rule''s other actions applied.'
+- date: 2026-11-18T18:37:00.181526+00:00
+  author: triage
+  text: |-
+    Question answered by the facts: DEV-604's pause is on `main` now, so carry on with the usage-limit reason on top (your option a, the order DEV-604 set).
+
+    - DEV-686 landed it as `978bedf02` (`git log main --grep DEV-604`), with the review finding fixed (`take_held_try`).
+    - Build the usage-limit pause and the `job_paused` rule event on that code; no port needed.
+- date: 2026-11-18T19:42:35.513807+00:00
+  author: claude
+  text: |-
+    Done: a job that stops on a provider's usage limit now pauses until the reset and runs again on the same profile. It no longer fails.
+
+    - The limit is found in the job's error, last message and events: `crates/lotar-agent/src/services/usage_limit.rs`. It reads Codex's "try again at Nov 20th, 2026 7:43 PM", Claude's "resets 3pm (Europe/Berlin)", RFC 3339 times, epochs and "try again in N minutes".
+    - When no time is named the job waits `LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS` (default `3600`). A limit wins over a real failure in the same job. A retry that hits the limit again pauses again, with no cap.
+    - The job ends as `paused`, so no `job_failed` rule runs and the ticket keeps its status and assignee. The retry waits in the queue (`not_before`) and the queue itself stays open. `lotar agent list-jobs` shows `paused (until <time>)`, and `agent queue` gives the reason.
+    - New rule event `job_paused` (alias `pause`): in automation YAML, `simulate`, the web UI's rule editor and `docs/help/automation.md`. The REST shape of a job record is unchanged.
+    - Not done: harnessmux's typed failures. 0.2.0 isn't released (crates.io has `0.1.10`), so it moves to DEV-711, which waits on DEV-683.
+    - The DEV-617 test used a rate limit as its example failure. A rate limit now pauses, so the test uses a worktree-setup failure instead.
+    - The standards rule `configs/lotar/automation.yml` (`not … rate limit|usage limit` on `job_failed`) no longer matters, but it does no harm.
+  report:
+    commits:
+    - hash: e837e05f
+      what: the usage-limit pause, the job_paused event, docs and tests (branch t3/usage-limit-pause)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration dev584
+      result: passed
+    next: merge t3/usage-limit-pause; DEV-711 once harnessmux 0.2.0 is out
+- date: 2026-11-18T20:09:57.966160+00:00
+  author: claude
+  text: |-
+    Review: blocking. Any failed job whose agent merely *talked* about a rate limit pauses and reruns every hour, with no end.
+
+    Reviewed `e837e05f0` (the only commit on `main..HEAD`; `t3/usage-limit-pause` is the same commit). Reran: `npm ci` (passed), `cargo nextest run --cargo-profile dev -E 'test(usage_limit) | test(dev584) | test(dev617) | test(automation) | test(pause) | test(queue)'` (208 passed), `npm run lint:agent` (passed), `vitest view/utils` (passed). `npm test` and `npm run smoke` in full: not rerun. No UI screenshots: the diff changes only `view/utils`, not pages, components or styles.
+
+    **Blocking**
+    - `crates/lotar-agent/src/services/agent_job_service.rs:5146` (`usage_limit_pause`) reads `failure_texts`: the agent's last message and the job's last 10 events. Those events hold the agent's reply parts (`agent_job_message`) and its tool calls (`Tool: <command>`, line ~4367). The pattern in `usage_limit.rs:400` is ordinary English (`rate limit`, `usage limit`, `too many requests`, `try again at`).
+      - Failure case: an agent on DEV-711, or any review of this ticket, runs `rg "rate limit"` or writes "the rate limit test fails". The job then fails for a real reason (stall, failed commit, exit 1). It becomes `paused`, waits an hour, runs again in full, and repeats forever. No `job_failed` rule runs and nobody is asked. That is the loop this ticket was meant to end, now silent and with no cap.
+      - DEV-604 avoids this with patterns no prose contains (`ENOSPC`, `os error 28`). These patterns don't have that protection.
+      - Fix: match only what the runner or provider reports. That means LoTaR's failure note (`t3 exited …: <stderr>`, the command runner's error) and the `TurnFailed { error }` / `Notice` texts. Not agent messages or `Tool:`/`Failed:` lines. Mark those events, or collect them separately, at `agent_job_service.rs:4441`.
+      - Add a test: last message "I checked the rate limit code", failing exit, no limit from the runner. The job must fail, not pause.
+    - Done-when "Uses harnessmux's typed failures" is not met. The fix agent moved it to [DEV-711](https://lotar.pyxzl.net/task/DEV-711). The owner didn't decide that split.
+      - harnessmux `main` already has it (`efc17df` DEV-683, `TurnFailed { error, kind, resets_at, retryable }`). Only the 0.2.0 release is missing; crates.io and `Cargo.toml` are on `0.1.10`.
+      - Fix: ask the owner. Either he releases harnessmux 0.2.0 and DEV-584 uses it, or he accepts DEV-711 as the follow-up. Don't guess.
+
+    **For the rework to check (not blocking on its own)**
+    - `docs/help/agent.md:184` says T3 Code itself resumes a turn it paused for a usage limit. The thread may then resume at the reset while LoTaR's queued retry waits for it. Since the ticket has a queued entry, the thread isn't taken over (DEV-626), so its outcome isn't recorded and the retry runs the work once more. Confirm or rule this out with a test.
+
+    **Holds**
+    - No `job_failed` rule runs and the ticket keeps its status and assignee. The retry goes first on the same profile with `not_before`, and the worker stays alive while it waits (`agent_queue_service.rs:584`). `list-jobs` shows `paused (until …)`. `job_paused` works in YAML, `simulate`, the UI and the docs. The fake-t3 tests cover Codex's and Claude's messages and a pause that repeats.
+    - `update_job_failure` now runs `job_paused` rules for DEV-604 queue pauses too. The docs say so; that is fine.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae237cd7b-56b1-4808-8d93-a5027ca90283
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e0c894c-8d31-47dc-b9c6-2d4724c64a55
 description: |-
   Step 2 of standards STD-133 (owner 2026-11-15: "Detect usage-limit and quota failures as their own state and pause cleanly instead of looping @fix retries or blaming code bugs; stop asking me the same question repeatedly."). Waits for step 1 (STD-133: no merge without a passed review), in the owner's order.
 
@@ -60,6 +122,8 @@ description: |-
   - [ ] Rules can match the new event (for example `job_paused`), so standards' rules can comment once instead of asking.
   - [ ] Uses harnessmux's typed failures (DEV-683): bump harnessmux to 0.2.0, match `EventBody::TurnFailed { error, .. }` in `agent_job_service.rs`, and read `kind` (rate_limited, quota) and `resets_at` before the text match.
   - [ ] Tests with a fake t3 that prints Codex's message, as in standards `scripts/automation.test.ts` (STD-130).
+tags:
+- review-returned
 history:
 - at: 2026-11-16T00:14:23.282323+00:00
   actor: claude
@@ -159,3 +223,92 @@ history:
       - [ ] Rules can match the new event (for example `job_paused`), so standards' rules can comment once instead of asking.
       - [ ] Uses harnessmux's typed failures (DEV-683): bump harnessmux to 0.2.0, match `EventBody::TurnFailed { error, .. }` in `agent_job_service.rs`, and read `kind` (rate_limited, quota) and `resets_at` before the text match.
       - [ ] Tests with a fake t3 that prints Codex's message, as in standards `scripts/automation.test.ts` (STD-130).
+- at: 2026-11-18T18:06:39.325425+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708"]}'
+- at: 2026-11-18T18:37:00.181526+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:37:02.124902+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686"]}'
+- at: 2026-11-18T18:37:06.259655+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T18:37:08.435064+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-18T18:48:54.942432+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653"]}'
+- at: 2026-11-18T19:14:08.544320+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T19:14:27.885256+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e0c894c-8d31-47dc-b9c6-2d4724c64a55
+- at: 2026-11-18T19:41:50.540118+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711"]}'
+- at: 2026-11-18T19:42:35.513807+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:42:53.395064+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T20:09:57.966160+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:09:58.316392+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626"]}'
+- at: 2026-11-18T20:09:58.560499+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-18T20:10:08.926261+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

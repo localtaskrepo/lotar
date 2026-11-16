@@ -1,0 +1,177 @@
+title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
+status: Reviewing
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@review-light'
+created: 2026-11-18T18:04:32.586592+00:00
+modified: 2026-11-18T20:10:59.779050+00:00
+relationships:
+  related:
+  - DEV-568
+comments:
+- date: 2026-11-18T18:52:37.734689+00:00
+  author: claude
+  text: |-
+    Copied the standard again; the copy is now byte-identical to its source.
+
+    - `.tasks/DEV/automation.yml` had no repo additions, so nothing to keep at the end
+    - New in the copy: the `waits` tag, the "Fix waits: Blocked" rule, the `agent.merge` merge wording (STD-207, STD-188)
+    - `cmp ~/Development/standards/configs/lotar/automation.yml .tasks/DEV/automation.yml` passes
+    - `repos.ts` reads the main checkout, so it still lists the drift until the merge
+    - Not run: lint, tests, smoke (no code changed). Rules edited, so `lotar trust` is needed after the merge
+    - Commit `90891ed26`
+  report:
+    commits:
+    - hash: 90891ed26
+      what: .tasks/DEV/automation.yml copied again from standards configs/lotar/automation.yml
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: not_run
+      reason: it reads the main checkout; the merge agent reruns it after the merge
+    - command: cmp configs/lotar/automation.yml .tasks/DEV/automation.yml
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: no code changed, only the rules YAML
+    next: Merge, then lotar trust (owner 2026-11-11), then rerun the drift check
+- date: 2026-11-18T19:43:26.157547+00:00
+  author: claude
+  text: |-
+    Review: blocking. The copy was identical when made, but the standard has moved on since, so drift remains.
+
+    - Read: diff of `90891ed26` (only `.tasks/DEV/automation.yml`), the ticket, `git log` of `configs/lotar/automation.yml` in standards
+    - Since the fix (10:52 PST) the standard got `a802865` (STD-189) and `b2001c0` (STD-234), both 2026-11-18 after 11:26
+    - `cmp ~/Development/standards/configs/lotar/automation.yml .tasks/DEV/automation.yml` now differs; `diff` shows:
+      - the "First rename this thread" lines (fix, work and rework prompts) are gone in the standard, still in the copy
+      - rework profile lacks `thread_name: "${{ticket.id}} rework: ..."` in the copy
+      - owner-inbox comment and the extra rule condition (assignee mallox + current tag owner) are missing in the copy
+    - "Done when" asks the copy to match the source; merging now leaves `[drift:.tasks/DEV/automation.yml]` listed
+    - Fix: copy `~/Development/standards/configs/lotar/automation.yml` over `.tasks/DEV/automation.yml` again, amend the commit, `cmp` right before finishing; run `lotar trust` after the merge
+    - The earlier part (waits tag, "Fix waits" rule, `agent.merge`) is correct and the YAML parses
+    - Not run: lint, tests, smoke (rules YAML only)
+- date: 2026-11-18T20:10:37.744945+00:00
+  author: claude
+  text: |-
+    Rework done: the copy matches the standard again, commit amended to `b1090da94`.
+
+    - Review read `90891ed26` (the HEAD I started from), so it was the right commit
+    - Copied `~/Development/standards/configs/lotar/automation.yml` over `.tasks/DEV/automation.yml` again; this adds STD-189 (`a802865`) and STD-234 (`a5e9d54`) on top of the earlier STD-207/STD-188 parts
+    - No repo additions in the file, so nothing kept at the end
+    - `cmp` right before finishing: identical to the source; the YAML parses
+    - Commit is signed, not pushed
+    - Not run: lint, tests, smoke (rules YAML only). `lotar trust` is needed after the merge
+    - If the standard moves again before the merge, the drift check lists the file again
+  report:
+    commits:
+    - hash: b1090da94
+      what: copy configs/lotar/automation.yml over .tasks/DEV/automation.yml
+    checks:
+    - command: cmp ~/Development/standards/configs/lotar/automation.yml .tasks/DEV/automation.yml
+      result: passed
+    - command: 'ruby YAML.load_file (aliases: true)'
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: rules YAML only
+    - command: npm test
+      result: not_run
+      reason: rules YAML only
+    - command: npm run smoke
+      result: not_run
+      reason: rules YAML only
+    next: Merge, then run lotar trust (rules changed)
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A705af74a-f7b4-4889-b67b-169c4fb3e567
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9351309b-53ad-46ed-865a-93b0ce6995ff
+description: |-
+  .tasks/DEV/automation.yml: configs/lotar/automation.yml changed since the copy (3 commits: git -C ~/Development/standards log -- configs/lotar/automation.yml)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `drift:.tasks/DEV/automation.yml`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[drift:.tasks/DEV/automation.yml]` while the problem is there.
+
+  ## Done when
+
+  The copy matches its source in ~/Development/standards/configs again (repo additions kept at its end) and the repo's checks pass.
+tags:
+- health
+- light
+- review-returned
+custom_fields:
+  finding: drift:.tasks/DEV/automation.yml
+history:
+- at: 2026-11-18T18:04:37.149633+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-18T18:51:20.945833+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T18:51:31.171426+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A705af74a-f7b4-4889-b67b-169c4fb3e567
+- at: 2026-11-18T18:52:37.734689+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:52:48.567734+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-light'
+    new: '@review-light'
+- at: 2026-11-18T19:43:26.005249+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, light
+    new: health, light, review-blocked
+- at: 2026-11-18T19:43:26.157547+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:43:31.422030+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review-light'
+    new: '@fix-light'
+  - field: tags
+    old: health, light, review-blocked
+    new: health, light, review-returned
+- at: 2026-11-18T20:10:10.536424+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-18T20:10:12.631235+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9351309b-53ad-46ed-865a-93b0ce6995ff
+- at: 2026-11-18T20:10:37.744945+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:10:59.779050+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-light'
+    new: '@review-light'

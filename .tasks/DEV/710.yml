@@ -1,0 +1,89 @@
+title: 'A completed t3 job never settles its T3 Code thread: settle_t3_thread returns before calling T3 and leaves no note'
+status: Reviewing
+priority: High
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-18T19:15:05.822593+00:00
+modified: 2026-11-18T20:00:47.608769+00:00
+relationships:
+  related:
+  - DEV-629
+  - DEV-652
+comments:
+- date: 2026-11-18T20:00:36.631324+00:00
+  author: claude
+  text: |-
+    Cause: 0.15.4 doesn't contain DEV-652. Fixed the silent exits; the live check needs release 0.15.5.
+
+    - Tag `v0.15.4` is `592abd9c4`, before DEV-652 `da8d50d0e`; DEV-652 is in release 0.15.5 (`.tasks/@releases/10.yml`)
+    - The installed binary has none of the settle notes (`grep -a "Settled the T3 Code thread"` in `/opt/homebrew/Cellar/lotar/0.15.4/bin/lotar` finds 0), and the DEV-629 log still carries the pre-DEV-652 "Pointed agent/DEV-629 at t3/…" note
+    - On main, the settle already works: `dev503_harness_jobs_test.rs` covers settling, staying active, and a refusal
+    - `settle_t3_thread` now notes "was not settled: the job has no harnessmux session" and "… session X can't be read: …" instead of returning silently
+    - Two exits stay silent, on purpose: a job that isn't a t3 job (it has no thread) and a job no longer in the registry (there's no log to note in)
+    - New test `a_t3_job_that_cannot_settle_its_thread_says_why` failed before the fix and passes after it
+  report:
+    commits:
+    - hash: c501383ba
+      what: settle_t3_thread notes a missing or unreadable harnessmux session
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2380 Rust, 1562 UI tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: live t3 job settles its thread
+      result: not_run
+      reason: needs release 0.15.5 installed
+    next: Review, merge, then rerun the ticket's check after 0.15.5 is installed
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa61fe3f-cbf9-4b4e-88f2-4ca921629f53
+description: |-
+  Found (chief of staff, 2026-11-18): lotar 0.15.4 includes DEV-652 (da8d50d0e), which should settle a completed t3 job's thread when the ticket doesn't wait for a person (owner 2026-11-17: "moving threads into settled that I didn't need to look at are also a good idea"). No job does it. 20 finished job threads of Done, Reviewing and Merging tickets across lotar, standards, local, gairola, mailgpg and autospec stayed unsettled, and the owner reads them as spam. None of the t3 job logs since the install has a note from settle_t3_thread, neither 'Settled the T3 Code thread', 'was not settled' nor 'stays active'. Example: job-20261118T185623.076Z-10 (DEV-629) ends with agent_job_completed, then 'DEV-629 is now Reviewing, assigned to @review', and nothing after that. Settling by hand worked on the same session: `harnessmux settle lotar-95e687-DEV-629-fix` returned the thread link. So one of the silent early returns in crates/lotar-agent/src/services/agent_job_service.rs settle_t3_thread fires: the registry entry or its session_id is missing, the runner is not 't3', or agent_runner::registry().load(&session) fails.
+
+  Check: run one t3 job to completion on a ticket that moves to an agent-assigned status (e.g. Reviewing, @review). Its thread lands in T3's Settled group, and its log carries 'Settled the T3 Code thread <link>'. A HelpNeeded ticket or one assigned to a person keeps its thread active and logs 'stays active'.
+
+  Done when: the cause is fixed, with a test that failed before the fix; every early return in settle_t3_thread logs a job note saying why it didn't settle; the check above passes live after the release.
+tags:
+- health
+custom_fields:
+  finding: t3-settle:job-end
+history:
+- at: 2026-11-18T19:15:06.073498+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-629","DEV-652"]}'
+- at: 2026-11-18T19:15:06.340557+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T19:52:49.844919+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T19:52:55.038198+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa61fe3f-cbf9-4b4e-88f2-4ca921629f53
+- at: 2026-11-18T20:00:36.631324+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:00:47.608769+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

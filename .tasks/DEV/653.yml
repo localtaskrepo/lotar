@@ -1,11 +1,11 @@
 title: 'Partial cleanup per step: each job step removes the build output the next step doesn''t use, measured'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-17T06:51:34.275016+00:00
-modified: 2026-11-18T05:55:56.912682+00:00
+modified: 2026-11-18T20:11:46.419764+00:00
 relationships:
   depends_on:
   - DEV-652
@@ -15,6 +15,9 @@ relationships:
   - DEV-697
   - DEV-701
   - DEV-703
+  - DEV-707
+  - DEV-584
+  - DEV-712
 comments:
 - date: 2026-11-18T05:55:39.106810+00:00
   author: claude
@@ -41,8 +44,101 @@ comments:
 - date: 2026-11-18T05:55:47.609737+00:00
   author: claude
   text: 'Correction to the comment above: the function is `finalize_job` in `crates/lotar-agent/src/services/agent_job_service.rs`, not `finish_job`.'
+- date: 2026-11-18T07:05:40.156824+00:00
+  author: mallox
+  text: 'Answer: yes (Yes, build the waiting-state rule and run it on a real ticket) (answered in INBOX-526)'
+- date: 2026-11-18T18:48:54.527324+00:00
+  author: claude
+  text: |-
+    **Waiting rule built** (commit 991766690, branch `t3/partial-build-cleanup-per-step`, not merged).
+
+    - New `lotar agent worktree run <TICKET> -- <cmd>`: runs a command in the ticket's agent worktrees. It runs nothing if a job runs for the ticket or there is no worktree.
+    - Rule in `.tasks/DEV/automation.yml`: on HelpNeeded/Blocked → `cargo clean --workspace` (keeps dependencies).
+    - Docs: `agent.md` (new section), `automation.md`.
+
+    **Measured**
+    - `target/` 3.4 GB → 0.7 GB in ~1 s (incremental and lotar crates gone, deps kept).
+    - Resume rebuild (`cargo build --bins --tests`): 55 s, with the Mac under heavy load (load 77).
+
+    **Real tickets**
+    - DEV-584 (HelpNeeded): cleaned 2.7 GiB in 1.06 s. I had copied a build into its worktree for the test, and I removed it afterwards.
+    - DEV-653 itself: skipped, since its job is running.
+
+    **Live:** this needs a lotar release. The server's 0.15.4 doesn't know the command, so it fails, and `ignore_failure` swallows that.
+    **Standards copy:** [STD-236](https://standards.pyxzl.net/task/STD-236), Blocked until this lands.
+  report:
+    commits:
+    - hash: '991766690'
+      what: lotar agent worktree run + waiting rule (HelpNeeded/Blocked → cargo clean --workspace), docs
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Release lotar with `agent worktree run`; until then the server's 0.15.4 fails the rule's command and ignores it. Then STD-236 copies the rule into standards.
+- date: 2026-11-18T19:39:23.857365+00:00
+  author: claude
+  text: |-
+    Review: blocking. The new command works, but the rule misses most of the ways a ticket starts to wait, and the docs say it covers them. The rule never ran end to end either.
+
+    Read: commit `991766690` (same as `t3/partial-build-cleanup-per-step`), the ticket and its comments, the fix agent's session log, `.tasks/DEV/automation.yml`, `finalize_job`/`apply_job_end_rules` in `agent_job_service.rs`, and `automation_service.rs`.
+
+    **Blocking**
+    1. **The rule misses most waits.** `docs/help/agent.md:447` says the build output goes "when a ticket goes to HelpNeeded or Blocked … also when a job's hand-back sets it". The rule only fires on a person's or an agent's own status change: a hand-back outcome goes through `apply_job_outcome` → `apply_task_update` (`automation_service.rs:2434`). These waits write with `TaskUpdateContext::automation_disabled()` and never fire it:
+       - rules that set HelpNeeded: review failed, third blocking review, fix failed again, merge failed again (`.tasks/DEV/automation.yml:321`, `:467`, `:543`, `:611`; "A rule's own change fires no other rule", `:149`)
+       - a T3 thread that waits for an answer (`hand_back_waiting_job`, `agent_job_service.rs:3582`)
+       - Blocked on open prerequisites (`mark_task_blocked`, `automation_service.rs:2985`)
+
+       Adding the command to those rules' `run` won't help: end rules run while the job is still registered (`end_and_take_outcome` comes after them), so `worktree run` would skip. Fix: let the job's end clean a ticket it leaves waiting (next to `remove_build_output` in `finalize_job`). Otherwise, have `agent.md:447` and the comment at `automation.yml:896` name exactly the waits the rule covers, and file the rest as a follow-up.
+    2. **Done-when 2 isn't met ("checked, not assumed").** The rule never fired on a real status change. The checks were `automation simulate` plus the command run by hand on DEV-584 with a copied build. The merge job sets Done, so the ticket would close with this unchecked. Fix: put the worktree's `target/debug/lotar` first on PATH and make a real status change (`lotar status <ticket> HelpNeeded`) on a ticket with a worktree. Show that `target/` shrank, and that a job-end hand-back does it too. Or keep the ticket open for the post-release check and say so in `--next`.
+
+    **Holds**
+    - `lotar agent worktree run`: the busy check uses the job file and the in-process registry, the command runs only in the ticket's worktrees, and a failure fails the run.
+    - The STD-95 change has the owner's yes (2026-11-18, INBOX-526). STD-236 holds the standards copy.
+    - No stray files. The fix agent's measurements are in its comment.
+
+    **Reran** (`npm ci` passed):
+    - `npm run -s lint:agent`: passed, no output.
+    - `cargo nextest run -p lotar-lib --test integration agent_safety_test`: 34/34 passed after `cargo build -p lotar --bin lotar`. Without that build, the new test failed with "unrecognized subcommand 'run'" (stale binary; the npm test script builds it).
+    - `npm run smoke`: not rerun; no UI or REST change.
+- date: 2026-11-18T20:11:33.909508+00:00
+  author: claude
+  text: |-
+    Rework: both review findings fixed (commit `05ea0d37e`, amended, signed). Review read HEAD `991766690`.
+
+    **1. Rule misses most waits** → docs now say exactly what it covers; the rest is [DEV-712](https://lotar.pyxzl.net/task/DEV-712).
+    - Covers: a person's status change, and an agent's hand-back during its job (applied, and fires the rule, once the job ended).
+    - Not covered, build output stays until Done: a rule's own HelpNeeded (failed review/merge), a T3 thread waiting for an answer, Blocked on prerequisites. Fixing those needs a job-end hook and a design choice on how lotar knows "waiting"; firing `updated` for rule changes would break "a rule's own change fires no other rule".
+    - Updated `docs/help/agent.md` (Build output while a ticket waits) and the rule comment in `.tasks/DEV/automation.yml`.
+
+    **2. Never ran end to end** → new test `waiting_rule_drops_build_output_on_hand_back_and_person_change_only` (`crates/lotar-lib/tests/agent_safety_test.rs`), real job, real worktree, real CLI:
+    - the agent runs `lotar status <id> HelpNeeded` during its job → after the job, `target/debug` is gone
+    - a person's `lotar status` Todo keeps it, HelpNeeded drops it
+    - a `job_completed` rule setting HelpNeeded keeps it (pins the limit; DEV-712 flips it)
+    - A live check on a real DEV ticket isn't possible yet: the server runs 0.15.4 without the command, and a test status change on a real ticket would open owner inbox tickets. Left as `--next` after the release.
+  report:
+    commits:
+    - hash: 05ea0d37e
+      what: worktree run + waiting rule, docs name the waits it covers, end-to-end test
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2374 Rust, 1561 frontend, 7 hooks
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: waiting rule on a real ticket with the server
+      result: not_run
+      reason: needs a lotar release (server 0.15.4 lacks agent worktree run)
+    next: 'After the release: set a real ticket with a worktree to HelpNeeded (or let an agent hand one back) and check target/ shrank; then STD-236 copies the rule'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A509492fe-d1ac-4c44-887b-244e75950add
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac8df013-267a-4c25-a134-08054d18ee06
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5ca3f513-1bed-4499-9fcd-298dd84d5836
 description: |-
   Owner 2026-11-17, in his words: "We could even do partial cleanup this way for things that are no longer need after a phase". He picked "Follow-up after DEV-652" (chief of staff options picker).
 
@@ -61,6 +157,8 @@ description: |-
   - [ ] Measurements in a comment (sizes per part, rebuild time per step, before and after).
   - [ ] The kept rules run on a real ticket through fix, review and merge (checked, not assumed); docs/help/automation.md and agent.md say so.
   - [ ] lint, tests and smoke pass.
+tags:
+- review-returned
 history:
 - at: 2026-11-17T07:05:48.712571+00:00
   actor: claude
@@ -107,3 +205,98 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-18T07:05:40.156824+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T07:05:40.611419+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T18:04:40.851770+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703"]}'
+    new: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707"]}'
+- at: 2026-11-18T18:32:38.072378+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T18:32:39.923929+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac8df013-267a-4c25-a134-08054d18ee06
+- at: 2026-11-18T18:48:54.527324+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:48:54.942879+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707"]}'
+    new: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584"]}'
+- at: 2026-11-18T18:49:16.776343+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T19:39:23.857365+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:39:25.080273+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-18T19:39:40.216320+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-18T20:00:52.130658+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-18T20:00:54.083128+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5ca3f513-1bed-4499-9fcd-298dd84d5836
+- at: 2026-11-18T20:06:25.107244+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584"]}'
+    new: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584","DEV-712"]}'
+- at: 2026-11-18T20:11:33.909508+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:11:46.419764+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

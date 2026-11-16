@@ -1,0 +1,154 @@
+title: A job that fails on a usage limit is summarised as "The agent reported no cost" instead of the limit error
+status: Merging
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-18T17:10:47.476966+00:00
+modified: 2026-11-18T20:13:07.035177+00:00
+comments:
+- date: 2026-11-18T18:50:53.353327+00:00
+  author: claude
+  text: |-
+    Fixed: a failed turn's error stays the job's summary; the "reported no cost" note is in the log only.
+
+    - Cause: `finish` in `drive_turns` (`crates/lotar-agent/src/services/agent_job_service.rs`) wrote the note via `progress`, which also set `last_message`, the source of the summary.
+    - Now it records the event without touching `last_message`.
+    - Test `a_failed_turns_error_stays_the_last_message_when_no_cost_came`: a rate-limit `TurnFailed` with a budget and no cost; failed before the fix.
+    - Check command in standards still lists 51 such jobs: old records, the fix applies to new jobs.
+  report:
+    commits:
+    - hash: bf613ebed
+      what: budget note goes to the log only
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: via lint:agent
+    - command: npm test
+      result: passed
+      reason: via test:agent, 2380 Rust tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review, then merge
+- date: 2026-11-18T19:49:26.301862+00:00
+  author: claude
+  text: |-
+    Review: passed. A failed turn's error now stays the job's summary; the budget note is in the log only.
+
+    - Read: `bf613ebed` (only `crates/lotar-agent/src/services/agent_job_service.rs`), the ticket, AGENTS.md, the last 5 main commits to the file. No newer ticket branch; no stray files.
+    - `finish` in `drive_turns` (line 4273) now records the note with `record_and_emit` without setting `last_message`; finalize (line 5052) copies `last_message` to `summary`, so the `TurnFailed` error (line 4446) stays. A completed job keeps the agent's reply as summary too, which the same note used to replace.
+    - `pause_cause` (line 5167) still sees the note among the last 10 events; saved jobs take `summary` from the status record. Nothing else depended on the note being the last message.
+    - Test `a_failed_turns_error_stays_the_last_message_when_no_cost_came` covers "Done when". Against the old code its `last_message` assert would fail (the old `progress` set it to the note). I didn't run it on the old code.
+    - Reran: `npm ci` passed, `npm run lint:agent` passed, `npm run test:rust:agent` passed (2380 tests). `npm run smoke` not rerun: backend-only change, and the fix agent ran it (405 passed).
+    - No UI change, no owner decision touched, no tickets filed.
+- date: 2026-11-18T20:13:07.035177+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (86461799) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 4 tests still running
+    ────────────
+         Summary [  76.205s] 2325/2380 tests run: 2324 passed, 1 failed, 0 skipped
+            FAIL [   6.638s] (2321/2380) lotar-lib::integration web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+      stdout ───
+
+        running 1 test
+        test web_api_integration_test::sse_delivers_during_a_steady_stream_of_events ... FAILED
+
+        failures:
+
+        failures:
+            web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1586 filtered out; finished in 6.61s
+
+      stderr ───
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (86461799) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 55/2380 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebase onto `main` changed nothing (`bf613ebed9ae`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2c23c8d-ba3d-49d9-8b84-c77cb7f417ae
+description: |-
+  ## Found
+  - The communication review (standards STD-17, 2026-11-18) saw 53 failed headless Claude jobs in standards since 2026-11-16 whose summary is only "The agent reported no cost, so the profile's max_budget_usd was not checked." (18 on 2026-11-18 01:07-01:13Z, INBOX-491 to INBOX-509).
+  - Their logs show the real cause one line earlier, e.g. `lotar agent logs job-20261118T011303.077Z-900` (in standards): `Internal error: You've hit your 5-hour limit · resets 6pm (America/Los_Angeles)` with `"errorKind": "rate_limit"`, then the budget note, then `agent_job_failed`.
+  - The job's summary is what triage, the Agents page and the owner read, so a usage limit looks like a budget problem.
+
+  ## How to check
+  `lotar --format json agent list-jobs -n 2000` in ~/Development/standards: failed jobs whose summary starts "The agent reported no cost".
+
+  ## Done when
+  - A job that fails on a turn error keeps that error as its summary; the "budget not checked" note stays in the log only (a test with a rate-limit turn failure).
+tags:
+- health
+custom_fields:
+  finding: comms:job-summary-hides-usage-limit
+history:
+- at: 2026-11-18T17:10:47.738996+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T18:39:25.710383+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T18:39:33.121499+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2c23c8d-ba3d-49d9-8b84-c77cb7f417ae
+- at: 2026-11-18T18:50:53.353327+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:51:11.522073+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T19:49:26.301862+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:49:32.943225+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-18T20:13:07.035177+00:00
+  actor: automation
+  changes:
+  - field: comment_added

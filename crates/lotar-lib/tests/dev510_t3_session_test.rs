@@ -189,7 +189,7 @@ fn a_new_thread_takes_the_profiles_thread_name_with_the_tickets_templates_filled
 fn a_thread_that_waits_for_an_answer_hands_the_ticket_back_with_its_link() {
     let harness = harness(2, 0);
     harness.show("running", "\"r1\"", 1, "Which one?");
-    harness.command().output().unwrap();
+    harness.command().assert().failure();
     let task = harness.task();
     assert_eq!(task.status.as_str(), "HelpNeeded");
     assert_eq!(task.assignee.as_deref(), Some("owner"));

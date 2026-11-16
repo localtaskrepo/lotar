@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-17T18:08:11.962632+00:00
-modified: 2026-11-18T02:04:01.785060+00:00
+modified: 2026-11-18T18:04:10.892228+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -23,6 +23,7 @@ relationships:
   - DEV-604
   - DEV-685
   - DEV-686
+  - DEV-636
 comments:
 - date: 2026-11-17T18:13:17.083588+00:00
   author: claude
@@ -128,6 +129,22 @@ comments:
       result: failed
       reason: unpushed:branches still lists the DEV-530, DEV-604 and DEV-628 branches you said to keep
     next: Clears when DEV-530, DEV-628 and DEV-686 land; then delete their leftover branches and rerun the check
+- date: 2026-11-18T18:04:07.480906+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-18.
+
+    13 commits on no remote, only on this Mac: agent/DEV-530 1, agent/DEV-636 1, t3/dependency-check-resume-held-jobs 1, t3/dev-530-review-held-job-resume 1, t3/f58e409d 1, t3/held-job-resume-after-prerequisites 1, t3/held-job-resume-on-prerequisites 1, t3/resume-held-job-after-prerequisites 1, t3/resume-held-job-when-unblocked 1, t3/resume-held-jobs 1, t3/resume-held-jobs-after-prereqs 1, t3/resume-held-jobs-after-prerequisites 1, t3/resume-held-jobs-after-prerequisites-1 1, t3/resume-held-jobs-when-unblocked 1, t3/resume-held-jobs-when-unblocked-1 2, t3/resume-held-jobs-when-unblocked-2 1, t3/review-dependency-job-resume 1, t3/review-dev-530-held-job-resume 2, t3/review-dev-530-held-job-resume-1 1, t3/review-dev-530-held-job-resume-2 1 (git log <branch> --not --remotes)
+
+    Filed by the daily repo-health run (`repos.ts --report`, finding `unpushed:branches`).
+
+    ## Check
+
+    `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+    ## Done when
+
+    git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a
@@ -345,3 +362,13 @@ history:
     new: Blocked
   - field: assignee
     old: '@fix-retry'
+- at: 2026-11-18T18:04:07.480906+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:04:10.892228+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-530","DEV-628","DEV-686"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+    new: '{"depends_on":["DEV-530","DEV-628","DEV-686"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686","DEV-636"]}'

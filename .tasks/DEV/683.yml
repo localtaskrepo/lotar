@@ -1,18 +1,21 @@
 title: 'Proposal: harnessmux: typed turn failures (kind, reset time, retryable) from the adapters'' error data'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-17T23:52:07.336095+00:00
-modified: 2026-11-18T05:05:12.367924+00:00
+modified: 2026-11-18T19:52:33.937294+00:00
 relationships:
+  blocks:
+  - DEV-711
   related:
   - DEV-584
   - DEV-657
   - DEV-604
   - DEV-684
   - DEV-691
+  - DEV-564
 comments:
 - date: 2026-11-17T23:52:34.697482+00:00
   author: claude
@@ -271,10 +274,87 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-18T07:07:02.461256+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent reworks it once more)
+
+    (answered in INBOX-524)
+  answer:
+    to: 2026-11-18T05:05:12.367924+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-524)
+- date: 2026-11-18T18:35:00.922727+00:00
+  author: claude
+  text: |-
+    Rework done: harnessmux `agent/DEV-683` rebased onto `main` (`c00cd57`) as `af6c870`, and Codex's capacity texts now fail as `overloaded`.
+
+    - Conflicts resolved: `src/backend/acp.rs` keeps main's `failure_in_reply(reply, last_chunk, ran_tools)` and sends `EventBody::failed(error)`; `src/acp_map.rs` tests keep main's cases plus the "5-hour limit" case; `CHANGELOG.md` has one `## 0.2.0 (unreleased)` with both entries.
+    - `src/failure.rs` `TEXTS`: `overloaded` now matches "at capacity", "high demand", "capacity is unavailable", "capacity unavailable", "exceeded retry limit". A 429 retry limit stays `rate_limited` (via "too many requests", checked first). New `transport` entry: "stream disconnected before completion".
+    - `texts_give_a_kind` has a case for each of these texts.
+    - `tests/cli.rs`: the DEV-684/691 replays (`codex-overloaded-after-a-deny`, `codex-error-glued-onto-a-message`) now also assert `kind: overloaded`, `retryable: true`.
+    - lotar's own `agent/DEV-683` has no commits; all work is in harnessmux.
+  report:
+    commits:
+    - hash: af6c870
+      what: harnessmux DEV-683 typed turn failures, rebased onto main c00cd57, Codex capacity texts typed overloaded
+    checks:
+    - command: cargo nextest run
+      result: passed
+      reason: 59/59
+    - command: cargo clippy --all-targets -- -D warnings
+      result: passed
+    - command: cargo fmt --check
+      result: passed
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint/test/smoke (lotar)
+      result: not_run
+      reason: no lotar files changed, all work is in harnessmux
+    next: Review harnessmux agent/DEV-683 at af6c870, then merge it fast-forward onto harnessmux main
+- date: 2026-11-18T19:13:34.239494+00:00
+  author: claude
+  text: |-
+    Review: passed. Both findings from the last review are fixed, and the branch merges cleanly onto current harnessmux `main`.
+
+    Reviewed harnessmux `agent/DEV-683` at `af6c870` (signed). Its base is `c00cd57`, and `main` is now `43345fd` (DEV-564, xtask signing). lotar's own `agent/DEV-683` and `t3/harnessmux-typed-turn-failures-1` have no commits.
+
+    **Checked**
+    - Rebase finding: `src/backend/acp.rs` keeps main's `failure_in_reply(reply, last_chunk, ran_tools)` and sends `EventBody::failed(error)`. `CHANGELOG.md` has a single `## 0.2.0 (unreleased)` section, which also holds DEV-564's entry after the merge.
+    - Codex capacity finding: `failure::TEXTS` types "at capacity", "high demand", "capacity (is) unavailable" and "exceeded retry limit" as `overloaded`. A retry limit that ended on a 429 stays `rate_limited`, because RateLimited is checked first. "stream disconnected before completion" is `transport`. Each text has a case in `texts_give_a_kind`, and the DEV-684 and DEV-691 replays assert `kind: overloaded`, `retryable: true`.
+    - Done when 1: `claude_limit_and_auth_errors_fail_the_turn_with_their_kind` replays a Claude rate limit to `rate_limited` with `resets_at` and `raw`, and an auth failure to `auth_required`. `a_recorded_codex_usage_limit_replays_as_rate_limited` covers Codex. The recordings were written by hand, as noted before. Done when 2 is in DEV-584's "Done when".
+    - Old event logs still parse: `kind` and `retryable` default to `other` and `false`. The README event table, the AGENTS.md rules and the MCP output match the code.
+
+    **Reran** on `af6c870` merged with `main` `43345fd`, in a detached copy that I removed afterwards:
+    - `cargo fmt --all --check`: passed
+    - `cargo clippy --all-targets -- -D warnings`: passed
+    - `cargo nextest run`: 59/59 passed
+    - Not run: `cargo deny check`, and lotar's `npm run lint`, `npm test` and `npm run smoke` (no lotar files changed). No UI work. repos.json has no install step for harnessmux.
+
+    No findings and no tickets filed. The harnessmux worktree is clean.
+- date: 2026-11-18T19:51:30.626811+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: `agent/DEV-683` is in `main` already, but the ticket's work is in another repository: `agent/DEV-683` in `/Users/mallox/Development/@localtaskrepo/harnessmux` holds 1 commit beyond its `main`. Review and merge it there, and `agent/DEV-683` here too.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-18T19:52:29.757369+00:00
+  author: claude
+  text: |-
+    Merged and pushed: harnessmux `main` is at `efc17df`.
+
+    - Work was in harnessmux `agent/DEV-683`. Rebased onto `main` (`43345fd`) as `efc17df`, no conflicts, then `git merge --ff-only` in the main checkout.
+    - Pushed to `origin/main` (`43345fd..efc17df`); the checkout was clean and nothing else was waiting.
+    - lotar's own `agent/DEV-683` has no commits and is already in lotar `main`, so nothing to land there.
+    - Checks in the harnessmux worktree after the rebase: `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo nextest run` (59/59), `cargo deny check`, all passed.
+    - No `.tasks` rules or profiles changed, so no `lotar trust` needed; no `install` step for harnessmux.
+    - Not a health ticket, so no check re-run.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A99135d3c-e4c5-4c4b-8d8b-1698f984e0be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af17f6c15-5bff-4902-9be0-e260d7ed3582
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67f8dd2b-9778-4fd7-ba93-fb6c50cbd563
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a1a657d-4988-47ac-a6dc-b525f7bb5964
 description: |-
   harnessmux reports a failed turn as `turn.failed {error: String}`, built from the error's text, and drops what the adapters already send: the kind of failure and when a usage limit resets. DEV-584 (pause a job until the usage-limit reset) has to guess both from text. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
 
@@ -294,8 +374,6 @@ description: |-
   - [x] lotar's usage-limit handling uses them: moved to DEV-584's "Done when" (2026-11-18)
 tags:
 - proposal
-- review-returned
-- review-returned-twice
 history:
 - at: 2026-11-17T23:52:07.552972+00:00
   actor: claude
@@ -557,3 +635,79 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T07:07:02.461256+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T07:07:02.463033+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T18:32:41.169037+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T18:33:09.282539+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a1a657d-4988-47ac-a6dc-b525f7bb5964
+- at: 2026-11-18T18:35:00.922727+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:35:25.111776+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T19:13:34.239494+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:13:36.366657+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-657","DEV-604","DEV-684","DEV-691"]}'
+    new: '{"related":["DEV-584","DEV-657","DEV-604","DEV-684","DEV-691","DEV-564"]}'
+- at: 2026-11-18T19:13:49.873280+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-18T19:41:50.145639+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-657","DEV-604","DEV-684","DEV-691","DEV-564"]}'
+    new: '{"blocks":["DEV-711"],"related":["DEV-584","DEV-657","DEV-604","DEV-684","DEV-691","DEV-564"]}'
+- at: 2026-11-18T19:51:30.626811+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:52:29.757369+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:52:33.937294+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: proposal, review-returned, review-returned-twice
+    new: proposal

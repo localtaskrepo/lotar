@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-18T02:02:30.991609+00:00
+modified: 2026-11-18T20:04:05.705539+00:00
 relationships:
   depends_on:
   - DEV-673
@@ -38,6 +38,9 @@ relationships:
   - DEV-673
   - DEV-672
   - DEV-664
+  - DEV-604
+  - DEV-661
+  - DEV-701
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -879,6 +882,58 @@ comments:
       result: passed
       reason: 405 tests
     next: Merge agent lands 7c62efa9 on main
+- date: 2026-11-18T18:35:06.905938+00:00
+  author: claude
+  text: 'Owner 2026-11-18 ("Move answered 5 on"): merge 7c62efa9 (reviewed rebase 254749ae replayed onto a11c6771, checks passed).'
+- date: 2026-11-18T19:14:04.231600+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: rebasing `agent/DEV-530` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`, `crates/lotar-lib/tests/agent_automation_integration_test.rs`, `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-530` is unchanged.
+
+    - Checked `agent/DEV-530` out in the new worktree `/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-530`
+    - Cloned target/ from /Users/mallox/.t3/worktrees/lotar/t3-32cc4ec5-b60cd7ed11dcaa8f (copy-on-write).
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-18T19:15:10.861580+00:00
+  author: claude
+  text: |-
+    Merge not done: main moved on and `7c62efa9` conflicts with it in three files. I aborted the rebase; the branch is unchanged.
+
+    - Main (`ee4e35a4a`) is 10 commits ahead since `a11c6771`; DEV-661, DEV-604 and DEV-643 reshaped the queue.
+    - `crates/lotar-agent/src/services/agent_queue_service.rs` (9 hunks): main added `taken`, `pause`, `commit_retry`, `carried_outcome`, `thread_name` to the queue state and entries, and replaced the request-building code with `entry.request()`. This branch adds `parked` and `ParkedEntry`, and replaces that same code with `queue_entry()` and `into_request()`. `enqueue`, `flush`, `remove`, `start_entry` and the empty-state constructor need both sides merged.
+    - `crates/lotar-lib/tests/agent_automation_integration_test.rs`: both sides appended large test blocks at the same spot (about 100 and 150 lines).
+    - `docs/help/agent.md`: one hunk at the top.
+    - Not certain both sides' intent survives a mechanical resolve (e.g. whether `park` and `unpark` must carry `thread_name`, `commit_retry` and `carried_outcome`), so I did not guess.
+    - Checks: none run.
+
+    Question: Should a fix agent redo the rebase of DEV-530 onto current main, by hand, with `taken`/`pause` and `parked` side by side and the checks rerun?
+- date: 2026-11-18T19:16:40.137371+00:00
+  author: triage
+  text: 'Owner 2026-11-18 ("Move answered 5 on"): merge 7c62efa9. Redoing the rebase by hand onto current main is how that merge gets done, so yes: rebase DEV-530 onto main with `taken`/`pause` and `parked` side by side (carry `thread_name`, `commit_retry`, `carried_outcome` through park and unpark), rerun the checks, then hand to merge. Source: owner decision in this ticket''s 2026-11-18 comment; DEV-673 is done.'
+- date: 2026-11-18T20:03:56.162540+00:00
+  author: claude
+  text: |-
+    Rebased DEV-530 by hand onto main `ee4e35a4a`: new commit `3ef8df2af` (was `7c62efa9`), all checks pass.
+
+    - `agent_queue_service.rs`: queue state now has `taken`, `pause` and `parked` side by side; `flush` and `remove` clear all three.
+    - Dropped the branch's `from_request`/`into_request` in favour of main's `retry_of` and `request()`; `queue_entry()` stays for the checks shared by `enqueue` and `unpark`.
+    - `park` now takes the whole queue entry, so `thread_name`, `commit_retry` and `carried_outcome` survive park and unpark. `prerequisites_allow_start` and `mark_task_blocked` take the entry too, so a paused job's commit-retry that gets parked keeps it.
+    - Test `unpark_moves_the_parked_job_to_the_queue` now checks the three fields come back after unpark.
+    - `agent_automation_integration_test.rs`: kept main's DEV-701 test and this branch's DEV-530 tests. `docs/help/agent.md`: merged both `agent queue` lines (pause, memory hold, `waiting_for_prerequisites`).
+  report:
+    commits:
+    - hash: 3ef8df2af
+      what: DEV-530 rebased by hand onto main ee4e35a4a
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2389 Rust, 1562 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: 'Merge agent: fast-forward main to 3ef8df2af'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -896,6 +951,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A26365793-0068-49f1-8c92-00a0e20ce261
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8841da47-b3e2-4fc1-9a39-9ff8db727eb5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade442be8-2502-4950-b6e5-487f4bbfd53d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc6e9155-6ac0-4e20-b6cf-1bc1a226d79f
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -918,11 +974,6 @@ description: |-
   - [ ] A queued job whose prerequisite reopened is parked again, not started. Test fails before.
   - [ ] Docs (help/automation.md) and the DEV rule match.
   - [ ] npm run lint, npm test, npm run smoke pass.
-tags:
-- review-returned
-- merge-retried
-- fix-retried
-- retry-fix
 history:
 - at: 2026-11-14T07:27:35.590249+00:00
   actor: claude
@@ -1973,3 +2024,94 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-673"],"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664"]}'
     new: '{"depends_on":["DEV-673"],"blocks":["DEV-637","DEV-664"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664"]}'
+- at: 2026-11-18T18:35:06.905938+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:35:07.413894+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Merging
+- at: 2026-11-18T18:35:08.607032+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@merge'
+- at: 2026-11-18T19:14:04.231600+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:15:10.861580+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:15:14.736199+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-673"],"blocks":["DEV-637","DEV-664"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664"]}'
+    new: '{"depends_on":["DEV-673"],"blocks":["DEV-637","DEV-664"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664","DEV-604","DEV-661"]}'
+- at: 2026-11-18T19:15:31.297366+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: review-returned, merge-retried, fix-retried, retry-fix
+    new: ''
+- at: 2026-11-18T19:15:31.744681+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-18T19:16:40.137371+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-18T19:16:48.977659+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T19:16:52.532860+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-18T19:54:11.323901+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T19:54:12.395714+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc6e9155-6ac0-4e20-b6cf-1bc1a226d79f
+- at: 2026-11-18T20:03:56.162540+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:03:56.361872+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-673"],"blocks":["DEV-637","DEV-664"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664","DEV-604","DEV-661"]}'
+    new: '{"depends_on":["DEV-673"],"blocks":["DEV-637","DEV-664"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664","DEV-604","DEV-661","DEV-701"]}'
+- at: 2026-11-18T20:04:05.705539+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T02:02:14.561899+00:00
-modified: 2026-11-18T03:04:32.004642+00:00
+modified: 2026-11-18T18:37:02.126979+00:00
 relationships:
   blocks:
   - DEV-664
@@ -14,6 +14,7 @@ relationships:
   - DEV-604
   - DEV-664
   - DEV-685
+  - DEV-584
 comments:
 - date: 2026-11-18T02:23:00.938271+00:00
   author: claude
@@ -243,3 +244,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T18:37:02.126979+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-664","DEV-690"],"related":["DEV-604","DEV-664","DEV-685"]}'
+    new: '{"blocks":["DEV-664","DEV-690"],"related":["DEV-604","DEV-664","DEV-685","DEV-584"]}'

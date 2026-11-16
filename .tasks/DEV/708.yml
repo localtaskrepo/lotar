@@ -1,0 +1,80 @@
+title: 'Waiting for the owner without a question: DEV-584'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-18T18:06:36.221643+00:00
+modified: 2026-11-18T18:53:48.173359+00:00
+relationships:
+  related:
+  - DEV-584
+  - DEV-604
+comments:
+- date: 2026-11-18T18:53:34.828780+00:00
+  author: claude
+  text: |-
+    Already resolved: DEV-584 no longer waits for the owner, so no file change is needed.
+
+    - `triage` answered it on 2026-11-18 18:37Z (DEV-604's pause is on `main` via `978bedf02`), then moved DEV-584 to Todo, assigned `@fix`.
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[question:DEV-584]`.
+    - `git log main..HEAD` is empty.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A779ab2d9-d0a8-4274-b5ed-c0b3c78de640
+description: |-
+  DEV-584 (A job that fails on a provider's usage limit pauses until the reset instead of failing into retries and owner questions) is HelpNeeded, but its last comment asks no question: "Automation rule 'Inbox: file what waits for the owner' skipped on DEV-584. Skipped its run command: this repository's a…" (lotar show DEV-584)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-584`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-584]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: question:DEV-584
+history:
+- at: 2026-11-18T18:06:39.355346+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-584"]}'
+- at: 2026-11-18T18:06:42.221191+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-18T18:52:54.675820+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T18:53:02.343822+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A779ab2d9-d0a8-4274-b5ed-c0b3c78de640
+- at: 2026-11-18T18:53:34.828780+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:53:35.058948+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584"]}'
+    new: '{"related":["DEV-584","DEV-604"]}'
+- at: 2026-11-18T18:53:48.173359+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

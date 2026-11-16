@@ -1,0 +1,73 @@
+title: 'Waiting for the owner without a question: DEV-653'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-18T18:04:39.000450+00:00
+modified: 2026-11-18T18:54:02.004070+00:00
+relationships:
+  related:
+  - DEV-653
+comments:
+- date: 2026-11-18T18:53:44.253468+00:00
+  author: claude
+  text: |-
+    Problem is gone: DEV-653 moved on after the owner's answer, nothing to fix.
+
+    - DEV-653 is now `Reviewing`, assigned `@review` (its waiting-state rule was built in commit `991766690`).
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[question:DEV-653]`.
+    - No file changes, no commits beyond main.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa80d778-8b62-4e66-8135-2341d5b0259a
+description: |-
+  DEV-653 (Partial cleanup per step: each job step removes the build output the next step doesn't use, measured) is HelpNeeded, but its last comment asks no question: "Answer: yes (Yes, build the waiting-state rule and run it on a real ticket) (answered in INBOX-526)" (lotar show DEV-653)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-653`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-653]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: question:DEV-653
+history:
+- at: 2026-11-18T18:04:40.852839+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-653"]}'
+- at: 2026-11-18T18:06:30.030615+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-18T18:52:50.468209+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T18:52:58.012238+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa80d778-8b62-4e66-8135-2341d5b0259a
+- at: 2026-11-18T18:53:44.253468+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:54:02.004070+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

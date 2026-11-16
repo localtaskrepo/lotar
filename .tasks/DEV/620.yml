@@ -4,7 +4,7 @@ priority: High
 type: Feature
 reporter: claude
 created: 2026-11-16T18:42:09.946527+00:00
-modified: 2026-11-17T18:13:17.262306+00:00
+modified: 2026-11-18T19:51:18.263571+00:00
 relationships:
   related:
   - DEV-608
@@ -25,6 +25,7 @@ relationships:
   - DEV-627
   - DEV-630
   - DEV-664
+  - DEV-610
 comments:
 - date: 2026-11-16T20:03:10.910172+00:00
   author: claude
@@ -452,3 +453,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622","DEV-621","DEV-626","DEV-633","DEV-627","DEV-630"]}'
     new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622","DEV-621","DEV-626","DEV-633","DEV-627","DEV-630","DEV-664"]}'
+- at: 2026-11-18T19:51:18.263571+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622","DEV-621","DEV-626","DEV-633","DEV-627","DEV-630","DEV-664"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622","DEV-621","DEV-626","DEV-633","DEV-627","DEV-630","DEV-664","DEV-610"]}'

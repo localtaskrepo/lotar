@@ -1,0 +1,37 @@
+title: 'Waiting cleanup for waits lotar or a rule sets: a job''s end drops the build output of a ticket it leaves HelpNeeded or Blocked'
+status: Todo
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T20:06:24.875941+00:00
+modified: 2026-11-18T20:06:25.335916+00:00
+relationships:
+  related:
+  - DEV-653
+description: |-
+  Found in DEV-653's review (2026-11-18): the waiting rule (`updated` on HelpNeeded/Blocked → `lotar agent worktree run <ticket> -- cargo clean --workspace`) fires only on a person's status change and an agent's hand-back. These waits write with `TaskUpdateContext::automation_disabled()` and fire no rule, so their build output (~2 GB each) stays until Done:
+  - rules that hand a ticket to mallox: review failed, third blocking review, fix failed again, merge failed again (`.tasks/DEV/automation.yml`; "A rule's own change fires no other rule")
+  - a T3 thread that waits for an answer (`hand_back_waiting_job`, `crates/lotar-agent/src/services/agent_job_service.rs`)
+  - Blocked on open prerequisites when a job would start (`mark_task_blocked`, `automation_service.rs`)
+
+  Adding the command to those rules' `run` doesn't work: end rules run while the job is still registered, so `worktree run` skips.
+
+  ## Idea
+  The job's end (`finalize_job`, next to `remove_build_output`) cleans a ticket it leaves waiting, without firing other rules: for example a config list of commands or paths for waiting tickets. Needs a design choice on how lotar knows "waiting" generically.
+
+  ## Done when
+  - [ ] A ticket a rule or lotar sets waiting loses its workspace build output once its job ended; a test shows it (flip the last assertion of `waiting_rule_drops_build_output_on_hand_back_and_person_change_only` in `crates/lotar-lib/tests/agent_safety_test.rs`).
+  - [ ] docs/help/agent.md "Build output while a ticket waits" and the rule comment in `.tasks/DEV/automation.yml` say so.
+history:
+- at: 2026-11-18T20:06:25.107799+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-653"]}'
+- at: 2026-11-18T20:06:25.335916+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

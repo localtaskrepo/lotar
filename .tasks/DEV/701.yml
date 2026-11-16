@@ -5,11 +5,12 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T04:40:49.336024+00:00
-modified: 2026-11-18T06:27:36.814231+00:00
+modified: 2026-11-18T20:03:56.364241+00:00
 relationships:
   related:
   - DEV-653
   - DEV-617
+  - DEV-530
 comments:
 - date: 2026-11-18T05:38:00.171921+00:00
   author: claude
@@ -250,3 +251,9 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-18T20:03:56.364241+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653","DEV-617"]}'
+    new: '{"related":["DEV-653","DEV-617","DEV-530"]}'

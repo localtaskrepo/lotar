@@ -1,0 +1,65 @@
+title: 'Dependabot alerts: open'
+status: Done
+priority: High
+type: Chore
+reporter: claude
+created: 2026-11-18T18:04:29.093545+00:00
+modified: 2026-11-18T18:52:44.961264+00:00
+comments:
+- date: 2026-11-18T18:52:31.487379+00:00
+  author: claude
+  text: |-
+    Nothing to fix: the only alert is for an advisory GitHub withdrew today, and no fixed picomatch exists.
+
+    - Alert `#78`: `picomatch <= 4.0.7`, `GHSA-fc5q-39xc-vjpf`, withdrawn `2026-11-18T15:38Z`; patched version: none
+    - `npm view picomatch versions`: `4.0.7` is the latest, and the lockfile has it (via `vite`, `vitest`, `vue-router`, `vue-tsc`)
+    - GitHub closes alerts for withdrawn advisories on its own; until then `repos.ts` still reports `[alerts:open]`
+    - Check gap filed: [STD-238](https://standards.pyxzl.net/task/STD-238) (skip withdrawn advisories)
+    - No commits, `git log main..HEAD` empty
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A99028628-2ce2-4aa7-a20e-823a86974853
+description: |-
+  1 open Dependabot alerts (skill update-dependencies)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `alerts:open`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[alerts:open]` while the problem is there.
+
+  ## Done when
+
+  No open Dependabot alerts: fixed by an update (skill update-dependencies in standards), or the repo archived by the owner. Dev-only alerts no update can fix wait for upstream and do not count.
+tags:
+- health
+custom_fields:
+  finding: alerts:open
+history:
+- at: 2026-11-18T18:04:30.018250+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T18:50:58.213084+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T18:51:11.796274+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A99028628-2ce2-4aa7-a20e-823a86974853
+- at: 2026-11-18T18:52:31.487379+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T18:52:44.961264+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
