@@ -297,6 +297,12 @@ impl AgentJobService {
         let tasks_dir_buf = tasks_dir.to_path_buf();
         let (job_model, job_effort) = (profile.model.clone(), profile.effort.clone());
 
+        if let Some((thread, job)) = running_t3_thread(tasks_dir, &ticket_id) {
+            return Err(LoTaRError::ValidationError(format!(
+                "Ticket '{ticket_id}' already has an active job: T3 Code still runs the thread {thread} of the job {job}"
+            )));
+        }
+
         let should_queue: bool;
         {
             let mut registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
@@ -3238,6 +3244,12 @@ fn run_session(
 
 /// The worktree T3 Code runs `thread` in, from `t3 thread show <thread> --json`.
 fn t3_thread_worktree(program: &std::path::Path, env: &[(String, String)], cwd: &std::path::Path, thread: &str) -> Option<std::path::PathBuf> {
+    let shown = t3_thread_show(program, env, cwd, thread)?;
+    shown.get("worktreePath")?.as_str().filter(|path| !path.is_empty()).map(std::path::PathBuf::from)
+}
+
+/// The `thread` object of `t3 thread show <thread> --json`.
+fn t3_thread_show(program: &std::path::Path, env: &[(String, String)], cwd: &std::path::Path, thread: &str) -> Option<serde_json::Value> {
     let output = Command::new(program)
         .args(["thread", "show", thread, "--json", "--messages", "0"])
         .envs(env.iter().map(|(key, value)| (key, value)))
@@ -3246,8 +3258,62 @@ fn t3_thread_worktree(program: &std::path::Path, env: &[(String, String)], cwd: 
         .output()
         .ok()
         .filter(|output| output.status.success())?;
-    let shown: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
-    shown.get("thread")?.get("worktreePath")?.as_str().filter(|path| !path.is_empty()).map(std::path::PathBuf::from)
+    let mut shown: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    shown.get_mut("thread").map(serde_json::Value::take)
+}
+
+/// How long a ticket found busy with a running T3 Code thread counts as
+/// busy before T3 Code is asked again: the queue tries a waiting ticket
+/// every few hundred milliseconds, and each `t3` call takes about half a second.
+const T3_THREAD_RECHECK: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Per ticket: when its running thread was found, the thread and its job.
+type RunningThreads = HashMap<String, (std::time::Instant, String, String)>;
+
+static RUNNING_T3_THREADS: LazyLock<Mutex<RunningThreads>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// A T3 Code thread of an earlier job on the ticket that T3 Code still runs,
+/// with that job's id (DEV-594). A thread can run on after its job ended:
+/// T3 Code resumes a turn it paused for a usage limit, which the job counted
+/// as failed, and the owner can answer in a thread. A second job would work
+/// beside it, its own thread on a branch of its own, as T3 Code checks the
+/// ticket's branch out in one worktree only.
+fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<(String, String)> {
+    let mut cache = RUNNING_T3_THREADS.lock().ok()?;
+    if let Some((at, thread, job)) = cache.get(ticket_id)
+        && at.elapsed() < T3_THREAD_RECHECK
+    {
+        return Some((thread.clone(), job.clone()));
+    }
+    cache.remove(ticket_id);
+    let mut threads: Vec<_> = saved_jobs(tasks_dir)
+        .into_iter()
+        .filter(|job| job.header.runner == AgentRunnerKind::T3.as_str() && crate::storage::identity::aliases_match(&job.header.ticket_id, ticket_id))
+        .filter_map(|job| job.status.and_then(|status| Some((status.at, status.agent_session?, job.header.job_id))))
+        .collect();
+    if threads.is_empty() {
+        return None;
+    }
+    threads.sort_by(|a, b| b.0.cmp(&a.0));
+    let table = crate::services::agent_runner::agent_table().ok()?;
+    let spec = table.get("t3").ok()?;
+    let (program, _) = block_on(spec.launch_command()).ok()?;
+    let env: Vec<(String, String)> = spec.env.clone().into_iter().collect();
+    let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
+    let mut asked = Vec::new();
+    for (_, thread, job) in threads {
+        if asked.contains(&thread) {
+            continue;
+        }
+        let running =
+            t3_thread_show(&program, &env, &cwd, &thread).is_some_and(|shown| shown.get("status").and_then(|status| status.as_str()) == Some("running"));
+        if running {
+            cache.insert(ticket_id.to_string(), (std::time::Instant::now(), thread.clone(), job.clone()));
+            return Some((thread, job));
+        }
+        asked.push(thread);
+    }
+    None
 }
 
 /// Make the session the job's runtime, unless the job was cancelled meanwhile.

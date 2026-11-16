@@ -78,6 +78,22 @@ struct Harness {
     _env: Vec<EnvVarGuard>,
 }
 
+impl Drop for Harness {
+    fn drop(&mut self) {
+        wait_for_jobs_to_end(&self.fixtures.tasks_root);
+    }
+}
+
+/// Wait until no job on the fixture runs, in this process or in a queue worker: a job still writes to the tasks folder
+/// after its status reads completed, and a test that ends then has that folder made again after the fixture's removal.
+fn wait_for_jobs_to_end(tasks_dir: &Path) {
+    wait_for("the jobs' end", || {
+        AgentJobService::queue_stats().running == 0
+            && lotar::services::agent_active_jobs::list(tasks_dir).is_empty()
+            && !lotar::services::agent_queue_service::AgentQueueService::is_worker_running(tasks_dir)
+    });
+}
+
 /// A TEST project with a `fixer` profile on the claude runner, run by the fake agent. `extra` adds profile keys
 /// (four spaces deep), `env` the fake's settings.
 fn harness(extra: &str, env: &[(&str, String)]) -> Harness {
@@ -430,15 +446,19 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
     );
     assert!(merge[0].contains("-PIPE-1-review (codex agent"), "and the review session: {}", merge[0]);
     assert!(root.join("fix.txt").is_file(), "the fix reached main");
+    wait_for_jobs_to_end(&fixtures.tasks_root);
 }
 
 /// `t3` as T3 Code's CLI: `thread start` runs each thread in a new worktree on a branch of its own (`t3/topic-<n>`),
 /// made from the `--worktree` base, runs `$FAKE_RUN` there and logs `<base> <branch> <commit it started from>` to
 /// `$FAKE_LOG`. `thread send thread-<n>` runs `$FAKE_RUN` in that thread's worktree and logs
-/// `send thread-<n> <branch> <commit it started from>`. `thread show thread-<n>` answers with that thread's worktree.
+/// `send thread-<n> <branch> <commit it started from>`. `thread show thread-<n>` answers with that thread's worktree,
+/// and with status `running` while a file `running-thread-<n>` is next to the script.
 const FAKE_T3: &str = r#"#!/bin/sh
 if [ "$1 $2" = "thread show" ]; then
-  printf '{"thread":{"threadId":"%s","worktreePath":"%s"}}\n' "$3" "$FAKE_TREES/${3#thread-}"
+  status=completed
+  [ -f "$(dirname "$0")/running-$3" ] && status=running
+  printf '{"thread":{"threadId":"%s","status":"%s","worktreePath":"%s"}}\n' "$3" "$status" "$FAKE_TREES/${3#thread-}"
   exit 0
 fi
 if [ "$1 $2" = "thread send" ]; then
@@ -592,6 +612,27 @@ fn the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out() {
     assert!(agent.join("rework.txt").is_file(), "and has the thread's work checked out");
 }
 
+/// DEV-594: a fix job's thread hit the usage limit, so the job failed, and T3 Code resumed the thread on its own when
+/// the limit reset. The next fix job started beside it, in a thread of its own on a `t3/*` branch, and both committed.
+/// A job now waits while T3 Code still runs an earlier job's thread on the ticket.
+#[test]
+fn no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let fix = rev(root, "agent/TEST-1");
+    let running = root.join("running-thread-0");
+    std::fs::write(&running, "").unwrap();
+    run_t3(&fixtures, "review")
+        .failure()
+        .stderr(predicate::str::contains("Ticket 'TEST-1' already has an active job: T3 Code still runs the thread thread-0 of the job job-"));
+    assert_eq!(std::fs::read_to_string(root.join("t3.log")).unwrap().lines().count(), 1, "no second thread started");
+    std::fs::remove_file(&running).unwrap();
+    run_t3(&fixtures, "review").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("agent/TEST-1 t3/topic-1 {fix}"), "the review starts from the fix: {log}");
+}
+
 /// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays
 /// where it was, so automation doesn't hand the ticket to a job that would read it.
 #[test]
@@ -705,6 +746,7 @@ fn a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread() {
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 "), "the merge continues the review's thread: {log}");
     wait_for("the merge's turn", || root.join("t3-trees/0/merged").is_file());
+    wait_for_jobs_to_end(&fixtures.tasks_root);
 }
 
 /// DEV-565, in one process (`lotar serve`): the merge takes over the review's session while it is still open there, and
@@ -725,6 +767,7 @@ fn a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env() {
     wait_for("the merge's turn", || root.join("t3-trees/0/merged").is_file());
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 "), "the merge continues the review's thread: {log}");
+    wait_for_jobs_to_end(&fixtures.tasks_root);
 }
 
 /// A continued thread whose branch holds a commit the ticket's branch lacks keeps it: the job starts a new thread on
