@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-17T02:09:52.818828+00:00
+modified: 2026-11-17T02:16:13.863675+00:00
 relationships:
   related:
   - DEV-599
@@ -14,6 +14,8 @@ relationships:
   - DEV-583
   - DEV-626
   - DEV-613
+  - DEV-563
+  - DEV-625
 comments:
 - date: 2026-11-16T05:21:49.697784+00:00
   author: claude
@@ -218,9 +220,6 @@ description: |-
 
   ## Done when
   - [ ] A test in dev503_harness_jobs_test.rs: after a fix job's idle answer is cached, a second T3 job on the ticket ends (a new thread), and the next start runs t3 thread show again within the 30 s window; with the threads-list check removed, the test fails.
-tags:
-- merge-retried
-- fix-retried
 history:
 - at: 2026-11-16T04:33:13.899609+00:00
   actor: claude
@@ -396,3 +395,21 @@ history:
   - field: status
     old: HelpNeeded
     new: Done
+- at: 2026-11-17T02:13:13.302487+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626","DEV-613"]}'
+    new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626","DEV-613","DEV-563"]}'
+- at: 2026-11-17T02:14:39.749398+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: merge-retried, fix-retried
+    new: ''
+- at: 2026-11-17T02:16:13.863675+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626","DEV-613","DEV-563"]}'
+    new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626","DEV-613","DEV-563","DEV-625"]}'

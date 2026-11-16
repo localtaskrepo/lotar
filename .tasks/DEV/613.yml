@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-17T02:06:04.941590+00:00
+modified: 2026-11-17T02:28:14.572210+00:00
 relationships:
   depends_on:
   - DEV-631
@@ -19,6 +19,8 @@ relationships:
   - DEV-631
   - DEV-624
   - DEV-609
+  - DEV-635
+  - DEV-630
 comments:
 - date: 2026-11-16T05:51:33.176016+00:00
   author: claude
@@ -195,12 +197,47 @@ comments:
       result: not_run
       reason: no UI or CLI behavior change
     next: Review, then merge agent rebases onto main and reruns the check
+- date: 2026-11-17T02:16:13.259125+00:00
+  author: claude
+  text: |-
+    Seen again in the DEV-625 merge, on main `8bd6232d` (load 30 to 80): `a_queue_entry_held_by_a_waiting_thread_says_so_once` "the entry still waits".
+
+    - 2 of 2 full `npm run test:agent` runs, 1 `--no-fail-fast` run, 8 of 30 stress iterations of `test(/dev503_harness_jobs_test/)`. No other test failed.
+- date: 2026-11-17T02:28:14.572210+00:00
+  author: claude
+  text: |-
+    Review: passed. `51144732` fixes the race and the stress check passes 30 of 30 runs.
+
+    - **Diff:** `dev503_harness_jobs_test.rs:769` swaps the one-shot `assert!(remove(...))` for `wait_for(..., || remove(...))`. That meets the first "Done when" item and changes nothing else.
+    - **Cause confirmed:** `run_worker` in `agent_queue_service.rs` runs `dequeue_entries` → `start_entry` → `requeue_entry_unchanged`, so a `remove` that lands in between gets false. `wait_for` has a 60 s bound, so a real loss of the entry still fails the test.
+    - **Rerun:** `cargo nextest run --workspace --stress-count 30 -E 'test(/dev503_harness_jobs_test/)'`: 30/30 passed (34 tests each run). `rustfmt --check` passed.
+    - **Branch:** `agent/DEV-613`, `t3/fix-flaky-queue-remove-race-test` and this worktree's branch all point at `51144732`. `git merge-tree` against current main (`4794918f`, which includes DEV-625's changes to the same file) merges cleanly. Main still has the flaky assert at line 873.
+    - **Leftover:** `t3/6ec6d3a3` (`989c0a39`, worktree `t3-6ec6d3a3-2e432a0fe3f41fa2`, clean) holds an older copy of the same fix. It isn't on the merge path and its work is saved in `51144732`, so it can be removed. I left it alone because this review changes nothing.
+    - No owner decisions touched, no stray files, no tickets filed.
+  report:
+    checks:
+    - command: cargo nextest run --workspace --stress-count 30 -E 'test(/dev503_harness_jobs_test/)'
+      result: passed
+      reason: 30/30, 447 s
+    - command: rustfmt --edition 2024 --check crates/lotar-lib/tests/dev503_harness_jobs_test.rs
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: one-line test change
+    - command: npm test
+      result: not_run
+      reason: one-line test change
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or runtime change
+    next: Merge agent rebases 51144732 onto main and reruns the check
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37610913-1767-4f04-b961-4185aa0051da
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46cc50ff-4090-4cf2-a4a6-5565f02e9189
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A69db690e-d3c2-47fc-8496-c1c4a755f65e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A76fca860-181f-4292-97e5-0e32be047f77
 description: |-
   Found in the DEV-600 review (`af2e42f2`).
 
@@ -473,3 +510,28 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624"]}'
     new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609"]}'
+- at: 2026-11-17T02:13:45.937978+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609"]}'
+    new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635"]}'
+- at: 2026-11-17T02:16:13.259125+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:17:48.664416+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A76fca860-181f-4292-97e5-0e32be047f77
+- at: 2026-11-17T02:18:45.584410+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635"]}'
+    new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635","DEV-630"]}'
+- at: 2026-11-17T02:28:14.572210+00:00
+  actor: claude
+  changes:
+  - field: comment_added

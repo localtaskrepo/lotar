@@ -1,11 +1,11 @@
 title: lotar serve announces task files written before it started as task_updated
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T01:58:30.379406+00:00
+modified: 2026-11-17T02:28:15.915841+00:00
 relationships:
   related:
   - DEV-614
@@ -26,3 +26,9 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T02:28:15.915841+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

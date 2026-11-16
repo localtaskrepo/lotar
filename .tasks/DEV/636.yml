@@ -1,11 +1,10 @@
 title: 'harnessmux builds too much debug info per worktree: dev profile without debug info, measured first'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
 created: 2026-11-17T01:03:37.707996+00:00
-modified: 2026-11-17T01:43:18.612990+00:00
+modified: 2026-11-17T02:23:39.458416+00:00
 relationships:
   related:
   - DEV-579
@@ -47,8 +46,37 @@ comments:
     - command: cargo deny check
       result: passed
     next: Review, then merge harnessmux branch agent/DEV-636 (c066000) onto harnessmux main; lotar's branch has no changes
+- date: 2026-11-17T02:22:13.535793+00:00
+  author: claude
+  text: |-
+    Review: passed. harnessmux `c066000` does what "Done when" asks; nothing blocking, no tickets filed.
+
+    - Read: the ticket and the fix comment, DEV-579's setting, harnessmux `AGENTS.md`, `.github/workflows/ci.yml`, `.config/nextest.toml`, `git log -5 main -- Cargo.toml AGENTS.md`
+    - Diff: `[profile.dev] debug = false` in `Cargo.toml` and one line in `AGENTS.md`. The branch sits on harnessmux `main` (`987add9`) and is signed (`G`)
+    - Shared `target/debug`: true, since harnessmux has no custom profile and cargo's `test` profile inherits `dev`, so `--cargo-profile dev` isn't needed. CI runs `--profile ci`, which is a nextest profile and doesn't change the cargo build
+    - Nothing relies on backtrace line numbers (grep for `backtrace`/`RUST_BACKTRACE` finds nothing), so `debug = false` is fine. Panic messages keep their file:line
+    - Callers: lotar pulls in harnessmux as a dependency, so the profile doesn't apply there; the release build is unchanged
+    - Measurements: 907 → 515 MB cold, with build time the same within the noise. Keeping it fits "smaller and not slower". Not dropping the optimized-dependencies setting fits the same rule
+    - Reran in `~/.t3/worktrees/harnessmux/DEV-636`: fmt, clippy `-D warnings`, `cargo nextest run` (43/43), `cargo deny check` all pass; the tree is still clean
+    - lotar `agent/DEV-636` (`eb76251`): its 5 commits all have twins on `main` with the same patches (`git cherry` marks every one `-`), so nothing from lotar needs to land
+  report:
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo nextest run
+      result: passed
+      reason: 43 of 43
+    - command: cargo deny check
+      result: passed
+    - command: cold/warm size and time measurements
+      result: not_run
+      reason: fix agent's numbers accepted, not remeasured
+    next: Merge harnessmux agent/DEV-636 (c066000) onto harnessmux main; lotar's agent/DEV-636 has nothing to land
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A32b33909-f47c-4bc3-9dea-fe08ed6a6c58
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a7a167-f47b-44f6-aba1-c1e85a08922c
 description: |-
   Owner, 2026-11-17, on DEV-579's harnessmux proposal: "yes I agree with a ticket once measurements are in". So this ticket measures first, then changes.
 
@@ -125,3 +153,23 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-17T02:20:56.292871+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a7a167-f47b-44f6-aba1-c1e85a08922c
+- at: 2026-11-17T02:22:13.535793+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:23:15.424075+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+- at: 2026-11-17T02:23:39.458416+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'

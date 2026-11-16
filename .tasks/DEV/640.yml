@@ -1,0 +1,92 @@
+title: 'Flaky test: web_api_integration_test read_until_deadline panics on EINVAL from set_read_timeout after the server closed the socket'
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-17T02:13:29.874075+00:00
+modified: 2026-11-17T02:28:15.321556+00:00
+relationships:
+  related:
+  - DEV-635
+comments:
+- date: 2026-11-17T02:26:52.165689+00:00
+  author: claude
+  text: |-
+    Fixed: `read_until_deadline` no longer panics when macOS refuses `set_read_timeout` on a closed socket.
+
+    - `crates/lotar-lib/tests/web_api_integration_test.rs`: EINVAL (`InvalidInput`) from `set_read_timeout` is skipped; the read then returns the leftover bytes or 0. Other errors still panic with a message.
+    - New test `read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways`: shuts the socket down both ways, which makes macOS return EINVAL every time. With the old `.unwrap()` it fails with the ticket's `Os { code: 22 }` panic; with the fix it passes.
+    - Commit `ecbe7036`
+  report:
+    commits:
+    - hash: ecbe7036
+      what: read_until_deadline ignores EINVAL from set_read_timeout; regression test
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration web_api_integration_test
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fd0d540-0fd0-4658-bfda-b234122bf1b7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6b0aeb7-a4a0-4429-844b-5cc98f305672
+description: |-
+  ## Found
+  - 2026-11-17, DEV-635's measurement run at load 140: `web_api_integration_test::chunked_bodies_get_411_and_overload_gets_503` panicked at `crates/lotar-lib/tests/web_api_integration_test.rs:31` with `Os { code: 22, kind: InvalidInput, message: "Invalid argument" }` from `stream.set_read_timeout(..).unwrap()`. It passed in the run before and after.
+  - macOS returns EINVAL from `setsockopt` on a socket the peer has already closed, so a server that closes early (411/503) races the loop's `set_read_timeout`.
+
+  ## Check
+  - `read_until_deadline` under load, after the server closes the connection.
+
+  ## Done when
+  - [ ] `read_until_deadline` treats EINVAL from `set_read_timeout` as the peer having closed (read returns what's left or 0) instead of panicking; a test covers it.
+tags:
+- health
+custom_fields:
+  finding: flaky-test:web_api_integration_test::chunked_bodies_get_411_and_overload_gets_503
+history:
+- at: 2026-11-17T02:13:30.325483+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-635"]}'
+- at: 2026-11-17T02:13:30.789460+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T02:13:35.456489+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T02:13:36.384105+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fd0d540-0fd0-4658-bfda-b234122bf1b7
+- at: 2026-11-17T02:26:52.165689+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:27:06.991353+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T02:28:15.321556+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6b0aeb7-a4a0-4429-844b-5cc98f305672

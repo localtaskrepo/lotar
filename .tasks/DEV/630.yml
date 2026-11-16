@@ -1,18 +1,45 @@
 title: 'The queue worker ignores a project''s max_parallel_jobs: DEV ran 4 jobs with a limit of 2'
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T02:03:11.559276+00:00
+modified: 2026-11-17T02:19:44.891118+00:00
 relationships:
   related:
   - DEV-626
+  - DEV-613
 comments:
 - date: 2026-11-17T02:03:11.559276+00:00
   author: claude
   text: 'Fix written: the worker takes each entry by its project''s limit, counting the project''s jobs in all processes; new test fails before, passes after. Running lint/test/smoke.'
+- date: 2026-11-17T02:18:44.708558+00:00
+  author: claude
+  text: |-
+    Fixed: the queue worker now keeps each project at its own `max_parallel_jobs` and counts jobs from every process.
+
+    - `agent_queue_service.rs`: `dequeue_startable` takes queued entries in order while their project has a free slot; the limit comes from `config_for_project` (the project's own, else the global one)
+    - Running jobs per project = this process's registry (`AgentJobService::active_jobs`, new) plus the `agent_active_jobs` records of other processes, deduplicated by job id
+    - `lotar agent queue` reason names the full project: `waiting for a free slot (1 of LIM's agent.worktree.max_parallel_jobs 1 running)`
+    - Behavior change: a global limit now applies to each project separately, not to all projects together
+    - Test `dev630_queue_project_parallel_limit_test`: projects LIM (limit 1) and FREE (none), LIM-1 runs via `agent run --wait` in another process; FREE-1/2 start, LIM-2 waits until LIM-1 ends. Against the old code it fails (LIM-2 starts at once)
+    - Docs: `docs/help/agent.md` (worktree config, `agent queue`)
+    - The full suite hit the existing flake [DEV-613](https://lotar.pyxzl.net/task/DEV-613) once; it fails 2 of 8 runs on unchanged code too, and the rerun passed
+  report:
+    commits:
+    - hash: 076bd5a2
+      what: queue worker applies each entry's project limit, counting the project's jobs in every process
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2277 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
@@ -53,3 +80,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:18:44.708558+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:18:45.585569+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626"]}'
+    new: '{"related":["DEV-626","DEV-613"]}'
+- at: 2026-11-17T02:19:44.891118+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

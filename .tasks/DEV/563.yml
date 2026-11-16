@@ -1,11 +1,11 @@
 title: Sign lotar builds from source with the owner's Developer ID
-status: HelpNeeded
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-17T01:44:27.886570+00:00
+modified: 2026-11-17T02:16:16.593552+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -25,6 +25,9 @@ relationships:
   - DEV-600
   - DEV-602
   - DEV-620
+  - DEV-579
+  - DEV-609
+  - DEV-625
 comments:
 - date: 2026-11-15T18:01:34.472793+00:00
   author: claude
@@ -436,6 +439,37 @@ comments:
       result: not_run
       reason: machine overloaded
     next: 'Owner: merge 79395263 on the targeted checks, or rerun the merge job when the Mac is quieter'
+- date: 2026-11-17T02:13:13.067394+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-563 is on main as `4794918f`.
+
+    - Rebased twice, main moved on during checks (DEV-579, then DEV-609/DEV-625).
+    - One conflict in `package.json`: kept this change's new `install:local` line and DEV-579's new `build:smoke` (`cargo build --bins --tests`). Separate lines, both kept.
+    - DEV-579 removed the `smoke`/`local` Cargo profiles; `release` is unchanged, so `scripts/install-local.mjs` still reads `target/release`.
+    - No lockfile change for npm, so no `npm ci`.
+    - Lint, `npm test` (2279 Rust, 1548 UI, 60 release, 7 hooks) and smoke (405/405) passed on `2c07042a` (on DEV-579).
+    - The last rebase onto `8bd6232d` brought only a Rust test file and tickets: reran `npm run test:release` (60/60) there; skipped the full suite and smoke rerun.
+    - Folded the main checkout's pending `.tasks` changes into the merged commit, then `git push` (`8bd6232d..4794918f`).
+    - No rules or agent profiles changed: `lotar trust` not needed.
+    - Still open: firewall and LAN check after the next release; LOCA-385.
+  report:
+    commits:
+    - hash: 4794918f
+      what: DEV-563 install:local signs source builds (merged and pushed to main)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2279 Rust, 1548 UI, 60 release, 7 hooks on 2c07042a
+    - command: npm run smoke
+      result: passed
+      reason: 405/405 on 2c07042a
+    - command: firewall/LAN check
+      result: not_run
+      reason: scheduled for the next release
+    next: 'After the next release: install a source build over the running one, check socketfilterfw --listapps and LAN; LOCA-385'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
@@ -462,9 +496,6 @@ description: |-
   - [ ] Linux and Windows: no signing, same staged install.
   - [ ] `codesign -dvv` on the installed source build shows `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`; local's `skills/lotar-services.md` is updated (filed there if it needs a LOCA ticket) so it no longer calls a signed source build wrong.
   - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
-tags:
-- fix-retried
-- merge-retried
 history:
 - at: 2026-11-15T17:40:28.831866+00:00
   actor: claude
@@ -909,3 +940,25 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A821aedb8-b488-4be5-bf28-a9fd5d021e92
+- at: 2026-11-17T02:13:13.067394+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:13:13.300489+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595","DEV-592","DEV-598","DEV-599","DEV-603","DEV-600","DEV-602","DEV-620"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595","DEV-592","DEV-598","DEV-599","DEV-603","DEV-600","DEV-602","DEV-620","DEV-579","DEV-609","DEV-625"]}'
+- at: 2026-11-17T02:14:42.050040+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-17T02:16:16.593552+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: fix-retried, merge-retried
+    new: ''

@@ -1758,17 +1758,21 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
 /// the branch it was given), newest tip first, the ticket's branch on a
 /// tie. A branch whose work landed, also rebased, doesn't count, nor does
 /// one main supersedes (`superseded_removal`): a merge that rebased and
-/// amended the fix leaves earlier copies whose content differs.
+/// amended the fix leaves earlier copies whose content differs. A branch
+/// counted only for its logged name must still hold the ticket's work
+/// (`holds_logged_work`): cleanup frees the name, and T3 Code may give it to
+/// another ticket's thread (DEV-612).
 fn unlanded_ticket_branch(tasks_dir: &std::path::Path, ticket_id: &str, prefix: &str, except: Option<&str>) -> Option<String> {
     let repo_root = resolve_repo_root(tasks_dir)?;
     let ticket_branch = build_worktree_branch(prefix, &sanitize_worktree_token(ticket_id));
     let refs = git_stdout(&repo_root, &["for-each-ref", "--format=%(committerdate:unix) %(refname:short)", "refs/heads/"]).ok()?;
     let main = git_stdout(&repo_root, &["symbolic-ref", "--quiet", "--short", "HEAD"]).ok().map(|branch| branch.trim().to_string());
     let owners = BranchOwners::load(&repo_root, prefix);
-    let logged: Vec<String> = saved_jobs(tasks_dir)
-        .into_iter()
-        .filter(|job| job.header.ticket_id == ticket_id)
-        .flat_map(|job| [job.header.worktree_branch, job.status.and_then(|status| status.worktree_branch)])
+    let jobs: Vec<_> = saved_jobs(tasks_dir).into_iter().filter(|job| job.header.ticket_id == ticket_id).collect();
+    let commits: Vec<&str> = jobs.iter().filter_map(|job| job.status.as_ref()?.ticket_commit.as_deref()).collect();
+    let logged: Vec<&str> = jobs
+        .iter()
+        .flat_map(|job| [job.header.worktree_branch.as_deref(), job.status.as_ref().and_then(|status| status.worktree_branch.as_deref())])
         .flatten()
         .collect();
     refs.lines()
@@ -1776,8 +1780,8 @@ fn unlanded_ticket_branch(tasks_dir: &std::path::Path, ticket_id: &str, prefix: 
         .filter(|(_, branch)| main.as_deref() != Some(*branch) && except != Some(*branch))
         .filter(|(_, branch)| {
             *branch == ticket_branch
-                || logged.iter().any(|logged| logged == branch)
                 || owners.ticket_branch_of(branch).as_deref() == Some(ticket_branch.as_str())
+                || (logged.contains(branch) && holds_logged_work(&repo_root, branch, ticket_id, &commits))
         })
         .filter(|(_, branch)| !branch_landed(&repo_root, branch).unwrap_or(true))
         .filter(|(_, branch)| {
@@ -1785,6 +1789,25 @@ fn unlanded_ticket_branch(tasks_dir: &std::path::Path, ticket_id: &str, prefix: 
         })
         .max_by_key(|(date, branch)| (date.parse::<i64>().unwrap_or(0), *branch == ticket_branch))
         .map(|(_, branch)| branch.to_string())
+}
+
+/// Whether `branch`, a name a job of `ticket_id` logged, still holds the
+/// ticket's work: its tip descends from a `commits` entry the jobs logged
+/// that main lacks, or a commit main lacks names the ticket first in its
+/// subject (`TEST-1 fix`, `TEST-1: fix`, `TEST-1-fix`). A state git can't
+/// judge doesn't count.
+fn holds_logged_work(repo_root: &std::path::Path, branch: &str, ticket_id: &str, commits: &[&str]) -> bool {
+    let tip = format!("refs/heads/{branch}");
+    let ancestor =
+        |commit: &str, of: &str| git_command(repo_root).args(["merge-base", "--is-ancestor", commit, of]).status().is_ok_and(|status| status.success());
+    if commits.iter().any(|commit| ancestor(commit, &tip) && !ancestor(commit, "HEAD")) {
+        return true;
+    }
+    let names_ticket = |subject: &str| {
+        subject.get(..ticket_id.len()).is_some_and(|start| start.eq_ignore_ascii_case(ticket_id))
+            && !subject.get(ticket_id.len()..).and_then(|rest| rest.chars().next()).is_some_and(char::is_alphanumeric)
+    };
+    git_stdout(repo_root, &["log", "--format=%s", &format!("HEAD..{tip}")]).is_ok_and(|subjects| subjects.lines().any(names_ticket))
 }
 
 /// Point the ticket's branch at the ticket's branch with the newest work

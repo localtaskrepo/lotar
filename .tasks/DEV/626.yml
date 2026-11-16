@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-17T02:10:38.570971+00:00
+modified: 2026-11-17T02:14:41.599707+00:00
 relationships:
   related:
   - DEV-593
@@ -113,7 +113,7 @@ description: |-
   - [ ] When T3 Code can't list its threads, nothing happens and the next look tries again; when the session can't be opened, the new job fails with the reason and its `job_failed` rules run.
   - [ ] Tests with the fake t3: a thread that turns running with no job is adopted and its end rule runs once; a second running thread on the ticket gets the comment; a waiting thread is left alone. Docs in docs/help/agent.md.
 tags:
-- review-blocked
+- review-returned
 history:
 - at: 2026-11-16T22:53:23.635327+00:00
   actor: claude
@@ -271,3 +271,12 @@ history:
   - field: tags
     old: ''
     new: review-blocked
+- at: 2026-11-17T02:14:41.599707+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

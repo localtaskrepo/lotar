@@ -1,11 +1,11 @@
 title: A job held back for prerequisites stays parked when its ticket is closed by hand
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T01:56:54.001918+00:00
-modified: 2026-11-17T01:56:56.411984+00:00
+modified: 2026-11-17T02:27:02.532874+00:00
 relationships:
   related:
   - DEV-530
@@ -33,3 +33,9 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T02:27:02.532874+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

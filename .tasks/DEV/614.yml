@@ -1,11 +1,11 @@
 title: 'Flaky smoke: relationships reciprocal repair test waits on an element under full-suite load'
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-17T01:58:58.488239+00:00
+modified: 2026-11-17T02:13:34.053358+00:00
 relationships:
   related:
   - DEV-606
@@ -235,3 +235,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:13:34.053358+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox

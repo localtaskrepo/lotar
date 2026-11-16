@@ -1,0 +1,18 @@
+title: agent.md doesn't say that end rules a full disk refused are kept and retried
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T02:28:12.068626+00:00
+modified: 2026-11-17T02:28:14.925851+00:00
+relationships:
+  related:
+  - DEV-633
+description: 'Found in the DEV-633 review: `docs/help/agent.md:238` says end-rule actions that find the storage lock busy are kept and resumed, but not that end rules whose checkpoint a full disk refused (ENOSPC) are now kept in the process and retried every 30 s, nor that this is lost when the process exits. Done when that paragraph describes both cases.'
+history:
+- at: 2026-11-17T02:28:14.925851+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

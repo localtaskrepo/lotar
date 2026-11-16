@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-17T01:48:12.930939+00:00
+modified: 2026-11-17T02:28:15.364464+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -204,9 +204,13 @@ comments:
     - Reran: `cargo nextest run -E 'test(/dev503_harness_jobs_test/)'` gave 35/35 passed. `rustfmt --check` on both Rust files passed, and `cargo clippy --workspace --all-targets -- -D warnings` was clean.
     - Not rerun: full `npm run lint`, `npm test` and `npm run smoke`; the fix comment says they passed.
     - Not UI work: no screenshots needed. No blocking or minor findings, no tickets filed.
+- date: 2026-11-17T02:20:44.433742+00:00
+  author: claude
+  text: 'Stalled since 2026-11-17T01:48Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1eaaed6-5fcf-4453-93a1-c602d6736f1c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aebc5a3cc-f4ba-483a-acf0-cf1cdfc7f5c6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8c7fca24-820c-46c7-a848-d438b0ed4118
 description: |-
   Found: job job-20261115T191640.133Z-8 (standards STD-136) rebased, fast-forwarded main to d0deac4 and pushed, then failed: `git branch --force agent/STD-136 18b8e9c` refused, 'cannot force update the branch used by worktree at .../agent-STD-136-...'. The ticket went back to Merging, assigned to @fix, and a fix agent was started for work already on main.
   Check: run a merge job in a T3 thread whose ticket branch is checked out in a lotar worktree; the job ends failed after the merge.
@@ -449,3 +453,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T02:20:36.570865+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-17T02:20:41.610722+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-17T02:20:44.433742+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:28:15.364464+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8c7fca24-820c-46c7-a848-d438b0ed4118

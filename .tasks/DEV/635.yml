@@ -1,15 +1,59 @@
 title: A new job worktree starts from a copy-on-write clone of an existing build instead of a cold build
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T01:03:33.051382+00:00
-modified: 2026-11-17T01:28:58.799597+00:00
+modified: 2026-11-17T02:14:41.988350+00:00
 relationships:
   related:
   - DEV-579
   - DEV-581
+  - DEV-640
+  - DEV-613
+  - DEV-634
+comments:
+- date: 2026-11-17T02:13:45.683800+00:00
+  author: claude
+  text: |-
+    Done: a new lotar job worktree clones `target/` copy-on-write (`clonefile(2)`) right after `git worktree add`. The measured gain is smaller than hoped, because cargo always rebuilds the workspace crates in a new checkout.
+
+    - **Code:** `clone_build_output` in `crates/lotar-lib/src/services/agent_job_service.rs`, called only from `prepare_worktree`'s new-worktree branch.
+      - Source, first that applies: the ticket's earlier worktree (T3 thread or detached worktrees, traced as done cleanup traces them; with several, the one built last), then the main checkout, then nothing.
+      - A reused worktree, a T3 thread's worktree and t3-runner jobs are untouched. Merge jobs' new worktrees clone too (note in `merge.rs`).
+    - **Failure:** the job logs `Couldn't clone target/ from <path>: <err>; this job builds cold.`, removes any partial `target/` and goes on. It never makes a full copy: off macOS the log says clonefile isn't available.
+    - **Log:** `Cloned target/ from <path> (copy-on-write).`, or why nothing was cloned.
+    - **Tests** (`agent_safety_test.rs`): clone from the main checkout; earlier worktree wins over the main checkout; failed clone (unreadable directory) and no `target/` both build cold.
+    - **Docs:** `docs/help/agent.md` (Worktrees). STD-95, `cleanup_paths` and done cleanup are unchanged.
+
+    **Measured** on a separate APFS disk image, so `df` counts only this. Load was 40 to 140, so times are rough.
+    - Clone itself: under 1 s, 1.4 MB.
+    - `npm run test:rust` with sccache warm: cold 384 s, +1.92 GB, 206 crates compiled; cloned 520 s (load 105 vs 55), +1.43 GB, 4 crates compiled. Test time dominates and load skews it.
+    - Build only (`nextest --no-run`) without sccache, as in sandboxed jobs (STD-125): cold 134 s, +1.88 GB; cloned 80 s, +1.36 GB.
+    - Why only about 0.5 GB saved: git checkout gives every source file a new mtime, so cargo rebuilds `lotar`, `lotar-lib`, `lotar-core` and `lotar-web-assets`. Their test binaries and incremental data are most of the 1.4 GB. The clone saves all dependency builds.
+
+    **Also**
+    - A flaky test seen in a measurement run is filed as [DEV-640](https://lotar.pyxzl.net/task/DEV-640): `chunked_bodies_get_411_and_overload_gets_503`, EINVAL from `set_read_timeout`. A DEV-613 flake also showed once in a measurement run; neither appeared in the gate runs.
+    - Told the DEV-634 thread (crate split) that this changes `agent_job_service.rs`.
+    - No guidance correction. The testing-strategy skill still names `--cargo-profile local`; that is right until DEV-579 lands.
+  report:
+    commits:
+    - hash: 068fa17d
+      what: clone target/ with clonefile(2) into a new job worktree
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2282 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: cargo nextest -E 'test(/agent_safety_test::a_(new|failed)/)'
+      result: passed
+      reason: the 3 new tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae2a93ce5-f5cd-4e81-80d2-9bba5a154e7a
 description: |-
@@ -103,3 +147,28 @@ history:
       - [ ] Measured: first `npm test` in a new worktree, time and added disk, cold vs cloned.
       - [ ] A test covers clone from the main checkout, from an earlier worktree over the main checkout, and the fallback; `docs/help/agent.md` (Worktrees) says so.
       - [ ] STD-95 (build output stays until Done) and `cleanup_paths` unchanged.
+- at: 2026-11-17T02:13:30.325019+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-579","DEV-581"]}'
+    new: '{"related":["DEV-579","DEV-581","DEV-640"]}'
+- at: 2026-11-17T02:13:45.683800+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:13:45.939173+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-579","DEV-581","DEV-640"]}'
+    new: '{"related":["DEV-579","DEV-581","DEV-640","DEV-613","DEV-634"]}'
+- at: 2026-11-17T02:14:41.988350+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

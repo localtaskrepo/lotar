@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-17T01:37:20.283759+00:00
+modified: 2026-11-17T02:16:49.183028+00:00
 relationships:
   related:
   - DEV-604
@@ -84,6 +84,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2723c3a0-e508-468f-a410-efcf7e0b6d36
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac4dae642-8a2d-47f1-ae9e-19025b0a012e
 description: |-
   Owner 2026-11-16, after the Mac crashed (picked option 2 of 4 from the options picker): "Memory gate": lotar starts no new job while swap is nearly full or macOS reports memory pressure.
 
@@ -233,3 +234,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:16:49.183028+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac4dae642-8a2d-47f1-ae9e-19025b0a012e

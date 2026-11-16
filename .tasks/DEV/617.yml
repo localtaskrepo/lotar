@@ -1,11 +1,11 @@
 title: A @fix-codex retry after a Claude rate limit ran on Claude and failed the same way
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-17T01:38:58.143796+00:00
+modified: 2026-11-17T02:28:17.591432+00:00
 relationships:
   related:
   - DEV-584
@@ -96,14 +96,42 @@ comments:
     choice:
     - fix
     note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review passed (comment 01:34Z) but its session ended ''idle'' (job-20261117T012140.075Z-11), no real failure; review again.'
+- date: 2026-11-17T02:23:42.863897+00:00
+  author: claude
+  text: |-
+    Branch checked: the work is intact; sending it to review again.
+
+    - `agent/DEV-617`, `t3/fix-codex-retry-claude-limit` and `t3/fix-codex-retry-rate-limit` all point at `15135f65`; no new changes
+    - Still merges cleanly onto main (`git merge-tree`)
+    - The new test `job_error_condition_tells_a_rate_limit_from_other_failures` passes
+    - The last review passed (01:34Z); only its session ended idle
+  report:
+    commits:
+    - hash: 15135f65
+      what: job error condition for rules (unchanged)
+    checks:
+    - command: cargo nextest run --cargo-profile local -E 'test(job_error_condition_tells_a_rate_limit_from_other_failures)'
+      result: passed
+    - command: git merge-tree --write-tree main HEAD
+      result: passed
+      reason: merges cleanly
+    - command: npm run smoke
+      result: not_run
+      reason: review and merge rerun the checks
+    next: Review on Codex, then merge
+- date: 2026-11-17T02:28:17.591432+00:00
+  author: automation
+  text: The fix agent's job job-20261117T021644.669Z-35 failed (lotar agent logs job-20261117T021644.669Z-35); @fix-retry retries it on branch t3/fix-codex-retry-rate-limit.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5546fe0-7dc8-46db-bd03-10093f4d83f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9ad2f7d5-5452-4daa-8dfb-591f61955bad
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af893bf8e-db36-4bbf-8cfa-1d26038346ca
 description: 'Found 2026-11-16 on DEV-606: job job-20261116T062103.231Z-76 (profile fix-codex) ran in a T3 thread with model claude-opus-5-5 (~/.local/state/harnessmux/sessions/lotar-95e687-DEV-606-fix-codex.json, profile.model) and failed in 7 s with ''Claude API rate limit reached'', just like the @fix job before it, so the ticket went to the owner. Check: that session file shows profile.model claude-opus-5-5 for LOTAR_AGENT_PROFILE fix-codex. Done: a fix-codex job runs on a Codex model (or the profile is renamed to what it runs), with a test; related to DEV-584 (wait through usage limits).'
 tags:
 - health
 - retry-fix
+- fix-retried
 custom_fields:
   finding: agent-job:retry-same-provider
 history:
@@ -214,3 +242,31 @@ history:
   - field: tags
     old: health
     new: health, retry-fix
+- at: 2026-11-17T02:17:59.698380+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T02:19:43.453975+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af893bf8e-db36-4bbf-8cfa-1d26038346ca
+- at: 2026-11-17T02:23:42.863897+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:28:14.308544+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, retry-fix
+    new: health, retry-fix, fix-retried
+- at: 2026-11-17T02:28:17.591432+00:00
+  actor: automation
+  changes:
+  - field: comment_added

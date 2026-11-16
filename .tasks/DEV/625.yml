@@ -1,15 +1,18 @@
 title: 'A dev503 test that times out under heavy load aborts its binary: Harness''s Drop panics again while unwinding'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T21:08:52.852170+00:00
-modified: 2026-11-17T01:12:57.498486+00:00
+modified: 2026-11-17T02:16:45.167518+00:00
 relationships:
   related:
   - DEV-613
   - DEV-633
+  - DEV-563
+  - DEV-579
+  - DEV-609
 comments:
 - date: 2026-11-16T23:41:38.923229+00:00
   author: claude
@@ -76,6 +79,36 @@ comments:
       result: not_run
       reason: needs a loaded machine
     next: Merge
+- date: 2026-11-17T02:16:13.653663+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `8bd6232d` is on main and origin/main.
+
+    - Rebased 3 times while main moved (DEV-579, DEV-609); each rebase was clean, with no lockfile change, so no `npm ci`.
+    - The one failing test is [DEV-613](https://lotar.pyxzl.net/task/DEV-613)'s flake (`dev503_harness_jobs_test.rs`, "the entry still waits"), which this change doesn't touch. It fails on main without this fix too, as other merges saw, and I added this run's evidence to DEV-613.
+    - Check command, 30 stress iterations at load 30 to 80: no SIGABRT or "panic in a destructor" anywhere. The flake's failures came back as ordinary failed tests, which is what this fix is for.
+    - No rules or config changed, so I didn't run `lotar trust`. I amended main's `.tasks` changes into the merged commit.
+  report:
+    commits:
+    - hash: 8bd6232d
+      what: Harness::drop only waits, without panicking, while the test is already panicking (rebased 8af10186, with .tasks amended in)
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+      reason: after each of the 3 rebases
+    - command: npm test (test:agent)
+      result: failed
+      reason: only a_queue_entry_held_by_a_waiting_thread_says_so_once, the known DEV-613 flake; the other 2278 Rust tests, UI, release and hooks passed
+    - command: npm run smoke
+      result: passed
+      reason: 405/405 on 87ad0675; not rerun after the last rebase (DEV-609 changed only a test file)
+    - command: cargo nextest -E 'test(/dev503_harness_jobs_test/)' --stress-count 30 --no-fail-fast
+      result: passed
+      reason: no SIGABRT; 8 iterations failed only on the DEV-613 flake
+    - command: git push
+      result: passed
+      reason: 9ad62dcb..8bd6232d
+    next: 'None: done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeec445cf-bb38-4f44-b052-6a4d7d637810
@@ -182,3 +215,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T02:13:13.303196+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-633"]}'
+    new: '{"related":["DEV-613","DEV-633","DEV-563"]}'
+- at: 2026-11-17T02:16:13.653663+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:16:13.864486+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-633","DEV-563"]}'
+    new: '{"related":["DEV-613","DEV-633","DEV-563","DEV-579","DEV-609"]}'
+- at: 2026-11-17T02:16:45.167518+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

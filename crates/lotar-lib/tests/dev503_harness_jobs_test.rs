@@ -1234,6 +1234,35 @@ fn a_leftover_copy_of_a_fix_that_main_supersedes_is_not_unlanded_work() {
     assert_eq!(rev(root, "main"), main);
 }
 
+/// DEV-612: the fix job's `t3/topic-0` landed, cleanup at Done removed it, and T3 Code gave the name to another
+/// ticket's thread. The reopened ticket's job log still names it, but it holds none of the ticket's work: a merge
+/// leaves the ticket's branch where it is and passes.
+#[test]
+fn a_logged_branch_name_another_ticket_reuses_is_not_the_tickets_work() {
+    let (fixtures, _env) = t3_harness_with(&[("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""), ("merge", "", "")]);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    git(root, &["merge", "--ff-only", "-q", "t3/topic-0"]);
+    let tree = root.join("t3-trees/0");
+    git(root, &["worktree", "remove", "--force", tree.to_str().unwrap()]);
+    git(root, &["branch", "-D", "-q", "t3/topic-0"]);
+    git(root, &["branch", "-f", "agent/TEST-1", "main"]);
+    git(root, &["worktree", "add", "-q", "-b", "t3/topic-0", tree.to_str().unwrap(), "main"]);
+    std::fs::write(tree.join("other.txt"), "other\n").unwrap();
+    git(&tree, &["add", "other.txt"]);
+    let status = std::process::Command::new("git")
+        .args(["commit", "-qm", "TEST-10 other work"])
+        .env("GIT_COMMITTER_DATE", "2099-01-01T00:00:00Z")
+        .current_dir(&tree)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let main = rev(root, "main");
+    run_t3(&fixtures, "merge").success();
+    assert_eq!(rev(root, "agent/TEST-1"), main, "the ticket's branch doesn't follow the other ticket's work");
+    assert_eq!(rev(root, "main"), main, "main stays where it was");
+}
+
 /// `t3` whose server stops answering: `thread start` names thread-1 and exits 1 with T3's error, and `thread show`
 /// fails the same way while `$FAKE_DOWN` holds a number above 0, then shows the thread completed.
 const FAKE_T3_OUTAGE: &str = r#"#!/bin/sh

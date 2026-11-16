@@ -1,11 +1,10 @@
 title: The web server treats a failed socket read as end of request and truncates the body
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
 created: 2026-11-16T20:55:33.664464+00:00
-modified: 2026-11-17T01:57:36.778307+00:00
+modified: 2026-11-17T02:16:33.080785+00:00
 relationships:
   related:
   - DEV-615
@@ -129,12 +128,36 @@ comments:
       result: not_run
       reason: nothing to merge
     next: 'None: the fix is on main and origin/main'
+- date: 2026-11-17T02:13:33.741921+00:00
+  author: automation
+  text: The merge agent's job job-20261117T014701.076Z-29 failed (lotar agent logs job-20261117T014701.076Z-29); the fix agent retries it on branch t3/web-server-socket-read-errors.
+- date: 2026-11-17T02:16:14.161597+00:00
+  author: claude
+  text: |-
+    Fix: nothing to do, the fix is already on `main` and `origin/main` as `486377fc`.
+
+    - Branch's only commit `cbfba630` is the pre-rebase copy of `486377fc`; `git diff main HEAD -- crates/lotar-lib/src/web_server.rs` is empty.
+    - Ticket check `body_read_retries_interrupted_and_fails_on_other_errors` passes.
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-lib body_read_retries
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: no change
+    - command: npm test
+      result: not_run
+      reason: no change
+    - command: npm run smoke
+      result: not_run
+      reason: no change
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2f6fcef8-6947-4a68-a032-277f7fdb0695
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adbac5943-5053-4239-a351-333ab440b5b5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b57ccc8-faa0-45dd-882c-3bfdcf2c4ebe
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97311ebc-5de8-4aba-8a30-299833e99d18
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7d549f7-09b6-44a9-bf7f-6b7bf7b38330
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A836bc07a-65ca-40a8-a9d1-42aeb42c9c6a
 description: 'Found while on DEV-615: `handle_connection` in `crates/lotar-lib/src/web_server.rs` reads headers and body with `stream.read(..).unwrap_or_default()`, so an `Interrupted` or timed-out read counts as EOF and the handler gets a cut body (a misleading 400 `Invalid body`). Check: a unit test feeding a stream that returns `Interrupted` once mid-body. Done: `Interrupted` is retried, other read errors close the connection without dispatching.'
 tags:
 - health
@@ -260,3 +283,45 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7d549f7-09b6-44a9-bf7f-6b7bf7b38330
+- at: 2026-11-17T02:13:33.221469+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-17T02:13:33.741921+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:13:38.287825+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-17T02:13:39.213616+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A836bc07a-65ca-40a8-a9d1-42aeb42c9c6a
+- at: 2026-11-17T02:16:14.161597+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:16:23.455399+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T02:16:33.080785+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried
+    new: health
