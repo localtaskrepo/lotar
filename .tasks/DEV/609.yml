@@ -5,12 +5,13 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T21:05:45.071514+00:00
+modified: 2026-11-16T21:38:22.977889+00:00
 relationships:
   related:
   - DEV-599
   - DEV-594
   - DEV-624
+  - DEV-583
 comments:
 - date: 2026-11-16T05:21:49.697784+00:00
   author: claude
@@ -107,6 +108,18 @@ comments:
       result: not_run
       reason: stopped after test failure
     next: 'Owner: merge 2b7224a0 now despite the unrelated flaky serve tests, or wait for DEV-624'
+- date: 2026-11-16T21:38:22.668931+00:00
+  author: claude
+  text: |-
+    Review: passed. The test does what "Done when" asks and fails without the threads-list check.
+
+    - Work: `02c1cd8a` adds `a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer` (31 lines, test only) in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`. No stray files.
+    - `45730a7f` is the DEV-599 copy. DEV-599 is now on main as `01a9160e`, and the code is the same apart from line offsets, so the copy drops out on rebase. The branch base `bae5712f` is behind main (DEV-583/598/599/600/602/603 landed since).
+    - `running_t3_thread` on main (`804cb0f9`) still keys the cache on `*known == asked`, so the test checks what the code really does.
+    - Reran on main with only `02c1cd8a` cherry-picked (scratch worktree, now removed): `cargo nextest run --workspace -E 'test(/a_t3_job_ending|a_start_on_a_busy_ticket|no_job_starts_while/)'`: 3 passed.
+    - Mutation: with `&& *known == asked` removed, the new test fails at "asks about both threads again" (`left: 6, right: 8`), matching what the fix agent reported.
+    - Not rerun: full `npm run lint`/`test`/`smoke`. The machine was overloaded (load ~150, the build took 53 min). Only test code changed, and the fix agent reports all three passed.
+    - No owner decision touched, no UI. Minor findings: none, no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177bbfb8-8291-4dbc-bae5-a926f125a36d
@@ -251,3 +264,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T21:38:22.668931+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T21:38:22.977889+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-599","DEV-594","DEV-624"]}'
+    new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583"]}'

@@ -707,7 +707,7 @@ fn no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread() {
 #[test]
 fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
     let elsewhere = tempfile::tempdir().unwrap();
-    let (fixtures, _env) = t3_harness_with(&[("fix", "", "")]);
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", ""), ("review", "", ""), ("merge", "", "")]);
     let root = fixtures.get_temp_path();
     let failed = elsewhere.path().join("failed");
     git(root, &["worktree", "add", "-q", "-b", "agent/TEST-1", failed.to_str().unwrap()]);
@@ -718,6 +718,15 @@ fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
     let failed = std::fs::canonicalize(&failed).unwrap();
     assert!(prompt.contains(&format!("uncommitted changes in `{}` (branch `agent/TEST-1`)", failed.display())), "{prompt}");
     assert!(failed.join("half-done.txt").is_file(), "the earlier work stays where it is");
+    // DEV-608: the changes stay there after the retry, so later jobs learn they may be carried over or dropped already,
+    // and a merge job doesn't hear of them.
+    assert!(prompt.contains("A job that takes the work over (a fix or rework)"), "{prompt}");
+    run_t3(&fixtures, "review").success();
+    let prompt = std::fs::read_to_string(root.join("t3.log.prompt-1")).unwrap();
+    assert!(prompt.contains("carried them over or dropped them already") && prompt.contains("A review job leaves them alone"), "{prompt}");
+    run_t3(&fixtures, "merge");
+    let prompt = std::fs::read_to_string(root.join("t3.log.prompt-2")).unwrap();
+    assert!(prompt.contains("This is a merge job") && !prompt.contains("half-done") && !prompt.contains(&failed.display().to_string()), "{prompt}");
 }
 
 /// DEV-600: harnessmux counts a thread with an `activeRunId` as running whatever its status says, and T3 Code shows a

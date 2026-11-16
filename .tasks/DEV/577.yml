@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-16T21:08:04.707054+00:00
+modified: 2026-11-16T22:17:03.834573+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -169,6 +169,30 @@ comments:
     - Any other worktree stays as it is. The move is then skipped when the work is on main (`BranchMove::Stayed`), else the job fails as before.
     - Tests: the DEV-573 and DEV-595 tests now make their worktree with a finished `stale` job; DEV-577's test fails on main's code (main moved the branch in the other worktree, no "stays where it is" note) and passes with the fix. The 35 tests in `dev503_harness_jobs_test.rs` pass.
     - `docs/help/agent.md` updated in place.
+- date: 2026-11-16T22:17:03.834573+00:00
+  author: claude
+  text: |-
+    Done: DEV-577 continued after DEV-583 and rebased onto main; it now follows the finished-only answer (INBOX-291) on top of DEV-595's reset.
+
+    - `e087ae1b` (signed) replaces `55b78b15`. It changes `crates/lotar-lib/src/services/agent_job_service.rs`, `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` and `docs/help/agent.md`.
+    - A worktree on the ticket branch is reset (clean) or detached (with changes) only when it is a finished job's (`finished_job_worktree`). Any other worktree stays; the move is then skipped when the work is on main, else the job fails.
+    - DEV-577's test failed on main's code and passes now; all 35 tests in `dev503_harness_jobs_test.rs` pass.
+    - One full-suite run under load failed `a_queue_entry_held_by_a_waiting_thread_says_so_once` (1.5 s timing window). It passed alone and in the next two full runs.
+  report:
+    commits:
+    - hash: e087ae1b
+      what: 'on main past DEV-595/DEV-602: reset or detach only a finished job''s worktree; leave others and skip the move when the work is on main'
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: rerun with RUSTC_WRAPPER= after the sccache queue stalled at load 150
+    - command: npm test
+      result: passed
+      reason: 2259 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review on another model, then the merge agent rebases onto main (DEV-606 is newer) and lands it
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1eaaed6-5fcf-4453-93a1-c602d6736f1c
 description: |-
@@ -379,3 +403,7 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605"]}'
     new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595"]}'
+- at: 2026-11-16T22:17:03.834573+00:00
+  actor: claude
+  changes:
+  - field: comment_added

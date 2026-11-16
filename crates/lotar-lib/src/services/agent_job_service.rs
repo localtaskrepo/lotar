@@ -295,7 +295,7 @@ impl AgentJobService {
         let t3_thread = runner_kind == AgentRunnerKind::T3;
         let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp, t3_thread);
         if t3_thread {
-            notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id));
+            notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id, is_merge_job));
         }
         let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, &ticket_id, req.agent.as_deref()));
         let prompt = build_prompt(&task, &user_prompt, context.as_ref(), earlier.as_deref(), instructions.as_deref(), Some(&notes));
@@ -1411,8 +1411,11 @@ struct T3Worktree {
 /// `t3 thread start --wait` returns when the turn ends, even while
 /// `t3_background_wait` keeps the thread working (T3 Code 0.1.9, DEV-335).
 /// A retried or resumed job's thread starts in a new worktree (DEV-583), so
-/// the notes name the ticket's worktrees that hold uncommitted work.
-fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str) -> String {
+/// the notes name the ticket's worktrees that hold uncommitted work. They
+/// stay there after a job carried them over or dropped them, so the note
+/// leaves them to a job that takes the work over; a merge job doesn't get
+/// it (DEV-608).
+fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool) -> String {
     let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
     let mut notes = format!(
         "- This job runs as a T3 Code thread, which doesn't get LoTaR's environment. Add `--tasks-dir \"{}\"` \
@@ -1421,11 +1424,16 @@ to every lotar command, so it changes this ticket in the main checkout and not a
 checks in the foreground and finish all work before your final message; don't end your turn to wait for background work.\n",
         dir.display()
     );
+    if is_merge_job {
+        return notes;
+    }
     for (path, branch) in uncommitted_ticket_worktrees(tasks_dir, config, ticket_id) {
         let shown = path.display();
         notes.push_str(&format!(
             "- An earlier job on this ticket left uncommitted changes in `{shown}` (branch `{branch}`), outside your worktree. \
-Read them there (`git -C \"{shown}\" status`, `git -C \"{shown}\" diff`) and carry over what you need; leave that worktree as it is.\n"
+A job that takes the work over (a fix or rework) reads them there (`git -C \"{shown}\" status`, `git -C \"{shown}\" diff`) \
+and carries over what it still needs; a later job may have carried them over or dropped them already, so check the ticket's \
+commits and comments first. A review job leaves them alone. Leave that worktree as it is.\n"
         ));
     }
     notes

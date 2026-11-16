@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T21:32:15.016584+00:00
+modified: 2026-11-16T22:00:10.998529+00:00
 relationships:
   related:
   - DEV-577
@@ -16,6 +16,8 @@ relationships:
   - DEV-566
   - DEV-602
   - DEV-603
+  - DEV-600
+  - DEV-606
 comments:
 - date: 2026-11-16T04:16:01.944881+00:00
   author: claude
@@ -203,6 +205,64 @@ comments:
       result: not_run
       reason: stopped, as above
     next: 'Owner: pick one: let the merge thread land a9d99539 as is, or review it on another model first'
+- date: 2026-11-16T21:35:12.028442+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-605 is on main as `a4b4a8d0` (`862c9b28..a4b4a8d0`).
+
+    - **Rebase conflict, resolved:** main had changed `run_job` in `agent_job_service.rs` (DEV-598, DEV-600, DEV-602, DEV-603). I kept both sides: main's setup record (DEV-598), `followed_note` (DEV-600), the session-handoff helpers (DEV-603), and recording the assignee for every job, not only merge jobs.
+    - **One ordering change during that resolution:** `follow_ticket_work` (DEV-602) now runs *before* lotar's own merge. Otherwise lotar would merge from a stale `agent/<ID>` when a T3 thread committed the fix on a `t3/*` branch. Its note is logged in the merge path too. All checks pass with it, but no review has looked at this change.
+    - **Main moved during the checks:** DEV-606 landed (`862c9b28`, a single smoke spec), so I rebased again and reran that spec.
+    - **Checks:** `lint:agent`, `test:agent` and `smoke` all passed on `a9d99539`. The first test run was killed by a 2-hour tool limit while the machine was at load 100–240, so I reran it.
+    - **Not reviewed:** the second review job (`job-20261116T061807.870Z-57`) failed on a Claude rate limit, and the rule sent the ticket to merge anyway. There is still no passed review of the rework.
+    - **Stale branch:** `agent/DEV-605` still points at the pre-rebase `25188cfe`, checked out in `agent-DEV-605-a91094d1b4852509`. I didn't touch it. The DEV-605 fix thread's copy `e6c9070c` on `t3/1e8def17` is a duplicate rebase and isn't needed.
+    - No `.tasks` rule or config change, so no `lotar trust` was needed. This isn't a health ticket, so there was no finding check.
+  report:
+    commits:
+    - hash: a4b4a8d0
+      what: DEV-605 merged on main and pushed (pending .tasks changes amended in)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2270 Rust, 1548 UI, release and hooks tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: smoke/tests/ui.board-layout.smoke.spec.ts
+      result: passed
+      reason: rerun after the second rebase onto DEV-606, which changed only this spec
+    - command: lotar trust
+      result: not_run
+      reason: the merged commits change no rules or config
+    next: 'Owner: decide whether DEV-605 needs a review after the fact, since the second review failed on a rate limit'
+- date: 2026-11-16T22:00:10.998529+00:00
+  author: claude
+  text: |-
+    Review: passed. The rework fixes both blocking findings from the first review. The branch conflicts with main in `agent_job_service.rs`, which the merge has to resolve with care (see below).
+
+    Read: the range-diff `aa89bae8` → `25188cfe`, `run_process` and `terminate_child`, the trust gate and the untrusted branch at `agent_job_service.rs:2729`, the two new tests and the doc changes.
+
+    **Findings from the first review**
+    - **A check could hang the merge:** fixed. `merge.rs:498-507` waits at most `OUTPUT_DRAIN_LIMIT`, then stops the process group. A check whose leftovers start their own process group can still keep its pipe threads alive, but lotar no longer waits for them, so the merge goes on.
+    - **Missing untrusted test:** fixed. `an_untrusted_repository_leaves_the_merge_to_the_agent` moves the profiles to a home config and clears `LOTAR_TRUST_ALL`. It asserts that the agent ran without the hand-off text and that the check didn't run. It is safe because nextest runs each test in its own process.
+    - **Doc wording:** fixed in `agent.md` step 5 and in the trust messages.
+
+    **For the merge (not a defect in this work)**
+    - The branch is 9 commits behind main. `git merge-tree main HEAD` shows conflicts in `crates/lotar-lib/src/services/agent_job_service.rs`, with DEV-598, DEV-600/566 and DEV-603.
+    - The resolution must keep all of these:
+      - DEV-598's setup record before the worktree setup.
+      - `assignee_at_start` for every job, plus `followed_note` (DEV-600).
+      - The DEV-603 session and handoff logic next to the `AgentSession::Fresh` this work forces on a hand-off.
+    - Then the DEV-605 tests have to run again on the rebased branch.
+
+    **Checks**
+    - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev605|trust/)'`: all 11 DEV-605 tests passed.
+    - The 4 `dev259` trust tests didn't run: they need the `lotar` binary that `-p` doesn't build.
+    - The rerun with `--workspace` was stopped after 50 min: under load 40-150 the compiler got about 0.1% CPU. The first try was also stuck in `sccache` for 23 min.
+    - I didn't rerun `npm run lint`, `npm test` or `npm run smoke` for the same reason. The fix agent reports them passed on `25188cfe`.
+    - I changed no files. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27aa3d95-a2c7-4dd5-b654-19819c5d68c0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa42985b0-da6c-4375-89b2-40b1447a986e
@@ -463,6 +523,20 @@ history:
     old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588"]}'
     new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603"]}'
 - at: 2026-11-16T21:32:15.016584+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T21:35:12.028442+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T21:35:12.348487+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603"]}'
+    new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606"]}'
+- at: 2026-11-16T22:00:10.998529+00:00
   actor: claude
   changes:
   - field: comment_added
