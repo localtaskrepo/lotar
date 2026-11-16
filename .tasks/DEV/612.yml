@@ -1,11 +1,11 @@
 title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
-status: Blocked
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-16T05:49:15.816679+00:00
+modified: 2026-11-16T18:40:41.509173+00:00
 relationships:
   depends_on:
   - DEV-602
@@ -36,8 +36,48 @@ comments:
       result: not_run
       reason: no code change
     next: 'When DEV-602 is on main: rebase agent/DEV-612 onto main and implement the Done when'
+- date: 2026-11-16T06:18:08.743956+00:00
+  author: automation
+  text: The fix agent's job job-20261116T061756.329Z-56 failed (lotar agent logs job-20261116T061756.329Z-56); @fix-codex retries it on branch agent/DEV-612.
+- date: 2026-11-16T06:19:45.364637+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T061938.697Z-68 failed again (lotar agent logs job-20261116T061938.697Z-68). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T18:40:41.509173+00:00
+  author: claude
+  text: |-
+    Duplicate thread stopped: the earlier DEV-612 thread is doing this work on `agent/DEV-612`.
+
+    - Both failed jobs' T3 threads came back after the rate limit and started the same fix. This one (`t3/cf3ddb2f`, job `job-20261116T061938.697Z-68`) made no edits or commits.
+    - I told the other thread that it owns the ticket and that the status still shows the retry question (HelpNeeded, assigned to mallox).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2bfb120b-d5dd-42da-8b97-d8582d5bcefb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09feb0e9-5605-42cb-b08e-a17fad3257e2
 description: |-
   Found in the DEV-602 review.
 
@@ -52,6 +92,8 @@ description: |-
   - [ ] Both callers get it: `follow_ticket_work` leaves `agent/<ID>` where it is, and `ensure_branch_merged` doesn't fail a merge naming the skipped branch.
   - [ ] A step fails: a git call that can't answer (missing ref, git error) skips the branch, as an unknown owner.
   - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
+tags:
+- fix-retried
 history:
 - at: 2026-11-16T04:47:33.913722+00:00
   actor: claude
@@ -138,3 +180,44 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-16T06:18:01.806201+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-16T06:18:07.869139+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-16T06:18:08.743956+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:19:39.642062+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09feb0e9-5605-42cb-b08e-a17fad3257e2
+- at: 2026-11-16T06:19:45.304847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:19:45.364637+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T18:40:41.509173+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: Sign lotar builds from source with the owner's Developer ID
-status: Merging
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-16T05:43:39.211834+00:00
+modified: 2026-11-16T19:25:55.846800+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -22,6 +22,8 @@ relationships:
   - DEV-598
   - DEV-599
   - DEV-603
+  - DEV-600
+  - DEV-602
 comments:
 - date: 2026-11-15T18:01:34.472793+00:00
   author: claude
@@ -344,6 +346,95 @@ comments:
     - Still open by design: the firewall/LAN check after the next release, and [LOCA-385](https://local.pyxzl.net/task/LOCA-385).
     - Stale copies of the same patch stay on `t3/e64a8987` (`adffe220`) and `t3/db6dfa77` (`53e25f3c`). Merge `43b1240d`; those branches can go.
     - No tickets filed. No files, status or assignee changed.
+- date: 2026-11-16T06:17:54.764690+00:00
+  author: automation
+  text: The merge agent's job job-20261116T061742.367Z-55 failed (lotar agent logs job-20261116T061742.367Z-55); the fix agent retries it on branch t3/sign-source-builds-developer-id-2.
+- date: 2026-11-16T06:19:24.722865+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T061916.139Z-66 failed again (lotar agent logs job-20261116T061916.139Z-66). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T19:14:02.369066+00:00
+  author: claude
+  text: |-
+    Not merged: the Mac is too overloaded to run the checks (load average 100–135, `vue-tsc` got 1.5 min CPU in 21 min).
+
+    - Rebased cleanly onto main `804cb0f9`: branch `t3/2ae5d5ce` now holds `5d06d011`, signed. No conflicts, no lockfile change.
+    - Main's 5 new commits (DEV-600, DEV-602, DEV-603, DEV-598, DEV-599) don't touch this change's files.
+    - Lint got through its type checks; I stopped it while Clippy was compiling from scratch. Tests and smoke didn't start.
+    - The earlier merge job died the same way (session timeout under load).
+
+    Question: should I merge `5d06d011` on the checks that passed on `43b1240d` (same patch, files untouched by main since), or wait and run the full checks when the machine is quiet?
+  report:
+    commits:
+    - hash: 5d06d011
+      what: rebased onto main 804cb0f9, unmerged
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: frontend/JS steps ran, Clippy stopped mid-compile at load ~110
+    - command: npm test
+      result: not_run
+      reason: machine overloaded
+    - command: npm run smoke
+      result: not_run
+      reason: machine overloaded
+    next: Run lint, test, smoke on 5d06d011 when the Mac is quiet, then ff-merge
+- date: 2026-11-16T19:25:55.846800+00:00
+  author: claude
+  text: |-
+    Merge stopped: rebased cleanly, but the full checks can't finish while the Mac is overloaded. Nothing merged or pushed.
+
+    - Rebased onto main `804cb0f9` (DEV-600, DEV-602, DEV-603). No conflicts, no lockfile change. New commit `79395263`, signed. Main has not changed the five touched files.
+    - The hash changed, so the earlier checks don't count. `npm run lint:agent` ran for 30 minutes and was then stopped by the time limit. It didn't fail: the load average was ~130, with 9 `lint:agent` runs from other worktrees going at once.
+    - Passed: `npm run test:release` 60/60 (10 installer tests), `oxlint` and `prettier --check` on the changed files. The change is only JS and docs; ESLint ignores `scripts/`.
+    - Not run: the full `lint:agent`, `npm test`, smoke.
+
+    Question: merge `79395263` on these targeted checks, or rerun the merge job when the Mac is quieter?
+  report:
+    commits:
+    - hash: '79395263'
+      what: DEV-563 rebased onto main 804cb0f9 (not merged)
+    checks:
+    - command: npm run test:release
+      result: passed
+      reason: 60/60, 10 installer tests
+    - command: oxlint + prettier on changed files
+      result: passed
+    - command: npm run lint:agent
+      result: not_run
+      reason: killed after 30 min, load average ~130, 9 lints in parallel
+    - command: npm test
+      result: not_run
+      reason: machine overloaded
+    - command: npm run smoke
+      result: not_run
+      reason: machine overloaded
+    next: 'Owner: merge 79395263 on the targeted checks, or rerun the merge job when the Mac is quieter'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
@@ -351,6 +442,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e18bebc-2fbf-4472-946e-1a78c1222882
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad11bdb0a-7289-4276-911b-aedc9142c5c1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92ad2009-c48f-4cf1-8221-9f55b80e87cd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A85e148be-757e-4b3c-9ab4-497d264a1967
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -370,6 +462,7 @@ description: |-
   - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
 tags:
 - fix-retried
+- merge-retried
 history:
 - at: 2026-11-15T17:40:28.831866+00:00
   actor: claude
@@ -752,3 +845,54 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-16T06:17:54.578239+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: fix-retried
+    new: fix-retried, merge-retried
+- at: 2026-11-16T06:17:54.764690+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:19:16.207702+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T06:19:22.788376+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A85e148be-757e-4b3c-9ab4-497d264a1967
+- at: 2026-11-16T06:19:24.551829+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-16T06:19:24.722865+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:14:02.369066+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:14:05.535890+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595","DEV-592","DEV-598","DEV-599","DEV-603"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595","DEV-592","DEV-598","DEV-599","DEV-603","DEV-600","DEV-602"]}'
+- at: 2026-11-16T19:25:55.846800+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -53,9 +53,28 @@ describe.concurrent('UI board columns dialog (DEV-130)', () => {
                     await page.getByTestId('board-columns-button').click();
                     const dialog = page.getByRole('dialog', { name: 'Board columns' });
                     await dialog.waitFor();
+                    // The modal is active once it has moved focus to Apply.
+                    await expect
+                        .poll(() =>
+                            dialog.getByTestId('board-columns-apply').evaluate((el) => el === document.activeElement),
+                        )
+                        .toBe(true);
                     // Stack non-adjacent statuses through the status menus: WontDo with Todo, QA with NeedsReview.
                     const moveVia = async (status: string, item: string) => {
-                        await dialog.getByLabel(`Move ${status}`, { exact: true }).click();
+                        const trigger = dialog.getByLabel(`Move ${status}`, { exact: true });
+                        const menu = trigger.locator('xpath=..');
+                        const isOpen = () => menu.evaluate((el) => (el as HTMLDetailsElement).open);
+                        // Under full-suite load the browser can leave a click unanswered (DEV-606):
+                        // click again, with a short timeout, until the menu is open.
+                        await expect
+                            .poll(
+                                async () => {
+                                    if (!(await isOpen())) await trigger.click({ timeout: 5_000 }).catch(() => {});
+                                    return isOpen();
+                                },
+                                { interval: 250, timeout: 30_000 },
+                            )
+                            .toBe(true);
                         await dialog.getByRole('button', { name: item, exact: true }).click();
                     };
                     await moveVia('WontDo', 'Move to Todo');

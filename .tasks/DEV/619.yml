@@ -1,0 +1,75 @@
+title: 't3 runner: name the thread <ID> <step>: <title> itself, so job prompts drop the rename step'
+status: InProgress
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T18:42:03.779287+00:00
+modified: 2026-11-16T19:57:09.544779+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
+description: |-
+  Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposal 2: lotar names the thread itself.
+
+  ## Found
+  - Every standards job prompt asks the agent first to rename its thread to "<ID> <step>: <title>" (owner 2026-11-13, standards STD-88). ToolSearch ran in 486 of 735 Claude job sessions, nearly all to load t3_thread_update for it: two extra model calls per job, each re-reading about 50k tokens. About $40 in a 40-hour window.
+  - lotar names a new thread "<ID> <title>"; a continued thread keeps its name.
+  - T3's CLI (t3 0.1.9) sets a title only at `t3 thread start --title`; it has no rename and `thread send` takes no title (2026-11-16).
+
+  ## Done when
+  - [ ] A profile (`agents.<name>.thread_name`) and a rule (`agent.thread_name`) set the thread name as a template, for example `thread_name: "${{ticket.id}} fix: ${{ticket.title}}"`. The rule's value wins over the profile's; an empty one keeps the profile's.
+  - [ ] The job fills in the ticket's templates when it starts, once: a ticket title that holds `${{` stays as written. A name that comes out empty falls back to `<ID> <title>`.
+  - [ ] A new thread starts with that name (`t3 thread start --title`).
+  - [ ] A continued thread is renamed to it before its turn is sent (route pending: see the open question). A rename that fails (T3 Code doesn't answer) logs it and the job runs on.
+  - [ ] Without the setting, names stay as today (`<ID> <title>`).
+  - [ ] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+  - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md); standards then drops the rename step from its prompts (configs/lotar/automation.yml).
+history:
+- at: 2026-11-16T18:42:07.557371+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T18:42:14.431650+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T18:45:57.539862+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
+- at: 2026-11-16T19:57:09.544779+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposal 2: lotar names the thread itself.
+
+      ## Found
+      - Every standards job prompt asks the agent first to rename its thread to "<ID> <step>: <title>" (owner 2026-11-13, standards STD-88). ToolSearch ran in 486 of 735 Claude job sessions, nearly all to load t3_thread_update for it: two extra model calls per job, each re-reading about 50k tokens. About $40 in a 40-hour window.
+      - lotar names a new thread "<ID> <title>"; a continued thread keeps its name.
+
+      ## Done when
+      - [ ] A profile or rule can set the thread name as a template (for example `thread_name: "${{ticket.id}} fix: ${{ticket.title}}"`); a new thread starts with it, and a continued thread is renamed to it before its turn is sent.
+      - [ ] Without the setting, names stay as today.
+      - [ ] A rename that fails (T3 Code doesn't answer) logs it and the job runs on.
+      - [ ] Docs say so; standards then drops the rename step from its prompts (configs/lotar/automation.yml).
+    new: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposal 2: lotar names the thread itself.
+
+      ## Found
+      - Every standards job prompt asks the agent first to rename its thread to "<ID> <step>: <title>" (owner 2026-11-13, standards STD-88). ToolSearch ran in 486 of 735 Claude job sessions, nearly all to load t3_thread_update for it: two extra model calls per job, each re-reading about 50k tokens. About $40 in a 40-hour window.
+      - lotar names a new thread "<ID> <title>"; a continued thread keeps its name.
+      - T3's CLI (t3 0.1.9) sets a title only at `t3 thread start --title`; it has no rename and `thread send` takes no title (2026-11-16).
+
+      ## Done when
+      - [ ] A profile (`agents.<name>.thread_name`) and a rule (`agent.thread_name`) set the thread name as a template, for example `thread_name: "${{ticket.id}} fix: ${{ticket.title}}"`. The rule's value wins over the profile's; an empty one keeps the profile's.
+      - [ ] The job fills in the ticket's templates when it starts, once: a ticket title that holds `${{` stays as written. A name that comes out empty falls back to `<ID> <title>`.
+      - [ ] A new thread starts with that name (`t3 thread start --title`).
+      - [ ] A continued thread is renamed to it before its turn is sent (route pending: see the open question). A rename that fails (T3 Code doesn't answer) logs it and the job runs on.
+      - [ ] Without the setting, names stay as today (`<ID> <title>`).
+      - [ ] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+      - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md); standards then drops the rename step from its prompts (configs/lotar/automation.yml).

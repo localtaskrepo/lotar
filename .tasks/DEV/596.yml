@@ -5,7 +5,7 @@ type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-15T23:48:39.768341+00:00
-modified: 2026-11-16T02:30:11.384090+00:00
+modified: 2026-11-16T19:25:28.080867+00:00
 relationships:
   related:
   - DEV-583
@@ -13,6 +13,7 @@ relationships:
   - DEV-573
   - DEV-580
   - DEV-594
+  - DEV-618
 comments:
 - date: 2026-11-16T00:08:55.974040+00:00
   author: claude
@@ -178,3 +179,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580"]}'
     new: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580","DEV-594"]}'
+- at: 2026-11-16T19:25:28.080867+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580","DEV-594"]}'
+    new: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580","DEV-594","DEV-618"]}'

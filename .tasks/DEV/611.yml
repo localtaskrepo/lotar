@@ -1,17 +1,19 @@
 title: The DEV-603 handoff names a session whose event log the new session already deleted
-status: Reviewing
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-16T04:47:15.051643+00:00
-modified: 2026-11-16T05:40:43.521800+00:00
+modified: 2026-11-16T20:27:18.089210+00:00
 relationships:
   related:
   - DEV-603
   - DEV-599
   - DEV-615
   - DEV-598
+  - DEV-621
+  - DEV-620
 comments:
 - date: 2026-11-16T05:40:30.225209+00:00
   author: claude
@@ -44,8 +46,83 @@ comments:
       result: failed
       reason: as expected, no kept event log
     next: Review; merge after DEV-603 lands (this branch carries its commit)
+- date: 2026-11-16T06:17:12.052721+00:00
+  author: automation
+  text: The review job job-20261116T061642.905Z-54 failed (lotar agent logs job-20261116T061642.905Z-54); the merge goes ahead without a review.
+- date: 2026-11-16T06:19:15.833893+00:00
+  author: automation
+  text: The merge agent's job job-20261116T061855.491Z-64 failed (lotar agent logs job-20261116T061855.491Z-64); the fix agent retries it on branch t3/4269c31d.
+- date: 2026-11-16T06:20:42.311268+00:00
+  author: automation
+  text: The fix agent's job job-20261116T062034.699Z-75 failed (lotar agent logs job-20261116T062034.699Z-75); @fix-codex retries it on branch t3/11d9a59c.
+- date: 2026-11-16T06:21:40.936156+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T062133.400Z-81 failed again (lotar agent logs job-20261116T062133.400Z-81). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T19:56:22.994336+00:00
+  author: claude
+  text: |-
+    Review: passed. No blocking findings; one minor ticket filed. I didn't rerun the tests (machine overloaded).
+
+    - Read: `3cf93d5e` diff, the ticket's "Done when", DEV-603, the harnessmux 0.1.9 registry (`save`/`remove`/`validate_name`) and `Session::start`, `earlier_sessions_text`, and main's recent commits to the touched files
+    - Every "Done when" point is met. `keep_session` moves the log, then saves the kept record as `ended` with no owner, then removes the old record. A kept name like `<name>.<stamp>` passes harnessmux's name check (64 characters max, `.` allowed). The job keeps a session only when its record has the new session's name. Any other profile's session is just named, with its own log path. A failed keep ends the job failed before any session starts
+    - If the rename succeeds but the save fails, the old record stays and the log sits under the kept name. Nothing is lost, and the next keep (same stamp) adds the record back
+    - Earlier sessions: the `{prefix}.` match lists kept rounds of a job that has no profile. Kept rounds of a profile already matched `{prefix}-`
+    - Branch vs main: DEV-603 is on main as `17e19601`. Its code and docs are identical to this branch's `685654c4` (only `.tasks` differs), so that commit drops on rebase. `git merge-tree` applies `3cf93d5e` onto main cleanly
+    - Test-first: the fix agent says the new test failed on the unfixed code. I didn't rerun it
+    - Minor: [DEV-621](https://lotar.pyxzl.net/task/DEV-621). There's no test for a failed keep or for the t3 handoff's thread line
+    - No UI changes, no stray files, no owner decisions involved
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev503|dev510|dev603|handoff|continue/)'
+      result: not_run
+      reason: the lotar crate was still compiling after ~60 min at load 70-90 from other sessions' builds, stopped
+    - command: npm run lint
+      result: not_run
+      reason: same machine load
+    - command: npm run smoke
+      result: not_run
+      reason: same machine load
+    next: 'Merge: rebase on main; 685654c4 matches DEV-603''s 17e19601 in code and drops'
+- date: 2026-11-16T20:27:18.089210+00:00
+  author: claude
+  text: |-
+    Retry: rebased onto main, checks running.
+
+    - Earlier review, merge and fix jobs failed on Claude rate limits, not on the work
+    - DEV-603 landed on main as `17e19601`; dropped the cherry-picked copy `685654c4` and rebased cleanly: DEV-611 is now `5821043c` on `804cb0f9`
+    - The machine is swapping hard (21 of 22.5 GB swap used, load ~40): the Rust build is slow
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2315ac2a-047b-4c72-ae46-d62a09fb92e2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5c48277-3e75-4eda-a4ad-5c48ac6a045b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa552dbff-68eb-418b-947a-7c56a0902c1f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A766dab5c-03a5-4f61-b567-942f5a8c155b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A955f102b-3b63-44c8-8f6a-4443c1690c35
 description: |-
   Found in the review of DEV-603 (`d9e58bcb`).
 
@@ -60,6 +137,9 @@ description: |-
   - [ ] Later jobs' "Earlier agent sessions" list the kept round like any other earlier session.
   - [ ] Other replacements (`session: new`/`fresh`, a closed or unusable session) still replace the old session as before: out of scope.
   - [ ] A test: a fix rework past `continue_within_minutes` whose prompt names the kept event log, which exists and holds the first round; the next job's earlier sessions list it.
+tags:
+- merge-retried
+- fix-retried
 history:
 - at: 2026-11-16T04:47:15.596256+00:00
   actor: claude
@@ -149,3 +229,101 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T06:16:50.090455+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5c48277-3e75-4eda-a4ad-5c48ac6a045b
+- at: 2026-11-16T06:17:10.450632+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-16T06:17:12.052721+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:18:56.366134+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa552dbff-68eb-418b-947a-7c56a0902c1f
+- at: 2026-11-16T06:19:15.638535+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: ''
+    new: merge-retried
+- at: 2026-11-16T06:19:15.833893+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:20:34.828423+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T06:20:35.873428+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A766dab5c-03a5-4f61-b567-942f5a8c155b
+- at: 2026-11-16T06:20:42.132552+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: merge-retried
+    new: merge-retried, fix-retried
+- at: 2026-11-16T06:20:42.311268+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:21:34.487158+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A955f102b-3b63-44c8-8f6a-4443c1690c35
+- at: 2026-11-16T06:21:40.748533+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:21:40.936156+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:55:38.213029+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598"]}'
+    new: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621"]}'
+- at: 2026-11-16T19:56:22.994336+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T20:03:11.363+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621"]}'
+    new: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620"]}'
+- at: 2026-11-16T20:27:18.089210+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,16 +1,17 @@
 title: 'Flaky smoke: board columns dialog click on Move WontDo times out under full-suite load'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-16T02:56:31.049417+00:00
-modified: 2026-11-16T05:11:58.073512+00:00
+modified: 2026-11-16T18:41:21.573976+00:00
 relationships:
   related:
   - DEV-563
   - DEV-575
   - DEV-614
+  - DEV-617
 comments:
 - date: 2026-11-16T04:27:17.687118+00:00
   author: claude
@@ -63,12 +64,74 @@ comments:
       result: not_run
       reason: no app code changed
     next: Merge agent lands 7c3253dd
+- date: 2026-11-16T06:17:42.714645+00:00
+  author: automation
+  text: The merge agent's job job-20261116T060008.302Z-48 failed (lotar agent logs job-20261116T060008.302Z-48); the fix agent retries it on branch t3/fix-flaky-board-columns-smoke-click.
+- date: 2026-11-16T06:19:24.536321+00:00
+  author: automation
+  text: The fix agent's job job-20261116T061915.631Z-65 failed (lotar agent logs job-20261116T061915.631Z-65); @fix-codex retries it on branch t3/c4bef463.
+- date: 2026-11-16T06:21:11.411738+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T062103.231Z-76 failed again (lotar agent logs job-20261116T062103.231Z-76). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T18:41:21.573976+00:00
+  author: claude
+  text: |-
+    Fix unchanged, ready to merge: the last three jobs failed on Claude rate limits, not on the work.
+
+    - `5ea7b340` is `7c3253dd` rebased onto main `804cb0f9`; `git range-diff` shows them identical. No new changes.
+    - Merge job `job-20261116T060008.302Z-48` hit the session limit while rerunning checks after its rebase. The fix and fix-codex retries failed within seconds for the same reason.
+    - The `@fix-codex` retry ran on `claude-opus-5-5`, so it couldn't get around the limit: filed as [DEV-617](https://lotar.pyxzl.net/task/DEV-617).
+  report:
+    commits:
+    - hash: 5ea7b340
+      what: DEV-606 fix, 7c3253dd rebased onto main 804cb0f9 (range-diff identical)
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: passed on 7c3253dd; merge agent reruns on 5ea7b340
+    - command: npm test
+      result: not_run
+      reason: passed on 7c3253dd; merge agent reruns
+    - command: npm run smoke
+      result: not_run
+      reason: passed 3/3 on 7c3253dd, reviewer 4 runs; merge agent reruns
+    next: Review is done (passed); merge 5ea7b340 into main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A894e9f23-1f2b-42fe-8f92-1146d26ffe1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abb16e3cc-20d8-4008-8f95-134c2dcd230d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af363bd91-e584-4ad2-9bb9-11c23f032066
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afc76cf49-37ae-4426-a70e-6c44de68530b
 description: 'Found in the DEV-563 run on 2026-11-15: `npm run test:smoke:agent` failed once at `smoke/tests/ui.board-layout.smoke.spec.ts:58` (moveVia): `locator.click` on `Move WontDo` (a <summary>) timed out after 30 s although the element was visible, enabled and stable. The same spec passed 3 of 3 runs alone (`npm run -s test:smoke:quick:agent tests/ui.board-layout.smoke.spec.ts`). Done when the click no longer depends on load (wait for the dialog state the click needs) and the full smoke passes repeatedly.'
 tags:
 - health
+- merge-retried
+- fix-retried
 history:
 - at: 2026-11-16T02:56:33.103722+00:00
   actor: claude
@@ -135,3 +198,68 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T06:17:42.366772+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-16T06:17:42.714645+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:19:15.803428+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T06:19:17.227676+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af363bd91-e584-4ad2-9bb9-11c23f032066
+- at: 2026-11-16T06:19:24.365827+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health, merge-retried
+    new: health, merge-retried, fix-retried
+- at: 2026-11-16T06:19:24.536321+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:21:04.406487+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afc76cf49-37ae-4426-a70e-6c44de68530b
+- at: 2026-11-16T06:21:11.350989+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:21:11.411738+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T18:41:05.108356+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-563","DEV-575","DEV-614"]}'
+    new: '{"related":["DEV-563","DEV-575","DEV-614","DEV-617"]}'
+- at: 2026-11-16T18:41:21.573976+00:00
+  actor: claude
+  changes:
+  - field: comment_added

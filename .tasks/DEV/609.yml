@@ -1,11 +1,11 @@
 title: No test shows that a job ending on a ticket drops its cached T3 Code answer
-status: Reviewing
+status: HelpNeeded
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T05:21:58.455120+00:00
+modified: 2026-11-16T06:21:40.776485+00:00
 relationships:
   related:
   - DEV-599
@@ -41,13 +41,58 @@ comments:
       result: passed
       reason: 405 tests
     next: Review, then merge after DEV-599 lands
+- date: 2026-11-16T06:15:30.888388+00:00
+  author: automation
+  text: The review job job-20261116T061505.436Z-52 failed (lotar agent logs job-20261116T061505.436Z-52); the merge goes ahead without a review.
+- date: 2026-11-16T06:19:01.049070+00:00
+  author: automation
+  text: The merge agent's job job-20261116T061842.498Z-62 failed (lotar agent logs job-20261116T061842.498Z-62); the fix agent retries it on branch t3/2fa3cb9f.
+- date: 2026-11-16T06:20:42.303644+00:00
+  author: automation
+  text: The fix agent's job job-20261116T062034.518Z-74 failed (lotar agent logs job-20261116T062034.518Z-74); @fix-codex retries it on branch t3/ddced517.
+- date: 2026-11-16T06:21:40.776485+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T062133.197Z-80 failed again (lotar agent logs job-20261116T062133.197Z-80). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177bbfb8-8291-4dbc-bae5-a926f125a36d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7768258-f9f1-4d7a-99f9-90537e91eeef
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b321fd1-c9bf-4980-90f7-c56299eeb0fe
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ec678b4-c277-4dba-9897-9dc0dc92079b
 description: |-
   Found in the DEV-599 review (dcfbccef). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs caches T3 Code's answer per ticket for T3_THREAD_RECHECK and keys it on the ticket's earlier threads, so a new earlier thread asks again at once. No test covers that: the DEV-599 test a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing only checks that the cache is used.
 
   ## Done when
   - [ ] A test in dev503_harness_jobs_test.rs: after a fix job's idle answer is cached, a second T3 job on the ticket ends (a new thread), and the next start runs t3 thread show again within the 30 s window; with the threads-list check removed, the test fails.
+tags:
+- merge-retried
+- fix-retried
 history:
 - at: 2026-11-16T04:33:13.899609+00:00
   actor: claude
@@ -90,3 +135,81 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T06:15:09.535637+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177bbfb8-8291-4dbc-bae5-a926f125a36d
+- at: 2026-11-16T06:15:30.694762+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-16T06:15:30.888388+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:18:54.844571+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7768258-f9f1-4d7a-99f9-90537e91eeef
+- at: 2026-11-16T06:19:00.867540+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: ''
+    new: merge-retried
+- at: 2026-11-16T06:19:01.049070+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:20:34.694513+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T06:20:35.631270+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b321fd1-c9bf-4980-90f7-c56299eeb0fe
+- at: 2026-11-16T06:20:41.950193+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: merge-retried
+    new: merge-retried, fix-retried
+- at: 2026-11-16T06:20:42.303644+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:21:34.357380+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ec678b4-c277-4dba-9897-9dc0dc92079b
+- at: 2026-11-16T06:21:40.716248+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:21:40.776485+00:00
+  actor: automation
+  changes:
+  - field: comment_added

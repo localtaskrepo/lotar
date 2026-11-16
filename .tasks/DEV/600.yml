@@ -1,11 +1,11 @@
 title: A T3 thread that waits for an answer holds every later job on its ticket without saying so
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:29:53.068923+00:00
-modified: 2026-11-16T06:01:43.833077+00:00
+modified: 2026-11-16T19:28:35.392636+00:00
 relationships:
   related:
   - DEV-594
@@ -15,6 +15,10 @@ relationships:
   - DEV-613
   - DEV-616
   - DEV-614
+  - DEV-583
+  - DEV-608
+  - DEV-563
+  - DEV-604
 comments:
 - date: 2026-11-16T02:33:15.242181+00:00
   author: claude
@@ -100,6 +104,30 @@ comments:
       result: not_run
       reason: the change is in the queue and job start only, no UI or API
     next: Merge after DEV-599; the merge drops its copy 76f3bdca
+- date: 2026-11-16T06:03:06.915560+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `804cb0f9` is on `main` and `origin/main`.
+
+    - Rebase onto `3db5898c`: dropped the copy of DEV-599 (`76f3bdca`); main has it as `01a9160e`, with the same patch lines.
+    - Two conflicts, both separate additions, and both sides are kept: in `dev503_harness_jobs_test.rs`, main's DEV-583 test and DEV-600's two tests; in `docs/help/agent.md`, main's review-blocked text and DEV-600's waiting-thread text in the same queue paragraph.
+    - No lockfile changed, so no `npm ci`. No rules or profiles changed, so no `lotar trust`.
+    - The `.tasks` changes of the main checkout are amended into the merged commit, as the owner's rule says.
+    - The one smoke flake is filed as [DEV-616](https://lotar.pyxzl.net/task/DEV-616), linked to [DEV-614](https://lotar.pyxzl.net/task/DEV-614), the same symptom in another test of that file.
+  report:
+    commits:
+    - hash: 804cb0f9
+      what: DEV-600 fix, rebased onto main and pushed
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2258 Rust, 1548 UI
+    - command: npm run smoke
+      result: failed
+      reason: 404/405, ui.relationships.smoke.spec.ts:1377 timed out; the file passed 19/19 on 2 reruns; UI test, the change touches no UI; filed DEV-616
+    next: 'None: the ticket goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ad4dd44-6ea0-4933-aaad-8f8d816b2933
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa06b6ffb-a7f3-4a4a-94c5-7ca758534437
@@ -251,3 +279,37 @@ history:
   - field: relationships
     old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616"]}'
     new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614"]}'
+- at: 2026-11-16T06:03:06.915560+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:03:07.938409+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583"]}'
+- at: 2026-11-16T06:03:31.222520+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-16T19:07:18.959036+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608"]}'
+- at: 2026-11-16T19:14:05.548854+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563"]}'
+- at: 2026-11-16T19:28:35.392636+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604"]}'

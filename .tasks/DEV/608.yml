@@ -1,14 +1,16 @@
 title: A T3 job's prompt keeps telling every later job on the ticket to carry over an earlier job's uncommitted changes
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-16T04:26:06.797877+00:00
-modified: 2026-11-16T05:59:58.387108+00:00
+modified: 2026-11-16T20:03:11.362442+00:00
 relationships:
   related:
   - DEV-583
+  - DEV-600
+  - DEV-620
 comments:
 - date: 2026-11-16T05:07:45.504413+00:00
   author: claude
@@ -53,9 +55,75 @@ comments:
     - Reran `cargo nextest run --test integration dev503` (26/26 passed) and `npm run lint` (passed). `npm test` and smoke: not rerun; the change only touches prompt text.
     - For the merge agent: main already has DEV-583 as `18314609`. The copied `2f833a1b` won't drop by itself on rebase: its patch differs (main's also edited `.tasks`) and it conflicts in `dev503_harness_jobs_test.rs`. Use `git rebase --onto main 2f833a1b`. I checked that `9849ff77` cherry-picked onto main `3db5898c` applies cleanly and passes dev503 (32/32).
     - No tickets filed.
+- date: 2026-11-16T06:18:33.145248+00:00
+  author: automation
+  text: The merge agent's job job-20261116T061830.676Z-59 failed (lotar agent logs job-20261116T061830.676Z-59); the fix agent retries it on branch t3/fix-t3-job-uncommitted-carryover-note.
+- date: 2026-11-16T06:20:14.984067+00:00
+  author: automation
+  text: The fix agent's job job-20261116T062007.027Z-71 failed (lotar agent logs job-20261116T062007.027Z-71); @fix-codex retries it on branch t3/2c703330.
+- date: 2026-11-16T06:21:40.257255+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T062132.618Z-79 failed again (lotar agent logs job-20261116T062132.618Z-79). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T19:07:17.154870+00:00
+  author: claude
+  text: |-
+    Fix retry: nothing new to do. The earlier merge and fix jobs failed only on the Claude API rate limit, not on the work.
+
+    - `9849ff77` is unchanged on `agent/DEV-608` and the `t3/*` retry branches. The review passed it.
+    - It still applies cleanly to current main `804cb0f9` (checked with `git merge-tree`). The only commit main gained since the review is DEV-600.
+    - For the merge: main already has DEV-583, so drop the copied `2f833a1b` with `git rebase --onto main 2f833a1b`.
+  report:
+    commits:
+    - hash: 9849ff77
+      what: DEV-608 fix (unchanged since review passed)
+    checks:
+    - command: git merge-tree onto main 804cb0f9
+      result: passed
+      reason: applies cleanly
+    - command: cargo nextest run --test integration dev503
+      result: not_run
+      reason: unchanged commit; review reran it (26/26) and 32/32 on main 3db5898c
+    - command: npm run lint
+      result: not_run
+      reason: passed on 9849ff77 (fix and review)
+    - command: npm test
+      result: not_run
+      reason: passed on 9849ff77 (fix)
+    - command: npm run smoke
+      result: not_run
+      reason: passed on 9849ff77 (fix, 405/405)
+    next: 'Merge: git rebase --onto main 2f833a1b, then the checks, then ff-only'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4b5016f-4464-4c66-9b06-16db3ff01f88
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abfed84ea-94c7-430e-9237-f0f29dd7a541
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A738b4fba-435a-47dd-b912-2e9faa02478a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca85fc7-0859-483f-a5eb-7aef9b23e97d
 description: |-
   Found in the DEV-583 review (eba9fc33). `t3_thread_notes` (`crates/lotar-lib/src/services/agent_job_service.rs`, `uncommitted_ticket_worktrees`) lists every worktree of the ticket with uncommitted changes and says "carry over what you need; leave that worktree as it is". Since the worktree is left as it is, the note stays in every later T3 job on the ticket: the review job (told to change no files) and the merge job (which could pull in changes the fix agent chose to drop). Check: fail a T3 fix job with uncommitted changes, retry it, then start the review: the review prompt still names the old worktree with 'carry over'.
 
@@ -66,6 +134,9 @@ description: |-
   - [ ] Non-T3 runners: unchanged (no such note).
   - [ ] A test covers both: merge-job prompt lacks the note, a later non-merge job's prompt has the new wording.
   - [ ] `docs/help/agent.md` describes it.
+tags:
+- merge-retried
+- fix-retried
 history:
 - at: 2026-11-16T04:26:08.423464+00:00
   actor: claude
@@ -129,3 +200,74 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T06:18:32.936607+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: ''
+    new: merge-retried
+- at: 2026-11-16T06:18:33.145248+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:20:07.248362+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T06:20:08.363849+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A738b4fba-435a-47dd-b912-2e9faa02478a
+- at: 2026-11-16T06:20:14.653213+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: merge-retried
+    new: merge-retried, fix-retried
+- at: 2026-11-16T06:20:14.984067+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:21:33.665976+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca85fc7-0859-483f-a5eb-7aef9b23e97d
+- at: 2026-11-16T06:21:40.194877+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:21:40.257255+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:07:17.154870+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:07:18.960404+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583"]}'
+    new: '{"related":["DEV-583","DEV-600"]}'
+- at: 2026-11-16T20:03:11.362442+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-600"]}'
+    new: '{"related":["DEV-583","DEV-600","DEV-620"]}'

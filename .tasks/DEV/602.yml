@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:33:11.139637+00:00
-modified: 2026-11-16T05:49:05.727138+00:00
+modified: 2026-11-16T19:14:05.567744+00:00
 relationships:
   blocks:
   - DEV-612
@@ -19,6 +19,8 @@ relationships:
   - DEV-604
   - DEV-612
   - DEV-585
+  - DEV-605
+  - DEV-563
 comments:
 - date: 2026-11-16T03:48:30.481925+00:00
   author: claude
@@ -266,3 +268,15 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-16T18:45:21.382220+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-612"],"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612","DEV-585"]}'
+    new: '{"blocks":["DEV-612"],"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612","DEV-585","DEV-605"]}'
+- at: 2026-11-16T19:14:05.567744+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-612"],"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612","DEV-585","DEV-605"]}'
+    new: '{"blocks":["DEV-612"],"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612","DEV-585","DEV-605","DEV-563"]}'

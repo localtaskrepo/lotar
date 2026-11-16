@@ -1,16 +1,17 @@
 title: 'Flaky smoke: relationships reciprocal repair test waits on an element under full-suite load'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-16T06:01:43.833671+00:00
+modified: 2026-11-16T19:56:46.513700+00:00
 relationships:
   related:
   - DEV-606
   - DEV-600
   - DEV-616
+  - DEV-583
 comments:
 - date: 2026-11-16T06:01:43.302227+00:00
   author: claude
@@ -19,11 +20,101 @@ comments:
 
     - `ui.relationships.smoke.spec.ts:1377` "previews a problem-card fix…" timed out waiting for the "Safe repair preview" region in the DEV-600 merge's full smoke run. It passed 19/19 twice on rerun.
     - If your fix covers the shared cause, it may close DEV-616 too.
+- date: 2026-11-16T06:18:01.145247+00:00
+  author: automation
+  text: The fix agent's job job-20261116T055647.657Z-47 failed (lotar agent logs job-20261116T055647.657Z-47); @fix-codex retries it on branch agent/DEV-614.
+- date: 2026-11-16T06:19:45.128715+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T061926.133Z-67 failed again (lotar agent logs job-20261116T061926.133Z-67). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T19:07:05.270554+00:00
+  author: claude
+  text: |-
+    Fixed: a late watcher event no longer clears the repair preview.
+
+    - Cause: the watcher can still report fixture files written before server start; the page's "Task data changed" handler then clears the open preview, so the click waits forever (confirmed with diagnostics in the first run).
+    - Fix in `smoke/tests/ui.relationships.smoke.spec.ts`: `openThenWriteRelationships` opens the page, waits for the SSE connection, writes the broken relationship and waits for its `task_updated`. Applied to `:353` (this ticket) and the problem-card test (covers [DEV-616](https://lotar.pyxzl.net/task/DEV-616)).
+    - Commit `2f6dd0eb` on `agent/DEV-614`, in worktree `agent-DEV-614-5ae6c6056b77c90c` (this thread's own `t3/*` worktree was the wrong branch, DEV-583).
+    - Full smoke could not prove "passes repeatedly": machine load average was 116-223 after a reboot, and 13/15 unrelated UI tests timed out. The two fixed tests passed in every run.
+  report:
+    commits:
+    - hash: 2f6dd0eb
+      what: both repair-preview tests open the page, then write the broken relationship and wait for its task_updated
+    checks:
+    - command: npx tsc --project smoke/tsconfig.json --noEmit
+      result: passed
+    - command: npx prettier + oxlint on the spec
+      result: passed
+    - command: relationships spec, the 2 repair tests x3 under load
+      result: passed
+    - command: npm run test:smoke:agent
+      result: failed
+      reason: 13 and 15 of 405 failed in 2 runs, scattered UI timeouts in other files at load average 116-223; the 2 fixed tests passed in both
+    - command: npm test
+      result: not_run
+      reason: smoke-only change
+    - command: npm run lint (full)
+      result: not_run
+      reason: smoke-only change
+    next: Review, then rerun the full smoke on a quiet machine before merge
+- date: 2026-11-16T19:56:46.513700+00:00
+  author: claude
+  text: |-
+    More evidence for `2f6dd0eb`: the fix holds under heavy load.
+
+    - Before the fix: the two repair-preview tests failed in 4 of 9 full runs; a diagnostic showed the notice "Task data changed. Preview safe repair again before applying." in place of the preview.
+    - First helper version waited for the SSE `ready` event, which the server only sends with `?ready=1`. Switched to `open`: the server subscribes before it sends headers.
+    - After the fix: both tests passed in 5 of 5 full runs at load average ~110. The other 4–12 failures per run are timeouts in specs this change doesn't touch.
+    - Not shown yet: the full smoke passing repeatedly on a quiet machine. The merge agent's rerun covers that.
+  report:
+    commits:
+    - hash: 2f6dd0eb
+      what: both repair-preview tests open the page, write the broken relationship, then wait for its task_updated
+    checks:
+    - command: npm run lint:frontend + lint:js + fmt:js:check
+      result: passed
+    - command: cargo clippy / cargo fmt
+      result: not_run
+      reason: smoke-spec-only change, stopped after 20+ min at load ~100
+    - command: npm run test:smoke:quick:agent x5 (after fix)
+      result: failed
+      reason: 4-12 of 405 per run, UI timeouts in other files at load avg ~110; both fixed tests passed 5/5
+    - command: npm test
+      result: not_run
+      reason: smoke-only change
+    next: Review, then rerun the full smoke on a quiet machine before merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a918fc-ce4e-4947-96ea-4af19c6d46ae
 description: 'Found in the DEV-606 review on 2026-11-15: 1 of 4 full smoke runs (`npm run -s test:smoke:quick:agent`, worktree of agent/DEV-606) failed `smoke/tests/ui.relationships.smoke.spec.ts:313` ''previews safe reciprocal repair without writes and applies only after confirmation'' (log: 2 × waiting for element to be visible, enabled and stable); the other 3 runs passed 405/405. Check: `npm run test:smoke:agent` repeatedly. Done when the test no longer depends on load and the full smoke passes repeatedly.'
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: smoke:ui.relationships-reciprocal-repair
 history:
@@ -59,3 +150,48 @@ history:
   - field: relationships
     old: '{"related":["DEV-606"]}'
     new: '{"related":["DEV-606","DEV-600","DEV-616"]}'
+- at: 2026-11-16T06:18:00.960291+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-16T06:18:01.145247+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:19:39.217359+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a918fc-ce4e-4947-96ea-4af19c6d46ae
+- at: 2026-11-16T06:19:45.065733+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:19:45.128715+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:07:05.270554+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:07:10.753371+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-606","DEV-600","DEV-616"]}'
+    new: '{"related":["DEV-606","DEV-600","DEV-616","DEV-583"]}'
+- at: 2026-11-16T19:56:46.513700+00:00
+  actor: claude
+  changes:
+  - field: comment_added

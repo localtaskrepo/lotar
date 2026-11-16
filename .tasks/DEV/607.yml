@@ -1,11 +1,11 @@
 title: 'Flaky smoke: global task actions on desktop still time out closing the Create task panel after DEV-597'
-status: Merging
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-16T03:37:27.096061+00:00
-modified: 2026-11-16T05:19:16.296247+00:00
+modified: 2026-11-16T19:23:32.970347+00:00
 relationships:
   related:
   - DEV-597
@@ -71,9 +71,94 @@ comments:
       result: not_run
       reason: no app or Rust code changed
     next: Merge
+- date: 2026-11-16T06:14:43.924587+00:00
+  author: automation
+  text: The merge agent's job job-20261116T061438.239Z-51 failed (lotar agent logs job-20261116T061438.239Z-51); the fix agent retries it on branch t3/fix-flaky-smoke-create-panel-close.
+- date: 2026-11-16T06:18:41.585877+00:00
+  author: automation
+  text: The fix agent's job job-20261116T061831.346Z-61 failed (lotar agent logs job-20261116T061831.346Z-61); @fix-codex retries it on branch t3/1a3d2c16.
+- date: 2026-11-16T06:20:41.302372+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T062034.034Z-73 failed again (lotar agent logs job-20261116T062034.034Z-73). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T19:23:28.063132+00:00
+  author: claude
+  text: |-
+    Merge not done: the machine is too loaded (load 115–135) for the checks to finish, so nothing went to main.
+
+    - Rebased `t3/1a3d2c16` onto main `804cb0f9`: clean, fix is now `525c9155`; no lockfile changed.
+    - `npm run lint:agent` hit the 30 min limit while still in cargo clippy; no lint finding before that.
+    - `npm test` and `npm run smoke` not run. A smoke run at this load would also be the slow case this flake comes from.
+    - Earlier failed jobs (`job-…-51`, `-73`) were Claude rate limits, not the work.
+    - Needed: retry the merge (`@merge`) once load is back to normal.
+  report:
+    checks:
+    - command: npm run lint:agent
+      result: not_run
+      reason: killed at the 30 min limit in cargo clippy, load 115-135; no finding before that
+    - command: npm test
+      result: not_run
+      reason: machine overloaded
+    - command: npm run smoke
+      result: not_run
+      reason: machine overloaded
+    next: Retry the merge when load is normal; branch t3/1a3d2c16 is rebased onto main
+- date: 2026-11-16T19:23:32.970347+00:00
+  author: claude
+  text: |-
+    Retry: no new work needed. The fix `dda97f68` is still the only commit beyond main, and the last three jobs failed on the Claude rate limit, not on the work.
+
+    - `lotar agent logs`: jobs `-51`, `-61` and `-73` all stopped with "Claude API rate limit reached".
+    - Main moved on (`804cb0f9`), but no commit there touches `smoke/tests/ui.global-actions.smoke.spec.ts`, and `git merge-tree` merges it cleanly.
+    - I couldn't rerun the spec here: the worktree has no smoke binary, and `npm run build:smoke` didn't finish within 30 min at load ~120. The checks reported for `dda97f68` still stand, since it is the same commit.
+  report:
+    commits:
+    - hash: dda97f68
+      what: close the Create task panel with the button's click event, no stable-box wait
+    checks:
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405 on dda97f68 (earlier fix job), plus 4 loaded runs and 1 review run
+    - command: npm run lint:agent
+      result: passed
+      reason: earlier fix job, same commit
+    - command: npm test
+      result: passed
+      reason: earlier fix job, same commit
+    - command: npm run test:smoke:quick:agent -- smoke/tests/ui.global-actions.smoke.spec.ts
+      result: not_run
+      reason: this worktree had no smoke binary; npm run build:smoke was stopped at the 30 min limit (load ~120 from other agents' builds)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0caf1a38-2a26-4a65-bd1f-173cb4151cb4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28ddd3b6-4d53-460f-885b-9eb324f37114
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7924a165-7c21-4943-8ec6-657dc2c32de6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7cc8907-407e-4649-993c-1e11eb51c734
 description: |-
   `smoke/tests/ui.global-actions.smoke.spec.ts` > "keeps actions usable and creates in the known project on desktop" timed out again in a full `npm run test:smoke:agent` run, after DEV-597 was marked Done.
 
@@ -85,6 +170,9 @@ description: |-
   ## Done when
   - [ ] The test waits for the panel to finish its open transition (or closes it in a way that doesn't need a stable box) so a slow full-suite run can't time out here.
   - [ ] Several full smoke runs under load pass this test.
+tags:
+- merge-retried
+- fix-retried
 history:
 - at: 2026-11-16T03:37:27.767129+00:00
   actor: claude
@@ -143,3 +231,66 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-16T06:14:43.745458+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: ''
+    new: merge-retried
+- at: 2026-11-16T06:14:43.924587+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:18:31.412827+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T06:18:32.349676+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7924a165-7c21-4943-8ec6-657dc2c32de6
+- at: 2026-11-16T06:18:41.414663+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: merge-retried
+    new: merge-retried, fix-retried
+- at: 2026-11-16T06:18:41.585877+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:20:34.898308+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7cc8907-407e-4649-993c-1e11eb51c734
+- at: 2026-11-16T06:20:41.240152+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:20:41.302372+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:23:28.063132+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:23:32.970347+00:00
+  actor: claude
+  changes:
+  - field: comment_added

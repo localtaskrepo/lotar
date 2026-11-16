@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-16T05:51:43.900873+00:00
+modified: 2026-11-16T07:04:19.897828+00:00
 relationships:
   related:
   - DEV-600
@@ -26,8 +26,44 @@ comments:
       result: not_run
       reason: the test isn't on main yet
     next: Owner picks A or B; then commit the one-line fix and run the 30x stress check
+- date: 2026-11-16T07:04:05.862314+00:00
+  author: mallox
+  text: 'Answer: A (Commit the line on agent/DEV-600, so it lands with DEV-600''s merge) (answered in INBOX-360)'
+- date: 2026-11-16T07:04:09.882525+00:00
+  author: automation
+  text: The fix agent's job job-20261116T070406.630Z-1 failed (lotar agent logs job-20261116T070406.630Z-1); @fix-codex retries it on branch agent/DEV-613.
+- date: 2026-11-16T07:04:19.897828+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T070410.191Z-2 failed again (lotar agent logs job-20261116T070410.191Z-2). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
 description: |-
   Found in the DEV-600 review (`af2e42f2`).
 
@@ -40,6 +76,7 @@ description: |-
   - [ ] The test passes 30 stress runs under load (`--stress-count 30` beside the rest of the dev503 tests).
 tags:
 - health
+- fix-retried
 history:
 - at: 2026-11-16T05:03:01.911155+00:00
   actor: claude
@@ -70,3 +107,50 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-16T07:04:05.862314+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-16T07:04:06.290500+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-16T07:04:07.001889+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-16T07:04:09.706864+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-16T07:04:09.882525+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T07:04:16.147680+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
+- at: 2026-11-16T07:04:19.843635+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T07:04:19.897828+00:00
+  actor: automation
+  changes:
+  - field: comment_added

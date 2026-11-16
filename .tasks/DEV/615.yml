@@ -1,18 +1,84 @@
 title: 'Flaky smoke: offers Add to release in the row menu once a release appears (DEV-464) fails under the full suite'
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-16T05:40:04.133417+00:00
+modified: 2026-11-16T19:42:22.323629+00:00
 relationships:
   related:
   - DEV-464
   - DEV-611
+comments:
+- date: 2026-11-16T06:16:18.867391+00:00
+  author: automation
+  text: The fix agent's job job-20261116T061601.330Z-53 failed (lotar agent logs job-20261116T061601.330Z-53); @fix-codex retries it on branch agent/DEV-615.
+- date: 2026-11-16T06:19:01.253658+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T061855.002Z-63 failed again (lotar agent logs job-20261116T061855.002Z-63). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T19:42:22.323629+00:00
+  author: claude
+  text: |-
+    The DEV-464 smoke test now waits out a busy server instead of failing on the first refused release create.
+
+    - Could not reproduce: the spec passes alone and inside all UI specs at load ~125; the original status wasn't recorded
+    - The create's only refusals that say "mutation was not run" are 503 BUSY (connection cap, `web_server.rs`) and a 400 storage lock still held after 2 s (`safety.rs`); the test retries just those, every 250 ms for up to 15 s
+    - The assertion now prints status and body, so a different cause names itself next time
+    - `smoke/tests/ui.releases.smoke.spec.ts`, commit `3c4bbaa6` on branch `t3/28cf1eef` (this thread's worktree, not `agent/DEV-615`)
+  report:
+    commits:
+    - hash: 3c4bbaa6
+      what: the DEV-464 test retries a create the server refused as busy and names status and body on failure
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts
+      result: passed
+      reason: 5 runs, 3 of 3 each, with LOTAR_BINARY_PATH=/opt/homebrew/bin/lotar (0.15.1)
+    - command: npx vitest run --config smoke/vitest.config.ts tests/ui.
+      result: passed
+      reason: releases spec 3 of 3 inside all 79 UI specs; 5 other failures come from the 0.15.1 binary
+    - command: tsc -p smoke/tsconfig.json, oxlint, prettier
+      result: passed
+    - command: npm run build:smoke
+      result: not_run
+      reason: killed after 30 min at load 110-130 (many parallel agent builds)
+    - command: npm run lint (Rust parts), npm test, npm run smoke
+      result: not_run
+      reason: test-only TypeScript change, and no binary of this checkout could be built
+    next: Review, then merge; the merge agent reruns the check against main's build
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
 description: 'Found in DEV-611''s `npm run smoke`: `tests/ui.releases.smoke.spec.ts` > offers Add to release (DEV-464) failed at line 112, `expect(created.ok).toBe(true)` (creating the release returned not ok). Check: `npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts` passes alone (2 of 2). Done: the release creation in that test succeeds under the full suite''s load, or the test waits for it.'
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: smoke:ui-releases-add-to-release
 history:
@@ -27,3 +93,49 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T06:16:03.093467+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T06:16:06.638935+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
+- at: 2026-11-16T06:16:18.595674+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-16T06:16:18.867391+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:18:55.852400+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
+- at: 2026-11-16T06:19:01.196014+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:19:01.253658+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:42:22.323629+00:00
+  actor: claude
+  changes:
+  - field: comment_added

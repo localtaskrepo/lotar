@@ -1,15 +1,58 @@
 title: 'Flaky smoke: relationships ''previews a problem-card fix'' times out waiting for the Safe repair preview'
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-16T06:00:44.086471+00:00
-modified: 2026-11-16T06:01:43.834070+00:00
+modified: 2026-11-16T19:25:47.246047+00:00
 relationships:
   related:
   - DEV-600
   - DEV-614
+comments:
+- date: 2026-11-16T06:18:40.991518+00:00
+  author: automation
+  text: The fix agent's job job-20261116T061831.165Z-60 failed (lotar agent logs job-20261116T061831.165Z-60); @fix-codex retries it on branch agent/DEV-616.
+- date: 2026-11-16T06:20:14.676635+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T062007.244Z-72 failed again (lotar agent logs job-20261116T062007.244Z-72). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T19:25:47.246047+00:00
+  author: claude
+  text: |-
+    Duplicate fix run stood down: the resumed first job's thread is fixing this on `agent/DEV-616`.
+
+    - Both runs found the same cause: the page drops an in-flight preview on any SSE task event or reconnect (`view/pages/Dependencies.vue` `changed()`), and the watcher in `crates/lotar-lib/src/web_server.rs` can report the fixture's pre-start writes late.
+    - I sent my notes and draft test change to that thread. Nothing committed from this run, and I left status and assignee unchanged.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7aa2d10-956a-4dcf-9aa0-05a2c4c27609
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7d6c9ef-b7b0-4938-8e2d-d5674b2579c6
 description: |-
   Seen in the DEV-600 merge run (`7af67b9c`, a change to the queue and job start only, nothing in the UI).
 
@@ -22,6 +65,7 @@ description: |-
   - [ ] The file passes 10 runs beside the full smoke suite.
 tags:
 - health
+- fix-retried
 history:
 - at: 2026-11-16T06:00:45.226030+00:00
   actor: claude
@@ -34,3 +78,49 @@ history:
   - field: relationships
     old: '{"related":["DEV-600"]}'
     new: '{"related":["DEV-600","DEV-614"]}'
+- at: 2026-11-16T06:18:31.347296+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T06:18:32.277136+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7aa2d10-956a-4dcf-9aa0-05a2c4c27609
+- at: 2026-11-16T06:18:40.811675+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-16T06:18:40.991518+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:20:08.322262+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7d6c9ef-b7b0-4938-8e2d-d5674b2579c6
+- at: 2026-11-16T06:20:14.604153+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T06:20:14.676635+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:25:47.246047+00:00
+  actor: claude
+  changes:
+  - field: comment_added

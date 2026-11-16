@@ -1,0 +1,97 @@
+title: 't3 runner: give job threads the profile''s tools.disallowed and env'
+status: HelpNeeded
+priority: High
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-16T18:41:59.400479+00:00
+modified: 2026-11-16T20:03:11.363729+00:00
+relationships:
+  related:
+  - DEV-596
+  - DEV-620
+comments:
+- date: 2026-11-16T19:14:25.198550+00:00
+  author: claude
+  text: |-
+    Correction from standards (measured by the STD-183 Codex thread, bare `claude -p` on Opus in a repo with `.claude/settings.local.json`):
+
+    - `env: {ENABLE_CLAUDEAI_MCP_SERVERS: "false"}` in a settings file does **not** turn the claude.ai connectors off (20.1k, same as deny alone); only the process environment does (19.1k)
+    - Deny rules on the servers work from the file: add `mcp__claude_ai_Google_Drive`, `mcp__claude_ai_Google_Calendar`, `mcp__claude_ai_Claude_Docs`, `mcp__claude_ai_Gmail`, `mcp__claude_ai_Context7`, `mcp__claude_ai_Pyxzl_Staff` to `permissions.deny`: 19.6k to 20.4k, no mcp__ tools left
+    - So for t3 threads: connectors off is deny rules (from the profile's `tools.disallowed`), not env. Not checked yet: whether T3's Claude sessions load `settings.local.json` (the SDK's settingSources); check that first
+- date: 2026-11-16T19:25:25.687063+00:00
+  author: claude
+  text: |-
+    Blocked: lotar can't write `.claude/settings.local.json` into a t3 job's worktree before its thread starts.
+
+    - T3 Code makes the worktree itself, inside `t3 thread start --worktree <base>`, and starts the agent right after. lotar never sees the worktree before the agent starts.
+    - Pre-creating the folder doesn't work: `git worktree add` refuses a non-empty path (`path_already_exists`, DEV-596). The `t3` CLI has no flag for an existing worktree, for Claude settings or for env (`t3 thread start --help`).
+    - T3 Code project scripts have `runOnWorktreeCreate` with `async: false` ("hold the agent until the script exits"), found in the T3 Code app's own source. That is the one hook that runs before the agent starts. I haven't checked that it also runs for threads started from the CLI.
+    - No code changed. Branch `agent/DEV-618` has no commits beyond main.
+
+    **Question:** which way do you want it?
+    1. A T3 Code project script for lotar (`runOnWorktreeCreate`, wait for setup) that runs a new `lotar agent t3-worktree-setup` command. The command writes the file only in a lotar job's worktree and does nothing in your own threads. You add the script once per T3 project, and docs/help/agent.md says how. The file is in place before the agent starts.
+    2. No T3 setup: lotar watches for the job's new worktree and writes the file the moment it appears. This races the Claude start, so the first call can miss the savings, and the "written before the thread starts" check in Done when would change to "as soon as the worktree appears".
+    3. Wait for a `t3` CLI option that passes Claude settings or env, and leave this ticket until then.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef1ab-19d5-4a1d-9e83-87eed3e27274
+description: |-
+  Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six; 1 and 4 only in job sessions" (answered in INBOX-351): unused tools and the claude.ai connectors go off in job sessions only, his own sessions keep them.
+
+  ## Found
+  - A Claude T3 job's first call is 50k to 60k tokens. The Artifact tool alone is 12.8k; Artifact, Workflow, ScheduleWakeup and ReportFindings were used in 1 of 735 job sessions; claude.ai connectors in 3.
+  - The claude and codex runners already pass a profile's tools.disallowed and env. The t3 runner can't: "T3's CLI has no effort, permissions, MCP servers or interrupt" (docs/help/agent.md).
+  - Measured: a Claude settings file `{"permissions":{"deny":["Artifact","Workflow","ScheduleWakeup","ReportFindings"]},"env":{"ENABLE_CLAUDEAI_MCP_SERVERS":"false"}}` takes a bare Opus session's first call from 40.2k to 20.9k tokens.
+
+  ## Done when
+  - [ ] A t3 job with provider claudeAgent whose profile sets tools.disallowed or env starts its thread in a worktree whose `.claude/settings.local.json` holds them (deny rules and env), written before the thread starts.
+  - [ ] A settings.local.json already there keeps its own keys; the profile's deny entries are added, its env keys win.
+  - [ ] The file never lands in a commit: not in LoTaR's commit of leftovers at the job's end, not in the agent's (git info/exclude or equivalent); the worktree's own .gitignore stays unchanged.
+  - [ ] Profiles without these keys, other providers and threads outside job worktrees are unchanged; writing the file fails: the job logs why and starts the thread without it.
+  - [ ] docs/help/agent.md says which profile keys reach a t3 thread.
+history:
+- at: 2026-11-16T18:42:01.701153+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T18:42:07.418581+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T18:44:04.586889+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef1ab-19d5-4a1d-9e83-87eed3e27274
+- at: 2026-11-16T19:14:25.198550+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:25:25.687063+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T19:25:28.082834+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-596"]}'
+- at: 2026-11-16T20:00:02.205714+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-16T20:03:11.363729+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596"]}'
+    new: '{"related":["DEV-596","DEV-620"]}'

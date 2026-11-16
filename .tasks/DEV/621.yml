@@ -1,0 +1,41 @@
+title: DEV-611's failed keep and the t3 handoff's thread line have no test
+status: InProgress
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T19:55:36.875709+00:00
+modified: 2026-11-16T19:58:20.018479+00:00
+relationships:
+  related:
+  - DEV-611
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
+description: |-
+  Found in the review of DEV-611 (`3cf93d5e`).
+
+  ## Found
+  `a_skipped_session_is_kept_and_the_handoff_names_its_event_log` covers the kept log, the handoff and the next job's earlier sessions. Two "Done when" points have no test:
+  - `keep_session` fails (`agent_runner.rs`, the rename or `registry.save`): `run_job` ends the job failed and starts no session (`agent_job_service.rs`, the `handoff_from` match).
+  - The t3 handoff names the old T3 Code thread (`- Its T3 Code thread: <agent_session>` in `handoff_text`).
+
+  ## Done when
+  - [ ] A test: keeping fails (for example a read-only sessions folder, or a kept name already taken by a directory); the job ends failed with "Could not keep the session …", no new session record exists, and the old record and event log are still there.
+  - [ ] A t3 test (`dev510_t3_session_test.rs`): a rework past `continue_within_minutes` whose prompt names the old thread's id.
+history:
+- at: 2026-11-16T19:55:39.199285+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T19:55:44.584583+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T19:58:20.018479+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
