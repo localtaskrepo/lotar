@@ -5,11 +5,39 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T02:30:57.049871+00:00
+modified: 2026-11-17T02:52:38.519606+00:00
 relationships:
   related:
   - DEV-626
   - DEV-600
+comments:
+- date: 2026-11-17T02:52:38.519606+00:00
+  author: claude
+  text: |-
+    Fixed: while a resumed thread of a ticket waits for an answer, lotar takes over none of its threads.
+
+    - **Branch base:** `resumed.rs` is only on `agent/DEV-626` (Reviewing), so this branch carries that commit cherry-picked onto main. DEV-626 must land first.
+    - `resumed.rs` `on_ticket`: waiting threads are now split off from the others instead of dropped. If any waits and no job is active, nothing is taken over. Each other running thread gets the "stop it in T3 Code" comment, which names the waiting thread, once per run.
+    - A thread `t3 thread list` lists as `waiting` also counts as waiting (before, only `running` ones were looked at).
+    - **Tests** in `dev626_resumed_t3_threads_test.rs`: newer thread waits, older one runs: no job, one comment, none after a second look through another path. A `waiting` listed thread holds the ticket too. Both failed before the fix.
+    - **Docs:** `docs/help/agent.md`, T3 Code threads section.
+    - **Guidance:** no durable finding.
+  report:
+    commits:
+    - hash: 66fee083f
+      what: DEV-626 commit 55e2126a9 cherry-picked onto main (resumed.rs exists only there); drops out once DEV-626 lands
+    - hash: 08cd964f2
+      what: a waiting thread holds the ticket, no other thread is taken over
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: failed
+      reason: '1 flake per run, each passes alone. Run 1: a_queue_entry_held_by_a_waiting_thread_says_so_once (DEV-613; its fake answers thread list with {} so resumed.rs is not reached). Run 2: DEV-626''s own blocking flake (dev626 test :151, job still queued). Full cargo nextest --no-fail-fast: 2286/2287, only DEV-613; UI, release, hooks passed'
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    next: Land DEV-626 first, then rebase agent/DEV-639 onto main (66fee083f drops or conflicts with DEV-626's amended commit; keep DEV-626's version), then review
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
 description: |-
@@ -71,3 +99,7 @@ history:
       - [ ] When `t3 thread show` fails for a thread, it counts as not waiting (as before); the next look asks again.
       - [ ] Unchanged: no waiting thread → the newest job's thread is taken over (DEV-626); a queued entry or a done ticket → nothing happens.
       - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`: newer thread waits, older one runs → no job, one comment on the older thread, none after a second look.
+- at: 2026-11-17T02:52:38.519606+00:00
+  actor: claude
+  changes:
+  - field: comment_added

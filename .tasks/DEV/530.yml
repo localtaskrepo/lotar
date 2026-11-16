@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-17T02:31:15.679856+00:00
+modified: 2026-11-17T02:51:02.504590+00:00
 relationships:
   blocks:
   - DEV-637
@@ -1632,3 +1632,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-637","DEV-592","DEV-600"]}'
     new: '{"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600"]}'
+- at: 2026-11-17T02:51:02.504590+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

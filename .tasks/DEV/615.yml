@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-17T02:03:30.323104+00:00
+modified: 2026-11-17T02:44:42.754482+00:00
 relationships:
   related:
   - DEV-464
@@ -113,6 +113,34 @@ comments:
     - Note: it retries every non-ok answer, also a deterministic 400, which only delays that failure by 15 s. Not blocking
     - Note for the merge: the earlier attempt `3c4bbaa6` is still on branch `t3/28cf1eef` (it retried only 503 and lock errors). Merge `agent/DEV-615` only; that branch is obsolete
     - Reran: `npm run test:smoke:agent -- tests/ui.releases.smoke.spec.ts` passed (3 of 3), and `npx prettier --check` on the spec is clean. Full `npm run smoke` not rerun
+- date: 2026-11-17T02:44:42.754482+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `dcc5d7eb` is on `main` and `origin/main`.
+
+    - Rebased onto `main` (`105f027a`) without conflicts; no lockfile changed
+    - Checks in the worktree after the rebase: lint, tests and the full smoke run (405 of 405) passed
+    - Fast-forwarded the main checkout, then amended the pending `.tasks` changes into the commit (`9ac3c39a` → `dcc5d7eb`)
+    - No rule or config files changed, so `lotar trust` wasn't needed
+    - Pushed `105f027a..dcc5d7eb`; no unfinished work was among the unpushed commits
+    - Ticket check against the main checkout passed (3 of 3). The main checkout has no built binary, so I used `LOTAR_BINARY_PATH` with the worktree's build of the same code
+    - Branch `t3/28cf1eef` still holds the earlier fix `3c4bbaa6`, which is now obsolete. I left it in place
+  report:
+    commits:
+    - hash: dcc5d7eb
+      what: DEV-615 smoke test waits for the release create (rebased fix 892eb10d, plus pending .tasks)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 of 405
+    - command: npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts
+      result: passed
+      reason: main checkout, 3 of 3, binary from the merge worktree
+    next: 'None: ticket goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
@@ -221,3 +249,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T02:44:42.754482+00:00
+  actor: claude
+  changes:
+  - field: comment_added

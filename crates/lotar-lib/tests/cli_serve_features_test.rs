@@ -277,6 +277,30 @@ fn reserve_ephemeral_port() -> u16 {
     port
 }
 
+/// Spawn a serve child on an explicitly requested port. The reserved port is
+/// free only until its listener drops, so another process can take it before
+/// serve binds it; a bind failure on that port retries with a fresh one.
+fn spawn_serve_on_requested_port(cwd: &std::path::Path, args: impl Fn(&str) -> Vec<String>) -> (ServeChild, u16) {
+    spawn_serve_on_reserved_port(cwd, reserve_ephemeral_port, args)
+}
+
+fn spawn_serve_on_reserved_port(cwd: &std::path::Path, mut reserve: impl FnMut() -> u16, args: impl Fn(&str) -> Vec<String>) -> (ServeChild, u16) {
+    const ATTEMPTS: usize = 5;
+    for attempt in 1..=ATTEMPTS {
+        let port = reserve();
+        let args = args(&port.to_string());
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        match try_spawn_serve(cwd, &args) {
+            ServeStart::Ready(serve) => return (serve, port),
+            ServeStart::Failed { stderr, .. } if attempt < ATTEMPTS && stderr.contains("Failed to bind") && stderr.contains(&format!(":{port}")) => {}
+            ServeStart::Failed { status, stdout, stderr } => {
+                panic!("serve exited before a readiness banner ({status}, attempt {attempt}); stdout:\n{stdout}\nstderr:\n{stderr}")
+            }
+        }
+    }
+    unreachable!("the last attempt returns or panics")
+}
+
 fn sorted_titles(payload: &serde_json::Value) -> Vec<String> {
     let mut titles: Vec<String> =
         payload["data"]["tasks"].as_array().expect("data.tasks array").iter().map(|task| task["title"].as_str().expect("title").to_string()).collect();
@@ -336,8 +360,8 @@ fn serve_ephemeral_port_is_advertised_and_api_answers() {
 #[test]
 fn serve_reports_requested_port_exactly() {
     let fixtures = TestFixtures::new();
-    let port = reserve_ephemeral_port();
-    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["serve", "--host", "127.0.0.1", "--port", &port.to_string()]);
+    let (mut serve, port) =
+        spawn_serve_on_requested_port(fixtures.temp_dir.path(), |port| ["serve", "--host", "127.0.0.1", "--port", port].map(String::from).to_vec());
 
     assert_eq!(serve.port, port, "banner must report the requested port");
     let (status, _) = serve.get("/api/tasks/list");
@@ -347,10 +371,27 @@ fn serve_reports_requested_port_exactly() {
 }
 
 #[test]
+fn requested_port_retries_when_the_reserved_port_is_taken_first() {
+    let fixtures = TestFixtures::new();
+    let taken = TcpListener::bind("127.0.0.1:0").unwrap();
+    let taken_port = taken.local_addr().unwrap().port();
+    let mut reservations = vec![reserve_ephemeral_port(), taken_port];
+    let (mut serve, port) = spawn_serve_on_reserved_port(
+        fixtures.temp_dir.path(),
+        || reservations.pop().expect("one reservation per attempt"),
+        |port| ["serve", "--host", "127.0.0.1", "--port", port].map(String::from).to_vec(),
+    );
+
+    assert_ne!(port, taken_port, "a taken reserved port must be replaced by a fresh one");
+    assert_eq!(serve.port, port, "banner must report the retried requested port");
+    assert!(serve.stop().success());
+    drop(taken);
+}
+
+#[test]
 fn serve_short_port_flag_sets_requested_port() {
     let fixtures = TestFixtures::new();
-    let port = reserve_ephemeral_port();
-    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["serve", "-p", &port.to_string()]);
+    let (mut serve, port) = spawn_serve_on_requested_port(fixtures.temp_dir.path(), |port| ["serve", "-p", port].map(String::from).to_vec());
 
     assert_eq!(serve.port, port, "-p must set the serve port");
     let (status, _) = serve.get("/api/tasks/list");

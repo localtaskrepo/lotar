@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-17T02:14:41.599707+00:00
+modified: 2026-11-17T02:52:38.051170+00:00
 relationships:
   related:
   - DEV-593
@@ -91,6 +91,13 @@ comments:
       result: not_run
       reason: Rust-only change; fix agent named no checks
     next: 'Fix agent: make the DEV-626 tests wait for an end status, then hand back for review'
+- date: 2026-11-17T02:52:38.051170+00:00
+  author: claude
+  text: |-
+    DEV-639 builds on this ticket's commit: land DEV-626 first.
+
+    - `agent/DEV-639` holds `66fee083f` (`55e2126a9` cherry-picked onto main, dropping the DEV-620 duplicate) plus `08cd964f2` (DEV-639).
+    - DEV-639 changes `on_ticket` in `resumed.rs` and adds two tests to `dev626_resumed_t3_threads_test.rs`; the fix for the `!= "running"` wait doesn't touch those lines.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ae3bded-6bb0-4dbe-b1d4-32538275daa2
 description: |-
@@ -280,3 +287,7 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-17T02:52:38.051170+00:00
+  actor: claude
+  changes:
+  - field: comment_added

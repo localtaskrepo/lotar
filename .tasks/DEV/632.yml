@@ -1,11 +1,11 @@
 title: 'Flaky test: cli_serve_features_test stop() gives output capture only 5 s under load'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T00:25:42.039816+00:00
-modified: 2026-11-17T02:28:57.264191+00:00
+modified: 2026-11-17T02:52:10.130923+00:00
 relationships:
   related:
   - DEV-607
@@ -181,3 +181,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-607","DEV-624","DEV-620"]}'
     new: '{"related":["DEV-607","DEV-624","DEV-620","DEV-643"]}'
+- at: 2026-11-17T02:52:10.130923+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
