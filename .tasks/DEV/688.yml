@@ -1,11 +1,10 @@
 title: A t3 job can't move agent/<ticket> to its thread's branch while a worktree has agent/<ticket> checked out
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@fix'
 created: 2026-11-18T02:23:14.686039+00:00
-modified: 2026-11-18T04:59:19.799234+00:00
+modified: 2026-11-18T05:22:06.508180+00:00
 relationships:
   depends_on:
   - DEV-658
@@ -73,13 +72,27 @@ comments:
     - mallox, 2026-11-17, on [DEV-658](https://lotar.pyxzl.net/task/DEV-658): "Now, once QA is green": the OK for step 4 of `.github/skills/release/SKILL.md` (signed tag, push, `lotar release release`), "Follow the skill to the end, incl. brew upgrade and the next release ticket"
     - DEV-658 was closed Done before the tag existed (`git ls-remote --tags origin 'v0.15.*'` stops at `v0.15.3`): finish the release steps, then rerun this check
     - If QA on main is red, file that as the blocker instead of asking again
+- date: 2026-11-18T05:21:52.630353+00:00
+  author: claude
+  text: |-
+    v0.15.4 is released and installed; the fix (DEV-673, `a11c67715`) is in it and its check passes.
+
+    - Tagged and released v0.15.4 on `592abd9c4` (QA green), Release run `44241115852` all green; `lotar --version` prints `lotar 0.15.4`
+    - `a11c67715` is an ancestor of `v0.15.4`
+    - On a checkout of `v0.15.4`: `the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_session` and `..._of_a_job_whose_log_lost_its_status` pass (2/2)
+    - STD-216 is Blocked on DEV-688 (`agent/STD-216` still `f2c4f93`); closing this ticket hands it to @fix, which now runs on 0.15.4
+    - No files changed, no commit
+  report:
+    checks:
+    - command: cargo nextest run --workspace the_tickets_branch_moves_in_the_worktree (at tag v0.15.4)
+      result: passed
+    next: STD-216's @fix job moves agent/STD-216 to 41462b6 now that DEV-688 is Done
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d4ab356-82dd-4657-9a3e-ec1121ba8b10
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a1ee22-1036-4262-971d-5e3ee9d79c77
 description: 'Found: STD-216 job-20261118T021821.921Z-1 failed with ''git branch --force agent/STD-216 41462b6 failed: fatal: cannot force update the branch agent/STD-216 used by worktree /Users/mallox/.t3/worktrees/standards/agent-STD-216-d14d5bbe7bff030e''. The fix is done and checked on the thread''s branch; only the move failed. Check: a test where agent/TEST-1 is checked out in a worktree and the thread''s branch is ahead: the job moves the branch anyway (e.g. git -C <worktree> reset --hard or update-ref there, when the worktree is clean) or detaches the worktree first. Done when STD-216''s branch lands without the owner. Related: DEV-687 (the earlier refusal).'
 tags:
 - health
-- retry-fix
 custom_fields:
   finding: infra:branch-in-worktree:move_ticket_branch
 history:
@@ -189,3 +202,21 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a1ee22-1036-4262-971d-5e3ee9d79c77
+- at: 2026-11-18T05:21:52.630353+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:22:06.137147+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-18T05:22:06.508180+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, retry-fix
+    new: health

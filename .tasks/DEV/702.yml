@@ -5,10 +5,12 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-18T05:10:18.248830+00:00
-modified: 2026-11-18T05:10:25.253407+00:00
+modified: 2026-11-18T05:21:52.391525+00:00
 relationships:
   blocks:
   - DEV-700
+  related:
+  - DEV-658
 releases:
 - 10
 description: |-
@@ -27,3 +29,9 @@ history:
   - field: relationships
     old: '{}'
     new: '{"blocks":["DEV-700"]}'
+- at: 2026-11-18T05:21:52.391525+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-700"]}'
+    new: '{"blocks":["DEV-700"],"related":["DEV-658"]}'

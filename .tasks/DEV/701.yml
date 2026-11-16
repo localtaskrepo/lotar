@@ -1,11 +1,13 @@
 title: Agent action queues no job when the ticket's assignee is already that agent
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-18T04:40:49.336024+00:00
-modified: 2026-11-18T04:40:49.615694+00:00
+modified: 2026-11-18T05:25:53.147962+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b20c500-78e5-4ed1-9442-566d04a6100c
 description: 'Found 2026-11-17 by the chief of staff: standards INBOX-397 had assignee @triage with no job. lotar automation run "Inbox: triage again" --select id:INBOX-397 (set assignee @triage, agent triage) printed "Set assignee to agent ''triage''" and "Queue agent job for profile ''triage''", yet lotar agent list-jobs showed no job. After lotar task edit INBOX-397 --assignee mallox the same command queued job-20261118T044015.808Z-1 at once. The same rule queued jobs for INBOX-402, 441 and 443, which had other assignees. Check: an automation run whose agent action targets a ticket already assigned to that agent queues a job (or says why not). Done: a failing test first, then the fix; the CLI never prints "Queue agent job" without queueing one.'
 tags:
 - health
@@ -17,3 +19,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T05:25:52.354432+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T05:25:53.147962+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b20c500-78e5-4ed1-9442-566d04a6100c

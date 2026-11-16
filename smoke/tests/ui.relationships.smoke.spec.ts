@@ -1,4 +1,5 @@
 import { relative } from 'node:path';
+import type { Page } from '@playwright/test';
 import { describe, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
@@ -35,6 +36,45 @@ async function writeRelationships(workspace: SmokeWorkspace, id: string, value: 
     const task = parse(await workspace.readTaskYaml(id));
     task.relationships = value;
     await workspace.write(relative(workspace.root, workspace.getTaskFilePath(id)), stringify(task));
+}
+
+/**
+ * Open `url`, then write the relationships and wait for the page to receive their
+ * `task_updated`. The watcher can still report the fixture files written before
+ * the server started, and such a late event clears an open repair preview; it
+ * reports changes in order, so none arrives after this one (DEV-614).
+ */
+async function openThenWriteRelationships(
+    page: Page,
+    url: string,
+    workspace: SmokeWorkspace,
+    id: string,
+    value: Record<string, string | string[]>,
+) {
+    await page.addInitScript(() => {
+        const state = window as Window & { sseOpen?: boolean; taskUpdates?: string[] };
+        state.taskUpdates = [];
+        const NativeEventSource = window.EventSource;
+        window.EventSource = class extends NativeEventSource {
+            constructor(source: string | URL, options?: EventSourceInit) {
+                super(source, options);
+                if (new URL(String(source), window.location.href).pathname !== '/api/events') return;
+                this.addEventListener('open', () => {
+                    state.sseOpen = true;
+                });
+                this.addEventListener('task_updated', (event) => {
+                    state.taskUpdates!.push(JSON.parse(event.data).id);
+                });
+            }
+        };
+    });
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => (window as Window & { sseOpen?: boolean }).sseOpen === true);
+    await writeRelationships(workspace, id, value);
+    await page.waitForFunction(
+        (task) => (window as Window & { taskUpdates?: string[] }).taskUpdates?.includes(task),
+        id,
+    );
 }
 
 describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DEV-9)', () => {
@@ -313,11 +353,20 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
     it('previews safe reciprocal repair without writes and applies only after confirmation', async ({ expect }) => {
         const { workspace, source, target } = await fixture();
         try {
-            await writeRelationships(workspace, source.id, { related: [target.id] });
-            const before = await Promise.all([workspace.readTaskYaml(source.id), workspace.readTaskYaml(target.id)]);
             const server = await startLotarServer(workspace);
             try {
-                await withPage(`${server.url}/dependencies?root=${source.id}&project=REL&type=all`, async (page) => {
+                await withPage('about:blank', async (page) => {
+                    await openThenWriteRelationships(
+                        page,
+                        `${server.url}/dependencies?root=${source.id}&project=REL&type=all`,
+                        workspace,
+                        source.id,
+                        { related: [target.id] },
+                    );
+                    const before = await Promise.all([
+                        workspace.readTaskYaml(source.id),
+                        workspace.readTaskYaml(target.id),
+                    ]);
                     await page.getByRole('button', { name: 'Fix relationships', exact: true }).click();
                     const preview = page.getByRole('region', { name: 'Safe repair preview', exact: true });
                     await preview.waitFor();
@@ -1351,59 +1400,62 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
     }) => {
         const { workspace, source, target, third } = await fixture();
         try {
-            await writeRelationships(workspace, source.id, { related: [target.id, third.id] });
-            const before = await Promise.all([source.id, target.id, third.id].map((id) => workspace.readTaskYaml(id)));
             const server = await startLotarServer(workspace);
             try {
-                await withPage(
-                    `${server.url}/dependencies?project=REL&root=${source.id}&relationships=related`,
-                    async (page) => {
-                        const problems = page.getByRole('region', { name: 'Dependency issues', exact: true });
-                        await problems.locator('summary').click();
-                        const card = problems
-                            .getByRole('list', { name: 'Problems in displayed graph', exact: true })
-                            .locator(':scope > li')
-                            .filter({ hasText: target.id });
-                        const previewed = page.waitForResponse(
-                            (response) => new URL(response.url()).pathname === '/api/relationships/repair',
-                        );
-                        await card.getByRole('button', { name: 'Fix', exact: true }).click();
-                        const response = await previewed;
-                        expect(response.status()).toBe(200);
-                        const ids = response.request().postDataJSON().issue_ids;
-                        expect(ids).toHaveLength(1);
-                        expect((await response.json()).data.changed_tasks).toEqual([target.id]);
-                        const preview = page.getByRole('region', { name: 'Safe repair preview', exact: true });
-                        await preview.waitFor();
-                        expect(await preview.textContent()).toContain('Only this problem is included');
-                        await expect
-                            .poll(
-                                async () =>
-                                    (await preview.boundingBox())!.y -
-                                    (await page.locator('.topbar').boundingBox())!.height,
-                            )
-                            .toBeGreaterThanOrEqual(0);
-                        expect(
-                            await Promise.all([source.id, target.id, third.id].map((id) => workspace.readTaskYaml(id))),
-                        ).toEqual(before);
-                        const applied = page.waitForResponse(
-                            (result) =>
-                                new URL(result.url()).pathname === '/api/relationships/repair' &&
-                                result.request().postDataJSON().apply === true,
-                        );
-                        await preview
-                            .getByRole('button', { name: 'Confirm and apply safe repair', exact: true })
-                            .click();
-                        const receipt = await applied;
-                        expect(receipt.status()).toBe(200);
-                        expect(receipt.request().postDataJSON().issue_ids).toEqual(ids);
-                        await expect
-                            .poll(async () => (await relationships(workspace, target.id)).related)
-                            .toEqual([source.id]);
-                        expect((await relationships(workspace, third.id)).related || []).toEqual([]);
-                        expect(await workspace.readTaskYaml(source.id)).toBe(before[0]);
-                    },
-                );
+                await withPage('about:blank', async (page) => {
+                    await openThenWriteRelationships(
+                        page,
+                        `${server.url}/dependencies?project=REL&root=${source.id}&relationships=related`,
+                        workspace,
+                        source.id,
+                        { related: [target.id, third.id] },
+                    );
+                    const before = await Promise.all(
+                        [source.id, target.id, third.id].map((id) => workspace.readTaskYaml(id)),
+                    );
+                    const problems = page.getByRole('region', { name: 'Dependency issues', exact: true });
+                    await problems.locator('summary').click();
+                    const card = problems
+                        .getByRole('list', { name: 'Problems in displayed graph', exact: true })
+                        .locator(':scope > li')
+                        .filter({ hasText: target.id });
+                    const previewed = page.waitForResponse(
+                        (response) => new URL(response.url()).pathname === '/api/relationships/repair',
+                    );
+                    await card.getByRole('button', { name: 'Fix', exact: true }).click();
+                    const response = await previewed;
+                    expect(response.status()).toBe(200);
+                    const ids = response.request().postDataJSON().issue_ids;
+                    expect(ids).toHaveLength(1);
+                    expect((await response.json()).data.changed_tasks).toEqual([target.id]);
+                    const preview = page.getByRole('region', { name: 'Safe repair preview', exact: true });
+                    await preview.waitFor();
+                    expect(await preview.textContent()).toContain('Only this problem is included');
+                    await expect
+                        .poll(
+                            async () =>
+                                (await preview.boundingBox())!.y -
+                                (await page.locator('.topbar').boundingBox())!.height,
+                        )
+                        .toBeGreaterThanOrEqual(0);
+                    expect(
+                        await Promise.all([source.id, target.id, third.id].map((id) => workspace.readTaskYaml(id))),
+                    ).toEqual(before);
+                    const applied = page.waitForResponse(
+                        (result) =>
+                            new URL(result.url()).pathname === '/api/relationships/repair' &&
+                            result.request().postDataJSON().apply === true,
+                    );
+                    await preview.getByRole('button', { name: 'Confirm and apply safe repair', exact: true }).click();
+                    const receipt = await applied;
+                    expect(receipt.status()).toBe(200);
+                    expect(receipt.request().postDataJSON().issue_ids).toEqual(ids);
+                    await expect
+                        .poll(async () => (await relationships(workspace, target.id)).related)
+                        .toEqual([source.id]);
+                    expect((await relationships(workspace, third.id)).related || []).toEqual([]);
+                    expect(await workspace.readTaskYaml(source.id)).toBe(before[0]);
+                });
             } finally {
                 await server.stop();
             }

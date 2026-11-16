@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:01:03.148737+00:00
-modified: 2026-11-18T04:04:55.299949+00:00
+modified: 2026-11-18T05:21:52.391013+00:00
 relationships:
   depends_on:
   - DEV-681
@@ -16,6 +16,7 @@ relationships:
   - DEV-681
   - DEV-353
   - DEV-685
+  - DEV-702
 comments:
 - date: 2026-11-18T00:02:41.977638+00:00
   author: mallox
@@ -145,6 +146,15 @@ comments:
       result: passed
     - command: npm run -s smoke
       result: passed
+- date: 2026-11-18T05:21:52.112237+00:00
+  author: claude
+  text: |-
+    Released and installed v0.15.4.
+
+    - QA green on `592abd9c4` (run `44234822238`); signed tag `v0.15.4` pushed, `lotar release release 0.15.4`
+    - Release run `44241115852`: all jobs succeeded; GitHub shows `v0.15.4` as Latest
+    - `brew upgrade lotar`: `lotar --version` prints `lotar 0.15.4`; codesign shows `Developer ID Application: Ravi Gairola (3HKD37M482)`, `net.pyxzl.lotar`
+    - Next release ticket [DEV-702](https://lotar.pyxzl.net/task/DEV-702) and record `0.15.5` already exist
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0fb4ee5-0af2-43c2-9ff2-844d5e38cc7d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae66d2417-c918-4f65-9cd1-a23b637ba16e
@@ -310,3 +320,13 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T05:21:52.112237+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:21:52.391013+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-681"],"blocks":["DEV-688"],"related":["DEV-651","DEV-681","DEV-353","DEV-685"]}'
+    new: '{"depends_on":["DEV-681"],"blocks":["DEV-688"],"related":["DEV-651","DEV-681","DEV-353","DEV-685","DEV-702"]}'

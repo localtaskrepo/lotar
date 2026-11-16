@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-18T04:40:02.533551+00:00
+modified: 2026-11-18T05:22:44.326685+00:00
 relationships:
   related:
   - DEV-606
@@ -127,6 +127,9 @@ comments:
 
     - "Review: passed" (2026-11-17 01:58 UTC) is newer than `2f6dd0eb` (2026-11-16 19:04 UTC), the branch's only commit beyond main.
     - The job failed only at its end and handed the ticket to mallox with no question; nothing is left to decide. Restarting the merge step with the manual rule "Stalled: merge after a passed review".
+- date: 2026-11-18T05:22:44.326685+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-614 is assigned to @merge now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a918fc-ce4e-4947-96ea-4af19c6d46ae
@@ -280,3 +283,7 @@ history:
     new: Merging
   - field: assignee
     new: '@merge'
+- at: 2026-11-18T05:22:44.326685+00:00
+  actor: automation
+  changes:
+  - field: comment_added

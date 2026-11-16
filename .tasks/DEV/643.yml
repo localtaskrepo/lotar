@@ -1,17 +1,18 @@
 title: lotar CLI writes fail with 'Storage lock still busy' for 40 s and more while the agent worker holds the lock
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T02:28:55.661113+00:00
-modified: 2026-11-18T04:39:34.938108+00:00
+modified: 2026-11-18T05:25:51.403257+00:00
 relationships:
   related:
   - DEV-632
   - DEV-647
   - DEV-530
   - DEV-660
+  - DEV-634
 comments:
 - date: 2026-11-17T03:19:30.416590+00:00
   author: claude
@@ -97,9 +98,39 @@ comments:
     choice:
     - fix
     note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job ended with ''The session lotar-95e687-DEV-643-review ended: idle'' although its review comment passed the work.'
+- date: 2026-11-18T05:25:44.937580+00:00
+  author: claude
+  text: |-
+    Branch checked again: f5893849f still fixes it on top of today's main. Sending it back to review.
+
+    - Main moved the code into new crates (`bafbec164`, DEV-634). `git merge-tree main HEAD` has no conflicts. The fix lands in `crates/lotar-tasks/src/services/task_service.rs` and the test in `crates/lotar-agent/src/services/agent_job_service.rs`.
+    - I built that merged tree in a scratch copy. With main's old `task_service.rs`, the test fails ("task lock held while the update waits for the registry"). With the fix, it passes.
+    - `lotar-agent` + `lotar-tasks`: 324 tests passed, Clippy clean.
+    - I did not rebase the branch. The sandbox refused it, so the merge agent does it.
+  report:
+    commits:
+    - hash: f5893849f
+      what: look up the running job before taking the storage locks
+    checks:
+    - command: cargo nextest run -p lotar-agent -p lotar-tasks (on main + fix)
+      result: passed
+      reason: 324 tests
+    - command: test fails without the fix on main
+      result: passed
+      reason: task lock held, as expected
+    - command: cargo clippy -p lotar-agent -p lotar-tasks --all-targets
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: unchanged commit, fix agent ran them on 2026-11-17
+    - command: ticket check under load
+      result: not_run
+      reason: running worker is the old build
+    next: Review f5893849f again, then merge (rebase onto main; git maps it into lotar-agent and lotar-tasks without conflicts)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5de768b9-c6ac-46bb-94a9-f73089fd03a4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80304b10-8469-4561-93fc-5bb7518d560c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2b85df8d-fe5f-4dd2-adbc-eb19abc2dc56
 description: 'Found: during the DEV-632 merge job (2026-11-16 ~18:27 PT, load ~60-70), 19 attempts in a row of `lotar --tasks-dir .../lotar/.tasks comment DEV-632 ...` failed with ''Storage lock .tasks/DEV/.task.lock is still busy after 2 seconds; mutation was not run''. lsof showed the lock held by `lotar ... agent worker` (pid 44303, running 1h40m); the 20th try went in. Filing this ticket then hit the same on `.tasks/@sprints/.sprints.lock`. Agent jobs get failed writes and must retry themselves. Check: under load, run lotar comment or add in DEV while the agent worker runs; it should not fail for tens of seconds. Done: the worker holds the locks only briefly, or CLI writes wait long enough, so a write goes in on the first try.'
 tags:
 - health
@@ -196,3 +227,33 @@ history:
   - field: tags
     old: health
     new: health, retry-fix
+- at: 2026-11-18T05:22:45.015975+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T05:22:45.834913+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2b85df8d-fe5f-4dd2-adbc-eb19abc2dc56
+- at: 2026-11-18T05:25:44.937580+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:25:45.256334+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-632","DEV-647","DEV-530","DEV-660"]}'
+    new: '{"related":["DEV-632","DEV-647","DEV-530","DEV-660","DEV-634"]}'
+- at: 2026-11-18T05:25:51.403257+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
