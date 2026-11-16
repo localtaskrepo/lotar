@@ -1,11 +1,11 @@
 title: 'Flaky test: web_api_integration_test read_until_deadline panics on EINVAL from set_read_timeout after the server closed the socket'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T02:13:29.874075+00:00
-modified: 2026-11-17T02:28:15.321556+00:00
+modified: 2026-11-17T02:31:41.689596+00:00
 relationships:
   related:
   - DEV-635
@@ -32,6 +32,17 @@ comments:
     - command: npm run smoke
       result: passed
     next: Review, then merge
+- date: 2026-11-17T02:31:34.349481+00:00
+  author: claude
+  text: |-
+    Review: passed. `ecbe7036` does what "Done when" asks, nothing more.
+
+    - Read: the diff (one file, `crates/lotar-lib/tests/web_api_integration_test.rs`), the ticket and fix comment, related DEV-635, AGENTS.md, recent history of the file on `main` (`3ec533d6`, nothing it depends on).
+    - `read_until_deadline` skips only `InvalidInput` from `set_read_timeout`; any other error still panics with a message.
+    - New test fails before the fix: a standalone `rustc` program confirmed macOS returns `Os { code: 22 }` from `set_read_timeout` after `shutdown(Both)`, and the read then returns `Ok(0)`. So the old `.unwrap()` panics, and the fixed loop returns 0.
+    - Other `set_read_timeout(..).unwrap()` calls in the file run before a request is sent or on kept-open SSE streams. They don't hit this race.
+    - Reran: `cargo nextest run -p lotar-lib --test integration -E 'test(/^web_api_integration_test::/)'`: 36 passed. `rustfmt --check` on the file passed. I didn't rerun `npm run lint`, `npm test` or `npm run smoke`; the fix agent reports them passed.
+    - No UI work, no stray files, no second branch. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fd0d540-0fd0-4658-bfda-b234122bf1b7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6b0aeb7-a4a0-4429-844b-5cc98f305672
@@ -90,3 +101,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6b0aeb7-a4a0-4429-844b-5cc98f305672
+- at: 2026-11-17T02:31:34.349481+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:31:41.689596+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

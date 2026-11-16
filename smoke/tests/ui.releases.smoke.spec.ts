@@ -104,13 +104,24 @@ describe.concurrent('UI releases smoke scenarios (DEV-393)', () => {
                     expect(await item.isDisabled()).toBe(true);
 
                     // A release created elsewhere reaches the open page through release_changed.
-                    const created = await fetch(`${server.url}/api/releases/create`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ version: '0.16.0' }),
-                    });
-                    expect(created.ok).toBe(true);
-                    const { data } = (await created.json()) as Envelope<{ release: { id: number } }>;
+                    // Under the full suite's load the server can refuse the write (DEV-615): retry
+                    // until it lands, and fail with the last status and body.
+                    let created = '';
+                    await expect
+                        .poll(
+                            async () => {
+                                const response = await fetch(`${server.url}/api/releases/create`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ version: '0.16.0' }),
+                                });
+                                created = await response.text();
+                                return response.ok ? 'created' : `${response.status} ${created}`;
+                            },
+                            { timeout: 15_000, interval: 500 },
+                        )
+                        .toBe('created');
+                    const { data } = JSON.parse(created) as Envelope<{ release: { id: number } }>;
                     await expect.poll(() => item.isEnabled(), { timeout: 15_000 }).toBe(true);
 
                     await item.click();

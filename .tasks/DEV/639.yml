@@ -1,28 +1,73 @@
 title: A resumed T3 thread is taken over while a newer thread of the ticket waits for an answer
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T02:10:25.266688+00:00
+modified: 2026-11-17T02:30:57.049871+00:00
 relationships:
   related:
   - DEV-626
   - DEV-600
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
 description: |-
   Found in the DEV-626 review (2026-11-16).
 
   ## Found
-  - `crates/lotar-lib/src/services/agent_job_service/resumed.rs:169` drops a thread that waits for an answer (`pendingRequestCount > 0`) from the list, and then takes over the next running thread of the ticket.
+  - `crates/lotar-lib/src/services/agent_job_service/resumed.rs:169` (branch `agent/DEV-626`, not on main yet) drops a thread that waits for an answer (`pendingRequestCount > 0`) from the list, and then takes over the next running thread of the ticket.
   - DEV-600 says a waiting thread holds the ticket: no other job on the ticket starts. With two resumed threads (the newer one waiting, an older one running), lotar takes the older one over beside the waiting one.
 
   ## Done when
-  - [ ] A ticket whose resumed threads include one that waits for an answer takes over none of them; the others get the "stop it in T3 Code" comment, once per run.
-  - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`.
+  - [ ] A ticket whose resumed threads include one that waits for an answer (`t3 thread show` has `pendingRequestCount > 0`, or `t3 thread list` lists it as `waiting`) takes over none of them, whether the waiting one is the newest or an older one.
+  - [ ] Each of its other running threads gets one comment per thread run that names it and the waiting thread and says to stop it in T3 Code; a second look at the same run adds no comment.
+  - [ ] The waiting thread itself gets no comment and keeps the ticket's assignee, as in DEV-626.
+  - [ ] When `t3 thread show` fails for a thread, it counts as not waiting (as before); the next look asks again.
+  - [ ] Unchanged: no waiting thread → the newest job's thread is taken over (DEV-626); a queued entry or a done ticket → nothing happens.
+  - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`: newer thread waits, older one runs → no job, one comment on the older thread, none after a second look.
 history:
 - at: 2026-11-17T02:10:25.266688+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T02:29:07.063228+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T02:30:10.467270+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
+- at: 2026-11-17T02:30:57.049871+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-626 review (2026-11-16).
+
+      ## Found
+      - `crates/lotar-lib/src/services/agent_job_service/resumed.rs:169` drops a thread that waits for an answer (`pendingRequestCount > 0`) from the list, and then takes over the next running thread of the ticket.
+      - DEV-600 says a waiting thread holds the ticket: no other job on the ticket starts. With two resumed threads (the newer one waiting, an older one running), lotar takes the older one over beside the waiting one.
+
+      ## Done when
+      - [ ] A ticket whose resumed threads include one that waits for an answer takes over none of them; the others get the "stop it in T3 Code" comment, once per run.
+      - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`.
+    new: |-
+      Found in the DEV-626 review (2026-11-16).
+
+      ## Found
+      - `crates/lotar-lib/src/services/agent_job_service/resumed.rs:169` (branch `agent/DEV-626`, not on main yet) drops a thread that waits for an answer (`pendingRequestCount > 0`) from the list, and then takes over the next running thread of the ticket.
+      - DEV-600 says a waiting thread holds the ticket: no other job on the ticket starts. With two resumed threads (the newer one waiting, an older one running), lotar takes the older one over beside the waiting one.
+
+      ## Done when
+      - [ ] A ticket whose resumed threads include one that waits for an answer (`t3 thread show` has `pendingRequestCount > 0`, or `t3 thread list` lists it as `waiting`) takes over none of them, whether the waiting one is the newest or an older one.
+      - [ ] Each of its other running threads gets one comment per thread run that names it and the waiting thread and says to stop it in T3 Code; a second look at the same run adds no comment.
+      - [ ] The waiting thread itself gets no comment and keeps the ticket's assignee, as in DEV-626.
+      - [ ] When `t3 thread show` fails for a thread, it counts as not waiting (as before); the next look asks again.
+      - [ ] Unchanged: no waiting thread → the newest job's thread is taken over (DEV-626); a queued entry or a done ticket → nothing happens.
+      - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`: newer thread waits, older one runs → no job, one comment on the older thread, none after a second look.

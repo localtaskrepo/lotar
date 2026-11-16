@@ -1,11 +1,11 @@
 title: The queue starts no new job while the Mac is short of memory
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-17T02:16:49.183028+00:00
+modified: 2026-11-17T02:37:51.507566+00:00
 relationships:
   related:
   - DEV-604
@@ -81,6 +81,29 @@ comments:
 - date: 2026-11-17T01:37:20.283759+00:00
   author: claude
   text: 'Stalled since 2026-11-17T00:36Z with no lotar job: the live check restarted @fix as the next turn of its thread, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-17T02:30:57.617586+00:00
+  author: claude
+  text: |-
+    Rework already committed in `d8659a72`; this round reran the full checks after the stall, all pass.
+
+    - The stalled job had finished: the fix (`process_pending_queue` starts the memory tick before its early return) and test `a_job_queued_for_a_slot_gets_the_memory_tick_once_a_hold_begins` are in `d8659a72` on `agent/DEV-623`
+    - No file changes this round
+    - `npm run lint:agent`, `npm run test:agent` (2269 Rust, 1548 UI), `npm run test:smoke:agent` (405): passed, with `RUSTC_WRAPPER=`
+  report:
+    commits:
+    - hash: d8659a72
+      what: memory gate, with the rework (memory tick also starts from process_pending_queue while held)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: as lint:agent, RUSTC_WRAPPER=
+    - command: npm test
+      result: passed
+      reason: as test:agent, 2269 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2723c3a0-e508-468f-a410-efcf7e0b6d36
@@ -239,3 +262,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac4dae642-8a2d-47f1-ae9e-19025b0a012e
+- at: 2026-11-17T02:30:57.617586+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:37:51.507566+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

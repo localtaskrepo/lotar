@@ -1,0 +1,34 @@
+title: End rules are kept and retried after any checkpoint error, not only a full disk or busy lock
+status: Blocked
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T02:28:24.830886+00:00
+modified: 2026-11-17T02:28:27.130172+00:00
+relationships:
+  depends_on:
+  - DEV-633
+  related:
+  - DEV-633
+comments:
+- date: 2026-11-17T02:28:27.130172+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-633.'
+description: 'Found in the DEV-633 review: `apply_durable_end_action` (`crates/lotar-lib/src/services/automation_service.rs`) keeps every error from `create_dir_all`/`acquire_storage_lock`/`save_end_action` in `UNSAVED_END_ACTIONS`, including permanent ones (permission denied, a file where the folder goes). Those retry every 30 s forever and `has_unsaved_end_actions` keeps the queue worker from exiting. A busy lock (WouldBlock) held by a run of the same job''s checkpoint that then finishes and deletes it would also let the kept copy run the steps a second time. The ticket asked for transient errors (ENOSPC, lock). Done when only StorageFull (and a busy lock, if safe) is kept, and other errors fail as before, with a test.'
+history:
+- at: 2026-11-17T02:28:25.603469+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T02:28:27.084970+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Blocked
+- at: 2026-11-17T02:28:27.130172+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,18 +1,24 @@
 title: A job's end rules that fail on a full disk are never retried, so the ticket stalls at its step
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T00:48:34.144750+00:00
-modified: 2026-11-17T02:28:14.528345+00:00
+modified: 2026-11-17T02:32:02.874340+00:00
 relationships:
+  blocks:
+  - DEV-642
+  - DEV-641
   related:
   - DEV-604
   - DEV-625
   - DEV-624
   - DEV-543
   - DEV-641
+  - DEV-642
+  - DEV-613
+  - DEV-620
 comments:
 - date: 2026-11-17T01:28:18.972368+00:00
   author: claude
@@ -45,6 +51,17 @@ comments:
 - date: 2026-11-17T02:12:38.440179+00:00
   author: claude
   text: 'Stalled since 2026-11-17T01:29Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-17T02:28:51.529727+00:00
+  author: claude
+  text: |-
+    Review: passed. `df1790ea` keeps job end rules whose checkpoint a full disk refused and runs them once the checkpoint saves. That is what "Done when" asks.
+
+    - Read: the diff (`automation_service.rs`, `agent_queue_service.rs`), the ticket and the fix comment, DEV-543/DEV-604, `docs/help/agent.md`, and the last commits on main to both files. The commit merges cleanly onto main (`git merge-tree`). Its 3 other commits are already on main under new hashes (DEV-620/632/624).
+    - Logic: `acquire_storage_lock` keeps the error kind, so ENOSPC arrives as `StorageFull`. The kept copy is saved only if no checkpoint exists, and the replay runs it. The recorded outcome waits behind it, as in DEV-543. The worker loop and a 30 s thread both retry.
+    - Test before the fix: not run. On the old code the checkpoint is never saved, so `PX-1` stays `Todo` and the test's `Done` assert fails.
+    - Reran: `cargo nextest run -p lotar-lib --lib automation_service` 17/17 passed (both new tests included). `cargo clippy -p lotar-lib --all-targets`: clean. `cargo nextest run -E 'test(/outcome|end_rule|end_action|queue|job_failed|job_completed/)'`: 44/45 passed. The failing test is `a_queue_entry_held_by_a_waiting_thread_says_so_once`, the known DEV-613 flake: it failed 3 of 7 runs and passed the rest.
+    - Not rerun: the full `npm run lint`, `npm test`, `npm run smoke`, and the ticket's check on a really full disk.
+    - Minor, filed: [DEV-641](https://lotar.pyxzl.net/task/DEV-641): `docs/help/agent.md:238` doesn't mention the full-disk case. [DEV-642](https://lotar.pyxzl.net/task/DEV-642): every checkpoint error is kept, not only transient ones. A permanent one retries forever and keeps the worker from exiting. Both depend on DEV-633.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac5a64c5-93b0-4a52-9a07-89f589caaf2c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc69ee00-65eb-413b-a296-1a8ad055869b
@@ -142,3 +159,34 @@ history:
   - field: relationships
     old: '{"related":["DEV-604","DEV-625","DEV-624","DEV-543"]}'
     new: '{"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641"]}'
+- at: 2026-11-17T02:28:25.079771+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641"]}'
+    new: '{"blocks":["DEV-642"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642"]}'
+- at: 2026-11-17T02:28:50.894604+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642"]}'
+- at: 2026-11-17T02:28:51.529727+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:28:51.989396+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620"]}'
+- at: 2026-11-17T02:32:02.874340+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

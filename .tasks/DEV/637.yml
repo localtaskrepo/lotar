@@ -1,14 +1,45 @@
 title: A job held back for prerequisites stays parked when its ticket is closed by hand
-status: InProgress
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T01:56:54.001918+00:00
-modified: 2026-11-17T02:27:02.532874+00:00
+modified: 2026-11-17T02:37:51.987295+00:00
 relationships:
-  related:
+  depends_on:
   - DEV-530
+  related:
+  - DEV-612
+comments:
+- date: 2026-11-17T02:31:27.922310+00:00
+  author: claude
+  text: |-
+    Waits for DEV-530: the parked-job list this fix changes is only on `agent/DEV-530` (`cf8caa2a`), not on main.
+
+    - Set to Blocked, `depends-on: DEV-530`; "Prerequisites done" continues it with @fix once DEV-530 is Done.
+    - Not built on `cf8caa2a`: DEV-530 still needs a rebase with conflicts and its own review; a copy here would land it twice.
+    - Plan: in `task_service.rs` next to `fire_unblocked_dependents` (line ~1447), when `previous` is open and `current` done, call `AgentQueueService::take_parked(tasks_dir, &current.id)`; an error goes to `report_automation_failure`, the update stands.
+    - Test in `agent_automation_integration_test.rs`: park a job (`AgentQueueService::park`), `lotar status <id> Done`, then `list_parked` is empty and `lotar task move` succeeds.
+    - "Done when" now names the surfaces, the open→open / done→done cases and the failure path.
+    - Branch `agent/DEV-637` holds `5e4b406b`, an older copy of DEV-612 (same code as main `105f027a`); no DEV-637 commit.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: no code change, waits for DEV-530
+    - command: npm test
+      result: not_run
+      reason: no code change
+    - command: npm run smoke
+      result: not_run
+      reason: no code change
+    next: 'When DEV-530 is on main: add the drop hook next to fire_unblocked_dependents, with its test'
+- date: 2026-11-17T02:37:51.987295+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-530.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ede6a56-9b89-4ce2-8b1c-a74fa80eb83a
 description: |-
   Found in the DEV-530 review (`cf8caa2a`).
 
@@ -16,11 +47,15 @@ description: |-
 
   - `resume_parked_job` drops a parked job only when the `unblocked` event fires or the agent is assigned again. `fire_unblocked_dependents` skips a dependent that is done itself, so a held ticket set to Done or WontDo by hand keeps its parked entry for good.
   - It stays listed in `lotar agent queue`, and `ensure_no_agent_work` (`task_move.rs`) refuses to move the ticket ("running or queued") until `lotar agent queue remove` takes it out.
+  - The parked list exists only on `agent/DEV-530` (not merged): this ticket waits for DEV-530.
 
   ## Done when
 
-  - [ ] A ticket with a parked job that reaches a done state drops the job (test fails before).
-  - [ ] `lotar agent queue` no longer lists it, and the ticket can be moved.
+  - [ ] A ticket with a parked job that reaches a done state of its project (Done, WontDo) drops the job in the same committed update, whatever made the change (CLI `status`/`edit`, REST, MCP, automation). Test fails before.
+  - [ ] A change between two open states, or between two done states, leaves the parked job alone.
+  - [ ] Dropping fails (queue file unreadable or locked): the status change still succeeds, and lotar reports it as an `automation_failed` warning; the entry stays for `lotar agent queue remove`.
+  - [ ] `lotar agent queue` no longer lists the ticket, and `lotar task move` moves it.
+  - [ ] npm run lint, npm test, npm run smoke pass.
 history:
 - at: 2026-11-17T01:56:54.623012+00:00
   actor: claude
@@ -39,3 +74,72 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-17T02:28:20.233233+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ede6a56-9b89-4ce2-8b1c-a74fa80eb83a
+- at: 2026-11-17T02:31:15.682032+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-530"]}'
+    new: '{"depends_on":["DEV-530"]}'
+- at: 2026-11-17T02:31:16.571285+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-530 review (`cf8caa2a`).
+
+      ## Found
+
+      - `resume_parked_job` drops a parked job only when the `unblocked` event fires or the agent is assigned again. `fire_unblocked_dependents` skips a dependent that is done itself, so a held ticket set to Done or WontDo by hand keeps its parked entry for good.
+      - It stays listed in `lotar agent queue`, and `ensure_no_agent_work` (`task_move.rs`) refuses to move the ticket ("running or queued") until `lotar agent queue remove` takes it out.
+
+      ## Done when
+
+      - [ ] A ticket with a parked job that reaches a done state drops the job (test fails before).
+      - [ ] `lotar agent queue` no longer lists it, and the ticket can be moved.
+    new: |-
+      Found in the DEV-530 review (`cf8caa2a`).
+
+      ## Found
+
+      - `resume_parked_job` drops a parked job only when the `unblocked` event fires or the agent is assigned again. `fire_unblocked_dependents` skips a dependent that is done itself, so a held ticket set to Done or WontDo by hand keeps its parked entry for good.
+      - It stays listed in `lotar agent queue`, and `ensure_no_agent_work` (`task_move.rs`) refuses to move the ticket ("running or queued") until `lotar agent queue remove` takes it out.
+      - The parked list exists only on `agent/DEV-530` (not merged): this ticket waits for DEV-530.
+
+      ## Done when
+
+      - [ ] A ticket with a parked job that reaches a done state of its project (Done, WontDo) drops the job in the same committed update, whatever made the change (CLI `status`/`edit`, REST, MCP, automation). Test fails before.
+      - [ ] A change between two open states, or between two done states, leaves the parked job alone.
+      - [ ] Dropping fails (queue file unreadable or locked): the status change still succeeds, and lotar reports it as an `automation_failed` warning; the entry stays for `lotar agent queue remove`.
+      - [ ] `lotar agent queue` no longer lists the ticket, and `lotar task move` moves it.
+      - [ ] npm run lint, npm test, npm run smoke pass.
+- at: 2026-11-17T02:31:27.922310+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:31:28.289046+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-530"]}'
+    new: '{"depends_on":["DEV-530"],"related":["DEV-612"]}'
+- at: 2026-11-17T02:37:51.658052+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T02:37:51.924334+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-17T02:37:51.987295+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-17T02:12:50.401569+00:00
+modified: 2026-11-17T02:32:13.714221+00:00
 relationships:
   depends_on:
   - DEV-602
@@ -14,6 +14,7 @@ relationships:
   - DEV-626
   - DEV-613
   - DEV-631
+  - DEV-637
 comments:
 - date: 2026-11-16T05:29:25.407255+00:00
   author: automation
@@ -145,6 +146,30 @@ comments:
 - date: 2026-11-17T02:12:50.401569+00:00
   author: claude
   text: 'Stalled since 2026-11-17T01:28Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-17T02:29:03.484140+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-612 is on `main` as `105f027a9`.
+
+    - Rebased cleanly onto `4794918f` (`1f8b1bf5` → `5e4b406b`). Only `Cargo.lock` changed among lockfiles, so no `npm ci`.
+    - All checks were rerun after the rebase, because the hash changed.
+    - `git merge --ff-only`, then pending `.tasks` changes amended in (owner 2026-11-12).
+    - No automation or config files changed, so `lotar trust` wasn't needed.
+    - Pushed `4794918f6..105f027a9` (the pre-push hook passed). The main checkout is clean and nothing is left unpushed.
+  report:
+    commits:
+    - hash: 105f027a9
+      what: a logged branch name counts only while the branch holds the ticket's work (rebased from 1f8b1bf5, .tasks amended in)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: rust 2281/2281, ui 1548/1548, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    next: 'None: Done when the job ends'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2bfb120b-d5dd-42da-8b97-d8582d5bcefb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09feb0e9-5605-42cb-b08e-a17fad3257e2
@@ -164,8 +189,6 @@ description: |-
   - [ ] Both callers get it: `follow_ticket_work` leaves `agent/<ID>` where it is, and `ensure_branch_merged` doesn't fail a merge naming the skipped branch.
   - [ ] A step fails: a git call that can't answer (missing ref, git error) skips the branch, as an unknown owner.
   - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
-tags:
-- fix-retried
 history:
 - at: 2026-11-16T04:47:33.913722+00:00
   actor: claude
@@ -422,3 +445,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T02:29:03.484140+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:31:28.288197+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613","DEV-631"]}'
+    new: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613","DEV-631","DEV-637"]}'
+- at: 2026-11-17T02:32:13.714221+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''
