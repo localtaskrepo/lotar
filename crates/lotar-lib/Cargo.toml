@@ -64,6 +64,8 @@ predicates = { version = "3.1.4", default-features = false }
 tempfile.workspace = true
 ctor.workspace = true
 dtor.workspace = true
+# The tests fake T3 Code's server (DEV-619).
+tungstenite = "0.30.0"
 
 [features]
 default = ["parallel"]

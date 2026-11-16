@@ -1,13 +1,14 @@
 //! DEV-510: harnessmux's t3 agent gives a job its thread's link, ends a turn that waits for an answer as such, and a
 //! taken-over t3 job ends with the thread's run instead of a second turn. A shell script stands in for T3's CLI.
+//! DEV-619: a continued job renames its thread through T3 Code's server, which a thread here stands in for.
 #![cfg(unix)]
 use jiff::SignedDuration;
 use jiff::Timestamp;
 
 use crate::common::TestFixtures;
 use crate::common::env_mutex::EnvVarGuard;
-use lotar::api_types::TaskCreate;
-use lotar::services::agent_job_service::AgentJobService;
+use lotar::api_types::{AgentJobCreateRequest, TaskCreate};
+use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use lotar::services::task_service::TaskService;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -15,11 +16,13 @@ use std::time::{Duration, Instant};
 
 /// `t3 thread start` appends its prompt to `prompts`, names thread t1, prints "Started." and exits with `start-exit` after `start-sleep` seconds;
 /// `thread send` prints "Sent."; `thread show` prints `show.json`; `thread list` prints `list.json` (or fails while
-/// `list-fail` exists). Every call goes to `calls`. While `setup` names a lotar binary, `thread start` makes the
-/// thread's worktree in `worktree` and runs `lotar agent worktree setup` there, as T3 Code's worktree script does.
+/// `list-fail` exists); `auth session issue` prints session s1's token. Every call goes to `calls`, with its arguments
+/// to `args`. While `setup` names a lotar binary, `thread start` makes the thread's worktree in `worktree` and runs
+/// `lotar agent worktree setup` there, as T3 Code's worktree script does.
 const FAKE_T3: &str = r#"#!/bin/sh
 dir=$(dirname "$0")
 echo "$1 $2" >> "$dir/calls"
+echo "$*" >> "$dir/args"
 if [ "$1 $2" = "thread start" ] && [ -f "$dir/setup" ]; then
   prev=""
   for arg in "$@"; do case "$prev" in --worktree) base=$arg ;; --branch) branch=$arg ;; esac; prev=$arg; done
@@ -30,6 +33,7 @@ case "$1 $2" in
   "thread start") cat >> "$dir/prompts"; echo "Thread t1" >&2; sleep "$(cat "$dir/start-sleep")"; echo "Started."; exit "$(cat "$dir/start-exit")" ;;
   "thread send") cat > /dev/null; echo "Sent." ;;
   "thread show") cat "$dir/show.json" ;;
+  "auth session") if [ "$3" = issue ]; then echo '{"sessionId":"s1","token":"secret"}'; else echo "Revoked session $4."; fi ;;
   "thread list") if [ -f "$dir/list-fail" ]; then echo "Could not reach the T3 Code server" >&2; exit 1; fi; cat "$dir/list.json" ;;
 esac
 "#;
@@ -57,12 +61,13 @@ fn harness(start_exit: u8, start_sleep: u32) -> Harness {
     std::fs::write(home.join("config/agents.toml"), format!("[agents.t3]\nkind = \"t3\"\ncommand = [\"{}\"]\n", script.display())).unwrap();
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        "default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fixer:\n    runner: t3\n    provider: claudeAgent\n    model: m\n",
+        "default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fixer:\n    runner: t3\n    provider: claudeAgent\n    model: m\n  named:\n    runner: t3\n    thread_name: \"${{ticket.id}} fix: ${{ticket.title}}\"\n",
     );
     let guards = vec![
         EnvVarGuard::set("HARNESSMUX_HOME", home.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
+        EnvVarGuard::set("T3CODE_HOME", root.join("t3home").to_string_lossy().as_ref()),
     ];
     let create = TaskCreate { title: "Thread job".into(), project: Some("TEST".into()), reporter: Some("owner".into()), ..Default::default() };
     TaskService::create(&mut fixtures.create_storage(), create).unwrap();
@@ -104,6 +109,10 @@ impl Harness {
             let list = serde_json::json!([{"threadId": "t1", "title": "TEST-1 Thread job", "createdAt": record["last_used"]}]);
             std::fs::write(self.dir.join("list.json"), list.to_string()).unwrap();
         }
+    }
+
+    fn args(&self) -> String {
+        std::fs::read_to_string(self.dir.join("args")).unwrap_or_default()
     }
 
     fn calls(&self) -> String {
@@ -164,6 +173,24 @@ fn a_t3_handoff_names_the_skipped_sessions_thread() {
     let handoff = prompts.split("Handoff:").nth(1).unwrap_or_default();
     assert!(handoff.contains("- Its T3 Code thread: t1\n"), "{prompts}");
     assert_eq!(harness.calls().matches("thread start").count(), 2, "{}", harness.calls());
+}
+
+#[test]
+fn a_new_thread_is_named_id_and_title_without_thread_name() {
+    let harness = harness(0, 0);
+    harness.show("completed", "null", 0, "Started.");
+    harness.command().assert().success();
+    assert!(harness.args().contains("--title TEST-1 Thread job "), "{}", harness.args());
+}
+
+#[test]
+fn a_new_thread_takes_the_profiles_thread_name_with_the_tickets_templates_filled_in() {
+    let harness = harness(0, 0);
+    harness.show("completed", "null", 0, "Started.");
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(harness.fixtures.get_temp_path()).args(["agent", "run", "TEST-1", "Fix it", "--agent", "named", "--wait"]);
+    cmd.assert().success();
+    assert!(harness.args().contains("--title TEST-1 fix: Thread job "), "{}", harness.args());
 }
 
 #[test]
@@ -465,4 +492,69 @@ fn a_t3_job_says_when_the_worktree_script_left_out_the_setup() {
     let logs = cli(&["agent", "logs", &id]);
     assert!(logs.contains("doesn't run `lotar agent worktree setup`"), "{logs}");
     assert!(!harness.fixtures.get_temp_path().join(".git/lotar/t3-worktree-setup").read_dir().unwrap().any(|_| true), "the record is gone");
+}
+
+/// Starts a job as profile `named` in a new thread, then continues that thread in this process; returns the
+/// continued job's progress notes.
+fn continue_named(harness: &Harness) -> Vec<String> {
+    harness.show("completed", "null", 0, "Started.");
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(harness.fixtures.get_temp_path()).args(["agent", "run", "TEST-1", "Fix it", "--agent", "named", "--wait"]);
+    cmd.assert().success();
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let req = AgentJobCreateRequest {
+        ticket_id: "TEST-1".into(),
+        prompt: "Merge it".into(),
+        agent: Some("named".into()),
+        thread_name: Some("${{ticket.id}} merge: ${{ticket.title}}".into()),
+        session: Some(lotar::config::types::AgentSession::Continue),
+        ..Default::default()
+    };
+    let job = AgentJobService::start_job_with_tasks_dir(req, harness.fixtures.tasks_root.as_path()).unwrap().id;
+    wait_for("the job's end", || AgentJobService::get_job(&job).is_some_and(|job| job.status == "completed"));
+    AgentJobService::events_for(&job).into_iter().filter(|event| event.kind == "agent_job_progress").filter_map(|event| event.message).collect()
+}
+
+/// DEV-619: a continued thread is renamed to the run's thread_name before its turn is sent, with a session token that
+/// lotar revokes afterwards.
+#[test]
+fn a_continued_thread_is_renamed_before_its_turn() {
+    let harness = harness(0, 0);
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let home = harness.fixtures.get_temp_path().join("t3home/userdata");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join("server-runtime.json"), format!(r#"{{"origin":"http://{}"}}"#, listener.local_addr().unwrap())).unwrap();
+    let calls_before_rename = harness.dir.join("calls");
+    let server = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let calls = std::fs::read_to_string(calls_before_rename).unwrap_or_default();
+        let mut socket = tungstenite::accept(stream).unwrap();
+        let request: serde_json::Value = match socket.read().unwrap() {
+            tungstenite::Message::Text(text) => serde_json::from_str(text.as_str()).unwrap(),
+            other => panic!("expected the rename request, got {other:?}"),
+        };
+        let answer = serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Success", "value": {"sequence": 1}}});
+        socket.send(tungstenite::Message::text(answer.to_string())).unwrap();
+        let _ = socket.read();
+        (request, calls)
+    });
+    let notes = continue_named(&harness);
+    let (request, calls) = server.join().unwrap();
+    assert_eq!(request["payload"]["type"], "thread.metadata.update");
+    assert_eq!(request["payload"]["threadId"], "t1");
+    assert_eq!(request["payload"]["title"], "TEST-1 merge: Thread job");
+    assert_eq!(calls.matches("thread send").count(), 0, "the rename comes before the continued turn: {calls}");
+    assert!(notes.iter().any(|note| note == "Renamed the T3 Code thread t1 to \"TEST-1 merge: Thread job\"."), "{notes:?}");
+    assert!(harness.args().contains("auth session revoke s1"), "{}", harness.args());
+    assert!(harness.calls().contains("thread send"), "{}", harness.calls());
+}
+
+/// DEV-619: a rename that can't reach T3 Code's server is logged and the job runs on.
+#[test]
+fn a_continued_thread_that_cant_be_renamed_runs_on() {
+    let harness = harness(0, 0);
+    let notes = continue_named(&harness);
+    let failed = "Could not rename the continued T3 Code thread to \"TEST-1 merge: Thread job\", so it keeps its name: T3 Code's server isn't running";
+    assert!(notes.iter().any(|note| note.starts_with(failed)), "{notes:?}");
+    assert!(harness.calls().contains("thread send"), "{}", harness.calls());
 }

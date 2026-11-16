@@ -1,11 +1,11 @@
 title: 'automation run --select ''id:STD-12'' also selects STD-120 to STD-129: no way to select exactly one ticket'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T17:12:58.754510+00:00
-modified: 2026-11-17T17:25:02.567832+00:00
+modified: 2026-11-17T20:39:17.757419+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -142,6 +142,7 @@ comments:
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-662 yet. DEV-662 waits for local:LOCA-501.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0b90132-f2dd-4516-bcf2-9a9f3aa8f9e7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A94ad83d3-c52f-4d7f-90f5-f5c31ce62c1e
 description: |-
   Found while reworking standards STD-199 (2026-11-17).
 
@@ -305,3 +306,14 @@ history:
   - field: tags
     old: health, fix-retried
     new: health, fix-retried, retry-fix
+- at: 2026-11-17T20:39:15.083675+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T20:39:17.757419+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A94ad83d3-c52f-4d7f-90f5-f5c31ce62c1e

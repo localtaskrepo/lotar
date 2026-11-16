@@ -866,6 +866,11 @@ pub struct AgentJobCreateRequest {
     /// that thread has unmerged work.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub session: Option<crate::config::types::AgentSession>,
+    /// Overrides the profile's `thread_name` for this run (t3 runner): the
+    /// thread's title, with the ticket's `${{...}}` templates filled in when
+    /// the job starts.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub thread_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

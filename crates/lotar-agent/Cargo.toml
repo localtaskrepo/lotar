@@ -33,6 +33,8 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml_ng.workspace = true
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
+# Renames T3 Code threads over the T3 Code server's WebSocket API (DEV-619).
+tungstenite = "0.30.0"
 tokio.workspace = true
 
 [dev-dependencies]

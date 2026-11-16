@@ -1247,6 +1247,9 @@ fn describe_action(action: &AutomationAction, current: &TaskDTO, config: &Resolv
                     settings.push(format!("{name} {value}"));
                 }
             }
+            if let Some(name) = expand_run_setting(agent.thread_name.as_deref(), |raw| preview.expand(raw)) {
+                settings.push(format!("thread name {name}"));
+            }
             if let Some(prompt) = agent.prompt.as_ref() {
                 settings.push(format!("prompt: {}", preview.expand(prompt)));
             }
@@ -2354,6 +2357,7 @@ fn apply_action(
                 model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
                 effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
                 provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
+                thread_name: thread_name_template(agent.thread_name.as_deref()),
                 ..AgentRunSettings::default()
             });
             // A message that reaches no agent says why on the ticket (DEV-525).
@@ -2749,6 +2753,8 @@ struct AgentRunSettings {
     provider: Option<String>,
     session: Option<crate::config::types::AgentSession>,
     prompt: Option<String>,
+    /// Still a template: the job fills it in from the ticket when it starts.
+    thread_name: Option<String>,
 }
 
 impl AgentRunSettings {
@@ -2759,8 +2765,15 @@ impl AgentRunSettings {
             provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
             session: agent.session,
             prompt: agent.prompt.as_ref().map(|prompt| tmpl.expand(prompt)).filter(|prompt| !prompt.trim().is_empty()),
+            thread_name: thread_name_template(agent.thread_name.as_deref()),
         }
     }
+}
+
+/// A rule's `thread_name`, left as a template: the job fills it in from the
+/// ticket when it starts, as it does the profile's (DEV-619).
+fn thread_name_template(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim).filter(|raw| !raw.is_empty()).map(str::to_string)
 }
 
 /// The run settings for a job started by assigning the ticket by hand: those
@@ -2856,6 +2869,7 @@ fn maybe_queue_agent_on_assignment(
         effort: run.effort,
         provider: run.provider,
         session: run.session,
+        thread_name: run.thread_name,
     };
 
     let mut storage = Storage::new(tasks_dir);
@@ -2947,6 +2961,7 @@ fn tell_agent(
             effort: run.effort,
             provider: run.provider,
             session: run.session,
+            thread_name: run.thread_name,
         };
         AgentQueueService::enqueue(&tasks_dir, req)?;
         return AgentQueueService::ensure_worker(&tasks_dir).map(|()| None);

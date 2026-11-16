@@ -48,6 +48,8 @@ pub struct AgentQueueEntry {
     pub provider: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<crate::config::types::AgentSession>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_name: Option<String>,
     /// The T3 Code thread the entry waits for, once its ticket has a comment
     /// that says so (DEV-600).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,6 +125,7 @@ impl AgentQueueService {
             effort: req.effort.clone(),
             provider: req.provider.clone(),
             session: req.session,
+            thread_name: req.thread_name.clone(),
             held_by: None,
         };
 
@@ -373,6 +376,7 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         effort: entry.effort,
         provider: entry.provider,
         session: entry.session,
+        thread_name: entry.thread_name,
     };
     if !crate::services::automation_service::queued_stage_allows_start(tasks_dir, &req) {
         return Ok(());

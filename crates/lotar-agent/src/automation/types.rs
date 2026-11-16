@@ -312,6 +312,9 @@ pub struct AutomationAgentAction {
     pub session: Option<crate::config::types::AgentSession>,
     #[serde(default)]
     pub prompt: Option<String>,
+    /// The T3 Code thread's title, like the profile's `thread_name`.
+    #[serde(default)]
+    pub thread_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

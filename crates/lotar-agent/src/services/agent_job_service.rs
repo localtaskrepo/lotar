@@ -1061,6 +1061,9 @@ fn resolve_profile(config: &ResolvedConfig, req: &AgentJobCreateRequest) -> LoTa
     if let Some(session) = req.session {
         profile.session = Some(session);
     }
+    if let Some(thread_name) = non_blank(req.thread_name.as_deref()) {
+        profile.thread_name = Some(thread_name);
+    }
     profile.model = non_blank(profile.model.as_deref());
     profile.effort = non_blank(profile.effort.as_deref());
     profile.provider = non_blank(profile.provider.as_deref());
@@ -3896,10 +3899,14 @@ fn run_session(
     let repo_root = resolve_repo_root(tasks_dir);
     let mut worktrees_before = None;
     let mut t3_setup_recorded = false;
+    let mut t3_rename_to = None;
     if launch.runner_kind == AgentRunnerKind::T3 {
-        let title =
-            Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, ticket_id, None).ok()).map(|task| task.title).unwrap_or_default();
-        session_profile.title = Some(format!("{ticket_id} {title}").trim().to_string());
+        let task = Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, ticket_id, None).ok());
+        let title = t3_thread_title(ticket_id, task.as_ref(), profile.thread_name.as_deref());
+        if launch.resume && profile.thread_name.is_some() {
+            t3_rename_to = Some(title.clone());
+        }
+        session_profile.title = Some(title);
         if let Some(plan) = launch.t3_plan.as_ref() {
             session_profile.worktree_base = Some(plan.base.clone());
             session_profile.branch = plan.branch.clone();
@@ -3934,6 +3941,12 @@ fn run_session(
     if !publish_session(job_id, &session) {
         let _ = block_on(session.cancel());
         return RunEnd::Stopped;
+    }
+    if let Some(title) = t3_rename_to {
+        let note = rename_continued_t3_thread(launch, &table, &t3_env, repo_root.as_deref(), &title);
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
+        });
     }
     let how = if launch.resume { "Continuing the session" } else { "Session" };
     update_job(job_id, |state| {
@@ -3983,6 +3996,42 @@ fn record_t3_worktree_setup(
             });
             false
         }
+    }
+}
+
+/// Rename the thread a continued T3 job runs in to `title` before its turn
+/// is sent (DEV-619); the job log's note says how it went. A rename that
+/// fails leaves the thread's name and the job runs on.
+fn rename_continued_t3_thread(
+    launch: &SessionLaunch<'_>,
+    table: &harnessmux::AgentTable,
+    env: &[(String, String)],
+    repo_root: Option<&std::path::Path>,
+    title: &str,
+) -> String {
+    let thread = crate::services::agent_runner::registry().load(launch.name).ok().and_then(|record| record.agent_session);
+    let program = table.get(launch.agent).map_err(|err| err.to_string()).and_then(|spec| block_on(spec.launch_command()).map_err(|err| err.to_string()));
+    let renamed = match (thread, program) {
+        (Some(thread), Ok((program, _))) => {
+            crate::services::t3_thread_api::rename_thread(&program, env, repo_root.unwrap_or(launch.cwd), &thread, title).map(|()| thread)
+        }
+        (None, _) => Err(format!("the session {} names no T3 Code thread", launch.name)),
+        (_, Err(err)) => Err(err),
+    };
+    match renamed {
+        Ok(thread) => format!("Renamed the T3 Code thread {thread} to \"{title}\"."),
+        Err(err) => format!("Could not rename the continued T3 Code thread to \"{title}\", so it keeps its name: {err}"),
+    }
+}
+
+/// A T3 Code thread's title: the profile's or run's `thread_name` with the
+/// ticket's templates filled in, else `<ID> <title>` (DEV-619). A name that
+/// comes out empty falls back to the default too.
+fn t3_thread_title(ticket_id: &str, task: Option<&crate::api_types::TaskDTO>, thread_name: Option<&str>) -> String {
+    let named = thread_name.zip(task).map(|(template, task)| crate::automation::template::TemplateContext::from_task(task).expand(template).trim().to_string());
+    match named.filter(|name| !name.is_empty()) {
+        Some(name) => name,
+        None => format!("{ticket_id} {}", task.map(|task| task.title.as_str()).unwrap_or_default()).trim().to_string(),
     }
 }
 
@@ -6460,6 +6509,35 @@ mod tests {
             AgentJobCreateRequest { ticket_id: "TEST-1".to_string(), prompt: "hello".to_string(), agent: Some("pinned".to_string()), ..Default::default() };
         let profile = resolve_profile(&config, &req).unwrap();
         assert_eq!(profile.args, ["--verbose"]);
+    }
+
+    /// DEV-619: a run's thread_name (a rule's) wins over the profile's; an empty one keeps the profile's.
+    #[test]
+    fn a_runs_thread_name_wins_over_the_profiles() {
+        let mut config = ResolvedConfig::from_global(GlobalConfig::default());
+        let mut detail = AgentProfileConfig::Runner("t3".to_string()).to_detail();
+        detail.thread_name = Some("${{ticket.id}} fix".to_string());
+        config.agent_profiles.insert("fix".to_string(), detail);
+        let req = |thread_name: &str| AgentJobCreateRequest {
+            ticket_id: "TEST-1".to_string(),
+            prompt: "hello".to_string(),
+            agent: Some("fix".to_string()),
+            thread_name: Some(thread_name.to_string()),
+            ..Default::default()
+        };
+        assert_eq!(resolve_profile(&config, &req("${{ticket.id}} merge")).unwrap().thread_name.as_deref(), Some("${{ticket.id}} merge"));
+        assert_eq!(resolve_profile(&config, &req("  ")).unwrap().thread_name.as_deref(), Some("${{ticket.id}} fix"));
+    }
+
+    /// DEV-619: the thread name fills in the ticket's templates once (a title that holds `${{` stays as written);
+    /// unset or empty, it is `<ID> <title>`.
+    #[test]
+    fn a_t3_threads_title_comes_from_thread_name_or_the_ticket() {
+        let task = crate::api_types::TaskDTO { title: "Fix ${{ticket.id}}".to_string(), ..sample_task() };
+        assert_eq!(t3_thread_title("TEST-1", Some(&task), Some("${{ticket.id}} fix: ${{ticket.title}}")), "TEST-1 fix: Fix ${{ticket.id}}");
+        assert_eq!(t3_thread_title("TEST-1", Some(&task), None), "TEST-1 Fix ${{ticket.id}}");
+        assert_eq!(t3_thread_title("TEST-1", Some(&task), Some("${{ticket.field:missing}}")), "TEST-1 Fix ${{ticket.id}}");
+        assert_eq!(t3_thread_title("TEST-1", None, Some("${{ticket.id}} fix")), "TEST-1");
     }
 }
 

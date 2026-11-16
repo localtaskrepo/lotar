@@ -1,11 +1,11 @@
 title: The queue worker loses an entry it took without a word when it dies before the job registers, or when the entry's retries run out
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-17T17:42:13.789054+00:00
+modified: 2026-11-17T20:39:10.983212+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -142,8 +142,34 @@ comments:
 - date: 2026-11-17T17:42:13.592762+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-661 yet. DEV-661 waits for local:LOCA-501.'
+- date: 2026-11-17T20:39:01.011254+00:00
+  author: claude
+  text: |-
+    Ready for review: the fix was already committed; the job only stopped because T3 Code wasn't running (LOCA-501, done now).
+
+    - Branch holds `0cdcf8fe3` on top of `main` (`git log main..HEAD`), worktree clean; no new changes in this job.
+    - Checks are from the 17:41 run; the code hasn't changed since, so I didn't rerun them.
+  report:
+    commits:
+    - hash: 0cdcf8fe3
+      what: taken entries persist until their job registers; a dropped entry comments its ticket; lotar add warns on failed rules
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: 17:41 run, code unchanged since
+    - command: npm run test:agent
+      result: passed
+      reason: 17:41 run, 2308 Rust and 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 17:41 run, 405 tests
+    - command: kill a real worker between take and start
+      result: not_run
+      reason: the unit test simulates the dead worker
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad512610d-e2c3-4b6c-b7fa-c9cbe1d49747
 description: |-
   Found while fixing DEV-660 (2026-11-17).
 
@@ -319,3 +345,27 @@ history:
   - field: tags
     old: health, fix-retried
     new: health, fix-retried, retry-fix
+- at: 2026-11-17T20:38:29.951172+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T20:38:30.745442+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad512610d-e2c3-4b6c-b7fa-c9cbe1d49747
+- at: 2026-11-17T20:39:01.011254+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:39:10.983212+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

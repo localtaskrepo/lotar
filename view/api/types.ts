@@ -1768,6 +1768,8 @@ export interface AgentJobCreateRequest {
     provider?: string
     /** `continue` runs the job as the next turn of the ticket's last T3 Code thread; `fresh` starts a new thread on its branch when that holds unmerged work. */
     session?: 'new' | 'continue' | 'fresh'
+    /** Overrides the profile's thread_name for this run (t3 runner): the thread's title, with the ticket's `${{...}}` templates filled in when the job starts. */
+    thread_name?: string
 }
 
 export interface AgentJobCreateResponse {

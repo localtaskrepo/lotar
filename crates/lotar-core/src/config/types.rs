@@ -311,6 +311,11 @@ pub struct AgentProfileDetail {
     /// `context_entries`.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub full_history: Option<bool>,
+    /// The T3 Code thread's title, with the ticket's `${{...}}` templates
+    /// filled in when the job starts (`t3` runner, DEV-619). Unset or empty:
+    /// `<ID> <title>`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub thread_name: Option<String>,
     /// What the job does when the agent asks for permission.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub on_permission: Option<AgentPermissionPolicy>,
