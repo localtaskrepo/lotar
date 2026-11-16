@@ -1,11 +1,11 @@
 title: Merge without an agent when the branch rebases cleanly and the checks pass
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T05:43:50.509643+00:00
+modified: 2026-11-16T05:51:52.356641+00:00
 relationships:
   related:
   - DEV-577
@@ -82,6 +82,28 @@ comments:
       result: not_run
       reason: no UI change; review blocks anyway
     next: 'Fix agent: bound the output drain in merge.rs run_process, add the untrusted-repo test, then review again'
+- date: 2026-11-16T05:51:43.880421+00:00
+  author: claude
+  text: |-
+    Rework done: both blocking findings fixed, amended as `25188cfe`.
+
+    - **Check hangs the merge** (`merge.rs` `run_process`): after the command exits, lotar waits for its output at most `OUTPUT_DRAIN_LIMIT` (5 s, as the runner does), then stops the process group (`terminate_child`), so a leftover server can't hold up the merge queue. Test `a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge` (check `sleep 30 & exit 0`): it took 31.5 s and failed without the fix, and passes with it.
+    - **Untrusted repo test**: `an_untrusted_repository_leaves_the_merge_to_the_agent` clears `LOTAR_TRUST_ALL`, uses an empty `LOTAR_TRUST_FILE`, and puts the merge profile in a home config, so only the repo's `agent.merge` is untrusted. The merge agent runs without the hand-off and the check doesn't run. It fails with the trust gate removed.
+    - **Not blocking, fixed**: `docs/help/agent.md` step 5 and the trust messages in `merge.rs` now say "rules, agent profiles or `agent.merge`". The doc also says what a check leaves running is stopped 5 s after it exits.
+  report:
+    commits:
+    - hash: 25188cfe
+      what: amended; bounded output wait for checks, untrusted-repo test, trust wording
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2254 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review again on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27aa3d95-a2c7-4dd5-b654-19819c5d68c0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa42985b0-da6c-4375-89b2-40b1447a986e
@@ -234,3 +256,16 @@ history:
   - field: status
     old: Reviewing
     new: InProgress
+- at: 2026-11-16T05:51:43.880421+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:51:52.356641+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

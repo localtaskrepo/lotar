@@ -311,9 +311,11 @@ impl AgentJobService {
         if has_active_job(&*JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?) {
             return Err(active_job_error());
         }
-        if let Some((thread, job)) = running_t3_thread(tasks_dir, &ticket_id) {
+        if let Some(hold) = running_t3_thread(tasks_dir, &ticket_id) {
+            let T3ThreadHold { thread, job, waiting, .. } = hold;
+            let what = if waiting { "waits for an answer" } else { "still runs" };
             return Err(LoTaRError::ValidationError(format!(
-                "Ticket '{ticket_id}' already has an active job: T3 Code still runs the thread {thread} of the job {job}"
+                "Ticket '{ticket_id}' already has an active job: the T3 Code thread {thread} of the job {job} {what}"
             )));
         }
 
@@ -3511,9 +3513,20 @@ fn t3_thread_show(program: &std::path::Path, env: &[(String, String)], cwd: &std
 /// a second (DEV-599).
 const T3_THREAD_RECHECK: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// A T3 Code thread of an earlier job that holds later jobs on its ticket.
+#[derive(Debug, Clone)]
+pub(crate) struct T3ThreadHold {
+    pub thread: String,
+    pub job: String,
+    /// The thread's link in T3 Code, when `t3 thread show` names one.
+    pub link: Option<String>,
+    /// The thread waits for an answer rather than runs a turn (DEV-600).
+    pub waiting: bool,
+}
+
 /// Per ticket: when T3 Code was asked, about which earlier threads, and the
-/// running one with its job, if any.
-type T3ThreadAnswers = HashMap<String, (std::time::Instant, Vec<String>, Option<(String, String)>)>;
+/// thread that holds the ticket, if any.
+type T3ThreadAnswers = HashMap<String, (std::time::Instant, Vec<String>, Option<T3ThreadHold>)>;
 
 static T3_THREAD_ANSWERS: LazyLock<Mutex<T3ThreadAnswers>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -3523,7 +3536,12 @@ static T3_THREAD_ANSWERS: LazyLock<Mutex<T3ThreadAnswers>> = LazyLock::new(|| Mu
 /// as failed, and the owner can answer in a thread. A second job would work
 /// beside it, its own thread on a branch of its own, as T3 Code checks the
 /// ticket's branch out in one worktree only.
-fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<(String, String)> {
+///
+/// A thread runs while its status is `running` or it has an `activeRunId`, as
+/// harnessmux counts it. A thread that waits for an answer holds the ticket
+/// too, so an answer given later can't start a turn beside the new job: the
+/// owner decided so (DEV-600).
+fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<T3ThreadHold> {
     let mut threads: Vec<_> = saved_jobs(tasks_dir)
         .into_iter()
         .filter(|job| job.header.runner == AgentRunnerKind::T3.as_str() && crate::storage::identity::aliases_match(&job.header.ticket_id, ticket_id))
@@ -3554,10 +3572,21 @@ fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<(St
     let answer = asked.iter().find_map(|thread| {
         let shown = t3_thread_show(&program, &env, &cwd, thread)?;
         let job = threads.iter().find(|(_, known, _)| known == thread).map(|(_, _, job)| job.clone())?;
-        (shown.get("status").and_then(|status| status.as_str()) == Some("running")).then(|| (thread.clone(), job))
+        let running = shown.get("status").and_then(|status| status.as_str()) == Some("running") || shown.get("activeRunId").is_some_and(|run| !run.is_null());
+        let waiting = shown.get("pendingRequestCount").and_then(serde_json::Value::as_u64).is_some_and(|count| count > 0);
+        let link = shown.get("link").and_then(|link| link.as_str()).filter(|link| !link.is_empty()).map(str::to_string);
+        (running || waiting).then(|| T3ThreadHold { thread: thread.clone(), job, link, waiting })
     });
     T3_THREAD_ANSWERS.lock().ok()?.insert(ticket_id.to_string(), (std::time::Instant::now(), asked, answer.clone()));
     answer
+}
+
+/// The thread that held the ticket at its last start, as T3 Code answered
+/// within [`T3_THREAD_RECHECK`]; asks T3 Code nothing.
+pub(crate) fn recent_t3_thread_hold(ticket_id: &str) -> Option<T3ThreadHold> {
+    let answers = T3_THREAD_ANSWERS.lock().ok()?;
+    let (at, _, hold) = answers.get(ticket_id)?;
+    hold.clone().filter(|_| at.elapsed() < T3_THREAD_RECHECK)
 }
 
 /// Make the session the job's runtime, unless the job was cancelled meanwhile.

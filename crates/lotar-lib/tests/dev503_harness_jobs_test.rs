@@ -6,6 +6,7 @@ use crate::common::TestFixtures;
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_types::{AgentJobCreateRequest, TaskCreate};
 use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
+use lotar::services::agent_queue_service::AgentQueueService;
 use lotar::services::task_service::TaskService;
 use predicates::prelude::*;
 use std::os::unix::fs::PermissionsExt;
@@ -513,14 +514,17 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// made from the `--worktree` base, runs `$FAKE_RUN` there and logs `<base> <branch> <commit it started from>` to
 /// `$FAKE_LOG`. `thread send thread-<n>` runs `$FAKE_RUN` in that thread's worktree and logs
 /// `send thread-<n> <branch> <commit it started from>`. `thread show thread-<n>` answers with that thread's worktree,
-/// and with status `running` while a file `running-thread-<n>` is next to the script; it logs `show thread-<n>` to
-/// `t3-show.log` there.
+/// and with status `running` while a file `running-thread-<n>` is next to the script, an `activeRunId` while
+/// `active-thread-<n>` is, and as waiting for an answer (`running`, `pendingRequestCount` 1) while `waiting-thread-<n>`
+/// is; it logs `show thread-<n>` to `t3-show.log` there.
 const FAKE_T3: &str = r#"#!/bin/sh
 if [ "$1 $2" = "thread show" ]; then
   echo "show $3" >> "$(dirname "$0")/t3-show.log"
-  status=completed
+  status=completed active=null pending=0
   [ -f "$(dirname "$0")/running-$3" ] && status=running
-  printf '{"thread":{"threadId":"%s","status":"%s","worktreePath":"%s"}}\n' "$3" "$status" "$FAKE_TREES/${3#thread-}"
+  [ -f "$(dirname "$0")/active-$3" ] && active='"r1"'
+  [ -f "$(dirname "$0")/waiting-$3" ] && status=running pending=1
+  printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","activeRunId":%s,"pendingRequestCount":%s,"worktreePath":"%s"}}\n' "$3" "$3" "$status" "$active" "$pending" "$FAKE_TREES/${3#thread-}"
   exit 0
 fi
 if [ "$1 $2" = "thread send" ]; then
@@ -685,9 +689,10 @@ fn no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread() {
     let fix = rev(root, "agent/TEST-1");
     let running = root.join("running-thread-0");
     std::fs::write(&running, "").unwrap();
-    run_t3(&fixtures, "review")
-        .failure()
-        .stderr(predicate::str::contains("Ticket 'TEST-1' already has an active job: T3 Code still runs the thread thread-0 of the job job-"));
+    run_t3(&fixtures, "review").failure().stderr(
+        predicate::str::contains("Ticket 'TEST-1' already has an active job: the T3 Code thread thread-0 of the job job-")
+            .and(predicate::str::contains(" still runs")),
+    );
     assert_eq!(std::fs::read_to_string(root.join("t3.log")).unwrap().lines().count(), 1, "no second thread started");
     std::fs::remove_file(&running).unwrap();
     run_t3(&fixtures, "review").success();
@@ -713,6 +718,65 @@ fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
     let failed = std::fs::canonicalize(&failed).unwrap();
     assert!(prompt.contains(&format!("uncommitted changes in `{}` (branch `agent/TEST-1`)", failed.display())), "{prompt}");
     assert!(failed.join("half-done.txt").is_file(), "the earlier work stays where it is");
+}
+
+/// DEV-600: harnessmux counts a thread with an `activeRunId` as running whatever its status says, and T3 Code shows a
+/// thread that waits for an answer as `running` with a pending request. Only the status was read. Both hold the
+/// ticket, and the error says which one it is.
+#[test]
+fn a_thread_with_an_active_run_or_a_question_holds_the_ticket() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let active = root.join("active-thread-0");
+    std::fs::write(&active, "").unwrap();
+    run_t3(&fixtures, "review")
+        .failure()
+        .stderr(predicate::str::contains("the T3 Code thread thread-0 of the job job-").and(predicate::str::contains(" still runs")));
+    std::fs::remove_file(&active).unwrap();
+    let waiting = root.join("waiting-thread-0");
+    std::fs::write(&waiting, "").unwrap();
+    run_t3(&fixtures, "review")
+        .failure()
+        .stderr(predicate::str::contains("the T3 Code thread thread-0 of the job job-").and(predicate::str::contains(" waits for an answer")));
+    assert_eq!(std::fs::read_to_string(root.join("t3.log")).unwrap().lines().count(), 1, "no second thread started");
+}
+
+/// DEV-600: a queue entry held by an earlier job's T3 Code thread waited without a word, retrying every few hundred
+/// milliseconds. Its ticket now gets one comment that says which thread holds it and what lets it go on.
+#[test]
+fn a_queue_entry_held_by_a_waiting_thread_says_so_once() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    std::fs::write(root.join("waiting-thread-0"), "").unwrap();
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let tasks_dir = fixtures.tasks_root.clone();
+    let req = AgentJobCreateRequest { ticket_id: "TEST-1".into(), prompt: "Review it".into(), agent: Some("review".into()), ..Default::default() };
+    assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+    let comments = || {
+        let task = TaskService::get(&fixtures.create_storage(), "TEST-1", None).unwrap();
+        task.comments.into_iter().filter(|comment| comment.text.starts_with("The queued @review job waits")).map(|comment| comment.text).collect::<Vec<_>>()
+    };
+    let worker = std::thread::spawn({
+        let tasks_dir = tasks_dir.clone();
+        move || AgentQueueService::run_worker(&tasks_dir)
+    });
+    wait_for("the waiting entry's comment", || !comments().is_empty());
+    // Several more retries of the entry.
+    std::thread::sleep(Duration::from_millis(1500));
+    assert!(AgentQueueService::remove(&tasks_dir, "TEST-1").unwrap(), "the entry still waits");
+    worker.join().unwrap().unwrap();
+    let comments = comments();
+    assert_eq!(comments.len(), 1, "{comments:?}");
+    assert!(
+        comments[0].contains("the T3 Code thread https://t3.test/thread-0 of the job job-")
+            && comments[0].contains("waits for an answer. Answer it in T3 Code"),
+        "{}",
+        comments[0]
+    );
+    assert_eq!(std::fs::read_to_string(root.join("t3.log")).unwrap().lines().count(), 1, "no second thread started");
 }
 
 /// DEV-599: a queue entry waiting for the ticket's running job, or for nothing after its earlier threads ended, asked

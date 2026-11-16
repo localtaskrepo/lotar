@@ -3,9 +3,9 @@ status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-16T05:47:36.260176+00:00
+modified: 2026-11-16T05:49:15.816679+00:00
 relationships:
   depends_on:
   - DEV-602
@@ -132,3 +132,9 @@ history:
   - field: assignee
     old: claude
     new: mallox
+- at: 2026-11-16T05:49:15.816679+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

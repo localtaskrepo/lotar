@@ -1,11 +1,11 @@
 title: Review and merge jobs work on the branch that holds the fix's commits, not on a new t3/* branch
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:33:11.139637+00:00
-modified: 2026-11-16T05:47:24.770947+00:00
+modified: 2026-11-16T05:49:05.727138+00:00
 relationships:
   blocks:
   - DEV-612
@@ -18,6 +18,7 @@ relationships:
   - DEV-593
   - DEV-604
   - DEV-612
+  - DEV-585
 comments:
 - date: 2026-11-16T03:48:30.481925+00:00
   author: claude
@@ -62,6 +63,30 @@ comments:
     - Tests fail before the fix: with `agent_job_service.rs` set back to `7a19ab6d`, the STD-133 test and the "merge brings nothing" test fail. The leftover-copy test fails once the `superseded_removal` filter is removed. The file is restored; the worktree is clean.
     - Reran: `npm run lint:agent` passed. `npm run test:agent` passed (2241 Rust, 1548 UI). Not rerun: `npm run test:smoke:agent` (Rust-only change; the fix agent ran it, 405/405).
     - Minor, filed as DEV-612: branches are matched by the names earlier jobs logged. For a reopened ticket, a freed `t3/<topic>` name that another ticket's thread reuses can be followed.
+- date: 2026-11-16T05:48:57.054558+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `3db5898c` is on `main` and `origin/main`.
+
+    - Rebased twice, because main moved during the checks. The second rebase conflicted with DEV-603 in `run_job` (`agent_job_service.rs`): two separate insertions at the same spot. I kept both, DEV-603's idle-session check first, then `follow_ticket_work`. The diff is unchanged (164+/8-).
+    - Checks on the final commit: `npm run lint:agent` passed, `npm run test:agent` passed (2256 Rust, 1548 UI), `npm run smoke` passed (405/405).
+    - Flake: one earlier `test:agent` run failed in a watcher SSE test (`watcher_reports_config_edits_and_ignores_internal_files` / `sprint_changes_announce_the_sprint_and_its_tasks`) at load ~25. A rerun passed. Already tracked as DEV-585.
+    - Amended the main checkout's `.tasks` changes into the merge commit. No rule or config files changed, so I didn't run `lotar trust`.
+    - `agent/DEV-602` still points at the pre-rebase `67499e12`, checked out in `agent-DEV-602-73ef697588699b5a`. Main supersedes it with a later `DEV-602` commit, so cleanup handles it.
+  report:
+    commits:
+    - hash: 3db5898c
+      what: DEV-602 fix, rebased onto main, .tasks amended in
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2256 Rust, 1548 UI; an earlier run flaked on a watcher SSE test (DEV-585)
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    next: Done; follow-up DEV-612
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fdff5f2-dc5b-42f4-94e7-32cec663f3c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f427401-39da-4fde-947a-80546299690b
@@ -225,3 +250,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612"]}'
     new: '{"blocks":["DEV-612"],"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612"]}'
+- at: 2026-11-16T05:48:57.054558+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:48:57.584469+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-612"],"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612"]}'
+    new: '{"blocks":["DEV-612"],"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612","DEV-585"]}'
+- at: 2026-11-16T05:49:05.727138+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

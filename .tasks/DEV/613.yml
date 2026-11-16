@@ -1,14 +1,33 @@
 title: 'Flaky test: a_queue_entry_held_by_a_waiting_thread_says_so_once can call remove while the worker holds the entry'
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-16T05:03:01.911155+00:00
+modified: 2026-11-16T05:51:43.900873+00:00
 relationships:
   related:
   - DEV-600
+comments:
+- date: 2026-11-16T05:51:33.176016+00:00
+  author: claude
+  text: |-
+    Question: the test only exists on `agent/DEV-600` (Merging, not on main). Where should the fix go?
+
+    - The race is real: `run_worker` dequeues the entry, `start_entry` runs `t3 thread show`, then requeues it. A `remove` in that gap returns false (`agent_queue_service.rs` on `agent/DEV-600`).
+    - Fix (one line, test only), at `dev503_harness_jobs_test.rs:689`: `wait_for("the waiting entry's removal", || AgentQueueService::remove(&tasks_dir, "TEST-1").unwrap());`
+    - `agent/DEV-613` (from main) can't hold it: a cherry-pick of `af2e42f2` onto main conflicts in the test file and `docs/help/agent.md`. Resolving that is the DEV-600 merge job's work. No DEV-600 merge job runs yet; its worktree is clean.
+    - **A (my pick):** I commit the line on `agent/DEV-600`, so it lands with DEV-600's merge. Then this ticket is Done.
+    - **B:** wait until DEV-600 is on main, then rerun this fix from main.
+  report:
+    checks:
+    - command: cargo nextest run (ticket check)
+      result: not_run
+      reason: the test isn't on main yet
+    next: Owner picks A or B; then commit the one-line fix and run the 30x stress check
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
 description: |-
   Found in the DEV-600 review (`af2e42f2`).
 
@@ -27,3 +46,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T05:49:29.854122+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T05:49:30.666773+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
+- at: 2026-11-16T05:51:33.176016+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:51:43.900873+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

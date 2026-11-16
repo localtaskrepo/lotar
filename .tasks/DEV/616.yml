@@ -1,0 +1,36 @@
+title: 'Flaky smoke: relationships ''previews a problem-card fix'' times out waiting for the Safe repair preview'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T06:00:44.086471+00:00
+modified: 2026-11-16T06:01:43.834070+00:00
+relationships:
+  related:
+  - DEV-600
+  - DEV-614
+description: |-
+  Seen in the DEV-600 merge run (`7af67b9c`, a change to the queue and job start only, nothing in the UI).
+
+  - `npm run smoke`: 404/405, failed in `smoke/tests/ui.relationships.smoke.spec.ts:1377`: `locator.waitFor: Timeout 30000ms exceeded` waiting for `getByRole('region', { name: 'Safe repair preview' })`. The test is "previews a problem-card fix and changes only that reciprocal assertion after confirmation".
+  - Rerunning only that file passed 19/19 twice (`npx vitest run --config smoke/vitest.config.ts tests/ui.relationships.smoke.spec.ts`).
+  - The DEV-600 fix run also had one smoke failure it didn't capture; it may be this test.
+
+  ## Done when
+  - [ ] The cause is found, and the test waits on what the preview's appearance depends on (the response, the rendered card), not on a fixed timeout under load.
+  - [ ] The file passes 10 runs beside the full smoke suite.
+tags:
+- health
+history:
+- at: 2026-11-16T06:00:45.226030+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T06:01:43.834070+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600"]}'
+    new: '{"related":["DEV-600","DEV-614"]}'

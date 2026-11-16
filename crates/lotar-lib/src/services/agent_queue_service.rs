@@ -47,6 +47,10 @@ pub struct AgentQueueEntry {
     pub provider: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<crate::config::types::AgentSession>,
+    /// The T3 Code thread the entry waits for, once its ticket has a comment
+    /// that says so (DEV-600).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held_by: Option<String>,
 }
 
 pub struct AgentQueueService;
@@ -118,6 +122,7 @@ impl AgentQueueService {
             effort: req.effort.clone(),
             provider: req.provider.clone(),
             session: req.session,
+            held_by: None,
         };
 
         let mut inserted = false;
@@ -286,6 +291,10 @@ impl AgentQueueService {
                             // (maybe in another process): wait for it rather
                             // than spend retries (DEV-279).
                             Err(err) if is_ticket_busy(&err) => {
+                                let mut entry = entry;
+                                if err.to_string().contains("the T3 Code thread") {
+                                    say_why_entry_waits(tasks_dir, &mut entry);
+                                }
                                 requeue_entry_unchanged(tasks_dir, &entry)?;
                             }
                             Err(err) => {
@@ -371,6 +380,38 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
 
 fn is_ticket_busy(err: &LoTaRError) -> bool {
     err.to_string().contains("already has an active job")
+}
+
+/// Comment on the ticket why its entry waits when an earlier job's T3 Code
+/// thread holds it, once per entry and thread: the queue tries the entry
+/// again every few hundred milliseconds (DEV-600).
+fn say_why_entry_waits(tasks_dir: &Path, entry: &mut AgentQueueEntry) {
+    let Some(hold) = crate::services::agent_job_service::recent_t3_thread_hold(&entry.ticket_id) else {
+        return;
+    };
+    if entry.held_by.as_deref() == Some(hold.thread.as_str()) {
+        return;
+    }
+    let who = if entry.agent.is_empty() { entry.runner.clone().unwrap_or_default() } else { format!("@{}", entry.agent) };
+    let thread = hold.link.as_deref().unwrap_or(&hold.thread);
+    let text = if hold.waiting {
+        format!(
+            "The queued {who} job waits: the T3 Code thread {thread} of the job {} waits for an answer. Answer it in T3 Code; the job starts once the thread's turn ends.",
+            hold.job
+        )
+    } else {
+        format!("The queued {who} job waits: T3 Code still runs the thread {thread} of the job {}. The job starts once the thread ends.", hold.job)
+    };
+    let mut storage = crate::storage::manager::Storage::new(tasks_dir);
+    let commented = crate::services::task_service::TaskService::add_comment_with_context(
+        &mut storage,
+        &entry.ticket_id,
+        &text,
+        crate::services::task_service::CommentContext::automation(),
+    );
+    if commented.is_ok() {
+        entry.held_by = Some(hold.thread);
+    }
 }
 
 /// Put an entry back without counting an attempt.

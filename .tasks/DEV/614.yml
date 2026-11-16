@@ -1,14 +1,26 @@
 title: 'Flaky smoke: relationships reciprocal repair test waits on an element under full-suite load'
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-16T05:11:33.081816+00:00
+modified: 2026-11-16T06:01:43.833671+00:00
 relationships:
   related:
   - DEV-606
+  - DEV-600
+  - DEV-616
+comments:
+- date: 2026-11-16T06:01:43.302227+00:00
+  author: claude
+  text: |-
+    Same symptom in another test of this file: filed as [DEV-616](https://lotar.pyxzl.net/task/DEV-616).
+
+    - `ui.relationships.smoke.spec.ts:1377` "previews a problem-card fix…" timed out waiting for the "Safe repair preview" region in the DEV-600 merge's full smoke run. It passed 19/19 twice on rerun.
+    - If your fix covers the shared cause, it may close DEV-616 too.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
 description: 'Found in the DEV-606 review on 2026-11-15: 1 of 4 full smoke runs (`npm run -s test:smoke:quick:agent`, worktree of agent/DEV-606) failed `smoke/tests/ui.relationships.smoke.spec.ts:313` ''previews safe reciprocal repair without writes and applies only after confirmation'' (log: 2 × waiting for element to be visible, enabled and stable); the other 3 runs passed 405/405. Check: `npm run test:smoke:agent` repeatedly. Done when the test no longer depends on load and the full smoke passes repeatedly.'
 tags:
 - health
@@ -26,3 +38,24 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T05:56:47.855031+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T05:56:48.826954+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
+- at: 2026-11-16T06:01:43.302227+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T06:01:43.833671+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-606"]}'
+    new: '{"related":["DEV-606","DEV-600","DEV-616"]}'

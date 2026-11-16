@@ -1,11 +1,11 @@
 title: Commit-signing and full-disk failures pause the queue instead of failing every job; a signing failure retries only the commit
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:33:15.288469+00:00
-modified: 2026-11-16T05:41:16.560591+00:00
+modified: 2026-11-16T05:56:37.706617+00:00
 relationships:
   related:
   - DEV-584
@@ -55,9 +55,49 @@ comments:
     **Smaller things for the rework**
     - `agent_job_service.rs:343` calls `admit()`, which uses up the due try, before checking for a free slot. A job that is then queued for lack of a slot is held again in `process_pending_queue`, so that try is lost for an interval. Also, a held job started in `serve` can take the try before the paused job's retry in the worker queue ("the paused job's retry first").
     - `agent_job_service.rs:4490`: the old doc line on `process_pending_queue` is still above the new one.
+- date: 2026-11-16T05:56:31.087493+00:00
+  author: claude
+  text: |-
+    Rework done: all three blocking findings and both smaller ones are fixed, amended into `e4edce9b`.
+
+    - **1. `--wait` hang:** `job_is_terminal` (`cli/handlers/agent.rs`) counts `paused`. `agent run --wait` returns when the job pauses and exits non-zero with `ended with status paused`. New test `waiting_for_a_job_ends_when_it_pauses`.
+    - **2. Lost hand-back:** at the pause, the job's recorded status/assignee (`peek_outcome`) and the ticket's current values go into the retry's queue entry (`CarriedOutcome`). The retry records them as its own outcome when it starts (`carry_outcome`), so they apply when it ends, like any job's. A field the owner changed during the pause keeps the owner's value, and the log says what was taken over or dropped. Tests: the signing test checks the agent's `InProgress`/`mallox` lands after the retry. The disk test checks the owner's `sam`, set during the pause, survives while the paused job's status still applies. Both tests failed with `carry_outcome` switched off.
+    - **3. UI:** `agent_job_paused` is now in `useAgentActivity.ts` (ends the indicator), `AgentJobs.vue` (subscribe + refresh, warning-coloured `paused` chip and card) and `TaskPanelTimelineTab.vue`, with the label `Paused` in `utils/agentJobs.ts`. SSE docs list the event. UI tests: `AgentActivityIndicator.spec.ts`, `agentJobsUtils.spec.ts`.
+    - **Smaller ones:** `admit()` is gone. Jobs held in `lotar serve` check the pause read-only (`AgentQueueService::holding`) and never take the scheduled try. Only the worker takes it, from the front of its queue (the paused job's retry), and only when it has a slot. The unit test checks that no slot uses no try. The stale doc line on `process_pending_queue` is removed.
+    - Screenshots (Agents page with a paused job): `DEV-604-agents-before-{light,dark}-{1920,1440,390}.png` and `DEV-604-agents-after-…png`, attached to this ticket. Before, the paused chip and log line were unstyled grey; after, they show in the warning colour, with the text label kept.
+    - Docs: `docs/help/agent.md` § Paused queue (ticket, `--wait`, who takes the try), `docs/help/sse.md`, `docs/developers/sse.md`.
+  report:
+    commits:
+    - hash: e4edce9b
+      what: 'rework: --wait ends on paused, a paused job''s status/assignee goes to its retry, UI knows agent_job_paused, scheduled try only for the worker'
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2243 Rust, 1548 UI
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: 405 tests
+    - command: ui-review screenshots
+      result: passed
+      reason: Agents page before/after, light and dark, 1920/1440/390, attached
+    next: Review again, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ace8ed2ae-c500-4fb4-b0a3-aa01766ee626
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedf559db-3d37-4107-9a7e-e53a0d9afc89
+- attachment: DEV-604-agents-before-dark-1440.a518a7fd1c5f7d52cdb183b4433db184.png
+- attachment: DEV-604-agents-before-dark-1920.f1909d315c600190d826035dc8e3ffa4.png
+- attachment: DEV-604-agents-before-dark-390.9dd10202744f91d03f459b20906317f1.png
+- attachment: DEV-604-agents-before-light-1440.a06c83e19984233e7ab0874138cd9680.png
+- attachment: DEV-604-agents-before-light-1920.863aa1382f31d3b67e6fd0b2fba61dc6.png
+- attachment: DEV-604-agents-before-light-390.df4ff787375909961bbea34e7a338218.png
+- attachment: DEV-604-agents-after-dark-1440.952b0eddfc66399766af64ead144a82a.png
+- attachment: DEV-604-agents-after-dark-1920.c4f1d9b6eb07dde372b0da3ecf37c42d.png
+- attachment: DEV-604-agents-after-dark-390.bb73935cfb6f159dada55c10cceb2db5.png
+- attachment: DEV-604-agents-after-light-1440.14d0ebb00b36e70c9f9fa1c9756e21c1.png
+- attachment: DEV-604-agents-after-light-1920.be35cb2fc6284ed1349b4fe4e0ed4f7d.png
+- attachment: DEV-604-agents-after-light-390.52d2c0ce200945330276a15d5f67f8f4.png
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
 
@@ -87,6 +127,7 @@ description: |-
     - Docs: `docs/help/agent.md`.
 tags:
 - review-returned
+- ui
 history:
 - at: 2026-11-16T02:33:17.084663+00:00
   actor: claude
@@ -201,3 +242,82 @@ history:
   - field: status
     old: Reviewing
     new: InProgress
+- at: 2026-11-16T05:50:48.166403+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-dark-1440.a518a7fd1c5f7d52cdb183b4433db184.png
+- at: 2026-11-16T05:50:48.255286+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-dark-1920.f1909d315c600190d826035dc8e3ffa4.png
+- at: 2026-11-16T05:50:48.318026+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-dark-390.9dd10202744f91d03f459b20906317f1.png
+- at: 2026-11-16T05:50:48.416515+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-light-1440.a06c83e19984233e7ab0874138cd9680.png
+- at: 2026-11-16T05:50:48.516871+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-light-1920.863aa1382f31d3b67e6fd0b2fba61dc6.png
+- at: 2026-11-16T05:50:48.638996+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-light-390.df4ff787375909961bbea34e7a338218.png
+- at: 2026-11-16T05:50:48.751880+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-dark-1440.952b0eddfc66399766af64ead144a82a.png
+- at: 2026-11-16T05:50:48.878879+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-dark-1920.c4f1d9b6eb07dde372b0da3ecf37c42d.png
+- at: 2026-11-16T05:50:48.975594+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-dark-390.bb73935cfb6f159dada55c10cceb2db5.png
+- at: 2026-11-16T05:50:49.056571+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-light-1440.14d0ebb00b36e70c9f9fa1c9756e21c1.png
+- at: 2026-11-16T05:50:49.179803+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-light-1920.be35cb2fc6284ed1349b4fe4e0ed4f7d.png
+- at: 2026-11-16T05:50:49.306023+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-light-390.52d2c0ce200945330276a15d5f67f8f4.png
+- at: 2026-11-16T05:50:49.435810+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, ui
+- at: 2026-11-16T05:56:31.087493+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T05:56:37.706617+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
