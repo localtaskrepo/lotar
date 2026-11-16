@@ -4,11 +4,12 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-15T23:57:31.115443+00:00
-modified: 2026-11-16T00:39:02.455756+00:00
+modified: 2026-11-16T02:23:28.057917+00:00
 relationships:
   related:
   - DEV-580
   - DEV-587
+  - DEV-586
 comments:
 - date: 2026-11-16T00:25:25.999127+00:00
   author: automation
@@ -38,6 +39,29 @@ comments:
       result: not_run
       reason: no file changes
     next: No review or merge needed; acceptance met without changes
+- date: 2026-11-16T02:23:27.018470+00:00
+  author: claude
+  text: |-
+    Earlier job's evidence (it was cut off by the retry): no change, no commit. Agrees with Codex's Done.
+
+    - Close path is synchronous (`requestClose` → `closeTaskPanel`). Nothing reopens the panel, so the app has no stuck state.
+    - Repro with Chromium CPU throttled 8× and 30×: 52 open/close cycles, every close detached.
+    - 5 full runs while 5+ sessions ran `vue-tsc` and `cargo` (load 88–186): our test failed once, at line 113 (panel never opened), in a run where 11 tests failed on 30 s timeouts. The other runs had 5, 3, 0 and 1 failures, all in other tests.
+    - Cause is the stalled Mac, not the test. DEV-586's run lock stops two smoke runs from overlapping, but not other agents' lint and builds.
+  report:
+    checks:
+    - command: npm run test:smoke:quick:agent x5
+      result: failed
+      reason: our test failed 1 of 5 (run 2, line 113, with 10 other tests at load 186); other runs 5, 3, 0, 1 unrelated failures
+    - command: throttled repro (CPU 8x/30x, 52 open-close cycles)
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: no file changed
+    - command: npm test
+      result: not_run
+      reason: no file changed
+    next: None for this test. If load flakes keep coming, the owner could cap parallel agent jobs (DEV-586's lock covers only smoke runs)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39ef181f-635e-4413-8f81-6e8c4e45749d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afabaa510-0701-441e-b20d-840d1f764451
@@ -105,3 +129,13 @@ history:
   - field: tags
     old: health, fix-retried
     new: health
+- at: 2026-11-16T02:23:27.018470+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:23:28.057917+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-580","DEV-587"]}'
+    new: '{"related":["DEV-580","DEV-587","DEV-586"]}'

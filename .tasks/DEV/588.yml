@@ -1,11 +1,11 @@
 title: 'Flaky test: concurrent_comments_and_references_preserve_all_writes hits the 2 s storage lock wait under load'
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-15T21:39:19.080638+00:00
-modified: 2026-11-16T00:27:08.652404+00:00
+modified: 2026-11-16T02:31:47.536377+00:00
 relationships:
   depends_on:
   - DEV-520
@@ -15,6 +15,7 @@ relationships:
   - DEV-590
   - DEV-530
   - DEV-563
+  - DEV-601
 comments:
 - date: 2026-11-15T22:34:21.388495+00:00
   author: claude
@@ -103,11 +104,68 @@ comments:
 - date: 2026-11-15T23:29:42.398242+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-588 yet. DEV-588 waits for DEV-520.'
+- date: 2026-11-16T00:41:40.417813+00:00
+  author: automation
+  text: The fix agent's job job-20261116T004137.224Z-38 failed (lotar agent logs job-20261116T004137.224Z-38); @fix-codex retries it on branch agent/DEV-588.
+- date: 2026-11-16T00:42:31.797476+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T004224.424Z-44 failed again (lotar agent logs job-20261116T004224.424Z-44). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T02:31:47.536377+00:00
+  author: claude
+  text: |-
+    Unblocked: DEV-520 is on main, and the branch passes every check after the rebase.
+
+    - Rebased `1259a51f` onto main `40670683`: now `e2f9a9f5`, signed, only `dev60_shared_mutation_test.rs` changed, no lockfiles.
+    - The takeover test that blocked the merge (`dev510 …fails_when_t3_cant_list_its_threads`) passes now.
+    - `npm run lint:agent`, `npm run test:agent` (2230 Rust, 1548 UI) and smoke (405) all pass.
+  report:
+    commits:
+    - hash: e2f9a9f5
+      what: 1259a51f rebased onto main 40670683 (DEV-520), no conflicts
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2230 Rust, 1548 UI, incl. dev510 takeover tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    next: Merge agent lands e2f9a9f5
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b47411f-c7b8-4f19-ae40-3aaccb34473a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A12e16879-9537-4690-ab70-ab981f592496
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A708cae1d-c300-4233-931f-d3dfa027a5ca
 description: 'Found by claude in the DEV-520 merge, 2026-11-15: `npm run test:agent` failed once at load average ~100 with `concurrent comment: IoError(WouldBlock) Storage lock .../.task.lock is still busy after 2 seconds` (`crates/lotar-lib/tests/dev60_shared_mutation_test.rs:434`); six threads write one ticket and the lock wait is `DEFAULT_STORAGE_LOCK_WAIT` = 2 s (`crates/lotar-core/src/storage/safety.rs:68`). Check: the test passes repeatedly under full-suite load. Done: the test can''t time out on a busy machine (for example a longer lock wait in the test, or fewer writers holding the lock at once) and still checks that no write is lost.'
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: npm test:dev60_shared_mutation_test::concurrent_comments_and_references_preserve_all_writes
 history:
@@ -226,3 +284,55 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530"]}'
     new: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563"]}'
+- at: 2026-11-16T00:41:37.517574+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-16T00:41:37.811756+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A12e16879-9537-4690-ab70-ab981f592496
+- at: 2026-11-16T00:41:40.242646+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-16T00:41:40.417813+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:42:25.613550+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A708cae1d-c300-4233-931f-d3dfa027a5ca
+- at: 2026-11-16T00:42:31.738493+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T00:42:31.797476+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:31:14.055279+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563"]}'
+    new: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563","DEV-601"]}'
+- at: 2026-11-16T02:31:47.536377+00:00
+  actor: claude
+  changes:
+  - field: comment_added

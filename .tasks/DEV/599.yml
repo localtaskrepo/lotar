@@ -1,0 +1,77 @@
+title: The busy-ticket check calls t3 for every earlier thread on each queue retry
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:29:49.963817+00:00
+modified: 2026-11-16T02:33:41.244313+00:00
+relationships:
+  related:
+  - DEV-594
+  - DEV-279
+  - DEV-600
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb8bc697-69d5-449f-896d-839c94b42ef2
+description: |-
+  Found in the DEV-594 review (043e01bd). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs (start_job_with_tasks_dir_mode, line ~300) runs before the registry/active-job check and caches only a running thread. While a ticket's queue entry waits for a running non-T3 job (DEV-279), or its earlier threads have all ended, each 300 ms worker poll runs t3 thread show once per earlier thread (about 0.5 s each), with the global RUNNING_T3_THREADS mutex held, so other tickets' job starts wait behind those calls. Check: queue an entry for a ticket with several ended T3 threads while a codex job runs on it; count t3 processes.
+
+  Builds on DEV-594 (043e01bd, not on main yet): this branch carries it as its first commit.
+
+  ## Done when
+
+  - [ ] A start on a ticket with an active job (this process's registry, or another process's active-jobs file) fails with "already has an active job" before any `t3 thread show` runs.
+  - [ ] The answer "no earlier thread runs" is cached per ticket for `T3_THREAD_RECHECK` (30 s), like "a thread runs": a second start in that window runs no `t3`.
+  - [ ] A cached answer counts only while the ticket's earlier threads are the ones it was found for: a new earlier thread on the ticket (a job ended since) asks T3 Code again at once.
+  - [ ] `RUNNING_T3_THREADS` is not locked while `t3` runs; other tickets' starts don't wait for it.
+  - [ ] A `t3` call that fails counts as "not running", as before (no change).
+  - [ ] Test: in-process, after a T3 fix job on the ticket, a queued start, a start refused as busy, and a start after cancelling run `t3 thread show` once in all.
+  - [ ] DEV-594's test `no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread` still passes; `docs/help/agent.md` says what is cached.
+history:
+- at: 2026-11-16T02:29:51.877029+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594"]}'
+    new: '{"related":["DEV-594","DEV-279"]}'
+- at: 2026-11-16T02:29:52.558485+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T02:29:55.839136+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T02:29:59.174033+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb8bc697-69d5-449f-896d-839c94b42ef2
+- at: 2026-11-16T02:33:07.076539+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-279"]}'
+    new: '{"related":["DEV-594","DEV-279","DEV-600"]}'
+- at: 2026-11-16T02:33:41.244313+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found in the DEV-594 review (043e01bd). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs (start_job_with_tasks_dir_mode, line ~300) runs before the registry/active-job check and caches only a running thread. While a ticket''s queue entry waits for a running non-T3 job (DEV-279), or its earlier threads have all ended, each 300 ms worker poll runs t3 thread show once per earlier thread (about 0.5 s each), with the global RUNNING_T3_THREADS mutex held, so other tickets'' job starts wait behind those calls. Check: queue an entry for a ticket with several ended T3 threads while a codex job runs on it; count t3 processes. Done when the registry check comes first and an idle answer is cached for T3_THREAD_RECHECK too, without holding the lock during t3 calls.'
+    new: |-
+      Found in the DEV-594 review (043e01bd). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs (start_job_with_tasks_dir_mode, line ~300) runs before the registry/active-job check and caches only a running thread. While a ticket's queue entry waits for a running non-T3 job (DEV-279), or its earlier threads have all ended, each 300 ms worker poll runs t3 thread show once per earlier thread (about 0.5 s each), with the global RUNNING_T3_THREADS mutex held, so other tickets' job starts wait behind those calls. Check: queue an entry for a ticket with several ended T3 threads while a codex job runs on it; count t3 processes.
+
+      Builds on DEV-594 (043e01bd, not on main yet): this branch carries it as its first commit.
+
+      ## Done when
+
+      - [ ] A start on a ticket with an active job (this process's registry, or another process's active-jobs file) fails with "already has an active job" before any `t3 thread show` runs.
+      - [ ] The answer "no earlier thread runs" is cached per ticket for `T3_THREAD_RECHECK` (30 s), like "a thread runs": a second start in that window runs no `t3`.
+      - [ ] A cached answer counts only while the ticket's earlier threads are the ones it was found for: a new earlier thread on the ticket (a job ended since) asks T3 Code again at once.
+      - [ ] `RUNNING_T3_THREADS` is not locked while `t3` runs; other tickets' starts don't wait for it.
+      - [ ] A `t3` call that fails counts as "not running", as before (no change).
+      - [ ] Test: in-process, after a T3 fix job on the ticket, a queued start, a start refused as busy, and a start after cancelling run `t3 thread show` once in all.
+      - [ ] DEV-594's test `no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread` still passes; `docs/help/agent.md` says what is cached.

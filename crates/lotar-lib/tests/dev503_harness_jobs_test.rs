@@ -549,8 +549,8 @@ fn every_t3_thread_of_a_ticket_ends_on_and_starts_from_the_tickets_branch() {
 
 /// DEV-573: a fix thread whose job ran while another worktree appeared (a parallel job's), after a failed job's
 /// worktree kept `agent/TEST-1` checked out. LoTaR took that old worktree for the thread's, so the ticket's branch
-/// stayed behind and the review and merge missed the fix. T3 Code now names the thread's worktree, and the old one is
-/// detached so the ticket's branch can follow.
+/// stayed behind and the review and merge missed the fix. T3 Code now names the thread's worktree, and the old one, with
+/// changes of its own, is detached so the ticket's branch can follow.
 #[test]
 fn the_tickets_branch_follows_its_thread_past_a_parallel_and_a_stale_worktree() {
     // Outside the fixture: lotar doesn't find TEST-1 with a worktree nested in the repository.
@@ -561,15 +561,35 @@ fn the_tickets_branch_follows_its_thread_past_a_parallel_and_a_stale_worktree() 
     let root = fixtures.get_temp_path();
     let stale = elsewhere.path().join("stale");
     git(root, &["worktree", "add", "-q", "-b", "agent/TEST-1", stale.to_str().unwrap()]);
+    std::fs::write(stale.join("draft.txt"), "unsaved").unwrap();
     let start = rev(root, "HEAD");
     run_t3(&fixtures, "fix").success();
     let fix = rev(root, "t3/topic-0");
     assert_ne!(fix, start, "the fix thread committed");
     assert_eq!(rev(root, "agent/TEST-1"), fix, "the fix thread's commit is on the ticket's branch");
-    assert_eq!(rev(&stale, "HEAD"), start, "the failed job's worktree stays, detached at its commit");
+    assert_eq!(rev(&stale, "HEAD"), start, "the failed job's worktree with changes stays, detached at its commit");
     run_t3(&fixtures, "review").success();
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("agent/TEST-1 t3/topic-1 {fix}"), "the review starts from the fix: {log}");
+}
+
+/// DEV-595: a T3 Code thread started on `agent/TEST-1` keeps it checked out in its worktree, and a later thread of
+/// the ticket ends on a branch of its own. Moving the ticket's branch failed the job (`cannot force update the branch
+/// used by worktree`). A clean worktree now moves with the branch and stays on it, so a later thread on the branch
+/// still finds it there.
+#[test]
+fn the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out() {
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (fixtures, _env) = t3_harness("echo rework > rework.txt && git add rework.txt && git commit -qm TEST-1-rework");
+    let root = fixtures.get_temp_path();
+    let agent = elsewhere.path().join("agent-TEST-1");
+    git(root, &["worktree", "add", "-q", "-b", "agent/TEST-1", agent.to_str().unwrap()]);
+    run_t3(&fixtures, "rework").success();
+    let rework = rev(root, "t3/topic-0");
+    assert_eq!(rev(root, "agent/TEST-1"), rework, "the ticket's branch follows the thread");
+    let head = std::process::Command::new("git").args(["symbolic-ref", "--short", "HEAD"]).current_dir(&agent).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&head.stdout).trim(), "agent/TEST-1", "the worktree stays on the ticket's branch");
+    assert!(agent.join("rework.txt").is_file(), "and has the thread's work checked out");
 }
 
 /// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays

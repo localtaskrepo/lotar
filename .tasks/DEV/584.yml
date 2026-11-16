@@ -4,13 +4,14 @@ priority: High
 type: Feature
 reporter: claude
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-16T00:14:23.675196+00:00
+modified: 2026-11-16T02:33:15.545792+00:00
 relationships:
   depends_on:
   - standards:STD-133
   related:
   - DEV-585
   - DEV-594
+  - DEV-604
 comments:
 - date: 2026-11-16T00:14:23.282323+00:00
   author: claude
@@ -44,3 +45,9 @@ history:
   - field: relationships
     old: '{"depends_on":["standards:STD-133"]}'
     new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594"]}'
+- at: 2026-11-16T02:33:15.545792+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604"]}'

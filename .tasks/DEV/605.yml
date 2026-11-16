@@ -1,0 +1,28 @@
+title: Merge without an agent when the branch rebases cleanly and the checks pass
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:33:19.654711+00:00
+modified: 2026-11-16T02:33:21.180617+00:00
+relationships:
+  related:
+  - DEV-577
+description: |-
+  Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker. Owner 2026-11-15: this replaces his 2026-11-12 decision to run merges as a turn of the fix thread (standards docs/decisions/2026-11-11-merge-in-fix-thread.md); standards STD-124 (reviews and merges headless) is related.
+
+  ## Found
+  - 181 merge jobs in 40 hours ($45): 70 of 77 merge transcripts ran on Opus inside the fix thread's large context; 31 found nothing to merge and 34 failed.
+
+  ## Done when
+  - [ ] After a passed review lotar itself rebases the ticket's branch onto the main checkout's branch, runs the repo's commit gate and checks, fast-forwards and pushes as the merge agent's prompt says today (standards configs/lotar/automation.yml, "Review passed: merge"), reruns a health ticket's check, comments the outcome and closes the ticket.
+  - [ ] An agent starts only for what needs judgment: a conflict, a failed check, unpushed commits of others in the way, a refused push. It gets a fresh session with a handoff, on the merge profile's model.
+  - [ ] No merge without a passed review stays true (standards STD-133 step 1).
+  - [ ] Tests for the clean path (no agent started) and each hand-off.
+history:
+- at: 2026-11-16T02:33:21.180617+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -5,12 +5,14 @@ type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-15T23:48:39.768341+00:00
-modified: 2026-11-16T00:25:26.786986+00:00
+modified: 2026-11-16T02:30:11.384090+00:00
 relationships:
   related:
   - DEV-583
   - DEV-595
   - DEV-573
+  - DEV-580
+  - DEV-594
 comments:
 - date: 2026-11-16T00:08:55.974040+00:00
   author: claude
@@ -53,6 +55,39 @@ comments:
     - LOCA-317: the leftover is at `~/.t3/worktrees/local/agent-LOCA-317-2aa6ebb394abb948-detached-1`. Its reflog says it was detached from `agent/LOCA-317`. `agent/LOCA-317` is gone and `0a44163` is on `main` in `local`, so a new ticket branch made from main holds it.
     - Reran: `cargo nextest run -p lotar-lib dev596` passed, `cargo clippy -p lotar-lib --all-targets -D warnings` was clean, and `rustfmt --check` and `prettier --check` passed on the touched files. I didn't rerun full test, smoke or the LOCA-317 job check: the merge agent runs those.
     - No tickets filed.
+- date: 2026-11-16T02:10:47.000768+00:00
+  author: claude
+  text: |-
+    Merged: `b2bab7f9` is on `main`. Not pushed: older unpushed commits belong to work that waits for the owner.
+
+    - Rebased onto `0bff1e4d` with no conflicts and no lockfile changes. `3bd769d5` became `a322b20b`, then `main` fast-forwarded to it.
+    - `npm run lint:agent`, `npm run test:agent` and `npm run test:smoke:agent` (405 passed) all passed in the worktree.
+    - The main checkout had 18 changed `.tasks` files. I amended them into the merged commit, which made it `b2bab7f9`. The main checkout is clean now.
+    - No `automation.yml` or `config.yml` changed, so `lotar trust` wasn't needed.
+    - Push skipped. `git log @{u}..` starts with `ee916064` (STD-170, HelpNeeded: waits for the OK to install) and `a5e77173` (STD-165, HelpNeeded: waits for an answer in its thread). `0bff1e4d` (DEV-580) and `b2bab7f9` sit on top of those two, so they wait as well.
+    - Ticket check passed: a job on LOCA-317 made `~/.t3/worktrees/local/agent-LOCA-317-2aa6ebb394abb948` on `agent/LOCA-317` (`b880095`, which holds `0a44163`). Its merge job ran there and reported "nothing to merge". The leftover stays at `...-detached-1`, with nothing deleted.
+  report:
+    commits:
+    - hash: b2bab7f9
+      what: move a detached leftover worktree out of T3 Code's path before a new ticket branch's thread (rebased from 3bd769d5, .tasks folded in)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: LOCA-317 job starts a thread
+      result: passed
+      reason: merge job ran on agent/LOCA-317 at the T3 path
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config files changed
+    - command: git push
+      result: not_run
+      reason: oldest unpushed commit ee916064 (STD-170) waits for the owner's OK
+    next: Push main once STD-170 and STD-165 are finished
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49ceb12b-687e-4f8a-a475-6b5b32ba3259
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91d06f33-b818-4246-b05b-fd996cd0b911
@@ -127,3 +162,19 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-16T02:10:47.000768+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:10:48.430799+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-595","DEV-573"]}'
+    new: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580"]}'
+- at: 2026-11-16T02:30:11.384090+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580"]}'
+    new: '{"related":["DEV-583","DEV-595","DEV-573","DEV-580","DEV-594"]}'

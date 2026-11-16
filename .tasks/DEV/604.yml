@@ -1,0 +1,36 @@
+title: Commit-signing and full-disk failures pause the queue instead of failing every job; a signing failure retries only the commit
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:33:15.288469+00:00
+modified: 2026-11-16T02:33:17.878277+00:00
+relationships:
+  related:
+  - DEV-584
+  - DEV-574
+  - DEV-579
+description: |-
+  Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+  ## Found
+  - 41 jobs failed on commit signing ("Couldn't find key in agent", the opgate outage 2026-11-15 00:30-09:32) after doing their work, so the work was redone ($37). Disk-full failures (DEV-574, DEV-579) failed jobs the same way. Usage limits: 65 jobs ($31), which DEV-584 covers.
+
+  ## Done when
+  - [ ] A job whose output shows a commit-signing failure or a full disk (ENOSPC, "No space left on device") ends as paused with that reason, like DEV-584's usage-limit pause: no failure rule, no retry tag, no owner question.
+  - [ ] While such a pause is open, lotar starts no new job that would hit it (signing: any job that commits; disk: any job) and tries one job again on a schedule (default 10 minutes); the first success resumes the queue. list-jobs shows the pause and its reason.
+  - [ ] A signing failure keeps the worktree as it is: the resumed job first retries the commit (the staged work stays) instead of starting the agent's task again.
+  - [ ] Tests with a fake signer that fails and a fake disk-full error.
+history:
+- at: 2026-11-16T02:33:17.084663+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584"]}'
+    new: '{"related":["DEV-584","DEV-574","DEV-579"]}'
+- at: 2026-11-16T02:33:17.878277+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

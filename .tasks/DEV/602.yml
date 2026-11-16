@@ -1,0 +1,32 @@
+title: Review and merge jobs work on the branch that holds the fix's commits, not on a new t3/* branch
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:33:11.139637+00:00
+modified: 2026-11-16T02:33:12.803472+00:00
+relationships:
+  related:
+  - DEV-583
+  - DEV-594
+  - DEV-577
+  - DEV-595
+description: |-
+  Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+  ## Found
+  - 48 merges or reviews failed on branch mismatches in 40 hours (about $40-60 of the jobs, with the retries they caused). Merges fail with "t3/... is not merged into the main checkout's current branch"; reviews check stale branches.
+  - standards STD-133: the fix committed f9f71b7 on t3/harden-agent-plumbing; the review ran on t3/harden-agent-plumbing-1 and the merge on t3/harden-agent-plumbing-2, both behind main. Each found nothing, and the ticket went to Done with nothing on main (reopened 2026-11-15).
+  - DEV-583 makes the T3 prompt name the thread's real branch; it doesn't make the review and the merge start where the fix's commits are.
+
+  ## Done when
+  - [ ] A review or merge job of a ticket starts on (or from) the branch that holds the ticket's newest fix commit, whatever T3 Code named it; a job that finds no commits beyond main while another branch of the ticket has some fails with that branch's name instead of passing or finding nothing.
+  - [ ] A ticket can't go Done through the merge step when none of its fix commits reached the main checkout's branch.
+  - [ ] A test with the fake t3 reproduces the STD-133 case (fix on t3/x, review and merge threads on t3/x-1 and t3/x-2) and fails before the change.
+history:
+- at: 2026-11-16T02:33:12.803472+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

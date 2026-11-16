@@ -1,0 +1,72 @@
+title: 'A job killed during its worktree setup leaves no log or record: its ticket keeps the agent assignee and no job'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:27:02.391806+00:00
+modified: 2026-11-16T02:32:46.305458+00:00
+relationships:
+  related:
+  - DEV-593
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2505bb09-8e58-4b77-8936-77e599e8c58a
+description: |-
+  Found 2026-11-15 in the review of DEV-593.
+
+  DEV-593 saves a job's takeover record as the job starts (`mark_started` in `crates/lotar-lib/src/services/agent_job_service.rs`). Before that, `run_job` sets up the worktree (`prepare_worktree`, `continued_thread_worktree`, git calls that can take seconds) and only then writes the job log (`init_job_log`). A lotar process killed in that gap leaves neither a log nor a record: no worker or `lotar serve` can take the job over, `lotar agent status` doesn't know it, and the ticket keeps its agent assignee with no job, the same symptom as DEV-593.
+
+  ## Done when
+  - [ ] A job whose process is killed during its worktree setup is ended by the next worker or server in that tasks directory (failed, with a reason that names the setup), and its `job_failed` rules run once, also when a second worker or server starts later.
+  - [ ] This holds for every runner (t3, other session runners, `command`): a record saved during the setup wins over the runner's own takeover reason, and the takeover starts or resumes no session.
+  - [ ] The taken-over job gets a job log (written then, with what the record knows), so `lotar agent status` and `list-jobs` show it as failed with that reason, not unknown or missing.
+  - [ ] A worktree setup that fails without a kill (agent worktrees on) is logged too: its job log shows the failure.
+  - [ ] A cancel during the setup still ends the job as cancelled; its record is dropped as before.
+  - [ ] Builds on DEV-593 (`d7d4c99a`), which isn't on main yet.
+history:
+- at: 2026-11-16T02:27:02.950455+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-593"]}'
+- at: 2026-11-16T02:27:03.873575+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T02:27:05.265924+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T02:27:07.804338+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2505bb09-8e58-4b77-8936-77e599e8c58a
+- at: 2026-11-16T02:32:46.305458+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found 2026-11-15 in the review of DEV-593.
+
+      DEV-593 saves a job's takeover record as the job starts (`mark_started` in `crates/lotar-lib/src/services/agent_job_service.rs`). Before that, `run_job` sets up the worktree (`prepare_worktree`, `continued_thread_worktree`, git calls that can take seconds) and only then writes the job log (`init_job_log`). A lotar process killed in that gap leaves neither a log nor a record: no worker or `lotar serve` can take the job over, `lotar agent status` doesn't know it, and the ticket keeps its agent assignee with no job, the same symptom as DEV-593.
+
+      ## Done when
+      - [ ] A job whose process is killed during its worktree setup is ended by the next worker or server in that tasks directory (failed, with a reason that names the setup), and its `job_failed` rules run once.
+      - [ ] Or, if that isn't possible: the owner decides how such a ticket is unstuck.
+    new: |-
+      Found 2026-11-15 in the review of DEV-593.
+
+      DEV-593 saves a job's takeover record as the job starts (`mark_started` in `crates/lotar-lib/src/services/agent_job_service.rs`). Before that, `run_job` sets up the worktree (`prepare_worktree`, `continued_thread_worktree`, git calls that can take seconds) and only then writes the job log (`init_job_log`). A lotar process killed in that gap leaves neither a log nor a record: no worker or `lotar serve` can take the job over, `lotar agent status` doesn't know it, and the ticket keeps its agent assignee with no job, the same symptom as DEV-593.
+
+      ## Done when
+      - [ ] A job whose process is killed during its worktree setup is ended by the next worker or server in that tasks directory (failed, with a reason that names the setup), and its `job_failed` rules run once, also when a second worker or server starts later.
+      - [ ] This holds for every runner (t3, other session runners, `command`): a record saved during the setup wins over the runner's own takeover reason, and the takeover starts or resumes no session.
+      - [ ] The taken-over job gets a job log (written then, with what the record knows), so `lotar agent status` and `list-jobs` show it as failed with that reason, not unknown or missing.
+      - [ ] A worktree setup that fails without a kill (agent worktrees on) is logged too: its job log shows the failure.
+      - [ ] A cancel during the setup still ends the job as cancelled; its record is dropped as before.
+      - [ ] Builds on DEV-593 (`d7d4c99a`), which isn't on main yet.

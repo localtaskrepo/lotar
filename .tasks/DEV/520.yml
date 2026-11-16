@@ -1,11 +1,11 @@
 title: An agent job hangs when its session's event stream lags and drops the turn's end
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-16T00:39:20.518221+00:00
+modified: 2026-11-16T02:30:11.368831+00:00
 relationships:
   blocks:
   - DEV-588
@@ -30,6 +30,7 @@ relationships:
   - DEV-590
   - DEV-593
   - DEV-580
+  - DEV-594
 comments:
 - date: 2026-11-14T06:11:36.177470+00:00
   author: claude
@@ -489,9 +490,6 @@ releases:
 description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lotar-lib/src/services/agent_job_service.rs) reads harnessmux''s broadcast channel (capacity 1024, harnessmux 0.1.1 session.rs:127) and on RecvError::Lagged just continues. MessageDelta/ThoughtDelta events come per chunk and lotar''s loop reads the cancel file and takes the registry lock per event, so a chatty turn can lag; if the dropped events include TurnFinished/TurnFailed the loop never sees the turn end and the job runs until someone cancels it. Check: a unit test that feeds more than 1024 events before the turn''s end and expects the job to end. Done: on lag, the missed events (seq after the last one seen) are replayed from the session''s event log (Status.events) through the same handling, the job ends with the right exit code, and the test passes.'
 tags:
 - health
-- review-returned
-- merge-retried
-- fix-retried
 custom_fields:
   finding: review:drive-session-lag
 history:
@@ -1140,3 +1138,18 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-16T00:40:06.447863+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned, merge-retried, fix-retried
+    new: health
+- at: 2026-11-16T02:30:11.368831+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-588","DEV-563"],"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586","DEV-590","DEV-593","DEV-580"]}'
+    new: '{"blocks":["DEV-588","DEV-563"],"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530","DEV-466","DEV-510","DEV-560","DEV-588","DEV-586","DEV-590","DEV-593","DEV-580","DEV-594"]}'

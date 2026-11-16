@@ -1,0 +1,26 @@
+title: A rework, review or merge round after more than 55 idle minutes starts a fresh session with a handoff
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:33:13.636+00:00
+modified: 2026-11-16T02:33:14.644238+00:00
+description: |-
+  Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+  ## Found
+  - 51 job calls rewrote the whole cache of a thread of 80k+ tokens because the thread resumed after its 1-hour prompt cache expired ($73 in 40 hours). Cache writes are 46% of Claude spend; a 1-hour cache write costs twice the input price.
+  - 1,006 job calls ran with over 200k tokens of context ($127).
+
+  ## Done when
+  - [ ] A rule's agent with session: continue (rework after a blocking review, a review or merge in the fix thread) starts a fresh session instead when the thread's last job ended more than a configurable time ago (default 55 minutes), and its prompt carries a short handoff: the ticket, the branch and newest commit, the last fix and review comments.
+  - [ ] list-jobs or the job log says which happened and why.
+  - [ ] Tests for both cases (resumed within the time, fresh after it).
+  - Related: standards' ticket for auto-compacting threads at 200k (same analysis).
+history:
+- at: 2026-11-16T02:33:14.644238+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

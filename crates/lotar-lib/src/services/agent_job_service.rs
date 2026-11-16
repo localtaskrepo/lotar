@@ -1564,9 +1564,10 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
 /// the thread's branch lacks and the main checkout doesn't have, which
 /// moving it would drop. Unless it is still at `started_from`, the commit
 /// the thread started from: then the thread rewrote that commit (an amend).
-/// A worktree of an earlier thread (one whose job failed) that still has
-/// `ticket_branch` checked out is detached at its commit first, as T3 Code
-/// leaves one when a later thread takes over the branch (DEV-573).
+/// A worktree that still has `ticket_branch` checked out (an earlier
+/// thread's, which T3 Code leaves when a later thread takes over the
+/// branch, DEV-573) moves with it when clean, else is detached at its
+/// commit first.
 fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_branch: &str, started_from: Option<&str>) -> Result<bool, String> {
     let git_output = |args: &[&str]| -> Result<String, String> {
         let output = git_command(repo_root).args(args).output().map_err(|err| format!("git {}: {err}", args.join(" ")))?;
@@ -1587,14 +1588,21 @@ fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_b
             return Err(format!("it has commits that {thread_branch} lacks"));
         }
         let worktrees = linked_worktrees(repo_root).map_err(|err| err.to_string())?;
-        for (path, _) in worktrees.iter().filter(|(_, on)| on.as_deref() == Some(ticket_branch)) {
-            let detach = git_command(path)
-                .args(["checkout", "--quiet", "--detach"])
-                .output()
-                .map_err(|err| format!("git checkout --detach in {}: {err}", path.display()))?;
-            if !detach.status.success() {
-                return Err(format!("git checkout --detach in {} failed: {}", path.display(), String::from_utf8_lossy(&detach.stderr).trim()));
+        if let Some((path, _)) = worktrees.iter().find(|(_, on)| on.as_deref() == Some(ticket_branch)) {
+            let in_worktree = |args: &[&str]| -> Result<String, String> {
+                let output = git_command(path).args(args).output().map_err(|err| format!("git {} in {}: {err}", args.join(" "), path.display()))?;
+                if !output.status.success() {
+                    return Err(format!("git {} in {} failed: {}", args.join(" "), path.display(), String::from_utf8_lossy(&output.stderr).trim()));
+                }
+                Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+            };
+            // A clean worktree moves with the branch and keeps it checked
+            // out, so a later thread on the branch finds it there (DEV-595).
+            if in_worktree(&["status", "--porcelain"])?.is_empty() {
+                in_worktree(&["reset", "--quiet", "--keep", &tip])?;
+                return Ok(true);
             }
+            in_worktree(&["checkout", "--quiet", "--detach"])?;
         }
     }
     git_output(&["branch", "--force", ticket_branch, &tip])?;

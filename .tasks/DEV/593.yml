@@ -1,16 +1,17 @@
 title: 'Jobs left in status unknown by a killed process are never taken over: their tickets stall with an agent assignee'
-status: Merging
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T22:38:45.433554+00:00
-modified: 2026-11-16T00:27:08.652779+00:00
+modified: 2026-11-16T02:27:31.287117+00:00
 relationships:
   related:
   - DEV-520
   - DEV-590
   - DEV-563
+  - DEV-598
 comments:
 - date: 2026-11-15T23:05:51.463565+00:00
   author: claude
@@ -89,10 +90,62 @@ comments:
 - date: 2026-11-16T00:26:18.747171+00:00
   author: automation
   text: The review job job-20261116T002557.781Z-29 failed (lotar agent logs job-20261116T002557.781Z-29); the merge goes ahead without a review.
+- date: 2026-11-16T00:41:20.048631+00:00
+  author: automation
+  text: The merge agent's job job-20261116T004114.219Z-36 failed (lotar agent logs job-20261116T004114.219Z-36); the fix agent retries it on branch t3/9345ff07.
+- date: 2026-11-16T00:42:31.594917+00:00
+  author: automation
+  text: The fix agent's job job-20261116T004223.855Z-43 failed (lotar agent logs job-20261116T004223.855Z-43); @fix-codex retries it on branch t3/81a4c186.
+- date: 2026-11-16T00:43:22.041550+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T004317.286Z-49 failed again (lotar agent logs job-20261116T004317.286Z-49). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T02:27:31.287117+00:00
+  author: claude
+  text: |-
+    Review: passed. The first review's finding is fixed: the record is saved before `agent_job_started` is logged.
+
+    - Read: `89b0ebff` (3 files, diff against `main` `40670683`), the ticket and all its comments, the first review, DEV-520/DEV-590, `AGENTS.md`. `docs/decisions` doesn't exist.
+    - `mark_started` (`agent_job_service.rs:4226`) saves the record before it logs the start, inside the same registry update as the cancel check. No early return between it and the second `register` (`:2787`), and `RunningJobSlot` drops the record on every exit.
+    - A takeover of a job with no session fails it with the documented reason and starts no session (`:1679`). The command runner keeps its own message.
+    - Side effect, checked and fine: the record now exists while `job_started` rules run. Status or assignee changes from those rules stay direct (`is_job_lifecycle`). Changes from other processes in that window now wait for the job's outcome, as they already did while the runner ran.
+    - Rerun: `RUSTC_WRAPPER= cargo build`, then `RUSTC_WRAPPER= cargo nextest run` on the 13 takeover/orphan tests, both new unit tests and `dev510 …killed_before_its_session_started_fails_once_taken_over` included. All 13 passed.
+    - Failed before the fix: not run (that needs a second build). From the code: on `main` the record was saved after the `job_started` rules, so the integration test's `orphans.len() == 1` can't hold there.
+    - Not rerun: `npm run lint`, `npm test`, `npm run smoke`. The fix agent reported them passed for `89b0ebff`.
+    - Minor, filed: DEV-598. A kill during worktree setup, before the job log and record exist, still leaves the ticket with an agent assignee. That's outside this ticket's "Done when".
+    - No UI changes. No stray files, no second branch.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7a13f60-c8a7-480f-9a43-18b65593cff9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A099de4f8-9b37-463b-906a-cd98e6116716
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6c05feb-0c13-4bb5-b76b-d949fcebec74
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A411fe491-6294-4ea9-a830-6190b0ea29c4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d8303cb-7c3a-400a-b103-d506cbf72b4a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A121e8ec4-974c-49f8-902d-8760d5c70955
 description: |-
   Jobs whose process died right after `agent_job_started` stay in status `unknown` and are never taken over, so their tickets sit InProgress with an agent assignee and no job. docs/help/agent.md says the queue worker for the same tasks directory, or the next `lotar serve`, takes such a job over and ends it. Found 2026-11-15 in local.
 
@@ -110,6 +163,8 @@ description: |-
   - [ ] `lotar agent status` and `list-jobs` show such a job as failed with that reason, not `unknown`.
 tags:
 - review-returned
+- merge-retried
+- fix-retried
 history:
 - at: 2026-11-15T22:38:45.899280+00:00
   actor: claude
@@ -213,3 +268,73 @@ history:
   - field: relationships
     old: '{"related":["DEV-520","DEV-590"]}'
     new: '{"related":["DEV-520","DEV-590","DEV-563"]}'
+- at: 2026-11-16T00:41:15.115191+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A411fe491-6294-4ea9-a830-6190b0ea29c4
+- at: 2026-11-16T00:41:19.604261+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: review-returned
+    new: review-returned, merge-retried
+- at: 2026-11-16T00:41:20.048631+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:42:24.007554+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T00:42:24.946078+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d8303cb-7c3a-400a-b103-d506cbf72b4a
+- at: 2026-11-16T00:42:31.418930+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: review-returned, merge-retried
+    new: review-returned, merge-retried, fix-retried
+- at: 2026-11-16T00:42:31.594917+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:43:18.087382+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A121e8ec4-974c-49f8-902d-8760d5c70955
+- at: 2026-11-16T00:43:21.986260+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T00:43:22.041550+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:27:02.949774+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-590","DEV-563"]}'
+    new: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598"]}'
+- at: 2026-11-16T02:27:31.287117+00:00
+  actor: claude
+  changes:
+  - field: comment_added

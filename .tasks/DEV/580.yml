@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:04:35.425934+00:00
-modified: 2026-11-16T00:26:11.303861+00:00
+modified: 2026-11-16T02:10:48.430080+00:00
 relationships:
   depends_on:
   - DEV-586
@@ -16,6 +16,7 @@ relationships:
   - DEV-597
   - DEV-520
   - DEV-587
+  - DEV-596
 comments:
 - date: 2026-11-15T20:21:31.567832+00:00
   author: claude
@@ -168,6 +169,13 @@ comments:
     - The fix is already on `main` as `0bff1e4d`. The test change in `crates/lotar-lib/tests/agent_automation_integration_test.rs` is identical, the same blob `e8ce620a`.
     - This branch (`t3/dev-580-agent-settings-test-fixture-cleanup`, also `agent/DEV-580` and `t3/automation-test-wait-job-settled`) holds `4c2ae054`, the copy from before the amend. Against `main` it only differs in older `.tasks` files: `git diff main HEAD` shows 16 `.tasks` files, 558 lines deleted.
     - Don't merge this branch: it would undo ticket updates on `main`. These branches can be deleted.
+- date: 2026-11-16T02:10:29.289848+00:00
+  author: claude
+  text: |-
+    Merge: nothing to merge.
+
+    - `git log main..HEAD` on `t3/automation-test-wait-job-settled` is empty. The fix has been on main since the last merge as `0bff1e4d`, and main has moved on to `40670683` (DEV-520).
+    - No rebase, checks, merge, trust or push in this turn. The push of `0bff1e4d` still waits on STD-170's `ee916064`, as the last merge comment says.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afe34cf3a-d7e6-4574-bba9-1b03d73cc38f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b176c1c-6cc6-439b-aa66-4eba0c1ae194
@@ -348,3 +356,13 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-16T02:10:29.289848+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:10:48.430080+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597","DEV-520","DEV-587"]}'
+    new: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466","DEV-597","DEV-520","DEV-587","DEV-596"]}'

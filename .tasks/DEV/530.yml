@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-16T00:30:38.454356+00:00
+modified: 2026-11-16T00:41:46.266559+00:00
 relationships:
   related:
   - DEV-351
@@ -594,6 +594,35 @@ comments:
       - Review read the current ticket branch, `agent/DEV-530` at `fb666856`; this is a new code finding, not the earlier stale-checkout or sccache failure.
       - The previous claim-recovery finding was removed; the subsequent checks all passed at 23:38Z. Latest review: an agent-assigned Blocked ticket without a parked job is excluded by the new rule and never resumes. Preserve its fallback continuation; suppress the rule only when a parked job actually resumes. Add regression coverage and align docs.
       - No `retry-fix` or `retry-fable` tag was present; this is the first tracked retry for this finding. If it recurs, use the prescribed Fable escalation rather than repeating the same retry.
+- date: 2026-11-16T00:41:46.266559+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T004136.749Z-37 failed again (lotar agent logs job-20261116T004136.749Z-37). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -605,6 +634,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea5d4a1a-1600-4200-809f-19b48ccdd0aa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1bf66bfc-ffd1-44f4-ac29-404c40d16033
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af46a62c4-7f4a-428e-abf0-9925649bab5d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a6ef49-966e-4533-9e37-826362e7f5cc
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -1416,3 +1446,27 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-16T00:41:36.809360+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-16T00:41:37.599856+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a6ef49-966e-4533-9e37-826362e7f5cc
+- at: 2026-11-16T00:41:46.081766+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-16T00:41:46.266559+00:00
+  actor: automation
+  changes:
+  - field: comment_added

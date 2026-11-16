@@ -1,0 +1,113 @@
+title: A T3 thread that waits for an answer holds every later job on its ticket without saying so
+status: HelpNeeded
+priority: Medium
+type: Bug
+reporter: claude
+assignee: mallox
+created: 2026-11-16T02:29:53.068923+00:00
+modified: 2026-11-16T02:36:20.305255+00:00
+relationships:
+  related:
+  - DEV-594
+  - DEV-599
+  - DEV-585
+comments:
+- date: 2026-11-16T02:33:15.242181+00:00
+  author: claude
+  text: |-
+    Question: should a T3 thread that waits for an answer hold later jobs on its ticket?
+
+    - Facts: T3 shows such a thread as `status: running`, `pendingRequestCount: 1` (harnessmux 0.1.9 `RunState`). Today's check (DEV-594 `043e01bd`, not on main yet) holds every later job until it's answered, silently.
+    - **A (my pick): it holds them**, and the queue entry comments once: "waits: thread <link> of job <job> waits for an answer — answer it there". Safe: a later answer can't start a turn beside the new job (the DEV-585 incident).
+    - **B: it doesn't hold them**: the retry/reassignment starts right away. Risk: if you later answer the old thread, it runs beside the new job on another branch.
+    - Either way: `activeRunId` counts as running, and a held entry comments its reason once.
+
+    Answer A or B in this thread.
+- date: 2026-11-16T02:36:20.305255+00:00
+  author: claude
+  text: |-
+    Plan for after the answer: build on `agent/DEV-599`, not main.
+
+    - DEV-599 branch = DEV-594 `043e01bd` cherry-picked + its own commit.
+    - `running_t3_thread` keeps `-> Option<(String, String)>`; cache is now `T3_THREAD_ANSWERS` (caches idle answers too, lock not held during `t3`).
+    - The running test is one `find_map` closure (`status == "running"`): the `activeRunId` / `pendingRequestCount` check goes there.
+    - Registry check now runs before `running_t3_thread`.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ad4dd44-6ea0-4933-aaad-8f8d816b2933
+description: |-
+  Found in the DEV-594 review (043e01bd). T3 Code reports a thread that waits for an answer as status running with pendingRequestCount > 0 (harnessmux 0.1.9 backend/t3.rs RunState). running_t3_thread treats that as running, so after a handback the owner's next job on the ticket (a retry option, a reassignment) waits in the queue until the T3 question is answered, and no comment says why. It also ignores activeRunId, which harnessmux counts as running. Check: leave a thread waiting for an answer, assign the ticket to another profile, see the queue entry wait silently.
+
+  Builds on DEV-594's `running_t3_thread` (`043e01bd`, not on main yet) and touches the same function as DEV-599.
+
+  ## Done when
+  - [ ] The owner decided whether a thread that waits for an answer (`pendingRequestCount > 0`) holds later jobs on its ticket ("Done when the owner decides whether such a thread blocks"), and the check follows that decision.
+  - [ ] A thread counts as running when its `status` is `running` or its `activeRunId` is not null, as harnessmux `RunState` says; either one is enough. A waiting thread's `pendingRequestCount` wins over both, as the owner decides.
+  - [ ] A queue entry held by such a thread comments on the ticket once, naming the thread (link) and the job and what lets it go on (the thread ends; for a waiting thread: answer it in T3 Code). Rechecks every 30 s add no comment; the entry's start adds none.
+  - [ ] `lotar agent run --wait` fails with a message that says whether the thread runs or waits for an answer.
+  - [ ] A `t3 thread show` that fails or returns no status doesn't hold the ticket (as today) and comments nothing.
+  - [ ] Tests in `dev503_harness_jobs_test.rs`: `activeRunId` set with a non-running status holds the job; a waiting thread does what the owner decided; the comment is written once over several queue retries. Each fails before the change.
+  - [ ] `docs/help/agent.md` (T3 section, queue) says the same.
+history:
+- at: 2026-11-16T02:29:55.070576+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T02:29:56.701533+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T02:29:59.597139+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ad4dd44-6ea0-4933-aaad-8f8d816b2933
+- at: 2026-11-16T02:33:05.989243+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found in the DEV-594 review (043e01bd). T3 Code reports a thread that waits for an answer as status running with pendingRequestCount > 0 (harnessmux 0.1.9 backend/t3.rs RunState). running_t3_thread treats that as running, so after a handback the owner''s next job on the ticket (a retry option, a reassignment) waits in the queue until the T3 question is answered, and no comment says why. It also ignores activeRunId, which harnessmux counts as running. Check: leave a thread waiting for an answer, assign the ticket to another profile, see the queue entry wait silently. Done when the owner decides whether such a thread blocks, a waiting entry comments its reason once, and running matches harnessmux (status running or activeRunId).'
+    new: |-
+      Found in the DEV-594 review (043e01bd). T3 Code reports a thread that waits for an answer as status running with pendingRequestCount > 0 (harnessmux 0.1.9 backend/t3.rs RunState). running_t3_thread treats that as running, so after a handback the owner's next job on the ticket (a retry option, a reassignment) waits in the queue until the T3 question is answered, and no comment says why. It also ignores activeRunId, which harnessmux counts as running. Check: leave a thread waiting for an answer, assign the ticket to another profile, see the queue entry wait silently.
+
+      Builds on DEV-594's `running_t3_thread` (`043e01bd`, not on main yet) and touches the same function as DEV-599.
+
+      ## Done when
+      - [ ] The owner decided whether a thread that waits for an answer (`pendingRequestCount > 0`) holds later jobs on its ticket ("Done when the owner decides whether such a thread blocks"), and the check follows that decision.
+      - [ ] A thread counts as running when its `status` is `running` or its `activeRunId` is not null, as harnessmux `RunState` says; either one is enough. A waiting thread's `pendingRequestCount` wins over both, as the owner decides.
+      - [ ] A queue entry held by such a thread comments on the ticket once, naming the thread (link) and the job and what lets it go on (the thread ends; for a waiting thread: answer it in T3 Code). Rechecks every 30 s add no comment; the entry's start adds none.
+      - [ ] `lotar agent run --wait` fails with a message that says whether the thread runs or waits for an answer.
+      - [ ] A `t3 thread show` that fails or returns no status doesn't hold the ticket (as today) and comments nothing.
+      - [ ] Tests in `dev503_harness_jobs_test.rs`: `activeRunId` set with a non-running status holds the job; a waiting thread does what the owner decided; the comment is written once over several queue retries. Each fails before the change.
+      - [ ] `docs/help/agent.md` (T3 section, queue) says the same.
+- at: 2026-11-16T02:33:07.077341+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594"]}'
+    new: '{"related":["DEV-594","DEV-599"]}'
+- at: 2026-11-16T02:33:15.242181+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:33:15.917292+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585"]}'
+- at: 2026-11-16T02:33:32.807828+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-16T02:36:20.305255+00:00
+  actor: claude
+  changes:
+  - field: comment_added

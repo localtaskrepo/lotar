@@ -1,17 +1,23 @@
 title: Two T3 fix jobs on DEV-585 ran in parallel on different branches; the reviewer saw a commit the handoff didn't report
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T23:19:28.800463+00:00
-modified: 2026-11-16T00:29:02.706732+00:00
+modified: 2026-11-16T02:33:11.318636+00:00
 relationships:
   related:
   - DEV-573
   - DEV-581
   - DEV-585
   - DEV-584
+  - DEV-599
+  - DEV-600
+  - DEV-503
+  - DEV-520
+  - DEV-596
+  - DEV-602
 comments:
 - date: 2026-11-16T00:14:57.744466+00:00
   author: claude
@@ -54,13 +60,107 @@ comments:
     - Review job failed; automation explicitly advanced to merge without a review.
     - Required lint, full tests and smoke are rebuilding with `RUSTC_WRAPPER=` after sccache permission errors persisted on retry.
     - Push will wait: the oldest unpushed commit is `ee916064` (STD-170), whose owner decision is still `HelpNeeded`.
+- date: 2026-11-16T00:40:59.521305+00:00
+  author: automation
+  text: The merge agent's job job-20261116T002631.924Z-33 failed (lotar agent logs job-20261116T002631.924Z-33); the fix agent retries it on branch t3/prevent-parallel-fix-jobs-1.
+- date: 2026-11-16T00:42:05.741932+00:00
+  author: automation
+  text: The fix agent's job job-20261116T004158.846Z-40 failed (lotar agent logs job-20261116T004158.846Z-40); @fix-codex retries it on branch t3/e4b9051b.
+- date: 2026-11-16T00:42:57.217913+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T004250.411Z-46 failed again (lotar agent logs job-20261116T004250.411Z-46). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T02:22:13.698051+00:00
+  author: claude
+  text: |-
+    Retry: nothing new to fix; the fix is still `6d352640`, ready to merge.
+
+    - The merge job stopped at a Codex usage limit (`job-…002631.924Z-33`), mid-way through its checks. The two fix retries after it (`-40`, `-46`) hit rate limits 5 s after they started.
+    - `6d352640` is `043e01bd`, rebased onto `3643595f`. Main is now `40670683`, which is `3643595f` amended with `.tasks` changes only, so the next rebase is clean.
+    - This thread runs on `t3/e4b9051b` and not on `agent/DEV-594`. That's expected: T3 Code puts each thread on a branch of its own, and lotar then points `agent/DEV-594` at that branch (`follow_thread_branch`). Both are at `6d352640`.
+    - Regression test `no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread` passes on `6d352640`.
+    - Still not covered: [DEV-584](https://lotar.pyxzl.net/task/DEV-584), retries during a usage-limit pause.
+  report:
+    commits:
+    - hash: 6d352640
+      what: no job on a ticket starts while T3 Code still runs an earlier job's thread on it (043e01bd rebased by the merge agent)
+    checks:
+    - command: npm run test:rust:agent -- -E test(/no_job_starts_while/)
+      result: passed
+      reason: RUSTC_WRAPPER= (sccache blocked)
+    - command: npm run lint:agent
+      result: not_run
+      reason: passed in the merge job on the same commit; no code change since
+    - command: npm run test:agent
+      result: not_run
+      reason: Rust suite passed on 19b574c5; the merge job ran out of usage before it finished on 6d352640, the merge reruns it
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: the merge job's retry on 6d352640 was cut off; the merge reruns it
+    next: 'Merge: rebase onto main 40670683 (only .tasks differ) and run the checks'
+- date: 2026-11-16T02:30:09.319041+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix does what "Done when" asks; two minor findings filed.
+
+    - Read: diff `main...043e01bd` (`agent_job_service.rs`, `dev503_harness_jobs_test.rs`, `docs/help/agent.md`), the ticket and its comments, related DEV-573/581/584/585, AGENTS.md, and main's recent commits to these files (DEV-520 `40670683`, DEV-596 `b2bab7f9`, DEV-581 `e5762570`).
+    - Covers the DEV-585 incident: the second job started at 21:55 while the resumed thread was `running` (21:10–22:07). Now the queue holds the entry (`is_ticket_busy` matches "already has an active job"), and production automation queues rather than starting directly, so "Answered in the thread" still works.
+    - Usage-limit pause (thread reads `failed`) is left to [DEV-584](https://lotar.pyxzl.net/task/DEV-584), and the docs say so. Fine.
+    - Test: the new test asserts the second start fails, which can't pass without the check. Reran the DEV-503 suite: 24/24 passed.
+    - No second fix: `6d352640` on `agent/DEV-594` and the `t3/e4b9051b` and `t3/prevent-parallel-fix-jobs-1` branches is the same patch (`git range-diff` shows `=`), rebased onto a stale DEV-520 commit `3643595f`, not main's `40670683`. Merge from `043e01bd`.
+    - Minor, filed: [DEV-599](https://lotar.pyxzl.net/task/DEV-599) calls `t3` once per earlier thread on every 300 ms queue retry, with a global lock held, because only a running result is cached. [DEV-600](https://lotar.pyxzl.net/task/DEV-600): a thread waiting for an answer reports `running`, so it holds later jobs without a comment, and the check ignores `activeRunId`.
+    - I didn't touch the ticket's status or assignee (HelpNeeded, mallox, retry question pending).
+  report:
+    checks:
+    - command: cargo nextest run --workspace -E test(/dev503/)
+      result: passed
+      reason: 24/24, incl. no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread
+    - command: git merge-tree main HEAD
+      result: passed
+      reason: merges cleanly onto 40670683
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: fix agent ran them; review reran the targeted suite only
+    - command: ui-review
+      result: not_run
+      reason: no pages, components or styles changed
+    next: 'Merge: rebase 043e01bd onto main (agent/DEV-594''s 6d352640 is the same patch on a stale DEV-520 commit 3643595f)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7b10056-3c44-41c2-8994-c511e6ecbf64
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add03900f-234f-44e1-ad34-1daae32380ea
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A602c1935-1c47-4eb4-8044-8f53c6c4d026
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6ec441e3-9898-46de-85b0-87558688fd74
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9b4a243-7f8e-4e48-904c-c454ca5b0f24
 description: 'Found 2026-11-15 on DEV-585: thread worktree t3-feedd691 ran on t3/fix-flaky-watcher-mcp-event-tests (d6dbec07) while its prompt said agent/DEV-585; a second fix job committed 1011487e on agent/DEV-585 (worktree agent-DEV-585-3db9...). The review blocked on the mismatch. Check: one fix job per ticket at a time, and a T3 job''s worktree is on agent/<ID> as its prompt says (see DEV-573, DEV-581). Done when a second fix job can''t start while one runs and the job''s branch matches its prompt.'
 tags:
 - health
+- merge-retried
+- fix-retried
 custom_fields:
   finding: agent-jobs:parallel-fix-branches
 history:
@@ -132,3 +232,90 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-16T00:40:59.245240+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-16T00:40:59.521305+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:41:58.943771+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T00:41:59.757189+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6ec441e3-9898-46de-85b0-87558688fd74
+- at: 2026-11-16T00:42:05.409450+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health, merge-retried
+    new: health, merge-retried, fix-retried
+- at: 2026-11-16T00:42:05.741932+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:42:51.358302+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9b4a243-7f8e-4e48-904c-c454ca5b0f24
+- at: 2026-11-16T00:42:57.157958+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T00:42:57.217913+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:22:13.698051+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:29:50.296960+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584"]}'
+    new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599"]}'
+- at: 2026-11-16T02:29:53.256996+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599"]}'
+    new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600"]}'
+- at: 2026-11-16T02:30:09.319041+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:30:11.383083+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600"]}'
+    new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596"]}'
+- at: 2026-11-16T02:33:11.318636+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596"]}'
+    new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596","DEV-602"]}'

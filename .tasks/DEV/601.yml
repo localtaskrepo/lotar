@@ -1,0 +1,42 @@
+title: 'Flaky test: concurrent_transactions_serialize_on_the_coordinated_locks hits the 2 s sprints lock wait under load'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T02:31:12.608516+00:00
+modified: 2026-11-16T02:36:32.641828+00:00
+relationships:
+  related:
+  - DEV-588
+  - DEV-595
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57f24ebc-0cf4-4840-8c2b-03b2b0e05502
+description: 'Found by claude in the DEV-595 merge, 2026-11-15: `npm run test:agent` failed once with `begin under contention: IoError(WouldBlock) Storage lock .../.tasks/@sprints/.sprints.lock is still busy after 2 seconds` (`crates/lotar-core/src/storage/transaction.rs:1196`); it passed alone right after. Same kind as DEV-588 (2 s `DEFAULT_STORAGE_LOCK_WAIT`). Check: the test passes repeatedly under full-suite load. Done: the test cannot time out on a busy machine and still checks that the transactions serialize.'
+tags:
+- health
+custom_fields:
+  finding: nextest:concurrent_transactions_serialize_on_the_coordinated_locks
+history:
+- at: 2026-11-16T02:31:14.058430+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-588","DEV-595"]}'
+- at: 2026-11-16T02:31:16.545170+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T02:36:25.352747+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T02:36:32.641828+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57f24ebc-0cf4-4840-8c2b-03b2b0e05502

@@ -1,11 +1,11 @@
 title: After a server restart, a non-empty agent queue stays idle until a new job is enqueued
-status: Merging
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-16T00:25:57.487812+00:00
+modified: 2026-11-16T02:11:00.746883+00:00
 relationships:
   related:
   - DEV-524
@@ -90,10 +90,76 @@ comments:
 - date: 2026-11-16T00:25:57.487812+00:00
   author: automation
   text: The review job job-20261116T002211.471Z-27 failed (lotar agent logs job-20261116T002211.471Z-27); the merge goes ahead without a review.
+- date: 2026-11-16T00:41:19.760450+00:00
+  author: automation
+  text: The merge agent's job job-20261116T004114.013Z-35 failed (lotar agent logs job-20261116T004114.013Z-35); the fix agent retries it on branch t3/6a0c93c5.
+- date: 2026-11-16T00:42:05.781181+00:00
+  author: automation
+  text: The fix agent's job job-20261116T004159.353Z-41 failed (lotar agent logs job-20261116T004159.353Z-41); @fix-codex retries it on branch t3/492c072e.
+- date: 2026-11-16T00:42:57.455653+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T004250.883Z-47 failed again (lotar agent logs job-20261116T004250.883Z-47). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T02:11:00.746883+00:00
+  author: claude
+  text: |-
+    Review: passed
+
+    - Read: commit `ed1eb876` (`git diff main...HEAD`: 7 files, no stray files, no `.tasks` edits), the ticket's "Done when", the fix and rework comments, Codex's blocking review, DEV-524, AGENTS.md.
+    - Each "Done when" item holds:
+      - `serve_handler.rs:295` calls `AgentQueueService::resume` after orphan recovery; empty queue starts nothing; a held lock means a worker runs and is left alone; a start failure warns and serves on.
+      - `lotar agent queue` reports `active`/`stopped`/`idle` with a `reason`; `stopped` names `lotar agent queue resume`; `worker_running`, `pending`, `running_jobs`, `queued_jobs` unchanged.
+      - `agent queue resume` returns `Err` only when the queue can't be read; worker-start failures give exit 0, `worker_state: "stopped"` and `error` (Codex's finding fixed).
+      - `docs/help/agent.md` describes the states, `resume` and the failure case.
+    - Failing test before the fix: holds by the code — besides `resume`, only an enqueue, a worker exiting with entries left and automation call `ensure_worker`, so without the hook `serve_starts_the_worker_for_a_queue_left_behind` waits for a job that never runs. I didn't revert the hook to run it.
+    - Earlier blocking findings: the exit code, the temp leftovers (the `Workspace` drop now waits for the worker) and the missing boundary tests are all fixed.
+    - Reran: `npm run test:rust:agent -- dev592` 7/7 passed, temp guard clean; `npm run lint:agent` passed. Worktree unchanged afterwards.
+    - No UI change. No tickets filed.
+  report:
+    checks:
+    - command: npm run test:rust:agent -- dev592
+      result: passed
+      reason: 7 of 7, temp guard clean
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: full suite, fix agent ran it after rework
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change; fix agent ran it
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64ee8131-7181-4973-9f22-9b8e73b9e1aa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7c500a9-f749-4c5f-9f0c-08ccea2aa0f6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A01012c5d-c108-496e-9cc6-bad7794a7894
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A107f2550-a229-4816-b920-d814b2851f3d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A140b7670-fbae-43e1-b402-26593e485856
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29000f68-1ede-4764-b872-7846b217c776
 description: |-
   After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
 
@@ -120,6 +186,8 @@ description: |-
   - [ ] `docs/help/agent.md` describes the states and `resume`.
 tags:
 - review-returned
+- merge-retried
+- fix-retried
 history:
 - at: 2026-11-15T22:38:44.990878+00:00
   actor: claude
@@ -258,5 +326,69 @@ history:
     new: '@merge'
 - at: 2026-11-16T00:25:57.487812+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:41:14.933010+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A107f2550-a229-4816-b920-d814b2851f3d
+- at: 2026-11-16T00:41:19.276849+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: review-returned
+    new: review-returned, merge-retried
+- at: 2026-11-16T00:41:19.760450+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:41:59.519638+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T00:42:00.471136+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A140b7670-fbae-43e1-b402-26593e485856
+- at: 2026-11-16T00:42:05.576557+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: review-returned, merge-retried
+    new: review-returned, merge-retried, fix-retried
+- at: 2026-11-16T00:42:05.781181+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:42:51.971993+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29000f68-1ede-4764-b872-7846b217c776
+- at: 2026-11-16T00:42:57.379159+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T00:42:57.455653+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:11:00.746883+00:00
+  actor: claude
   changes:
   - field: comment_added

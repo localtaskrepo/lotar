@@ -1,15 +1,18 @@
 title: Job end fails when the ticket branch is checked out in LoTaR's own agent worktree
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T23:22:25.966473+00:00
-modified: 2026-11-16T00:25:57.207120+00:00
+modified: 2026-11-16T02:33:11.319116+00:00
 relationships:
   related:
   - DEV-596
   - DEV-573
+  - DEV-581
+  - DEV-601
+  - DEV-602
 comments:
 - date: 2026-11-16T00:06:06.962493+00:00
   author: claude
@@ -40,12 +43,65 @@ comments:
 - date: 2026-11-16T00:25:57.207120+00:00
   author: automation
   text: The review job job-20261116T002142.437Z-26 failed (lotar agent logs job-20261116T002142.437Z-26); the merge goes ahead without a review.
+- date: 2026-11-16T00:41:19.767865+00:00
+  author: automation
+  text: The merge agent's job job-20261116T004113.346Z-34 failed (lotar agent logs job-20261116T004113.346Z-34); the fix agent retries it on branch t3/e8b6b1b2.
+- date: 2026-11-16T00:42:06.218091+00:00
+  author: automation
+  text: The fix agent's job job-20261116T004159.520Z-42 failed (lotar agent logs job-20261116T004159.520Z-42); @fix-codex retries it on branch t3/5fef5a14.
+- date: 2026-11-16T00:42:57.604982+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T004251.052Z-48 failed again (lotar agent logs job-20261116T004251.052Z-48). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-16T02:10:24.841986+00:00
+  author: claude
+  text: |-
+    Review: passed. `bdcc0f38` does what "Done" asks; no findings.
+
+    - Read: the diff (`move_ticket_branch` in `agent_job_service.rs`, `dev503_harness_jobs_test.rs`, `docs/help/agent.md`), the ticket and fix comment, DEV-596, DEV-573, and the recent commits on `main` to these files (DEV-581 `e5762570`).
+    - A clean worktree runs `git reset --keep <tip>`, which moves the branch and keeps it checked out. A worktree with changes is detached as before. Both happen after the check that the ticket branch has no commits the thread lacks.
+    - It fits DEV-581: a headless job runs in the worktree that has the branch checked out. Keeping that worktree on the branch, instead of detaching it, also avoids the detached leftover that DEV-596 runs into.
+    - New test: before the fix the worktree ended detached, so its `symbolic-ref` assertion fails. The DEV-573 test still covers the detach case through an untracked file.
+    - Docs match the code.
+    - Reran: `cargo nextest run --workspace dev503` passed (24/24). `cargo clippy -p lotar-lib --all-targets -D warnings` was clean. `rustfmt --check` and `prettier --check` passed on the touched files. I didn't rerun the full test or smoke suites: the merge agent runs those.
+    - DEV-596 (`3bd769d5`, Merging) changes other functions in the same file. A rebase may need care, but the two fixes don't conflict in logic.
+    - No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97078b6d-c4b7-4950-a60f-90436c562edc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af985c3f6-1f68-44c2-9afe-d4a312baba44
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b9f951b-11e8-40a4-80c4-a37903d8e5c6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad001b9e9-93c3-4db1-8a59-c80d1bf9021d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af2574820-8d98-45fe-8db3-33d3791eb2b2
 description: 'Found: MGP-13 job job-20261115T212717.075Z-1 (mailgpg) failed at the end: `git branch --force agent/MGP-13 607bcc8` -> ''cannot force update the branch used by worktree at ~/.t3/worktrees/mailgpg/agent-MGP-13-93bc836e8df965ff''. The ticket went back to HelpNeeded although the work was done. Check: a T3 job whose thread branch differs from agent/<ID> while agent/<ID> is checked out in its agent worktree. Done: LoTaR moves the branch in that worktree (reset when clean, or detach first) instead of failing the job.'
 tags:
 - health
+- merge-retried
+- fix-retried
 custom_fields:
   finding: agent-job:branch-force-checked-out
 history:
@@ -108,3 +164,85 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-16T00:41:14.310177+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b9f951b-11e8-40a4-80c4-a37903d8e5c6
+- at: 2026-11-16T00:41:19.442275+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-16T00:41:19.767865+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:41:59.587565+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-16T00:42:00.521362+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad001b9e9-93c3-4db1-8a59-c80d1bf9021d
+- at: 2026-11-16T00:42:05.758771+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health, merge-retried
+    new: health, merge-retried, fix-retried
+- at: 2026-11-16T00:42:06.218091+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:42:52.047528+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af2574820-8d98-45fe-8db3-33d3791eb2b2
+- at: 2026-11-16T00:42:57.420543+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T00:42:57.604982+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:10:24.841986+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T02:10:25.201229+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581"]}'
+- at: 2026-11-16T02:31:14.057163+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601"]}'
+- at: 2026-11-16T02:33:11.319116+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602"]}'

@@ -1,10 +1,11 @@
 title: Sign lotar builds from source with the owner's Developer ID
-status: Blocked
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
+assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-16T00:27:25.898470+00:00
+modified: 2026-11-16T00:42:30.991677+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -212,9 +213,43 @@ comments:
 - date: 2026-11-16T00:27:09.366523+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-563 yet. DEV-563 waits for DEV-520.'
+- date: 2026-11-16T00:41:46.116810+00:00
+  author: automation
+  text: The fix agent's job job-20261116T004137.397Z-39 failed (lotar agent logs job-20261116T004137.397Z-39); @fix-codex retries it on branch t3/e64a8987.
+- date: 2026-11-16T00:42:30.991677+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261116T004224.592Z-45 failed again (lotar agent logs job-20261116T004224.592Z-45). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8fcc53f0-d434-4d0a-bd72-2d73e8a3c23f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e18bebc-2fbf-4472-946e-1a78c1222882
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -232,6 +267,8 @@ description: |-
   - [ ] Linux and Windows: no signing, same staged install.
   - [ ] `codesign -dvv` on the installed source build shows `Identifier=net.pyxzl.lotar`, `TeamIdentifier=3HKD37M482`; local's `skills/lotar-services.md` is updated (filed there if it needs a LOCA ticket) so it no longer calls a signed source build wrong.
   - [ ] Checked in the next version: a fresh source build installed over the running one, `/usr/libexec/ApplicationFirewall/socketfilterfw --listapps` needs no new exception and the servers answer on the LAN.
+tags:
+- fix-retried
 history:
 - at: 2026-11-15T17:40:28.831866+00:00
   actor: claude
@@ -479,3 +516,50 @@ history:
   changes:
   - field: assignee
     old: '@fix'
+- at: 2026-11-16T00:40:54.064856+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T00:41:37.567013+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-16T00:41:38.522113+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8fcc53f0-d434-4d0a-bd72-2d73e8a3c23f
+- at: 2026-11-16T00:41:42.302032+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-16T00:41:46.116810+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-16T00:42:25.636826+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e18bebc-2fbf-4472-946e-1a78c1222882
+- at: 2026-11-16T00:42:30.920967+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-16T00:42:30.991677+00:00
+  actor: automation
+  changes:
+  - field: comment_added

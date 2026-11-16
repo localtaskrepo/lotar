@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-16T00:20:38.967870+00:00
+modified: 2026-11-16T02:33:19.831030+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -13,6 +13,8 @@ relationships:
   - DEV-573
   - DEV-583
   - DEV-530
+  - DEV-602
+  - DEV-605
 comments:
 - date: 2026-11-15T19:51:52.799436+00:00
   author: claude
@@ -288,3 +290,15 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583"]}'
     new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530"]}'
+- at: 2026-11-16T02:33:11.317638+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602"]}'
+- at: 2026-11-16T02:33:19.831030+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605"]}'
