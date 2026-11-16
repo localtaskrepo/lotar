@@ -541,7 +541,15 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
     updateLogEntries(next.id, [entry])
   }
   // Update queue stats on job state changes
-  if (['agent_job_started', 'agent_job_completed', 'agent_job_failed', 'agent_job_cancelled'].includes(kind)) {
+  if (
+    [
+      'agent_job_started',
+      'agent_job_completed',
+      'agent_job_failed',
+      'agent_job_cancelled',
+      'agent_job_paused',
+    ].includes(kind)
+  ) {
     refreshTicketSoon(next.ticket_id)
     api
       .listAgentJobs()
@@ -744,6 +752,7 @@ function setupSse() {
       'agent_job_completed',
       'agent_job_failed',
       'agent_job_cancelled',
+      'agent_job_paused',
       'task_updated',
     ].join(','),
   })
@@ -770,6 +779,7 @@ function setupSse() {
     'agent_job_completed',
     'agent_job_failed',
     'agent_job_cancelled',
+    'agent_job_paused',
   ]
 
   handlers.forEach((kind) => {
@@ -1019,7 +1029,8 @@ onBeforeUnmount(() => {
   background: var(--color-accent);
 }
 
-.phase-step--queued::after {
+.phase-step--queued::after,
+.phase-step--paused::after {
   background: var(--color-warning);
 }
 
@@ -1049,7 +1060,8 @@ onBeforeUnmount(() => {
   border-left-color: var(--color-accent);
 }
 
-.job-card.job-queued {
+.job-card.job-queued,
+.job-card.job-paused {
   border-left-color: var(--color-warning);
 }
 
@@ -1189,7 +1201,8 @@ onBeforeUnmount(() => {
   background: color-mix(in oklab, var(--color-accent) 15%, transparent);
 }
 
-.status-chip.status-queued {
+.status-chip.status-queued,
+.status-chip.status-paused {
   color: var(--color-warning);
   background: color-mix(in oklab, var(--color-warning) 15%, transparent);
 }

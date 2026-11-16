@@ -1,0 +1,24 @@
+title: 'harnessmux: some Codex error texts still end a turn as finished'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T02:58:51.888766+00:00
+modified: 2026-11-18T02:58:52.577298+00:00
+relationships:
+  related:
+  - DEV-684
+description: |-
+  Found in the review of DEV-684 (harnessmux `65a95a0`).
+
+  - `LAST_PARAGRAPH_FAILURES` (`src/acp_map.rs:84-89`) has four of Codex's error texts. codex 0.169.0's binary has more that codex-acp sends the same way (text chunk, then `end_turn`): "Policy-restricted capacity is unavailable. Please try again later." and "Flex capacity unavailable…".
+  - The check reads the last paragraph of the whole turn's text (`turn.reply`, all message chunks joined without separators, `src/backend/acp.rs:240`). If an earlier Codex message doesn't end in a blank line, the error chunk is glued onto it and the check misses it. Not seen in a real run yet: in acpx #850 the turn had no earlier message.
+
+  Done when: both texts fail the turn, and an error chunk after an earlier message without a trailing blank line fails it too, each with a test.
+history:
+- at: 2026-11-18T02:58:52.577298+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

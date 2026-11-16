@@ -1,9 +1,9 @@
 use crate::api_types::AgentJobCreateRequest;
 use crate::config::manager::ConfigManager;
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::services::agent_job_service::{AgentJobService, JobStartMode};
+use crate::services::agent_job_service::AgentJobService;
 use crate::services::memory_gate::MemoryHold;
-use crate::utils::time;
+use crate::utils::time::{self, Rfc3339};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -20,6 +20,8 @@ const QUEUE_VERSION: u32 = 1;
 const WORKER_POLL_MS: u64 = 300;
 /// Retries of an entry whose start failed, after the first try.
 const MAX_ATTEMPTS: u32 = 3;
+/// How long a paused queue waits before it tries one held job again (DEV-604).
+const PAUSE_RETRY_SECONDS: i64 = 600;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct AgentQueueState {
@@ -31,6 +33,95 @@ struct AgentQueueState {
     /// that dies before that leaves them here for the next one (DEV-661).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     taken: Vec<AgentQueueEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pause: Option<QueuePause>,
+}
+
+/// Why the queue holds jobs back (DEV-604).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PauseReason {
+    /// Commits can't be signed: the jobs that commit wait.
+    Signing,
+    /// The disk is full: every job waits.
+    Disk,
+}
+
+impl PauseReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Signing => "signing",
+            Self::Disk => "disk",
+        }
+    }
+
+    pub fn describe(self) -> &'static str {
+        match self {
+            Self::Signing => "commit signing fails",
+            Self::Disk => "the disk is full",
+        }
+    }
+
+    /// Whether this pause holds a job back; `commits` says whether the job commits.
+    pub fn holds(self, commits: bool) -> bool {
+        self == Self::Disk || commits
+    }
+}
+
+/// A pause of the queue: a job failed on something every job like it
+/// would fail on, so they wait, and one of them tries again at
+/// `next_try_at` (DEV-604).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueuePause {
+    pub reason: PauseReason,
+    /// The output line that showed it.
+    pub message: String,
+    pub since: String,
+    pub next_try_at: String,
+    /// The job that paused the queue, and its ticket.
+    pub job_id: String,
+    pub ticket_id: String,
+}
+
+impl QueuePause {
+    pub fn retry_due(&self) -> bool {
+        time::parse_rfc3339(&self.next_try_at).ok().is_none_or(|at| at <= jiff::Timestamp::now())
+    }
+
+    /// One line for `agent queue` and `agent list-jobs`.
+    pub fn summary(&self) -> String {
+        format!(
+            "paused since {} because {} (job {} on {}: {}); one held job tries again at {}",
+            self.since,
+            self.reason.describe(),
+            self.job_id,
+            self.ticket_id,
+            self.message,
+            self.next_try_at
+        )
+    }
+}
+
+/// What a job that ended on a commit it couldn't make retries: only that
+/// commit, in the worktree that holds the work (DEV-604).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommitRetry {
+    /// The job whose commit failed.
+    pub job_id: String,
+    pub worktree_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_branch: Option<String>,
+}
+
+/// The status and assignee change a paused job recorded (DEV-320), carried
+/// to its retry, with the ticket's status and assignee at the pause: a
+/// field the ticket changed in since stays as it is (DEV-604).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CarriedOutcome {
+    pub outcome: crate::api_types::JobOutcome,
+    pub status_at_pause: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee_at_pause: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +150,48 @@ pub struct AgentQueueEntry {
     /// that says so (DEV-600).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub held_by: Option<String>,
+    /// Set on a paused job's retry that only makes its commit (DEV-604).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit_retry: Option<CommitRetry>,
+    /// What the paused job recorded for its ticket, applied when its retry ends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carried_outcome: Option<CarriedOutcome>,
+}
+
+impl AgentQueueEntry {
+    /// The entry that runs `req` again; `commit_retry` makes it retry only the commit.
+    pub fn retry_of(req: &AgentJobCreateRequest, commit_retry: Option<CommitRetry>, carried_outcome: Option<CarriedOutcome>) -> Self {
+        Self {
+            ticket_id: req.ticket_id.clone(),
+            agent: req.agent.clone().unwrap_or_default(),
+            runner: req.runner.clone().filter(|_| req.agent.is_none()),
+            prompt: req.prompt.clone(),
+            queued_at: time::now_rfc3339(),
+            attempts: 0,
+            model: req.model.clone(),
+            effort: req.effort.clone(),
+            provider: req.provider.clone(),
+            session: req.session,
+            thread_name: req.thread_name.clone(),
+            held_by: None,
+            commit_retry,
+            carried_outcome,
+        }
+    }
+
+    fn request(&self) -> AgentJobCreateRequest {
+        AgentJobCreateRequest {
+            ticket_id: self.ticket_id.clone(),
+            prompt: self.prompt.clone(),
+            runner: self.runner.clone(),
+            agent: (!self.agent.is_empty()).then(|| self.agent.clone()),
+            model: self.model.clone(),
+            effort: self.effort.clone(),
+            provider: self.provider.clone(),
+            session: self.session,
+            thread_name: self.thread_name.clone(),
+        }
+    }
 }
 
 pub struct AgentQueueService;
@@ -132,6 +265,8 @@ impl AgentQueueService {
             session: req.session,
             thread_name: req.thread_name.clone(),
             held_by: None,
+            commit_retry: None,
+            carried_outcome: None,
         };
 
         let mut inserted = false;
@@ -237,6 +372,7 @@ impl AgentQueueService {
     /// `memory_hold` is the caller's one reading of the memory gate, so
     /// the reason and the hold it shows beside it agree (DEV-681).
     pub fn worker_state(tasks_dir: &Path, pending: &[AgentQueueEntry], memory_hold: Option<&MemoryHold>) -> (WorkerState, Option<String>) {
+        let pause = Self::pause_state(tasks_dir);
         if !Self::is_worker_running(tasks_dir) {
             if pending.is_empty() {
                 return (WorkerState::Idle, None);
@@ -245,6 +381,9 @@ impl AgentQueueService {
         }
         if pending.is_empty() {
             return (WorkerState::Active, None);
+        }
+        if let Some(pause) = pause {
+            return (WorkerState::Active, Some(format!("the queue is {}", pause.summary())));
         }
         if let Some(hold) = memory_hold {
             return (WorkerState::Active, Some(format!("waiting for memory: {}", hold.describe())));
@@ -265,6 +404,90 @@ impl AgentQueueService {
         let project = ticket_project(ticket_id);
         let slots = job_slots_for(tasks_dir, project.iter().cloned(), own_jobs)?;
         Ok(slots.wait_reason(project.as_deref()))
+    }
+
+    /// Pause the queue because a job failed on `reason`, and put that job's
+    /// retry first in the queue (DEV-604). An open disk pause stays one:
+    /// it holds every job, a signing pause only those that commit. An open
+    /// pause keeps its start; its next try moves to an interval from now.
+    pub fn pause(tasks_dir: &Path, reason: PauseReason, message: &str, job_id: &str, retry: &AgentQueueEntry) -> LoTaRResult<QueuePause> {
+        let now = jiff::Timestamp::now();
+        let next_try_at = next_try_at_from(now);
+        let mut paused = None;
+        with_locked_queue(tasks_dir, |state| {
+            let pause = match state.pause.take() {
+                Some(mut open) if open.reason == PauseReason::Disk && reason == PauseReason::Signing => {
+                    open.next_try_at = next_try_at.clone();
+                    open
+                }
+                open => QueuePause {
+                    reason,
+                    message: message.to_string(),
+                    since: open.map_or_else(|| now.to_rfc3339(), |open| open.since),
+                    next_try_at: next_try_at.clone(),
+                    job_id: job_id.to_string(),
+                    ticket_id: retry.ticket_id.clone(),
+                },
+            };
+            state.pending.retain(|item| !same_entry(item, retry));
+            state.pending.insert(0, retry.clone());
+            paused = Some(pause.clone());
+            state.pause = Some(pause);
+        })?;
+        Self::ensure_worker(tasks_dir)?;
+        paused.ok_or_else(|| LoTaRError::ValidationError("The queue could not be paused".to_string()))
+    }
+
+    /// The queue's open pause, if any.
+    pub fn pause_state(tasks_dir: &Path) -> Option<QueuePause> {
+        read_state(tasks_dir)?.pause
+    }
+
+    /// The open pause that holds a job that `commits` (or not) back.
+    pub fn holding(tasks_dir: &Path, commits: bool) -> Option<QueuePause> {
+        Self::pause_state(tasks_dir).filter(|pause| pause.reason.holds(commits))
+    }
+
+    /// Give the pause's due try to a job that `commits` (or not) and waits
+    /// outside the queue, in `lotar serve`, when no queue entry the pause
+    /// holds waits for it: else nothing might ever end the pause (DEV-604).
+    /// Taken under the queue lock, so one process gets it.
+    pub fn take_held_try(tasks_dir: &Path, commits: bool) -> bool {
+        if !Self::holding(tasks_dir, commits).is_some_and(|pause| pause.retry_due()) {
+            return false;
+        }
+        let mut taken = false;
+        let _ = with_locked_queue(tasks_dir, |state| {
+            let Some(pause) = state.pause.as_mut().filter(|pause| pause.reason.holds(commits) && pause.retry_due()) else {
+                return;
+            };
+            let reason = pause.reason;
+            if state.pending.iter().any(|entry| reason == PauseReason::Disk || reason.holds(entry_commits(tasks_dir, entry))) {
+                return;
+            }
+            pause.next_try_at = next_try_at();
+            taken = true;
+        });
+        taken
+    }
+
+    /// End the pause a job that `commits` (or not) just proved over, by
+    /// completing: it would have hit it. The held entries start.
+    pub fn end_pause(tasks_dir: &Path, commits: bool) -> Option<QueuePause> {
+        if !queue_file_path(tasks_dir).exists() {
+            return None;
+        }
+        let mut ended = None;
+        with_locked_queue(tasks_dir, |state| {
+            if state.pause.as_ref().is_some_and(|pause| pause.reason.holds(commits)) {
+                ended = state.pause.take();
+            }
+        })
+        .ok()?;
+        if ended.is_some() && !Self::list_pending(tasks_dir).unwrap_or_default().is_empty() {
+            let _ = Self::ensure_worker(tasks_dir);
+        }
+        ended
     }
 
     pub fn ensure_worker(tasks_dir: &Path) -> LoTaRResult<()> {
@@ -385,17 +608,7 @@ fn worker_slot_free(tasks_dir: &Path) -> LoTaRResult<bool> {
 
 fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
     let last_try = entry.attempts >= MAX_ATTEMPTS;
-    let req = AgentJobCreateRequest {
-        ticket_id: entry.ticket_id,
-        prompt: entry.prompt,
-        runner: entry.runner,
-        agent: (!entry.agent.is_empty()).then_some(entry.agent),
-        model: entry.model,
-        effort: entry.effort,
-        provider: entry.provider,
-        session: entry.session,
-        thread_name: entry.thread_name,
-    };
+    let req = entry.request();
     if !crate::services::automation_service::queued_stage_allows_start(tasks_dir, &req) {
         return Ok(());
     }
@@ -404,7 +617,7 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
     if req.agent.is_some() && !crate::services::automation_service::prerequisites_allow_start(tasks_dir, &req, last_try).map_err(LoTaRError::ValidationError)? {
         return Ok(());
     }
-    let _ = AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;
+    let _ = AgentJobService::start_queued_job(req, tasks_dir, entry.commit_retry, entry.carried_outcome)?;
     Ok(())
 }
 
@@ -497,7 +710,8 @@ fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry, err: &LoTaRError)
 }
 
 /// Take the entries that have a free slot, in queue order; the others stay
-/// queued (DEV-630).
+/// queued (DEV-630). While the queue is paused, the entries it holds stay,
+/// except one when its next try is due (DEV-604).
 fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
     let mut entries = Ok(Vec::new());
     with_locked_queue(tasks_dir, |state| {
@@ -508,7 +722,26 @@ fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
                 return;
             }
         };
-        let (take, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut state.pending).into_iter().partition(|entry| slots.take(entry));
+        let mut retry_due = state.pause.as_ref().is_some_and(QueuePause::retry_due);
+        let mut take = Vec::new();
+        let mut keep = Vec::new();
+        for entry in std::mem::take(&mut state.pending) {
+            // A disk pause holds every entry: no need to read their profiles.
+            let held = state.pause.as_ref().is_some_and(|pause| pause.reason == PauseReason::Disk || pause.reason.holds(entry_commits(tasks_dir, &entry)));
+            if held && !retry_due {
+                keep.push(entry);
+            } else if slots.take(&entry) {
+                if held {
+                    retry_due = false;
+                    if let Some(pause) = state.pause.as_mut() {
+                        pause.next_try_at = next_try_at();
+                    }
+                }
+                take.push(entry);
+            } else {
+                keep.push(entry);
+            }
+        }
         state.pending = keep;
         state.taken.extend(take.iter().cloned());
         entries = Ok(take);
@@ -595,6 +828,26 @@ fn ticket_project(ticket_id: &str) -> Option<String> {
     crate::storage::TaskId::parse(ticket_id).ok().map(|id| id.project)
 }
 
+fn entry_commits(tasks_dir: &Path, entry: &AgentQueueEntry) -> bool {
+    entry.commit_retry.is_some() || AgentJobService::job_commits(tasks_dir, &entry.request())
+}
+
+/// How long a pause waits before its next try: `LOTAR_AGENT_PAUSE_RETRY_SECONDS`,
+/// else ten minutes.
+fn retry_interval() -> jiff::SignedDuration {
+    let seconds = std::env::var("LOTAR_AGENT_PAUSE_RETRY_SECONDS").ok().and_then(|value| value.trim().parse::<i64>().ok()).unwrap_or(PAUSE_RETRY_SECONDS);
+    jiff::SignedDuration::from_secs(seconds.max(0))
+}
+
+/// When a pause's next try is due, an interval from `now`.
+fn next_try_at_from(now: jiff::Timestamp) -> String {
+    now.saturating_add(retry_interval()).unwrap_or(jiff::Timestamp::MAX).to_rfc3339()
+}
+
+fn next_try_at() -> String {
+    next_try_at_from(jiff::Timestamp::now())
+}
+
 fn pending_count(tasks_dir: &Path) -> LoTaRResult<usize> {
     let mut count = 0;
     with_locked_queue(tasks_dir, |state| {
@@ -622,6 +875,15 @@ where
     Ok(())
 }
 
+/// The queue's state, read without writing it back; `None` without a queue.
+fn read_state(tasks_dir: &Path) -> Option<AgentQueueState> {
+    let mut file = File::open(queue_file_path(tasks_dir)).ok()?;
+    file.lock_shared().ok()?;
+    let state = load_state(&mut file, tasks_dir).ok();
+    let _ = file.unlock();
+    state
+}
+
 fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState> {
     file.seek(SeekFrom::Start(0)).map_err(LoTaRError::IoError)?;
     let mut buf = String::new();
@@ -633,6 +895,7 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
             updated_at: time::now_rfc3339(),
             pending: Vec::new(),
             taken: Vec::new(),
+            pause: None,
         });
     }
     let mut state: AgentQueueState = serde_json::from_str(&buf).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
@@ -780,6 +1043,57 @@ mod tests {
         // Entries written before these fields existed still load.
         let legacy: AgentQueueEntry = serde_json::from_str(r#"{"ticket_id":"TEST-2","agent":"a","prompt":"p","queued_at":"now","attempts":0}"#).unwrap();
         assert!(legacy.model.is_none() && legacy.effort.is_none());
+    }
+
+    fn entry(ticket: &str) -> AgentQueueEntry {
+        AgentQueueEntry::retry_of(
+            &AgentJobCreateRequest { ticket_id: ticket.into(), prompt: "p".into(), agent: Some("a".into()), ..Default::default() },
+            None,
+            None,
+        )
+    }
+
+    /// DEV-604: a signing pause holds only jobs that commit, a disk pause
+    /// every job; the worker starts one held entry, the first, when the next
+    /// try is due; a job the pause would have held ends it
+    /// by completing.
+    #[test]
+    fn a_pause_holds_jobs_in_its_scope_and_admits_one_try_when_due() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let _interval = EnvGuard::set("LOTAR_AGENT_PAUSE_RETRY_SECONDS", "3600");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        assert!(AgentQueueService::holding(&tasks_dir, true).is_none(), "no queue, no pause");
+
+        let pause = AgentQueueService::pause(&tasks_dir, PauseReason::Signing, "Couldn't find key in agent", "job-1", &entry("TEST-1")).unwrap();
+        assert_eq!(pause.ticket_id, "TEST-1");
+        assert!(AgentQueueService::holding(&tasks_dir, false).is_none(), "a job that doesn't commit starts");
+        assert!(AgentQueueService::holding(&tasks_dir, true).is_some());
+        assert!(AgentQueueService::end_pause(&tasks_dir, false).is_none(), "a job that doesn't commit proves nothing");
+
+        // A disk pause isn't narrowed by a later signing failure.
+        AgentQueueService::pause(&tasks_dir, PauseReason::Disk, "No space left on device", "job-2", &entry("TEST-2")).unwrap();
+        AgentQueueService::pause(&tasks_dir, PauseReason::Signing, "gpg failed to sign the data", "job-3", &entry("TEST-3")).unwrap();
+        let open = AgentQueueService::pause_state(&tasks_dir).unwrap();
+        assert_eq!((open.reason, open.job_id.as_str(), open.since.as_str()), (PauseReason::Disk, "job-2", pause.since.as_str()));
+        assert!(AgentQueueService::holding(&tasks_dir, false).is_some(), "a full disk holds every job");
+        let order: Vec<String> = AgentQueueService::list_pending(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(order, ["TEST-3", "TEST-2", "TEST-1"], "each paused job's retry goes first");
+        assert!(dequeue_startable(&tasks_dir).unwrap().is_empty(), "the worker takes no held entry");
+
+        // The next try is due: one entry, the first, starts, and the next
+        // try moves on.
+        let due = time::now_rfc3339();
+        with_locked_queue(&tasks_dir, |state| state.pause.as_mut().unwrap().next_try_at = due.clone()).unwrap();
+        let taken: Vec<String> = dequeue_startable(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(taken, ["TEST-3"]);
+        assert!(dequeue_startable(&tasks_dir).unwrap().is_empty(), "one try per interval");
+
+        assert_eq!(AgentQueueService::end_pause(&tasks_dir, false).map(|pause| pause.reason), Some(PauseReason::Disk));
+        assert!(AgentQueueService::pause_state(&tasks_dir).is_none());
+        assert_eq!(dequeue_startable(&tasks_dir).unwrap().len(), 2, "the held entries start");
     }
 
     #[test]

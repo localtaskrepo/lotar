@@ -325,6 +325,10 @@ fn adopt(tasks_dir: &Path, ticket_id: &str, resumed: &Resumed) -> Result<String,
                 main_head_at_start: None,
                 assignee_at_start: None,
                 ticket_commit_at_start: None,
+                request: None,
+                commit_retry: None,
+                carried_outcome: None,
+                commits: super::job_commits_with(&config, &profile, AgentRunnerKind::T3),
             },
         );
         // It counts toward max_parallel_jobs, so queued jobs wait for it.

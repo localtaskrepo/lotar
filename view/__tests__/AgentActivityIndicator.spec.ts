@@ -68,6 +68,13 @@ describe('AgentActivityIndicator', () => {
         await flushPromises()
         expect(one.find('[data-testid="agent-activity"]').exists()).toBe(false)
 
+        // A job that pauses the queue (DEV-604) has ended too.
+        handlers.get('agent_job_paused')!(
+            new MessageEvent('agent_job_paused', { data: JSON.stringify({ id: 'job-4' }) }),
+        )
+        await flushPromises()
+        expect(three.find('[data-testid="agent-activity"]').exists()).toBe(false)
+
         one.unmount()
         two.unmount()
         three.unmount()

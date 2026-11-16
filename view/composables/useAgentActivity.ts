@@ -15,7 +15,7 @@ export interface AgentActivity {
 }
 
 const ACTIVE = new Set(['running', 'queued', 'pending', 'starting'])
-const DONE_EVENTS = new Set(['agent_job_completed', 'agent_job_failed', 'agent_job_cancelled'])
+const DONE_EVENTS = new Set(['agent_job_completed', 'agent_job_failed', 'agent_job_cancelled', 'agent_job_paused'])
 const EVENTS = [
     'agent_job_started',
     'agent_job_init',
@@ -24,6 +24,7 @@ const EVENTS = [
     'agent_job_completed',
     'agent_job_failed',
     'agent_job_cancelled',
+    'agent_job_paused',
 ]
 
 const jobs = ref(new Map<string, AgentActivity>())

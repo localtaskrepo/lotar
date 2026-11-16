@@ -320,10 +320,15 @@ impl AgentHandler {
         {
             renderer.emit_info(format_args!("Queue: new jobs wait for memory: {}", hold.describe()));
         }
+        // A paused queue says so (DEV-604).
+        let pause = AgentQueueService::pause_state(&resolver.path);
+        if let Some(pause) = pause.as_ref().filter(|_| !matches!(renderer.format, OutputFormat::Json)) {
+            renderer.emit_warning(format!("The agent queue is {}.", pause.summary()));
+        }
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "pause": pause }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found (agent logging is off).");
@@ -334,7 +339,7 @@ impl AgentHandler {
 
         if job_ids.is_empty() {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "pause": pause }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found.");
@@ -363,7 +368,7 @@ impl AgentHandler {
         }
 
         if matches!(renderer.format, OutputFormat::Json) {
-            renderer.emit_json(&serde_json::json!({ "jobs": jobs, "memory_hold": hold_json }));
+            renderer.emit_json(&serde_json::json!({ "jobs": jobs, "memory_hold": hold_json, "pause": pause }));
             return Ok(());
         }
 
@@ -470,6 +475,7 @@ impl AgentHandler {
                         "reason": reason,
                         "memory_hold": memory.hold.as_ref().map(crate::services::memory_gate::MemoryHold::to_json),
                         "memory_error": memory.error,
+                        "pause": AgentQueueService::pause_state(tasks_dir),
                         "running_jobs": stats.running,
                         "queued_jobs": stats.queued,
                     }));
@@ -993,7 +999,7 @@ fn wait_for_job_completion(job_id: &str, follow: bool, timeout_seconds: Option<u
 /// DEV-21 to avoid conflation with the task completion policy's terminal
 /// statuses; sprint lifecycle states are a third, separate notion.
 fn job_is_terminal(status: &str) -> bool {
-    status.eq_ignore_ascii_case("completed") || status.eq_ignore_ascii_case("failed") || status.eq_ignore_ascii_case("cancelled")
+    ["completed", "failed", "cancelled", "paused"].iter().any(|end| status.eq_ignore_ascii_case(end))
 }
 
 fn is_zombie_process(process: &sysinfo::Process) -> bool {

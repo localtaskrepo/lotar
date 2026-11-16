@@ -19,6 +19,10 @@ describe('agent job helpers', () => {
         expect(describeLogEntry(entry('agent_job_started')).text).toBe('Job started')
         expect(describeLogEntry(entry('agent_job_result')).text).toBe('')
         expect(describeLogEntry(entry('agent_job_failed', 'exit 1'))).toMatchObject({ label: 'Failed', tone: 'danger' })
+        expect(describeLogEntry(entry('agent_job_paused', 'Paused, not failed'))).toMatchObject({
+            label: 'Paused',
+            tone: 'warning',
+        })
     })
 
     it('formats durations compactly', () => {

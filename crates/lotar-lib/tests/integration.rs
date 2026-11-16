@@ -167,6 +167,7 @@ mod dev56_task_identity_test;
 mod dev57_task_query_test;
 mod dev58_typed_error_mapping_test;
 mod dev592_queue_resumes_after_restart_test;
+mod dev604_queue_pauses_test;
 mod dev605_merge_without_agent_test;
 mod dev60_shared_mutation_test;
 mod dev61_reference_kinds_test;

@@ -313,8 +313,15 @@ const JOB_EVENTS = [
   'agent_job_completed',
   'agent_job_failed',
   'agent_job_cancelled',
+  'agent_job_paused',
 ]
-const JOB_ENDS = new Set(['agent_job_started', 'agent_job_completed', 'agent_job_failed', 'agent_job_cancelled'])
+const JOB_ENDS = new Set([
+  'agent_job_started',
+  'agent_job_completed',
+  'agent_job_failed',
+  'agent_job_cancelled',
+  'agent_job_paused',
+])
 
 const isOwnJob = (ticketId?: string) => !!ticketId && ticketId === props.taskId
 

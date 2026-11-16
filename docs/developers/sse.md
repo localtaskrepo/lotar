@@ -15,7 +15,7 @@ The server responds with `text/event-stream`, sends an initial `retry: 1000` hin
 | Parameter | Details |
 |-----------|---------|
 | `debounce_ms` | Debounce window (default 100 ms). Left blank, the server falls back to `LOTAR_SSE_DEBOUNCE_MS`. Values below 20 ms are clamped when fast-IO mode is enabled. |
-| `kinds` / `topic` | Comma-separated, case-insensitive list of kinds to keep. Valid kinds: `task_created`, `task_updated`, `task_deleted`, `config_updated`, `project_changed`, `sync_started`, `sync_progress`, `sync_completed`, `sync_failed`, `agent_job_started`, `agent_job_progress`, `agent_job_message`, `agent_job_input`, `agent_job_completed`, `agent_job_failed`, `agent_job_cancelled`. When omitted, all events flow through. `topic` is a legacy alias retained for compatibility. |
+| `kinds` / `topic` | Comma-separated, case-insensitive list of kinds to keep. Valid kinds: `task_created`, `task_updated`, `task_deleted`, `config_updated`, `project_changed`, `sync_started`, `sync_progress`, `sync_completed`, `sync_failed`, `agent_job_started`, `agent_job_progress`, `agent_job_message`, `agent_job_input`, `agent_job_completed`, `agent_job_failed`, `agent_job_cancelled`, `agent_job_paused`. When omitted, all events flow through. `topic` is a legacy alias retained for compatibility. |
 | `project` | Filter events to a specific project prefix. Task events match when the task ID (e.g., `TEST-42`) shares that prefix; filesystem events match on their `{ "name": "<PROJECT>" }` payload; sync events match their top-level `project` payload (`null` never matches). |
 | `ready` | `true`/`1` requests a one-time `ready` event. Only honored when `LOTAR_SSE_READY=1` is set on the server. |
 
@@ -38,6 +38,7 @@ Combine filters freely: e.g., subscribe to only `task_created` from project `ENG
 - `agent_job_completed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "completed", "finished_at": "...", "exit_code": 0, "sequence": 7, "at": "..." }`.
 - `agent_job_failed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "failed", "finished_at": "...", "exit_code": 1, "sequence": 7, "at": "..." }`.
 - `agent_job_cancelled` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "cancelled", "finished_at": "...", "sequence": 5, "at": "..." }`.
+- `agent_job_paused` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "paused", "finished_at": "...", "message": "Paused, not failed: ...", "sequence": 7, "at": "..." }`: the job failed on commit signing or a full disk and the queue paused (see `agent.md`, Paused queue).
 
 Every `agent_job_*` SSE event carries `sequence` and `at` taken from the exact
 same log entry served by `GET /api/jobs/logs`: `sequence` is the stable per-job
