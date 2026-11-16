@@ -5,11 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-16T21:44:28.470366+00:00
+modified: 2026-11-16T22:37:12.959721+00:00
 relationships:
   related:
   - DEV-600
   - DEV-625
+  - DEV-608
+  - DEV-619
+  - DEV-607
 comments:
 - date: 2026-11-16T05:51:33.176016+00:00
   author: claude
@@ -91,6 +94,12 @@ comments:
       result: not_run
       reason: no UI or CLI change
     next: Review on Codex, then merge
+- date: 2026-11-16T22:37:12.768248+00:00
+  author: claude
+  text: |-
+    Seen again 2026-11-16 in the DEV-607 merge (load ~120): `dev503_harness_jobs_test.rs:769` `the entry still waits`.
+
+    - `npm run test:agent`, worktree `t3-a42a9c69`, on `74796683`; alone it passed 5/5, and the next full run passed 2258/2258.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
@@ -203,3 +212,25 @@ history:
   - field: assignee
     old: mallox
     new: '@review'
+- at: 2026-11-16T22:19:27.807168+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-625"]}'
+    new: '{"related":["DEV-600","DEV-625","DEV-608"]}'
+- at: 2026-11-16T22:25:19.989839+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-625","DEV-608"]}'
+    new: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619"]}'
+- at: 2026-11-16T22:37:12.768248+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T22:37:12.959721+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619"]}'
+    new: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607"]}'

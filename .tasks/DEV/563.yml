@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-16T19:25:55.846800+00:00
+modified: 2026-11-16T22:35:56.411397+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -24,6 +24,7 @@ relationships:
   - DEV-603
   - DEV-600
   - DEV-602
+  - DEV-620
 comments:
 - date: 2026-11-15T18:01:34.472793+00:00
   author: claude
@@ -896,3 +897,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T22:35:56.411397+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595","DEV-592","DEV-598","DEV-599","DEV-603","DEV-600","DEV-602"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595","DEV-592","DEV-598","DEV-599","DEV-603","DEV-600","DEV-602","DEV-620"]}'

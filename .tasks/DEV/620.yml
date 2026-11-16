@@ -5,12 +5,13 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T18:42:09.946527+00:00
-modified: 2026-11-16T20:03:11.364020+00:00
+modified: 2026-11-16T22:48:01.615299+00:00
 relationships:
   related:
   - DEV-608
   - DEV-611
   - DEV-618
+  - DEV-563
 comments:
 - date: 2026-11-16T20:03:10.910172+00:00
   author: claude
@@ -20,6 +21,21 @@ comments:
     - Prompt code: `build_prompt`, `prompt_comments` in `crates/lotar-lib/src/services/agent_job_service.rs`
     - Settings on the agent profile (`context_entries`, `full_history`), next to `continue_within_minutes`: no REST or UI change
     - Told the DEV-618, DEV-611 and DEV-608 fix threads, which touch the same file
+- date: 2026-11-16T22:35:55.151774+00:00
+  author: claude
+  text: |-
+    Measured: job prompts on DEV-563 (churned: 20 comments, 18 stored entries) are about two thirds shorter.
+
+    | Job | Before | After |
+    |---|---|---|
+    | fix | 50.1k | 15.6k |
+    | review | 42.1k | 14.0k |
+    | merge | 47.1k | 16.2k |
+
+    - Characters, ticket part + instructions and "This job" notes. Ticket part rebuilt with the real `build_prompt` from DEV-563's comments, history and `.context` as each job's prompt saw them (last fix, review and merge in the context): fix 44.9k → 12.2k, review 36.8k → 10.5k, merge 41.8k → 12.7k
+    - Instructions + notes for a T3 fix job: 5,230 → 3,475 (66%); instructions alone 3,935 → 2,421
+    - Recent context default 2 entries: stored prompts are median 2.5k (the rule's boilerplate, p90 3.3k), replies median 1.0k (p90 2.3k), across 276 `.context` files; the comments now carry the older rounds
+    - The picks on DEV-563: open question (automation's retry question), newest fix report, newest review
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79143270-686a-4330-848d-940b822b946e
 description: |-
@@ -31,7 +47,7 @@ description: |-
   - 2026-11-16 (claude): today's prompt carries no comments; the history is the "Recent context": up to 20 stored prompts (median 2.5k, the rule's boilerplate) and replies (median 1.0k), uncut. The 5.2k are the built-in instructions (3.9k) plus the "This job" notes (1.3k).
 
   ## Done when
-  - [ ] The prompt has a "Comments" section: the open question (the newest comment before the ticket was last assigned to a person, not written by that person, or the newest with a `question`), the answer to it when there is one (labelled "Question" then), the newest fix comment and the newest review comment, oldest first, each cut at 1,500 characters with " …", plus the comment count and `lotar show <ID>` / `lotar task timeline <ID>` for the rest. Phase of a comment = the profile assigned when it was written: `@review…` review (or a comment with `review`), `@merge…` neither, other `@…` fix. Older comments are left out. No comments on the ticket: no section.
+  - [ ] The prompt has a "Comments" section: the open question (the newest comment before the ticket was last assigned to a person, not written by that person, or the newest with a `question`), the answer to it when there is one (labelled "Question" then), the newest fix comment and the newest review comment, oldest first, each cut at 1,500 characters with " …", plus the comment count and `lotar show <ID>` / `lotar task timeline <ID>` for the rest. Phase of a comment = the profile last assigned when it was written (an agent working on after a hand-back continues that phase): `@review…` review (or a comment with `review`), `@merge…` neither, other `@…` fix; automation's comments are not fix or review comments. The answer is the first later comment with an `answer` or by the person the question's phase handed the ticket to. Older comments are left out. No comments on the ticket: no section.
   - [ ] Recent context carries the newest `context_entries` (profile setting, default 2: the previous job's prompt and reply) of the stored entries, each cut at 1,500 characters; `0` leaves the section out. Stored entries stay 20.
   - [ ] Profile `full_history: true` gives the old prompt: all stored entries uncut, no Comments section; it wins over `context_entries`.
   - [ ] Built-in instructions plus "This job" notes are at most two thirds of before (≤ 3.47k of 5.2k characters, expanded for a T3 fix job), saying the same; the tests that pin their phrases pass.
@@ -95,3 +111,47 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-608","DEV-611","DEV-618"]}'
+- at: 2026-11-16T22:35:55.151774+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T22:35:56.413959+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563"]}'
+- at: 2026-11-16T22:48:01.615299+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposals 3 and 5.
+
+      ## Found
+      - Job prompts: fix mean 12k characters, review 19k, merge 34k (max 45k). The ticket context with its whole comment history and the last 20 prompts and replies is most of it: merge 26k characters on average. On Claude a merge job's prompt is 14.8k tokens, written fresh to the cache and re-read on every call.
+      - The built-in agent instructions are 5.2k characters (about 1.8k tokens) in every job.
+      - 2026-11-16 (claude): today's prompt carries no comments; the history is the "Recent context": up to 20 stored prompts (median 2.5k, the rule's boilerplate) and replies (median 1.0k), uncut. The 5.2k are the built-in instructions (3.9k) plus the "This job" notes (1.3k).
+
+      ## Done when
+      - [ ] The prompt has a "Comments" section: the open question (the newest comment before the ticket was last assigned to a person, not written by that person, or the newest with a `question`), the answer to it when there is one (labelled "Question" then), the newest fix comment and the newest review comment, oldest first, each cut at 1,500 characters with " …", plus the comment count and `lotar show <ID>` / `lotar task timeline <ID>` for the rest. Phase of a comment = the profile assigned when it was written: `@review…` review (or a comment with `review`), `@merge…` neither, other `@…` fix. Older comments are left out. No comments on the ticket: no section.
+      - [ ] Recent context carries the newest `context_entries` (profile setting, default 2: the previous job's prompt and reply) of the stored entries, each cut at 1,500 characters; `0` leaves the section out. Stored entries stay 20.
+      - [ ] Profile `full_history: true` gives the old prompt: all stored entries uncut, no Comments section; it wins over `context_entries`.
+      - [ ] Built-in instructions plus "This job" notes are at most two thirds of before (≤ 3.47k of 5.2k characters, expanded for a T3 fix job), saying the same; the tests that pin their phrases pass.
+      - [ ] Measured before and after on a fix, review and merge prompt of the same ticket; numbers in the ticket.
+      - [ ] docs/help/agent.md and config-reference.md describe the sections and both settings.
+    new: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposals 3 and 5.
+
+      ## Found
+      - Job prompts: fix mean 12k characters, review 19k, merge 34k (max 45k). The ticket context with its whole comment history and the last 20 prompts and replies is most of it: merge 26k characters on average. On Claude a merge job's prompt is 14.8k tokens, written fresh to the cache and re-read on every call.
+      - The built-in agent instructions are 5.2k characters (about 1.8k tokens) in every job.
+      - 2026-11-16 (claude): today's prompt carries no comments; the history is the "Recent context": up to 20 stored prompts (median 2.5k, the rule's boilerplate) and replies (median 1.0k), uncut. The 5.2k are the built-in instructions (3.9k) plus the "This job" notes (1.3k).
+
+      ## Done when
+      - [ ] The prompt has a "Comments" section: the open question (the newest comment before the ticket was last assigned to a person, not written by that person, or the newest with a `question`), the answer to it when there is one (labelled "Question" then), the newest fix comment and the newest review comment, oldest first, each cut at 1,500 characters with " …", plus the comment count and `lotar show <ID>` / `lotar task timeline <ID>` for the rest. Phase of a comment = the profile last assigned when it was written (an agent working on after a hand-back continues that phase): `@review…` review (or a comment with `review`), `@merge…` neither, other `@…` fix; automation's comments are not fix or review comments. The answer is the first later comment with an `answer` or by the person the question's phase handed the ticket to. Older comments are left out. No comments on the ticket: no section.
+      - [ ] Recent context carries the newest `context_entries` (profile setting, default 2: the previous job's prompt and reply) of the stored entries, each cut at 1,500 characters; `0` leaves the section out. Stored entries stay 20.
+      - [ ] Profile `full_history: true` gives the old prompt: all stored entries uncut, no Comments section; it wins over `context_entries`.
+      - [ ] Built-in instructions plus "This job" notes are at most two thirds of before (≤ 3.47k of 5.2k characters, expanded for a T3 fix job), saying the same; the tests that pin their phrases pass.
+      - [ ] Measured before and after on a fix, review and merge prompt of the same ticket; numbers in the ticket.
+      - [ ] docs/help/agent.md and config-reference.md describe the sections and both settings.

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T22:00:10.998529+00:00
+modified: 2026-11-16T22:49:03.857766+00:00
 relationships:
   related:
   - DEV-577
@@ -18,6 +18,8 @@ relationships:
   - DEV-603
   - DEV-600
   - DEV-606
+  - DEV-608
+  - DEV-611
 comments:
 - date: 2026-11-16T04:16:01.944881+00:00
   author: claude
@@ -540,3 +542,15 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T22:19:27.805675+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606"]}'
+    new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608"]}'
+- at: 2026-11-16T22:49:03.857766+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608"]}'
+    new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588","DEV-566","DEV-602","DEV-603","DEV-600","DEV-606","DEV-608","DEV-611"]}'

@@ -1,11 +1,43 @@
 title: 't3 runner: name the thread <ID> <step>: <title> itself, so job prompts drop the rename step'
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-16T19:57:09.544779+00:00
+modified: 2026-11-16T22:25:33.253710+00:00
+relationships:
+  related:
+  - DEV-613
+comments:
+- date: 2026-11-16T22:25:19.837146+00:00
+  author: claude
+  text: |-
+    New threads are named now; renaming a continued thread needs your call, because T3 Code's CLI can't rename a thread.
+
+    - `agents.<name>.thread_name` and the rule's `agent.thread_name` (the rule wins) take a template like `"${{ticket.id}} fix: ${{ticket.title}}"`. The job fills it in from the ticket when it starts and passes it to `t3 thread start --title`. Unset or empty: `<ID> <title>` as today.
+    - `POST /api/jobs` takes `thread_name`; `api_types.rs`, `types.ts` and `openapi.json` agree. Docs: `agent.md`, `automation.md`, `config-reference.md`.
+    - Blocker: `t3` 0.1.9 has only `list/start/send/show`. Nothing renames a thread, and `send` takes no title. So for now a continued thread (merge, rework: `session: continue`) keeps its name, and the job log says so.
+    - `a_queue_entry_held_by_a_waiting_thread_says_so_once` failed twice under load, then passed on its own. That's the flake [DEV-613](https://lotar.pyxzl.net/task/DEV-613) covers, not this change.
+
+    **Question:** how should a continued thread get its new name?
+    1. (Recommended) Keep it as it is now. Standards drops the rename step from the fix and review prompts and keeps it only in merge and rework, which continue a thread. I'd also draft a T3 Code feature request for `t3 thread rename` (or `send --title`) for you to approve before filing.
+    2. lotar renames through the T3 Code server's internal API, which T3 doesn't document and can change in any release.
+  report:
+    commits:
+    - hash: 67fbb375
+      what: thread_name on profiles and rules; new threads start with it
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent, run with RUSTC_WRAPPER= because sccache hung
+    - command: npm test
+      result: passed
+      reason: test:agent, 2262 Rust tests + UI/release/hooks
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: 'Owner: choose how a continued thread gets renamed (question below)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
 description: |-
@@ -73,3 +105,22 @@ history:
       - [ ] Without the setting, names stay as today (`<ID> <title>`).
       - [ ] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
       - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md); standards then drops the rename step from its prompts (configs/lotar/automation.yml).
+- at: 2026-11-16T22:25:19.837146+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T22:25:19.990262+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-613"]}'
+- at: 2026-11-16T22:25:33.253710+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

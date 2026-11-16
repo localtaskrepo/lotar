@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:47:15.051643+00:00
-modified: 2026-11-16T20:27:18.089210+00:00
+modified: 2026-11-16T22:53:23.634249+00:00
 relationships:
   related:
   - DEV-603
@@ -14,6 +14,11 @@ relationships:
   - DEV-598
   - DEV-621
   - DEV-620
+  - DEV-605
+  - DEV-606
+  - DEV-608
+  - DEV-624
+  - DEV-626
 comments:
 - date: 2026-11-16T05:40:30.225209+00:00
   author: claude
@@ -117,6 +122,15 @@ comments:
     - Earlier review, merge and fix jobs failed on Claude rate limits, not on the work
     - DEV-603 landed on main as `17e19601`; dropped the cherry-picked copy `685654c4` and rebased cleanly: DEV-611 is now `5821043c` on `804cb0f9`
     - The machine is swapping hard (21 of 22.5 GB swap used, load ~40): the Rust build is slow
+- date: 2026-11-16T22:49:03.528926+00:00
+  author: claude
+  text: |-
+    Merge in progress: rebased onto main `b1cd11a1` as `bdaad138`, checks rerunning.
+
+    - The copied DEV-603 commit `685654c4` was dropped in the first rebase: its code diff is identical to main's `17e19601` (only `.tasks` differed).
+    - First run on `e6b2647d` (main `804cb0f9`): lint passed, Rust 2259/2259 with `--no-fail-fast`, UI, release and hooks tests passed. The first full run hit the known DEV-624 flake (`serve_honors_explicit_tasks_dir_for_api_requests`, status 0 under load average 130). It passed alone.
+    - Main then gained DEV-606, DEV-605 and DEV-608, so I'm rerunning everything on the rebased HEAD.
+    - Side effect: to stop my smoke build I ran `pkill -f 'cargo build --profile smoke'`, which matches that build on the whole machine. Another session's smoke build running then may have been killed too.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2315ac2a-047b-4c72-ae46-d62a09fb92e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5c48277-3e75-4eda-a4ad-5c48ac6a045b
@@ -327,3 +341,19 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T22:49:03.528926+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T22:49:03.859650+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620"]}'
+    new: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620","DEV-605","DEV-606","DEV-608","DEV-624"]}'
+- at: 2026-11-16T22:53:23.634249+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620","DEV-605","DEV-606","DEV-608","DEV-624"]}'
+    new: '{"related":["DEV-603","DEV-599","DEV-615","DEV-598","DEV-621","DEV-620","DEV-605","DEV-606","DEV-608","DEV-624","DEV-626"]}'

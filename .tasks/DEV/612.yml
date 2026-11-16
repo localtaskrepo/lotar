@@ -5,12 +5,13 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-16T18:40:41.509173+00:00
+modified: 2026-11-16T22:53:23.634860+00:00
 relationships:
   depends_on:
   - DEV-602
   related:
   - DEV-602
+  - DEV-626
 comments:
 - date: 2026-11-16T05:29:25.407255+00:00
   author: automation
@@ -87,7 +88,7 @@ description: |-
   - Builds on DEV-602 (owner 2026-11-15, options picker: "Wait for DEV-602"): start only once DEV-602 is on main.
 
   ## Done when
-  - [ ] A branch counted only because a saved job logged its name counts only while its tip descends from a `ticket_commit` a job of the ticket logged, or one of its commits missing from the main checkout's branch has a subject that starts with the ticket ID (`DEV-612` followed by a non-alphanumeric character or the end, so `DEV-6120` doesn't match). Otherwise it is skipped. A job that logged no `ticket_commit` relies on the subject check alone.
+  - [ ] A branch counted only because a saved job logged its name counts only while its tip descends from a `ticket_commit` a job of the ticket logged that the main checkout's branch lacks (a logged commit on main doesn't count: every branch made from main descends from it), or one of its commits missing from the main checkout's branch has a subject that starts with the ticket ID (`DEV-612` followed by a non-alphanumeric character or the end, so `DEV-6120` doesn't match). Otherwise it is skipped. A job that logged no `ticket_commit` relies on the subject check alone.
   - [ ] `agent/<ID>` itself and branches traced to it (`BranchOwners`) count as before: the check covers logged names only.
   - [ ] Both callers get it: `follow_ticket_work` leaves `agent/<ID>` where it is, and `ensure_branch_merged` doesn't fail a merge naming the skipped branch.
   - [ ] A step fails: a git call that can't answer (missing ref, git error) skips the branch, as an unknown owner.
@@ -221,3 +222,41 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T22:21:37.644745+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-602 review.
+
+      ## Found
+      - `unlanded_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` (on `agent/DEV-602`, not yet on main) counts every branch whose *name* a saved job of the ticket logged (`.tasks/@agent-logs`), with no check that the branch is still the one the job worked on.
+      - Done cleanup deletes `t3/<topic>` branches, and T3 Code can give the freed name to another ticket's thread. When the first ticket is reopened, `follow_ticket_work` can point `agent/<ID>` at the other ticket's work (when `agent/<ID>` has none of its own). And `ensure_branch_merged` can then fail a good merge, naming that branch.
+      - Builds on DEV-602 (owner 2026-11-15, options picker: "Wait for DEV-602"): start only once DEV-602 is on main.
+
+      ## Done when
+      - [ ] A branch counted only because a saved job logged its name counts only while its tip descends from a `ticket_commit` a job of the ticket logged, or one of its commits missing from the main checkout's branch has a subject that starts with the ticket ID (`DEV-612` followed by a non-alphanumeric character or the end, so `DEV-6120` doesn't match). Otherwise it is skipped. A job that logged no `ticket_commit` relies on the subject check alone.
+      - [ ] `agent/<ID>` itself and branches traced to it (`BranchOwners`) count as before: the check covers logged names only.
+      - [ ] Both callers get it: `follow_ticket_work` leaves `agent/<ID>` where it is, and `ensure_branch_merged` doesn't fail a merge naming the skipped branch.
+      - [ ] A step fails: a git call that can't answer (missing ref, git error) skips the branch, as an unknown owner.
+      - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
+    new: |-
+      Found in the DEV-602 review.
+
+      ## Found
+      - `unlanded_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` (on `agent/DEV-602`, not yet on main) counts every branch whose *name* a saved job of the ticket logged (`.tasks/@agent-logs`), with no check that the branch is still the one the job worked on.
+      - Done cleanup deletes `t3/<topic>` branches, and T3 Code can give the freed name to another ticket's thread. When the first ticket is reopened, `follow_ticket_work` can point `agent/<ID>` at the other ticket's work (when `agent/<ID>` has none of its own). And `ensure_branch_merged` can then fail a good merge, naming that branch.
+      - Builds on DEV-602 (owner 2026-11-15, options picker: "Wait for DEV-602"): start only once DEV-602 is on main.
+
+      ## Done when
+      - [ ] A branch counted only because a saved job logged its name counts only while its tip descends from a `ticket_commit` a job of the ticket logged that the main checkout's branch lacks (a logged commit on main doesn't count: every branch made from main descends from it), or one of its commits missing from the main checkout's branch has a subject that starts with the ticket ID (`DEV-612` followed by a non-alphanumeric character or the end, so `DEV-6120` doesn't match). Otherwise it is skipped. A job that logged no `ticket_commit` relies on the subject check alone.
+      - [ ] `agent/<ID>` itself and branches traced to it (`BranchOwners`) count as before: the check covers logged names only.
+      - [ ] Both callers get it: `follow_ticket_work` leaves `agent/<ID>` where it is, and `ensure_branch_merged` doesn't fail a merge naming the skipped branch.
+      - [ ] A step fails: a git call that can't answer (missing ref, git error) skips the branch, as an unknown owner.
+      - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
+- at: 2026-11-16T22:53:23.634860+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-602"],"related":["DEV-602"]}'
+    new: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626"]}'

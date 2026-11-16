@@ -5,13 +5,14 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T21:38:22.977889+00:00
+modified: 2026-11-16T22:53:23.633688+00:00
 relationships:
   related:
   - DEV-599
   - DEV-594
   - DEV-624
   - DEV-583
+  - DEV-626
 comments:
 - date: 2026-11-16T05:21:49.697784+00:00
   author: claude
@@ -120,6 +121,34 @@ comments:
     - Mutation: with `&& *known == asked` removed, the new test fails at "asks about both threads again" (`left: 6, right: 8`), matching what the fix agent reported.
     - Not rerun: full `npm run lint`/`test`/`smoke`. The machine was overloaded (load ~150, the build took 53 min). Only test code changed, and the fix agent reports all three passed.
     - No owner decision touched, no UI. Minor findings: none, no tickets filed.
+- date: 2026-11-16T22:21:18.773494+00:00
+  author: claude
+  text: |-
+    Rebased onto main: the test now sits on main's DEV-599, ready for review.
+
+    - The earlier review, merge and fix jobs failed on Claude rate limits, not on the work.
+    - Main now has DEV-599 (`01a9160e`), reworked after DEV-583. The branch's old copy (`45730a7f`) conflicted with it, so I rebased only the test commit onto main: `git rebase --onto main 45730a7f`. `02c1cd8a` became `aba86f0b`, and the branch is one commit on top of main.
+    - `running_t3_thread` on main still has the `&& *known == asked` check, and the test needed no change.
+  report:
+    commits:
+    - hash: aba86f0b
+      what: test a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer, rebased onto main
+    checks:
+    - command: cargo nextest run -E test(/dev503_harness_jobs_test/)
+      result: passed
+      reason: 35/35, RUSTC_WRAPPER= (sccache hung)
+    - command: 'mutation: drop ''&& *known == asked'''
+      result: passed
+      reason: test fails, 6 shows vs 8
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: not_run
+      reason: machine load 50-150 and hung sccache; passed on the pre-rebase commit 02c1cd8a
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: same reason; passed on 02c1cd8a
+    next: Review, then merge (the merge agent runs the full checks)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aff9d5016-1a23-4cb7-9b5e-a671b7abb78a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177bbfb8-8291-4dbc-bae5-a926f125a36d
@@ -274,3 +303,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-599","DEV-594","DEV-624"]}'
     new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583"]}'
+- at: 2026-11-16T22:21:18.773494+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T22:53:23.633688+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583"]}'
+    new: '{"related":["DEV-599","DEV-594","DEV-624","DEV-583","DEV-626"]}'

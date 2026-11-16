@@ -5,11 +5,12 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-15T22:25:18.384081+00:00
-modified: 2026-11-16T21:33:23.469168+00:00
+modified: 2026-11-16T22:53:23.618681+00:00
 relationships:
   related:
   - DEV-513
   - DEV-581
+  - DEV-626
 comments:
 - date: 2026-11-16T21:33:22.376872+00:00
   author: claude
@@ -48,3 +49,9 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-16T22:53:23.618681+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-513","DEV-581"]}'
+    new: '{"related":["DEV-513","DEV-581","DEV-626"]}'

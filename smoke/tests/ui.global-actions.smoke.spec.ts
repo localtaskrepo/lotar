@@ -117,7 +117,12 @@ describe.concurrent('Global task action and compact toolbars (DEV-98)', () => {
                             if (route.includes('project=ACT'))
                                 expect(await panel.locator('select').first().inputValue()).toBe('ACT');
                             expect(await globalCreate.isDisabled()).toBe(true);
-                            await panel.getByRole('button', { name: 'Close panel', exact: true }).click();
+                            // Under full-suite load the panel can still be sliding in, and a
+                            // click waits for a stable box until it times out (DEV-607). The
+                            // button's own click event closes it wherever the box is.
+                            await panel
+                                .getByRole('button', { name: 'Close panel', exact: true })
+                                .dispatchEvent('click');
                             await panel.waitFor({ state: 'detached' });
                         }
                         expect(writes).toEqual([]);

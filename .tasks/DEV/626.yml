@@ -1,0 +1,43 @@
+title: After a restart T3 Code resumes cut-off job threads on its own, outside any lotar job, and their tickets stay HelpNeeded
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T22:53:21.812089+00:00
+modified: 2026-11-16T22:53:24.272663+00:00
+relationships:
+  related:
+  - DEV-593
+  - DEV-594
+  - DEV-598
+  - DEV-591
+  - DEV-607
+  - DEV-609
+  - DEV-611
+  - DEV-612
+description: |-
+  Found by the chief of staff 2026-11-16 (owner: "a few work threads in t3 are stuck for quite a while").
+
+  ## Found
+  - The Mac crashed at 23:13 on 2026-11-15; the running jobs failed and their tickets went to HelpNeeded with the retry question (DEV-607, DEV-609, DEV-611, DEV-612).
+  - When T3 Code's server started again (2026-11-16 18:39:39Z) it requested a new run on every thread whose turn the crash had cut off (run ordinal 3, 'requestedAt 18:39:39'). Six such threads ran for 4 hours outside any lotar job: lotar list-running showed 4 jobs, T3 10 running threads. DEV-611 had three at once (fix, merge, plain thread) on one branch; each rebuilt lotar from scratch and ran lint, test and smoke while the Mac was overloaded; queued jobs (the v0.15.2 release DEV-591) waited 1.5 h.
+  - Their outcome never reaches the ticket: no end rule runs, so a finished merge leaves the ticket HelpNeeded on mallox.
+  - Separately: lotar ran 4 jobs although .tasks/DEV/config.yml sets max_parallel_jobs: 2 (installed 0.15.1; check whether the per-project limit is only on main).
+
+  ## Done when
+  - [ ] When a ticket's earlier job thread is running again without a lotar job (T3 resumed it), lotar either adopts it as a job (records it, counts it toward the limit, runs the end rules when it ends) or stops it and queues the step the ticket needs; say which and why in the ticket.
+  - [ ] Never more than one running thread per ticket; the duplicate is stopped with a comment.
+  - [ ] Tests with the fake t3 (a thread that turns running with no job); docs in docs/help/agent.md.
+history:
+- at: 2026-11-16T22:53:23.635327+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-593","DEV-594","DEV-598"]}'
+    new: '{"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612"]}'
+- at: 2026-11-16T22:53:24.272663+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

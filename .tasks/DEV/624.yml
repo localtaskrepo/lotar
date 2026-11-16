@@ -1,16 +1,27 @@
 title: 'Flaky test: cli_serve_features_test serve tests get no response within the 1.5 s read timeout under load'
-status: Todo
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T21:05:30.352250+00:00
-modified: 2026-11-16T21:05:31.170172+00:00
+modified: 2026-11-16T22:49:03.860154+00:00
 relationships:
   related:
   - DEV-609
   - DEV-354
   - DEV-359
+  - DEV-607
+  - DEV-611
+comments:
+- date: 2026-11-16T22:37:11.900989+00:00
+  author: claude
+  text: |-
+    Seen again 2026-11-16 in the DEV-607 merge (load ~60): `serve_honors_explicit_tasks_dir_for_api_requests` failed at `cli_serve_features_test.rs:169`, `output capture did not finish: Err(Timeout)`.
+
+    - `npm run test:agent`, worktree `t3-a42a9c69`, on `74796683`; the next full run passed 2258/2258.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97fc7517-3464-4ef3-a807-2a602fdbf376
 description: |-
   Found in the DEV-609 merge (2026-11-16): `npm run test:agent` failed twice on `2b7224a0` (main `804cb0f9` plus one test in another file) while the Mac's load average was 140-170.
 
@@ -38,3 +49,30 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T22:25:12.228254+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T22:25:13.064318+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97fc7517-3464-4ef3-a807-2a602fdbf376
+- at: 2026-11-16T22:37:11.900989+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T22:37:12.487725+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-609","DEV-354","DEV-359"]}'
+    new: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607"]}'
+- at: 2026-11-16T22:49:03.860154+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607"]}'
+    new: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611"]}'

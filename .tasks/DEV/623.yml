@@ -1,16 +1,47 @@
 title: The queue starts no new job while the Mac is short of memory
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-16T21:00:56.248007+00:00
+modified: 2026-11-16T22:24:58.302526+00:00
 relationships:
   related:
   - DEV-604
   - DEV-378
   - DEV-525
+comments:
+- date: 2026-11-16T22:24:43.617057+00:00
+  author: claude
+  text: |-
+    Memory gate built: while macOS reports memory pressure (warn/critical) or swap is over 85%, no new agent job starts; held jobs start after 2 min of normal memory.
+
+    - New `crates/lotar-lib/src/services/memory_gate.rs`: reads `sysctl kern.memorystatus_vm_pressure_level vm.swapusage` (Linux: `/proc/meminfo` swap), rereads every 30 s while held, 5 s while open; shared state `memory-gate-<hash>.json` in the queue dir
+    - Queue worker takes no entry while held (attempts unchanged, no ticket comments); `lotar serve` queues new jobs and a 30 s tick starts them once memory is normal
+    - `lotar agent queue` / `list-jobs`: `waiting for memory: … (held since …)`, JSON `memory_hold`; a failed reading holds nothing and is warned about
+    - Config `agent.memory_gate` (`enabled` unset = on on macOS only, `max_swap_percent` 85, `settle_seconds` 120); docs in `docs/help/agent.md` § Memory gate and `config-reference.md`
+    - Tests: unit tests with fake readings (warn, critical, swap high, back to normal, settle restart, failed reading), sysctl/meminfo parsing; integration `dev623_memory_gate_test` (held entry, queue + list-jobs output). Tests/smoke set `LOTAR_MEMORY_READING=normal`
+    - Heads-up: this Mac reads pressure **warn** right now (swap 3.8 of 5 GB), so with this build jobs would wait until it clears. `agent.memory_gate.enabled: false` turns it off
+    - No REST/UI change; the Config page doesn't show the new keys
+  report:
+    commits:
+    - hash: 955578b7
+      what: memory gate in the queue worker and lotar serve, agent.memory_gate config, queue/list-jobs status, docs, tests
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent, RUSTC_WRAPPER= (sccache queue stalled)
+    - command: npm test
+      result: passed
+      reason: test:agent, 2268 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: real macOS reading
+      result: passed
+      reason: pressure warn held a queued job
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 description: |-
@@ -103,3 +134,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-604"]}'
     new: '{"related":["DEV-604","DEV-378","DEV-525"]}'
+- at: 2026-11-16T22:24:43.617057+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T22:24:58.302526+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
