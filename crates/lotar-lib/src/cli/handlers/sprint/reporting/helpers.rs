@@ -1,8 +1,8 @@
-use chrono::{Duration, Utc};
-
 use crate::services::sprint_metrics::SprintBurndownMetric;
 use crate::services::sprint_service::SprintRecord;
 use crate::services::sprint_status::{self, SprintLifecycleState};
+use jiff::SignedDuration;
+use jiff::Timestamp;
 
 pub(crate) fn format_percentage(value: Option<f64>) -> String {
     match value {
@@ -33,8 +33,8 @@ pub(crate) fn metric_label(metric: SprintBurndownMetric) -> &'static str {
     }
 }
 
-pub(crate) fn format_duration(duration: Duration) -> String {
-    let mut seconds = duration.num_seconds();
+pub(crate) fn format_duration(duration: SignedDuration) -> String {
+    let mut seconds = duration.as_secs();
     let negative = seconds < 0;
     if negative {
         seconds = -seconds;
@@ -67,7 +67,7 @@ pub(crate) fn select_sprint_id_for_review(records: &[SprintRecord]) -> Option<u3
         return None;
     }
 
-    let now = Utc::now();
+    let now = Timestamp::now();
     let mut completed = Vec::new();
     let mut active = Vec::new();
     let mut pending = Vec::new();

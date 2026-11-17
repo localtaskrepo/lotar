@@ -12,6 +12,7 @@
 //!   dry runs, and force;
 //! - the computed `config show` / `config inspect` fields.
 
+use lotar::utils::time;
 use std::collections::BTreeMap;
 
 use lotar::services::config_service::ConfigService;
@@ -67,7 +68,7 @@ fn unset_done_states_keep_legacy_inferred_mode() {
         );
     }
     // The live calendar day equals today's server-local date.
-    let today = chrono::Local::now().date_naive().format("%Y-%m-%d").to_string();
+    let today = time::local_today().strftime("%Y-%m-%d").to_string();
     assert_eq!(inspect["global_effective"]["task_calendar_day"].as_str(), Some(today.as_str()));
 }
 

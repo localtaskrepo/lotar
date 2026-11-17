@@ -1,4 +1,6 @@
 use crate::storage::task::parse_status_from_yaml;
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 
 pub(crate) fn run_status(
     id: &str,
@@ -210,7 +212,7 @@ pub(crate) fn run_time_in_status(
     Ok(())
 }
 
-type StatusSnapshot = (chrono::DateTime<chrono::Utc>, Option<crate::types::TaskStatus>);
+type StatusSnapshot = (Timestamp, Option<crate::types::TaskStatus>);
 
 /// Seconds a task file spent in each status within `since..=until`, replayed
 /// from its git history. `None` when the file has no commits up to `until`.
@@ -218,8 +220,8 @@ fn status_durations(
     repo_root: &std::path::Path,
     tasks_root: &std::path::Path,
     file_rel: &std::path::Path,
-    since_dt: chrono::DateTime<chrono::Utc>,
-    until_dt: chrono::DateTime<chrono::Utc>,
+    since_dt: Timestamp,
+    until_dt: Timestamp,
 ) -> Result<Option<std::collections::BTreeMap<String, i64>>, String> {
     use crate::services::audit_service::AuditService;
 
@@ -241,9 +243,9 @@ fn status_durations(
         snaps.iter().take_while(|(dt, _)| *dt <= since_dt).filter_map(|(_, st)| st.clone()).last().or_else(|| snaps.iter().find_map(|(_, st)| st.clone()));
 
     let mut durations = std::collections::BTreeMap::new();
-    let mut add = |status: &Option<crate::types::TaskStatus>, from, to: chrono::DateTime<chrono::Utc>| {
+    let mut add = |status: &Option<crate::types::TaskStatus>, from, to: Timestamp| {
         if let Some(status) = status {
-            let secs = to.signed_duration_since(from).num_seconds().max(0);
+            let secs = to.duration_since(from).as_secs().max(0);
             *durations.entry(status.to_string()).or_insert(0) += secs;
         }
     };

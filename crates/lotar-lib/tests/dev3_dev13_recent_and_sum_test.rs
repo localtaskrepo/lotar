@@ -1,8 +1,9 @@
 //! DEV-3: `recent:` takes any days or weeks, measured from `modified`, and
 //! `-recent:<N>d` lists tasks not changed for that long (also `stats stale`).
 //! DEV-13: `lotar list --sum <field>` adds totals over every matching task.
-
-use chrono::{Duration, Utc};
+use jiff::Timestamp;
+use lotar::utils::time;
+use lotar::utils::time::Rfc3339;
 use serde_json::Value;
 
 use crate::common;
@@ -23,7 +24,7 @@ fn workspace() -> Workspace {
         (3, 40, "effort: 3pt\ncustom_fields:\n  estimate: lots\n"),
         (4, 60, "status: Done\n"),
     ] {
-        let modified = (Utc::now() - Duration::days(age)).to_rfc3339();
+        let modified = (Timestamp::now() - time::days(age)).to_rfc3339();
         let status = if extra.contains("status:") { "" } else { "status: Todo\n" };
         std::fs::write(
             tasks_dir.join("RS").join(format!("{num}.yml")),

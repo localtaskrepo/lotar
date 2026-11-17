@@ -1,12 +1,13 @@
-use chrono::Local;
+use jiff::civil::Date;
+use lotar::utils::time;
 use serde_json::Value;
 
 use crate::common;
 use common::TestFixtures;
 
 fn ymd_string(days_from_today: i64) -> String {
-    let d = Local::now().date_naive() + chrono::Duration::days(days_from_today);
-    d.format("%Y-%m-%d").to_string()
+    let d = time::local_today() + time::days(days_from_today);
+    d.strftime("%Y-%m-%d").to_string()
 }
 
 #[test]
@@ -42,8 +43,8 @@ fn parse_shortcuts_and_offsets() {
     let v: Value = serde_json::from_slice(&out).unwrap();
     // result should be >= tomorrow but skip weekend specifics by just ensuring it's not in the past
     let new_date = v["new_due_date"].as_str().unwrap();
-    let today = Local::now().date_naive();
-    let parsed = chrono::NaiveDate::parse_from_str(new_date, "%Y-%m-%d").unwrap();
+    let today = time::local_today();
+    let parsed = Date::strptime("%Y-%m-%d", new_date).unwrap();
     assert!(parsed >= today);
 
     // +2bd
@@ -51,7 +52,7 @@ fn parse_shortcuts_and_offsets() {
     let out = cmd.current_dir(temp_dir).arg("due-date").arg("1").arg("+2bd").arg("--format=json").assert().success().get_output().stdout.clone();
     let v: Value = serde_json::from_slice(&out).unwrap();
     let new_date = v["new_due_date"].as_str().unwrap();
-    let parsed = chrono::NaiveDate::parse_from_str(new_date, "%Y-%m-%d").unwrap();
+    let parsed = Date::strptime("%Y-%m-%d", new_date).unwrap();
     assert!(parsed >= today);
 }
 
@@ -70,8 +71,8 @@ fn parse_weekday_phrases() {
         let v: Value = serde_json::from_slice(&out).unwrap();
         let new_date = v["new_due_date"].as_str().unwrap();
         // Ensure it's a valid YYYY-MM-DD and in the future
-        let parsed = chrono::NaiveDate::parse_from_str(new_date, "%Y-%m-%d").unwrap();
-        assert!(parsed > Local::now().date_naive());
+        let parsed = Date::strptime("%Y-%m-%d", new_date).unwrap();
+        assert!(parsed > time::local_today());
     }
 }
 

@@ -9,8 +9,10 @@ use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
 use crate::utils::git::{clear_repository_env, git_command, verified_common_dir};
+use crate::utils::time;
 use crate::workspace::TasksDirectoryResolver;
-use chrono::Utc;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
@@ -334,7 +336,7 @@ impl AgentJobService {
         let history = PromptHistory { full: profile.full_history.unwrap_or(false), entries: profile.context_entries.unwrap_or(DEFAULT_CONTEXT_ENTRIES) };
         let prompt = build_prompt(&task, &user_prompt, context.as_ref(), history, earlier.as_deref(), instructions.as_deref(), Some(&notes));
 
-        let created_at = Utc::now().to_rfc3339();
+        let created_at = time::now_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
         let (job_model, job_effort) = (profile.model.clone(), profile.effort.clone());
 
@@ -608,7 +610,7 @@ impl AgentJobService {
             let mut cancelled = false;
             if state.record.status != AgentJobStatus::Cancelled {
                 state.record.status = AgentJobStatus::Cancelled;
-                state.record.finished_at = Some(Utc::now().to_rfc3339());
+                state.record.finished_at = Some(time::now_rfc3339());
                 record_and_emit(state, "agent_job_cancelled", None);
                 cancelled = true;
             }
@@ -883,7 +885,7 @@ fn job_context_for(id: &str) -> Option<AutomationJobContext> {
 }
 
 fn make_job_id() -> String {
-    let stamp = Utc::now().format("%Y%m%dT%H%M%S%.3fZ").to_string();
+    let stamp = Timestamp::now().strftime("%Y%m%dT%H%M%S%.3fZ").to_string();
     let counter = JOB_COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("job-{stamp}-{counter}")
 }
@@ -3196,10 +3198,10 @@ fn run_job(
     // A process killed during the worktree setup leaves this record, so the
     // next worker or server ends the job (DEV-598).
     let setup_record = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        registry.jobs.get(&job_id).map(|state| crate::services::agent_active_jobs::ActiveJob {
-            in_setup: true,
-            ..active_record_of(state, &ticket_id, &Utc::now().to_rfc3339(), None)
-        })
+        registry
+            .jobs
+            .get(&job_id)
+            .map(|state| crate::services::agent_active_jobs::ActiveJob { in_setup: true, ..active_record_of(state, &ticket_id, &time::now_rfc3339(), None) })
     });
     if let Some(record) = setup_record.as_ref() {
         crate::services::agent_active_jobs::register(&tasks_dir, record);
@@ -3217,7 +3219,7 @@ fn run_job(
     let mut merge_started_at = None;
     if let Some(settings) = config.agent_merge.as_ref().filter(|_| merge::is_merge_job(&job_id)) {
         if crate::config::trust::TrustService::allows_commands(&tasks_dir) {
-            let started_at = Utc::now().to_rfc3339();
+            let started_at = time::now_rfc3339();
             if !start_job(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &started_at, None) {
                 return;
             }
@@ -3275,8 +3277,8 @@ fn run_job(
         && let Some(idle) = idle_since(&record.last_used)
     {
         let limit = profile.continue_within_minutes.unwrap_or(DEFAULT_CONTINUE_WITHIN_MINUTES);
-        let minutes = idle.num_minutes();
-        if idle >= chrono::Duration::minutes(i64::try_from(limit).unwrap_or(i64::MAX)) {
+        let minutes = idle.as_mins();
+        if idle >= SignedDuration::from_mins(i64::try_from(limit).unwrap_or(i64::MAX)) {
             session_reason = Some(format!(
                 "The session {} was last used {minutes} minutes ago, not within continue_within_minutes ({limit}); this job starts a new one with a handoff.",
                 record.name
@@ -3339,7 +3341,7 @@ fn run_job(
         Err(err) => {
             if config.agent_worktree.enabled {
                 // The failure goes to the job's log, so `agent status` shows it.
-                init_job_log(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &Utc::now().to_rfc3339(), None, None);
+                init_job_log(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &time::now_rfc3339(), None, None);
                 update_job_failure(&job_id, &ticket_id, format!("Worktree setup failed: {err}"), &tasks_dir);
                 return;
             }
@@ -3359,7 +3361,7 @@ fn run_job(
     let started_at = match merge_started_at {
         Some(started_at) => started_at,
         None => {
-            let started_at = Utc::now().to_rfc3339();
+            let started_at = time::now_rfc3339();
             let worktree = (worktree_context.worktree_path.as_ref().map(|p| p.to_string_lossy().to_string()), worktree_context.worktree_branch.clone());
             if !start_job(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &started_at, Some(worktree)) {
                 return;
@@ -3437,9 +3439,9 @@ fn run_job(
 const DEFAULT_CONTINUE_WITHIN_MINUTES: u64 = 55;
 
 /// How long ago a session's `last_used` was; `None` when it doesn't parse.
-fn idle_since(last_used: &str) -> Option<chrono::Duration> {
-    let at = chrono::DateTime::parse_from_rfc3339(last_used).ok()?;
-    Some(Utc::now().signed_duration_since(at.with_timezone(&Utc)).max(chrono::Duration::zero()))
+fn idle_since(last_used: &str) -> Option<SignedDuration> {
+    let at = time::parse_rfc3339(last_used).ok()?;
+    Some(Timestamp::now().duration_since(at).max(SignedDuration::ZERO))
 }
 
 /// What a job that starts a new session instead of resuming an idle one
@@ -4645,7 +4647,7 @@ fn finalize_cancelled_job(job_id: &str) {
             return;
         }
         state.cancellation_finalized = true;
-        state.record.finished_at = Some(Utc::now().to_rfc3339());
+        state.record.finished_at = Some(time::now_rfc3339());
         state.record.summary = state.record.last_message.clone();
         state.runtime = None;
         let record = state.record.clone();
@@ -4851,7 +4853,7 @@ fn finalize_job(
     tasks_dir: &std::path::Path,
     config: &ResolvedConfig,
 ) {
-    let now = Utc::now().to_rfc3339();
+    let now = time::now_rfc3339();
     // A runner that reported a failure fails the job even when it exits 0.
     let runner_failed = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.runner_failed)).unwrap_or(false);
     let mut success = exit_code.unwrap_or(1) == 0 && !runner_failed;
@@ -4971,7 +4973,7 @@ fn finalize_job(
         job_id,
         crate::services::agent_log_service::JobStatusLine {
             status: status_str.to_string(),
-            at: Utc::now().to_rfc3339(),
+            at: time::now_rfc3339(),
             exit_code,
             summary,
             usage,
@@ -5017,7 +5019,7 @@ fn exit_description(exit_code: Option<i32>) -> String {
 }
 
 fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir: &std::path::Path) {
-    let now = Utc::now().to_rfc3339();
+    let now = time::now_rfc3339();
     let mut failed = false;
     update_job(job_id, |state| {
         if !matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running) {
@@ -5280,7 +5282,7 @@ fn should_stop_job(job_id: &str) -> bool {
 }
 
 fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
-    let at = Utc::now().to_rfc3339();
+    let at = time::now_rfc3339();
     state.next_sequence = state.next_sequence.saturating_add(1);
     let event = AgentJobEvent { kind: kind.to_string(), sequence: state.next_sequence, at: at.clone(), message };
     state.events.push(event.clone());
@@ -5351,11 +5353,9 @@ fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
 const MAX_FINISHED_JOBS: usize = 500;
 
 fn prune_finished_jobs(registry: &mut JobRegistry) {
-    let cutoff = Utc::now() - chrono::Duration::hours(24);
-    let finished_at = |state: &AgentJobState| {
-        state.record.finished_at.as_deref().and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok()).map(|at| at.with_timezone(&Utc))
-    };
-    let mut finished: Vec<(chrono::DateTime<Utc>, String)> = registry
+    let cutoff = Timestamp::now() - SignedDuration::from_hours(24);
+    let finished_at = |state: &AgentJobState| state.record.finished_at.as_deref().and_then(|at| time::parse_rfc3339(at).ok());
+    let mut finished: Vec<(Timestamp, String)> = registry
         .jobs
         .iter()
         .filter(|(_, state)| {
@@ -5776,7 +5776,7 @@ mod tests {
                 runner: "command".to_string(),
                 agent_profile: None,
                 status: AgentJobStatus::Running,
-                created_at: Utc::now().to_rfc3339(),
+                created_at: time::now_rfc3339(),
                 started_at: None,
                 finished_at: None,
                 exit_code: None,
@@ -5973,7 +5973,7 @@ mod tests {
                 job_id: state.record.id.clone(),
                 ticket_id: "TEST-1".to_string(),
                 runner: "command".to_string(),
-                created_at: Utc::now().to_rfc3339(),
+                created_at: time::now_rfc3339(),
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -6000,7 +6000,7 @@ mod tests {
             agent: agent.map(str::to_string),
             owner_pid: 0,
             child_pid: 0,
-            started_at: Utc::now().to_rfc3339(),
+            started_at: time::now_rfc3339(),
             session_id: Some("thread-1".to_string()),
             assignee_at_start: None,
             in_setup: false,
@@ -6025,7 +6025,7 @@ mod tests {
                 job_id: job_id.to_string(),
                 ticket_id: "TEST-1".to_string(),
                 runner: "t3".to_string(),
-                created_at: Utc::now().to_rfc3339(),
+                created_at: time::now_rfc3339(),
                 worktree_path: None,
                 worktree_branch: Some("agent/TEST-1".to_string()),
                 model: None,
@@ -6036,7 +6036,7 @@ mod tests {
         .expect("init log");
         let status = crate::services::agent_log_service::JobStatusLine {
             status: "completed".to_string(),
-            at: Utc::now().to_rfc3339(),
+            at: time::now_rfc3339(),
             exit_code: Some(0),
             summary: Some("Review passed".to_string()),
             usage: None,
@@ -6093,7 +6093,7 @@ mod tests {
                 job_id: job_id.to_string(),
                 ticket_id: "TEST-1".to_string(),
                 runner: "t3".to_string(),
-                created_at: Utc::now().to_rfc3339(),
+                created_at: time::now_rfc3339(),
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -6172,7 +6172,7 @@ mod tests {
                 job_id: id.to_string(),
                 ticket_id: "TEST-1".to_string(),
                 runner: "command".to_string(),
-                created_at: Utc::now().to_rfc3339(),
+                created_at: time::now_rfc3339(),
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,

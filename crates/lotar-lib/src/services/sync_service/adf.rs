@@ -118,8 +118,8 @@ fn inline_to_text(nodes: &[JsonValue]) -> String {
             "date" => {
                 let rendered = attr("timestamp")
                     .and_then(|ms| ms.parse::<i64>().ok())
-                    .and_then(chrono::DateTime::from_timestamp_millis)
-                    .map(|date| date.format("%Y-%m-%d").to_string());
+                    .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
+                    .map(|date| date.strftime("%Y-%m-%d").to_string());
                 out.push_str(&rendered.unwrap_or_default());
             }
             _ => {

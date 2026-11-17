@@ -3,6 +3,7 @@
 //! which is how they run on a schedule from cron.
 
 use lotar::api_server::{ApiServer, HttpRequest};
+use lotar::utils::time;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -26,7 +27,7 @@ fn workspace(rules: &str) -> Workspace {
             "title: {title}\nstatus: {status}\npriority: Medium\ntype: Feature\ncreated: 2026-07-01T00:00:00Z\nmodified: {changed}\nhistory:\n- at: {changed}\n  actor: me\n  changes:\n  - field: status\n    old: Todo\n    new: {status}\n"
         )
     };
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = time::now_rfc3339();
     std::fs::write(tasks.join("AM/1.yml"), task("Done long ago", "Done", "2026-08-01T00:00:00Z")).unwrap();
     std::fs::write(tasks.join("AM/2.yml"), task("Done today", "Done", &now)).unwrap();
     std::fs::write(tasks.join("AM/3.yml"), task("Still open", "Todo", &now)).unwrap();

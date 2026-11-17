@@ -1,7 +1,7 @@
-use chrono::{DateTime, Duration, Utc};
-
 use crate::storage::sprint::Sprint;
 use crate::utils::time;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SprintLifecycleState {
@@ -58,13 +58,13 @@ impl SprintStatusWarning {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SprintLifecycleStatus {
     pub state: SprintLifecycleState,
-    pub planned_start: Option<DateTime<Utc>>,
-    pub planned_end: Option<DateTime<Utc>>,
-    pub actual_start: Option<DateTime<Utc>>,
-    pub actual_end: Option<DateTime<Utc>>,
-    pub computed_end: Option<DateTime<Utc>>,
+    pub planned_start: Option<Timestamp>,
+    pub planned_end: Option<Timestamp>,
+    pub actual_start: Option<Timestamp>,
+    pub actual_end: Option<Timestamp>,
+    pub computed_end: Option<Timestamp>,
     /// When the sprint turns overdue: `computed_end` plus `plan.overdue_after`.
-    pub overdue_at: Option<DateTime<Utc>>,
+    pub overdue_at: Option<Timestamp>,
     pub warnings: Vec<SprintStatusWarning>,
 }
 
@@ -74,7 +74,7 @@ impl SprintLifecycleStatus {
     }
 }
 
-pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStatus {
+pub fn derive_status(sprint: &Sprint, now: Timestamp) -> SprintLifecycleStatus {
     let mut warnings = Vec::new();
     let plan = sprint.plan.as_ref();
     let actual = sprint.actual.as_ref();
@@ -101,20 +101,20 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
                 }
             }
         })
-        .unwrap_or_else(Duration::zero);
+        .unwrap_or(SignedDuration::ZERO);
 
     let computed_end = if let Some(end) = planned_end {
         Some(end)
     } else if let (Some(actual_start), Some(length)) = (actual_start.as_ref(), length.as_ref()) {
         // Checked: a legacy out-of-range length must not panic status reads.
-        actual_start.checked_add_signed(*length)
+        actual_start.checked_add(*length).ok()
     } else if let (Some(planned_start), Some(length)) = (planned_start.as_ref(), length.as_ref()) {
-        planned_start.checked_add_signed(*length)
+        planned_start.checked_add(*length).ok()
     } else {
         None
     };
 
-    let overdue_at = computed_end.map(|end| end.checked_add_signed(grace).unwrap_or(end));
+    let overdue_at = computed_end.map(|end| end.checked_add(grace).ok().unwrap_or(end));
 
     let state = if actual_end.is_some() {
         SprintLifecycleState::Complete
@@ -135,7 +135,7 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
     SprintLifecycleStatus { state, planned_start, planned_end, actual_start, actual_end, computed_end, overdue_at, warnings }
 }
 
-fn parse_timestamp(field: &'static str, value: Option<&String>, warnings: &mut Vec<SprintStatusWarning>) -> Option<DateTime<Utc>> {
+fn parse_timestamp(field: &'static str, value: Option<&String>, warnings: &mut Vec<SprintStatusWarning>) -> Option<Timestamp> {
     value.and_then(|raw| {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
@@ -151,7 +151,7 @@ fn parse_timestamp(field: &'static str, value: Option<&String>, warnings: &mut V
     })
 }
 
-fn parse_length(field: &'static str, value: Option<&String>, warnings: &mut Vec<SprintStatusWarning>) -> Option<Duration> {
+fn parse_length(field: &'static str, value: Option<&String>, warnings: &mut Vec<SprintStatusWarning>) -> Option<SignedDuration> {
     value.and_then(|raw| {
         let trimmed = raw.trim();
         if trimmed.is_empty() {

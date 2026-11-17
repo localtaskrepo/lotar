@@ -187,7 +187,7 @@ fn rest_and_mcp_report_findings() {
 fn cli_repeated_report_without_news_records_the_date_instead_of_a_comment() {
     let fixtures = TestFixtures::new();
     fixtures.create_config_in_dir(&fixtures.tasks_root, CONFIG);
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let today = jiff::ZonedDateTime::now().strftime("%Y-%m-%d").to_string();
     let comments = |task: &Value| task["comments"].as_array().map_or(0, Vec::len);
 
     add_json(&fixtures, "deps:jest", "jest 30 breaks the build");

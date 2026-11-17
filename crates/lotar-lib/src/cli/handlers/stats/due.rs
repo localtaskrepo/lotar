@@ -1,3 +1,5 @@
+use crate::utils::time;
+use jiff::Timestamp;
 #[expect(clippy::too_many_arguments, reason = "one parameter per CLI flag; this handler forwards them unchanged")]
 pub(crate) fn run(
     buckets: Option<String>,
@@ -37,7 +39,7 @@ pub(crate) fn run(
     // semantics), replacing the date-only/UTC island: RFC3339 due values
     // bucket on the local date they fall on, matching the REST/CLI
     // executor.
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
     let today = crate::services::task_query::today_local(now);
     // Parse threshold for overdue mode (Nd or Nw)
     let overdue_cutoff_days: i64 = if overdue {
@@ -80,7 +82,8 @@ pub(crate) fn run(
             }
             // In overdue-only mode, count only tasks overdue by the threshold.
             if overdue {
-                let days_overdue = crate::services::task_query::parse_stored_due(due_raw).map(|due| (today - due.local_date()).num_days()).unwrap_or(0);
+                let days_overdue =
+                    crate::services::task_query::parse_stored_due(due_raw).map(|due| time::whole_days(today.duration_since(due.local_date()))).unwrap_or(0);
                 if days_overdue < overdue_cutoff_days {
                     continue;
                 }

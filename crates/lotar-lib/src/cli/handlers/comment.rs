@@ -7,6 +7,7 @@ use crate::services::task_questions::{AnswerInput, OPTION_SET_FIELDS};
 use crate::services::task_reviews::parse_finding;
 use crate::services::task_service::TaskService;
 use crate::types::{CommentQuestion, CommentReport, CommentReview, OptionSet, QuestionOption, TaskComment};
+use crate::utils::time;
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::{Map, Value};
 
@@ -188,7 +189,7 @@ struct CommentAddInputs {
 fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, full_id: &str, inputs: CommentAddInputs) -> Result<(), String> {
     renderer.log_debug("comment: preparing new comment entry");
     if inputs.dry_run {
-        let timestamp = chrono::Utc::now().to_rfc3339();
+        let timestamp = time::now_rfc3339();
         let prefix = crate::storage::TaskId::parse(full_id).ok().map(|parsed| parsed.project);
         let author = crate::utils::identity::resolve_current_user_for_project(Some(ctx.storage.root_path.as_path()), prefix.as_deref());
         let text = crate::services::task_service::strip_author_prefix(&inputs.text, author.as_deref()).map_err(|e| e.to_string())?.to_string();

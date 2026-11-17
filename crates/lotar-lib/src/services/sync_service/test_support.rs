@@ -1,5 +1,7 @@
 //! Routed mock HTTP API for sync tests. Each request is answered by a route
 //! closure and recorded so tests can assert on what the client sent.
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 
 use super::*;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -149,7 +151,7 @@ pub(super) fn workspace(provider: SyncProvider) -> (tempfile::TempDir, TasksDire
 pub(super) fn recorder(direction: SyncDirection, dry_run: bool) -> SyncReportRecorder {
     SyncReportRecorder::new(SyncRunContext {
         run_id: "test".into(),
-        started_at: Utc::now().to_rfc3339(),
+        started_at: Timestamp::now().to_rfc3339(),
         direction,
         provider: "test".into(),
         remote: "test".into(),

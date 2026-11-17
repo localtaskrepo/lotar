@@ -3,8 +3,9 @@
 use crate::api_types::{AgentJob, TaskTimeline, TaskTimelineEntry};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::task_timeline::TaskTimelineService;
+use crate::utils::time;
 use crate::workspace::TasksDirectoryResolver;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 pub fn handle_timeline(id: &str, threads: bool, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let project = project.map(|p| crate::utils::project::resolve_project_input(p, resolver.path.as_path()));
@@ -75,7 +76,7 @@ fn describe_job(job: &AgentJob) -> String {
     let settings = [Some(job.runner.as_str()), job.model.as_deref()].into_iter().flatten().collect::<Vec<_>>().join(", ");
     let mut text = format!("{} ({settings}) {}", job.agent.as_deref().unwrap_or("agent"), job.status);
     if let (Some(start), Some(end)) = (job.started_at.as_deref().and_then(parse), job.finished_at.as_deref().and_then(parse)) {
-        text.push_str(&format!(" in {}", format_duration((end - start).num_seconds())));
+        text.push_str(&format!(" in {}", format_duration((end - start).as_secs())));
     }
     if let Some(cost) = job.usage.as_ref().and_then(|usage| usage.cost_usd) {
         text.push_str(&format!(", ${cost:.4}"));
@@ -84,12 +85,12 @@ fn describe_job(job: &AgentJob) -> String {
     text
 }
 
-fn parse(at: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(at).ok().map(|time| time.with_timezone(&Utc))
+fn parse(at: &str) -> Option<Timestamp> {
+    time::parse_rfc3339(at).ok()
 }
 
 fn short_time(at: &str) -> String {
-    parse(at).map_or_else(|| at.to_string(), |time| time.format("%Y-%m-%d %H:%MZ").to_string())
+    parse(at).map_or_else(|| at.to_string(), |time| time.strftime("%Y-%m-%d %H:%MZ").to_string())
 }
 
 /// "45s", "3m 05s", "1h 02m", as the web UI writes durations.

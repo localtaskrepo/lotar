@@ -2,7 +2,7 @@ use crate::api_types::AgentJobCreateRequest;
 use crate::config::manager::ConfigManager;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, JobStartMode};
-use chrono::Utc;
+use crate::utils::time;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -117,7 +117,7 @@ impl AgentQueueService {
             agent: agent.clone(),
             runner: runner.clone(),
             prompt,
-            queued_at: Utc::now().to_rfc3339(),
+            queued_at: time::now_rfc3339(),
             attempts: 0,
             model: req.model.clone(),
             effort: req.effort.clone(),
@@ -579,7 +579,7 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
         return Ok(AgentQueueState {
             version: QUEUE_VERSION,
             tasks_dir: tasks_dir.to_string_lossy().to_string(),
-            updated_at: Utc::now().to_rfc3339(),
+            updated_at: time::now_rfc3339(),
             pending: Vec::new(),
         });
     }
@@ -592,7 +592,7 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
 
 fn save_state(file: &mut File, state: &AgentQueueState) -> LoTaRResult<()> {
     let mut state = state.clone();
-    state.updated_at = Utc::now().to_rfc3339();
+    state.updated_at = time::now_rfc3339();
     let payload = serde_json::to_string_pretty(&state).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
     file.set_len(0).map_err(LoTaRError::IoError)?;
     file.seek(SeekFrom::Start(0)).map_err(LoTaRError::IoError)?;

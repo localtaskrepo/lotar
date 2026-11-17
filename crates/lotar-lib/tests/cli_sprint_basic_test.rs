@@ -1,4 +1,5 @@
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use lotar::config::types::SprintDefaultsConfig;
 use lotar::services::sprint_service::SprintService;
 use lotar::storage::TaskFilter;
@@ -6,6 +7,8 @@ use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintCapacity, SprintPlan, SprintTaskEntry};
 use lotar::types::{Priority, custom_value_string};
 use lotar::utils::paths;
+use lotar::utils::time;
+use lotar::utils::time::Rfc3339;
 use lotar::{Task, TaskStatus};
 use predicates::prelude::*;
 use serde_json::Value;
@@ -466,7 +469,7 @@ fn sprint_start_warns_when_start_time_far_in_future() {
 
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
-    let future_start = (Utc::now() + Duration::hours(24)).to_rfc3339();
+    let future_start = (Timestamp::now() + SignedDuration::from_hours(24)).to_rfc3339();
 
     let mut cmd = common::cargo_bin_in(&fixtures);
     cmd.args(["sprint", "start", "1", "--at"])
@@ -476,7 +479,7 @@ fn sprint_start_warns_when_start_time_far_in_future() {
         .stdout(predicate::str::contains("Started sprint #1 (Sprint Delta)."))
         .stderr(predicate::str::contains("more than 12 hours in the future"));
 
-    let later_start = (Utc::now() + Duration::hours(36)).to_rfc3339();
+    let later_start = (Timestamp::now() + SignedDuration::from_hours(36)).to_rfc3339();
 
     let mut cmd_force = common::cargo_bin_in(&fixtures);
     cmd_force
@@ -493,7 +496,7 @@ fn sprint_start_warns_when_planned_start_is_overdue() {
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let planned_start = (Utc::now() - Duration::hours(36)).to_rfc3339();
+    let planned_start = (Timestamp::now() - SignedDuration::from_hours(36)).to_rfc3339();
 
     let sprint = Sprint {
         plan: Some(SprintPlan { label: Some("Sprint Overdue Start".to_string()), starts_at: Some(planned_start.clone()), ..SprintPlan::default() }),
@@ -516,9 +519,9 @@ fn sprint_close_warns_when_past_planned_end() {
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let planned_start = Utc::now() - Duration::days(14);
+    let planned_start = Timestamp::now() - time::days(14);
     let planned_start_str = planned_start.to_rfc3339();
-    let computed_end = (planned_start + Duration::days(7)).to_rfc3339();
+    let computed_end = (planned_start + time::days(7)).to_rfc3339();
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -535,7 +538,7 @@ fn sprint_close_warns_when_past_planned_end() {
     let mut cmd_start = common::cargo_bin_in(&fixtures);
     cmd_start.args(["sprint", "start", "1", "--at", &planned_start_str]).assert().success();
 
-    let close_at = Utc::now().to_rfc3339();
+    let close_at = time::now_rfc3339();
 
     let mut cmd_close = common::cargo_bin_in(&fixtures);
     cmd_close
@@ -612,11 +615,11 @@ fn sprint_no_warn_suppresses_lifecycle_warnings() {
     SprintService::create(&mut storage, sprint_alpha, None).expect("create sprint alpha");
     SprintService::create(&mut storage, sprint_beta, None).expect("create sprint beta");
 
-    let start_alpha_at = Utc::now() - Duration::hours(1);
+    let start_alpha_at = Timestamp::now() - SignedDuration::from_hours(1);
     let mut start_alpha = common::cargo_bin_in(&fixtures);
     start_alpha.args(["sprint", "start", "1", "--at"]).arg(start_alpha_at.to_rfc3339()).assert().success();
 
-    let future_start = (Utc::now() + Duration::hours(24)).to_rfc3339();
+    let future_start = (Timestamp::now() + SignedDuration::from_hours(24)).to_rfc3339();
 
     let mut start_beta = common::cargo_bin_in(&fixtures);
     start_beta
@@ -629,7 +632,7 @@ fn sprint_no_warn_suppresses_lifecycle_warnings() {
         .stderr(predicate::str::contains("Another sprint").not())
         .stderr(predicate::str::contains("more than 12 hours in the future").not());
 
-    let close_time = (Utc::now() + Duration::days(14)).to_rfc3339();
+    let close_time = (Timestamp::now() + time::days(14)).to_rfc3339();
 
     let mut close_beta = common::cargo_bin_in(&fixtures);
     close_beta

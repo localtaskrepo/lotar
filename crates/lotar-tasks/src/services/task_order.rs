@@ -1,3 +1,4 @@
+use crate::utils::time;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::api_types::{TaskOrderRequest, TaskOrderResponse};
@@ -193,7 +194,7 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
     if full_order == previous {
         return Ok(TaskOrderResponse { status: "ok".into(), tasks: previous, changed: false, sprint_id: request.sprint });
     }
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = time::now_rfc3339();
     let old_position = previous.iter().position(|id| id == &task).expect("validated origin") + 1;
     let new_position = full_order.iter().position(|id| id == &task).expect("validated origin") + 1;
     let placement = if request.before.is_some() { "before" } else { "after" };

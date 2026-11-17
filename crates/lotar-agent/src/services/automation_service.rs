@@ -15,6 +15,9 @@ use crate::storage::manager::Storage;
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::utils::identity::resolve_me_alias;
 use crate::utils::tags::normalize_tags;
+use crate::utils::time;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
@@ -60,7 +63,7 @@ fn cooldown_allows(rule: &AutomationRule, rule_key: &str, ticket_id: &str, tasks
     }
     drop(map);
     match cooldown_store::last_fired(tasks_dir, rule_key, ticket_id) {
-        Some(at) => chrono::Utc::now().signed_duration_since(at).to_std().is_ok_and(|elapsed| elapsed >= duration),
+        Some(at) => std::time::Duration::try_from(Timestamp::now().duration_since(at)).is_ok_and(|elapsed| elapsed >= duration),
         None => true,
     }
 }
@@ -80,7 +83,10 @@ fn cooldown_record(rule: &AutomationRule, rule_key: &str, ticket_id: &str, tasks
 /// `<cache dir>/lotar/automation-cooldowns.json` (or the directory in
 /// `LOTAR_AUTOMATION_STATE_DIR`), keyed by tasks directory, rule and ticket.
 mod cooldown_store {
+    use super::time;
+    use crate::utils::time::Rfc3339;
     use fs2::FileExt;
+    use jiff::Timestamp;
     use std::collections::BTreeMap;
     use std::io::{Read, Seek, SeekFrom, Write};
     use std::path::{Path, PathBuf};
@@ -121,19 +127,16 @@ mod cooldown_store {
         Some(result)
     }
 
-    pub(super) fn last_fired(tasks_dir: &Path, rule: &str, ticket: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    pub(super) fn last_fired(tasks_dir: &Path, rule: &str, ticket: &str) -> Option<Timestamp> {
         let key = entry_key(tasks_dir, rule, ticket);
-        with_state(|state| state.get(&key).cloned())
-            .flatten()
-            .and_then(|raw| chrono::DateTime::parse_from_rfc3339(&raw).ok())
-            .map(|at| at.with_timezone(&chrono::Utc))
+        with_state(|state| state.get(&key).cloned()).flatten().and_then(|raw| time::parse_rfc3339(&raw).ok())
     }
 
     pub(super) fn record(tasks_dir: &Path, rule: &str, ticket: &str) {
         let key = entry_key(tasks_dir, rule, ticket);
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         let _ = with_state(|state| {
-            state.retain(|_, at| chrono::DateTime::parse_from_rfc3339(at).is_ok_and(|at| now.signed_duration_since(at) < chrono::Duration::days(MAX_AGE_DAYS)));
+            state.retain(|_, at| time::parse_rfc3339(at).is_ok_and(|at| now.duration_since(at) < time::days(MAX_AGE_DAYS)));
             state.insert(key, now.to_rfc3339());
         });
     }
@@ -1387,7 +1390,7 @@ fn simulate_action(
 
     // The simulated state must reflect the projected completion/due
     // classification (DEV-21), not the pre-action snapshot.
-    simulated.task_state = Some(crate::services::completion::compute_task_state(&simulated.status, simulated.due_date.as_deref(), config, chrono::Utc::now()));
+    simulated.task_state = Some(crate::services::completion::compute_task_state(&simulated.status, simulated.due_date.as_deref(), config, Timestamp::now()));
 
     simulated
 }
@@ -2993,16 +2996,13 @@ fn ticket_agent(task: &TaskDTO, config: &ResolvedConfig, rule_agent: Option<&str
 /// keeps the loop guard from blocking a ticket forever in a long-running
 /// server (DEV-279); loops run within minutes.
 fn count_terminal_jobs_for_ticket(ticket_id: &str) -> usize {
-    let since = chrono::Utc::now() - chrono::Duration::hours(24);
+    let since = Timestamp::now() - SignedDuration::from_hours(24);
     AgentJobService::list_jobs()
         .iter()
         .filter(|j| {
             crate::storage::identity::aliases_match(&j.ticket_id, ticket_id)
                 && (j.status == "completed" || j.status == "failed")
-                && j.finished_at
-                    .as_deref()
-                    .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
-                    .is_none_or(|at| at.with_timezone(&chrono::Utc) >= since)
+                && j.finished_at.as_deref().and_then(|at| time::parse_rfc3339(at).ok()).is_none_or(|at| at >= since)
         })
         .count()
 }

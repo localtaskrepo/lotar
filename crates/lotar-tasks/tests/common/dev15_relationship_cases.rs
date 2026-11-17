@@ -1,5 +1,6 @@
 use super::*;
 use crate::services::task_service::{TaskService, TaskUpdateContext};
+use crate::utils::time;
 
 #[test]
 fn dev151_typed_unique_id_keeps_isolated_task_before_budget_without_mutation() {
@@ -596,8 +597,8 @@ fn graph_filters_share_identity_dates_sprints_and_needs_semantics() {
     f.write("AA-2", Default::default());
     let mut task = f.task("AA-1");
     task.assignee = Some("alice_smith".into());
-    task.due_date = Some(chrono::Local::now().date_naive().to_string());
-    task.modified = chrono::Utc::now().to_rfc3339();
+    task.due_date = Some(time::local_today().to_string());
+    task.modified = time::now_rfc3339();
     fs::write(f.storage.root_path.join("AA/1.yml"), serde_yaml_ng::to_string(&task).unwrap()).unwrap();
     fs::write(f.storage.root_path.join("@sprints/1.yml"), "tasks:\n  - id: AA-001\n    order: 3\n").unwrap();
     let before = f.bytes("AA-1");

@@ -6,6 +6,7 @@ use crate::config::types::ResolvedConfig;
 use crate::services::task_list::TaskQueryInput;
 use crate::storage::DeletionFilter;
 use crate::workspace::TasksDirectoryResolver;
+use jiff::Timestamp;
 
 /// Handler for `lotar list`: maps the flags onto the shared task query
 /// (DEV-230), then pages and prints the result.
@@ -25,7 +26,7 @@ impl CommandHandler for SearchHandler {
         let query = input.resolve(&ctx.config, resolver.path.as_path()).map_err(|e| e.cli_message())?;
 
         renderer.log_debug("list: executing search");
-        let tasks = crate::services::task_list::run(&ctx.storage, &query, chrono::Utc::now());
+        let tasks = crate::services::task_list::run(&ctx.storage, &query, Timestamp::now());
         let total_matching = tasks.len();
         // Totals over every matching task, not just this page (DEV-13).
         let sums = args.sum.iter().map(|field| crate::services::task_list::sum_field(&tasks, field, &query.config)).collect::<Result<Vec<_>, _>>()?;

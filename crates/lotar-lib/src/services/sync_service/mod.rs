@@ -1,8 +1,8 @@
 //! Two-way sync between local tasks and Jira or GitHub issues. The entry
 //! points live here; the work is split across the submodules.
 
+use crate::utils::time;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
-use chrono::Utc;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue, json};
@@ -223,7 +223,7 @@ impl SyncService {
             project: remote_config.project.clone(),
             repo: remote_config.repo.clone(),
             filter: remote_config.filter.clone(),
-            checked_at: Utc::now().to_rfc3339(),
+            checked_at: time::now_rfc3339(),
             warnings,
             info,
         })
@@ -309,7 +309,7 @@ impl SyncService {
         let run_project = if direction == SyncDirection::Pull { pull_project.clone() } else { project_prefix.clone() };
         let context = SyncRunContext {
             run_id: make_run_id(client_run_id),
-            started_at: Utc::now().to_rfc3339(),
+            started_at: time::now_rfc3339(),
             direction,
             provider: provider_label(&remote_config.provider).to_string(),
             remote: trimmed_remote.to_string(),
@@ -360,7 +360,7 @@ impl SyncService {
                     "project": recorder.context.project.clone(),
                     "dry_run": recorder.context.dry_run,
                     "error": err.to_string(),
-                    "finished_at": Utc::now().to_rfc3339(),
+                    "finished_at": time::now_rfc3339(),
                 }),
             );
             return Err(err);
@@ -389,7 +389,7 @@ impl SyncService {
                 "run_id": report_meta.id.clone(),
                 "project": report_meta.project.clone(),
                 "report": report_meta.clone(),
-                "finished_at": Utc::now().to_rfc3339(),
+                "finished_at": time::now_rfc3339(),
             }),
         );
 

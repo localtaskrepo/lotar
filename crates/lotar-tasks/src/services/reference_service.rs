@@ -4,6 +4,7 @@ use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
 use crate::storage::task::Task;
 use crate::types::{ReferenceEntry, TaskChange, TaskChangeLogEntry};
+use crate::utils::time;
 use ignore::WalkBuilder;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -87,7 +88,7 @@ impl ReferenceService {
             }
             let display = changed_values.iter().map(|value| format!("{kind}:{value}")).collect::<Vec<_>>().join(", ");
             let (old, new) = if added { (None, Some(display)) } else { (Some(display), None) };
-            let now = chrono::Utc::now().to_rfc3339();
+            let now = time::now_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
                 at: now.clone(),

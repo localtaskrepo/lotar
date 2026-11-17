@@ -1,7 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-
-use chrono::Utc;
+use crate::utils::time;
 use serde::Serialize;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::sprint_service::SprintRecord;
@@ -211,7 +210,7 @@ fn cleanup_under_transaction(
         }
 
         task.sprints = desired.into_iter().collect();
-        task.modified = Utc::now().to_rfc3339();
+        task.modified = time::now_rfc3339();
         let project_prefix = crate::storage::operations::StorageOperations::get_project_for_task(&task_id).unwrap_or_default();
         let project_path = storage.root_path.join(&project_prefix);
         let (file_path, file_string) = crate::storage::operations::StorageOperations::prepare_task_edit(&project_path, &task_id, &task)

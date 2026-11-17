@@ -1,6 +1,6 @@
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use std::path::Path;
-
-use chrono::{DateTime, Duration, Utc};
 
 use crate::cli::args::sprint::SprintCalendarArgs;
 use crate::cli::handlers::sprint::shared::truncate;
@@ -21,7 +21,7 @@ pub(crate) fn handle_calendar(calendar_args: &SprintCalendarArgs, tasks_root: &P
     let storage = Storage::try_open(tasks_root).ok_or_else(|| "No sprints found. Create one before running calendar.".to_string())?;
 
     let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
-    let context = compute_sprint_calendar(&records, calendar_args.include_complete, calendar_args.limit, Utc::now());
+    let context = compute_sprint_calendar(&records, calendar_args.include_complete, calendar_args.limit, Timestamp::now());
 
     match renderer.format {
         OutputFormat::Json => {
@@ -79,7 +79,7 @@ fn render_calendar_text(renderer: &OutputRenderer, context: &SprintCalendarConte
     }
 }
 
-fn format_calendar_window(start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>, duration: Option<Duration>) -> String {
+fn format_calendar_window(start: Option<Timestamp>, end: Option<Timestamp>, duration: Option<SignedDuration>) -> String {
     match (start, end) {
         (Some(begin), Some(finish)) => {
             let duration_text = duration.map(format_duration).unwrap_or_else(|| "n/a".to_string());
@@ -91,6 +91,6 @@ fn format_calendar_window(start: Option<DateTime<Utc>>, end: Option<DateTime<Utc
     }
 }
 
-fn format_calendar_date(value: DateTime<Utc>) -> String {
-    value.format("%Y-%m-%d").to_string()
+fn format_calendar_date(value: Timestamp) -> String {
+    value.strftime("%Y-%m-%d").to_string()
 }

@@ -8,11 +8,12 @@
 //! ship in 0.15.1 and in 0.16.0. `move` replaces a ticket's releases with
 //! one; `add` keeps the others.
 
+use crate::utils::time;
+use jiff::Timestamp;
+use jiff::civil::Date;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-
-use chrono::Utc;
 
 use crate::api_types::{ReleaseListItem, TaskDTO, TaskUpdate};
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -177,7 +178,7 @@ impl ReleaseService {
         release.version = normalize_version(&release.version)?;
         release.canonicalize();
         validate_dates(&release)?;
-        let now = Utc::now().to_rfc3339();
+        let now = time::now_rfc3339();
         release.created = Some(now.clone());
         release.modified = Some(now);
         let dir = Release::dir(tasks_root);
@@ -220,7 +221,7 @@ impl ReleaseService {
             if next == current {
                 return Ok((ReleaseRecord { id, release: current }, false));
             }
-            let now = Utc::now().to_rfc3339();
+            let now = time::now_rfc3339();
             let changes = diff(&current, &next);
             next.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
@@ -236,7 +237,7 @@ impl ReleaseService {
 
     /// Mark a release as released at `at` (default now).
     pub fn mark_released(tasks_root: &Path, id: u32, at: Option<String>) -> LoTaRResult<(ReleaseRecord, bool)> {
-        let at = at.filter(|text| !text.trim().is_empty()).unwrap_or_else(|| Utc::now().to_rfc3339());
+        let at = at.filter(|text| !text.trim().is_empty()).unwrap_or_else(time::now_rfc3339);
         Self::update(tasks_root, id, &ReleasePatch { released_at: Some(Some(at)), ..ReleasePatch::default() })
     }
 
@@ -311,7 +312,7 @@ impl ReleaseService {
     ) -> Result<Vec<(String, TaskDTO)>, crate::services::task_list::TaskQueryError> {
         input.releases.push("none".to_string());
         let query = input.resolve(config, &storage.root_path)?;
-        let mut tasks = crate::services::task_list::run(storage, &query, Utc::now());
+        let mut tasks = crate::services::task_list::run(storage, &query, Timestamp::now());
         tasks.retain(|(_, task)| !task.task_state.as_ref().is_some_and(|state| state.is_done));
         Ok(tasks)
     }
@@ -355,9 +356,9 @@ impl ReleaseService {
         let members: Vec<&TaskDTO> = tasks.iter().map(|(_, task)| task).filter(|task| task.releases.contains(&record.id)).collect();
         let done = members.iter().filter(|task| task.task_state.as_ref().is_some_and(|state| state.is_done)).count();
         let release = &record.release;
-        let today = chrono::Local::now().date_naive();
-        let overdue = !release.is_released()
-            && release.planned_date.as_deref().and_then(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").ok()).is_some_and(|date| date < today);
+        let today = time::local_today();
+        let overdue =
+            !release.is_released() && release.planned_date.as_deref().and_then(|date| Date::strptime("%Y-%m-%d", date).ok()).is_some_and(|date| date < today);
         ReleaseListItem {
             id: record.id,
             version: release.version.clone(),
@@ -436,13 +437,13 @@ fn ensure_unique_version(records: &[ReleaseRecord], version: &str, except: Optio
 
 fn validate_dates(release: &Release) -> LoTaRResult<()> {
     if let Some(date) = release.planned_date.as_deref()
-        && chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err()
+        && Date::strptime("%Y-%m-%d", date).is_err()
     {
         return Err(LoTaRError::ValidationError(format!("planned_date '{date}' is not a date: use YYYY-MM-DD")));
     }
     if let Some(at) = release.released_at.as_deref()
-        && chrono::DateTime::parse_from_rfc3339(at).is_err()
-        && chrono::NaiveDate::parse_from_str(at, "%Y-%m-%d").is_err()
+        && time::parse_rfc3339(at).is_err()
+        && Date::strptime("%Y-%m-%d", at).is_err()
     {
         return Err(LoTaRError::ValidationError(format!("released_at '{at}' is not a date or RFC 3339 timestamp")));
     }

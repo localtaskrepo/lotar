@@ -1,6 +1,8 @@
 //! DEV-510: harnessmux's t3 agent gives a job its thread's link, ends a turn that waits for an answer as such, and a
 //! taken-over t3 job ends with the thread's run instead of a second turn. A shell script stands in for T3's CLI.
 #![cfg(unix)]
+use jiff::SignedDuration;
+use jiff::Timestamp;
 
 use crate::common::TestFixtures;
 use crate::common::env_mutex::EnvVarGuard;
@@ -146,8 +148,8 @@ fn a_t3_handoff_names_the_skipped_sessions_thread() {
         .find(|path| path.to_string_lossy().ends_with("-TEST-1-fixer.json"))
         .expect("the fixer session");
     let mut record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    let at = chrono::Utc::now() - chrono::Duration::minutes(56);
-    record["last_used"] = serde_json::Value::String(at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+    let at = Timestamp::now() - SignedDuration::from_mins(56);
+    record["last_used"] = serde_json::Value::String(at.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
     std::fs::write(&path, record.to_string()).unwrap();
 
     harness.command().args(["--session", "continue"]).assert().success();

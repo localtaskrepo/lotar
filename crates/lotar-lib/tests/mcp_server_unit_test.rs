@@ -1,4 +1,5 @@
 use crate::common::env_mutex::EnvVarGuard;
+use lotar::utils::time;
 use std::path::{Path, PathBuf};
 
 struct CwdGuard(PathBuf);
@@ -554,7 +555,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
     let mut storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
     let mut sprint = lotar::storage::sprint::Sprint::default();
     sprint.plan = Some(lotar::storage::sprint::SprintPlan { label: Some("Iteration".into()), ..Default::default() });
-    sprint.actual = Some(lotar::storage::sprint::SprintActual { started_at: Some(chrono::Utc::now().to_rfc3339()), ..Default::default() });
+    sprint.actual = Some(lotar::storage::sprint::SprintActual { started_at: Some(time::now_rfc3339()), ..Default::default() });
     let created = lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None).expect("create sprint");
     let sprint_id = created.record.id;
 

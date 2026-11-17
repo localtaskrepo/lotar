@@ -5,6 +5,8 @@
 //! and the pending-link journal. The expected traces were captured from the
 //! provider-specific implementation before it was consolidated, so the shared
 //! orchestration must reproduce them exactly.
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 
 use super::test_support::MockApi;
 use super::*;
@@ -67,7 +69,7 @@ fn fixture(provider: SyncProvider) -> (tempfile::TempDir, TasksDirectoryResolver
 fn new_recorder(dry_run: bool) -> SyncReportRecorder {
     SyncReportRecorder::new(SyncRunContext {
         run_id: "characterization".into(),
-        started_at: Utc::now().to_rfc3339(),
+        started_at: Timestamp::now().to_rfc3339(),
         direction: SyncDirection::Push,
         provider: "test".into(),
         remote: "test".into(),

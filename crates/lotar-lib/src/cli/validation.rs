@@ -1,6 +1,8 @@
 use crate::config::types::ResolvedConfig;
 use crate::storage::task::Task;
 use crate::types::{Priority, TaskStatus, TaskType};
+use crate::utils::time;
+use crate::utils::time::Rfc3339;
 
 /// Configuration-aware validation for CLI inputs
 pub struct CliValidator<'a> {
@@ -112,10 +114,10 @@ impl<'a> CliValidator<'a> {
         };
 
         // Datetime-like forms normalize to RFC3339 (UTC)
-        let datetime_like = chrono::DateTime::parse_from_rfc3339(s_raw).is_ok() || crate::utils::time::parse_naive_local_datetime_to_utc(s_raw).is_some();
+        let datetime_like = time::parse_rfc3339(s_raw).is_ok() || crate::utils::time::parse_naive_local_datetime_to_utc(s_raw).is_some();
 
         crate::utils::time::parse_human_datetime_to_utc(s_raw)
-            .map(|dt| if datetime_like { dt.to_rfc3339() } else { dt.with_timezone(&chrono::Local).date_naive().format("%Y-%m-%d").to_string() })
+            .map(|dt| if datetime_like { dt.to_rfc3339() } else { time::local_date(dt).strftime("%Y-%m-%d").to_string() })
             .map_err(|_| invalid())
     }
 

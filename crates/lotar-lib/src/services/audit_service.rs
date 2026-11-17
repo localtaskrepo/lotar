@@ -1,4 +1,7 @@
-use chrono::{DateTime, Datelike, Duration, Utc};
+use crate::utils::time;
+use crate::utils::time::Rfc3339;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
@@ -100,7 +103,8 @@ pub struct FileCommitEvent {
     pub commit: String,
     pub author: String,
     pub email: String,
-    pub date: DateTime<Utc>,
+    #[serde(serialize_with = "crate::utils::time::serialize_rfc3339_z")]
+    pub date: Timestamp,
     pub message: String,
     /// Repo-relative path of the file in this commit. Differs from the
     /// current path once the task moved (nested folder or archive, DEV-4).
@@ -131,7 +135,8 @@ pub struct ActivityFeedItem {
     pub commit: String,
     pub author: String,
     pub email: String,
-    pub date: DateTime<Utc>,
+    #[serde(serialize_with = "crate::utils::time::serialize_rfc3339_z")]
+    pub date: Timestamp,
     pub message: String,
     pub task_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -144,7 +149,8 @@ pub struct PropertyChange<T> {
     pub field: String,
     pub old: Option<T>,
     pub new: Option<T>,
-    pub at: DateTime<Utc>,
+    #[serde(serialize_with = "crate::utils::time::serialize_rfc3339_z")]
+    pub at: Timestamp,
     pub commit: String,
 }
 
@@ -160,7 +166,7 @@ struct ParsedCommit {
     sha: String,
     author: String,
     email: String,
-    date: DateTime<Utc>,
+    date: Timestamp,
     message: String,
     files: Vec<PathBuf>,
 }
@@ -237,7 +243,7 @@ struct CommitHeader {
     sha: String,
     author: String,
     email: String,
-    date: DateTime<Utc>,
+    date: Timestamp,
     message: Option<String>,
 }
 
@@ -287,7 +293,7 @@ impl AuditService {
         if parts.len() < 4 {
             return None;
         }
-        let date = chrono::DateTime::parse_from_rfc3339(parts[3]).ok()?.with_timezone(&Utc);
+        let date = time::parse_rfc3339(parts[3]).ok()?;
         Some(CommitHeader {
             sha: parts[0].to_string(),
             author: parts[1].to_string(),
@@ -301,8 +307,8 @@ impl AuditService {
     /// over the given pathspecs, returning raw stdout for line-by-line parsing.
     fn run_git_log(
         repo_root: &Path,
-        since: Option<DateTime<Utc>>,
-        until: Option<DateTime<Utc>>,
+        since: Option<Timestamp>,
+        until: Option<Timestamp>,
         with_message: bool,
         name_only: bool,
         max_commits: usize,
@@ -460,8 +466,8 @@ impl AuditService {
     pub fn list_activity_feed(
         repo_root: &Path,
         tasks_rel: &Path,
-        since: DateTime<Utc>,
-        until: DateTime<Utc>,
+        since: Timestamp,
+        until: Timestamp,
         project_filter: Option<&str>,
         max_commits: usize,
     ) -> Result<Vec<ActivityFeedItem>, String> {
@@ -527,8 +533,8 @@ impl AuditService {
 
     fn collect_commits(
         repo_root: &Path,
-        since: DateTime<Utc>,
-        until: DateTime<Utc>,
+        since: Timestamp,
+        until: Timestamp,
         max_commits: usize,
         path_filters: &[PathBuf],
     ) -> Result<Vec<ParsedCommit>, String> {
@@ -648,8 +654,8 @@ impl AuditService {
         tasks_root_abs: &Path,
         tasks_rel: &Path,
         commits: Vec<ParsedCommit>,
-        since: DateTime<Utc>,
-        until: DateTime<Utc>,
+        since: Timestamp,
+        until: Timestamp,
         project_filter: Option<&str>,
     ) -> Result<Vec<ActivityFeedItem>, String> {
         if !tasks_root_abs.exists() {
@@ -724,7 +730,7 @@ impl AuditService {
                         (commit.sha.clone(), commit.author.clone(), commit.email.clone(), commit.message.clone(), commit.date)
                     } else {
                         (
-                            format!("history-{}-{}", task_id, entry_time.timestamp()),
+                            format!("history-{}-{}", task_id, entry_time.as_second()),
                             actor.unwrap_or_else(|| "Unknown".to_string()),
                             String::new(),
                             format!("Task update for {}", task_id),
@@ -764,16 +770,11 @@ impl AuditService {
         Ok(items)
     }
 
-    fn parse_history_timestamp(entry: &TaskChangeLogEntry) -> Option<DateTime<Utc>> {
-        chrono::DateTime::parse_from_rfc3339(entry.at.as_str()).map(|dt| dt.with_timezone(&Utc)).ok()
+    fn parse_history_timestamp(entry: &TaskChangeLogEntry) -> Option<Timestamp> {
+        time::parse_rfc3339(entry.at.as_str()).ok()
     }
 
-    fn match_commit_for_entry<'a>(
-        commits: &'a [ParsedCommit],
-        task_ids: &[String],
-        entry_time: DateTime<Utc>,
-        actor: Option<&str>,
-    ) -> Option<&'a ParsedCommit> {
+    fn match_commit_for_entry<'a>(commits: &'a [ParsedCommit], task_ids: &[String], entry_time: Timestamp, actor: Option<&str>) -> Option<&'a ParsedCommit> {
         if commits.is_empty() {
             return None;
         }
@@ -783,7 +784,7 @@ impl AuditService {
         for commit in commits {
             let message = commit.message.to_uppercase();
             if ids_upper.iter().any(|id| message.contains(id)) {
-                let diff = (commit.date - entry_time).num_seconds().abs();
+                let diff = (commit.date - entry_time).as_secs().abs();
                 if best.is_none_or(|(_, best_diff)| diff < best_diff) {
                     best = Some((commit, diff));
                 }
@@ -798,8 +799,8 @@ impl AuditService {
             let mut best_actor: Option<(&ParsedCommit, i64)> = None;
             for commit in commits {
                 if commit.author.to_lowercase().contains(&actor_lower) {
-                    let diff = (commit.date - entry_time).num_seconds().abs();
-                    if diff <= Duration::minutes(10).num_seconds() && best_actor.is_none_or(|(_, best_diff)| diff < best_diff) {
+                    let diff = (commit.date - entry_time).as_secs().abs();
+                    if diff <= SignedDuration::from_mins(10).as_secs() && best_actor.is_none_or(|(_, best_diff)| diff < best_diff) {
                         best_actor = Some((commit, diff));
                     }
                 }
@@ -811,8 +812,8 @@ impl AuditService {
 
         let mut best_time: Option<(&ParsedCommit, i64)> = None;
         for commit in commits {
-            let diff = (commit.date - entry_time).num_seconds().abs();
-            if diff <= Duration::minutes(5).num_seconds() && best_time.is_none_or(|(_, best_diff)| diff < best_diff) {
+            let diff = (commit.date - entry_time).as_secs().abs();
+            if diff <= SignedDuration::from_mins(5).as_secs() && best_time.is_none_or(|(_, best_diff)| diff < best_diff) {
                 best_time = Some((commit, diff));
             }
         }
@@ -951,8 +952,8 @@ impl AuditService {
     pub fn list_changed_tasks(
         repo_root: &Path,
         tasks_rel: &Path,
-        since: DateTime<Utc>,
-        until: DateTime<Utc>,
+        since: Timestamp,
+        until: Timestamp,
         author_filter: Option<&str>,
         project_filter: Option<&str>,
     ) -> Result<Vec<ChangedTaskSummary>, String> {
@@ -966,7 +967,7 @@ impl AuditService {
         let stdout = Self::run_git_log(repo_root, Some(since), Some(until), false, true, 0, &[tasks_rel.to_path_buf()])?;
 
         let mut summaries: HashMap<String, ChangedTaskSummary> = HashMap::new();
-        let mut current_commit: Option<(String, String, String, DateTime<Utc>)> = None; // (sha, author, email, date)
+        let mut current_commit: Option<(String, String, String, Timestamp)> = None; // (sha, author, email, date)
 
         // Header lines contain NUL separators; following non-empty lines are file paths; blank lines separate commits
         for line in stdout.lines() {
@@ -1039,8 +1040,8 @@ impl AuditService {
     pub fn list_authors_activity(
         repo_root: &Path,
         tasks_rel: &Path,
-        since: DateTime<Utc>,
-        until: DateTime<Utc>,
+        since: Timestamp,
+        until: Timestamp,
         project_filter: Option<&str>,
     ) -> Result<Vec<AuthorActivity>, String> {
         let pathspec = Self::resolve_project_pathspec(tasks_rel, project_filter)?;
@@ -1076,8 +1077,8 @@ impl AuditService {
     pub fn list_activity(
         repo_root: &Path,
         tasks_rel: &Path,
-        since: DateTime<Utc>,
-        until: DateTime<Utc>,
+        since: Timestamp,
+        until: Timestamp,
         group_by: GroupBy,
         project_filter: Option<&str>,
     ) -> Result<Vec<ActivityItem>, String> {
@@ -1086,7 +1087,7 @@ impl AuditService {
         let pathspec = Self::resolve_project_pathspec(tasks_rel, project_filter)?;
         let stdout = Self::run_git_log(repo_root, Some(since), Some(until), false, name_only, 0, &[pathspec])?;
         let mut map: std::collections::HashMap<String, ActivityItem> = std::collections::HashMap::new();
-        let mut current: Option<(String, String, String, DateTime<Utc>)> = None;
+        let mut current: Option<(String, String, String, Timestamp)> = None;
         let mut touched_projects: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for line in stdout.lines() {
@@ -1113,8 +1114,8 @@ impl AuditService {
                     let _sha = parts[0].to_string();
                     let author = parts[1].to_string();
                     let _email = parts[2].to_string();
-                    let date = match chrono::DateTime::parse_from_rfc3339(parts[3]) {
-                        Ok(dt) => dt.with_timezone(&Utc),
+                    let date = match time::parse_rfc3339(parts[3]) {
+                        Ok(dt) => dt,
                         Err(_) => continue,
                     };
                     current = Some((_sha, author, _email, date));
@@ -1136,7 +1137,7 @@ impl AuditService {
                             }
                         }
                         GroupBy::Day => {
-                            let key = date.format("%Y-%m-%d").to_string();
+                            let key = date.strftime("%Y-%m-%d").to_string();
                             let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem { key: key.clone(), count: 0, last_date: *date });
                             entry.count += 1;
                             if *date > entry.last_date {
@@ -1145,7 +1146,7 @@ impl AuditService {
                         }
                         GroupBy::Week => {
                             // ISO week key: YYYY-Www
-                            let iso_week = date.iso_week();
+                            let iso_week = time::utc_date(*date).iso_week_date();
                             let key = format!("{}-W{:02}", iso_week.year(), iso_week.week());
                             let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem { key: key.clone(), count: 0, last_date: *date });
                             entry.count += 1;
@@ -1198,7 +1199,8 @@ pub struct ChangedTaskSummary {
     pub file: String,
     pub last_commit: String,
     pub last_author: String,
-    pub last_date: DateTime<Utc>,
+    #[serde(serialize_with = "crate::utils::time::serialize_rfc3339_z")]
+    pub last_date: Timestamp,
     pub commits: usize,
 }
 
@@ -1207,7 +1209,8 @@ pub struct AuthorActivity {
     pub author: String,
     pub email: String,
     pub commits: usize,
-    pub last_date: DateTime<Utc>,
+    #[serde(serialize_with = "crate::utils::time::serialize_rfc3339_z")]
+    pub last_date: Timestamp,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1222,7 +1225,8 @@ pub enum GroupBy {
 pub struct ActivityItem {
     pub key: String,
     pub count: usize,
-    pub last_date: DateTime<Utc>,
+    #[serde(serialize_with = "crate::utils::time::serialize_rfc3339_z")]
+    pub last_date: Timestamp,
 }
 
 #[cfg(all(test, unix))]
@@ -1244,7 +1248,7 @@ mod blob_batch_tests {
             sha: "0123456789abcdef0123456789abcdef01234567".to_string(),
             author: "a".to_string(),
             email: "a@example.com".to_string(),
-            date: Utc::now(),
+            date: Timestamp::now(),
             message: "m".to_string(),
             files: vec![PathBuf::from(".tasks/DEV/1.yml")],
         };

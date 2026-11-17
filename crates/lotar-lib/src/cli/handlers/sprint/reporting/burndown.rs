@@ -1,6 +1,6 @@
+use crate::utils::time;
+use jiff::Timestamp;
 use std::path::Path;
-
-use chrono::Utc;
 
 use crate::cli::args::sprint::SprintBurndownArgs;
 use crate::config::resolution::load_and_merge_configs;
@@ -33,7 +33,7 @@ pub(crate) fn handle_burndown(burndown_args: &SprintBurndownArgs, tasks_root: &P
     }
 
     let record = SprintService::get(&storage, target_id).map_err(|err| err.to_string())?;
-    let context = compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now())?;
+    let context = compute_sprint_burndown(&storage, &record, &resolved_config, Timestamp::now())?;
 
     match renderer.format {
         OutputFormat::Json => {
@@ -78,7 +78,7 @@ fn render_burndown_text(renderer: &OutputRenderer, context: &SprintBurndownConte
         SprintBurndownMetric::Tasks => {
             renderer.emit_raw_stdout(format_args!("Total tasks: {} | Ideal horizon: {} days", computation.totals.tasks, computation.day_span));
             for point in &context.computation.series {
-                let date_display = point.date.date_naive();
+                let date_display = time::utc_date(point.date);
                 renderer.emit_raw_stdout(format_args!("{}  {:>9}  {:>5.1}", date_display, point.remaining_tasks, point.ideal_tasks));
             }
         }
@@ -89,7 +89,7 @@ fn render_burndown_text(renderer: &OutputRenderer, context: &SprintBurndownConte
                 computation.day_span
             ));
             for point in &context.computation.series {
-                let date_display = point.date.date_naive();
+                let date_display = time::utc_date(point.date);
                 renderer.emit_raw_stdout(format_args!(
                     "{}  {:>9}  {:>5.1}",
                     date_display,
@@ -105,7 +105,7 @@ fn render_burndown_text(renderer: &OutputRenderer, context: &SprintBurndownConte
                 computation.day_span
             ));
             for point in &context.computation.series {
-                let date_display = point.date.date_naive();
+                let date_display = time::utc_date(point.date);
                 renderer.emit_raw_stdout(format_args!(
                     "{}  {:>9}  {:>5.1}",
                     date_display,

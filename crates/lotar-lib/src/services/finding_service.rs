@@ -140,7 +140,7 @@ impl FindingService {
             .map(str::to_string)
             .or_else(|| crate::utils::identity::resolve_current_user(Some(storage.root_path.as_path())))
             .unwrap_or_else(|| "unknown".to_string());
-        let date = chrono::Local::now().format("%Y-%m-%d");
+        let date = jiff::ZonedDateTime::now().strftime("%Y-%m-%d");
         let text = format!("{REPORT_PREFIX}{reporter} on {date}.\n\n{description}");
         let task =
             TaskService::add_comment_with_context(storage, &task.id, &text, CommentContext { actor_override: Some(reporter), ..CommentContext::default() })?;
@@ -150,7 +150,7 @@ impl FindingService {
     /// Set `finding_seen` to today. Bookkeeping, not an edit: no history
     /// entry, `modified` stays, no automation.
     fn mark_seen(storage: &mut Storage, id: &str) -> LoTaRResult<TaskDTO> {
-        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let today = jiff::ZonedDateTime::now().strftime("%Y-%m-%d").to_string();
         let value = crate::types::custom_value_string(today);
         storage.mutate_task(id, |task| {
             if task.custom_fields.get(FINDING_SEEN_FIELD) == Some(&value) {

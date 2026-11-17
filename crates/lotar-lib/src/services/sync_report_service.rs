@@ -1,8 +1,7 @@
+use crate::utils::time;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
-
-use chrono::{DateTime, Utc};
 
 use crate::api_types::{SyncReport, SyncReportListResponse, SyncReportMeta};
 use crate::config::types::ResolvedConfig;
@@ -153,8 +152,8 @@ fn build_report_filename(report: &SyncReport) -> String {
 }
 
 fn format_report_timestamp(value: &str) -> String {
-    if let Ok(parsed) = DateTime::parse_from_rfc3339(value) {
-        return parsed.format("%Y-%m-%dT%H-%M-%S").to_string();
+    if let Ok(parsed) = time::parse_rfc3339(value) {
+        return parsed.strftime("%Y-%m-%dT%H-%M-%S").to_string();
     }
     sanitize_component(&value.replace([':', '.'], "-"), 32)
 }
@@ -196,7 +195,7 @@ fn report_to_meta(report: &SyncReport, stored_path: Option<String>) -> SyncRepor
 }
 
 fn sort_report_meta(a: &SyncReportMeta, b: &SyncReportMeta) -> std::cmp::Ordering {
-    let parse = |value: &str| DateTime::parse_from_rfc3339(value).ok().map(|dt| dt.with_timezone(&Utc));
+    let parse = |value: &str| time::parse_rfc3339(value).ok();
     let a_time = parse(&a.created_at);
     let b_time = parse(&b.created_at);
     match (a_time, b_time) {

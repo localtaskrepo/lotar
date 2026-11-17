@@ -11,6 +11,7 @@ use crate::utils::scan::{
     ScanConfigSnapshot, configured_line_scanner, merge_signal_words, parse_inline_attributes, refresh_code_reference, replace_line_contents,
     scan_config_from_manager, validate_source_write, write_source,
 };
+use crate::utils::time;
 use crate::workspace::TasksDirectoryResolver;
 use std::path::PathBuf;
 // feature-aware custom fields manipulation helpers are implemented below
@@ -25,7 +26,7 @@ where
         .mutate_task(&full_id, |fresh| {
             let changed = mutator(fresh);
             if changed {
-                fresh.modified = chrono::Utc::now().to_rfc3339();
+                fresh.modified = time::now_rfc3339();
             }
             Ok(changed)
         })

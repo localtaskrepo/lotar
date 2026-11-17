@@ -1,6 +1,6 @@
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 use std::path::Path;
-
-use chrono::Utc;
 
 use super::super::helpers::select_sprint_id_for_review;
 use super::text::{emit_actual, emit_plan, render_review_text, render_stats_text, render_summary_text};
@@ -20,7 +20,7 @@ pub(crate) fn handle_show(show_args: &SprintShowArgs, tasks_root: &Path, rendere
 
     let record = SprintService::get(&storage, show_args.sprint_id).map_err(|err| err.to_string())?;
 
-    let lifecycle = sprint_status::derive_status(&record.sprint, Utc::now());
+    let lifecycle = sprint_status::derive_status(&record.sprint, Timestamp::now());
     let summary = SprintSummary::from_record(&record, &lifecycle);
 
     match renderer.format {
@@ -120,7 +120,7 @@ pub(crate) fn handle_summary(summary_args: &SprintSummaryArgs, tasks_root: &Path
     }
 
     let record = SprintService::get(&context.storage, target_id).map_err(|err| err.to_string())?;
-    let summary_context = compute_sprint_summary(&context.storage, &record, &context.resolved_config, Utc::now());
+    let summary_context = compute_sprint_summary(&context.storage, &record, &context.resolved_config, Timestamp::now());
 
     match renderer.format {
         OutputFormat::Json => {
@@ -133,7 +133,7 @@ pub(crate) fn handle_summary(summary_args: &SprintSummaryArgs, tasks_root: &Path
 }
 
 pub(crate) fn render_sprint_review(storage: &Storage, record: &SprintRecord, resolved_config: &ResolvedConfig, renderer: &OutputRenderer) {
-    let context = compute_sprint_review(storage, record, resolved_config, Utc::now());
+    let context = compute_sprint_review(storage, record, resolved_config, Timestamp::now());
 
     match renderer.format {
         OutputFormat::Json => {
@@ -144,7 +144,7 @@ pub(crate) fn render_sprint_review(storage: &Storage, record: &SprintRecord, res
 }
 
 fn render_sprint_stats(storage: &Storage, record: &SprintRecord, resolved_config: &ResolvedConfig, renderer: &OutputRenderer) {
-    let context = compute_sprint_stats(storage, record, resolved_config, Utc::now());
+    let context = compute_sprint_stats(storage, record, resolved_config, Timestamp::now());
 
     match renderer.format {
         OutputFormat::Json => {

@@ -4,6 +4,8 @@
 
 use crate::config::types::{AgentPermissionPolicy, AgentPermissions, AgentProfileDetail, AgentRunnerKind};
 use crate::errors::{LoTaRError, LoTaRResult};
+use crate::utils::time;
+use jiff::Timestamp;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
@@ -142,11 +144,7 @@ pub fn earlier_sessions(project: &std::path::Path, ticket_id: &str, current: &st
 pub fn keep_session(name: &str) -> Result<(harnessmux::SessionRecord, std::path::PathBuf), String> {
     let registry = registry();
     let mut record = registry.load(name).map_err(|err| err.to_string())?;
-    let stamp = chrono::DateTime::parse_from_rfc3339(&record.last_used)
-        .map(|at| at.with_timezone(&chrono::Utc))
-        .unwrap_or_else(|_| chrono::Utc::now())
-        .format("%Y%m%dT%H%M%SZ")
-        .to_string();
+    let stamp = time::parse_rfc3339(&record.last_used).unwrap_or_else(|_| Timestamp::now()).strftime("%Y%m%dT%H%M%SZ").to_string();
     let base: String = name.chars().take(64 - stamp.len() - 1).collect();
     let kept = format!("{base}.{stamp}");
     let events = registry.events_path(&kept);

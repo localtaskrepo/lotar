@@ -1,4 +1,6 @@
 use assert_cmd::Command;
+use jiff::civil::Date;
+use lotar::utils::time;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -82,19 +84,17 @@ fn stats_distribution_snapshot() {
 
 #[test]
 fn stats_due_buckets_snapshot() {
-    use chrono::{Duration, Local};
-
     let temp = crate::common::temp_dir();
 
     // Due buckets use the local calendar day, so the test must too.
-    let today = Local::now().date_naive();
-    let fmt = |d: chrono::NaiveDate| d.format("%Y-%m-%d").to_string();
+    let today = time::local_today();
+    let fmt = |d: Date| d.strftime("%Y-%m-%d").to_string();
 
-    let overdue = fmt(today - Duration::days(1));
+    let overdue = fmt(today - time::days(1));
     let today_s = fmt(today);
-    let week = fmt(today + Duration::days(3));
-    let month = fmt(today + Duration::days(20));
-    let later = fmt(today + Duration::days(40));
+    let week = fmt(today + time::days(3));
+    let month = fmt(today + time::days(20));
+    let later = fmt(today + time::days(40));
 
     // Create tasks with different due dates
     let mut c = crate::common::lotar_cmd().unwrap();
@@ -130,17 +130,15 @@ fn stats_due_buckets_snapshot() {
 
 #[test]
 fn stats_due_overdue_threshold_snapshot() {
-    use chrono::{Duration, Local};
-
     let temp = crate::common::temp_dir();
 
     // Due buckets use the local calendar day, so the test must too.
-    let today = Local::now().date_naive();
-    let fmt = |d: chrono::NaiveDate| d.format("%Y-%m-%d").to_string();
+    let today = time::local_today();
+    let fmt = |d: Date| d.strftime("%Y-%m-%d").to_string();
 
-    let overdue_1 = fmt(today - Duration::days(1));
-    let overdue_10 = fmt(today - Duration::days(10));
-    let future_1 = fmt(today + Duration::days(1));
+    let overdue_1 = fmt(today - time::days(1));
+    let overdue_10 = fmt(today - time::days(10));
+    let future_1 = fmt(today + time::days(1));
 
     // Create tasks with due dates: 1d overdue, 10d overdue, 1d future
     let mut c = crate::common::lotar_cmd().unwrap();

@@ -1,8 +1,10 @@
-use chrono::{Duration, Utc};
+use jiff::Timestamp;
 use lotar::services::sprint_service::SprintService;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintActual, SprintPlan};
 use lotar::utils::paths;
+use lotar::utils::time;
+use lotar::utils::time::Rfc3339;
 use predicates::prelude::*;
 use serde_json::Value;
 
@@ -24,12 +26,12 @@ issue.priorities: [Low, Medium, High]
     .expect("write config");
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
-    let now = Utc::now();
-    let upcoming_start = now + Duration::days(21);
-    let upcoming_end = upcoming_start + Duration::days(14);
-    let active_start = now - Duration::days(7);
-    let completed_end = now - Duration::days(35);
-    let completed_start = completed_end - Duration::days(14);
+    let now = Timestamp::now();
+    let upcoming_start = now + time::days(21);
+    let upcoming_end = upcoming_start + time::days(14);
+    let active_start = now - time::days(7);
+    let completed_end = now - time::days(35);
+    let completed_start = completed_end - time::days(14);
 
     // Upcoming sprint
     let upcoming = Sprint {
@@ -140,9 +142,9 @@ issue.priorities: [Low, High]
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let now = Utc::now();
-    let starts_at = now + Duration::days(2);
-    let ends_at = starts_at + Duration::days(11);
+    let now = Timestamp::now();
+    let starts_at = now + time::days(2);
+    let ends_at = starts_at + time::days(11);
 
     let pending = Sprint {
         plan: Some(SprintPlan {

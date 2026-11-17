@@ -1,6 +1,6 @@
 use crate::config::types::ResolvedConfig;
 use crate::errors::{LoTaRError, LoTaRResult};
-use chrono::Utc;
+use crate::utils::time;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -60,7 +60,7 @@ impl AgentContextService {
         let limit = limit.unwrap_or(CONTEXT_LIMIT_DEFAULT);
         let mut context = Self::load(tasks_dir, config, ticket_id)?.unwrap_or(AgentContextFile {
             ticket_id: ticket_id.to_string(),
-            updated_at: Utc::now().to_rfc3339(),
+            updated_at: time::now_rfc3339(),
             messages: Vec::new(),
         });
 
@@ -69,7 +69,7 @@ impl AgentContextService {
             let start = context.messages.len().saturating_sub(limit);
             context.messages = context.messages[start..].to_vec();
         }
-        context.updated_at = Utc::now().to_rfc3339();
+        context.updated_at = time::now_rfc3339();
 
         // Refuse cross-root writes BEFORE creating anything: the context file
         // must land inside the workspace root that actually holds the ticket,
@@ -95,11 +95,11 @@ impl AgentContextService {
 }
 
 pub fn build_user_message(content: &str) -> AgentContextMessage {
-    AgentContextMessage { role: "user".to_string(), content: content.to_string(), at: Utc::now().to_rfc3339() }
+    AgentContextMessage { role: "user".to_string(), content: content.to_string(), at: time::now_rfc3339() }
 }
 
 pub fn build_assistant_message(content: &str) -> AgentContextMessage {
-    AgentContextMessage { role: "assistant".to_string(), content: content.to_string(), at: Utc::now().to_rfc3339() }
+    AgentContextMessage { role: "assistant".to_string(), content: content.to_string(), at: time::now_rfc3339() }
 }
 
 /// The tasks root that actually holds `ticket_id`, when it differs from

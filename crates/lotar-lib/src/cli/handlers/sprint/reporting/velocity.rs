@@ -1,6 +1,5 @@
+use jiff::Timestamp;
 use std::path::Path;
-
-use chrono::Utc;
 
 use crate::cli::args::sprint::SprintVelocityArgs;
 use crate::cli::handlers::sprint::shared::truncate;
@@ -29,7 +28,7 @@ pub(crate) fn handle_velocity(velocity_args: &SprintVelocityArgs, tasks_root: &P
 
     let options = VelocityOptions { limit, include_active: velocity_args.include_active, metric: velocity_args.metric };
 
-    let computation = compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
+    let computation = compute_velocity(&storage, &records, &resolved_config, &options, Timestamp::now());
 
     match renderer.format {
         OutputFormat::Json => {
@@ -61,7 +60,7 @@ fn render_velocity_text(renderer: &OutputRenderer, computation: &VelocityComputa
 
     for entry in &computation.entries {
         let label = entry.summary.label.clone().unwrap_or_else(|| format!("Sprint {}", entry.sprint_id));
-        let closed_display = entry.actual_end.or(entry.end).map(|dt| dt.format("%Y-%m-%d").to_string()).unwrap_or_else(|| "-".to_string());
+        let closed_display = entry.actual_end.or(entry.end).map(|dt| dt.strftime("%Y-%m-%d").to_string()).unwrap_or_else(|| "-".to_string());
         let committed_display = format_velocity_value(computation.metric, entry.committed);
         let completed_display = format_velocity_value(computation.metric, entry.completed);
         let percentage_display = format_percentage(entry.completion_ratio);

@@ -1,7 +1,7 @@
 use crate::common::env_mutex::{EnvVarGuard, lock_var};
-use chrono::Utc;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
+use lotar::utils::time;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -333,7 +333,7 @@ fn api_sprint_assignment_and_backlog() {
     let mut storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
     let mut sprint = lotar::storage::sprint::Sprint::default();
     sprint.plan = Some(lotar::storage::sprint::SprintPlan { label: Some("Iteration 1".into()), ..Default::default() });
-    sprint.actual = Some(lotar::storage::sprint::SprintActual { started_at: Some(Utc::now().to_rfc3339()), ..Default::default() });
+    sprint.actual = Some(lotar::storage::sprint::SprintActual { started_at: Some(time::now_rfc3339()), ..Default::default() });
     let created = lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None).expect("create sprint");
     let sprint_id = created.record.id;
 

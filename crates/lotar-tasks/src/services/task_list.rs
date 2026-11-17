@@ -12,6 +12,7 @@ use crate::services::task_query::{self, SortKey, SortSpec, TaskQueryOptions};
 use crate::storage::DeletionFilter;
 use crate::storage::layout::ArchiveFilter;
 use crate::storage::manager::Storage;
+use jiff::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::path::Path;
@@ -477,7 +478,7 @@ fn stored_status(tasks_root: &Path, project: Option<&str>, raw: &str, message: S
 
 /// Load, filter and order the tasks a query selects. Pagination is left to
 /// the caller.
-pub fn run(storage: &Storage, query: &TaskQuery, now: chrono::DateTime<chrono::Utc>) -> Vec<(String, TaskDTO)> {
+pub fn run(storage: &Storage, query: &TaskQuery, now: Timestamp) -> Vec<(String, TaskDTO)> {
     let mut tasks = crate::services::task_service::TaskService::list(storage, &query.filter);
     apply_release_filter(&mut tasks, query.releases.as_ref());
     apply_field_filters(&mut tasks, &query.field_filters, &query.config);
@@ -494,14 +495,14 @@ fn apply_release_filter(tasks: &mut Vec<(String, TaskDTO)>, filter: Option<&crat
 }
 
 /// Leave out tasks matching any of the query's exclusions (DEV-5).
-pub fn remove_excluded(storage: &Storage, query: &TaskQuery, tasks: &mut Vec<(String, TaskDTO)>, now: chrono::DateTime<chrono::Utc>) {
+pub fn remove_excluded(storage: &Storage, query: &TaskQuery, tasks: &mut Vec<(String, TaskDTO)>, now: Timestamp) {
     remove_matching(storage, &query.exclude, tasks, now);
 }
 
 /// Leave out tasks matching any of `exclusions`. Each exclusion is checked
 /// against the given tasks in memory, with the same filters [`run`] applies,
 /// rather than as its own workspace query (DEV-292).
-pub fn remove_matching(storage: &Storage, exclusions: &[TaskQuery], tasks: &mut Vec<(String, TaskDTO)>, now: chrono::DateTime<chrono::Utc>) {
+pub fn remove_matching(storage: &Storage, exclusions: &[TaskQuery], tasks: &mut Vec<(String, TaskDTO)>, now: Timestamp) {
     if exclusions.is_empty() || tasks.is_empty() {
         return;
     }
@@ -583,7 +584,7 @@ pub fn select(storage: &Storage, base: &ResolvedConfig, tasks_root: &Path, searc
     let mut input = TaskQueryInput::default();
     input.add_search(&crate::utils::search_syntax::parse(search))?;
     let query = input.resolve(base, tasks_root)?;
-    Ok(run(storage, &query, chrono::Utc::now()))
+    Ok(run(storage, &query, Timestamp::now()))
 }
 
 /// Keep tasks whose field values loosely match every field filter. Version

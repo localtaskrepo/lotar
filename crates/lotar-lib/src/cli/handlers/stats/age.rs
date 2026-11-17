@@ -1,4 +1,6 @@
 use crate::cli::args::stats::StatsAgeDistribution;
+use crate::utils::time;
+use jiff::Timestamp;
 
 #[expect(clippy::needless_pass_by_value, reason = "parsed CLI arguments are moved in from the command")]
 pub(crate) fn run(
@@ -16,7 +18,7 @@ pub(crate) fn run(
     // ...existing code...
 
     // Now is reference point
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
 
     // Helper to key buckets by human label and numeric order for sorting
     let mut counts: std::collections::BTreeMap<i64, usize> = std::collections::BTreeMap::new();
@@ -24,24 +26,24 @@ pub(crate) fn run(
     match distribution {
         StatsAgeDistribution::Day => {
             for (_id, t) in tasks.into_iter() {
-                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created).map(|dt| dt.with_timezone(&chrono::Utc)) {
-                    let days = (now - created).num_days().max(0);
+                if let Ok(created) = time::parse_rfc3339(&t.created) {
+                    let days = time::whole_days(now.duration_since(created)).max(0);
                     *counts.entry(days).or_insert(0) += 1;
                 }
             }
         }
         StatsAgeDistribution::Week => {
             for (_id, t) in tasks.into_iter() {
-                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created).map(|dt| dt.with_timezone(&chrono::Utc)) {
-                    let weeks = ((now - created).num_days().max(0)) / 7;
+                if let Ok(created) = time::parse_rfc3339(&t.created) {
+                    let weeks = (time::whole_days(now.duration_since(created)).max(0)) / 7;
                     *counts.entry(weeks).or_insert(0) += 1;
                 }
             }
         }
         StatsAgeDistribution::Month => {
             for (_id, t) in tasks.into_iter() {
-                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created).map(|dt| dt.with_timezone(&chrono::Utc)) {
-                    let months = ((now - created).num_days().max(0)) / 30; // approx
+                if let Ok(created) = time::parse_rfc3339(&t.created) {
+                    let months = (time::whole_days(now.duration_since(created)).max(0)) / 30; // approx
                     *counts.entry(months).or_insert(0) += 1;
                 }
             }

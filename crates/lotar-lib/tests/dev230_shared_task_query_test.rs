@@ -3,10 +3,12 @@
 //! The same filter must select the same tasks in the same order from the CLI
 //! (`lotar list`), REST (`/api/tasks/list` and `/api/tasks/export`) and MCP
 //! (`task_list`), including the filters that used to exist on only one side.
-
-use chrono::{Duration, Local, Utc};
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
+use lotar::utils::time;
+use lotar::utils::time::Rfc3339;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -29,19 +31,19 @@ impl Fixture {
     }
 
     fn task(&self, num: u32, title: &str, priority: &str, extra: &str) {
-        let modified = (Utc::now() - Duration::days(30) + Duration::minutes(i64::from(num))).to_rfc3339();
+        let modified = (Timestamp::now() - time::days(30) + SignedDuration::from_mins(i64::from(num))).to_rfc3339();
         let yaml = format!("title: {title}\nstatus: Todo\npriority: {priority}\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\n{extra}");
         std::fs::write(self.tasks_dir.join("QP").join(format!("{num}.yml")), yaml).unwrap();
     }
 }
 
 fn date(days_from_today: i64) -> String {
-    (Local::now().date_naive() + Duration::days(days_from_today)).format("%Y-%m-%d").to_string()
+    (time::local_today() + time::days(days_from_today)).strftime("%Y-%m-%d").to_string()
 }
 
 /// Tasks covering every filter below; QP-n has modified time order n.
 fn seed(fx: &Fixture) {
-    let recent = Utc::now().to_rfc3339();
+    let recent = time::now_rfc3339();
     fx.task(1, "Tagged estimate", "Medium", "tags: [ui]\neffort: 4h\nassignee: alice\n");
     fx.task(2, "Untagged big", "Medium", &format!("effort: 2d\ndue_date: {}\nassignee: bob\n", date(2)));
     fx.task(3, "Overdue screenshot", "Medium", &format!("tags: [bug]\ndue_date: {}\nreferences:\n- attachment: shot.png\n", date(-3)));

@@ -1,11 +1,11 @@
 //! Helpers shared by the `lotar stats` subcommands: project scoping, task
 //! loading, the git window for history-based stats, and list output.
 
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
+use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-use chrono::{DateTime, Utc};
-use serde_json::{Map, Value, json};
 
 use crate::api_types::TaskDTO;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -30,7 +30,7 @@ pub(crate) fn list_tasks(scope_project: Option<&str>, resolver: &TasksDirectoryR
     input.add_search(&crate::utils::search_syntax::parse(filter)).map_err(|e| e.cli_message())?;
     let query = input.resolve(&base, resolver.path.as_path()).map_err(|e| e.cli_message())?;
     let storage = Storage::open_read_only(&resolver.path);
-    Ok(crate::services::task_list::run(&storage, &query, chrono::Utc::now()))
+    Ok(crate::services::task_list::run(&storage, &query, Timestamp::now()))
 }
 
 /// The IDs `filter` keeps, for stats that list tickets from git; `None`
@@ -57,7 +57,7 @@ pub(crate) fn header(action: &str, global: bool, scope_project: Option<&str>) ->
 }
 
 /// [`header`] plus the `since`/`until` window of history-based stats.
-pub(crate) fn window_header(action: &str, since: DateTime<Utc>, until: DateTime<Utc>, global: bool, scope_project: Option<&str>) -> Map<String, Value> {
+pub(crate) fn window_header(action: &str, since: Timestamp, until: Timestamp, global: bool, scope_project: Option<&str>) -> Map<String, Value> {
     let mut map = header(action, global, scope_project);
     map.insert("since".into(), json!(since.to_rfc3339()));
     map.insert("until".into(), json!(until.to_rfc3339()));

@@ -1,4 +1,6 @@
 use super::*;
+use crate::utils::time;
+use jiff::Timestamp;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/activity/feed", |req: &HttpRequest| {
@@ -84,17 +86,17 @@ pub(super) fn register(api_server: &mut ApiServer) {
 /// fall back to the last 30 days.
 /// `since`/`until` window (RFC 3339), defaulting to the last 30 days. A
 /// value that does not parse is a 400, not a silent default (DEV-276).
-fn activity_window(req: &HttpRequest) -> Result<(chrono::DateTime<Utc>, chrono::DateTime<Utc>), HttpResponse> {
-    let parse = |key: &str| -> Result<Option<chrono::DateTime<Utc>>, HttpResponse> {
+fn activity_window(req: &HttpRequest) -> Result<(Timestamp, Timestamp), HttpResponse> {
+    let parse = |key: &str| -> Result<Option<Timestamp>, HttpResponse> {
         match req.query.get(key).map(|s| s.trim()).filter(|s| !s.is_empty()) {
             None => Ok(None),
-            Some(raw) => chrono::DateTime::parse_from_rfc3339(raw)
-                .map(|dt| Some(dt.with_timezone(&Utc)))
+            Some(raw) => time::parse_rfc3339(raw)
+                .map(Some)
                 .map_err(|_| bad_request(format!("Invalid {key} '{raw}': use an RFC 3339 timestamp such as 2026-01-31T00:00:00Z"))),
         }
     };
-    let now = Utc::now();
-    let since = parse("since")?.unwrap_or(now - chrono::Duration::days(30));
+    let now = Timestamp::now();
+    let since = parse("since")?.unwrap_or(now - time::days(30));
     let until = parse("until")?.unwrap_or(now);
     Ok((since, until))
 }

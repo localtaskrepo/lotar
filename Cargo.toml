@@ -28,7 +28,7 @@ serde_json = { version = "1.0.154", features = ["std"], default-features = false
 # in every script; script/boolean/age/segment property classes (\p{Greek},
 # \p{Emoji}…) are left out to save ~180 KB (DEV-221).
 regex = { version = "1.13.1", default-features = false, features = ["std", "unicode-perl", "unicode-case", "unicode-gencat"] }
-chrono = { version = "0.4.45", features = ["serde", "clock"], default-features = false }
+jiff = "1.0.0"
 serde = { version = "1.0.229", features = ["derive"], default-features = false }
 serde_yaml_ng = "0.10.0"
 dirs = "7.0.0"

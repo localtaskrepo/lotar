@@ -1,11 +1,11 @@
 title: dev510 test a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads times out on main, also run alone
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T18:25:53.916459+00:00
-modified: 2026-11-17T19:11:40.747453+00:00
+modified: 2026-11-17T19:21:07.168434+00:00
 relationships:
   related:
   - DEV-520
@@ -60,6 +60,32 @@ comments:
     - `rustfmt --edition 2024 --check` on the file passed. No stray files, and no second branch.
     - Not rerun: `npm run test:agent`, lint and smoke (the fix agent reports all passed). A failing test before the change doesn't apply: the timeout never reproduced, so this is a diagnostic, not a bug fix.
     - No tickets filed.
+- date: 2026-11-17T19:21:06.986278+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-670` is in `main`.
+
+    - Rebased `agent/DEV-670` onto `main` (`7b973e172283`): `d39bc23db992`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `d39bc23db992`
+    - Amended the pending `.tasks` changes into the merged commit: `19547e4241eb`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[nextest:dev510_t3_session_test]`
+  report:
+    commits:
+    - hash: 19547e424
+      what: DEV-670 dev510 test a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads times out on main, also run alone
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24d11501-1b19-4a0f-9117-2db78a77dbea
 description: |-
@@ -137,3 +163,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T19:21:06.986278+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:21:07.168434+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

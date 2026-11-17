@@ -1,4 +1,6 @@
 //! Run context, sync events and the per-task report recorder.
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 
 use super::*;
 
@@ -117,7 +119,7 @@ pub(super) fn make_run_id(client_run_id: Option<&str>) -> String {
             return trimmed.to_string();
         }
     }
-    let stamp = Utc::now().format("%Y%m%dT%H%M%S%.3fZ").to_string();
+    let stamp = Timestamp::now().strftime("%Y%m%dT%H%M%S%.3fZ").to_string();
     let counter = RUN_COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("sync-{stamp}-{counter}")
 }
@@ -129,7 +131,7 @@ pub(super) fn make_entry(
     title: Option<String>,
     message: Option<String>,
 ) -> SyncReportEntry {
-    SyncReportEntry { status: status.as_str().to_string(), at: Utc::now().to_rfc3339(), task_id, reference, title, message, fields: Vec::new() }
+    SyncReportEntry { status: status.as_str().to_string(), at: Timestamp::now().to_rfc3339(), task_id, reference, title, message, fields: Vec::new() }
 }
 
 pub(super) fn make_entry_with_fields(
@@ -140,7 +142,7 @@ pub(super) fn make_entry_with_fields(
     fields: Vec<String>,
     message: Option<String>,
 ) -> SyncReportEntry {
-    SyncReportEntry { status: status.as_str().to_string(), at: Utc::now().to_rfc3339(), task_id, reference, title, message, fields }
+    SyncReportEntry { status: status.as_str().to_string(), at: Timestamp::now().to_rfc3339(), task_id, reference, title, message, fields }
 }
 
 #[derive(Debug, Clone, Copy)]

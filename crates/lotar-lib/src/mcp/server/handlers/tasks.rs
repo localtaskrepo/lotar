@@ -1,3 +1,4 @@
+use jiff::Timestamp;
 use serde_json::{Value, json};
 
 use super::super::hints::{EnumHints, enum_hints_to_value, make_enum_error_data};
@@ -1329,7 +1330,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let storage = Storage::new(&resolver.path.clone());
     // Filtered and in global order BEFORE pagination, so pages are stable
     // and match the REST list/export order.
-    let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now()).into_iter().map(|(_, t)| t).collect::<Vec<_>>();
+    let tasks = crate::services::task_list::run(&storage, &query, Timestamp::now()).into_iter().map(|(_, t)| t).collect::<Vec<_>>();
     let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_TASK_LIST_LIMIT) {
         Ok(value) if (1..=MCP_MAX_TASK_LIST_LIMIT).contains(&value) => value,
         Ok(_) => {

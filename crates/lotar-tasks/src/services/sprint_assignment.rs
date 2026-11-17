@@ -1,7 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::Serialize;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status::{self, SprintLifecycleState};
@@ -336,7 +335,7 @@ pub struct SprintBacklogResult {
 
 pub fn fetch_backlog(storage: &Storage, options: &SprintBacklogOptions) -> Result<SprintBacklogResult, String> {
     // Tasks the query selects that are in no sprint.
-    let mut entries: Vec<SprintBacklogEntry> = crate::services::task_list::run(storage, &options.query, chrono::Utc::now())
+    let mut entries: Vec<SprintBacklogEntry> = crate::services::task_list::run(storage, &options.query, Timestamp::now())
         .into_iter()
         .filter(|(_, task)| task.sprints.is_empty())
         .map(|(id, task)| SprintBacklogEntry {
@@ -396,7 +395,7 @@ pub fn resolve_sprint_id(records: &[SprintRecord], reference: Option<&str>) -> R
 
 /// IDs of sprints currently active or overdue, in record order.
 pub fn active_sprint_ids(records: &[SprintRecord]) -> Vec<u32> {
-    let now = Utc::now();
+    let now = Timestamp::now();
     records.iter().filter(|record| sprint_status::derive_status(&record.sprint, now).state.is_active_or_overdue()).map(|record| record.id).collect()
 }
 
@@ -425,7 +424,7 @@ pub fn resolve_previous_sprint(records: &[SprintRecord]) -> Result<u32, String> 
 }
 
 pub fn ensure_sprint_is_open(record: &SprintRecord) -> Result<(), String> {
-    let lifecycle = sprint_status::derive_status(&record.sprint, Utc::now());
+    let lifecycle = sprint_status::derive_status(&record.sprint, Timestamp::now());
     if matches!(lifecycle.state, SprintLifecycleState::Complete) {
         return Err(format!("Sprint #{} ({}) is closed. Pass --allow-closed to override.", record.id, sprint_display_name(record)));
     }

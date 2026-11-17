@@ -1,3 +1,4 @@
+use jiff::Timestamp;
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 
@@ -17,7 +18,6 @@ use crate::services::sprint_service::{SprintService, sprint_from_create_request,
 use crate::services::sprint_velocity::{DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity};
 use crate::storage::manager::Storage;
 use crate::workspace::TasksDirectoryResolver;
-use chrono::Utc;
 
 fn parse_sprint_reference(params: &Value) -> Result<Option<String>, &'static str> {
     if let Some(raw) = params.get("sprint_id") {
@@ -146,7 +146,7 @@ pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let now = Utc::now();
+    let now = Timestamp::now();
     let mut sprints: Vec<SprintListItem> = records.iter().map(|record| sprint_record_to_list_item(record, now)).collect();
     sprints.sort_by_key(|a| a.id);
 
@@ -206,7 +206,7 @@ pub(crate) fn handle_sprint_get(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let item = sprint_record_to_list_item(&record, Utc::now());
+    let item = sprint_record_to_list_item(&record, Timestamp::now());
     let payload = json!({"status": "ok", "sprint": item});
     text_result(req.id, &payload)
 }
@@ -239,7 +239,7 @@ pub(crate) fn handle_sprint_create(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let response = SprintCreateResponse {
         status: "ok".to_string(),
-        sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+        sprint: sprint_record_to_list_item(&outcome.record, Timestamp::now()),
         warnings: outcome.warnings.iter().map(|warning| warning.message().to_string()).collect(),
         applied_defaults: outcome.applied_defaults.clone(),
     };
@@ -279,7 +279,7 @@ pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let response = SprintUpdateResponse {
         status: "ok".to_string(),
-        sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+        sprint: sprint_record_to_list_item(&outcome.record, Timestamp::now()),
         warnings: outcome.warnings.iter().map(|warning| warning.message().to_string()).collect(),
     };
 
@@ -312,7 +312,7 @@ pub(crate) fn handle_sprint_summary(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let summary = compute_sprint_summary(&storage, &record, &resolved_config, Utc::now());
+    let summary = compute_sprint_summary(&storage, &record, &resolved_config, Timestamp::now());
     ok(
         req.id,
         json!({
@@ -347,7 +347,7 @@ pub(crate) fn handle_sprint_burndown(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let ctx = match compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now()) {
+    let ctx = match compute_sprint_burndown(&storage, &record, &resolved_config, Timestamp::now()) {
         Ok(ctx) => ctx,
         Err(msg) => return err(req.id, -32602, msg.as_str(), None),
     };
@@ -417,7 +417,7 @@ pub(crate) fn handle_sprint_velocity(req: JsonRpcRequest) -> JsonRpcResponse {
     };
 
     let options = VelocityOptions { limit, include_active, metric };
-    let computed = compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
+    let computed = compute_velocity(&storage, &records, &resolved_config, &options, Timestamp::now());
     let payload = computed.to_payload(include_active);
 
     text_result(req.id, &payload)

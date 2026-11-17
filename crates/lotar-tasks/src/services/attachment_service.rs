@@ -3,6 +3,7 @@ use crate::services::reference_service::{ReferenceMutationOutcome, ReferenceServ
 use crate::storage::TaskFilter;
 use crate::storage::manager::Storage;
 use crate::types::ReferenceEntry;
+use crate::utils::time;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -521,7 +522,7 @@ impl AttachmentService {
                     reference.attachment = next.next().cloned();
                 }
             }
-            let now = chrono::Utc::now().to_rfc3339();
+            let now = time::now_rfc3339();
             task.history.push(crate::types::TaskChangeLogEntry {
                 extra: Default::default(),
                 at: now.clone(),

@@ -1,7 +1,6 @@
-use std::path::Path;
-
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::Serialize;
+use std::path::Path;
 
 use crate::config::types::ResolvedConfig;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -50,7 +49,7 @@ pub(super) fn render_operation_response(
     warnings_enabled: bool,
     _resolved_config: &ResolvedConfig,
 ) {
-    let lifecycle = sprint_status::derive_status(&record.sprint, Utc::now());
+    let lifecycle = sprint_status::derive_status(&record.sprint, Timestamp::now());
     let summary = SprintSummary::from_record(&record, &lifecycle);
     let detail = SprintDetail::from_record(&record, &summary, &lifecycle);
     let actual_started_at = record.sprint.actual.as_ref().and_then(|actual| actual.started_at.clone());

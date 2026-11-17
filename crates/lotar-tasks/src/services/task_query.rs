@@ -23,7 +23,10 @@
 
 use crate::api_types::TaskDTO;
 use crate::utils::text_search::{SearchQuery, Searchable};
-use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, TimeZone, Utc};
+use crate::utils::time;
+use jiff::SignedDuration;
+use jiff::Timestamp;
+use jiff::civil::Date;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
@@ -401,16 +404,16 @@ impl TaskSortFields for TaskDTO {
 /// for every date in every timezone).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StoredDue {
-    Date(NaiveDate),
-    Instant(DateTime<Utc>),
+    Date(Date),
+    Instant(Timestamp),
 }
 
 impl StoredDue {
     /// The local calendar date this due falls on.
-    pub fn local_date(self) -> NaiveDate {
+    pub fn local_date(self) -> Date {
         match self {
             StoredDue::Date(date) => date,
-            StoredDue::Instant(instant) => instant.with_timezone(&Local).date_naive(),
+            StoredDue::Instant(instant) => time::local_date(instant),
         }
     }
 }
@@ -423,13 +426,13 @@ pub fn parse_stored_due(raw: &str) -> Option<StoredDue> {
     if trimmed.is_empty() {
         return None;
     }
-    if let Ok(dt) = DateTime::parse_from_rfc3339(trimmed) {
-        return Some(StoredDue::Instant(dt.with_timezone(&Utc)));
+    if let Ok(dt) = time::parse_rfc3339(trimmed) {
+        return Some(StoredDue::Instant(dt));
     }
     if let Some(dt) = crate::utils::time::parse_naive_local_datetime_to_utc(trimmed) {
         return Some(StoredDue::Instant(dt));
     }
-    if let Ok(date) = NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
+    if let Ok(date) = Date::strptime("%Y-%m-%d", trimmed) {
         return Some(StoredDue::Date(date));
     }
     None
@@ -439,7 +442,7 @@ pub fn parse_stored_due(raw: &str) -> Option<StoredDue> {
 /// local datetime, or date-only mapped to the earliest valid local instant
 /// of that calendar date (DST-gap safe: if local midnight does not exist,
 /// the first resolvable minute of the date is used).
-pub fn parse_stored_datetime_to_utc(raw: &str) -> Option<DateTime<Utc>> {
+pub fn parse_stored_datetime_to_utc(raw: &str) -> Option<Timestamp> {
     match parse_stored_due(raw) {
         Some(StoredDue::Instant(instant)) => Some(instant),
         Some(StoredDue::Date(date)) => earliest_local_instant(date),
@@ -451,34 +454,35 @@ pub fn parse_stored_datetime_to_utc(raw: &str) -> Option<DateTime<Utc>> {
 /// then successive minutes (up to 4h) so dates whose midnight falls in a DST
 /// gap still resolve; falls back to naive-UTC midnight only if the whole
 /// window is unresolvable.
-fn earliest_local_instant(date: NaiveDate) -> Option<DateTime<Utc>> {
-    for minute in 0..=240u32 {
-        let (h, m) = (minute / 60, minute % 60);
-        if let Some(dt) = Local.with_ymd_and_hms(date.year(), date.month(), date.day(), h, m, 0).single() {
-            return Some(dt.with_timezone(&Utc));
+fn earliest_local_instant(date: Date) -> Option<Timestamp> {
+    let midnight = date.to_datetime(jiff::civil::Time::midnight());
+    let tz = time::local_tz();
+    for minute in 0..=240 {
+        if let Ok(dt) = tz.to_ambiguous_timestamp(midnight + SignedDuration::from_mins(minute)).unambiguous() {
+            return Some(dt);
         }
     }
-    date.and_hms_opt(0, 0, 0).map(|naive| DateTime::from_naive_utc_and_offset(naive, Utc))
+    jiff::tz::Offset::UTC.to_timestamp(midnight).ok()
 }
 
 /// The local calendar date an instant falls on.
-fn local_date_of(instant: DateTime<Utc>) -> NaiveDate {
-    instant.with_timezone(&Local).date_naive()
+fn local_date_of(instant: Timestamp) -> Date {
+    time::local_date(instant)
 }
 
 /// Local "today" for a clock value.
-pub fn today_local(now: DateTime<Utc>) -> NaiveDate {
+pub fn today_local(now: Timestamp) -> Date {
     local_date_of(now)
 }
 
 /// Inclusive lower bound for `recent=<N>d`.
-pub fn recent_cutoff(now: DateTime<Utc>, filter: RecentFilter) -> DateTime<Utc> {
-    now - Duration::days(i64::from(filter.days))
+pub fn recent_cutoff(now: Timestamp, filter: RecentFilter) -> Timestamp {
+    now - time::days(i64::from(filter.days))
 }
 
 /// Pure, DST-safe date-bucket test (calendar arithmetic only).
-fn due_bucket_matches(due_local: NaiveDate, today: NaiveDate, filter: DueFilter) -> bool {
-    let soon_end = today + Duration::days(SOON_WINDOW_DAYS);
+fn due_bucket_matches(due_local: Date, today: Date, filter: DueFilter) -> bool {
+    let soon_end = today + time::days(SOON_WINDOW_DAYS);
     match filter {
         DueFilter::Today => due_local == today,
         DueFilter::Soon => due_local > today && due_local <= soon_end,
@@ -487,7 +491,7 @@ fn due_bucket_matches(due_local: NaiveDate, today: NaiveDate, filter: DueFilter)
     }
 }
 
-fn task_matches_due(task: &TaskDTO, filter: DueFilter, today: NaiveDate) -> bool {
+fn task_matches_due(task: &TaskDTO, filter: DueFilter, today: Date) -> bool {
     // DEV-21: only the Overdue bucket excludes terminal tasks ("completed
     // work is not overdue work"). Today/Soon/Later keep matching done
     // tasks. The bucket itself is recomputed here from the raw due value
@@ -501,7 +505,7 @@ fn task_matches_due(task: &TaskDTO, filter: DueFilter, today: NaiveDate) -> bool
 /// Shared predicate: does a stored due value fall in the requested bucket?
 /// Date-only values bucket directly on their calendar date; instants on the
 /// local date they fall on. Missing/unparseable values match nothing.
-pub fn due_raw_matches_bucket(raw: Option<&str>, filter: DueFilter, today: NaiveDate) -> bool {
+pub fn due_raw_matches_bucket(raw: Option<&str>, filter: DueFilter, today: Date) -> bool {
     let Some(due) = raw.and_then(parse_stored_due) else {
         return false;
     };
@@ -511,19 +515,19 @@ pub fn due_raw_matches_bucket(raw: Option<&str>, filter: DueFilter, today: Naive
 /// Shared predicate for window filters (`--due-soon[=days]`): the due falls
 /// on today or any of the next `days` calendar days (inclusive on both
 /// ends, matching the documented "due within N days" wording).
-pub fn due_raw_within_window(raw: Option<&str>, today: NaiveDate, days: i64) -> bool {
+pub fn due_raw_within_window(raw: Option<&str>, today: Date, days: i64) -> bool {
     let Some(due) = raw.and_then(parse_stored_due) else {
         return false;
     };
     let date = due.local_date();
-    date >= today && date <= today + Duration::days(days)
+    date >= today && date <= today + time::days(days)
 }
 
-fn task_matches_recent(task: &TaskDTO, cutoff: DateTime<Utc>) -> bool {
-    let Some(modified) = DateTime::parse_from_rfc3339(task.modified.as_str()).ok() else {
+fn task_matches_recent(task: &TaskDTO, cutoff: Timestamp) -> bool {
+    let Some(modified) = time::parse_rfc3339(task.modified.as_str()).ok() else {
         return false;
     };
-    modified.with_timezone(&Utc) >= cutoff
+    modified >= cutoff
 }
 
 fn task_matches_needs(task: &TaskDTO, needs: &BTreeSet<NeedsFlag>) -> bool {
@@ -554,7 +558,7 @@ fn task_matches_has(task: &TaskDTO, has: &BTreeSet<HasFlag>) -> bool {
 }
 
 /// Apply the smart filters (`due`, `recent`, `needs`, `has`) in place.
-pub fn apply_smart_filters(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now: DateTime<Utc>) {
+pub fn apply_smart_filters(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now: Timestamp) {
     if options.due.is_none()
         && options.due_within_days.is_none()
         && options.recent.is_none()
@@ -615,7 +619,7 @@ fn compare_optional_due(a: Option<&str>, b: Option<&str>) -> Ordering {
 }
 
 fn compare_parsed_instant(a: &str, b: &str) -> Ordering {
-    let parse = |raw: &str| DateTime::parse_from_rfc3339(raw).ok();
+    let parse = |raw: &str| time::parse_rfc3339(raw).ok();
     match (parse(a), parse(b)) {
         (Some(x), Some(y)) => x.cmp(&y),
         (Some(_), None) => Ordering::Less,
@@ -682,7 +686,7 @@ pub fn sort_tasks_ranked<T: TaskSortFields>(tasks: &mut [(String, T)], spec: &So
 
 /// Full executor: smart filters, then global ordering. Returns the filtered
 /// and ordered task list; pagination stays a caller concern.
-pub fn apply(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now: DateTime<Utc>) {
+pub fn apply(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now: Timestamp) {
     apply_smart_filters(tasks, options, now);
     if options.sort == SortSpec::Builtin(SortKey::Relevance) {
         sort_by_relevance(tasks, options.search.as_ref(), options.order);
@@ -727,6 +731,7 @@ pub fn sort_by_relevance<T: TaskSortFields + Searchable>(tasks: &mut [(String, T
 mod tests {
     use super::*;
     use crate::types::TaskComment;
+    use crate::utils::time::Rfc3339;
 
     #[test]
     fn parse_sort_by_accepts_builtins_and_prefixes() {
@@ -770,8 +775,8 @@ mod tests {
 
     #[test]
     fn due_buckets_cover_boundaries_without_overlap() {
-        let today = NaiveDate::from_ymd_opt(2026, 3, 8).unwrap(); // US DST spring-forward day
-        let mk = |y, m, d| NaiveDate::from_ymd_opt(y, m, d).unwrap();
+        let today = jiff::civil::date(2026, 3, 8); // US DST spring-forward day
+        let mk = |y, m, d| jiff::civil::date(y, m, d);
         assert!(due_bucket_matches(mk(2026, 3, 7), today, DueFilter::Overdue));
         assert!(due_bucket_matches(today, today, DueFilter::Today));
         assert!(due_bucket_matches(mk(2026, 3, 9), today, DueFilter::Soon));
@@ -779,7 +784,7 @@ mod tests {
         assert!(due_bucket_matches(mk(2026, 3, 16), today, DueFilter::Later));
         // No overlaps: each boundary date matches exactly one bucket.
         for offset in -2..=10 {
-            let d = today + Duration::days(offset);
+            let d = today + time::days(offset);
             let matched: Vec<DueFilter> =
                 [DueFilter::Today, DueFilter::Soon, DueFilter::Later, DueFilter::Overdue].into_iter().filter(|f| due_bucket_matches(d, today, *f)).collect();
             assert_eq!(matched.len(), 1, "date {d} matched {matched:?}");
@@ -799,7 +804,7 @@ mod tests {
 
     #[test]
     fn date_only_due_keeps_identity_and_sort_instant_resolves() {
-        let date = NaiveDate::from_ymd_opt(2026, 11, 1).unwrap(); // US DST fall-back day
+        let date = jiff::civil::date(2026, 11, 1); // US DST fall-back day
         assert_eq!(parse_stored_due("2026-11-01"), Some(StoredDue::Date(date)));
         // The sortable instant resolves even where midnight is ambiguous and
         // maps back onto the same local date.
@@ -809,8 +814,8 @@ mod tests {
 
     #[test]
     fn due_bucket_predicates_cover_window_and_overdue() {
-        let today = NaiveDate::from_ymd_opt(2026, 6, 10).unwrap();
-        let due = |d: i64| Some((today + Duration::days(d)).format("%Y-%m-%d").to_string());
+        let today = jiff::civil::date(2026, 6, 10);
+        let due = |d: i64| Some((today + time::days(d)).strftime("%Y-%m-%d").to_string());
         // Overdue bucket: strictly before today.
         assert!(due_raw_matches_bucket(due(-1).as_deref(), DueFilter::Overdue, today));
         assert!(!due_raw_matches_bucket(due(0).as_deref(), DueFilter::Overdue, today));
@@ -996,10 +1001,10 @@ mod tests {
 
     #[test]
     fn smart_filters_match_needs_and_recent_boundaries() {
-        let now = DateTime::parse_from_rfc3339("2026-06-15T12:00:00Z").unwrap().with_timezone(&Utc);
+        let now = time::parse_rfc3339("2026-06-15T12:00:00Z").unwrap();
         let cutoff = recent_cutoff(now, RecentFilter { days: 7 });
         let t_exact = dto("A-1", cutoff.to_rfc3339().as_str());
-        let t_older = dto("B-1", (cutoff - chrono::Duration::seconds(1)).to_rfc3339().as_str());
+        let t_older = dto("B-1", (cutoff - SignedDuration::from_secs(1)).to_rfc3339().as_str());
         let mut needs_both = dto("C-1", now.to_rfc3339().as_str());
         needs_both.effort = None;
         needs_both.due_date = None;
@@ -1022,7 +1027,7 @@ mod tests {
         let has = parse_has("tag").unwrap();
         assert!(has.contains(&HasFlag::Tag));
         assert_eq!(parse_has("Tags").unwrap(), has);
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut tagged = dto("A-1", now.to_rfc3339().as_str());
         tagged.tags = vec!["ui".to_string()];
         let untagged = dto("B-1", now.to_rfc3339().as_str());
@@ -1037,7 +1042,7 @@ mod tests {
     fn has_question_keeps_tasks_with_an_open_question() {
         // DEV-488
         let has = parse_has("question").unwrap();
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut asked = TaskComment::new("2026-11-13T10:00:00Z".into(), None, "Which?".into());
         asked.question =
             Some(crate::types::CommentQuestion { options: Vec::new(), recommended: None, multiple: false, other: true, extra: Default::default() });

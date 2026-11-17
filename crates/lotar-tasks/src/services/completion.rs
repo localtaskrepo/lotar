@@ -10,10 +10,10 @@
 //! interval and per-cut completion from the task's JSON history so
 //! reopened and terminal-to-terminal transitions are handled correctly.
 
+use crate::utils::time;
+use jiff::Timestamp;
 use std::collections::HashMap;
 use std::collections::HashSet;
-
-use chrono::{DateTime, Utc};
 
 use crate::api_types::{TaskDueBucketDTO, TaskStateDTO};
 use crate::config::types::ResolvedConfig;
@@ -119,8 +119,8 @@ pub fn effective_done_status_values(config: &ResolvedConfig) -> Vec<String> {
 
 /// Server-local calendar day (`YYYY-MM-DD`) for a point in time. Derived
 /// from the injected clock, never from a cached resolved snapshot.
-pub fn local_calendar_day(now: DateTime<Utc>) -> String {
-    crate::services::task_query::today_local(now).format("%Y-%m-%d").to_string()
+pub fn local_calendar_day(now: Timestamp) -> String {
+    crate::services::task_query::today_local(now).strftime("%Y-%m-%d").to_string()
 }
 
 /// Compute the runtime task-state projection: `is_done` from the task's own
@@ -128,7 +128,7 @@ pub fn local_calendar_day(now: DateTime<Utc>) -> String {
 /// clock, and the server-local calendar day at build time. Terminal past-due
 /// tasks have no bucket (only the Overdue bucket excludes terminal tasks);
 /// tasks due today stay `today` even when done.
-pub fn compute_task_state(status: &TaskStatus, due_raw: Option<&str>, config: &ResolvedConfig, now: DateTime<Utc>) -> TaskStateDTO {
+pub fn compute_task_state(status: &TaskStatus, due_raw: Option<&str>, config: &ResolvedConfig, now: Timestamp) -> TaskStateDTO {
     let done = effective_done_statuses(config);
     let is_done = done.contains(&status.as_str().to_ascii_lowercase());
     let today = crate::services::task_query::today_local(now);
@@ -138,13 +138,13 @@ pub fn compute_task_state(status: &TaskStatus, due_raw: Option<&str>, config: &R
             if is_done { None } else { Some(TaskDueBucketDTO::Overdue) }
         } else if due == today {
             Some(TaskDueBucketDTO::Today)
-        } else if due <= today + chrono::Duration::days(7) {
+        } else if due <= today + time::days(7) {
             Some(TaskDueBucketDTO::Soon)
         } else {
             Some(TaskDueBucketDTO::Later)
         }
     });
-    TaskStateDTO { is_done, done_states: effective_done_status_values(config), due_bucket, calendar_day: today.format("%Y-%m-%d").to_string() }
+    TaskStateDTO { is_done, done_states: effective_done_status_values(config), due_bucket, calendar_day: today.strftime("%Y-%m-%d").to_string() }
 }
 
 /// Per-task done sets for mixed-project collections: each task resolves
@@ -206,14 +206,14 @@ where
     TaskDoneSets { by_task }
 }
 
-fn parse_history_timestamp(raw: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(raw.trim()).ok().map(|parsed| parsed.with_timezone(&Utc))
+fn parse_history_timestamp(raw: &str) -> Option<Timestamp> {
+    time::parse_rfc3339(raw.trim()).ok()
 }
 
 /// Legacy best-effort completion estimate for tasks without usable status
 /// history: the last modification (creation as the floor). This mirrors the
 /// pre-DEV-21 behavior and is a conscious estimate, not a recorded fact.
-fn legacy_completion_estimate(task: &StoredTask) -> Option<DateTime<Utc>> {
+fn legacy_completion_estimate(task: &StoredTask) -> Option<Timestamp> {
     let modified = task.modified.trim();
     if !modified.is_empty()
         && let Some(at) = parse_history_timestamp(modified)
@@ -229,11 +229,11 @@ fn legacy_completion_estimate(task: &StoredTask) -> Option<DateTime<Utc>> {
 /// restart the interval. Tasks without usable status history fall back to
 /// the legacy modified/created estimate. `None` when the task is not
 /// currently terminal.
-pub fn current_completion_started_at(task: &StoredTask, done: &HashSet<String>) -> Option<DateTime<Utc>> {
+pub fn current_completion_started_at(task: &StoredTask, done: &HashSet<String>) -> Option<Timestamp> {
     if !done.contains(&task.status.as_str().to_ascii_lowercase()) {
         return None;
     }
-    let mut started: Option<DateTime<Utc>> = None;
+    let mut started: Option<Timestamp> = None;
     for entry in &task.history {
         let Some(at) = parse_history_timestamp(&entry.at) else {
             continue;
@@ -262,7 +262,7 @@ pub fn current_completion_started_at(task: &StoredTask, done: &HashSet<String>) 
 /// done before the reopen and open afterwards until they re-complete;
 /// terminal-to-terminal transitions keep the task done throughout. Tasks
 /// without status history use the legacy estimate.
-pub fn task_done_at_cut(task: &StoredTask, done: &HashSet<String>, cut: DateTime<Utc>) -> bool {
+pub fn task_done_at_cut(task: &StoredTask, done: &HashSet<String>, cut: Timestamp) -> bool {
     let mut replayed: Option<String> = None;
     let mut initial: Option<String> = None;
     for entry in &task.history {
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn terminal_past_due_has_no_bucket() {
         let config = ResolvedConfig::from_global(crate::config::types::GlobalConfig::default());
-        let now = DateTime::parse_from_rfc3339("2026-10-03T12:00:00Z").unwrap().with_timezone(&Utc);
+        let now = time::parse_rfc3339("2026-10-03T12:00:00Z").unwrap();
         let open_overdue = compute_task_state(&TaskStatus::from("Todo"), Some("2026-10-01"), &config, now);
         assert!(!open_overdue.is_done);
         // The embedded policy is the ordered effective list actually used

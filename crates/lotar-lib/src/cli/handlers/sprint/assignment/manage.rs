@@ -1,3 +1,4 @@
+use jiff::Timestamp;
 use std::path::Path;
 
 use serde::Serialize;
@@ -247,7 +248,7 @@ pub(crate) fn select_task_ids(
     };
     input.add_search(&crate::utils::search_syntax::parse(&args.select.join(" "))).map_err(|e| e.cli_message())?;
     let query = input.resolve(config, resolver.path.as_path()).map_err(|e| e.cli_message())?;
-    Ok(crate::services::task_list::run(storage, &query, chrono::Utc::now()).into_iter().map(|(id, _)| id).collect())
+    Ok(crate::services::task_list::run(storage, &query, Timestamp::now()).into_iter().map(|(id, _)| id).collect())
 }
 
 #[derive(Debug, Serialize)]

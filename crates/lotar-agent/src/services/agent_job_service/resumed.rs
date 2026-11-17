@@ -12,7 +12,7 @@ use super::{
 use crate::config::types::{AgentProfileDetail, AgentRunnerKind};
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
 use crate::storage::manager::Storage;
-use chrono::Utc;
+use crate::utils::time;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -283,7 +283,7 @@ fn adopt(tasks_dir: &Path, ticket_id: &str, resumed: &Resumed) -> Result<String,
     }
 
     let job_id = make_job_id();
-    let started_at = Utc::now().to_rfc3339();
+    let started_at = time::now_rfc3339();
     let workspace_root = tasks_dir.parent().map(Path::to_path_buf).unwrap_or_else(|| tasks_dir.to_path_buf());
     {
         let mut registry = JOB_REGISTRY.lock().map_err(|_| "the job registry is unavailable".to_string())?;

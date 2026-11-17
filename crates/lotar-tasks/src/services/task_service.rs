@@ -16,6 +16,8 @@ use crate::types::{Priority, TaskChange, TaskChangeLogEntry, TaskStatus, TaskTyp
 use crate::utils::identity::{resolve_current_user_for_project, resolve_me_alias_for_project};
 use crate::utils::project::generate_project_prefix;
 use crate::utils::tags::normalize_tags;
+use crate::utils::time;
+use jiff::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
@@ -268,7 +270,7 @@ pub struct PreparedTaskCreate<'a> {
 /// instants when both are RFC 3339, else as text (hand-written files may
 /// hold other formats, which task responses echo unchanged).
 fn same_modified(stored: &str, expected: &str) -> bool {
-    let parse = |raw: &str| chrono::DateTime::parse_from_rfc3339(raw.trim()).ok();
+    let parse = |raw: &str| time::parse_rfc3339(raw.trim()).ok();
     match (parse(stored), parse(expected)) {
         (Some(a), Some(b)) => a == b,
         _ => stored.trim() == expected.trim(),
@@ -482,7 +484,7 @@ impl TaskService {
         let linked = Self::link_mentions(storage, &id, t.description.as_deref(), None);
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let mut dto = Self::to_dto(&id, t, Some(&sprint_lookup), &config, chrono::Utc::now());
+        let mut dto = Self::to_dto(&id, t, Some(&sprint_lookup), &config, Timestamp::now());
         if linked {
             dto = Self::get(storage, &id, Some(&project)).unwrap_or(dto);
         }
@@ -738,7 +740,7 @@ impl TaskService {
                 let sprint_lookup = Self::load_sprint_lookup(storage);
                 // Padded aliases (TP-001) surface the canonical spelling (TP-1)
                 // so all transports agree on the task identity.
-                Ok(Self::to_dto(&parsed.canonical(), t, Some(&sprint_lookup), &config, chrono::Utc::now()))
+                Ok(Self::to_dto(&parsed.canonical(), t, Some(&sprint_lookup), &config, Timestamp::now()))
             }
             None => Err(LoTaRError::TaskNotFound(id.to_string())),
         }
@@ -797,7 +799,7 @@ impl TaskService {
         let outcome = storage.mutate_task(&canonical, move |task| {
             // Lifecycle guard (DEV-92): no comments on a tombstone.
             Self::ensure_not_deleted(task, &canonical_guard)?;
-            let now = chrono::Utc::now().to_rfc3339();
+            let now = time::now_rfc3339();
             let actor = actor_override.or_else(|| resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)));
             let comment = build(task, now.clone(), actor.clone())?;
             task.comments.push(comment);
@@ -816,7 +818,7 @@ impl TaskService {
         let comment = outcome.after.comments.last().cloned().ok_or_else(|| LoTaRError::ValidationError("the comment was not stored".to_string()))?;
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, chrono::Utc::now());
+        let dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, Timestamp::now());
         Ok(PushedComment { dto, comment, config, project: parsed.project })
     }
 
@@ -870,7 +872,7 @@ impl TaskService {
                 return Ok(false);
             }
             task.comments[index].text = text.to_string();
-            let now = chrono::Utc::now().to_rfc3339();
+            let now = time::now_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
                 at: now.clone(),
@@ -884,7 +886,7 @@ impl TaskService {
         let previous_text = outcome.before.comments.get(index).map(|comment| comment.text.clone());
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let mut dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, chrono::Utc::now());
+        let mut dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, Timestamp::now());
         if outcome.changed && Self::link_mentions(storage, &canonical, Some(text), previous_text.as_deref()) {
             dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
         }
@@ -1372,11 +1374,11 @@ impl TaskService {
         // patches and pending-journal refusals keep failing closed.
         if sprint_change.is_none() && Self::tasks_effectively_equal(&effective_existing, &t, &config, explicit_tags) {
             let sprint_lookup = Self::load_sprint_lookup(storage);
-            let dto = Self::to_dto(&canonical, effective_existing, Some(&sprint_lookup), &config, chrono::Utc::now());
+            let dto = Self::to_dto(&canonical, effective_existing, Some(&sprint_lookup), &config, Timestamp::now());
             return Ok(TaskUpdateReceipt { dto, changed: false, deferred: None });
         }
 
-        let modified = chrono::Utc::now().to_rfc3339();
+        let modified = time::now_rfc3339();
         t.modified = modified.clone();
 
         let fields_changed = !changes.is_empty();
@@ -1422,7 +1424,7 @@ impl TaskService {
 
         let linked = Self::link_mentions(storage, &canonical, t.description.as_deref(), existing.description.as_deref());
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         let previous_dto = Self::to_dto(&canonical, existing, Some(&sprint_lookup), &config, now);
         let mut dto = Self::to_dto(&canonical, t, Some(&sprint_lookup), &config, now);
         if linked {
@@ -1751,7 +1753,7 @@ impl TaskService {
                 // Idempotent no-op: no write, no extra history entry.
                 return Ok(false);
             }
-            let now = chrono::Utc::now().to_rfc3339();
+            let now = time::now_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
                 at: now.clone(),
@@ -1866,7 +1868,7 @@ impl TaskService {
             // stored values blocks the restore without any mutation.
             Self::validate_stored_enums(task, &config, &canonical_guard, "restore")?;
 
-            let now = chrono::Utc::now().to_rfc3339();
+            let now = time::now_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
                 at: now.clone(),
@@ -1908,7 +1910,7 @@ impl TaskService {
                 .mutate_task(&canonical, move |task| {
                     task.history.push(TaskChangeLogEntry {
                         extra: Default::default(),
-                        at: chrono::Utc::now().to_rfc3339(),
+                        at: time::now_rfc3339(),
                         actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
                         changes: vec![TaskChange { field: field.into(), old: None, new: None }],
                     });
@@ -2049,7 +2051,7 @@ impl TaskService {
                     .entry((config_root.clone(), project_prefix.clone()))
                     .or_insert_with(|| Self::resolve_config_for_project(config_root.as_path(), &project_prefix));
                 Self::ensure_task_defaults(&mut t, config, false);
-                (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup), config, chrono::Utc::now()))
+                (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup), config, Timestamp::now()))
             })
             .collect();
 
@@ -2088,7 +2090,7 @@ impl TaskService {
         let mut task = task;
         Self::ensure_task_defaults(&mut task, &config, false);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Self::to_dto(canonical_id, task, Some(&sprint_lookup), &config, chrono::Utc::now())
+        Self::to_dto(canonical_id, task, Some(&sprint_lookup), &config, Timestamp::now())
     }
 
     pub(crate) fn to_dto(
@@ -2096,7 +2098,7 @@ impl TaskService {
         task: Task,
         sprint_lookup: Option<&HashMap<String, BTreeMap<u32, u32>>>,
         config: &ResolvedConfig,
-        now: chrono::DateTime<chrono::Utc>,
+        now: Timestamp,
     ) -> TaskDTO {
         let modified = Self::shown_modified(&task);
         let sprint_order = sprint_lookup.and_then(|lookup| lookup.get(id)).cloned().unwrap_or_default();

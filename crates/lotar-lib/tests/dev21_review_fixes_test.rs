@@ -13,8 +13,6 @@
 //! with explicit offsets — no environment mutation, no silent-skip guards.
 //! Load-time: hand-edited invalid explicit policies fail closed on read;
 //! repair through the candidate pipeline keeps working.
-
-use chrono::{Duration, NaiveDate, TimeZone, Utc};
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
 use lotar::services::sprint_reports::compute_sprint_review;
@@ -22,6 +20,8 @@ use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintActual, SprintPlan, SprintTaskEntry};
+use lotar::utils::time;
+use lotar::utils::time::Rfc3339;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -49,7 +49,7 @@ impl NestedFixture {
             std::fs::create_dir_all(root.join("PX")).unwrap();
             std::fs::write(root.join("config.yml"), format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n")).unwrap();
         }
-        let yesterday = (chrono::Local::now().date_naive() - Duration::days(1)).format("%Y-%m-%d").to_string();
+        let yesterday = (time::local_today() - time::days(1)).strftime("%Y-%m-%d").to_string();
         for (root, num) in [(&root_a, 1u32), (&root_b, 2u32)] {
             std::fs::write(
                 root.join("PX").join(format!("{num}.yml")),
@@ -171,7 +171,7 @@ fn f1_sprint_metrics_classify_cross_root_tasks_per_policy() {
     let created = SprintService::create(&mut storage, sprint, None).unwrap();
     let record = SprintService::list(&storage).unwrap().into_iter().find(|r| r.id == created.record.id).unwrap();
     let config = lotar::config::resolution::load_and_merge_configs(Some(&fx.root_a)).unwrap();
-    let now = Utc.with_ymd_and_hms(2026, 5, 20, 12, 0, 0).unwrap();
+    let now = time::utc(jiff::civil::date(2026, 5, 20), 12, 0, 0);
 
     let review = compute_sprint_review(&storage, &record, &config, now);
     assert_eq!(review.payload.metrics.total_tasks, 2);
@@ -232,7 +232,7 @@ fn mixed_both_done_fixture(order: &[&str]) -> (MixedFixture, Storage, lotar::ser
 
 #[test]
 fn f2_same_status_string_terminal_in_one_project_only() {
-    let now = Utc.with_ymd_and_hms(2026, 5, 20, 12, 0, 0).unwrap();
+    let now = time::utc(jiff::civil::date(2026, 5, 20), 12, 0, 0);
     for order in [["ALPHA-1", "BETA-1"], ["BETA-1", "ALPHA-1"]] {
         let (_fx, storage, record) = mixed_both_done_fixture(&order);
         let config = lotar::config::resolution::load_and_merge_configs(Some(&storage.root_path)).unwrap();
@@ -281,7 +281,7 @@ fn f2_unanimous_status_rows_stay_done() {
     let created = SprintService::create(&mut storage, sprint, None).unwrap();
     let record = SprintService::list(&storage).unwrap().into_iter().find(|r| r.id == created.record.id).unwrap();
     let config = lotar::config::resolution::load_and_merge_configs(Some(&tasks_dir)).unwrap();
-    let now = Utc.with_ymd_and_hms(2026, 5, 20, 12, 0, 0).unwrap();
+    let now = time::utc(jiff::civil::date(2026, 5, 20), 12, 0, 0);
     let review = compute_sprint_review(&storage, &record, &config, now);
     assert_eq!(review.payload.metrics.done_tasks, 2);
     let done_row = review.payload.metrics.status_breakdown.iter().find(|row| row.status.eq_ignore_ascii_case("done")).unwrap();
@@ -311,12 +311,12 @@ fn f3_fall_back_hour_offsets_parse_deterministically() {
         other => panic!("expected instants, got {other:?}"),
     }
     // Date-only values keep their calendar identity on the boundary day.
-    assert_eq!(parse_stored_due("2026-11-01"), Some(lotar::services::task_query::StoredDue::Date(NaiveDate::from_ymd_opt(2026, 11, 1).unwrap())));
+    assert_eq!(parse_stored_due("2026-11-01"), Some(lotar::services::task_query::StoredDue::Date(jiff::civil::date(2026, 11, 1))));
     // Offset-carrying values never consult local midnight for parsing;
     // classification lands on the SERVER's local date of the instant
     // (environment-dependent by contract, asserted self-consistently).
     let instant = parse_stored_due("2026-03-08T02:30:00-05:00").expect("offset instant parses regardless of local gaps");
-    assert_eq!(instant.local_date(), chrono::DateTime::parse_from_rfc3339("2026-03-08T02:30:00-05:00").unwrap().with_timezone(&chrono::Local).date_naive());
+    assert_eq!(instant.local_date(), time::local_date(time::parse_rfc3339("2026-03-08T02:30:00-05:00").unwrap()));
 }
 
 #[test]
@@ -325,8 +325,8 @@ fn f3_bucket_and_replay_boundaries_pinned_at_dst_days() {
     use lotar::services::task_query::{DueFilter, due_raw_matches_bucket, today_local};
     use lotar::types::TaskStatus;
 
-    let spring = NaiveDate::from_ymd_opt(2026, 3, 8).unwrap();
-    let fall = NaiveDate::from_ymd_opt(2026, 11, 1).unwrap();
+    let spring = jiff::civil::date(2026, 3, 8);
+    let fall = jiff::civil::date(2026, 11, 1);
     // Pure bucket predicates on the boundary days themselves.
     assert!(due_raw_matches_bucket(Some("2026-03-08"), DueFilter::Today, spring));
     assert!(due_raw_matches_bucket(Some("2026-11-01"), DueFilter::Today, fall));
@@ -334,22 +334,22 @@ fn f3_bucket_and_replay_boundaries_pinned_at_dst_days() {
     assert!(due_raw_matches_bucket(Some("2026-10-31"), DueFilter::Overdue, fall));
 
     // Injected-clock snapshot: calendar_day is the local date OF THE
-    // INJECTED INSTANT (never Utc::now()), for boundary instants on both
+    // INJECTED INSTANT (never Timestamp::now()), for boundary instants on both
     // transition days.
     let config = lotar::config::types::ResolvedConfig::from_global(lotar::config::types::GlobalConfig::default());
     for now in [
-        Utc.with_ymd_and_hms(2026, 3, 8, 7, 0, 0).unwrap(),  // 02:00 local jump (US)
-        Utc.with_ymd_and_hms(2026, 11, 1, 6, 0, 0).unwrap(), // repeated hour boundary
+        time::utc(jiff::civil::date(2026, 3, 8), 7, 0, 0),  // 02:00 local jump (US)
+        time::utc(jiff::civil::date(2026, 11, 1), 6, 0, 0), // repeated hour boundary
     ] {
         let state = compute_task_state(&TaskStatus::from("Todo"), None, &config, now);
-        assert_eq!(state.calendar_day, today_local(now).format("%Y-%m-%d").to_string());
+        assert_eq!(state.calendar_day, today_local(now).strftime("%Y-%m-%d").to_string());
     }
 
     // Replay cuts are pure UTC instants: both passes of the repeated local
     // hour classify against the same strict-before cut.
     let task = lotar::storage::task::Task::default();
     let done: std::collections::HashSet<String> = ["done"].iter().map(|s| (*s).to_string()).collect();
-    let cut = Utc.with_ymd_and_hms(2026, 11, 1, 12, 0, 0).unwrap();
+    let cut = time::utc(jiff::civil::date(2026, 11, 1), 12, 0, 0);
     assert!(!task_done_at_cut(&task, &done, cut));
 }
 
@@ -384,7 +384,7 @@ fn f3_burndown_utc_grid_uniform_across_23_25h_local_days() {
     };
 
     let config = lotar::config::types::ResolvedConfig::from_global(lotar::config::types::GlobalConfig::default());
-    let now = Utc.with_ymd_and_hms(2026, 12, 1, 12, 0, 0).unwrap();
+    let now = time::utc(jiff::civil::date(2026, 12, 1), 12, 0, 0);
 
     // Spring-forward week (local day 2026-03-08 is 23h): the UTC grid still
     // flips at UTC midnights — done at 06:30Z on 03-08 counts from the

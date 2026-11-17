@@ -1,7 +1,9 @@
-use std::collections::{BTreeMap, HashSet};
-
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use crate::utils::time;
+use crate::utils::time::Rfc3339;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use serde::Serialize;
+use std::collections::{BTreeMap, HashSet};
 
 #[cfg(feature = "schema")]
 use schemars::JsonSchema;
@@ -265,11 +267,11 @@ pub struct SprintCalendarEntry {
     pub id: u32,
     pub summary: SprintSummary,
     pub lifecycle: SprintReviewLifecyclePayload,
-    pub start: Option<DateTime<Utc>>,
-    pub end: Option<DateTime<Utc>>,
-    pub actual_start: Option<DateTime<Utc>>,
-    pub actual_end: Option<DateTime<Utc>>,
-    pub duration: Option<Duration>,
+    pub start: Option<Timestamp>,
+    pub end: Option<Timestamp>,
+    pub actual_start: Option<Timestamp>,
+    pub actual_end: Option<Timestamp>,
+    pub duration: Option<SignedDuration>,
     pub relative: String,
     pub sort_key: i64,
     pub warnings: Vec<SprintStatusWarningPayload>,
@@ -331,7 +333,7 @@ pub struct SprintBurndownTotals {
 
 #[derive(Debug, Clone)]
 pub struct SprintBurndownPoint {
-    pub date: DateTime<Utc>,
+    pub date: Timestamp,
     pub remaining_tasks: usize,
     pub ideal_tasks: f64,
     pub remaining_points: Option<f64>,
@@ -356,7 +358,7 @@ struct StatusAggregate {
     done_count: usize,
 }
 
-pub fn compute_sprint_review(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: DateTime<Utc>) -> SprintReviewContext {
+pub fn compute_sprint_review(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: Timestamp) -> SprintReviewContext {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
     let summary = SprintSummary::from_record(record, &lifecycle);
     let detail = SprintDetail::from_record(record, &summary, &lifecycle);
@@ -383,7 +385,7 @@ pub fn compute_sprint_review(storage: &Storage, record: &SprintRecord, config: &
     SprintReviewContext { payload, metrics, summary, lifecycle }
 }
 
-pub fn compute_sprint_stats(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: DateTime<Utc>) -> SprintStatsContext {
+pub fn compute_sprint_stats(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: Timestamp) -> SprintStatsContext {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
     let summary = SprintSummary::from_record(record, &lifecycle);
     let detail = SprintDetail::from_record(record, &summary, &lifecycle);
@@ -467,7 +469,7 @@ pub fn compute_sprint_stats(storage: &Storage, record: &SprintRecord, config: &R
     SprintStatsContext { payload, metrics, durations, summary, lifecycle }
 }
 
-pub fn compute_sprint_summary(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: DateTime<Utc>) -> SprintSummaryContext {
+pub fn compute_sprint_summary(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: Timestamp) -> SprintSummaryContext {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
     let summary = SprintSummary::from_record(record, &lifecycle);
     let detail = SprintDetail::from_record(record, &summary, &lifecycle);
@@ -552,12 +554,7 @@ pub fn compute_sprint_summary(storage: &Storage, record: &SprintRecord, config: 
     SprintSummaryContext { payload, metrics, durations, summary, lifecycle }
 }
 
-pub fn compute_sprint_burndown(
-    storage: &Storage,
-    record: &SprintRecord,
-    _config: &ResolvedConfig,
-    now: DateTime<Utc>,
-) -> Result<SprintBurndownContext, String> {
+pub fn compute_sprint_burndown(storage: &Storage, record: &SprintRecord, _config: &ResolvedConfig, now: Timestamp) -> Result<SprintBurndownContext, String> {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
     let summary = SprintSummary::from_record(record, &lifecycle);
     let detail = SprintDetail::from_record(record, &summary, &lifecycle);
@@ -590,7 +587,7 @@ pub fn compute_sprint_burndown(
     Ok(SprintBurndownContext { payload, computation, summary, lifecycle })
 }
 
-pub fn compute_sprint_calendar(records: &[SprintRecord], include_complete: bool, limit: Option<usize>, now: DateTime<Utc>) -> SprintCalendarContext {
+pub fn compute_sprint_calendar(records: &[SprintRecord], include_complete: bool, limit: Option<usize>, now: Timestamp) -> SprintCalendarContext {
     let mut entries = Vec::new();
     let mut skipped_complete = false;
 
@@ -611,7 +608,7 @@ pub fn compute_sprint_calendar(records: &[SprintRecord], include_complete: bool,
         };
         let relative = format_calendar_relative(&lifecycle, start, end, now);
         let sort_source = start.or(end);
-        let sort_key = sort_source.map(|dt| dt.timestamp()).unwrap_or_else(|| i64::MAX - record.id as i64);
+        let sort_key = sort_source.map(|dt| dt.as_second()).unwrap_or_else(|| i64::MAX - record.id as i64);
         let warning_payloads = to_status_warning_payloads(&lifecycle.warnings);
 
         entries.push(SprintCalendarEntry {
@@ -654,8 +651,8 @@ pub fn compute_sprint_calendar(records: &[SprintRecord], include_complete: bool,
                 actual_start: entry.actual_start.map(|dt| dt.to_rfc3339()),
                 actual_end: entry.actual_end.map(|dt| dt.to_rfc3339()),
                 duration_days: entry.duration.map(duration_to_days),
-                time_until_start_days: entry.start.map(|dt| duration_to_days(dt.signed_duration_since(now))),
-                time_until_end_days: entry.end.map(|dt| duration_to_days(dt.signed_duration_since(now))),
+                time_until_start_days: entry.start.map(|dt| duration_to_days(dt.duration_since(now))),
+                time_until_end_days: entry.end.map(|dt| duration_to_days(dt.duration_since(now))),
                 window: format_calendar_window(entry.start, entry.end, entry.duration),
                 has_warnings: entry.summary.has_warnings,
                 status_warnings: entry.warnings.clone(),
@@ -748,9 +745,9 @@ pub fn generate_burndown_series(
 ) -> Result<SprintBurndownComputation, String> {
     let (start, end) = resolve_burndown_window(record, lifecycle, tasks, done_sets)?;
 
-    let start_day = start.date_naive();
-    let end_day = end.date_naive();
-    let day_span = end_day.signed_duration_since(start_day).num_days().max(0) as usize;
+    let start_day = time::utc_date(start);
+    let end_day = time::utc_date(end);
+    let day_span = time::whole_days(end_day.duration_since(start_day)).max(0) as usize;
     let series_len = day_span + 1;
 
     let mut items = Vec::with_capacity(tasks.len());
@@ -768,12 +765,12 @@ pub fn generate_burndown_series(
     let points_available = if total_points > 0.000_1 { Some(total_points) } else { None };
     let hours_available = if total_hours > 0.000_1 { Some(total_hours) } else { None };
 
-    let start_anchor = start_day.and_hms_opt(0, 0, 0).expect("valid start midnight");
+    let start_anchor = time::utc(start_day, 0, 0, 0);
     let mut series = Vec::with_capacity(series_len.max(1));
 
     for i in 0..=day_span {
-        let day_start = Utc.from_utc_datetime(&(start_anchor + Duration::days(i as i64)));
-        let day_end = day_start + Duration::days(1);
+        let day_start = start_anchor + time::days(i as i64);
+        let day_end = day_start + time::days(1);
 
         let mut completed_tasks = 0usize;
         let mut completed_points = 0.0f64;

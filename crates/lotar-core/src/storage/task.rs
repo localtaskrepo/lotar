@@ -133,7 +133,7 @@ fn serialize_extra_fields<S: serde::Serializer>(fields: &BTreeMap<String, serde_
 
 impl Task {
     pub fn new(_root_path: PathBuf, title: String, priority: Priority) -> Self {
-        Self { title, priority, created: chrono::Utc::now().to_rfc3339(), ..Self::default() }
+        Self { title, priority, created: crate::utils::time::now_rfc3339(), ..Self::default() }
     }
 }
 
@@ -213,9 +213,9 @@ pub const MISSING_CREATED: &str = "1970-01-01T00:00:00Z";
 pub fn parse_task_file_tolerant(path: &std::path::Path, content: &str) -> Option<Task> {
     let mut task = parse_task_yaml_tolerant(content)?;
     if task.created == MISSING_CREATED
-        && let Some(modified) = std::fs::metadata(path).ok().and_then(|meta| meta.modified().ok())
+        && let Some(modified) = std::fs::metadata(path).ok().and_then(|meta| meta.modified().ok()).and_then(|at| jiff::Timestamp::try_from(at).ok())
     {
-        task.created = chrono::DateTime::<chrono::Utc>::from(modified).to_rfc3339();
+        task.created = crate::utils::time::Rfc3339::to_rfc3339(&modified);
     }
     Some(task)
 }

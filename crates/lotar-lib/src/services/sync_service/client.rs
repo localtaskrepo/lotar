@@ -1,4 +1,5 @@
 //! Auth profile resolution and the HTTP client shared by both providers.
+use crate::utils::time::Rfc3339;
 
 use super::*;
 
@@ -155,7 +156,7 @@ pub(super) fn send_json_request(client: &SyncClient, req: ureq::RequestBuilder<u
                 .or_else(|| {
                     reset
                         .and_then(|s| s.trim().parse::<i64>().ok())
-                        .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0))
+                        .and_then(|ts| jiff::Timestamp::from_second(ts).ok())
                         .map(|at| format!("the limit resets at {}", at.to_rfc3339()))
                 })
                 .unwrap_or_else(|| "retry later".to_string());

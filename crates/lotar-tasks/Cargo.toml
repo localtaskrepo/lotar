@@ -20,7 +20,7 @@ workspace = true
 [dependencies]
 lotar-core.workspace = true
 blake3.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 clap.workspace = true
 dirs.workspace = true
 fs2.workspace = true

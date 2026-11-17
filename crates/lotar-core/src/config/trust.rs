@@ -150,7 +150,7 @@ impl TrustService {
             return Ok(false);
         };
         update_trust_file(|file| {
-            file.workspaces.insert(workspace_key(tasks_dir), TrustRecord { fingerprint, trusted_at: chrono::Utc::now().to_rfc3339() });
+            file.workspaces.insert(workspace_key(tasks_dir), TrustRecord { fingerprint, trusted_at: crate::utils::time::now_rfc3339() });
         })?;
         Ok(true)
     }

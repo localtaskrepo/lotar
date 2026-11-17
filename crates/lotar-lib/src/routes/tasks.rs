@@ -1,4 +1,5 @@
 use super::*;
+use jiff::Timestamp;
 
 #[cfg(test)]
 #[path = "../../tests/common/dev56_upload_coordination_cases.rs"]
@@ -64,7 +65,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(query) => query,
             Err(response) => return response,
         };
-        let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now());
+        let tasks = crate::services::task_list::run(&storage, &query, Timestamp::now());
 
         let total = tasks.len();
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
@@ -113,7 +114,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(query) => query,
             Err(response) => return response,
         };
-        let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now());
+        let tasks = crate::services::task_list::run(&storage, &query, Timestamp::now());
 
         // RFC 4180 quoting; cells a spreadsheet would read as a formula get
         // a leading apostrophe (DEV-275).

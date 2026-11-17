@@ -23,6 +23,7 @@ use crate::storage::TaskFilter;
 use crate::storage::manager::Storage;
 use crate::types::ReferenceEntry;
 use crate::utils::scan::{dedupe_code_references, is_user_attached};
+use crate::utils::time;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -194,7 +195,7 @@ pub fn run_anchor_pass(
         let outcome = storage.mutate_task(&task_id, |fresh| {
             let changed = apply_plan(&mut fresh.references, &plan);
             if changed {
-                fresh.modified = chrono::Utc::now().to_rfc3339();
+                fresh.modified = time::now_rfc3339();
             }
             Ok(changed)
         })?;

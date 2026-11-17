@@ -1,4 +1,5 @@
 use super::*;
+use jiff::Timestamp;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/sprints/backlog/order", |_req: &HttpRequest| {
@@ -49,7 +50,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut sprints: Vec<SprintListItem> = records.iter().map(|record| sprint_record_to_list_item(record, now)).collect();
 
         sprints.sort_by_key(|a| a.id);
@@ -94,7 +95,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let response = SprintCreateResponse {
             status: "ok".to_string(),
-            sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+            sprint: sprint_record_to_list_item(&outcome.record, Timestamp::now()),
             warnings: outcome.warnings.iter().map(|warning| warning.message().to_string()).collect(),
             applied_defaults: outcome.applied_defaults.clone(),
         };
@@ -351,7 +352,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let resolved_config = try_response!(load_merged_config(&resolver));
 
-        let summary = compute_sprint_summary(&storage, &record, &resolved_config, Utc::now());
+        let summary = compute_sprint_summary(&storage, &record, &resolved_config, Timestamp::now());
         ok_json(200, json!({"data": summary.payload}))
     });
 
@@ -378,7 +379,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let resolved_config = try_response!(load_merged_config(&resolver));
 
-        let context = match compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now()) {
+        let context = match compute_sprint_burndown(&storage, &record, &resolved_config, Timestamp::now()) {
             Ok(ctx) => ctx,
             Err(msg) => return bad_request(msg),
         };
@@ -410,7 +411,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let payload = SprintUpdateResponse {
             status: "ok".to_string(),
-            sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+            sprint: sprint_record_to_list_item(&outcome.record, Timestamp::now()),
             warnings: outcome.warnings.iter().map(|warning| warning.message().to_string()).collect(),
         };
 
@@ -493,7 +494,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let options = VelocityOptions { limit, include_active, metric };
 
-        let computation = compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
+        let computation = compute_velocity(&storage, &records, &resolved_config, &options, Timestamp::now());
         let payload = computation.to_payload(include_active);
 
         ok_json(200, json!({"data": payload}))

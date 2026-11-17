@@ -7,6 +7,7 @@ use crate::config::types::CustomFieldsFrom;
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::workspace::TasksDirectoryResolver;
+use jiff::Timestamp;
 use std::collections::BTreeMap;
 
 #[derive(Debug)]
@@ -491,7 +492,7 @@ fn insert_computed_completion_fields(value: &mut serde_json::Value, resolved: &c
     };
     map.insert("effective_done_states".to_string(), serde_json::json!(completion::effective_done_status_values(resolved)));
     map.insert("done_states_mode".to_string(), serde_json::json!(completion::done_states_mode(resolved).as_str()));
-    map.insert("task_calendar_day".to_string(), serde_json::json!(completion::local_calendar_day(chrono::Utc::now())));
+    map.insert("task_calendar_day".to_string(), serde_json::json!(completion::local_calendar_day(Timestamp::now())));
 }
 
 /// The custom fields the web UI offers in its pickers (DEV-485).

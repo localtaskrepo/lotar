@@ -1,4 +1,6 @@
-use chrono::{DateTime, Duration, Utc};
+use crate::utils::time::Rfc3339;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use serde::Serialize;
 
 use crate::config::types::ResolvedConfig;
@@ -26,11 +28,11 @@ pub struct VelocityEntry {
     pub sprint_id: u32,
     pub summary: SprintSummary,
     pub lifecycle: SprintReviewLifecyclePayload,
-    pub start: Option<DateTime<Utc>>,
-    pub end: Option<DateTime<Utc>>,
-    pub actual_start: Option<DateTime<Utc>>,
-    pub actual_end: Option<DateTime<Utc>>,
-    pub duration: Option<Duration>,
+    pub start: Option<Timestamp>,
+    pub end: Option<Timestamp>,
+    pub actual_start: Option<Timestamp>,
+    pub actual_end: Option<Timestamp>,
+    pub duration: Option<SignedDuration>,
     pub relative: String,
     pub committed: f64,
     pub completed: f64,
@@ -148,7 +150,7 @@ pub fn compute_velocity(
     records: &[SprintRecord],
     _config: &ResolvedConfig,
     options: &VelocityOptions,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> VelocityComputation {
     if records.is_empty() {
         return VelocityComputation {
@@ -236,7 +238,7 @@ pub fn compute_velocity(
             capacity,
             completion_ratio,
             warnings,
-            sort_key: sort_source.timestamp(),
+            sort_key: sort_source.as_second(),
         });
     }
 

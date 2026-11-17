@@ -7,6 +7,9 @@ use crate::services::agent_job_service::AgentJobService;
 use crate::services::audit_service::AuditService;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
+use crate::utils::time;
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 use std::path::Path;
 
 pub struct TaskTimelineService;
@@ -48,8 +51,8 @@ impl TaskTimelineService {
 }
 
 /// Times come in different offsets and precisions; ones that don't parse sort first.
-fn sort_key(at: &str) -> Option<chrono::DateTime<chrono::Utc>> {
-    chrono::DateTime::parse_from_rfc3339(at).ok().map(|time| time.with_timezone(&chrono::Utc))
+fn sort_key(at: &str) -> Option<Timestamp> {
+    time::parse_rfc3339(at).ok()
 }
 
 /// The commits of the task's file; none outside a git repository.

@@ -9,10 +9,13 @@
 //! - strict rejection of invalid explicit enum/sprint/sort/page params on
 //!   REST and MCP (nothing fails open);
 //! - date/DST-safe due buckets and the inclusive recent=7d cutoff.
-
-use chrono::{Duration, Local, TimeZone, Utc};
+use jiff::SignedDuration;
+use jiff::Timestamp;
+use jiff::civil::Date;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
+use lotar::utils::time;
+use lotar::utils::time::Rfc3339;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -151,19 +154,18 @@ fn mcp_list_all(params: Value, limit: usize) -> Vec<String> {
     all
 }
 
-fn local_today() -> chrono::NaiveDate {
-    Local::now().date_naive()
+fn local_today() -> Date {
+    time::local_today()
 }
 
 fn date_only(days_from_today: i64) -> String {
-    (local_today() + Duration::days(days_from_today)).format("%Y-%m-%d").to_string()
+    (local_today() + time::days(days_from_today)).strftime("%Y-%m-%d").to_string()
 }
 
 /// RFC3339 instant of a local calendar date at the given wall-clock time.
-fn local_instant(days_from_today: i64, h: u32, m: u32) -> String {
-    let date = local_today() + Duration::days(days_from_today);
-    let naive = date.and_hms_opt(h, m, 0).unwrap();
-    Local.from_local_datetime(&naive).single().unwrap().with_timezone(&Utc).to_rfc3339()
+fn local_instant(days_from_today: i64, h: i8, m: i8) -> String {
+    let date = local_today() + time::days(days_from_today);
+    time::local_tz().to_ambiguous_timestamp(date.at(h, m, 0, 0)).unambiguous().unwrap().to_rfc3339()
 }
 
 fn ids_prefixed(project: &str, nums: &[u32]) -> Vec<String> {
@@ -221,9 +223,9 @@ fn export_applies_smart_filters_and_global_order() {
     let fx = Fixture::new("QB");
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref());
 
-    let now = Utc::now();
-    let recent = (now - Duration::days(3)).to_rfc3339();
-    let old = (now - Duration::days(30)).to_rfc3339();
+    let now = Timestamp::now();
+    let recent = (now - time::days(3)).to_rfc3339();
+    let old = (now - time::days(30)).to_rfc3339();
 
     fx.write(1, &fx.task_yaml(1, "overdue recent", &recent, &[("due_date", date_only(-1))]));
     fx.write(2, &fx.task_yaml(2, "today old", &old, &[("due_date", date_only(0))]));
@@ -443,10 +445,10 @@ fn recent_boundary_is_inclusive_at_seven_days() {
     // so the boundary is asserted with a +/-2s tolerance band around the
     // exact 7-day cutoff; exact-cutoff semantics are covered by the unit
     // test with an injected clock.
-    let now = Utc::now();
-    let cutoff = now - Duration::days(7);
-    fx.write(1, &fx.task_yaml(1, "just inside cutoff", &(cutoff + Duration::seconds(2)).to_rfc3339(), &[]));
-    fx.write(2, &fx.task_yaml(2, "just outside cutoff", &(cutoff - Duration::seconds(2)).to_rfc3339(), &[]));
+    let now = Timestamp::now();
+    let cutoff = now - time::days(7);
+    fx.write(1, &fx.task_yaml(1, "just inside cutoff", &(cutoff + SignedDuration::from_secs(2)).to_rfc3339(), &[]));
+    fx.write(2, &fx.task_yaml(2, "just outside cutoff", &(cutoff - SignedDuration::from_secs(2)).to_rfc3339(), &[]));
 
     let api = api();
     let (status, ids) = rest_list_all(&api, &[("project", "QH"), ("recent", "7d")], 50);
@@ -643,7 +645,7 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
     .unwrap();
 
     let today = local_today();
-    let today_str = today.format("%Y-%m-%d").to_string();
+    let today_str = today.strftime("%Y-%m-%d").to_string();
     let mk = |num: u32, modified: &str, extra: &[(&str, String)]| {
         let mut yaml = format!(
             "title: t{num}\nstatus: Todo\npriority: medium\ntype: Task\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\ntags: []\nassignee: Alice\n"

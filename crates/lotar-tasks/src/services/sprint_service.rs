@@ -1,3 +1,6 @@
+use crate::utils::time;
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -7,7 +10,6 @@ use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::manager::Storage;
 use crate::storage::sprint::{Sprint, SprintActual, SprintCanonicalizationWarning, SprintCapacity, SprintPlan};
 use crate::storage::task::Task;
-use chrono::Utc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SprintRecord {
@@ -235,7 +237,7 @@ impl SprintService {
     pub fn create(storage: &mut Storage, mut sprint: Sprint, defaults: Option<&SprintDefaultsConfig>) -> LoTaRResult<SprintOperationOutcome> {
         let applied_defaults = defaults.map(|defaults| apply_sprint_defaults(&mut sprint, defaults)).unwrap_or_default();
         let warnings = sprint.canonicalize();
-        let now = Utc::now().to_rfc3339();
+        let now = time::now_rfc3339();
         if sprint.created.is_none() {
             sprint.created = Some(now.clone());
         }
@@ -310,7 +312,7 @@ impl SprintService {
     /// so coordinated transactions can stage the exact bytes (DEV-55).
     fn prepare_update(mut sprint: Sprint) -> LoTaRResult<(Sprint, Vec<SprintCanonicalizationWarning>, String)> {
         let warnings = sprint.canonicalize();
-        let now = Utc::now().to_rfc3339();
+        let now = time::now_rfc3339();
         sprint.modified = Some(now.clone());
         if sprint.created.is_none() {
             sprint.created = Some(now);
@@ -322,7 +324,7 @@ impl SprintService {
     /// Stamp write timestamps onto a canonicalized candidate that is already
     /// known to differ from the stored record.
     fn stamp_for_write(mut sprint: Sprint) -> LoTaRResult<(Sprint, String)> {
-        let now = Utc::now().to_rfc3339();
+        let now = time::now_rfc3339();
         sprint.modified = Some(now.clone());
         if sprint.created.is_none() {
             sprint.created = Some(now);
@@ -547,7 +549,7 @@ pub fn sprint_from_create_request(payload: &crate::api_types::SprintCreateReques
 }
 
 /// List view of a stored sprint, with its lifecycle derived at `reference`.
-pub fn sprint_record_to_list_item(record: &SprintRecord, reference: chrono::DateTime<Utc>) -> crate::api_types::SprintListItem {
+pub fn sprint_record_to_list_item(record: &SprintRecord, reference: Timestamp) -> crate::api_types::SprintListItem {
     let lifecycle = crate::services::sprint_status::derive_status(&record.sprint, reference);
     let plan = record.sprint.plan.as_ref();
     let capacity = plan.and_then(|plan| plan.capacity.as_ref());

@@ -25,7 +25,6 @@ use crate::services::{
     task_service::TaskService,
 };
 use crate::workspace::TasksDirectoryResolver;
-use chrono::Utc;
 use serde_json::json;
 
 /// Unwrap a `Result<T, HttpResponse>` inside a route handler, returning the

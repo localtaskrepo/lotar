@@ -1,7 +1,9 @@
 use crate::api_types::{ProjectDTO, ProjectStatsDTO, TaskValuesDTO};
 use crate::storage::manager::Storage;
 use crate::types::TaskChangeLogEntry;
-use chrono::{DateTime, Utc};
+use crate::utils::time;
+use crate::utils::time::Rfc3339;
+use jiff::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub struct ProjectService;
@@ -42,7 +44,7 @@ impl ProjectService {
                 },
             );
 
-        let mut latest: Option<DateTime<Utc>> = None;
+        let mut latest: Option<Timestamp> = None;
         let mut tag_counts: HashMap<String, usize> = HashMap::new();
 
         for (_, task) in tasks.iter() {
@@ -114,15 +116,15 @@ impl ProjectService {
     }
 }
 
-fn update_latest(target: &mut Option<DateTime<Utc>>, value: &str) {
-    if let Ok(dt) = DateTime::parse_from_rfc3339(value) {
-        let utc = dt.with_timezone(&Utc);
+fn update_latest(target: &mut Option<Timestamp>, value: &str) {
+    if let Ok(dt) = time::parse_rfc3339(value) {
+        let utc = dt;
         if target.is_none_or(|current| utc > current) {
             *target = Some(utc);
         }
     }
 }
 
-fn update_history_entry(target: &mut Option<DateTime<Utc>>, entry: &TaskChangeLogEntry) {
+fn update_history_entry(target: &mut Option<Timestamp>, entry: &TaskChangeLogEntry) {
     update_latest(target, &entry.at);
 }

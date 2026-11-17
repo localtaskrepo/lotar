@@ -13,6 +13,8 @@ use crate::services::task_service::{CommentContext, TaskService, TaskUpdateConte
 use crate::services::task_validation as validation;
 use crate::storage::manager::Storage;
 use crate::types::{CommentAnswer, CommentQuestion, CommentReport, OptionSet, TaskComment};
+use crate::utils::time;
+use jiff::Timestamp;
 use serde::Deserialize;
 
 /// The fields an option's `set:` accepts.
@@ -143,14 +145,14 @@ pub(crate) fn prepare_answer(
     let answer = resolve_answer(question, spec, input)?;
     let patch = if let Some(set) = merged_set(spec, &answer.choice) {
         validate_option_set("answer", &set, config)?;
-        let current = TaskService::to_dto(id, task.clone(), None, config, chrono::Utc::now());
+        let current = TaskService::to_dto(id, task.clone(), None, config, Timestamp::now());
         crate::hooks::get().option_set_patch(storage, &current, config, &set)?
     } else {
         Default::default()
     };
     let project = crate::storage::TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(err.to_string()))?.project;
     let actor = crate::utils::identity::resolve_current_user_for_project(Some(&storage.root_path), Some(&project));
-    let mut comment = TaskComment::new(chrono::Utc::now().to_rfc3339(), actor, answer_text(spec, &answer));
+    let mut comment = TaskComment::new(time::now_rfc3339(), actor, answer_text(spec, &answer));
     comment.answer = Some(answer);
     Ok((comment, patch))
 }

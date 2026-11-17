@@ -1,6 +1,9 @@
 //! DEV-503: every runner but `command` runs as a harnessmux session. A shell script stands in for the agent's ACP
 //! server (harnessmux's `agents.toml` under a scratch `HARNESSMUX_HOME` points the claude agent at it).
 #![cfg(unix)]
+use jiff::SignedDuration;
+use jiff::Timestamp;
+use lotar::utils::time;
 
 use crate::common::TestFixtures;
 use crate::common::env_mutex::EnvVarGuard;
@@ -204,8 +207,8 @@ fn age_session(harness: &Harness, minutes: i64) {
         .find(|path| path.to_string_lossy().ends_with("-TEST-1-fixer.json"))
         .expect("the fixer session");
     let mut record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    let at = chrono::Utc::now() - chrono::Duration::minutes(minutes);
-    record["last_used"] = serde_json::Value::String(at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+    let at = Timestamp::now() - SignedDuration::from_mins(minutes);
+    record["last_used"] = serde_json::Value::String(at.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
     std::fs::write(&path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
 }
 
@@ -308,7 +311,7 @@ fn a_failed_keep_fails_the_job_and_starts_no_session() {
         .expect("the fixer session");
     let record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&old).unwrap()).unwrap();
     let name = record["name"].as_str().unwrap().to_string();
-    let stamp = chrono::DateTime::parse_from_rfc3339(record["last_used"].as_str().unwrap()).unwrap().format("%Y%m%dT%H%M%SZ").to_string();
+    let stamp = time::parse_rfc3339(record["last_used"].as_str().unwrap()).unwrap().strftime("%Y%m%dT%H%M%SZ").to_string();
     let base: String = name.chars().take(64 - stamp.len() - 1).collect();
     std::fs::create_dir(sessions.join(format!("{base}.{stamp}.events.jsonl"))).unwrap();
 

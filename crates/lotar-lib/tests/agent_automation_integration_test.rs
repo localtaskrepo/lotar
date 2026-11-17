@@ -1,4 +1,5 @@
 #![cfg(unix)]
+use lotar::utils::time;
 
 use crate::common;
 use common::TestFixtures;
@@ -1845,7 +1846,7 @@ automation:
     let mut storage = fixtures.create_storage();
 
     // Create an active sprint
-    let sprint = Sprint { actual: Some(SprintActual { started_at: Some(chrono::Utc::now().to_rfc3339()), closed_at: None }), ..Default::default() };
+    let sprint = Sprint { actual: Some(SprintActual { started_at: Some(time::now_rfc3339()), closed_at: None }), ..Default::default() };
     let outcome = SprintService::create(&mut storage, sprint, None).expect("create sprint");
     let sprint_id = outcome.record.id;
 

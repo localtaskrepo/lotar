@@ -1,6 +1,8 @@
+use crate::utils::time;
+use crate::utils::time::Rfc3339;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 use std::path::Path;
-
-use chrono::{DateTime, Duration, Utc};
 
 use crate::cli::args::sprint::{SprintCloseArgs, SprintStartArgs};
 use crate::output::{OutputFormat, OutputRenderer};
@@ -8,7 +10,6 @@ use crate::services::sprint_assignment;
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status::{self, SprintLifecycleStatus};
 use crate::storage::sprint::{Sprint, SprintActual};
-use crate::utils::time;
 
 use super::support::{SprintOperationKind, render_operation_response, resolve_sprint_records_context};
 
@@ -119,16 +120,16 @@ pub(crate) fn handle_close(close_args: &SprintCloseArgs, tasks_root: &Path, rend
     Ok(())
 }
 
-fn determine_start_timestamp(args: &SprintStartArgs) -> Result<DateTime<Utc>, String> {
-    if let Some(ref at) = args.at { time::parse_human_datetime_to_utc(at).map_err(|err| format!("Invalid --at value: {}", err)) } else { Ok(Utc::now()) }
+fn determine_start_timestamp(args: &SprintStartArgs) -> Result<Timestamp, String> {
+    if let Some(ref at) = args.at { time::parse_human_datetime_to_utc(at).map_err(|err| format!("Invalid --at value: {}", err)) } else { Ok(Timestamp::now()) }
 }
 
-fn determine_close_timestamp(args: &SprintCloseArgs) -> Result<DateTime<Utc>, String> {
-    if let Some(ref at) = args.at { time::parse_human_datetime_to_utc(at).map_err(|err| format!("Invalid --at value: {}", err)) } else { Ok(Utc::now()) }
+fn determine_close_timestamp(args: &SprintCloseArgs) -> Result<Timestamp, String> {
+    if let Some(ref at) = args.at { time::parse_human_datetime_to_utc(at).map_err(|err| format!("Invalid --at value: {}", err)) } else { Ok(Timestamp::now()) }
 }
 
-fn select_sprint_id_for_start(records: &[SprintRecord], evaluation_time: DateTime<Utc>) -> Option<u32> {
-    let mut ready: Vec<(DateTime<Utc>, u32)> = Vec::new();
+fn select_sprint_id_for_start(records: &[SprintRecord], evaluation_time: Timestamp) -> Option<u32> {
+    let mut ready: Vec<(Timestamp, u32)> = Vec::new();
     let mut fallback: Option<u32> = None;
 
     for record in records {
@@ -159,7 +160,7 @@ fn select_sprint_id_for_close(records: &[SprintRecord]) -> Option<u32> {
     let mut active = records
         .iter()
         .filter_map(|record| {
-            let lifecycle = sprint_status::derive_status(&record.sprint, Utc::now());
+            let lifecycle = sprint_status::derive_status(&record.sprint, Timestamp::now());
             if lifecycle.actual_end.is_some() {
                 None
             } else if lifecycle.actual_start.is_some() {
@@ -175,7 +176,7 @@ fn select_sprint_id_for_close(records: &[SprintRecord]) -> Option<u32> {
             .iter()
             .rev()
             .find(|record| {
-                let lifecycle = sprint_status::derive_status(&record.sprint, Utc::now());
+                let lifecycle = sprint_status::derive_status(&record.sprint, Timestamp::now());
                 lifecycle.actual_end.is_none()
             })
             .map(|record| record.id)
@@ -196,7 +197,7 @@ fn warn_about_parallel_active_sprints(
     notifications_enabled: bool,
     records: &[SprintRecord],
     target_id: u32,
-    reference_time: DateTime<Utc>,
+    reference_time: Timestamp,
     context: ParallelWarningContext,
 ) {
     if !notifications_enabled {
@@ -233,13 +234,13 @@ fn warn_about_parallel_active_sprints(
     renderer.emit_warning(format_args!("{}: {}.{}", prefix, list, guidance));
 }
 
-fn warn_about_future_start(renderer: &OutputRenderer, notifications_enabled: bool, start_instant: DateTime<Utc>, force: bool) {
+fn warn_about_future_start(renderer: &OutputRenderer, notifications_enabled: bool, start_instant: Timestamp, force: bool) {
     if !notifications_enabled || force {
         return;
     }
 
-    let now = Utc::now();
-    if start_instant > now + Duration::hours(12) {
+    let now = Timestamp::now();
+    if start_instant > now + SignedDuration::from_hours(12) {
         renderer
             .emit_warning(format_args!("The requested start time {} is more than 12 hours in the future; pass --force to proceed.", start_instant.to_rfc3339()))
     }
@@ -255,7 +256,7 @@ fn warn_about_overdue_start(renderer: &OutputRenderer, notifications_enabled: bo
     }
 
     if let Some(planned_start) = lifecycle.planned_start
-        && Utc::now() > planned_start
+        && Timestamp::now() > planned_start
     {
         renderer.emit_warning(format_args!(
             "Sprint #{} ({}) was scheduled to start at {} and is now overdue to begin.",
@@ -271,7 +272,7 @@ fn warn_about_overdue_close(
     notifications_enabled: bool,
     record: &SprintRecord,
     lifecycle: &SprintLifecycleStatus,
-    close_instant: DateTime<Utc>,
+    close_instant: Timestamp,
 ) {
     if !notifications_enabled {
         return;
@@ -289,7 +290,7 @@ fn warn_about_overdue_close(
     }
 }
 
-fn apply_start_to_sprint(sprint: &mut Sprint, start_instant: DateTime<Utc>, force: bool) {
+fn apply_start_to_sprint(sprint: &mut Sprint, start_instant: Timestamp, force: bool) {
     let actual = sprint.actual.get_or_insert_with(SprintActual::default);
     if actual.started_at.is_some() && !force {
         return;
@@ -297,7 +298,7 @@ fn apply_start_to_sprint(sprint: &mut Sprint, start_instant: DateTime<Utc>, forc
     actual.started_at = Some(start_instant.to_rfc3339());
 }
 
-fn apply_close_to_sprint(sprint: &mut Sprint, close_instant: DateTime<Utc>, _force: bool) {
+fn apply_close_to_sprint(sprint: &mut Sprint, close_instant: Timestamp, _force: bool) {
     let actual = sprint.actual.get_or_insert_with(SprintActual::default);
     actual.closed_at = Some(close_instant.to_rfc3339());
 }

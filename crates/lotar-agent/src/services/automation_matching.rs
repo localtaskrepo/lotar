@@ -2,6 +2,10 @@ use crate::api_types::TaskDTO;
 use crate::automation::types::{AutomationCommentCondition, AutomationConditionGroup, AutomationFieldCondition, AutomationRule};
 use crate::config::types::ResolvedConfig;
 use crate::utils::tags::normalize_tags;
+use crate::utils::time;
+use jiff::SignedDuration;
+use jiff::Timestamp;
+use jiff::civil::Date;
 use regex::Regex;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -756,8 +760,8 @@ fn value_matches_regex(value: &AutomationValue, regex: &Regex) -> bool {
 /// Resolve a date reference string to a local NaiveDate.
 /// Supports keywords ("today", "tomorrow", …), "YYYY-MM-DD", RFC 3339 datetimes,
 /// and offset expressions via the shared human date grammar.
-fn resolve_date_reference(s: &str) -> Option<chrono::NaiveDate> {
-    crate::utils::time::parse_human_datetime_to_utc(s).ok().map(|dt| dt.with_timezone(&chrono::Local).date_naive())
+fn resolve_date_reference(s: &str) -> Option<Date> {
+    crate::utils::time::parse_human_datetime_to_utc(s).ok().map(time::local_date)
 }
 
 /// Fields that name a moment in the task's past: when it was created, last
@@ -796,12 +800,12 @@ fn matches_past_moment(value: Option<&str>, map: &crate::automation::types::Auto
     let Some(moment) = value.and_then(|raw| crate::utils::time::parse_human_datetime_to_utc(raw).ok()) else {
         return false;
     };
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
     if let Some(reference) = map.before.as_deref() {
         let Some(date) = resolve_date_reference(reference) else {
             return false;
         };
-        if moment.with_timezone(&chrono::Local).date_naive() >= date {
+        if time::local_date(moment) >= date {
             return false;
         }
     }
@@ -824,8 +828,8 @@ fn matches_past_moment(value: Option<&str>, map: &crate::automation::types::Auto
     true
 }
 
-/// Parse a duration string like "3d", "2w", "30d" into chrono::Duration.
-fn parse_date_offset(s: &str) -> Option<chrono::Duration> {
+/// Parse a duration string like "3d", "2w", "30d" into SignedDuration.
+fn parse_date_offset(s: &str) -> Option<SignedDuration> {
     crate::utils::time::parse_duration_like(s)
 }
 
@@ -838,7 +842,7 @@ fn matches_date_conditions(value: &AutomationValue, map: &crate::automation::typ
     let Some(field_date) = resolve_date_reference(date_str) else {
         return false; // unparseable date → condition fails
     };
-    let today = chrono::Local::now().date_naive();
+    let today = time::local_today();
 
     if let Some(ref_str) = map.before.as_ref() {
         let Some(ref_date) = resolve_date_reference(ref_str) else {

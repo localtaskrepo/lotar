@@ -6,6 +6,7 @@
 //! its history. No redirect is left: the old ID still belongs to the other
 //! copy.
 
+use crate::utils::time;
 use std::path::{Path, PathBuf};
 
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -82,7 +83,7 @@ impl TaskService {
 
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
-                at: chrono::Utc::now().to_rfc3339(),
+                at: time::now_rfc3339(),
                 actor: crate::utils::identity::resolve_current_user_for_project(Some(root.as_path()), Some(&parsed.project)),
                 changes: vec![TaskChange { field: "renumbered".into(), old: Some(from.clone()), new: Some(to.clone()) }],
             });

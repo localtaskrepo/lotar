@@ -14,7 +14,8 @@
 //!   TaskDTO snapshots.
 
 use crate::common;
-use chrono::{DateTime, Duration, Local, TimeZone, Utc};
+use jiff::SignedDuration;
+use jiff::civil::Date;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
 use lotar::services::sprint_reports::{compute_sprint_burndown, compute_sprint_review};
@@ -22,6 +23,8 @@ use lotar::services::sprint_service::SprintService;
 use lotar::services::sprint_velocity::compute_velocity;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintActual, SprintPlan, SprintTaskEntry};
+use lotar::utils::time;
+use lotar::utils::time::Rfc3339;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -59,12 +62,12 @@ impl Fixture {
     }
 }
 
-fn local_today() -> chrono::NaiveDate {
-    Local::now().date_naive()
+fn local_today() -> Date {
+    time::local_today()
 }
 
 fn date_only(days_from_today: i64) -> String {
-    (local_today() + Duration::days(days_from_today)).format("%Y-%m-%d").to_string()
+    (local_today() + time::days(days_from_today)).strftime("%Y-%m-%d").to_string()
 }
 
 fn api() -> ApiServer {
@@ -283,7 +286,7 @@ fn mixed_project_sprint_analytics_resolve_each_task_policy() {
     let records = SprintService::list(&storage).unwrap();
     let record = records.iter().find(|r| r.id == created.record.id).unwrap().clone();
     let config = lotar::config::resolution::load_and_merge_configs(Some(&fx.tasks_dir)).unwrap();
-    let now = Utc.with_ymd_and_hms(2026, 5, 20, 12, 0, 0).unwrap();
+    let now = time::utc(jiff::civil::date(2026, 5, 20), 12, 0, 0);
 
     // Review: ALPHA-3 (Shipped) and BETA-1 (Done) are done under their own
     // policies; ALPHA-1 stays open. Before DEV-21 the single global set
@@ -350,11 +353,11 @@ fn reopened_and_terminal_to_terminal_timing_replay_per_cut() {
     // the re-completion at 09-05 started the current interval, and the
     // Done -> Closed move did NOT restart it.
     let started = lotar::services::completion::current_completion_started_at(&task, &done);
-    assert_eq!(started, Some(DateTime::parse_from_rfc3339("2026-09-05T10:00:00Z").unwrap().with_timezone(&Utc)));
+    assert_eq!(started, Some(time::parse_rfc3339("2026-09-05T10:00:00Z").unwrap()));
 
     // Per-cut replay: done on 09-02/09-03, open after the reopen until the
     // re-completion, done afterwards (including the Closed day).
-    let cut = |day: &str, hour: u32| DateTime::parse_from_rfc3339(&format!("2026-09-{day}T{hour:02}:00:00Z")).unwrap().with_timezone(&Utc);
+    let cut = |day: &str, hour: u32| time::parse_rfc3339(&format!("2026-09-{day}T{hour:02}:00:00Z")).unwrap();
     assert!(lotar::services::completion::task_done_at_cut(&task, &done, cut("03", 0)));
     // Cuts are strictly-before: at the reopen instant itself the
     // pre-transition (Done) state still holds; one hour later it does not.
@@ -365,7 +368,7 @@ fn reopened_and_terminal_to_terminal_timing_replay_per_cut() {
 
     // Burndown replays per calendar cut: remaining flips back up after the
     // reopen instead of using the earliest-ever done timestamp.
-    let now = Utc.with_ymd_and_hms(2026, 9, 20, 12, 0, 0).unwrap();
+    let now = time::utc(jiff::civil::date(2026, 9, 20), 12, 0, 0);
     let burndown = compute_sprint_burndown(&storage, &record, &config, now).unwrap();
     let remaining: Vec<usize> = burndown.computation.series.iter().map(|point| point.remaining_tasks).collect();
     // Days 09-01..09-08 (window anchored by actual start/end).
@@ -383,9 +386,9 @@ fn missing_history_falls_back_to_modified_estimate() {
     let task = storage.get("LG-1", "LG").expect("task");
     let done: std::collections::HashSet<String> = ["done"].iter().map(|s| s.to_string()).collect();
     let started = lotar::services::completion::current_completion_started_at(&task, &done);
-    assert_eq!(started, Some(DateTime::parse_from_rfc3339("2026-01-02T00:00:00Z").unwrap().with_timezone(&Utc)));
+    assert_eq!(started, Some(time::parse_rfc3339("2026-01-02T00:00:00Z").unwrap()));
     // Before the estimate the task counts as open.
-    assert!(!lotar::services::completion::task_done_at_cut(&task, &done, DateTime::parse_from_rfc3339("2026-01-01T12:00:00Z").unwrap().with_timezone(&Utc)));
+    assert!(!lotar::services::completion::task_done_at_cut(&task, &done, time::parse_rfc3339("2026-01-01T12:00:00Z").unwrap()));
 }
 
 #[test]
@@ -393,10 +396,10 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
     use lotar::api_types::{TaskDTO, TaskDueBucketDTO, TaskStateDTO};
     use lotar::services::task_query::{self, TaskQueryOptions};
 
-    let now = Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap();
+    let now = time::utc(jiff::civil::date(2026, 6, 15), 12, 0, 0);
     let today = task_query::today_local(now);
-    let tomorrow_local = (today + Duration::days(1)).and_hms_opt(18, 0, 0).unwrap();
-    let due_tomorrow = Local.from_local_datetime(&tomorrow_local).single().unwrap().to_rfc3339();
+    let tomorrow_local = (today + time::days(1)).at(18, 0, 0, 0);
+    let due_tomorrow = time::local_tz().to_ambiguous_timestamp(tomorrow_local).unambiguous().unwrap().to_rfc3339();
 
     // Stale snapshot claims a different calendar day and bucket; predicates
     // must ignore it and classify from the raw due value + injected clock.
@@ -436,7 +439,7 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
         custom_fields: Default::default(),
     };
 
-    let mut tasks = vec![("X-1".to_string(), dto(Some(due_tomorrow.clone()))), ("X-2".to_string(), dto(Some(today.format("%Y-%m-%d").to_string())))];
+    let mut tasks = vec![("X-1".to_string(), dto(Some(due_tomorrow.clone()))), ("X-2".to_string(), dto(Some(today.strftime("%Y-%m-%d").to_string())))];
     let mut options = TaskQueryOptions { due: Some(task_query::parse_due("soon").unwrap()), ..TaskQueryOptions::default() };
     task_query::apply(&mut tasks, &options, now);
     let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
@@ -445,8 +448,8 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
 
     // Same dues, later clock: on rollover the previous tomorrow is today,
     // while the previous date-only today must no longer match.
-    let later = now + Duration::hours(12);
-    let mut tasks = vec![("X-1".to_string(), dto(Some(due_tomorrow.clone()))), ("X-2".to_string(), dto(Some(today.format("%Y-%m-%d").to_string())))];
+    let later = now + SignedDuration::from_hours(12);
+    let mut tasks = vec![("X-1".to_string(), dto(Some(due_tomorrow.clone()))), ("X-2".to_string(), dto(Some(today.strftime("%Y-%m-%d").to_string())))];
     options = TaskQueryOptions { due: Some(task_query::parse_due("today").unwrap()), ..TaskQueryOptions::default() };
     task_query::apply(&mut tasks, &options, later);
     let today_later = task_query::today_local(later);
@@ -465,12 +468,12 @@ fn due_parser_and_buckets_agree_across_dst_boundary() {
     // Pin both sides of spring-forward and both passes of fall-back.
     // Explicit offsets avoid ambiguous local-time conversion and silent skips.
     for rfc3339 in ["2026-03-08T01:30:00-05:00", "2026-03-08T03:30:00-04:00", "2026-11-01T01:30:00-04:00", "2026-11-01T01:30:00-05:00"] {
-        let instant = chrono::DateTime::parse_from_rfc3339(rfc3339).unwrap();
-        let now = instant.with_timezone(&Utc) - Duration::days(2);
+        let instant = time::parse_rfc3339(rfc3339).unwrap();
+        let now = instant - time::days(2);
         let today = today_local(now);
-        let date_only = instant.with_timezone(&Local).date_naive();
+        let date_only = time::local_date(instant);
         let bucket_rfc = due_raw_matches_bucket(Some(rfc3339), DueFilter::Soon, today);
-        let bucket_date = due_raw_matches_bucket(Some(&date_only.format("%Y-%m-%d").to_string()), DueFilter::Soon, today);
+        let bucket_date = due_raw_matches_bucket(Some(&date_only.strftime("%Y-%m-%d").to_string()), DueFilter::Soon, today);
         assert!(bucket_rfc, "boundary instant must be due soon: {rfc3339}");
         assert_eq!(bucket_rfc, bucket_date, "rfc3339: {rfc3339}");
     }

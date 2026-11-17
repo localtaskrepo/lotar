@@ -2,6 +2,8 @@
 //! `@least_busy` spreads work across a manual run, and exclusions filter the
 //! main query's results in memory.
 #![cfg(unix)]
+use jiff::Timestamp;
+use lotar::utils::time;
 
 use crate::common;
 use common::TestFixtures;
@@ -45,8 +47,8 @@ fn feed_reports_every_task_of_a_bulk_commit() {
     git(root, &["add", "-A"]);
     git(root, &["commit", "-qm", "bulk status"]);
 
-    let since = chrono::Utc::now() - chrono::Duration::days(1);
-    let until = chrono::Utc::now() + chrono::Duration::days(1);
+    let since = Timestamp::now() - time::days(1);
+    let until = Timestamp::now() + time::days(1);
     let feed = AuditService::list_activity_feed(root, std::path::Path::new(".tasks"), since, until, None, 200).unwrap();
 
     let bulk: Vec<_> = feed.iter().filter(|i| i.message == "bulk status").collect();

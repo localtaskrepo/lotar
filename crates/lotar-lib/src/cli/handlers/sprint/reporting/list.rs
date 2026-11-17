@@ -1,7 +1,6 @@
-use std::path::Path;
-
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::Serialize;
+use std::path::Path;
 
 use crate::cli::args::sprint::SprintListArgs;
 use crate::cli::handlers::sprint::shared::{SprintAssignmentIntegrityPayload, build_assignment_integrity, emit_cleanup_summary, emit_missing_report, truncate};
@@ -79,7 +78,7 @@ pub(crate) fn handle_list(list_args: &SprintListArgs, tasks_root: &Path, rendere
         truncated = true;
     }
 
-    let now = Utc::now();
+    let now = Timestamp::now();
     let summaries: Vec<SprintSummary> = records
         .iter()
         .map(|record| {
@@ -318,10 +317,9 @@ fn format_short_datetime(raw: &str) -> String {
     }
 
     match crate::utils::time::parse_human_datetime_to_utc(raw) {
-        Ok(dt) => {
-            use chrono::Timelike;
-
-            if dt.hour() == 0 && dt.minute() == 0 && dt.second() == 0 { dt.format("%b %-d").to_string() } else { dt.format("%b %-d %H:%M").to_string() }
+        Ok(at) => {
+            let dt = jiff::tz::Offset::UTC.to_datetime(at);
+            if dt.hour() == 0 && dt.minute() == 0 && dt.second() == 0 { dt.strftime("%b %-d").to_string() } else { dt.strftime("%b %-d %H:%M").to_string() }
         }
         Err(_) => raw.to_string(),
     }

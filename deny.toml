@@ -13,9 +13,6 @@ ignore = [
     # unsafe-libyaml (via serde_yaml_ng) is unmaintained, not unsound.
     # Accepted in DEV-122 (2026-10-21); revisit if YAML handling changes.
     { id = "RUSTSEC-2024-0449", reason = "informational; accepted in DEV-122" },
-    # chrono is unmaintained, not unsound; no maintained release exists.
-    # Accepted in DEV-665 (2026-11-17) until the jiff migration lands.
-    { id = "RUSTSEC-2026-0543", reason = "informational; accepted in DEV-665" },
 ]
 
 [licenses]

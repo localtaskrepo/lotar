@@ -1,4 +1,5 @@
-use chrono::{Duration, SecondsFormat, Utc};
+use jiff::Timestamp;
+use lotar::utils::time;
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
@@ -267,8 +268,8 @@ mod git_required {
         let root = temp.path();
         init_repo(&temp);
 
-        let now = Utc::now();
-        let ts = |days| (now - Duration::days(days)).to_rfc3339_opts(SecondsFormat::Secs, true);
+        let now = Timestamp::now();
+        let ts = |days| (now - time::days(days)).strftime("%Y-%m-%dT%H:%M:%SZ").to_string();
         let created_one = ts(60);
         let edit_one = ts(45);
         let created_two = ts(30);

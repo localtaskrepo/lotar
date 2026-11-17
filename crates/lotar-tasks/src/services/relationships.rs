@@ -14,7 +14,9 @@ use crate::storage::manager::Storage;
 use crate::storage::task::Task;
 use crate::storage::transaction::MultiFileTransaction;
 use crate::types::{TaskChange, TaskChangeLogEntry, TaskRelationships};
+use crate::utils::time;
 use fs2::FileExt;
+use jiff::Timestamp;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -827,7 +829,7 @@ pub fn graph(storage: &Storage, request: &RelationshipGraphRequest) -> LoTaRResu
     let assertions = inventory.assertions();
     let projection_edges: Vec<_> =
         assertions.keys().filter(|edge| request.relationship_kinds.as_ref().is_none_or(|kinds| kinds.contains(&edge.2))).cloned().collect();
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
     let mut query: std::collections::HashMap<_, _> = request.filters.clone().into_iter().collect();
     if let Some(project) = &request.project {
         query.insert("project".into(), project.clone());
@@ -1402,7 +1404,7 @@ fn stage_tasks(txn: &mut MultiFileTransaction, storage: &Storage, inventory: &In
         txn.ensure_covers(std::slice::from_ref(&parsed.project))?;
         // Reciprocal links write both tasks; an archived one stays read-only.
         crate::storage::operations::ensure_writable(&record.root.join(&parsed.project), &record.path, &id)?;
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = time::now_rfc3339();
         task.modified = now.clone();
         task.history.push(TaskChangeLogEntry {
             extra: Default::default(),
@@ -1438,7 +1440,7 @@ pub(crate) fn emit_counterparts(storage: &Storage, ids: &[String]) {
         {
             let config = crate::services::task_service::TaskService::resolve_config_for_project(&record.root, &project);
             crate::services::task_service::TaskService::ensure_task_defaults(&mut task, &config, false);
-            let dto = crate::services::task_service::TaskService::to_dto(id, task, Some(&sprint_lookup), &config, chrono::Utc::now());
+            let dto = crate::services::task_service::TaskService::to_dto(id, task, Some(&sprint_lookup), &config, Timestamp::now());
             let actor = crate::utils::identity::resolve_current_user_for_project(Some(&storage.root_path), Some(&project));
             crate::api_events::emit_task_updated(&dto, actor.as_deref());
         }

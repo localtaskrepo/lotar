@@ -7,6 +7,7 @@
 //! neither half behind. Old references are never rewritten; they resolve
 //! through the stub when they are used.
 
+use crate::utils::time;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -92,7 +93,7 @@ impl TaskService {
         let changes = Self::fit_to_project(&root, &mut task, request, &target_config, &target)?;
         Self::enforce_membership(&task, &target_config, &target)?;
 
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = time::now_rfc3339();
         let actor = resolve_current_user_for_project(Some(root.as_path()), Some(&target));
         let moved = TaskChange { field: "moved".into(), old: Some(from.clone()), new: Some(to.clone()) };
         task.moved_to = None;
@@ -190,7 +191,7 @@ impl TaskService {
             }
         }
 
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = time::now_rfc3339();
         let actor = resolve_current_user_for_project(Some(root.as_path()), Some(&new_id.project));
         let moved = TaskChange { field: "moved".into(), old: Some(from.clone()), new: Some(to.clone()) };
         if !task.moved_from.contains(&from) {

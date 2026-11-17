@@ -1,6 +1,8 @@
 /// Tasks not changed for at least `threshold` (DEV-3): the shared task query
 /// with `-recent:<threshold>`, measured from each task's `modified` time
 /// (not git history), oldest change first.
+use crate::utils::time;
+use jiff::Timestamp;
 pub(crate) fn run(
     threshold: &str,
     limit: usize,
@@ -27,9 +29,9 @@ pub(crate) fn run(
     let query = format!("{filter} {exclude_recent} sort_by=modified order=asc");
     let tasks = super::common::list_tasks(scope_project.as_deref(), resolver, &query)?;
 
-    let now = chrono::Utc::now();
-    let modified = |task: &crate::api_types::TaskDTO| chrono::DateTime::parse_from_rfc3339(&task.modified).map(|at| at.with_timezone(&chrono::Utc)).ok();
-    let age_days = |task: &crate::api_types::TaskDTO| modified(task).map(|at| (now - at).num_days()).unwrap_or_default();
+    let now = Timestamp::now();
+    let modified = |task: &crate::api_types::TaskDTO| time::parse_rfc3339(&task.modified).ok();
+    let age_days = |task: &crate::api_types::TaskDTO| modified(task).map(|at| time::whole_days(now.duration_since(at))).unwrap_or_default();
     let limited: Vec<_> = tasks.into_iter().take(limit).collect();
 
     super::common::emit_items(

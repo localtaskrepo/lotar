@@ -1,20 +1,20 @@
-use chrono::{DateTime, Duration, Utc};
-
 use crate::services::sprint_service::SprintRecord;
 use crate::services::sprint_status::{SprintLifecycleState, SprintLifecycleStatus};
 use crate::storage::task::Task as StoredTask;
 use crate::utils::time;
+use jiff::SignedDuration;
+use jiff::Timestamp;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SprintDurations {
-    pub planned: Option<Duration>,
-    pub actual: Option<Duration>,
-    pub elapsed: Option<Duration>,
-    pub remaining: Option<Duration>,
-    pub overdue: Option<Duration>,
+    pub planned: Option<SignedDuration>,
+    pub actual: Option<SignedDuration>,
+    pub elapsed: Option<SignedDuration>,
+    pub remaining: Option<SignedDuration>,
+    pub overdue: Option<SignedDuration>,
 }
 
-pub fn compute_sprint_durations(record: &SprintRecord, lifecycle: &SprintLifecycleStatus, now: DateTime<Utc>) -> SprintDurations {
+pub fn compute_sprint_durations(record: &SprintRecord, lifecycle: &SprintLifecycleStatus, now: Timestamp) -> SprintDurations {
     let planned_duration = match (lifecycle.planned_start, lifecycle.planned_end) {
         (Some(start), Some(end)) if end > start => Some(end - start),
         _ => record.sprint.plan.as_ref().and_then(|plan| plan.length.as_ref()).and_then(|value| time::parse_duration_like(value)),
@@ -49,8 +49,8 @@ pub fn compute_sprint_durations(record: &SprintRecord, lifecycle: &SprintLifecyc
     SprintDurations { planned: planned_duration, actual: actual_duration, elapsed: elapsed_duration, remaining: remaining_duration, overdue: overdue_duration }
 }
 
-pub fn format_duration(duration: Duration) -> String {
-    let mut seconds = duration.num_seconds();
+pub fn format_duration(duration: SignedDuration) -> String {
+    let mut seconds = duration.as_secs();
     let negative = seconds < 0;
     if negative {
         seconds = -seconds;
@@ -78,11 +78,11 @@ pub fn format_duration(duration: Duration) -> String {
     if negative { format!("-{}", text) } else { text }
 }
 
-pub fn duration_to_days(duration: Duration) -> f64 {
-    duration.num_seconds() as f64 / 86_400.0
+pub fn duration_to_days(duration: SignedDuration) -> f64 {
+    duration.as_secs() as f64 / 86_400.0
 }
 
-pub fn resolve_calendar_start(record: &SprintRecord, lifecycle: &SprintLifecycleStatus) -> Option<DateTime<Utc>> {
+pub fn resolve_calendar_start(record: &SprintRecord, lifecycle: &SprintLifecycleStatus) -> Option<Timestamp> {
     lifecycle
         .actual_start
         .or(lifecycle.planned_start)
@@ -91,7 +91,7 @@ pub fn resolve_calendar_start(record: &SprintRecord, lifecycle: &SprintLifecycle
         .or_else(|| record.sprint.created.as_deref().and_then(parse_optional_datetime))
 }
 
-pub fn resolve_calendar_end(record: &SprintRecord, lifecycle: &SprintLifecycleStatus) -> Option<DateTime<Utc>> {
+pub fn resolve_calendar_end(record: &SprintRecord, lifecycle: &SprintLifecycleStatus) -> Option<Timestamp> {
     lifecycle
         .actual_end
         .or(lifecycle.computed_end)
@@ -101,7 +101,7 @@ pub fn resolve_calendar_end(record: &SprintRecord, lifecycle: &SprintLifecycleSt
         .or_else(|| record.sprint.modified.as_deref().and_then(parse_optional_datetime))
 }
 
-pub fn format_calendar_relative(lifecycle: &SprintLifecycleStatus, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>, now: DateTime<Utc>) -> String {
+pub fn format_calendar_relative(lifecycle: &SprintLifecycleStatus, start: Option<Timestamp>, end: Option<Timestamp>, now: Timestamp) -> String {
     match lifecycle.state {
         SprintLifecycleState::Pending => {
             if let Some(start_dt) = start {
@@ -138,7 +138,7 @@ pub fn format_calendar_relative(lifecycle: &SprintLifecycleStatus, start: Option
     }
 }
 
-pub fn format_calendar_window(start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>, duration: Option<Duration>) -> String {
+pub fn format_calendar_window(start: Option<Timestamp>, end: Option<Timestamp>, duration: Option<SignedDuration>) -> String {
     match (start, end) {
         (Some(begin), Some(finish)) => {
             let duration_text = duration.map(format_duration).unwrap_or_else(|| "n/a".to_string());
@@ -150,11 +150,11 @@ pub fn format_calendar_window(start: Option<DateTime<Utc>>, end: Option<DateTime
     }
 }
 
-fn format_calendar_date(value: DateTime<Utc>) -> String {
-    value.format("%Y-%m-%d").to_string()
+fn format_calendar_date(value: Timestamp) -> String {
+    value.strftime("%Y-%m-%d").to_string()
 }
 
-pub fn parse_optional_datetime(raw: &str) -> Option<DateTime<Utc>> {
+pub fn parse_optional_datetime(raw: &str) -> Option<Timestamp> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
@@ -169,7 +169,7 @@ pub fn parse_optional_datetime(raw: &str) -> Option<DateTime<Utc>> {
 /// status history fall back to the conscious modified/created estimate.
 /// Returns `None` when the task is not currently terminal (a reopened task
 /// has no current completion even though it was done earlier).
-pub fn find_done_timestamp(task: &StoredTask, done_statuses: &std::collections::HashSet<String>) -> Option<DateTime<Utc>> {
+pub fn find_done_timestamp(task: &StoredTask, done_statuses: &std::collections::HashSet<String>) -> Option<Timestamp> {
     crate::services::completion::current_completion_started_at(task, done_statuses)
 }
 
@@ -178,7 +178,7 @@ pub fn resolve_burndown_window(
     lifecycle: &SprintLifecycleStatus,
     tasks: &[(String, StoredTask)],
     done_sets: &crate::services::completion::TaskDoneSets,
-) -> Result<(DateTime<Utc>, DateTime<Utc>), String> {
+) -> Result<(Timestamp, Timestamp), String> {
     let task_created_min = tasks.iter().filter_map(|(_, task)| parse_optional_datetime(&task.created)).min();
 
     let start = lifecycle
@@ -217,12 +217,12 @@ pub fn resolve_burndown_window(
         .ok_or_else(|| format!("Sprint #{} lacks plan/actual end timestamps and none of its tasks provide modified times.", record.id))?;
 
     if end <= start {
-        end = start + Duration::days(1);
+        end = start + time::days(1);
     }
 
     Ok((start, end))
 }
 
-pub fn format_calendar_date_basic(value: DateTime<Utc>) -> String {
-    value.format("%Y-%m-%d").to_string()
+pub fn format_calendar_date_basic(value: Timestamp) -> String {
+    value.strftime("%Y-%m-%d").to_string()
 }

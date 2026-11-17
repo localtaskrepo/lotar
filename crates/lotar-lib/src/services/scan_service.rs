@@ -10,8 +10,8 @@ use crate::utils::scan::{
     ScanConfigSnapshot, configured_line_scanner, merge_signal_words, parse_inline_attributes, refresh_code_reference, replace_line_contents,
     scan_config_from_manager, validate_source_write, write_source,
 };
+use crate::utils::time;
 use crate::workspace::TasksDirectoryResolver;
-use chrono::Utc;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -476,7 +476,7 @@ fn update_task_code_reference(storage: &mut Storage, task_id: &str, code_ref: &s
     let outcome = storage.mutate_task(task_id, |fresh| {
         let changed = refresh_code_reference(&mut fresh.references, code_ref, live_refs, &fresh.history);
         if changed {
-            fresh.modified = Utc::now().to_rfc3339();
+            fresh.modified = time::now_rfc3339();
         }
         Ok(changed)
     })?;
