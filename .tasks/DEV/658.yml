@@ -1,11 +1,11 @@
 title: Release v0.15.4
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T16:01:03.148737+00:00
-modified: 2026-11-18T02:42:38.124408+00:00
+modified: 2026-11-18T03:17:33.162932+00:00
 relationships:
   depends_on:
   - DEV-681
@@ -112,6 +112,16 @@ comments:
       result: passed
       reason: 405 tests
     next: Review agent-DEV-658 again, then merge onto main (rebase over 9d8613379)
+- date: 2026-11-18T03:17:26.468231+00:00
+  author: claude
+  text: |-
+    Review: passed. The version bump on `agent/DEV-658` is complete and correct, and it can merge.
+
+    - Work: one commit, `866cfc8a7`. It changes only `Cargo.toml` (`[workspace.package]` plus the five exact `=0.15.4` workspace deps) and `Cargo.lock` (six crates), as the Pre-Release Checklist in `docs/release-guide.md` asks. No tracked doc still says `0.15.3`, and `package.json` keeps its own version, as the guide says.
+    - Reran: `npm ci` ok, `npm run lint` passed, `cargo build` ok, and `target/debug/lotar --version` prints `lotar 0.15.4`. I didn't rerun `npm test` or `npm run smoke` (long-running). The fix agent reports both passed, and a version-only diff can't change them.
+    - Main is 6 commits ahead (`de2a61629`). `git merge-tree main HEAD` is clean. The prerequisite DEV-681 is Done. No `t3/release-v0-15-4` rework branch is ahead of HEAD.
+    - Before the tag (release step 1, ticket edits on main): `DEV-644`, `DEV-656`, `DEV-678`, `DEV-685`, `DEV-686` and `DEV-687` are merged since `v0.15.3` but are in no release. Add them with `lotar release add 0.15.4 <ID>`. This is part of this ticket's remaining steps, so I filed no ticket.
+    - No stray files and no owner decisions touched (patch bump is the default). Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0fb4ee5-0af2-43c2-9ff2-844d5e38cc7d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae66d2417-c918-4f65-9cd1-a23b637ba16e
@@ -254,3 +264,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T03:17:26.468231+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:17:33.162932+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

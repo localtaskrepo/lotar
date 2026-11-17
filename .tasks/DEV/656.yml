@@ -1,11 +1,11 @@
 title: lotar-lib windows_regressions.rs header says the Windows job links only that binary
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T08:49:43.891209+00:00
-modified: 2026-11-18T02:28:21.267203+00:00
+modified: 2026-11-18T03:16:06.957627+00:00
 relationships:
   depends_on:
   - DEV-655
@@ -239,6 +239,43 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: comment-only change
+- date: 2026-11-18T03:16:06.799906+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-656` is in `main`.
+
+    - Rebased `agent/DEV-656` onto `main` (`fd1db5ddcc6c`): `2816cfbe5cdd`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-656` onto `main` (`3cbe25d9b975`): `61e993183e87`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-656` onto `main` (`978bedf02cb5`): `f891035fa07c`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `f891035fa07c`
+    - Amended the pending `.tasks` changes into the merged commit: `de2a61629c78`
+    - Pushed 3 commits to `origin/main`
+  report:
+    commits:
+    - hash: 3cbe25d9b
+      what: DEV-687 A t3 job refuses to move agent/<ticket> to its thread's branch when the thread rebased the branch's commit and kept it under another branch
+    - hash: 978bedf02
+      what: DEV-686 DEV-604 is Done, but its work e4edce9b never reached main
+    - hash: de2a61629
+      what: DEV-656 lotar-lib windows_regressions.rs header says the Windows job links only that binary
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A470291bc-a890-4691-8707-69a67da72fae
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1908d8b6-e7b5-41be-a44e-cd371940dad9
@@ -250,9 +287,6 @@ description: |-
   ## Done when
   - [ ] That header names both `windows_regressions` binaries (lotar-lib's and lotar-agent's) and `lotar-agent-wrapper`, as `crates/lotar-agent/tests/windows_regressions.rs` and the ci.yml comment do.
   - [ ] `npm run lint` passes.
-tags:
-- review-returned
-- fix-retried
 history:
 - at: 2026-11-17T08:49:44.443157+00:00
   actor: claude
@@ -470,3 +504,16 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-18T03:16:06.799906+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:16:06.957627+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned, fix-retried
+    new: ''

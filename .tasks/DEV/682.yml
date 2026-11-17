@@ -1,14 +1,16 @@
 title: 'Proposal: agent jobs end on a stall timeout and stop when their ticket goes Done or to a person'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-17T23:52:06.189581+00:00
-modified: 2026-11-18T02:51:09.936308+00:00
+modified: 2026-11-18T03:25:33.314854+00:00
 relationships:
   related:
   - DEV-657
+  - DEV-688
+  - DEV-694
 comments:
 - date: 2026-11-17T23:52:34.645149+00:00
   author: claude
@@ -132,9 +134,36 @@ comments:
 - date: 2026-11-18T02:51:09.936308+00:00
   author: automation
   text: The fix agent's job job-20261118T024235.204Z-10 failed (lotar agent logs job-20261118T024235.204Z-10); @fix-retry retries it on branch t3/agent-job-stall-reconcile.
+- date: 2026-11-18T03:25:24.590282+00:00
+  author: claude
+  text: |-
+    Retry: nothing left to fix, the work is ready for review as `bdbffc029`.
+
+    - The fix job `job-20261118T024235.204Z-10` finished its work but failed at the very end: `git branch --force agent/DEV-682` was refused because worktree `agent-DEV-682-820334f8766c1228` had the branch checked out.
+    - Now `agent/DEV-682`, `t3/agent-job-stall-reconcile` and this thread's branch all point at `bdbffc029`, and that worktree is clean.
+    - That job-end bug is already filed as DEV-694 and DEV-688, so I didn't file it again.
+    - No code changed, so I didn't rerun the checks: the same commit passed lint, tests and smoke in that job.
+  report:
+    commits:
+    - hash: 485ac56fb
+      what: stall_timeout_seconds + cancel jobs whose ticket went Done or to a person
+    - hash: bdbffc029
+      what: a job on a ticket Done before it started runs on
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: same commit bdbffc029 passed in job-20261118T024235.204Z-10
+    - command: npm test
+      result: not_run
+      reason: same commit passed there (2364 Rust tests)
+    - command: npm run smoke
+      result: not_run
+      reason: same commit passed there (405 tests)
+    next: review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab633688f-62e2-4bd0-a509-75f41d400c27
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5f40a7a6-4bc2-4399-aa2f-498af6e18e69
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f0ca270-c400-43bd-9790-c262b6953996
 description: |-
   A running agent job that hangs holds its parallel slot and its ticket indefinitely, and a job keeps running (and spending tokens) after its ticket goes Done or is reassigned. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section lotar).
 
@@ -253,3 +282,27 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T03:24:40.979507+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f0ca270-c400-43bd-9790-c262b6953996
+- at: 2026-11-18T03:25:24.590282+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:25:24.784985+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-657"]}'
+    new: '{"related":["DEV-657","DEV-688","DEV-694"]}'
+- at: 2026-11-18T03:25:33.314854+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

@@ -1,14 +1,16 @@
 title: 'harnessmux: some Codex error texts still end a turn as finished'
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-18T02:58:51.888766+00:00
-modified: 2026-11-18T02:58:52.577298+00:00
+modified: 2026-11-18T03:25:35.173664+00:00
 relationships:
   related:
   - DEV-684
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad01813e-ca32-4de5-939e-c516b2e63466
 description: |-
   Found in the review of DEV-684 (harnessmux `65a95a0`).
 
@@ -22,3 +24,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T03:25:34.339742+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T03:25:35.173664+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad01813e-ca32-4de5-939e-c516b2e63466

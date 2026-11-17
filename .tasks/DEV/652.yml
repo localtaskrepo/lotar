@@ -1,11 +1,11 @@
 title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-fable'
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-18T03:07:41.415959+00:00
+modified: 2026-11-18T03:24:58.125645+00:00
 relationships:
   depends_on:
   - DEV-657
@@ -26,6 +26,9 @@ relationships:
   - DEV-673
   - DEV-674
   - DEV-675
+  - DEV-604
+  - DEV-672
+  - DEV-687
 comments:
 - date: 2026-11-17T06:49:42.579878+00:00
   author: claude
@@ -319,6 +322,76 @@ comments:
     - Global rule: unpushed commits are amended, not stacked. `f6d837068` stays in the reflog, so it is reversible.
     - Rebase refused by the sandbox: rerun it with your harness's approval to run outside the sandbox before handing back.
     - Port the t3 worktree changes of DEV-674, DEV-673, DEV-675, DEV-619, DEV-618 and the `lotar-agent` move (DEV-634) by hand; run lint, tests and smoke before review.
+- date: 2026-11-18T03:24:26.214637+00:00
+  author: claude
+  text: |-
+    Rebased onto main and resolved the conflicts; still one commit.
+
+    **Ported by hand**
+    - **DEV-634:** the change now lives in `crates/lotar-agent`.
+    - **DEV-604, DEV-672:** the commit-retry and pause fields stay; `ticket_commit_at_start` is gone.
+    - **DEV-619:** thread names and renaming continued threads stay.
+    - **DEV-618, DEV-674:** lotar now writes the profile's `tools.disallowed` and `env` into `.claude/settings.local.json` in the ticket's worktree before a new thread starts. That replaces the record/claim files and `lotar agent worktree setup`, which are removed, as T3 Code no longer makes the worktree. Codex threads get no file, and without worktrees nothing is written.
+    - **DEV-673, DEV-675, DEV-687:** these fixed lotar pointing the ticket branch at the thread's `t3/*` branch. That step is gone, so their tests are dropped.
+
+    **Tests**
+    - The DEV-618 and DEV-619 tests moved to dev503's fake T3 Code server, because continued turns now go over MCP. The fake server now also handles the `/ws` rename.
+
+    **Note:** `agent/DEV-652` still points at the old f6d837068. The new commit is on `t3/t3-job-lotar-worktree-4`.
+  report:
+    commits:
+    - hash: 6c723f0cf
+      what: DEV-652 rebased onto main (de2a61629), one signed commit
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2352 Rust, 1548 UI, 67 node
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    next: Review 6c723f0cf on t3/t3-job-lotar-worktree-4
+- date: 2026-11-18T03:24:36.150421+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261118T030737.077Z-16 failed again or on a rate limit (lotar agent logs job-20261118T030737.077Z-16). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-18T03:24:56.832670+00:00
+  author: triage
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the same error came back after the @fix retry (retry-fix), so fix-fable. The work is done and checks pass: rebased commit 6c723f0cf on t3/t3-job-lotar-worktree-4. Do not redo it. Only landing failed: git branch --force agent/DEV-652 is refused because the stale T3-made worktree ~/.t3/worktrees/lotar/agent-DEV-652-dc465b1929db89d7 holds the branch. Check it is clean, remove it (git worktree remove) or move it aside, point agent/DEV-652 at 6c723f0cf, then hand off for review. Consider making lotar handle this case itself.
+  answer:
+    to: 2026-11-18T03:24:36.150421+00:00
+    choice:
+    - fix-fable
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the same error came back after the @fix retry (retry-fix), so fix-fable. The work is done and checks pass: rebased commit 6c723f0cf on t3/t3-job-lotar-worktree-4. Do not redo it. Only landing failed: git branch --force agent/DEV-652 is refused because the stale T3-made worktree ~/.t3/worktrees/lotar/agent-DEV-652-dc465b1929db89d7 holds the branch. Check it is clean, remove it (git worktree remove) or move it aside, point agent/DEV-652 at 6c723f0cf, then hand off for review. Consider making lotar handle this case itself.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
@@ -348,6 +421,7 @@ description: |-
 tags:
 - fix-retried
 - retry-fix
+- retry-fable
 history:
 - at: 2026-11-17T06:47:32.201695+00:00
   actor: claude
@@ -723,3 +797,42 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-18T03:24:26.214637+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:24:26.554149+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687"]}'
+- at: 2026-11-18T03:24:36.076771+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T03:24:36.150421+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:24:56.832670+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:24:56.834613+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'
+- at: 2026-11-18T03:24:58.125645+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried, retry-fix
+    new: fix-retried, retry-fix, retry-fable

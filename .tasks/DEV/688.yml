@@ -5,7 +5,7 @@ type: Feature
 reporter: triage
 assignee: '@review'
 created: 2026-11-18T02:23:14.686039+00:00
-modified: 2026-11-18T02:36:16.992366+00:00
+modified: 2026-11-18T03:25:24.785450+00:00
 relationships:
   depends_on:
   - DEV-658
@@ -13,6 +13,7 @@ relationships:
   - DEV-687
   - TEST-1
   - DEV-673
+  - DEV-682
 comments:
 - date: 2026-11-18T02:36:06.738036+00:00
   author: claude
@@ -105,3 +106,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T03:25:24.785450+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-658"],"related":["DEV-687","TEST-1","DEV-673"]}'
+    new: '{"depends_on":["DEV-658"],"related":["DEV-687","TEST-1","DEV-673","DEV-682"]}'

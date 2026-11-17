@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T23:52:07.336095+00:00
-modified: 2026-11-18T02:44:33.078424+00:00
+modified: 2026-11-18T03:19:07.784528+00:00
 relationships:
   related:
   - DEV-584
@@ -152,6 +152,34 @@ comments:
     - `cargo clippy --all-targets --all-features -- -D warnings`: passed
     - `cargo nextest run`: 56 passed
     - Not run: `cargo deny check`, and lotar's `npm run lint`, `npm test` and `npm run smoke` (lotar unchanged).
+- date: 2026-11-18T03:19:00.639369+00:00
+  author: claude
+  text: |-
+    Both review findings fixed; ready for review again.
+
+    - Changelog: the entries moved from the released `0.1.10` to a new `## 0.2.0 (unreleased)` section, which says the `TurnFailed { error, .. }` break is why the minor version goes up. lotar's `harnessmux = "0.1.9"` won't pick it up with `cargo update`.
+    - Done when 2: DEV-584 has a new "Done when" item: bump harnessmux to 0.2.0, match `EventBody::TurnFailed { error, .. }` in `agent_job_service.rs`, read `kind` and `resets_at` before the text. Item 2 here is checked off as moved to DEV-584.
+    - Amended into one signed commit `6377748` on harnessmux `agent/DEV-683` (was `85a7484` + `98b9bf7`; it differs from `98b9bf7` only in `CHANGELOG.md`).
+  report:
+    commits:
+    - hash: '6377748'
+      what: typed turn failures, one commit (85a7484 + 98b9bf7 squashed), CHANGELOG under 0.2.0 (unreleased) (harnessmux agent/DEV-683)
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo nextest run
+      result: passed
+      reason: 56 tests
+    - command: cargo deny check
+      result: passed
+    - command: npx prettier --check CHANGELOG.md
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: lotar code unchanged
+    next: Review harnessmux agent/DEV-683 at 6377748, then merge; the release is 0.2.0
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A99135d3c-e4c5-4c4b-8d8b-1698f984e0be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af17f6c15-5bff-4902-9be0-e260d7ed3582
@@ -171,7 +199,7 @@ description: |-
 
   ## Done when
   - [ ] recorded sessions for a Claude rate limit and an auth failure replay to the typed fields
-  - [ ] lotar's usage-limit handling uses them (DEV-584)
+  - [x] lotar's usage-limit handling uses them: moved to DEV-584's "Done when" (2026-11-18)
 tags:
 - proposal
 - review-returned
@@ -304,3 +332,60 @@ history:
   - field: tags
     old: proposal, review-blocked
     new: proposal, review-returned
+- at: 2026-11-18T03:17:34.557952+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-18T03:18:27.010499+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      harnessmux reports a failed turn as `turn.failed {error: String}`, built from the error's text, and drops what the adapters already send: the kind of failure and when a usage limit resets. DEV-584 (pause a job until the usage-limit reset) has to guess both from text. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
+
+      ## Evidence
+      - claude-agent-acp (the pinned adapter): a failed turn's JSON-RPC error `data` is `{errorKind, rateLimit}` with `rateLimit.resetsAt` ([src/result-end.ts](https://github.com/agentclientprotocol/claude-agent-acp/blob/main/src/result-end.ts)); `usage_update` carries `_meta["_claude/rateLimit"]`, `quota`, `authStatus` (docs/air-extensions.md).
+      - acpx's two-layer error contract: stable code + raw error + `retryable` ([ACPX_ERROR_STRATEGY.md](https://github.com/openclaw/acpx/blob/main/docs/ACPX_ERROR_STRATEGY.md), [error-normalization.ts](https://github.com/openclaw/acpx/blob/main/src/acp/error-normalization.ts)).
+      - happy merges push and pull rate-limit data into one shape with `resetsAt` ([usageLimits.ts](https://github.com/slopus/happy/blob/main/packages/happy-cli/src/claude/utils/usageLimits.ts)); its fixture shows the native text "You've hit your limit · resets …", which `FAILURE_TEXTS` doesn't match.
+      - harnessmux: `src/error.rs:54`, `src/session.rs:347` (string only, `raw: None`), `src/acp_map.rs:33-41` (Usage reads used, size, cost).
+
+      ## Proposal
+      - `turn.failed` gets `kind` (rate_limited, quota, auth_required, overloaded, context_exhausted, transport, other), `resets_at`, `retryable` and `raw`, from the adapter's error data first; text matching stays as the fallback.
+      - `usage` events carry the rate-limit window when the adapter sends it.
+      - lotar's DEV-584 then reads `kind` and `resets_at` instead of the message.
+
+      ## Done when
+      - [ ] recorded sessions for a Claude rate limit and an auth failure replay to the typed fields
+      - [ ] lotar's usage-limit handling uses them (DEV-584)
+    new: |-
+      harnessmux reports a failed turn as `turn.failed {error: String}`, built from the error's text, and drops what the adapters already send: the kind of failure and when a usage limit resets. DEV-584 (pause a job until the usage-limit reset) has to guess both from text. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
+
+      ## Evidence
+      - claude-agent-acp (the pinned adapter): a failed turn's JSON-RPC error `data` is `{errorKind, rateLimit}` with `rateLimit.resetsAt` ([src/result-end.ts](https://github.com/agentclientprotocol/claude-agent-acp/blob/main/src/result-end.ts)); `usage_update` carries `_meta["_claude/rateLimit"]`, `quota`, `authStatus` (docs/air-extensions.md).
+      - acpx's two-layer error contract: stable code + raw error + `retryable` ([ACPX_ERROR_STRATEGY.md](https://github.com/openclaw/acpx/blob/main/docs/ACPX_ERROR_STRATEGY.md), [error-normalization.ts](https://github.com/openclaw/acpx/blob/main/src/acp/error-normalization.ts)).
+      - happy merges push and pull rate-limit data into one shape with `resetsAt` ([usageLimits.ts](https://github.com/slopus/happy/blob/main/packages/happy-cli/src/claude/utils/usageLimits.ts)); its fixture shows the native text "You've hit your limit · resets …", which `FAILURE_TEXTS` doesn't match.
+      - harnessmux: `src/error.rs:54`, `src/session.rs:347` (string only, `raw: None`), `src/acp_map.rs:33-41` (Usage reads used, size, cost).
+
+      ## Proposal
+      - `turn.failed` gets `kind` (rate_limited, quota, auth_required, overloaded, context_exhausted, transport, other), `resets_at`, `retryable` and `raw`, from the adapter's error data first; text matching stays as the fallback.
+      - `usage` events carry the rate-limit window when the adapter sends it.
+      - lotar's DEV-584 then reads `kind` and `resets_at` instead of the message.
+
+      ## Done when
+      - [ ] recorded sessions for a Claude rate limit and an auth failure replay to the typed fields
+      - [x] lotar's usage-limit handling uses them: moved to DEV-584's "Done when" (2026-11-18)
+- at: 2026-11-18T03:19:00.639369+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:19:07.784528+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

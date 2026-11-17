@@ -1364,7 +1364,7 @@ fn excerpt(text: &str) -> String {
 /// profile the ticket was last assigned to when it was written (a person
 /// working on it continues that profile's phase): `@review…` is a review,
 /// `@merge…` neither, any other profile a fix. Automation's comments are
-/// left out.
+/// never the newest fix or review comment, but can be the open question.
 fn prompt_comments(task: &crate::api_types::TaskDTO) -> Vec<(&'static str, &crate::types::TaskComment)> {
     let assignments: Vec<(&str, &str)> = task
         .history
@@ -1485,13 +1485,19 @@ fn build_prompt(
     }
 
     if !history.full && !task.comments.is_empty() {
+        let picked = prompt_comments(task);
+        let shown = if picked.is_empty() {
+            ". ".to_string()
+        } else {
+            format!("; below the open question and the newest fix and review comments, each cut at {PROMPT_EXCERPT_CHARS} characters. ")
+        };
         out.push_str(&format!(
-            "\nComments ({} on the ticket; below the open question and the newest fix and review comments, each cut at {PROMPT_EXCERPT_CHARS} characters. \
-All of them: `lotar show {id}`; the history: `lotar task timeline {id}`):\n",
+            "\nComments ({} on the ticket{shown}All of them: `lotar show {id}`; the history: `lotar task timeline {id}`){}\n",
             task.comments.len(),
+            if picked.is_empty() { "" } else { ":" },
             id = task.id
         ));
-        for (label, comment) in prompt_comments(task) {
+        for (label, comment) in picked {
             let author = comment.author.as_deref().unwrap_or("unknown");
             out.push_str(&format!("- {label}, by {author}, {}:\n{}\n", comment.date, excerpt(&comment.text)));
         }
@@ -5983,6 +5989,26 @@ mod tests {
         task.history.truncate(2);
         let picked: Vec<&str> = prompt_comments(&task).into_iter().map(|(label, _)| label).collect();
         assert_eq!(picked, vec!["Newest fix comment", "Open question"]);
+    }
+
+    /// DEV-628: the owner's notes before the first fix job and automation's comments are not picked, and the
+    /// Comments section is then one line with the count and the commands.
+    #[test]
+    fn no_comment_picked_leaves_one_comments_line() {
+        let mut task = sample_task();
+        task.comments =
+            vec![comment("2026-11-16T01:00:00Z", "mallox", "Note before any job"), comment("2026-11-16T03:00:00Z", "automation", "The fix agent's job failed")];
+        task.history = vec![assigned("2026-11-16T02:00:00Z", None, "@fix")];
+        assert!(prompt_comments(&task).is_empty());
+
+        let prompt = build_prompt(&task, "go", None, BRIEF, None, None, None);
+        assert!(prompt.contains("\nComments (2 on the ticket. All of them: `lotar show TEST-1`; the history: `lotar task timeline TEST-1`)\n"), "{prompt}");
+        assert!(!prompt.contains("below the") && !prompt.contains("Note before any job"), "{prompt}");
+
+        // Automation's comment is never a fix comment, but before a hand-back it is the open question.
+        task.history.push(assigned("2026-11-16T04:00:00Z", Some("@fix"), "mallox"));
+        let picked: Vec<_> = prompt_comments(&task).into_iter().map(|(label, comment)| (label, comment.text.as_str())).collect();
+        assert_eq!(picked, vec![("Open question", "The fix agent's job failed")]);
     }
 
     #[test]
