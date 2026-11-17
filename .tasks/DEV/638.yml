@@ -1,11 +1,11 @@
 title: lotar serve announces task files written before it started as task_updated
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T06:47:32.200690+00:00
+modified: 2026-11-17T09:13:27.166163+00:00
 relationships:
   related:
   - DEV-614
@@ -276,6 +276,49 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-17T09:07:42.889797+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-411)
+  answer:
+    to: 2026-11-17T04:41:56.236036+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-411)
+- date: 2026-11-17T09:11:01.997955+00:00
+  author: claude
+  text: |-
+    Retry after the third review job ended idle: no new changes, `99ee73da0` goes back to review.
+
+    - All DEV-638 branches, incl. `t3/watcher-ignore-prestart-task-writes`, point at `99ee73da0`; only `crates/lotar-lib/src/web_server.rs` differs from `main`
+    - Three reviews passed this commit (03:29, 03:55, 04:40); each job then ended idle (DEV-644), not on the work
+    - Reran `cargo nextest run -p lotar-lib watcher_`: 2 passed; trial merge with `main` clean
+  report:
+    commits:
+    - hash: 99ee73da0
+      what: seed the tasks watcher's fingerprints at start, test for pre-start writes
+    checks:
+    - command: cargo nextest run -p lotar-lib watcher_
+      result: passed
+      reason: 2 passed
+    - command: git merge-tree main HEAD
+      result: passed
+      reason: no conflicts; main doesn't touch web_server.rs
+    - command: npm run lint
+      result: not_run
+      reason: passed on 99ee73da0 in the first fix job
+    - command: npm test
+      result: not_run
+      reason: passed on 99ee73da0 in the first fix job
+    - command: npm run smoke
+      result: not_run
+      reason: 405 passed on 99ee73da0 in the first fix job
+    next: Review on another model, then the merge agent lands 99ee73da0
+- date: 2026-11-17T09:13:22.878178+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-638 is assigned to @review now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22b1bf8c-7133-4be8-b911-a6234f55843e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e669ea5-0714-4b68-9b9c-a06ebd8772d7
@@ -284,6 +327,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d795fce-8b26-4cd1-a4cb-3181b378e406
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb340442-490c-4554-a7a9-e454bcc4b762
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aed5ea785-3761-4e25-9f43-ad590a86979d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d6ef080-734c-4fc2-8e96-543bdb90c946
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab038bc22-ff75-4512-be20-7e30f3381097
 description: 'Found in the DEV-614 review on 2026-11-16: the tasks watcher (crates/lotar-lib/src/web_server.rs start_tasks_watcher) can still report files written just before the server started (FSEvents delivers recent history), and its ''announced'' fingerprint map starts empty, so it emits task_updated for unchanged files. On the Dependencies page (view/pages/Dependencies.vue changed()) such an event clears an open safe repair preview with ''Task data changed''. DEV-614 worked around it in the smoke test only. Check: start lotar serve right after writing a task file, open /api/events, watch for a task_updated of that file without a new write. Done when the watcher seeds its fingerprints at start (or ignores events for content it saw at start) and a test shows no event for pre-start writes.'
 tags:
 - health
@@ -516,3 +561,46 @@ history:
   - field: relationships
     old: '{"related":["DEV-614","DEV-644"]}'
     new: '{"related":["DEV-614","DEV-644","DEV-652"]}'
+- at: 2026-11-17T09:07:42.889797+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:07:42.894280+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T09:07:52.107458+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T09:07:54.167941+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d6ef080-734c-4fc2-8e96-543bdb90c946
+- at: 2026-11-17T09:11:01.997955+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:11:15.435773+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T09:13:22.878178+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:13:27.166163+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab038bc22-ff75-4512-be20-7e30f3381097

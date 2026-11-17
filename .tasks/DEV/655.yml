@@ -1,0 +1,341 @@
+title: Move the two remaining service-only automation tests from lotar-lib to lotar-agent
+status: Merging
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T08:14:39.859239+00:00
+modified: 2026-11-17T09:11:15.837667+00:00
+relationships:
+  blocks:
+  - DEV-656
+  related:
+  - DEV-634
+  - DEV-495
+  - DEV-656
+  - DEV-654
+comments:
+- date: 2026-11-17T08:45:49.346506+00:00
+  author: claude
+  text: |-
+    Both tests moved to `crates/lotar-agent`, and they run with `-p lotar-agent`.
+
+    - Base: `lotar-agent` exists only on `agent/DEV-634`, so I cherry-picked its 2 commits onto this branch. Resetting the branch to it was refused. Merge DEV-634 first.
+    - `dev566_moved_during_job_test`: now in lotar-agent's `integration` binary. A temp `.tasks` dir replaces `TestFixtures`, which it used only for `new`/`create_storage`/`get_temp_path`, so `TestFixtures` stays in lotar-lib.
+    - `automation_async_run_test` was in lotar-lib's `windows_regressions` binary, not `integration.rs`. It is now in a new lotar-agent `windows_regressions` binary. The Windows job's unchanged `--test windows_regressions` selects both binaries (checked with `cargo nextest list`).
+    - `ci_windows_reporting_contract_test` now checks which binary holds each module. It fails when the module is dropped (checked, then restored).
+    - Docs: ci.yml comment, `crates/lotar-lib/tests/README.md`, `platform-test-verification.md`, testing-strategy.
+    - Commit `7486679f0` has a generated message ("changes from the fix agent"), not the one asked for: something committed my staged work first. It is on `t3/move-automation-tests-to-lotar-agent` too, so I left it unamended to keep the two branches the same.
+    - Guidance: testing-strategy now names `tests/windows_regressions.rs` for service-only tests Windows CI must run.
+  report:
+    commits:
+    - hash: 7486679f0
+      what: both tests moved to lotar-agent, Windows binary, contract test, docs
+    - hash: bafbec164
+      what: DEV-634's 4fc0e04b6, cherry-picked as the base
+    - hash: 62c863ac8
+      what: DEV-634's 1192c4e54, cherry-picked as the base
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2305 Rust, 1548 UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 118 files, 405 tests
+    - command: cargo nextest run -p lotar-agent --cargo-profile dev
+      result: passed
+      reason: 142 tests, incl. 3 dev566 + 3 async_run
+    - command: Windows CI selection on Windows
+      result: not_run
+      reason: no Windows here; cargo nextest list with the CI flags shows lotar-agent::windows_regressions and lotar-lib::windows_regressions
+    next: Review; merge after DEV-634 (rebasing onto main once DEV-634 is in drops its cherry-picked commits)
+- date: 2026-11-17T08:49:58.797412+00:00
+  author: claude
+  text: |-
+    Review: passed. Both tests moved to lotar-agent as "Done when" asks; all checks pass.
+
+    - Read: commit `7486679f0` (on top of DEV-634's `bafbec164`, `62c863ac8`), the ticket, DEV-634, DEV-495, root `Cargo.toml`, the Windows job in `ci.yml`.
+    - `dev566_moved_during_job_test` is a module of lotar-agent's `integration` with a `tempfile` `.tasks` dir; `automation_async_run_test` is in the new lotar-agent `windows_regressions` binary (`[[test]]` in `crates/lotar-agent/Cargo.toml`, needed because `autotests = false`). Both are gone from lotar-lib.
+    - The Windows selection really includes both: `default-members` has lotar-agent, and `cargo nextest list --all-features --test windows_regressions --bin lotar-agent-wrapper` lists `lotar-agent::windows_regressions` (3 tests here, plus the `cfg(windows)` stdio ones on Windows) next to `lotar-lib::windows_regressions`.
+    - `ci_windows_reporting_contract_test` checks each module is in exactly one binary across both crates, and fails if it is dropped.
+    - Docs: README, `platform-test-verification.md`, ci.yml comment and testing-strategy name both binaries.
+    - The fix agent left no handoff comment (the job ended while lint was still running), so I reran everything.
+    - Reran: `cargo nextest run -p lotar-agent --cargo-profile dev` (142 passed), `npm run lint` passed, `npm test` (2305 Rust + 1548 UI) passed, `npm run smoke` (405) passed. Worktree left clean.
+    - Not run: Windows itself. No Windows target installed here, so the `cfg(windows)` module (only its crate path changed) compiles only on CI.
+    - Minor, filed: [DEV-656](https://lotar.pyxzl.net/task/DEV-656): the header of `crates/lotar-lib/tests/windows_regressions.rs` (lines 3-4) still says the Windows job links only that binary.
+- date: 2026-11-17T08:50:51.177760+00:00
+  author: claude
+  text: |-
+    Merge stopped: it would put DEV-634 on main, and DEV-634 is still waiting for you.
+
+    - `git log main..HEAD`: DEV-634 `bafbec164`, `62c863ac8`, then DEV-655 `7486679f0`. The ticket says this branch carries DEV-634 "until DEV-634 is on main". It isn't on main yet.
+    - [DEV-634](https://lotar.pyxzl.net/task/DEV-634) is HelpNeeded, assigned to you: its review passed (08:14), but the automation asks "Retry with which agent, or WontDo?" after a failed job.
+    - `agent/DEV-634` (`4fc0e04b6`, `1192c4e54`) holds the same patches as this branch's copies (`git range-diff`: identical), so landing both together would be clean.
+    - Nothing rebased, merged or pushed. Main checkout untouched.
+
+    Question: land DEV-634 together with DEV-655 in this merge (then close DEV-634), or wait for DEV-634's own merge first?
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: merge stopped before the checks
+    - command: npm test
+      result: not_run
+      reason: merge stopped before the checks
+    - command: npm run smoke
+      result: not_run
+      reason: merge stopped before the checks
+    next: 'Owner: land DEV-634 first, or OK to land both with this merge'
+- date: 2026-11-17T09:06:09.672491+00:00
+  author: mallox
+  text: 'Answer: both (Land DEV-634 and DEV-655 together, then close DEV-634) (answered in INBOX-415)'
+- date: 2026-11-17T09:06:36.726327+00:00
+  author: claude
+  text: |-
+    Owner chose "both": land DEV-634 and DEV-655 together, then close DEV-634 (INBOX-415). Nothing to change; ready to merge.
+
+    - Branch `agent/DEV-655` (HEAD `7486679f0`): `bafbec164`, `62c863ac8` (DEV-634) and `7486679f0` (DEV-655), on top of main `b7a9cb85e`. Main hasn't moved.
+    - `git diff agent/DEV-634 62c863ac8` shows only DEV-654's `crates/lotar-core/src/utils/git.rs` and tickets, which are already on main: the copies carry all of DEV-634.
+    - After the merge: set [DEV-634](https://lotar.pyxzl.net/task/DEV-634) to Done and clear its assignee (owner's decision, now in this ticket's description).
+    - No new commit and no files changed in this turn.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: no change since 7486679f0, where the fix and the review ran it (passed)
+    - command: npm test
+      result: not_run
+      reason: same commit, passed in fix and review
+    - command: npm run smoke
+      result: not_run
+      reason: same commit, passed in fix and review
+    next: 'Merge agent: rebase onto main, land all three commits, then set DEV-634 Done'
+- date: 2026-11-17T09:11:01.247220+00:00
+  author: claude
+  text: |-
+    Review: passed. Same commit as the 08:49 review; nothing changed since.
+
+    - HEAD and `agent/DEV-655` are both `7486679f0` (on DEV-634's `bafbec164`, `62c863ac8`); main is still `b7a9cb85e`. No rework commit to review instead.
+    - Owner's answer (INBOX-415) is to land DEV-634 and DEV-655 together, so carrying DEV-634's commits is now decided, not a blocker.
+    - Reran: `cargo nextest run -p lotar-agent --cargo-profile dev` 142 passed; the 9 `ci_windows_reporting` contract tests passed.
+    - Not rerun: `npm run lint`, `npm test`, `npm run smoke`. They passed on this same hash in the 08:49 review.
+    - Findings: none new; [DEV-656](https://lotar.pyxzl.net/task/DEV-656) (stale header comment) still stands as the one minor follow-up.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22cc2ed8-b7a2-4bb2-992f-a68f1bcd0471
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ebc7200-d4b6-4e1c-a6bb-3de3bc166a8e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7d44ed51-d61e-4874-b38c-75ff85f2b0a8
+description: |-
+  Found in the DEV-634 review: testing-strategy says agent and automation tests that need only the services go in `crates/lotar-agent`, but two stayed in `crates/lotar-lib/tests`.
+
+  - `automation_async_run_test.rs`: calls only `lotar::services::automation_service` (`BoundedTail`, `stderr_eof_within_grace`, `windows_async_stdio`). It is in lotar-lib's `windows_regressions` binary (DEV-495), the one test binary the Windows CI job runs, not in `integration.rs`.
+  - `dev566_moved_during_job_test.rs`: calls `AutomationService` and `TaskService` in process, through lotar-lib's `common::TestFixtures`.
+
+  Builds on DEV-634 (`lotar-agent` exists only on `agent/DEV-634`), so this branch carries its two commits until DEV-634 is on main.
+
+  Owner, 2026-11-17 (INBOX-415): "Land DEV-634 and DEV-655 together, then close DEV-634": this branch's merge lands DEV-634's two commits with DEV-655's; afterwards DEV-634 goes to Done.
+
+  ## Done when
+  - [ ] Both run in `cargo nextest run -p lotar-agent --cargo-profile dev` and are gone from `crates/lotar-lib/tests` (`integration.rs` and `windows_regressions.rs`).
+  - [ ] `dev566_moved_during_job_test` is a module of lotar-agent's `integration` binary, with a temp `.tasks` dir in place of lotar-lib's `TestFixtures` (it uses only `new`, `create_storage`, `get_temp_path`, so `TestFixtures` itself doesn't move).
+  - [ ] `automation_async_run_test` is in a new lotar-agent test binary `windows_regressions`, so the Windows CI job still runs it natively: the job's unchanged `--test windows_regressions --bin lotar-agent-wrapper` selects both packages' `windows_regressions` binaries, run and coverage manifest alike.
+  - [ ] `ci_windows_reporting_contract_test` checks the module is in lotar-agent's `windows_regressions.rs` and in neither lotar-lib binary; it fails if the module is dropped.
+  - [ ] Docs naming the Windows selection (`crates/lotar-lib/tests/README.md`, `docs/developers/platform-test-verification.md`, the ci.yml comment) name both binaries.
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+history:
+- at: 2026-11-17T08:14:40.431265+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T08:14:41.720858+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T08:14:43.000317+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22cc2ed8-b7a2-4bb2-992f-a68f1bcd0471
+- at: 2026-11-17T08:16:24.322507+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-634 review: testing-strategy says agent and automation tests that need only the services go in `crates/lotar-agent`, but two stayed in `crates/lotar-lib/tests`.
+
+      - `automation_async_run_test.rs`: calls only `lotar::services::automation_service` (`BoundedTail`, `stderr_eof_within_grace`, `windows_async_stdio`).
+      - `dev566_moved_during_job_test.rs`: calls `AutomationService` and `TaskService` in process, through lotar-lib's `common::TestFixtures`.
+
+      ## Done when
+      - [ ] Both run in `cargo nextest run -p lotar-agent --cargo-profile dev` and are gone from `crates/lotar-lib/tests/integration.rs`.
+      - [ ] If `TestFixtures` can't move, the reason goes in a comment and the file stays.
+    new: |-
+      Found in the DEV-634 review: testing-strategy says agent and automation tests that need only the services go in `crates/lotar-agent`, but two stayed in `crates/lotar-lib/tests`.
+
+      - `automation_async_run_test.rs`: calls only `lotar::services::automation_service` (`BoundedTail`, `stderr_eof_within_grace`, `windows_async_stdio`). It is in lotar-lib's `windows_regressions` binary (DEV-495), the one test binary the Windows CI job runs, not in `integration.rs`.
+      - `dev566_moved_during_job_test.rs`: calls `AutomationService` and `TaskService` in process, through lotar-lib's `common::TestFixtures`.
+
+      Builds on DEV-634 (`lotar-agent` exists only on `agent/DEV-634`), so this branch carries its two commits until DEV-634 is on main.
+
+      ## Done when
+      - [ ] Both run in `cargo nextest run -p lotar-agent --cargo-profile dev` and are gone from `crates/lotar-lib/tests` (`integration.rs` and `windows_regressions.rs`).
+      - [ ] `dev566_moved_during_job_test` is a module of lotar-agent's `integration` binary, with a temp `.tasks` dir in place of lotar-lib's `TestFixtures` (it uses only `new`, `create_storage`, `get_temp_path`, so `TestFixtures` itself doesn't move).
+      - [ ] `automation_async_run_test` is in a new lotar-agent test binary `windows_regressions`, so the Windows CI job still runs it natively: the job's unchanged `--test windows_regressions --bin lotar-agent-wrapper` selects both packages' `windows_regressions` binaries, run and coverage manifest alike.
+      - [ ] `ci_windows_reporting_contract_test` checks the module is in lotar-agent's `windows_regressions.rs` and in neither lotar-lib binary; it fails if the module is dropped.
+      - [ ] Docs naming the Windows selection (`crates/lotar-lib/tests/README.md`, `docs/developers/platform-test-verification.md`, the ci.yml comment) name both binaries.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-17T08:16:24.600379+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-634"]}'
+    new: '{"related":["DEV-634","DEV-495"]}'
+- at: 2026-11-17T08:39:14.179804+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T08:39:37.951468+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ebc7200-d4b6-4e1c-a6bb-3de3bc166a8e
+- at: 2026-11-17T08:45:49.346506+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:49:44.086492+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-634","DEV-495"]}'
+    new: '{"related":["DEV-634","DEV-495","DEV-656"]}'
+- at: 2026-11-17T08:49:58.797412+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:50:08.143858+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-17T08:50:51.177760+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:51:10.487090+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-17T08:56:51.484155+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-634","DEV-495","DEV-656"]}'
+    new: '{"blocks":["DEV-656"],"related":["DEV-634","DEV-495","DEV-656"]}'
+- at: 2026-11-17T09:06:09.672491+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:06:10.023176+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T09:06:11.385903+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T09:06:36.529143+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-634 review: testing-strategy says agent and automation tests that need only the services go in `crates/lotar-agent`, but two stayed in `crates/lotar-lib/tests`.
+
+      - `automation_async_run_test.rs`: calls only `lotar::services::automation_service` (`BoundedTail`, `stderr_eof_within_grace`, `windows_async_stdio`). It is in lotar-lib's `windows_regressions` binary (DEV-495), the one test binary the Windows CI job runs, not in `integration.rs`.
+      - `dev566_moved_during_job_test.rs`: calls `AutomationService` and `TaskService` in process, through lotar-lib's `common::TestFixtures`.
+
+      Builds on DEV-634 (`lotar-agent` exists only on `agent/DEV-634`), so this branch carries its two commits until DEV-634 is on main.
+
+      ## Done when
+      - [ ] Both run in `cargo nextest run -p lotar-agent --cargo-profile dev` and are gone from `crates/lotar-lib/tests` (`integration.rs` and `windows_regressions.rs`).
+      - [ ] `dev566_moved_during_job_test` is a module of lotar-agent's `integration` binary, with a temp `.tasks` dir in place of lotar-lib's `TestFixtures` (it uses only `new`, `create_storage`, `get_temp_path`, so `TestFixtures` itself doesn't move).
+      - [ ] `automation_async_run_test` is in a new lotar-agent test binary `windows_regressions`, so the Windows CI job still runs it natively: the job's unchanged `--test windows_regressions --bin lotar-agent-wrapper` selects both packages' `windows_regressions` binaries, run and coverage manifest alike.
+      - [ ] `ci_windows_reporting_contract_test` checks the module is in lotar-agent's `windows_regressions.rs` and in neither lotar-lib binary; it fails if the module is dropped.
+      - [ ] Docs naming the Windows selection (`crates/lotar-lib/tests/README.md`, `docs/developers/platform-test-verification.md`, the ci.yml comment) name both binaries.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+    new: |-
+      Found in the DEV-634 review: testing-strategy says agent and automation tests that need only the services go in `crates/lotar-agent`, but two stayed in `crates/lotar-lib/tests`.
+
+      - `automation_async_run_test.rs`: calls only `lotar::services::automation_service` (`BoundedTail`, `stderr_eof_within_grace`, `windows_async_stdio`). It is in lotar-lib's `windows_regressions` binary (DEV-495), the one test binary the Windows CI job runs, not in `integration.rs`.
+      - `dev566_moved_during_job_test.rs`: calls `AutomationService` and `TaskService` in process, through lotar-lib's `common::TestFixtures`.
+
+      Builds on DEV-634 (`lotar-agent` exists only on `agent/DEV-634`), so this branch carries its two commits until DEV-634 is on main.
+
+      Owner, 2026-11-17 (INBOX-415): "Land DEV-634 and DEV-655 together, then close DEV-634": this branch's merge lands DEV-634's two commits with DEV-655's; afterwards DEV-634 goes to Done.
+
+      ## Done when
+      - [ ] Both run in `cargo nextest run -p lotar-agent --cargo-profile dev` and are gone from `crates/lotar-lib/tests` (`integration.rs` and `windows_regressions.rs`).
+      - [ ] `dev566_moved_during_job_test` is a module of lotar-agent's `integration` binary, with a temp `.tasks` dir in place of lotar-lib's `TestFixtures` (it uses only `new`, `create_storage`, `get_temp_path`, so `TestFixtures` itself doesn't move).
+      - [ ] `automation_async_run_test` is in a new lotar-agent test binary `windows_regressions`, so the Windows CI job still runs it natively: the job's unchanged `--test windows_regressions --bin lotar-agent-wrapper` selects both packages' `windows_regressions` binaries, run and coverage manifest alike.
+      - [ ] `ci_windows_reporting_contract_test` checks the module is in lotar-agent's `windows_regressions.rs` and in neither lotar-lib binary; it fails if the module is dropped.
+      - [ ] Docs naming the Windows selection (`crates/lotar-lib/tests/README.md`, `docs/developers/platform-test-verification.md`, the ci.yml comment) name both binaries.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-17T09:06:36.726327+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:06:36.891319+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-656"],"related":["DEV-634","DEV-495","DEV-656"]}'
+    new: '{"blocks":["DEV-656"],"related":["DEV-634","DEV-495","DEV-656","DEV-654"]}'
+- at: 2026-11-17T09:06:43.800328+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T09:06:55.055956+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7d44ed51-d61e-4874-b38c-75ff85f2b0a8
+- at: 2026-11-17T09:11:01.247220+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:11:15.837667+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

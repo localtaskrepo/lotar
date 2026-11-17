@@ -44,6 +44,11 @@ tempfile.workspace = true
 name = "integration"
 path = "tests/integration.rs"
 
+# The tests the Windows CI job runs natively (DEV-495), as in crates/lotar-lib.
+[[test]]
+name = "windows_regressions"
+path = "tests/windows_regressions.rs"
+
 [features]
 # Must follow lotar-core's `schema`: it changes the custom field value type.
 schema = ["lotar-core/schema"]

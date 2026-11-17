@@ -1,0 +1,176 @@
+title: lotar-lib windows_regressions.rs header says the Windows job links only that binary
+status: Blocked
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-17T08:49:43.891209+00:00
+modified: 2026-11-17T08:57:13.602012+00:00
+relationships:
+  depends_on:
+  - DEV-655
+  related:
+  - DEV-655
+  - DEV-634
+comments:
+- date: 2026-11-17T08:52:17.183063+00:00
+  author: claude
+  text: |-
+    The lotar-lib `windows_regressions.rs` header now names both `windows_regressions` binaries and `lotar-agent-wrapper`.
+
+    - `crates/lotar-lib/tests/windows_regressions.rs` lines 3-6: the job links this binary, crates/lotar-agent's `windows_regressions` (its `--test windows_regressions` selects both) and `lotar-agent-wrapper`'s tests
+    - Built on main, not on DEV-655: cherry-picking `agent/DEV-655` was refused. DEV-655 doesn't touch these lines, so the commit should rebase cleanly. **Merge after DEV-655**, otherwise main names a binary that doesn't exist yet
+    - `npm run lint` passes. Test and smoke didn't run: only a comment changed
+  report:
+    commits:
+    - hash: 9eb886fb8
+      what: header names both windows_regressions binaries and lotar-agent-wrapper
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: comment-only change in a test header
+    - command: npm run smoke
+      result: not_run
+      reason: comment-only change
+    next: Review, then merge after DEV-655 (this header names lotar-agent's binary, which only DEV-655 adds)
+- date: 2026-11-17T08:55:34.148740+00:00
+  author: claude
+  text: |-
+    Review: blocking. Merged now, the header would name a test binary that doesn't exist on main, and nothing stops the merge from happening now.
+
+    - Read: commit `9eb886fb8` (the only one in `main..HEAD`; `agent/DEV-656` is the same commit), the ticket, DEV-655 and its comments, `crates/lotar-agent/tests/windows_regressions.rs` and the ci.yml comment on `agent/DEV-655`, and the merge rule in `.tasks/DEV/automation.yml`.
+    - The wording matches the lotar-agent header and the ci.yml comment, so "Done when" item 1 holds on DEV-655's tree. Reran `npm run lint`: passed. The worktree is clean.
+    - **Blocking:** `crates/lotar-lib/tests/windows_regressions.rs:3-4` names "crates/lotar-agent's `windows_regressions`". But the commit is based on main, which has no `crates/lotar-agent` (`git ls-tree main crates/` lists only lotar-core, lotar-lib and lotar-web-assets). Main's ci.yml comment (line 608) still says "binary" and lists async-run under lotar-lib.
+    - The "merge after DEV-655" note exists only as a comment. The merge prompt ("Review passed: merge") never reads comments or relationships: it rebases, runs the checks (they pass, since only a comment changed), then fast-forwards and pushes. DEV-655 and DEV-634 are HelpNeeded, waiting for the owner, so DEV-656 would land first and leave main wrong.
+    - **Fix, either one:** (a) set DEV-656 to `Blocked` with `depends_on` DEV-655, so "Prerequisites done" continues it after DEV-655 lands, then rebase onto main; or (b) move this hunk into DEV-655's branch, since its "Done when" already asks that the docs naming the Windows selection name both binaries. Then close DEV-656 as WontDo.
+    - Minor, not filed (taste): line 6 is 111 characters while the rest of the header wraps at 80. Rewrapping it fits whichever rework happens.
+- date: 2026-11-17T08:57:05.562193+00:00
+  author: claude
+  text: |-
+    Rework: DEV-656 now waits for DEV-655 (`Blocked`, `depends_on` DEV-655), and the header is rewrapped.
+
+    - Blocking finding (merge would describe a binary main lacks): I took the reviewer's first fix. `lotar task relationships add DEV-656 DEV-655 --kind depends-on`, status `Blocked`, so the "Prerequisites done" rule restarts it once DEV-655 is done. It is not folded into DEV-655: that branch waits on the owner, and this one stays a separate commit
+    - Minor finding: the 111-char line 6 is rewrapped at 80 in `crates/lotar-lib/tests/windows_regressions.rs`
+    - Amended commit: `c061d26fa` (signed). `npm run lint` passes
+  report:
+    commits:
+    - hash: c061d26fa
+      what: header names both windows_regressions binaries and lotar-agent-wrapper, rewrapped at 80
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: comment-only change
+    - command: npm run smoke
+      result: not_run
+      reason: comment-only change
+    next: 'When DEV-655 is done, the ''Prerequisites done'' rule restarts this ticket: rebase agent/DEV-656 onto main, then review and merge'
+- date: 2026-11-17T08:57:13.602012+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-655.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A470291bc-a890-4691-8707-69a67da72fae
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1908d8b6-e7b5-41be-a44e-cd371940dad9
+description: |-
+  Found in the DEV-655 review. Since DEV-655, the Windows CI job's `--test windows_regressions --bin lotar-agent-wrapper` also links lotar-agent's `windows_regressions` binary, but `crates/lotar-lib/tests/windows_regressions.rs` lines 3-4 still say "The Windows job links only this binary and `lotar-agent-wrapper`'s tests".
+
+  ## Done when
+  - [ ] That header names both `windows_regressions` binaries (lotar-lib's and lotar-agent's) and `lotar-agent-wrapper`, as `crates/lotar-agent/tests/windows_regressions.rs` and the ci.yml comment do.
+  - [ ] `npm run lint` passes.
+tags:
+- review-returned
+history:
+- at: 2026-11-17T08:49:44.443157+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T08:49:45.431885+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T08:49:46.232596+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A470291bc-a890-4691-8707-69a67da72fae
+- at: 2026-11-17T08:52:17.183063+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:52:28.246495+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T08:52:39.134592+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1908d8b6-e7b5-41be-a44e-cd371940dad9
+- at: 2026-11-17T08:55:34.148740+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:55:34.408113+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-655"]}'
+    new: '{"related":["DEV-655","DEV-634"]}'
+- at: 2026-11-17T08:55:34.619163+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-17T08:55:43.812849+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-17T08:55:51.391844+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T08:56:51.484686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-655","DEV-634"]}'
+    new: '{"depends_on":["DEV-655"],"related":["DEV-655","DEV-634"]}'
+- at: 2026-11-17T08:57:05.562193+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:57:13.377601+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T08:57:13.572485+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-17T08:57:13.602012+00:00
+  actor: automation
+  changes:
+  - field: comment_added

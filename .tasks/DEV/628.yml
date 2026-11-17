@@ -1,15 +1,18 @@
 title: Job prompt shows an empty Comments section when no comment is picked
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-17T04:07:30.104583+00:00
+modified: 2026-11-17T09:13:42.269858+00:00
 relationships:
   related:
   - DEV-620
   - DEV-631
+  - DEV-635
+  - DEV-639
+  - DEV-646
 comments:
 - date: 2026-11-17T00:08:46.341868+00:00
   author: automation
@@ -131,12 +134,51 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-17T09:08:35.547004+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-407)
+  answer:
+    to: 2026-11-17T04:07:30.104583+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-407)
+- date: 2026-11-17T09:13:30.669066+00:00
+  author: claude
+  text: |-
+    Branch checked: the work is intact and unchanged; it goes to review again.
+
+    - The "failed" review had finished: it posted "Review: passed" at 03:55, then its session was ended as idle (`agent logs job-20261117T034911.202Z-83`)
+    - Branch HEAD `b06642d2` (signed), the only commit not on main; `1227e5bd` is already on main (`git cherry`)
+    - `b06642d2` replays cleanly onto main `b7a9cb85`, which has DEV-646, DEV-635 and DEV-639 in `agent_job_service.rs`; the 49 job prompt tests pass there
+    - No file changes, nothing new to commit
+  report:
+    commits:
+    - hash: b06642d2
+      what: DEV-628 fix, unchanged (reviewed and passed 03:55)
+    checks:
+    - command: cargo nextest run -p lotar-lib --lib agent_job_service
+      result: passed
+      reason: 49, on b06642d2 cherry-picked onto main b7a9cb85
+    - command: npm run lint
+      result: not_run
+      reason: code unchanged since the 03:55 review ran it
+    - command: npm test
+      result: not_run
+      reason: unchanged since the rework run passed
+    - command: npm run smoke
+      result: not_run
+      reason: unchanged since the rework run passed
+    next: Review again on the other model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aebace08c-547a-4525-9c19-7bab320bea41
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae582f4d-ee41-45c3-802c-7de9fae349d1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7211882e-8293-4060-8a4a-109b8652b8e3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa042b8b2-4b2d-4368-82f8-5d53ac03b51d
 description: |-
   Found in the DEV-620 review.
 
@@ -322,3 +364,43 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T09:08:35.547004+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:08:37.210815+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T09:11:00.638705+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T09:11:14.105418+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa042b8b2-4b2d-4368-82f8-5d53ac03b51d
+- at: 2026-11-17T09:13:30.669066+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:13:31.174207+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-620","DEV-631"]}'
+    new: '{"related":["DEV-620","DEV-631","DEV-635","DEV-639","DEV-646"]}'
+- at: 2026-11-17T09:13:42.269858+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

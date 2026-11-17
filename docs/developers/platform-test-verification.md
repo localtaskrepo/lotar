@@ -7,8 +7,8 @@ cannot run every platform, and what the Windows CI lane in
 ## Scope of the Windows lane
 
 `windows_checks` runs on `windows-latest` and keeps its existing coverage
-unchanged (every test of the `windows_regressions` and `lotar-agent-wrapper`
-nextest binaries plus the manifest-vs-JUnit coverage gate), and adds a browser-free
+unchanged (every test of the `windows_regressions` binaries of lotar-lib and
+lotar-agent and of the `lotar-agent-wrapper` binary plus the manifest-vs-JUnit coverage gate), and adds a browser-free
 portable agent smoke selection:
 
 ```

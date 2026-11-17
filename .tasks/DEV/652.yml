@@ -1,12 +1,13 @@
 title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
-status: HelpNeeded
+status: Blocked
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-17T07:01:34.762601+00:00
+modified: 2026-11-17T09:10:33.408563+00:00
 relationships:
+  depends_on:
+  - DEV-657
   blocks:
   - DEV-653
   related:
@@ -16,6 +17,7 @@ relationships:
   - DEV-638
   - DEV-644
   - DEV-353
+  - DEV-657
 comments:
 - date: 2026-11-17T06:49:42.579878+00:00
   author: claude
@@ -73,10 +75,36 @@ comments:
 
     - `git log main..HEAD`, `main..agent/DEV-652`, `main..t3/t3-job-lotar-worktree`: no commits (all at `72687ab60`)
     - The fix agent made no changes and handed back with a question (HelpNeeded, assigned to mallox)
+- date: 2026-11-17T09:07:13.786362+00:00
+  author: mallox
+  text: 'Answer: harnessmux (harnessmux''s t3 agent calls T3''s t3_thread_launch itself, without the CLI (a harnessmux ticket)) (answered in INBOX-412)'
+- date: 2026-11-17T09:10:08.305096+00:00
+  author: claude
+  text: |-
+    Waiting for harnessmux: filed [DEV-657](https://lotar.pyxzl.net/task/DEV-657), following your answer (INBOX-412). Its fix agent is already running.
+
+    - DEV-657: when a t3 session's `cwd` is a git worktree of its `project`, the t3 agent starts the thread through T3's `t3_thread_launch` with `existing_worktree` at that path. Later turns keep using `t3 thread send/show/list`. It ends with a crates.io release.
+    - Auth idea for DEV-657 (not tested yet): `t3 auth session issue --scope orchestration:read --scope orchestration:operate --ttl 5m --token-only` mints a bearer token for `/mcp`.
+    - The lotar side has to wait for that release: `harnessmux = "0.1.9"` in `Cargo.toml` has no way to bind an existing worktree.
+    - DEV-652 now depends on DEV-657 and is Blocked. "Prerequisites done" picks it up again once DEV-657 is Done.
+    - No code changed, no commit. The cleanup-rules part (your scope comment) comes after the switch, in the same commit.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: no code change
+    - command: npm test
+      result: not_run
+      reason: no code change
+    - command: npm run smoke
+      result: not_run
+      reason: no code change
+    next: 'After DEV-657 ships in a harnessmux release: bump harnessmux, run t3 jobs through prepare_worktree, remove plan_t3_worktree / move_aside_detached_t3_worktree, update docs/help/agent.md and the standards agents.yml comment, then the cleanup-rules scope'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1e2226ce-5f74-40ec-bf11-141509e5ee1a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29cbd039-1aee-40b3-ad0b-c284421245d8
 description: |-
   Owner 2026-11-17 (DEV-579): "I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux." Owner 2026-11-16 (chief of staff options picker): "lotar makes them, T3 shows".
 
@@ -194,3 +222,48 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T09:07:13.786362+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:07:14.276081+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T09:07:16.184815+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T09:07:17.016848+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29cbd039-1aee-40b3-ad0b-c284421245d8
+- at: 2026-11-17T09:09:23.534256+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353"]}'
+    new: '{"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657"]}'
+- at: 2026-11-17T09:09:54.048517+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657"]}'
+- at: 2026-11-17T09:10:08.305096+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:10:33.408563+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+  - field: assignee
+    old: '@fix'

@@ -605,8 +605,9 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     # Target selection, not a name list: every test in the windows_regressions
-    # binary (crates/lotar-lib/tests/windows_regressions.rs: storage safety, scan, async-run
-    # monitoring) and in lotar-agent-wrapper runs here, so platform-specific
+    # binaries (crates/lotar-lib/tests/windows_regressions.rs: storage safety, scan;
+    # crates/lotar-agent/tests/windows_regressions.rs: async-run monitoring) and in
+    # lotar-agent-wrapper runs here, so platform-specific
     # cases (the Windows atomic-readonly one included) and future additions
     # are covered without maintaining witness names. A small binary of its own
     # keeps the library's unit-test build and the integration binary out of

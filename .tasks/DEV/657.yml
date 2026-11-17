@@ -1,0 +1,71 @@
+title: harnessmux's t3 agent starts a thread in an existing worktree through T3's t3_thread_launch
+status: InProgress
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T09:09:23.082971+00:00
+modified: 2026-11-17T09:11:14.462633+00:00
+relationships:
+  blocks:
+  - DEV-652
+  related:
+  - DEV-652
+  - DEV-318
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1efc943f-fca5-4376-bd67-e786b4bdf9f9
+description: |-
+  Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+
+  ## Found
+  - `t3 thread start` (T3 Code 0.1.9, upstream main too) only has `--worktree <base>`: T3 Code makes a new worktree in `~/.t3/worktrees` on a new `t3/...` branch for every thread. `src/backend/t3.rs` only knows `worktree_base`/`branch`.
+  - T3's server already takes an existing checkout: MCP `t3_thread_launch` with `workspaceStrategy: {type: existing_worktree, worktreePath}`. `assertProjectWorktree` accepts only a path in `git worktree list` of the project's `workspaceRoot` (symlinks resolved), else "worktreePath must be one of the project's git worktrees". Worktrees lotar makes with `git worktree add` pass.
+  - Auth: the CLI signs itself in per call (`EnvironmentAuth.issueMcpClientSession`) and calls `<origin>/mcp` with a short-lived Bearer token. `t3 auth session issue --scope orchestration:read --scope orchestration:operate --ttl 5m --token-only` mints a bearer token from the CLI; whether `/mcp` accepts it is not checked yet.
+
+  ## What
+  - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`) starts its thread with `t3_thread_launch`, `existing_worktree` at `cwd`, keeping title, provider/model and the prompt. Later turns, `show`, resume and the thread lookup by title stay as they are (`t3 thread send/show/list`).
+  - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+  - Which wins: `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no thread started. `cwd` equal to `project` → `t3 thread start` as today.
+  - A failed launch (server unreachable, auth refused, path rejected) fails the turn with T3's error text and starts no thread; `agent_session_asked` handling stays, so a resume never makes a second thread.
+
+  ## Done when
+  - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), and `~/.t3/worktrees` gets nothing new.
+  - [ ] A second turn and a resume continue the same thread; the started event carries the thread link.
+  - [ ] Tests (replayed, no real agent) cover: launch in a worktree, `worktree_base` + worktree refused, launch failure fails the turn without a thread.
+  - [ ] README t3 row and CHANGELOG say it; fmt, clippy, nextest, deny pass.
+  - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
+history:
+- at: 2026-11-17T09:09:23.535461+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-652"]}'
+- at: 2026-11-17T09:09:24.147209+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T09:09:54.049733+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-652"]}'
+    new: '{"blocks":["DEV-652"],"related":["DEV-652"]}'
+- at: 2026-11-17T09:09:56.033191+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-652"],"related":["DEV-652"]}'
+    new: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318"]}'
+- at: 2026-11-17T09:11:00.555670+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T09:11:14.462633+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1efc943f-fca5-4376-bd67-e786b4bdf9f9

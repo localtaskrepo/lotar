@@ -1,17 +1,20 @@
 title: Split agent jobs and automation out of lotar-lib into a crate lotar-agent
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T01:03:27.180760+00:00
-modified: 2026-11-17T07:35:38.886934+00:00
+modified: 2026-11-17T09:06:37.100368+00:00
 relationships:
   related:
   - DEV-498
   - DEV-499
   - DEV-579
   - DEV-635
+  - DEV-655
+  - DEV-654
+  - DEV-656
 comments:
 - date: 2026-11-17T01:29:07.217603+00:00
   author: claude
@@ -71,9 +74,190 @@ comments:
       result: not_run
       reason: needs the owner's first publish with a token
     next: Review on Codex (started now); before the next release the owner publishes lotar-tasks and lotar-agent once with a token and registers their trusted publishers (docs/release-guide.md)
+- date: 2026-11-17T07:39:06.928858+00:00
+  author: claude
+  text: |-
+    Owner decision 2026-11-17: first crates.io publish of `lotar-tasks` and `lotar-agent` as "0.0.0 placeholders" (only to claim the names); he adds the crates.io token to opgate creds first, then registers the trusted publishers.
+
+    - Real 0.15.3 crates can't go up: they need `lotar-core` 0.15.3, and crates.io has 0.15.2 (v0.15.3 not released yet).
+    - Placeholders packaged and verified (no code, no deps); publish waits for the token item in opgate.
+- date: 2026-11-17T07:42:01.308285+00:00
+  author: claude
+  text: |-
+    Placeholders published: `lotar-tasks` 0.0.0 and `lotar-agent` 0.0.0 are on crates.io (no code, no deps).
+
+    - Token from 1Password item "LoTaR Crates.io publish token" through `opgate run`, used only for those two `cargo publish` calls.
+    - `docs/release-guide.md` now says both have their first publish and still need their publisher.
+  report:
+    commits:
+    - hash: b5f12de24
+      what: amended ed8ce0976, release guide notes the placeholders
+    next: 'Owner: register the trusted publishers of lotar-tasks and lotar-agent (owner localtaskrepo, repo lotar, workflow release.yml, environment release), turn on trusted publishing only, revoke the token'
+- date: 2026-11-17T07:46:51.926547+00:00
+  author: claude
+  text: |-
+    Trusted publishers for `lotar-tasks` and `lotar-agent` registered by the owner (2026-11-17).
+
+    - Owner decision 2026-11-17: the token stays in 1Password "for future repo that need to be set up".
+    - `docs/release-guide.md`: all six crates listed with publishers; a new crate starts as a 0.0.0 placeholder published with the token from item "LoTaR Crates.io publish token" (vault Agents, via opgate).
+  report:
+    commits:
+    - hash: 4fc0e04b6
+      what: 'amended, release guide: all six crates have trusted publishers; token stays in 1Password'
+    next: Review on Codex, then merge
+- date: 2026-11-17T07:47:24.480043+00:00
+  author: claude
+  text: |-
+    Split done as the owner chose ("B"): lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core, no cycle (`cargo tree -p lotar-lib`).
+
+    - Took over the previous job's uncommitted work from `agent-DEV-634-e93fcb025e5f17d0`, whose turn ended while `npm test` was still running. Its worktree is left as it was.
+    - `crates/lotar-tasks`: the task services. They reach automation and agent jobs only through `lotar_tasks::hooks` (8 hooks). Without hooks, tasks still save, but no automation runs; an answer whose option sets fields fails loudly instead.
+    - `crates/lotar-agent`: agent jobs, queue, runner and automation. `lotar::install_hooks()` runs first thing in `main()`, which covers the CLI, `lotar serve` and `lotar mcp`. Guard tests fail when the hooks aren't installed, and without the line in `main()` the CLI automation test fails too.
+    - Also in this job: moved 6 service-only automation test files (29 tests) to `crates/lotar-agent/tests`. Tests that run the binary or REST stay in `crates/lotar-lib/tests`, as testing-strategy now says.
+    - Restored this ticket's description: the previous job had overwritten it with "-". It now has your "B" decision and an updated "Done when".
+    - Before -> after, one-line change in `agent_job_service.rs`: rebuild 8.1–8.6 s -> 1.1 s (lotar-agent) / 6.9 s (lotar-lib). Agent tests 73–82 s -> 14 s via `-p lotar-agent`. `target/debug` 3.7 GB -> 3.5 GB.
+    - Next split candidates (not done here): MCP 9.1k and sync 5.4k of lotar-lib's 45.2k lines. lotar-agent is 16.7k lines, lotar-tasks 13.4k.
+  report:
+    commits:
+    - hash: ba00c5ed8
+      what: crates lotar-tasks and lotar-agent split out of lotar-lib (option B, task hooks)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2305 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405; ran before the last change, which touches only tests and docs
+    - command: cargo nextest run --cargo-profile dev -p lotar-agent
+      result: passed
+      reason: '136'
+    - command: cargo nextest run --cargo-profile dev -p lotar-tasks
+      result: passed
+      reason: '147'
+    next: Review on another model, then merge
+- date: 2026-11-17T07:47:34.053410+00:00
+  author: automation
+  text: The fix agent's job job-20261117T073111.403Z-1666 failed (lotar agent logs job-20261117T073111.403Z-1666); @fix-retry retries it on branch t3/split-agent-jobs-into-lotar-agent.
+- date: 2026-11-17T07:55:24.708734+00:00
+  author: claude
+  text: |-
+    Retry fixed: the split is now one branch with all the work, and every check passes on it.
+
+    - Why the last job failed: two commits of the same split existed. `4fc0e04b6` (on `agent/DEV-634`) had the newer release guide but not the test move, and `ba00c5ed8` (on `t3/split-agent-jobs-into-lotar-agent`) had the test move but the old release guide. LoTaR can't point `agent/DEV-634` at a branch that lacks its commit.
+    - The fix: `1192c4e54` sits on top of `4fc0e04b6` and adds the test move from `ba00c5ed8`. Its tree equals `ba00c5ed8` plus the newer `docs/release-guide.md`, so nothing from either commit is lost.
+    - Checks on this tree: `npm run lint`, `npm test` (2305 Rust, 1548 UI), `npm run smoke` (405), and `-p lotar-agent` (136 tests in 14 s) all pass.
+    - No code changes beyond the two earlier commits, and no other T3 thread is running.
+  report:
+    commits:
+    - hash: 4fc0e04b6
+      what: the split (lotar-tasks, lotar-agent, hooks, release guide)
+    - hash: 1192c4e54
+      what: six service-only automation test files moved to crates/lotar-agent/tests
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2305 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: cargo nextest run --cargo-profile dev -p lotar-agent
+      result: passed
+      reason: '136'
+    next: Review on another model, then merge (rebase onto main, which has DEV-654 since; the two commits can be squashed)
+- date: 2026-11-17T08:03:20.311078+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T075532.924Z-1669 failed or its review thread did (lotar agent logs job-20261117T075532.924Z-1669), so the work on branch t3/split-agent-automation-crate isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T08:03:35.700287+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job failed only because the T3 Code server stopped answering (t3 exited 1) after the review ran clean so far: lint and 2305 Rust tests passed, the hook guard held. Review again.
+  answer:
+    to: 2026-11-17T08:03:20.311078+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job failed only because the T3 Code server stopped answering (t3 exited 1) after the review ran clean so far: lint and 2305 Rust tests passed, the hook guard held. Review again.'
+- date: 2026-11-17T08:03:38.560923+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T080336.058Z-1 failed again or on a rate limit (lotar agent logs job-20261117T080336.058Z-1). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T08:14:56.405246+00:00
+  author: claude
+  text: |-
+    Review: passed. The split matches the owner's "B" and every "Done when" item; nothing blocks the merge.
+
+    - Read: `git log main..HEAD` (`4fc0e04b6`, `1192c4e54`) and the diff, the ticket and its comments, AGENTS.md, testing-strategy, release guide, `release.yml`, `stage-crates.mjs`. No commits on `t3/split-agent-jobs-lotar-agent-crate` that HEAD lacks.
+    - `cargo tree`: lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core, no cycle.
+    - Hooks: the task services call agent code only through `lotar_tasks::hooks` (8 calls, each the old call moved 1:1 into `crates/lotar-agent/src/task_hooks.rs`). `src/main.rs` installs them for CLI, `serve` and `mcp`. `lotar-agent-wrapper` saves no tasks.
+    - The guard works: with the `install_hooks()` line removed from `main.rs`, `cli_priority_set_routes_through_automation_and_persists` fails. Restored afterwards.
+    - Reran: `npm run lint` passed. `npm run test:rust`: 2305 passed. `cargo nextest run -p lotar-agent --cargo-profile dev`: 136 passed in 14 s. `npm run test:release`: 60 passed. Not rerun: `npm run smoke` and `test:ui`. Those cover UI/REST surfaces the change doesn't touch, and the fix agent ran them on this tree.
+    - Main moved on by `b7a9cb85e` (DEV-654, `lotar-core/src/utils/git.rs` plus tickets). `git merge-tree` shows no conflict.
+    - Minor, filed: [DEV-655](https://lotar.pyxzl.net/task/DEV-655). Two service-only automation tests are still in lotar-lib: `automation_async_run_test.rs` and `dev566_moved_during_job_test.rs`.
+    - Noted, not a finding: `upload_fault` is now compiled into release builds as `#[doc(hidden)] pub`. Nothing outside tests can arm it, and lotar-core already does the same for its fault hooks.
+    - The merge agent can squash the two commits into one, as the fix agent's hand-off says.
+- date: 2026-11-17T09:06:37.100368+00:00
+  author: claude
+  text: |-
+    Owner 2026-11-17 (INBOX-415): "Land DEV-634 and DEV-655 together, then close DEV-634".
+
+    - DEV-655's branch `agent/DEV-655` carries this ticket's two commits (`bafbec164`, `62c863ac8`, copies of `4fc0e04b6`, `1192c4e54`) under DEV-655's `7486679f0`.
+    - The DEV-655 merge lands them; this ticket goes to Done afterwards.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe9cf8d5-29d4-4949-9c63-1e8aed77afa5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A52e16d4b-4fb9-4039-aef7-67dd650ad494
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54281bbe-1d96-4b70-b27e-24a8badc65b2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57452cde-ae86-46b7-83a6-02160cea5c5d
 description: |-
   Owner, 2026-11-17, on DEV-579 choosing option A: "Okay, A sounds good." Continues DEV-499's workspace split; STD-131: keep projects small and focused.
 
@@ -94,6 +278,9 @@ description: |-
   - [ ] Measured, before and after: build and test time and `target/debug` size for a one-line change in `agent_job_service.rs`.
   - [ ] No behaviour change: `npm run lint`, `npm test`, `npm run smoke` pass; REST and CLI output unchanged.
   - [ ] MCP and sync as next candidates: noted in a comment with their size, not done here.
+tags:
+- fix-retried
+- retry-fix
 history:
 - at: 2026-11-17T01:03:29.381350+00:00
   actor: claude
@@ -204,6 +391,132 @@ history:
       - [ ] No behaviour change: `npm run lint`, `npm test`, `npm run smoke` pass; REST and CLI output unchanged.
       - [ ] MCP and sync as next candidates: noted in a comment with their size, not done here.
 - at: 2026-11-17T07:35:38.886934+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:39:06.928858+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:42:01.308285+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:46:51.926547+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:47:24.480043+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:47:33.868129+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T07:47:34.053410+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:47:44.431615+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54281bbe-1d96-4b70-b27e-24a8badc65b2
+- at: 2026-11-17T07:55:24.708734+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:55:32.550432+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-17T07:55:43.989567+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57452cde-ae86-46b7-83a6-02160cea5c5d
+- at: 2026-11-17T08:03:20.246699+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review-claude'
+    new: mallox
+- at: 2026-11-17T08:03:20.311078+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:03:35.700287+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:03:35.701564+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T08:03:36.811402+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, retry-fix
+- at: 2026-11-17T08:03:37.820800+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T08:03:38.497367+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-17T08:03:38.560923+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:14:40.059163+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635"]}'
+    new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655"]}'
+- at: 2026-11-17T08:14:56.405246+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T08:14:57.067334+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655"]}'
+    new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654"]}'
+- at: 2026-11-17T08:55:34.407361+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654"]}'
+    new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656"]}'
+- at: 2026-11-17T09:06:37.100368+00:00
   actor: claude
   changes:
   - field: comment_added

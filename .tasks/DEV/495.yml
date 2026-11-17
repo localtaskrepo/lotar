@@ -5,13 +5,14 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:21:42.297785+00:00
-modified: 2026-11-14T18:05:21.938634+00:00
+modified: 2026-11-17T08:16:24.599812+00:00
 relationships:
   related:
   - DEV-493
   - DEV-506
   - DEV-500
   - DEV-532
+  - DEV-655
 comments:
 - date: 2026-11-13T22:49:13.685117+00:00
   author: claude
@@ -304,3 +305,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-493","DEV-506","DEV-500"]}'
     new: '{"related":["DEV-493","DEV-506","DEV-500","DEV-532"]}'
+- at: 2026-11-17T08:16:24.599812+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-493","DEV-506","DEV-500","DEV-532"]}'
+    new: '{"related":["DEV-493","DEV-506","DEV-500","DEV-532","DEV-655"]}'

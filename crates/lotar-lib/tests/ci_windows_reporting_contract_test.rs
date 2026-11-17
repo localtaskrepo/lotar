@@ -31,10 +31,19 @@ fn attempted_windows_smoke_runs_still_require_a_report_but_skipped_runs_do_not()
             assert!(!flags.contains(&flag), "Windows run and coverage manifest must not use {flag}: {command}");
         }
     }
-    let binary = include_str!("windows_regressions.rs");
-    for module in ["storage_safety_test", "utils_scan_test", "automation_async_run_test"] {
-        assert!(binary.contains(&format!("mod {module};")), "Windows regressions must include {module}");
-        assert!(!include_str!("integration.rs").contains(&format!("mod {module};")), "{module} belongs to one test binary only");
+    // `--test windows_regressions` selects the binary of that name in both
+    // crates; lotar-agent holds the automation tests (DEV-655).
+    let lib_binary = include_str!("windows_regressions.rs");
+    let agent_binary = include_str!("../../lotar-agent/tests/windows_regressions.rs");
+    let integration = [include_str!("integration.rs"), include_str!("../../lotar-agent/tests/integration.rs")];
+    for (binary, others, module) in [
+        (lib_binary, agent_binary, "storage_safety_test"),
+        (lib_binary, agent_binary, "utils_scan_test"),
+        (agent_binary, lib_binary, "automation_async_run_test"),
+    ] {
+        let line = format!("mod {module};");
+        assert!(binary.contains(&line), "Windows regressions must include {module}");
+        assert!(!others.contains(&line) && !integration.iter().any(|it| it.contains(&line)), "{module} belongs to one test binary only");
     }
     assert!(rust_run["run"].as_str().unwrap().contains("--retries 0"));
     assert!(rust_run["run"].as_str().unwrap().contains("--failure-output=immediate-final"));

@@ -1,7 +1,7 @@
 //! Fire-and-forget automation run monitoring and Windows stdio detach; run natively on Windows CI (DEV-495).
 
 mod async_run_monitor_tests {
-    use lotar::services::automation_service::{BoundedTail, stderr_eof_within_grace};
+    use lotar_agent::services::automation_service::{BoundedTail, stderr_eof_within_grace};
     use std::sync::mpsc;
     use std::time::{Duration, Instant};
 
@@ -56,7 +56,7 @@ mod async_run_monitor_tests {
 /// `api.automation.smoke.spec.ts`).
 #[cfg(windows)]
 mod windows_async_stdio_tests {
-    use lotar::services::automation_service::windows_async_stdio as sys;
+    use lotar_agent::services::automation_service::windows_async_stdio as sys;
 
     const FILE_TYPE_PIPE: u32 = 0x0003;
 

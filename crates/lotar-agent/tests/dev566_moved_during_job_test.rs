@@ -6,10 +6,10 @@
 #![cfg(unix)]
 
 use crate::common;
-use common::TestFixtures;
-use lotar::api_types::{TaskCreate, TaskUpdate};
-use lotar::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService};
-use lotar::services::task_service::{TaskService, TaskUpdateContext};
+use lotar_agent::api_types::{TaskCreate, TaskUpdate};
+use lotar_agent::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService};
+use lotar_agent::services::task_service::{TaskService, TaskUpdateContext};
+use lotar_agent::storage::manager::Storage;
 
 const RULES: &str = "automation:
   rules:
@@ -34,13 +34,14 @@ const RULES: &str = "automation:
 /// The ticket after its job ended: it was assigned to mallox when the job
 /// started, and to `moved_to` (Reviewing) during the job when given.
 fn end_job(assignee_at_start: Option<&str>, moved_to: Option<&str>) -> (String, Option<String>) {
-    let fixtures = TestFixtures::new();
-    let tasks_dir = fixtures.tasks_root.clone();
-    let queue = fixtures.get_temp_path().join("queue");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let queue = tmp.path().join("queue");
     let _queue_env = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", queue.to_str().unwrap());
     std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MOVE\nissue:\n  states: [HelpNeeded, Reviewing, Merging, Done]\n").unwrap();
     std::fs::write(tasks_dir.join("automation.yml"), RULES).unwrap();
-    let mut storage = fixtures.create_storage();
+    let mut storage = Storage::new(&tasks_dir);
     let created = TaskService::create(
         &mut storage,
         TaskCreate {
@@ -72,7 +73,7 @@ fn end_job(assignee_at_start: Option<&str>, moved_to: Option<&str>) -> (String, 
         }),
     )
     .unwrap();
-    let task = TaskService::get(&fixtures.create_storage(), &created.id, None).unwrap();
+    let task = TaskService::get(&Storage::new(&tasks_dir), &created.id, None).unwrap();
     (task.status.as_str().to_string(), task.assignee)
 }
 

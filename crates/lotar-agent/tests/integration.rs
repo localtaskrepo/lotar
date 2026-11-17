@@ -18,6 +18,7 @@ mod dev298_automation_current_conditions_test;
 mod dev365_automation_alias_conditions_test;
 mod dev373_automation_version_conditions_test;
 mod dev383_automation_comment_author_test;
+mod dev566_moved_during_job_test;
 mod dev59_automation_composition_test;
 
 #[test]

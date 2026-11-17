@@ -7,7 +7,6 @@
 
 #![allow(clippy::unwrap_used, reason = "test helpers outside #[test] fns")]
 
-mod automation_async_run_test;
 mod storage_safety_test;
 mod utils_scan_test;
 

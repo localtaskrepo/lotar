@@ -163,7 +163,6 @@ mod dev549_file_viewer_test;
 mod dev54_mutation_contract_test;
 mod dev55_transactional_mutations_test;
 mod dev562_similar_open_ticket_test;
-mod dev566_moved_during_job_test;
 mod dev56_task_identity_test;
 mod dev57_task_query_test;
 mod dev58_typed_error_mapping_test;
