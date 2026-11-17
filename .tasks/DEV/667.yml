@@ -1,0 +1,73 @@
+title: 'Waiting for the owner without a question: DEV-585'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-17T18:11:30.094911+00:00
+modified: 2026-11-17T18:16:32.042616+00:00
+relationships:
+  related:
+  - DEV-585
+comments:
+- date: 2026-11-17T18:16:27.004964+00:00
+  author: claude
+  text: |-
+    Moved DEV-585 on instead of asking the owner: it needed no decision, only a Claude merge run.
+
+    - Its fix `1011487e` passed review but isn't on `main`; the Codex merge paused because the local-port tests can't run in its sandbox.
+    - DEV-585 is now Todo, assigned `@fix`, with a comment naming the exact next step (rebase, `lint:agent`, `test:agent`, `smoke`, fast-forward).
+    - `repos.ts` check for `question:DEV-585` no longer lists it. No files changed, no commits.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A599f5190-76a9-4025-bfd1-a23cf672469f
+description: |-
+  DEV-585 (Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load) is HelpNeeded, but its last comment asks no question: "Merge paused before landing: rebased successfully, but fresh runtime verification requires a Claude job. - Main advance…" (lotar show DEV-585)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-585`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-585]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: question:DEV-585
+history:
+- at: 2026-11-17T18:11:32.513264+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-585"]}'
+- at: 2026-11-17T18:11:34.479117+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-17T18:14:18.101418+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T18:14:36.658305+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A599f5190-76a9-4025-bfd1-a23cf672469f
+- at: 2026-11-17T18:16:27.004964+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:16:32.042616+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

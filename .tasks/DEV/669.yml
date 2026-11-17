@@ -1,0 +1,89 @@
+title: Replace unmaintained chrono (RUSTSEC-2026-0543) with jiff or time
+status: InProgress
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T18:13:11.087662+00:00
+modified: 2026-11-17T18:32:36.791382+00:00
+relationships:
+  related:
+  - DEV-122
+  - DEV-665
+  - DEV-654
+  - DEV-668
+  - DEV-585
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac6b1fa-471d-4f08-ab90-a091782b3058
+description: |-
+  RUSTSEC-2026-0543 marks chrono unmaintained (no vulnerability, no safe upgrade). DEV-665 added a deny.toml ignore to unblock CI. chrono is a workspace dependency in lotar-core, lotar-lib, lotar-agent and lotar-tasks (~185 uses). Evaluate jiff/time like DEV-122 did for YAML: prove task YAML date/time round-trips stay byte-compatible, serde formats and timezone handling; then migrate and drop the ignore entry from deny.toml.
+
+  ## Done when
+
+  - [ ] chrono is gone: no `chrono` in any `Cargo.toml`, `Cargo.lock` or `.rs` file; jiff (latest stable, already a transitive dependency via serde_with) replaces it.
+  - [ ] Timestamps written to task YAML, history, comments, sprints, audit and the REST/MCP/JSON output keep chrono's exact `to_rfc3339()` shape: UTC as `+00:00` (not `Z`), fractional seconds as 0, 3, 6 or 9 digits. A unit test pins this for whole seconds, millis, micros and nanos.
+  - [ ] Every timestamp shape chrono's `parse_from_rfc3339` accepted still parses to the same instant (`Z`, `+00:00`, other offsets, fractions); a value that fails to parse is handled as before (skipped / error message), not a panic.
+  - [ ] Task files with existing timestamps load and save without byte changes (existing no-op round-trip tests pass).
+  - [ ] Local-time behaviour stays the same: date-only and naive inputs are local midnight/local time in the system zone (`TZ` wins over `/etc/localtime`); day offsets stay on the same calendar date across DST.
+  - [ ] Display formats (`%Y-%m-%d`, `%b %-d %H:%M`, compact `%Y%m%dT%H%M%SZ` ...) print the same text as before.
+  - [ ] The `RUSTSEC-2026-0543` ignore entry is not in `deny.toml` once DEV-665 and this ticket are both on main, and `cargo deny check` passes.
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+history:
+- at: 2026-11-17T18:13:11.324302+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-122","DEV-665"]}'
+- at: 2026-11-17T18:13:11.553552+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T18:17:04.939018+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-122","DEV-665"]}'
+    new: '{"related":["DEV-122","DEV-665","DEV-654"]}'
+- at: 2026-11-17T18:17:05.374352+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-122","DEV-665","DEV-654"]}'
+    new: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668"]}'
+- at: 2026-11-17T18:17:49.552156+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T18:17:50.446753+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac6b1fa-471d-4f08-ab90-a091782b3058
+- at: 2026-11-17T18:19:45.852945+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'RUSTSEC-2026-0543 marks chrono unmaintained (no vulnerability, no safe upgrade). DEV-665 added a deny.toml ignore to unblock CI. chrono is a workspace dependency in lotar-core, lotar-lib, lotar-agent and lotar-tasks (~185 uses). Evaluate jiff/time like DEV-122 did for YAML: prove task YAML date/time round-trips stay byte-compatible, serde formats and timezone handling; then migrate and drop the ignore entry from deny.toml.'
+    new: |-
+      RUSTSEC-2026-0543 marks chrono unmaintained (no vulnerability, no safe upgrade). DEV-665 added a deny.toml ignore to unblock CI. chrono is a workspace dependency in lotar-core, lotar-lib, lotar-agent and lotar-tasks (~185 uses). Evaluate jiff/time like DEV-122 did for YAML: prove task YAML date/time round-trips stay byte-compatible, serde formats and timezone handling; then migrate and drop the ignore entry from deny.toml.
+
+      ## Done when
+
+      - [ ] chrono is gone: no `chrono` in any `Cargo.toml`, `Cargo.lock` or `.rs` file; jiff (latest stable, already a transitive dependency via serde_with) replaces it.
+      - [ ] Timestamps written to task YAML, history, comments, sprints, audit and the REST/MCP/JSON output keep chrono's exact `to_rfc3339()` shape: UTC as `+00:00` (not `Z`), fractional seconds as 0, 3, 6 or 9 digits. A unit test pins this for whole seconds, millis, micros and nanos.
+      - [ ] Every timestamp shape chrono's `parse_from_rfc3339` accepted still parses to the same instant (`Z`, `+00:00`, other offsets, fractions); a value that fails to parse is handled as before (skipped / error message), not a panic.
+      - [ ] Task files with existing timestamps load and save without byte changes (existing no-op round-trip tests pass).
+      - [ ] Local-time behaviour stays the same: date-only and naive inputs are local midnight/local time in the system zone (`TZ` wins over `/etc/localtime`); day offsets stay on the same calendar date across DST.
+      - [ ] Display formats (`%Y-%m-%d`, `%b %-d %H:%M`, compact `%Y%m%dT%H%M%SZ` ...) print the same text as before.
+      - [ ] The `RUSTSEC-2026-0543` ignore entry is not in `deny.toml` once DEV-665 and this ticket are both on main, and `cargo deny check` passes.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-17T18:32:36.791382+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668"]}'
+    new: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585"]}'

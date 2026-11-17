@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T06:57:37.267960+00:00
-modified: 2026-11-17T09:06:36.890859+00:00
+modified: 2026-11-17T18:17:04.938221+00:00
 relationships:
   related:
   - DEV-635
@@ -13,6 +13,9 @@ relationships:
   - DEV-466
   - DEV-634
   - DEV-655
+  - DEV-668
+  - DEV-665
+  - DEV-669
 comments:
 - date: 2026-11-17T07:08:47.514767+00:00
   author: claude
@@ -123,6 +126,13 @@ comments:
       result: not_run
       reason: skipped, passed on fb9ecb994 per rework comment
     next: Watch the next QA runs for the flake
+- date: 2026-11-17T18:17:04.749548+00:00
+  author: claude
+  text: |-
+    Open step closed: the fix held on CI since the merge.
+
+    - `Rust Quality Checks` passed in all 6 QA runs on `main` after `b7a9cb85e` (`44040141429` … `44143772762`)
+    - The 4 later QA failures are `Security Audit` only: cargo-deny flags chrono as unmaintained (RUSTSEC-2026-0543), tracked in DEV-669 and DEV-665
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4a141ed-0d1d-4696-b833-5d123ae895a9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d2a4eb5-f5fc-431b-aa61-611790f229dd
@@ -266,3 +276,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634"]}'
     new: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634","DEV-655"]}'
+- at: 2026-11-17T18:11:43.690873+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634","DEV-655"]}'
+    new: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634","DEV-655","DEV-668"]}'
+- at: 2026-11-17T18:17:04.749548+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:17:04.938221+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634","DEV-655","DEV-668"]}'
+    new: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634","DEV-655","DEV-668","DEV-665","DEV-669"]}'

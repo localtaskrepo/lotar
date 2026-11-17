@@ -1,0 +1,90 @@
+title: 'Commits only on this Mac: branches'
+status: HelpNeeded
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-17T18:08:11.962632+00:00
+modified: 2026-11-17T18:13:28.943553+00:00
+relationships:
+  related:
+  - DEV-567
+  - DEV-516
+  - DEV-528
+  - DEV-585
+  - DEV-628
+  - DEV-466
+  - DEV-620
+comments:
+- date: 2026-11-17T18:13:17.083588+00:00
+  author: claude
+  text: |-
+    Deleted 5 of 8 branches whose commits were safe elsewhere; 2 backup branches need your call, 1 is another session's rebase.
+
+    - Deleted, each commit also on a branch with a worktree: `agent/DEV-516` (`906720436`, on `t3/sandbox-blocked-check-retries-1`), `agent/DEV-528` (`537faefda`, `t3/fix-agent-handback-retry-rule`), `agent/DEV-585` (`51c66b0b9`, `t3/fix-flaky-watcher-mcp-event-tests-1`), `agent/DEV-628` (`b06642d2`, `t3/job-prompt-empty-comments-section-3`; its DEV-620 parent is on main), `t3/review-held-job-resume` (`388d708f`, `t3/resume-held-jobs-when-unblocked-1`)
+    - Left: `t3/b9902be4` (`e4edce9b`, also on `agent/DEV-604`). Its worktree `t3-b9902be4-…` is mid-rebase with conflicts in `agent_job_service.rs` and `agent_queue_service.rs`; another session is working there. The check clears once it finishes.
+    - Held nowhere else: `backup/DEV-466-896309c0` (3 commits from 2026-11-13, early drafts of the git-timeout fix; DEV-466 is Done as `50cfad9a2`, 147 of 156 added lines are on main) and `backup/DEV-585-d6dbec07` (1 commit, 2026-11-15, an earlier version of the DEV-585 fix than the one on `t3/fix-flaky-watcher-mcp-event-tests-1`)
+    - Check now: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `unpushed:branches` with 5 commits on those three branches
+
+    Question: delete the two `backup/*` branches as superseded drafts, or keep them (then push them to origin)?
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
+description: |-
+  11 commits on no remote, only on this Mac: agent/DEV-516 1, agent/DEV-528 1, agent/DEV-585 1, agent/DEV-628 1, backup/DEV-466-896309c0 3, backup/DEV-585-d6dbec07 1, t3/b9902be4 1, t3/review-held-job-resume 2 (git log <branch> --not --remotes)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `unpushed:branches`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+  ## Done when
+
+  git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
+tags:
+- health
+- light
+custom_fields:
+  finding: unpushed:branches
+history:
+- at: 2026-11-17T18:08:30.601201+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-567"]}'
+    new: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628"]}'
+- at: 2026-11-17T18:08:36.243381+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-17T18:09:26.754825+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T18:09:56.007342+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
+- at: 2026-11-17T18:13:17.083588+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:13:17.262989+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628"]}'
+    new: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620"]}'
+- at: 2026-11-17T18:13:28.943553+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-light'
+    new: mallox

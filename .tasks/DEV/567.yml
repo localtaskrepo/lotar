@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-15T18:38:30.477073+00:00
-modified: 2026-11-15T21:17:00.518366+00:00
+modified: 2026-11-17T18:08:18.203810+00:00
 relationships:
   related:
   - DEV-532
@@ -15,6 +15,7 @@ relationships:
   - DEV-516
   - DEV-528
   - DEV-542
+  - DEV-664
 comments:
 - date: 2026-11-15T18:39:30.794002+00:00
   author: automation
@@ -203,3 +204,9 @@ history:
   changes:
   - field: assignee
     old: mallox
+- at: 2026-11-17T18:08:18.203810+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-532","DEV-466","DEV-467","DEV-481","DEV-496","DEV-516","DEV-528","DEV-542"]}'
+    new: '{"related":["DEV-532","DEV-466","DEV-467","DEV-481","DEV-496","DEV-516","DEV-528","DEV-542","DEV-664"]}'

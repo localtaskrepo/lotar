@@ -1,0 +1,46 @@
+title: dev510 test a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads times out on main, also run alone
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T18:25:53.916459+00:00
+modified: 2026-11-17T18:32:36.578412+00:00
+relationships:
+  related:
+  - DEV-520
+  - DEV-585
+  - DEV-590
+comments:
+- date: 2026-11-17T18:32:36.578412+00:00
+  author: claude
+  text: |-
+    Flaky rather than always broken: the test passed in two later full runs under load.
+
+    - It timed out in `npm run -s test:agent` and once alone, then passed in 2 of 2 runs of `node scripts/rust-test-runner.mjs --agent` (load average about 39) on the same tree (`51c66b0b`).
+description: |-
+  Found 2026-11-17 during DEV-585 checks on main d6da943e plus DEV-585 (which doesn't touch this code): the test hits its 60 s wait_for("the job to end") at crates/lotar-lib/tests/dev510_t3_session_test.rs:203, in the full suite and alone. harnessmux 0.1.9 at ~/.cargo/bin. DEV-520/DEV-590 (Done) fixed an earlier hang here.
+
+  Check: cargo nextest run --cargo-profile local -p lotar-lib --test integration -E 'test(/a_t3_job_taken_over_before_its_thread_id_was_saved_fails/)'
+
+  Done when it passes alone and in npm run test:agent.
+tags:
+- health
+custom_fields:
+  finding: nextest:dev510_t3_session_test
+history:
+- at: 2026-11-17T18:25:54.170578+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-520","DEV-585","DEV-590"]}'
+- at: 2026-11-17T18:25:54.400783+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T18:32:36.578412+00:00
+  actor: claude
+  changes:
+  - field: comment_added

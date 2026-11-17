@@ -1,11 +1,11 @@
 title: 'Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@review'
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-17T00:59:17.831253+00:00
+modified: 2026-11-17T18:32:44.302267+00:00
 relationships:
   related:
   - DEV-510
@@ -16,6 +16,10 @@ relationships:
   - DEV-583
   - DEV-602
   - DEV-631
+  - DEV-664
+  - DEV-667
+  - DEV-670
+  - DEV-669
 comments:
 - date: 2026-11-15T20:59:19.246258+00:00
   author: automation
@@ -170,9 +174,45 @@ comments:
       result: not_run
       reason: owner sandbox decision requires Claude for local-port tests
     next: 'Claude merge job: verify rebased head, run required checks and repeated loaded tests, then fast-forward main and handle tasks/push'
+- date: 2026-11-17T18:15:48.635043+00:00
+  author: claude
+  text: |-
+    Nothing here needs the owner: the fix is reviewed and passed, only a Claude merge run is left. Back to an agent.
+
+    - Fix is `1011487e` (worktree `agent-DEV-585-3db9096767d7fe42`, detached); not on `main` yet (`WATCHER_SETTLED` absent). Review passed (codex, 2026-11-15).
+    - The Codex merge paused: main moved, rebase was clean, but the watcher/MCP local-port tests can't run in the Codex sandbox (`standards/docs/decisions/2026-11-14-codex-sandbox-network.md`).
+    - `agent/DEV-585` branch was deleted by DEV-664 (commit safe in that worktree); `backup/DEV-585-d6dbec07` is kept for DEV-664's call.
+    - Next: a Claude job rebases `1011487e` onto `main`, runs `npm run -s lint:agent`, `npm run -s test:agent` and `npm run -s smoke` (network allowed), then fast-forwards `main`.
+- date: 2026-11-17T18:32:36.610188+00:00
+  author: claude
+  text: |-
+    Fix verified on the rebased commit `51c66b0b` (main `d6da943e` + DEV-585): the watcher and MCP tests pass in repeated loaded full runs.
+
+    - No new changes: the branch already holds the reviewed fix (same as `1011487e`), rebased cleanly by the last merge run.
+    - The three tests from the ticket passed in all three full Rust runs; `.lotar-test-scratch` was empty afterwards.
+    - One unrelated failure in the first run: `dev510_t3_session_test::a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads` timed out after 60 s, also once when run alone, then passed under load. Filed as DEV-670.
+    - No chrono uses added, so this won't conflict with DEV-669's jiff change.
+  report:
+    commits:
+    - hash: 51c66b0b
+      what: SSE ready waits for the tasks watcher and its sprint snapshots; MCP tools watcher takes its baseline before the first request; tests wait with a deadline, not fixed windows
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+      reason: 2213/2214 Rust run; the one failure is the unrelated dev510 takeover test (60 s timeout), filed as DEV-670; UI, release and hooks then ran on their own and passed
+    - command: node scripts/rust-test-runner.mjs --agent, twice under load (10 yes processes, load average about 39)
+      result: passed
+      reason: 2228/2228 both runs
+    - command: npm run -s smoke
+      result: passed
+      reason: 118 files, 405 tests
+    next: Review on another model, then merge 51c66b0b onto main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab03303e3-95f6-4964-b850-05c9841e7ba5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6d0ae523-068a-40cd-9cbb-a988f1097835
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f7da85f-ebd4-464c-8b91-6b661f0f75a0
 description: |-
   Found during the DEV-510 merge (2026-11-15): the first `npm run -s test:agent` in the DEV-510 worktree failed 3 tests; the second full run passed 2218/2218 on the same commit.
 
@@ -384,3 +424,67 @@ history:
   - field: relationships
     old: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602"]}'
     new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631"]}'
+- at: 2026-11-17T18:08:30.418557+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631"]}'
+    new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631","DEV-664"]}'
+- at: 2026-11-17T18:11:32.509567+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631","DEV-664"]}'
+    new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631","DEV-664","DEV-667"]}'
+- at: 2026-11-17T18:15:48.635043+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:15:48.862200+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-17T18:15:49.170839+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-17T18:19:37.746531+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T18:19:38.611116+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f7da85f-ebd4-464c-8b91-6b661f0f75a0
+- at: 2026-11-17T18:25:54.169660+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631","DEV-664","DEV-667"]}'
+    new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631","DEV-664","DEV-667","DEV-670"]}'
+- at: 2026-11-17T18:32:36.610188+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:32:36.790664+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631","DEV-664","DEV-667","DEV-670"]}'
+    new: '{"related":["DEV-510","DEV-513","DEV-594","DEV-584","DEV-600","DEV-583","DEV-602","DEV-631","DEV-664","DEV-667","DEV-670","DEV-669"]}'
+- at: 2026-11-17T18:32:44.302267+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

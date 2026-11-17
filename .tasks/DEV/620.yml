@@ -4,7 +4,7 @@ priority: High
 type: Feature
 reporter: claude
 created: 2026-11-16T18:42:09.946527+00:00
-modified: 2026-11-17T06:37:37.443532+00:00
+modified: 2026-11-17T18:13:17.262306+00:00
 relationships:
   related:
   - DEV-608
@@ -24,6 +24,7 @@ relationships:
   - DEV-633
   - DEV-627
   - DEV-630
+  - DEV-664
 comments:
 - date: 2026-11-16T20:03:10.910172+00:00
   author: claude
@@ -445,3 +446,9 @@ history:
   changes:
   - field: releases
     new: '#8'
+- at: 2026-11-17T18:13:17.262306+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622","DEV-621","DEV-626","DEV-633","DEV-627","DEV-630"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622","DEV-621","DEV-626","DEV-633","DEV-627","DEV-630","DEV-664"]}'

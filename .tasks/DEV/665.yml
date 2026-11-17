@@ -1,0 +1,143 @@
+title: 'CI failing on the default branch: .github/workflows/ci.yml'
+status: Merging
+priority: High
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T18:11:05.929921+00:00
+modified: 2026-11-17T18:19:34.796830+00:00
+relationships:
+  related:
+  - DEV-533
+  - DEV-669
+  - DEV-122
+  - DEV-654
+  - DEV-668
+comments:
+- date: 2026-11-17T18:13:36.028055+00:00
+  author: claude
+  text: |-
+    CI red on main only because of cargo-deny: new advisory `RUSTSEC-2026-0543` marks chrono unmaintained. Accepted it in `deny.toml` like unsafe-libyaml in DEV-122.
+
+    - Every other job in run `44142333082` passed; Security Audit failed only on `error[unmaintained]: chrono` (no vulnerability, "No safe upgrade is available").
+    - Commit `e03bb43c2` adds an ignore entry with its reason to `deny.toml`; `cargo deny check` now reports advisories ok, bans ok, licenses ok, sources ok.
+    - The chrono → jiff/time migration (~185 uses in 4 crates) is filed as DEV-669; that ticket also removes the ignore entry.
+  report:
+    commits:
+    - hash: e03bb43c2
+      what: deny.toml ignores RUSTSEC-2026-0543 (chrono unmaintained)
+    checks:
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: deny.toml only, no code change
+    - command: npm test
+      result: not_run
+      reason: deny.toml only
+    - command: npm run smoke
+      result: not_run
+      reason: deny.toml only
+    next: Merge, then confirm the next main ci.yml run's Security Audit job is green
+- date: 2026-11-17T18:19:26.616095+00:00
+  author: claude
+  text: |-
+    Review: passed. `e03bb43c2` fixes the only failing CI check and changes nothing else.
+
+    - Diff: 3 lines in `deny.toml` (`main..HEAD`), an ignore entry for `RUSTSEC-2026-0543` with a reason. No stray files and no second branch: `agent/DEV-665` is HEAD.
+    - Cause confirmed: in runs `44142333082` and the newer `44143772762` on main, every job passed except Security Audit. That job runs only `cargo deny check` (`.github/workflows/ci.yml:840`) and fails only on `error[unmaintained]: chrono`.
+    - Reran `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`. The worktree is still clean.
+    - Policy: `deny.toml` allows an ignore with a reason for an advisory that can't affect LoTaR. "Unmaintained, not unsound" fits that, as with `RUSTSEC-2024-0449` in DEV-122. Follow-up DEV-669 (chrono → jiff/time, then drop the ignore) exists and is in progress.
+    - Done when ("latest main run green") can only show after the merge. No test is needed because this is a config change, not a code bug.
+    - Findings: none. Tickets filed: none.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2686f3d6-f649-404b-bddd-8c3fb4f4795d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A684e8f05-89e2-4687-b9ae-e5183b513653
+description: |-
+  Quality Assurance failing on main (gh run list -R localtaskrepo/lotar -b main -w ci.yml)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `ci-red:.github/workflows/ci.yml`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[ci-red:.github/workflows/ci.yml]` while the problem is there.
+
+  ## Done when
+
+  The workflow's latest run on the default branch is green.
+tags:
+- health
+custom_fields:
+  finding: ci-red:.github/workflows/ci.yml
+history:
+- at: 2026-11-17T18:11:12.444518+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T18:11:30.076648+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T18:11:43.968085+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2686f3d6-f649-404b-bddd-8c3fb4f4795d
+- at: 2026-11-17T18:13:11.324126+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-533"]}'
+    new: '{"related":["DEV-533","DEV-669"]}'
+- at: 2026-11-17T18:13:36.028055+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:13:36.250192+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-533","DEV-669"]}'
+    new: '{"related":["DEV-533","DEV-669","DEV-122"]}'
+- at: 2026-11-17T18:13:57.694646+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T18:17:04.938756+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-533","DEV-669","DEV-122"]}'
+    new: '{"related":["DEV-533","DEV-669","DEV-122","DEV-654"]}'
+- at: 2026-11-17T18:17:05.373822+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-533","DEV-669","DEV-122","DEV-654"]}'
+    new: '{"related":["DEV-533","DEV-669","DEV-122","DEV-654","DEV-668"]}'
+- at: 2026-11-17T18:18:26.656603+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A684e8f05-89e2-4687-b9ae-e5183b513653
+- at: 2026-11-17T18:19:26.616095+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:19:34.796830+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

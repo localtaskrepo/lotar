@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-17T04:33:11.029478+00:00
+modified: 2026-11-17T18:14:50.484644+00:00
 relationships:
   blocks:
   - DEV-645
@@ -14,6 +14,7 @@ relationships:
   - DEV-378
   - DEV-525
   - DEV-629
+  - DEV-666
 comments:
 - date: 2026-11-16T22:24:43.617057+00:00
   author: claude
@@ -118,6 +119,15 @@ comments:
     - For the merge agent: rebasing onto main conflicts in `crates/lotar-core/src/config/{fields,normalization,resolution,types}.rs` (main added config keys on the same lines); mechanical, keep both
     - Note: after a hold ends, `lotar serve` starts held jobs one per 30 s tick or job end, not all at once; I count that as fine (it staggers starts)
     - Minor, filed: [DEV-645](https://lotar.pyxzl.net/task/DEV-645) `list-jobs` can show a hold from an old reading once no process reads memory
+- date: 2026-11-17T18:14:50.484644+00:00
+  author: claude
+  text: |-
+    Question: the review passed and `d8659a72` is not on main; hand it to @merge now (`lotar assignee DEV-623 @merge`), or are you holding it for something?
+
+    - You moved it from Reviewing to HelpNeeded at 2026-11-17T03:15Z without a comment; no agent is waiting on it
+    - Review passed on `d8659a72` (the only commit beyond main on `agent/DEV-623`); the full lint, test and smoke runs passed at 02:30Z
+    - The merge will hit mechanical conflicts in `crates/lotar-core/src/config/{fields,normalization,resolution,types}.rs` (keep both sides)
+    - [DEV-645](https://lotar.pyxzl.net/task/DEV-645) is blocked on this ticket
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2723c3a0-e508-468f-a410-efcf7e0b6d36
@@ -320,3 +330,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-645"]}'
     new: '{"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629"]}'
+- at: 2026-11-17T18:11:25.941386+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629"]}'
+    new: '{"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666"]}'
+- at: 2026-11-17T18:14:50.484644+00:00
+  actor: claude
+  changes:
+  - field: comment_added

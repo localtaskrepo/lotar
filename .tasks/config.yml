@@ -4,3 +4,12 @@ default:
   project: DEV
 server:
   public_url: https://lotar.pyxzl.net
+agent:
+  merge:
+    checks:
+    - npm run -s lint:agent
+    - npm run -s test:agent
+    - npm run -s smoke
+    install: npm ci
+    push: true
+    finding_check: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar

@@ -1,0 +1,77 @@
+title: 'Waiting for the owner without a question: DEV-623'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-17T18:11:21.641505+00:00
+modified: 2026-11-17T18:15:27.045363+00:00
+relationships:
+  related:
+  - DEV-623
+comments:
+- date: 2026-11-17T18:15:26.283309+00:00
+  author: claude
+  text: |-
+    Fixed without a file change: DEV-623 now ends in a question the owner can answer in a line.
+
+    - Cause: the owner moved DEV-623 from Reviewing to HelpNeeded at 2026-11-17T03:15Z with no comment; the last comment was the passed review
+    - Added to DEV-623: "hand `d8659a72` to @merge now, or are you holding it?"
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[question:DEV-623]` (`[question:DEV-585]` is another ticket)
+    - No commits beyond main, no files changed; lint, test and smoke not run
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9af873f5-d0b8-4093-a233-dfc09867b1da
+description: |-
+  DEV-623 (The queue starts no new job while the Mac is short of memory) is HelpNeeded, but its last comment asks no question: "Review: passed — the rework fixes the blocking finding, and the rest matches "Done when". - Reviewed `d8659a72` (the on…" (lotar show DEV-623)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-623`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-623]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: question:DEV-623
+history:
+- at: 2026-11-17T18:11:25.944076+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-623"]}'
+- at: 2026-11-17T18:11:28.195763+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-17T18:13:52.197810+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T18:14:13.320765+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9af873f5-d0b8-4093-a233-dfc09867b1da
+- at: 2026-11-17T18:15:26.283309+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:15:26.616739+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-17T18:15:27.045363+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix-light'

@@ -1,10 +1,11 @@
 title: A job that fails on a provider's usage limit pauses until the reset instead of failing into retries and owner questions
-status: Blocked
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
+assignee: mallox
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-17T17:48:06.675589+00:00
+modified: 2026-11-17T18:18:24.794329+00:00
 relationships:
   depends_on:
   - standards:STD-133
@@ -23,6 +24,27 @@ comments:
     - Job `job-20261115T205914.061Z-57` failed after 4 s: `t3` exited 1, "Thread mcp:c6c8c4b1… stopped with status failed: Claude API rate limit reached".
     - T3 Code had noted "This turn is paused until the 5-hour limit resets in 11m" and sent "Continue where you left off." at 21:10; the thread then worked till 22:07 and committed `1011487e`, outside any lotar job.
     - Meanwhile the @fix-codex retry and a second @fix job ran. DEV-594 now holds back a job while an earlier job's thread is `running`, but during the pause the thread reads `failed`, so the retry still starts then. A t3 job that waits through T3's pause would close that gap.
+- date: 2026-11-17T18:18:13.928112+00:00
+  author: claude
+  text: |-
+    Needs your call: the pause this ticket builds on (DEV-604) never landed, so I changed no files.
+
+    - DEV-604 says "this ticket builds the pause and DEV-584 adds the usage-limit reason to it". Its work (`QueuePause`, `agent_job_paused`, `paused` status) is not on `main`: `git merge-base --is-ancestor e4edce9b main` says no, and `grep -i pause crates/lotar-agent/src` finds nothing.
+    - The work sits on `agent/DEV-604` (`e4edce9b`) and an unreported rework on `t3/acb65239` (`48d4054e`). Both are based on `804cb0f9` (2026-11-15), still under `crates/lotar-lib/src/services/`, and conflict with main, where that code now lives in `crates/lotar-agent`.
+    - DEV-604 reads Done, but its last review (2026-11-16 19:28Z) is blocking: in `lotar serve` a pause can hold jobs forever. The comment after it asks you to reopen DEV-604; nobody has.
+
+    **Question:** how should the pause get built? (a) Reopen DEV-604: port it onto main, fix the review finding, land it; then DEV-584 adds the usage-limit reason and the `job_paused` rule event on top (recommended: one commit per feature, the order DEV-604 set). (b) DEV-584 ports DEV-604's pause onto main itself, fixes the finding, adds the usage limit, and DEV-604 closes into it: one big commit. (c) DEV-584 builds a usage-limit pause on main without DEV-604's code.
+  report:
+    checks:
+    - command: git merge-base --is-ancestor e4edce9b main
+      result: failed
+      reason: DEV-604's pause isn't on main
+    next: Owner picks the order; then the chosen ticket starts
+- date: 2026-11-17T18:18:24.794329+00:00
+  author: automation
+  text: 'Automation rule ''Inbox: file what waits for the owner'' skipped on DEV-584. Skipped its run command: this repository''s automation rules and agent profiles have changed since you last trusted them. Review them with `lotar trust --status`, then run `lotar trust` (or set LOTAR_TRUST_ALL=1 in CI). The rule''s other actions applied.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae237cd7b-56b1-4808-8d93-a5027ca90283
 description: |-
   Step 2 of standards STD-133 (owner 2026-11-15: "Detect usage-limit and quota failures as their own state and pause cleanly instead of looping @fix retries or blaming code bugs; stop asking me the same question repeatedly."). Waits for step 1 (STD-133: no merge without a passed review), in the owner's order.
 
@@ -65,3 +87,36 @@ history:
   - field: relationships
     old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617"]}'
     new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663"]}'
+- at: 2026-11-17T18:12:21.124663+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T18:16:32.942316+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T18:16:33.889484+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae237cd7b-56b1-4808-8d93-a5027ca90283
+- at: 2026-11-17T18:18:13.928112+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T18:18:24.741072+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-17T18:18:24.794329+00:00
+  actor: automation
+  changes:
+  - field: comment_added
