@@ -1,5 +1,5 @@
-//! Test-process environment for the unit tests of lotar-core and lotar-lib
-//! (DEV-90), included by both via #[path]. The integration-test `common`
+//! Test-process environment for the unit tests of the lotar crates (DEV-90)
+//! and lotar-agent's integration tests, included via #[path]. The integration-test `common`
 //! module (crates/lotar-lib/tests/common) performs the same redirect for its
 //! binaries; keep the two in sync.
 

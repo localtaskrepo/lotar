@@ -1,9 +1,9 @@
 //! DEV-383: `comment: { author: ... }` conditions and `${{comment.author}}`
 //! let a `commented` rule tell who wrote the comment.
 
-use lotar::services::automation_service::{AutomationEvent, AutomationService};
-use lotar::services::task_service::{CommentContext, TaskService};
-use lotar::storage::manager::Storage;
+use lotar_agent::services::automation_service::{AutomationEvent, AutomationService};
+use lotar_agent::services::task_service::{CommentContext, TaskService};
+use lotar_agent::storage::manager::Storage;
 
 use crate::common;
 use common::env_mutex::EnvVarGuard;
@@ -78,6 +78,6 @@ fn comment_condition_never_matches_other_events() {
 
 #[test]
 fn unknown_comment_condition_key_is_rejected() {
-    let parsed: Result<lotar::automation::types::AutomationConditionGroup, _> = serde_yaml_ng::from_str("comment: { text: hi }");
+    let parsed: Result<lotar_agent::automation::types::AutomationConditionGroup, _> = serde_yaml_ng::from_str("comment: { text: hi }");
     assert!(parsed.is_err());
 }

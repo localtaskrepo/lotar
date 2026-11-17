@@ -1,9 +1,9 @@
 //! DEV-373: automation conditions on version fields, with `version: <range>`.
 
-use lotar::api_types::TaskUpdate;
-use lotar::services::automation_service::{AutomationEvent, AutomationService};
-use lotar::services::task_service::TaskService;
-use lotar::storage::manager::Storage;
+use lotar_agent::api_types::TaskUpdate;
+use lotar_agent::services::automation_service::{AutomationEvent, AutomationService};
+use lotar_agent::services::task_service::TaskService;
+use lotar_agent::storage::manager::Storage;
 
 use crate::common;
 use common::env_mutex::EnvVarGuard;
@@ -42,9 +42,9 @@ fn start() -> TaskUpdate {
 }
 
 fn set_affects(value: &str) -> TaskUpdate {
-    let mut fields = lotar::types::CustomFields::new();
-    fields.insert("affects".into(), lotar::types::custom_value_string(value));
-    fields.insert("product".into(), lotar::types::custom_value_string("web"));
+    let mut fields = lotar_agent::types::CustomFields::new();
+    fields.insert("affects".into(), lotar_agent::types::custom_value_string(value));
+    fields.insert("product".into(), lotar_agent::types::custom_value_string("web"));
     TaskUpdate { custom_fields: Some(fields), ..TaskUpdate::default() }
 }
 

@@ -2,11 +2,11 @@
 //! `set` plan. Apply covers every supported field and alias; preview keeps
 //! the same field coverage and reports what only a real run can decide.
 
-use lotar::api_types::{TaskCreate, TaskDTO, TaskUpdate};
-use lotar::services::automation_service::{AutomationEvent, AutomationService};
-use lotar::services::task_service::TaskService;
-use lotar::storage::manager::Storage;
-use lotar::utils::paths;
+use lotar_agent::api_types::{TaskCreate, TaskDTO, TaskUpdate};
+use lotar_agent::services::automation_service::{AutomationEvent, AutomationService};
+use lotar_agent::services::task_service::TaskService;
+use lotar_agent::storage::manager::Storage;
+use lotar_agent::utils::paths;
 use std::path::{Path, PathBuf};
 
 fn workspace() -> (tempfile::TempDir, PathBuf) {
@@ -60,7 +60,7 @@ fn apply_sets_every_supported_field_with_templates_and_labels_alias() {
     assert_eq!(after.assignee.as_deref(), Some("alice"));
     assert_eq!(after.reporter.as_deref(), Some("bob"));
     assert_eq!(after.tags, vec!["Alpha".to_string(), "beta".to_string()]);
-    assert_eq!(after.custom_fields.get("team").map(lotar::types::custom_value_to_string), Some("core".to_string()));
+    assert_eq!(after.custom_fields.get("team").map(lotar_agent::types::custom_value_to_string), Some("core".to_string()));
 }
 
 #[test]

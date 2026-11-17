@@ -2,10 +2,10 @@
 //! match a real update, and `lotar automation simulate`, the same way as
 //! `tags` and `type`.
 
-use lotar::api_types::TaskUpdate;
-use lotar::services::automation_service::{AutomationEvent, AutomationService};
-use lotar::services::task_service::TaskService;
-use lotar::storage::manager::Storage;
+use lotar_agent::api_types::TaskUpdate;
+use lotar_agent::services::automation_service::{AutomationEvent, AutomationService};
+use lotar_agent::services::task_service::TaskService;
+use lotar_agent::storage::manager::Storage;
 
 use crate::common;
 use common::env_mutex::EnvVarGuard;

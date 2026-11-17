@@ -70,7 +70,7 @@ Counts are static source counts (`#[test]` / `#[tokio::test]`), not run results;
 
 - 1498 test functions across `crates/lotar-lib/src/` and `crates/lotar-lib/tests/`
 - 35 agent automation integration tests (`crates/lotar-lib/tests/agent_automation_integration_test.rs`): lifecycle, failure, cancel, multi-phase chaining
-- Related suites: `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-lib/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs`
+- Related suites: `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-agent/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs`
 - `on.commented` is implemented and covered: `AutomationEvent::Commented` exists in `crates/lotar-agent/src/services/automation_service.rs` and is dispatched by `TaskService::add_comment_with_context` (`crates/lotar-tasks/src/services/task_service.rs`); automation's own comment actions use `CommentContext::automation()` and never re-dispatch it (recursion guard). Tested in `crates/lotar-lib/tests/dev60_shared_mutation_test.rs` and the CLI comment tests.
 
 ### Smoke Tests (278 tests across 71 files; static `it(` count)
@@ -227,7 +227,7 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 | UI page | `view/pages/AgentJobs.vue` |
 | UI types | `view/api/types.ts` |
 | Templates | `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-pipeline.yml`, `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-reviewed.yml` |
-| Integration tests | `crates/lotar-lib/tests/agent_automation_integration_test.rs`, `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-lib/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs` |
+| Integration tests | `crates/lotar-lib/tests/agent_automation_integration_test.rs`, `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-agent/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs` |
 | Smoke: CLI automation | `smoke/tests/cli.automation.smoke.spec.ts` |
 | Smoke: CLI agent commands | `smoke/tests/cli.agent-commands.smoke.spec.ts` |
 | Smoke: CLI config/agent | `smoke/tests/cli.config-agent.smoke.spec.ts` |

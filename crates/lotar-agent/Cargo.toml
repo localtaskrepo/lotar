@@ -13,6 +13,8 @@ repository.workspace = true
 homepage.workspace = true
 # docs/ is the copy scripts/stage-crates.mjs makes for cargo package.
 include = ["/src/**", "/build.rs", "/docs/**"]
+# One integration test binary (tests/integration.rs), as in crates/lotar-lib.
+autotests = false
 
 [lints]
 workspace = true
@@ -37,6 +39,10 @@ tokio.workspace = true
 ctor.workspace = true
 dtor.workspace = true
 tempfile.workspace = true
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
 
 [features]
 # Must follow lotar-core's `schema`: it changes the custom field value type.

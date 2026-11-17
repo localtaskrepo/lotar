@@ -4,12 +4,12 @@
 //! event-time snapshot. Conditions, templates, and comment/job dispatch
 //! keep the event's own values, and automation writes never re-dispatch.
 
-use lotar::api_types::{TaskCreate, TaskDTO, TaskUpdate};
-use lotar::services::automation_service::{AutomationEvent, AutomationService};
-use lotar::services::task_service::TaskService;
-use lotar::storage::manager::Storage;
-use lotar::types::TaskRelationships;
-use lotar::utils::paths;
+use lotar_agent::api_types::{TaskCreate, TaskDTO, TaskUpdate};
+use lotar_agent::services::automation_service::{AutomationEvent, AutomationService};
+use lotar_agent::services::task_service::TaskService;
+use lotar_agent::storage::manager::Storage;
+use lotar_agent::types::TaskRelationships;
+use lotar_agent::utils::paths;
 use std::path::{Path, PathBuf};
 
 fn workspace() -> (tempfile::TempDir, PathBuf) {
