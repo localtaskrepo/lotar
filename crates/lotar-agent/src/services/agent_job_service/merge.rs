@@ -131,6 +131,12 @@ impl Merge<'_> {
             return Err(hand_off(format!("`{branch}` doesn't exist")));
         }
         if merged_landed(&root, self.tasks_dir, &branch).unwrap_or(false) {
+            if let Some(elsewhere) = work_elsewhere(self.tasks_dir, self.ticket_id, &root, &branch) {
+                return Err(hand_off(format!(
+                    "`{branch}` is in `{}` already, but the ticket's work is in another repository: {elsewhere}. Review and merge it there",
+                    self.main
+                )));
+            }
             return Err(Stop::Nothing(format!("`{branch}` is in `{}` already", self.main)));
         }
         let trusted_before = TrustService::state(self.tasks_dir) == TrustState::Trusted;
@@ -423,6 +429,57 @@ fn passed_checks(tasks_dir: &Path, ticket_id: &str, head: &str) -> Vec<String> {
         .and_then(|comment| comment.report.as_ref())
         .map(|report| report.checks.iter().filter(|check| check.result == "passed").map(|check| check.command.trim().to_string()).collect())
         .unwrap_or_default()
+}
+
+/// Another repository the ticket names, by a path in its description or
+/// comments, whose `branch` holds commits beyond that repository's main
+/// checkout branch: lotar's own branch being on main then says nothing
+/// about the ticket's work (lotar DEV-677).
+pub(super) fn work_elsewhere(tasks_dir: &Path, ticket_id: &str, root: &Path, branch: &str) -> Option<String> {
+    let storage = crate::storage::manager::Storage::new(tasks_dir);
+    let task = crate::services::task_service::TaskService::get(&storage, ticket_id, None).ok()?;
+    let ours = common_dir(root)?;
+    let texts = std::iter::once(task.description.unwrap_or_default())
+        .chain(task.comments.into_iter().flat_map(|comment| std::iter::once(comment.text).chain(comment.report.and_then(|report| report.next))));
+    let mut seen = vec![ours];
+    for path in texts.flat_map(|text| named_paths(&text)) {
+        let Some(common) = path.ancestors().find(|dir| dir.exists()).and_then(crate::utils::git::find_repo_root).and_then(|repo| common_dir(&repo)) else {
+            continue;
+        };
+        if seen.contains(&common) {
+            continue;
+        }
+        seen.push(common.clone());
+        let Some(checkout) = common.parent().filter(|_| common.file_name().is_some_and(|name| name == ".git")) else {
+            continue;
+        };
+        let Ok(main) = git(checkout, &["symbolic-ref", "--quiet", "--short", "HEAD"]) else {
+            continue;
+        };
+        let ahead =
+            git(checkout, &["cherry", &main, &format!("refs/heads/{branch}")]).map(|cherry| cherry.lines().filter(|line| line.starts_with('+')).count());
+        if let Ok(ahead @ 1..) = ahead {
+            return Some(format!("`{branch}` in `{}` holds {ahead} commit{} beyond its `{main}`", checkout.display(), if ahead == 1 { "" } else { "s" }));
+        }
+    }
+    None
+}
+
+/// The repository's shared git directory, which its worktrees share too.
+fn common_dir(dir: &Path) -> Option<PathBuf> {
+    git(dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"]).ok().and_then(|common| std::fs::canonicalize(common).ok())
+}
+
+/// The absolute and `~/` paths in `text`.
+fn named_paths(text: &str) -> Vec<PathBuf> {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    text.split(|ch: char| ch.is_whitespace() || "`'\"()[]<>,;".contains(ch))
+        .map(|token| token.trim_end_matches(['.', ':']))
+        .filter_map(|token| match token.strip_prefix("~/") {
+            Some(rest) => home.as_ref().map(|home| home.join(rest)),
+            None => token.starts_with('/').then(|| PathBuf::from(token)),
+        })
+        .collect()
 }
 
 /// Run `command` through the shell in `dir`, without LoTaR's own

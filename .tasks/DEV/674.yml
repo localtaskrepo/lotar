@@ -1,11 +1,11 @@
 title: 't3 worktree setup: a leftover or same-commit record can give a job''s Claude settings to the wrong worktree'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T20:09:56.418127+00:00
-modified: 2026-11-17T22:14:49.879479+00:00
+modified: 2026-11-17T22:19:44.592342+00:00
 relationships:
   related:
   - DEV-618
@@ -118,6 +118,29 @@ comments:
     - Reran: `npm ci` ok, `cargo nextest run -p lotar-agent t3_worktree_setup` 9/9, `npm run lint:agent` passed, `npm run test:agent` passed (2339 Rust, 1548 UI), `npm run test:smoke:agent` passed (405). Worktree clean afterwards.
     - Not checked live: `t3` isn't on PATH in this job, so I didn't call `t3 thread list/show` myself. The earlier review confirmed that T3 Code stores `worktreePath` before it runs the setup script.
     - No UI changes. No new tickets: DEV-678 already covers leftover `.result` files.
+- date: 2026-11-17T22:19:44.430211+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-674` is in `main`.
+
+    - Rebased `agent/DEV-674` onto `main` (`7d0ada7fe608`): `7c1a758cf97c`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `7c1a758cf97c`
+    - Amended the pending `.tasks` changes into the merged commit: `a6fd74304cc0`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: a6fd74304
+      what: 'DEV-674 t3 worktree setup: a leftover or same-commit record can give a job''s Claude settings to the wrong worktree'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c
 description: |-
@@ -136,8 +159,6 @@ description: |-
   - [ ] `setup()` and `record()` delete expired records (older than `PENDING_SECS`, 10 minutes), also unreadable ones by file age.
   - [ ] `docs/help/agent.md` says how a thread from the existing ticket branch is matched.
   - [ ] Unit tests for each case; `npm run lint`, `npm test`, `npm run smoke` pass.
-tags:
-- review-returned
 history:
 - at: 2026-11-17T20:09:57.144073+00:00
   actor: claude
@@ -312,3 +333,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T22:19:44.430211+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:19:44.592342+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned
+    new: ''

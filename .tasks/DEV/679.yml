@@ -1,0 +1,63 @@
+title: A merge job lands lotar's agent/<ID> and sets the ticket Done while another repo's agent/<ID> still holds the ticket's unmerged commits
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T22:20:59.906600+00:00
+modified: 2026-11-17T22:22:39.890893+00:00
+relationships:
+  related:
+  - DEV-677
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac11cca5c-ca9e-495f-a496-7fc2dd72e741
+description: |-
+  Found (review of DEV-677, 2026-11-17): DEV-677 checks the other repo (merge::work_elsewhere) only when lotar's own branch is already on main. When lotar's agent/<ID> has commits too, Merge::run (merge.rs) rebases and lands it, and ensure_branch_merged (agent_job_service.rs, Ok(false) arm: git merge --ff-only, then Ok) completes the job without asking work_elsewhere. A ticket with work in both repos then goes Done with the other repo's main unchanged. Check: a ticket whose lotar branch and another named repo's agent/<ID> both hold commits beyond their mains; merge job ends completed with the other repo unmerged. Done: the merge (deterministic and agent path) refuses to complete while work_elsewhere finds unmerged commits, with a test.
+
+  ## Done when
+
+  Case: lotar's `agent/<ID>` and another repo's `agent/<ID>` (named by a path in the ticket) both hold commits beyond their mains.
+
+  - [ ] lotar's own merge (`agent.merge`, deterministic): lands nothing and hands off to the merge agent, saying the ticket's work is also in the other repo (`work_elsewhere` text). It checks this before the rebase, whether or not lotar's branch is on main.
+  - [ ] After the merge agent exits 0 (`ensure_branch_merged`): while the other repo still holds unmerged commits, the job fails ("Merge job finished, but <ID>'s work is in another repository: ...") and lotar does not fast-forward its own branch, so the ticket doesn't go Done. A handback (agent changed the assignee) wins over that failure, as before.
+  - [ ] Merge agent landed the other repo: lotar fast-forwards its own branch as before and the job completes.
+  - [ ] Merge agent's runner fails: the job stays failed (unchanged: `merged_despite_failure` only applies when lotar's branch is on main and already checks `work_elsewhere`).
+  - [ ] `git` can't judge lotar's branch: passes as before.
+  - [ ] Tests in `dev605_merge_without_agent_test.rs` for the deterministic hand-off, the agent path failing, and the agent path completing; each fails without the fix where it can.
+  - [ ] `docs/help/agent.md` describes the case.
+history:
+- at: 2026-11-17T22:21:00.469665+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T22:21:01.459653+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T22:21:02.244953+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac11cca5c-ca9e-495f-a496-7fc2dd72e741
+- at: 2026-11-17T22:22:39.890893+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found (review of DEV-677, 2026-11-17): DEV-677 checks the other repo (merge::work_elsewhere) only when lotar''s own branch is already on main. When lotar''s agent/<ID> has commits too, Merge::run (merge.rs) rebases and lands it, and ensure_branch_merged (agent_job_service.rs, Ok(false) arm: git merge --ff-only, then Ok) completes the job without asking work_elsewhere. A ticket with work in both repos then goes Done with the other repo''s main unchanged. Check: a ticket whose lotar branch and another named repo''s agent/<ID> both hold commits beyond their mains; merge job ends completed with the other repo unmerged. Done: the merge (deterministic and agent path) refuses to complete while work_elsewhere finds unmerged commits, with a test.'
+    new: |-
+      Found (review of DEV-677, 2026-11-17): DEV-677 checks the other repo (merge::work_elsewhere) only when lotar's own branch is already on main. When lotar's agent/<ID> has commits too, Merge::run (merge.rs) rebases and lands it, and ensure_branch_merged (agent_job_service.rs, Ok(false) arm: git merge --ff-only, then Ok) completes the job without asking work_elsewhere. A ticket with work in both repos then goes Done with the other repo's main unchanged. Check: a ticket whose lotar branch and another named repo's agent/<ID> both hold commits beyond their mains; merge job ends completed with the other repo unmerged. Done: the merge (deterministic and agent path) refuses to complete while work_elsewhere finds unmerged commits, with a test.
+
+      ## Done when
+
+      Case: lotar's `agent/<ID>` and another repo's `agent/<ID>` (named by a path in the ticket) both hold commits beyond their mains.
+
+      - [ ] lotar's own merge (`agent.merge`, deterministic): lands nothing and hands off to the merge agent, saying the ticket's work is also in the other repo (`work_elsewhere` text). It checks this before the rebase, whether or not lotar's branch is on main.
+      - [ ] After the merge agent exits 0 (`ensure_branch_merged`): while the other repo still holds unmerged commits, the job fails ("Merge job finished, but <ID>'s work is in another repository: ...") and lotar does not fast-forward its own branch, so the ticket doesn't go Done. A handback (agent changed the assignee) wins over that failure, as before.
+      - [ ] Merge agent landed the other repo: lotar fast-forwards its own branch as before and the job completes.
+      - [ ] Merge agent's runner fails: the job stays failed (unchanged: `merged_despite_failure` only applies when lotar's branch is on main and already checks `work_elsewhere`).
+      - [ ] `git` can't judge lotar's branch: passes as before.
+      - [ ] Tests in `dev605_merge_without_agent_test.rs` for the deterministic hand-off, the agent path failing, and the agent path completing; each fails without the fix where it can.
+      - [ ] `docs/help/agent.md` describes the case.

@@ -201,6 +201,68 @@ fn a_branch_without_new_commits_has_nothing_to_merge() {
     assert!(repo.comments().iter().any(|comment| comment.text.starts_with("Nothing to merge")));
 }
 
+/// DEV-677: lotar's branch is empty, the ticket's commits are on the same
+/// branch of another repository its comment names. That repository's main
+/// checkout.
+fn work_in_another_repository(repo: &Repo) -> PathBuf {
+    let other = repo.outside.path().join("other");
+    fs::create_dir(&other).expect("mkdir");
+    git(&other, &["init", "-q"]);
+    for (key, value) in [("user.name", "Agent Tests"), ("user.email", "agent-tests@example.com"), ("commit.gpgsign", "false")] {
+        git(&other, &["config", key, value]);
+    }
+    git(&other, &["commit", "-q", "--allow-empty", "-m", "Initial commit"]);
+    git(&other, &["branch", BRANCH]);
+    let worktree = repo.outside.path().join("other-fix");
+    git(&other, &["worktree", "add", "-q", &worktree.to_string_lossy(), BRANCH]);
+    git(&worktree, &["commit", "-q", "--allow-empty", "-m", "MRG-1 the work"]);
+    let mut storage = repo.fixtures.create_storage();
+    let text = format!("Reopened: the work is branch `{BRANCH}` in `{}`.", worktree.display());
+    TaskService::add_comment_with_context(&mut storage, TICKET, &text, Default::default()).expect("comment");
+    other
+}
+
+#[test]
+fn a_ticket_whose_work_is_in_another_repository_is_not_done() {
+    let repo = Repo::new(CHECKS);
+    work_in_another_repository(&repo);
+
+    let (status, prompt) = repo.merge();
+
+    assert_eq!(status, "failed", "the merge agent left the other repository's branch unmerged");
+    let prompt = prompt.expect("the merge agent ran");
+    assert!(prompt.contains("the ticket's work is in another repository") && prompt.contains("holds 1 commit beyond"), "{prompt}");
+    assert!(!repo.comments().iter().any(|comment| comment.text.starts_with("Nothing to merge")));
+}
+
+#[test]
+fn a_merge_agent_that_lands_the_other_repository_completes() {
+    let repo = Repo::new(CHECKS);
+    let other = work_in_another_repository(&repo);
+    let agent = repo.outside.path().join("merge-agent.sh");
+    let script = fs::read_to_string(&agent).expect("read agent");
+    fs::write(&agent, format!("{script}cd '{}' && git merge -q --ff-only {BRANCH}\n", other.display())).expect("write agent");
+
+    let (status, prompt) = repo.merge();
+
+    assert!(prompt.is_some(), "the merge agent ran");
+    assert_eq!(status, "completed", "the other repository's main holds the work");
+}
+
+#[test]
+fn a_failed_merge_agent_leaves_work_in_another_repository_unfinished() {
+    let repo = Repo::new(CHECKS);
+    work_in_another_repository(&repo);
+    let agent = repo.outside.path().join("merge-agent.sh");
+    let script = fs::read_to_string(&agent).expect("read agent");
+    fs::write(&agent, format!("{script}exit 7\n")).expect("write agent");
+
+    let (status, prompt) = repo.merge();
+
+    assert!(prompt.is_some(), "the merge agent ran");
+    assert_eq!(status, "failed", "lotar's branch on main doesn't complete the job: the work is in the other repository");
+}
+
 #[test]
 fn a_conflict_hands_off_to_the_merge_agent() {
     let repo = Repo::new(CHECKS);

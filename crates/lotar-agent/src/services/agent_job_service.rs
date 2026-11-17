@@ -4862,8 +4862,34 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
         return Ok(None);
     };
+    // An agent that handed the ticket back (for example because a check failed
+    // on the work) left the branch unmerged on purpose (DEV-516). A handback
+    // reassigns the ticket; finishing never does, with or without end rules,
+    // though it may set a status. A T3 Code thread's change waits as the
+    // job's outcome; an agent with the job's environment changes it directly.
+    // A job taken over from an older lotar may have no starting assignee;
+    // its recorded outcome still counts.
+    let handed_back = || {
+        let recorded = crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id).and_then(|outcome| outcome.assignee);
+        let changed = || {
+            let at_start = assignee_at_start.clone()?;
+            ticket_state(tasks_dir, ticket_id).map(|(_, assignee)| assignee).filter(|now| *now != at_start).map(Option::unwrap_or_default)
+        };
+        recorded.or_else(changed).map(|assignee| {
+            let to = if assignee.is_empty() { "unassigned".to_string() } else { format!("to {assignee}") };
+            format!("The agent handed {ticket_id} back ({to}): LoTaR leaves {branch} unmerged")
+        })
+    };
     match merged_landed(&repo_root, tasks_dir, &branch) {
         Ok(true) => {
+            // The ticket's work is in another repository (DEV-677): lotar's
+            // branch on main says nothing about it.
+            if let Some(elsewhere) = merge::work_elsewhere(tasks_dir, ticket_id, &repo_root, &branch) {
+                return match handed_back() {
+                    Some(handed_back) => Ok(Some(handed_back)),
+                    None => Err(format!("Merge job finished, but {ticket_id}'s work is in another repository: {elsewhere}")),
+                };
+            }
             let brought_nothing = start.as_deref().is_some_and(|start| {
                 git_stdout(&repo_root, &["cherry", start, &format!("refs/heads/{branch}")]).is_ok_and(|out| !out.lines().any(|line| line.starts_with('+')))
             });
@@ -4879,21 +4905,8 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
         Err(_) => return Ok(None),
         Ok(false) => {}
     }
-    // An agent that handed the ticket back (for example because a check failed
-    // on the work) left the branch unmerged on purpose (DEV-516). A handback
-    // reassigns the ticket; finishing never does, with or without end rules,
-    // though it may set a status. A T3 Code thread's change waits as the
-    // job's outcome; an agent with the job's environment changes it directly.
-    // A job taken over from an older lotar may have no starting assignee;
-    // its recorded outcome still counts.
-    let recorded = crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id).and_then(|outcome| outcome.assignee);
-    let changed = || {
-        let at_start = assignee_at_start?;
-        ticket_state(tasks_dir, ticket_id).map(|(_, assignee)| assignee).filter(|now| *now != at_start).map(Option::unwrap_or_default)
-    };
-    if let Some(assignee) = recorded.or_else(changed) {
-        let to = if assignee.is_empty() { "unassigned".to_string() } else { format!("to {assignee}") };
-        return Ok(Some(format!("The agent handed {ticket_id} back ({to}): LoTaR leaves {branch} unmerged")));
+    if let Some(handed_back) = handed_back() {
+        return Ok(Some(handed_back));
     }
     let output = git_command(&repo_root).args(["merge", "--ff-only", "--quiet", &branch]).output().map_err(|err| format!("git merge: {err}"))?;
     if output.status.success() {
@@ -4935,15 +4948,18 @@ fn merged_landed(repo_root: &std::path::Path, tasks_dir: &std::path::Path, branc
 
 /// For a merge job whose runner failed: the note that explains why it
 /// completes anyway, when its branch is on main already (`merged_landed`)
-/// and its worktree holds nothing uncommitted. `None` for other jobs, and
-/// for states git can't judge.
+/// and its worktree holds nothing uncommitted. `None` for other jobs, for
+/// a ticket whose work is in another repository, and for states git can't
+/// judge.
 fn merged_despite_failure(job_id: &str, tasks_dir: &std::path::Path, exit_code: Option<i32>, runner_failed: bool) -> Option<String> {
-    let (runner, branch, worktree) = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        registry
-            .jobs
-            .get(job_id)
-            .filter(|state| state.record.is_merge_job)
-            .and_then(|state| state.record.worktree_branch.clone().map(|branch| (state.record.runner.clone(), branch, state.record.worktree_path.clone())))
+    let (runner, ticket_id, branch, worktree) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| {
+            state
+                .record
+                .worktree_branch
+                .clone()
+                .map(|branch| (state.record.runner.clone(), state.record.ticket_id.clone(), branch, state.record.worktree_path.clone()))
+        })
     })?;
     let repo_root = resolve_repo_root(tasks_dir)?;
     if let Some(worktree) = worktree.map(std::path::PathBuf::from).filter(|path| path.exists()) {
@@ -4953,6 +4969,11 @@ fn merged_despite_failure(job_id: &str, tasks_dir: &std::path::Path, exit_code: 
         }
     }
     if !merged_landed(&repo_root, tasks_dir, &branch).ok()? {
+        return None;
+    }
+    // The ticket's work is in another repository (DEV-677): lotar's branch
+    // on main says nothing about it.
+    if merge::work_elsewhere(tasks_dir, &ticket_id, &repo_root, &branch).is_some() {
         return None;
     }
     let failure = if runner_failed { "reported a failure".to_string() } else { exit_description(exit_code) };
