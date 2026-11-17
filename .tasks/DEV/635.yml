@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-17T01:03:33.051382+00:00
-modified: 2026-11-17T03:34:35.779958+00:00
+modified: 2026-11-17T06:11:46.113209+00:00
 relationships:
   related:
   - DEV-579
@@ -83,10 +83,14 @@ comments:
     - **Reran on main + `068fa17d`** (detached scratch, since removed): `cargo nextest run --test integration -E 'test(/clone|build_output|worktree|merge/)'` 64/64 passed; `cargo clippy --workspace --all-targets -D warnings` clean.
     - **Not rerun:** the full `npm test` and `npm run smoke`; the fix agent reports both passing.
     - **Status:** I left it HelpNeeded / mallox, as set at 03:12Z.
+- date: 2026-11-17T06:11:17.666763+00:00
+  author: claude
+  text: 'Owner 2026-11-16 (chief of staff picker): "Merge DEV-635". Both reviews passed; merge queued on @merge.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae2a93ce5-f5cd-4e81-80d2-9bba5a154e7a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5774b9d5-2c63-43ab-ae2f-6c3581628f13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0f964ad1-0c21-4f77-904a-ee2ff9810474
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27da51d1-bca9-4935-a2fb-90e1e45e0fa2
 description: |-
   Owner, 2026-11-17, on DEV-579: "I like the idea of copying existing data over, but I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux."
 
@@ -259,3 +263,12 @@ history:
   - field: relationships
     old: '{"related":["DEV-579","DEV-581","DEV-640","DEV-613","DEV-634"]}'
     new: '{"related":["DEV-579","DEV-581","DEV-640","DEV-613","DEV-634","DEV-577","DEV-612","DEV-633"]}'
+- at: 2026-11-17T06:11:17.666763+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:11:46.113209+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27da51d1-bca9-4935-a2fb-90e1e45e0fa2

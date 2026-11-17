@@ -1,17 +1,58 @@
 title: read_until_deadline EOF test skips the EINVAL path when shutdown answers NotConnected
-status: InProgress
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T05:51:46.365057+00:00
-modified: 2026-11-17T05:52:15.811267+00:00
+modified: 2026-11-17T06:14:28.583619+00:00
 relationships:
   related:
   - DEV-649
   - DEV-640
+comments:
+- date: 2026-11-17T06:10:05.995417+00:00
+  author: claude
+  text: |-
+    Fixed: the test now hits the EINVAL branch on every run.
+
+    - `crates/lotar-lib/tests/web_api_integration_test.rs`: `shutdown(Both)` runs while the peer is alive, the peer is dropped after; on macOS the test asserts `set_read_timeout` fails with `InvalidInput`, so a regression shows
+    - Scratch loop of the new steps: 2000/2000 `shutdown=ok timeout=InvalidInput read=0`
+    - DEV-649's commit `c9ed2248e` (not on main yet) edits the same lines; with the peer alive `shutdown` can't answer `NotConnected`, so its match is no longer needed. The second merge keeps this version
+  report:
+    commits:
+    - hash: f2eb7214c
+      what: shut down before dropping the peer; assert EINVAL on macOS
+    checks:
+    - command: scratch loop of new steps x2000
+      result: passed
+      reason: shutdown=ok timeout=InvalidInput read=0 every time
+    - command: cargo nextest run -p lotar-lib --test integration read_until_deadline (x5)
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2295 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review, then merge; resolve the conflict with unmerged DEV-649 (c9ed2248e) by keeping this version
+- date: 2026-11-17T06:14:02.182372+00:00
+  author: claude
+  text: |-
+    Review: passed. `f2eb7214c` does what "Done when" asks and nothing else.
+
+    - Read: the diff (one test, `crates/lotar-lib/tests/web_api_integration_test.rs:855`), the ticket, DEV-649/DEV-640, the `read_until_deadline` helper, and the last commits to the file on main (`bfb2cb834` DEV-640)
+    - `shutdown(Both)` now runs before `drop(peer)`, so `shutdown` can't answer `NotConnected`. On macOS a new assert checks that `set_read_timeout` fails with `InvalidInput`, so the test fails if it stops reaching the EINVAL branch. With the old order, that assert would have failed about 1 run in 5
+    - Ticket check: a scratch loop of the new steps, run 2000 times, gave `shutdown=Ok timeout=InvalidInput read=0` every time
+    - Reran `cargo nextest run -p lotar-lib --test integration read_until_deadline` 5 times: all passed. `rustfmt --check` on the file: clean
+    - Didn't rerun the full `npm run lint`, `npm test` or `npm run smoke` (the fix agent reports them passing)
+    - Merge note stands: DEV-649's `c9ed2248e` (only on `agent/DEV-649`) edits the same lines. Keep this version, because its order makes DEV-649's `NotConnected` match unnecessary
+    - No findings, no tickets filed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A00256ffb-802a-4b43-ab31-14d448816fc5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0e424a4-8b62-4f6e-87fe-7aee22f5fc8f
 description: |-
   Found in the DEV-649 review (2026-11-16).
 
@@ -43,3 +84,34 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A00256ffb-802a-4b43-ab31-14d448816fc5
+- at: 2026-11-17T06:10:05.995417+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:10:17.383249+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T06:10:45.490020+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0e424a4-8b62-4f6e-87fe-7aee22f5fc8f
+- at: 2026-11-17T06:14:02.182372+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:14:28.583619+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

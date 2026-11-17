@@ -1,11 +1,11 @@
 title: A resumed T3 thread is taken over while a newer thread of the ticket waits for an answer
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T05:24:25.186949+00:00
+modified: 2026-11-17T06:01:25.542667+00:00
 relationships:
   depends_on:
   - DEV-626
@@ -18,6 +18,7 @@ relationships:
   - DEV-648
   - DEV-630
   - DEV-649
+  - DEV-647
 comments:
 - date: 2026-11-17T02:52:38.519606+00:00
   author: claude
@@ -138,6 +139,31 @@ comments:
     - **Fails before:** in a scratch worktree with the old `resumed.rs`, both new tests fail (`dev626_resumed_t3_threads_test.rs:245`, `:271`); removed afterwards.
     - **Reran:** `npm run lint:agent` passed; `node scripts/rust-test-runner.mjs --agent dev626` passed 6/6 twice, no `.lotar-test-scratch` leftover (the DEV-648 `job_settled` wait works). `npm test` and `npm run smoke` not rerun (fix agent ran them on this commit).
     - No UI changes, no stray files, no tickets filed.
+- date: 2026-11-17T06:01:08.644041+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `4d2e623a6` is on `main` and `origin/main`.
+
+    - **Rebased three times:** main moved on during the merge, with DEV-630/642, DEV-647 and DEV-648. On the last rebase, `dev626_resumed_t3_threads_test.rs` `wait_for_end` conflicted, because DEV-648 had landed the same `job_settled` wait. I kept main's version and dropped the duplicate comment.
+    - **Checks on `5ffbd7cec`:** `npm run lint:agent` passed. The Rust suite passed 2297/2297. The UI, release and hooks tests passed, and `npm run smoke` passed 405/405.
+    - **Flaky test, not from this ticket:** `read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways` failed 2 runs of `npm run test:agent` (DEV-640's test, `ENOTCONN` from `shutdown`). It also failed 1 of 5 times on its own. Filed as DEV-649.
+    - **Commit:** I amended the pending `.tasks` changes into the merge commit (owner 2026-11-12).
+    - **Trust and push:** No rules or config changed, so I didn't run `lotar trust`. repos.json says `"push": true`, the main checkout was clean and this was the only unpushed commit, so I pushed it.
+  report:
+    commits:
+    - hash: 4d2e623a6
+      what: DEV-639 fix on main (rebased, .tasks amended in)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on 5ffbd7cec
+    - command: npm test
+      result: passed
+      reason: 2297/2297 Rust (nextest --no-fail-fast), UI, release, hooks on 5ffbd7cec
+    - command: npm run smoke
+      result: passed
+      reason: 405/405 on 5ffbd7cec
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac88a9490-deab-4292-aa6e-550801b0d77f
@@ -158,8 +184,6 @@ description: |-
   - [ ] When `t3 thread show` fails for a thread, it counts as not waiting (as before); the next look asks again.
   - [ ] Unchanged: no waiting thread → the newest job's thread is taken over (DEV-626); a queued entry or a done ticket → nothing happens.
   - [ ] A test with the fake t3 in `tests/dev626_resumed_t3_threads_test.rs`: newer thread waits, older one runs → no job, one comment on the older thread, none after a second look.
-tags:
-- fix-retried
 history:
 - at: 2026-11-17T02:10:25.266688+00:00
   actor: claude
@@ -368,3 +392,22 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-626"],"related":["DEV-626","DEV-600","DEV-613","DEV-633","DEV-640","DEV-648","DEV-630"]}'
     new: '{"depends_on":["DEV-626"],"related":["DEV-626","DEV-600","DEV-613","DEV-633","DEV-640","DEV-648","DEV-630","DEV-649"]}'
+- at: 2026-11-17T06:01:08.644041+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:01:09.311155+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-626"],"related":["DEV-626","DEV-600","DEV-613","DEV-633","DEV-640","DEV-648","DEV-630","DEV-649"]}'
+    new: '{"depends_on":["DEV-626"],"related":["DEV-626","DEV-600","DEV-613","DEV-633","DEV-640","DEV-648","DEV-630","DEV-649","DEV-647"]}'
+- at: 2026-11-17T06:01:25.542667+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''
