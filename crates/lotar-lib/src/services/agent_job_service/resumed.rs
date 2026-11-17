@@ -34,6 +34,7 @@ struct Resumed {
     thread: String,
     run: String,
     link: Option<String>,
+    waiting: bool,
     ended_at: String,
     worktree_path: Option<String>,
     worktree_branch: Option<String>,
@@ -71,11 +72,12 @@ pub(super) fn look(tasks_dir: &Path) {
     };
     let mut by_ticket: BTreeMap<String, Vec<Resumed>> = BTreeMap::new();
     for mut resumed in ended {
-        let Some(thread) = listed.get(&resumed.thread).filter(|thread| thread.status == "running") else {
+        let Some(thread) = listed.get(&resumed.thread).filter(|thread| thread.status == "running" || thread.status == "waiting") else {
             continue;
         };
         resumed.run = thread.run.clone();
         resumed.link = thread.link.clone();
+        resumed.waiting = thread.status == "waiting";
         by_ticket.entry(resumed.ticket_id.clone()).or_default().push(resumed);
     }
     for (ticket_id, mut threads) in by_ticket {
@@ -109,6 +111,7 @@ fn ended_threads(tasks_dir: &Path) -> Vec<Resumed> {
             thread: thread.clone(),
             run: String::new(),
             link: None,
+            waiting: false,
             ended_at: status.at,
             worktree_path: status.worktree_path.or(job.header.worktree_path),
             worktree_branch: status.worktree_branch.or(job.header.worktree_branch),
@@ -155,19 +158,20 @@ fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path, tasks_dir:
 }
 
 /// The ticket's running threads, newest job's first: the first is taken over
-/// when no job runs or waits for the ticket, the others get a comment. Under
-/// the ticket's lock, so one process handles them, once per run.
+/// when no job runs or waits for the ticket and no thread of it waits for an
+/// answer, the others get a comment. Under the ticket's lock, so one process
+/// handles them, once per run.
 fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: &Path, env: &[(String, String)], cwd: &Path) {
     let Some(_lock) = crate::services::agent_active_jobs::lock_resumed_threads(tasks_dir, ticket_id) else {
         return;
     };
     // A thread a running session follows belongs to a job; one that waits
-    // for an answer holds the ticket until it is answered (DEV-600).
-    let threads: Vec<Resumed> = threads
+    // for an answer holds the ticket until it is answered (DEV-600), so no
+    // other thread of it is taken over (DEV-639).
+    let (waiting, threads): (Vec<Resumed>, Vec<Resumed>) = threads
         .into_iter()
         .filter(|resumed| session_of(&resumed.thread).is_none_or(|record| !followed(&record)))
-        .filter(|resumed| !waits_for_answer(program, env, cwd, &resumed.thread))
-        .collect();
+        .partition(|resumed| resumed.waiting || waits_for_answer(program, env, cwd, &resumed.thread));
     // The owner's own use of a done ticket's thread.
     if threads.is_empty() || ticket_done_state(tasks_dir, ticket_id) == Some(true) {
         return;
@@ -179,8 +183,11 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
         return;
     }
     let mut threads = threads.into_iter();
-    let mut beside = None;
-    if !busy && let Some(first) = threads.next() {
+    let mut beside = waiting.first().filter(|_| !busy).map(|held| format!("the thread {} that waits for an answer", held.shown()));
+    if !busy
+        && beside.is_none()
+        && let Some(first) = threads.next()
+    {
         if !crate::services::agent_active_jobs::first_look_at_run(tasks_dir, &first.thread, &first.run) {
             return;
         }

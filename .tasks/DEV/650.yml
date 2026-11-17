@@ -1,0 +1,45 @@
+title: read_until_deadline EOF test skips the EINVAL path when shutdown answers NotConnected
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T05:51:46.365057+00:00
+modified: 2026-11-17T05:52:15.811267+00:00
+relationships:
+  related:
+  - DEV-649
+  - DEV-640
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A00256ffb-802a-4b43-ab31-14d448816fc5
+description: |-
+  Found in the DEV-649 review (2026-11-16).
+
+  ## Found
+  - `crates/lotar-lib/tests/web_api_integration_test.rs:855`: the test drops the peer before `shutdown(Both)`. When the peer's close lands first, `shutdown` answers `NotConnected` (DEV-649 now accepts it), but then `set_read_timeout` succeeds, so that run never reaches the EINVAL branch of `read_until_deadline` it was written for (DEV-640).
+  - A scratch loop of the same steps on macOS saw `shutdown=NotConnected timeout=ok read=0` once and `shutdown=ok timeout=InvalidInput read=0` four times.
+
+  ## Check
+  - Run the test's steps in a loop: every iteration has `set_read_timeout` fail with `InvalidInput`.
+
+  ## Done when
+  - [ ] The test reaches the EINVAL branch on every run, e.g. by shutting the socket down while the peer is still alive and dropping the peer afterwards.
+tags:
+- health
+history:
+- at: 2026-11-17T05:51:48.904604+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T05:52:06.542841+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T05:52:15.811267+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A00256ffb-802a-4b43-ab31-14d448816fc5

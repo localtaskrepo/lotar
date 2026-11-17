@@ -1,15 +1,16 @@
 title: 'Flaky test: read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways panics on ENOTCONN from shutdown on macOS'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T05:24:24.590809+00:00
-modified: 2026-11-17T05:45:43.530954+00:00
+modified: 2026-11-17T05:52:23.769417+00:00
 relationships:
   related:
   - DEV-639
   - DEV-640
+  - DEV-650
 comments:
 - date: 2026-11-17T05:41:58.862263+00:00
   author: claude
@@ -38,6 +39,28 @@ comments:
       result: not_run
       reason: Rust test-only change, no server or UI code touched
     next: Review, then merge
+- date: 2026-11-17T05:52:01.505728+00:00
+  author: claude
+  text: |-
+    Review: passed. `c9ed2248e` fixes the panic; one minor gap filed as [DEV-650](https://lotar.pyxzl.net/task/DEV-650).
+
+    - Read: the diff (`crates/lotar-lib/tests/web_api_integration_test.rs:861`), the ticket, DEV-640's commit `bfb2cb834` and `read_until_deadline` (line 27). No other commits on main touch the file since. No stray files; not UI work.
+    - Reran `node scripts/rust-test-runner.mjs --agent read_until_deadline` 20 times: 20 passed.
+    - Failing before the fix: a scratch loop of the same steps (outside the repo) hit `shutdown` → `NotConnected` in 1 of 5 iterations, which the old `unwrap()` turns into the reported panic. So the race is real and the fix covers it.
+    - Minor: in that `NotConnected` run `set_read_timeout` succeeds, so the run skips the EINVAL branch. The claim "shut down either way" is only partly true. Most runs still cover EINVAL, so the merge can go ahead. Filed [DEV-650](https://lotar.pyxzl.net/task/DEV-650): shut down before dropping the peer.
+  report:
+    checks:
+    - command: node scripts/rust-test-runner.mjs --agent read_until_deadline x20
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: reviewer reran only the ticket check; fix agent reported lint:agent clean
+    - command: npm test
+      result: not_run
+      reason: one Rust test changed; fix agent reported test:rust:agent 2294 passed
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or server change
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca16f28-9a8e-461b-807a-ca9312c22080
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A477dee0d-6db4-436d-9819-dd87be9ea3e8
@@ -99,3 +122,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A477dee0d-6db4-436d-9819-dd87be9ea3e8
+- at: 2026-11-17T05:51:47.499116+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-639","DEV-640"]}'
+    new: '{"related":["DEV-639","DEV-640","DEV-650"]}'
+- at: 2026-11-17T05:52:01.505728+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T05:52:23.769417+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

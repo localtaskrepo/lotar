@@ -227,3 +227,48 @@ fn the_thread_of_a_cancelled_job_is_left_alone() {
     assert_eq!(harness.task().comments.len(), comments);
     assert!(!harness.calls().contains("thread list"), "T3 Code isn't asked: {}", harness.calls());
 }
+
+/// DEV-639: a waiting thread holds the ticket (DEV-600), so lotar takes over no other thread of it.
+#[test]
+fn no_thread_is_taken_over_while_a_newer_thread_of_the_ticket_waits_for_an_answer() {
+    let harness = harness();
+    harness.run_job("other", "t1");
+    harness.run_job("fixer", "t2");
+    let assignee = harness.task().assignee;
+
+    harness.list(&[("t1", "running"), ("t2", "running")]);
+    harness.show("t1", "running", Some("r2"), 0, "Working.");
+    harness.show("t2", "running", Some("r2"), 1, "Which one?");
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+
+    assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none(), "no job takes a thread over");
+    assert_eq!(harness.comments_with("lotar takes it over"), 0, "{:?}", harness.task().comments);
+    assert_eq!(harness.task().assignee, assignee);
+    let beside = harness.task().comments.into_iter().find(|comment| comment.text.contains("stop it in T3 Code")).expect("a comment on the running thread");
+    assert!(beside.text.contains(&link("t1")) && beside.text.contains(&link("t2")), "{}", beside.text);
+
+    // Another process looks at the same runs through its own path to the tasks directory.
+    let other_path = harness.fixtures.get_temp_path().join("tasks-link");
+    std::os::unix::fs::symlink(&tasks_dir, &other_path).unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&other_path);
+    assert_eq!(harness.comments_with("stop it in T3 Code"), 1, "one comment per thread run");
+    assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none());
+}
+
+#[test]
+fn a_thread_t3_code_lists_as_waiting_holds_the_ticket_too() {
+    let harness = harness();
+    harness.run_job("other", "t1");
+    harness.run_job("fixer", "t2");
+
+    harness.list(&[("t1", "waiting"), ("t2", "running")]);
+    harness.show("t1", "waiting", Some("r2"), 0, "Which one?");
+    harness.show("t2", "running", Some("r2"), 0, "Working.");
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+
+    assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none(), "no job takes a thread over");
+    let beside = harness.task().comments.into_iter().find(|comment| comment.text.contains("stop it in T3 Code")).expect("a comment on the running thread");
+    assert!(beside.text.contains(&link("t2")) && beside.text.contains(&link("t1")), "{}", beside.text);
+}
