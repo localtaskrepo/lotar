@@ -1,11 +1,11 @@
 title: read_until_deadline EOF test skips the EINVAL path when shutdown answers NotConnected
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T05:51:46.365057+00:00
-modified: 2026-11-17T06:14:28.583619+00:00
+modified: 2026-11-17T06:31:12.926789+00:00
 relationships:
   related:
   - DEV-649
@@ -50,6 +50,37 @@ comments:
     - Didn't rerun the full `npm run lint`, `npm test` or `npm run smoke` (the fix agent reports them passing)
     - Merge note stands: DEV-649's `c9ed2248e` (only on `agent/DEV-649`) edits the same lines. Keep this version, because its order makes DEV-649's `NotConnected` match unnecessary
     - No findings, no tickets filed
+- date: 2026-11-17T06:30:39.444681+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `b4995394b` is on `main` and `origin/main`.
+
+    - Rebased twice. On the second rebase main had gained DEV-649 (`ba2a58301`), which changes the same lines of `crates/lotar-lib/tests/web_api_integration_test.rs`. I kept DEV-650's version, as the fix agent and the review said. With the other end still open, `shutdown` can't answer `NotConnected`, so DEV-649's goal (no panic) still holds
+    - The code after the conflict fix matches the commit the checks ran on (`7ab5a6e52`); only `.tasks` files differ. The targeted test passed again after the conflict fix
+    - Ticket check against main's code: a loop of the steps, run 2000 times, gave `shutdown=Ok timeout=InvalidInput read=0` every time
+    - `.tasks` changes from the main checkout (DEV-649 ticket file) were amended into the merge commit. No rules changed, so I didn't run `lotar trust`
+    - Pushed `ba2a58301..b4995394b`. It was the only unpushed commit, and the main checkout is clean
+  report:
+    commits:
+    - hash: b4995394b
+      what: shut down before dropping the peer; assert EINVAL on macOS (on main, pushed)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on 7ab5a6e52, same code as the merged commit
+    - command: npm test
+      result: passed
+      reason: 2297 Rust, 1548 UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: ticket loop check x2000
+      result: passed
+      reason: InvalidInput every time
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    next: 'None: ticket goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A00256ffb-802a-4b43-ab31-14d448816fc5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0e424a4-8b62-4f6e-87fe-7aee22f5fc8f
@@ -115,3 +146,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T06:30:39.444681+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:31:12.926789+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

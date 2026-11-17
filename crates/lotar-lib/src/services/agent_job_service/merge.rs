@@ -207,6 +207,7 @@ impl Merge<'_> {
         let context =
             prepare_worktree(self.tasks_dir, self.ticket_id, self.config).map_err(|err| hand_off(format!("no worktree for `{}`: {err}", self.branch)))?;
         self.done.push(format!("Checked `{}` out in the new worktree `{}`", self.branch, context.working_dir.display()));
+        self.done.extend(context.note);
         Ok((context.working_dir, true))
     }
 

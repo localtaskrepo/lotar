@@ -1204,3 +1204,87 @@ fn build_output_stays_while_another_job_runs_in_the_worktree() {
     assert!(Path::new(job.worktree_path.as_deref().unwrap()).join("target/debug/app").exists(), "tracked files are never deleted");
     assert!(!deleted_note(&job));
 }
+
+/// DEV-635: a repository that ignores `target/`, with the main checkout's
+/// build in `target/debug/app`.
+fn cloned_build_setup() -> (TestFixtures, String) {
+    let (fixture, ticket) = setup("exit 0", true);
+    let root = fixture.get_temp_path();
+    fs::write(root.join(".gitignore"), "target/\n").unwrap();
+    git(root, &["add", ".gitignore"]);
+    git(root, &["commit", "-m", "Ignore build output"]);
+    fs::create_dir_all(root.join("target/debug")).unwrap();
+    fs::write(root.join("target/debug/app"), "main").unwrap();
+    (fixture, ticket)
+}
+
+fn job_note(job: &lotar::api_types::AgentJob, text: &str) -> Option<String> {
+    AgentJobService::events_for(&job.id).into_iter().filter_map(|event| event.message).find(|message| message.contains(text))
+}
+
+/// A new worktree's build: `Some(app)` with what the cloned `target/debug/app` holds.
+fn cloned_app(job: &lotar::api_types::AgentJob) -> Option<String> {
+    assert_eq!(job.status, "completed", "a clone never fails the job: {:?}", job.last_message);
+    fs::read_to_string(Path::new(job.worktree_path.as_deref().unwrap()).join("target/debug/app")).ok()
+}
+
+#[test]
+fn a_new_worktree_clones_the_main_checkouts_build() {
+    common::require_git();
+    let (fixture, ticket) = cloned_build_setup();
+    let job = run_build_output_job(&fixture, &ticket);
+    let root = fixture.get_temp_path();
+    if cfg!(target_os = "macos") {
+        assert_eq!(cloned_app(&job).as_deref(), Some("main"));
+        assert_eq!(job_note(&job, "Cloned target/"), Some(format!("Cloned target/ from {} (copy-on-write).", root.display())), "the job log names the source");
+    } else {
+        assert_eq!(cloned_app(&job), None, "no full copy without clonefile");
+        assert!(job_note(&job, "clonefile(2) isn't available on this system; this job builds cold.").is_some());
+    }
+    assert_eq!(fs::read_to_string(root.join("target/debug/app")).unwrap(), "main", "the source stays");
+}
+
+/// The ticket's earlier worktree (a T3 Code thread's, on a branch made from
+/// the ticket branch) wins over the main checkout.
+#[test]
+fn a_new_worktree_clones_the_tickets_earlier_worktree_before_the_main_checkout() {
+    common::require_git();
+    let (fixture, ticket) = cloned_build_setup();
+    let root = fixture.get_temp_path();
+    let branch = format!("agent/{ticket}");
+    git(root, &["branch", &branch]);
+    git(root, &["branch", "t3/topic", &branch]);
+    let outside = tempfile::tempdir().unwrap();
+    let thread = outside.path().join("t3-tree");
+    git(root, &["worktree", "add", "-q", thread.to_str().unwrap(), "t3/topic"]);
+    fs::create_dir_all(thread.join("target/debug")).unwrap();
+    fs::write(thread.join("target/debug/app"), "earlier").unwrap();
+    let job = run_build_output_job(&fixture, &ticket);
+    if cfg!(target_os = "macos") {
+        assert_eq!(cloned_app(&job).as_deref(), Some("earlier"));
+        let thread = fs::canonicalize(&thread).unwrap();
+        assert!(job_note(&job, &format!("Cloned target/ from {} (copy-on-write).", thread.display())).is_some());
+    } else {
+        assert_eq!(cloned_app(&job), None);
+    }
+}
+
+/// A clone that fails (here an unreadable directory in the build) leaves a
+/// cold build and says why; so does a repository with no build at all.
+#[test]
+fn a_failed_or_missing_clone_leaves_a_cold_build() {
+    common::require_git();
+    let (fixture, ticket) = cloned_build_setup();
+    let locked = fixture.get_temp_path().join("target/debug/locked");
+    fs::create_dir_all(&locked).unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+    let job = run_build_output_job(&fixture, &ticket);
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(cloned_app(&job), None, "no partial target/ stays");
+    assert!(job_note(&job, "Couldn't clone target/ from ").is_some_and(|note| note.ends_with("; this job builds cold.")));
+
+    let (fixture, ticket) = setup("exit 0", true);
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(cloned_app(&job), None);
+    assert!(job_note(&job, "No target/ to clone in an earlier worktree of the ticket or in the main checkout; this job builds cold.").is_some());
+}

@@ -1545,11 +1545,63 @@ fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
     if verified_common_dir(&worktree_path).map_err(LoTaRError::IoError)? != repo_common {
         return Err(LoTaRError::ValidationError("Worktree belongs to a different repository".into()));
     }
+    context.note = Some(clone_build_output(&repo_root, &config.agent_worktree.branch_prefix, &branch, &worktree_path));
 
     context.working_dir = worktree_path.clone();
     context.worktree_path = Some(worktree_path);
     context.worktree_branch = Some(branch);
     Ok(context)
+}
+
+/// A new worktree starts from a copy-on-write clone of the ticket's newest
+/// build (DEV-635): `target/` of an earlier worktree of the ticket (its T3
+/// Code threads'), the one built last, else of the main checkout. Only
+/// `clonefile(2)` clones; a full copy would cost the disk the clone saves,
+/// so on failure the job builds cold. Returns the note for the job log.
+fn clone_build_output(repo_root: &std::path::Path, prefix: &str, branch: &str, worktree: &std::path::Path) -> String {
+    let build = |dir: &std::path::Path| dir.join("target");
+    let has_build = |dir: &std::path::Path| fs::symlink_metadata(build(dir)).is_ok_and(|meta| meta.is_dir());
+    // `target/` itself changes only when an entry is added; cargo rewrites
+    // `.rustc_info.json` and the profile directories on every build.
+    let built_at = |dir: &std::path::Path| {
+        fs::read_dir(build(dir)).into_iter().flatten().flatten().filter_map(|entry| entry.metadata().and_then(|meta| meta.modified()).ok()).max()
+    };
+    let new = fs::canonicalize(worktree).unwrap_or_else(|_| worktree.to_path_buf());
+    let earlier = agent_worktrees(repo_root, prefix)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|tree| tree.ticket_branch == branch && fs::canonicalize(&tree.path).is_ok_and(|path| path != new) && has_build(&tree.path))
+        .max_by_key(|tree| built_at(&tree.path))
+        .map(|tree| tree.path);
+    let Some(source) = earlier.or_else(|| has_build(repo_root).then(|| repo_root.to_path_buf())) else {
+        return "No target/ to clone in an earlier worktree of the ticket or in the main checkout; this job builds cold.".to_string();
+    };
+    let to = build(worktree);
+    if fs::symlink_metadata(&to).is_ok() {
+        return "The new worktree has a target/ already; nothing cloned.".to_string();
+    }
+    match clonefile(&build(&source), &to) {
+        Ok(()) => format!("Cloned target/ from {} (copy-on-write).", source.display()),
+        Err(err) => {
+            let _ = fs::remove_dir_all(&to);
+            format!("Couldn't clone target/ from {}: {err}; this job builds cold.", source.display())
+        }
+    }
+}
+
+/// Clone a directory tree copy-on-write (APFS); other filesystems fail.
+#[cfg(target_os = "macos")]
+fn clonefile(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    use std::os::unix::ffi::OsStrExt;
+    let from = std::ffi::CString::new(from.as_os_str().as_bytes())?;
+    let to = std::ffi::CString::new(to.as_os_str().as_bytes())?;
+    // SAFETY: both are NUL-terminated paths that outlive the call.
+    if unsafe { libc::clonefile(from.as_ptr(), to.as_ptr(), 0) } == 0 { Ok(()) } else { Err(std::io::Error::last_os_error()) }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn clonefile(_from: &std::path::Path, _to: &std::path::Path) -> std::io::Result<()> {
+    Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "clonefile(2) isn't available on this system"))
 }
 
 /// Where a t3 job's thread starts: `t3 thread start --worktree <base> [--branch <branch>]`.
