@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-17T18:14:50.484644+00:00
+modified: 2026-11-17T19:32:17.468423+00:00
 relationships:
   blocks:
   - DEV-645
@@ -128,6 +128,9 @@ comments:
     - Review passed on `d8659a72` (the only commit beyond main on `agent/DEV-623`); the full lint, test and smoke runs passed at 02:30Z
     - The merge will hit mechanical conflicts in `crates/lotar-core/src/config/{fields,normalization,resolution,types}.rs` (keep both sides)
     - [DEV-645](https://lotar.pyxzl.net/task/DEV-645) is blocked on this ticket
+- date: 2026-11-17T19:31:41.851125+00:00
+  author: mallox
+  text: 'Answer: merge (Merge as built (gate on by default on macOS)) (answered in INBOX-399)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2723c3a0-e508-468f-a410-efcf7e0b6d36
@@ -340,3 +343,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T19:31:41.851125+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:32:17.468423+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

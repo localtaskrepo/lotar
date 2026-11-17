@@ -1,11 +1,11 @@
 title: 't3 runner: give job threads the profile''s tools.disallowed and env'
-status: HelpNeeded
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-16T18:41:59.400479+00:00
-modified: 2026-11-16T20:03:11.363729+00:00
+modified: 2026-11-17T19:28:00.658323+00:00
 relationships:
   related:
   - DEV-596
@@ -33,8 +33,12 @@ comments:
     1. A T3 Code project script for lotar (`runOnWorktreeCreate`, wait for setup) that runs a new `lotar agent t3-worktree-setup` command. The command writes the file only in a lotar job's worktree and does nothing in your own threads. You add the script once per T3 project, and docs/help/agent.md says how. The file is in place before the agent starts.
     2. No T3 setup: lotar watches for the job's new worktree and writes the file the moment it appears. This races the Claude start, so the first call can miss the savings, and the "written before the thread starts" check in Done when would change to "as soon as the worktree appears".
     3. Wait for a `t3` CLI option that passes Claude settings or env, and leave this ticket until then.
+- date: 2026-11-17T19:27:57.681568+00:00
+  author: mallox
+  text: We already call npm ci or a different command in all repos. Maybe we just default to run npm in all projects if a package.json exists or recommend a better approach with a different default command to run on triggers. Also, onWorktree might not trigger since t3 isn't creating work trees (answered in INBOX-445)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef1ab-19d5-4a1d-9e83-87eed3e27274
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67416213-09db-42c9-9957-6856b853ac51
 description: |-
   Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six; 1 and 4 only in job sessions" (answered in INBOX-351): unused tools and the claude.ai connectors go off in job sessions only, his own sessions keep them.
 
@@ -95,3 +99,24 @@ history:
   - field: relationships
     old: '{"related":["DEV-596"]}'
     new: '{"related":["DEV-596","DEV-620"]}'
+- at: 2026-11-17T19:27:57.681568+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:27:58.525085+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T19:27:59.839564+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T19:28:00.658323+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67416213-09db-42c9-9957-6856b853ac51

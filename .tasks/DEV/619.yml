@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-16T23:20:28.654384+00:00
+modified: 2026-11-17T19:30:37.939726+00:00
 relationships:
   related:
   - DEV-613
@@ -39,6 +39,9 @@ comments:
       result: passed
       reason: 405 tests
     next: 'Owner: choose how a continued thread gets renamed (question below)'
+- date: 2026-11-17T19:30:37.260057+00:00
+  author: mallox
+  text: Implement with the internal API, we just need to react when the next version gets installed to check if there API changed or if the garage is available. Don't file but so check if someone already filled it (answered in INBOX-444)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
 description: |-
@@ -131,3 +134,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-613"]}'
     new: '{"related":["DEV-613","DEV-620"]}'
+- at: 2026-11-17T19:30:37.260057+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:30:37.939726+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

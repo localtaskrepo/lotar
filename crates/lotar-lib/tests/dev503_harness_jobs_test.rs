@@ -1096,6 +1096,32 @@ fn a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread() {
     wait_for_jobs_to_end(&fixtures.tasks_root);
 }
 
+/// DEV-671: a `session: continue` job of a claude profile on a ticket whose only session is a T3 Code thread doesn't
+/// take the thread's next turn: it starts a claude session of its own and the job log says why.
+#[test]
+fn a_continued_job_on_another_runner_starts_a_session_of_its_own() {
+    let (fixtures, _env) = t3_harness_and(&[("fix", "", "")], "  review:\n    runner: claude\n    session: continue\n    env:\n      FAKE_LOG: /dev/null\n");
+    let root = fixtures.get_temp_path();
+    let acp = root.join("fake-acp.sh");
+    std::fs::write(&acp, FAKE_ACP_AGENT).unwrap();
+    std::fs::set_permissions(&acp, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let agents = root.join("harnessmux/config/agents.toml");
+    let t3 = std::fs::read_to_string(&agents).unwrap();
+    std::fs::write(&agents, format!("{t3}[agents.claude]\ncommand = [\"{}\"]\n", acp.display())).unwrap();
+    run_t3(&fixtures, "fix").success();
+    run_t3(&fixtures, "review").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert_eq!(log.lines().count(), 1, "the review sends the fix thread nothing: {log}");
+    let review = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
+        .find(|job| job.contains("\"agent_profile\":\"review\""))
+        .expect("the review's job log");
+    assert!(review.contains("\"runner\":\"claude\""), "the review runs on claude: {review}");
+    assert!(review.contains("runs the t3 agent, not claude; this job starts a new one."), "the job log says why: {review}");
+    wait_for_jobs_to_end(&fixtures.tasks_root);
+}
+
 /// DEV-565, in one process (`lotar serve`): the merge takes over the review's session while it is still open there, and
 /// its turn runs with the merge profile's env, not the review's.
 #[test]
