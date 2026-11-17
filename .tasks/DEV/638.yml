@@ -1,11 +1,11 @@
 title: lotar serve announces task files written before it started as task_updated
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T16:11:38.062420+00:00
+modified: 2026-11-17T16:13:44.504007+00:00
 relationships:
   related:
   - DEV-614
@@ -391,6 +391,32 @@ comments:
 - date: 2026-11-17T16:11:36.009114+00:00
   author: automation
   text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab038bc22-ff75-4512-be20-7e30f3381097 of the job job-20261117T091645.311Z-47 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T161135.978Z-1: DEV-638 goes back to @merge, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-17T16:13:19.034233+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `66ac7e113` is on `main` and `origin/main`.
+
+    - Rebased `99ee73da0` onto `main` (23 commits ahead, no conflicts), then fast-forwarded the main checkout; `.tasks` changes amended in as the owner set
+    - Checks after the rebase: `npm run lint:agent` and `npm run test:agent` passed
+    - Smoke: first run 404/405. The failure was `smoke/tests/harness.mcp-client.smoke.spec.ts:80` timing out at load average ~38; it has nothing to do with this change. It passed 3/3 alone and the full rerun passed 405/405. Filed as [DEV-659](https://lotar.pyxzl.net/task/DEV-659)
+    - Ticket check: `lotar serve` started right after writing `CHK/1.yml`; `/api/events` sent no `task_updated` for it
+    - No rule or config files changed, so no `lotar trust` needed. Pushed: main checkout clean, only this commit was unpushed
+  report:
+    commits:
+    - hash: 66ac7e113
+      what: watcher seeds its fingerprints before watching (rebased from 99ee73da0, .tasks amended in)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 1st run 404/405, flaky MCP client test filed as DEV-659; rerun 405/405
+    - command: manual /api/events check
+      result: passed
+      reason: no task_updated for a pre-start file
+    next: 'None: ticket goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22b1bf8c-7133-4be8-b911-a6234f55843e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e669ea5-0714-4b68-9b9c-a06ebd8772d7
@@ -405,10 +431,6 @@ references:
 description: 'Found in the DEV-614 review on 2026-11-16: the tasks watcher (crates/lotar-lib/src/web_server.rs start_tasks_watcher) can still report files written just before the server started (FSEvents delivers recent history), and its ''announced'' fingerprint map starts empty, so it emits task_updated for unchanged files. On the Dependencies page (view/pages/Dependencies.vue changed()) such an event clears an open safe repair preview with ''Task data changed''. DEV-614 worked around it in the smoke test only. Check: start lotar serve right after writing a task file, open /api/events, watch for a task_updated of that file without a new write. Done when the watcher seeds its fingerprints at start (or ignores events for content it saw at start) and a test shows no event for pre-start writes.'
 tags:
 - health
-- fix-retried
-- retry-fix
-- retry-fable
-- merge-retried
 custom_fields:
   finding: review:serve-watcher-replays-prestart-writes
 history:
@@ -760,3 +782,16 @@ history:
   - field: status
     old: HelpNeeded
     new: Merging
+- at: 2026-11-17T16:13:19.034233+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:13:44.504007+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, retry-fix, retry-fable, merge-retried
+    new: health

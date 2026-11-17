@@ -1,0 +1,109 @@
+title: A ticket created while another job in its tasks dir starts or ends gets its agent assignee from the created rule but no job
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T16:15:20.189944+00:00
+modified: 2026-11-17T16:17:18.525259+00:00
+relationships:
+  related:
+  - DEV-643
+  - DEV-646
+  - DEV-647
+comments:
+- date: 2026-11-17T16:17:18.525259+00:00
+  author: claude
+  text: |-
+    On 0.15.3 a start with another job running in local worked: no repro yet.
+
+    - 2026-11-17 16:16:48Z: `lotar assignee LOCA-471 --clear`, then `@fix`, with LOCA-500's job running in local. The job started at 16:16:52 (status InProgress).
+    - So the loss needs more than one running job, e.g. a job starting or ending (worktree cleanup, DEV-647) when the ticket is created. All 12 losses happened on 0.15.2 or earlier.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af14f2e6c-276d-42d1-8c0a-5d03c1661ffa
+description: |-
+  Found by LOCA-500 (local, 2026-11-17).
+
+  ## Found
+  - In local, the rule "Health: start the fix agent" (`on.created`: `set assignee @fix` plus `agent`) set the assignee on 12 tickets filed by `repos.ts --live --report` (`lotar add --finding`), but no job ever ran: no `.tasks/@agent-logs` entry, no `<ID>.context`, nothing in `~/Library/Caches/lotar/agent-queue/queue-*.json`, status still Todo. `lotar --format json agent list-jobs -n 2000` has none of them.
+  - Lost: LOCA-469 (2026-11-16 00:48Z), 470 (00:53), 471 (02:26), 474 (03:25), 488 (23:14), 490 (11-17 00:18), 492 (00:24), 495 (00:50), 496 (00:55), 497 (01:07), 498 (02:20), 499 (02:47). LOCA-471 (disk nearly full, High) sat 38 h until the Mac's disk ran full.
+  - Each was filed while another job in the same tasks dir started, ran or ended: 488 14 s after 487 (whose job started 23:14:26), 490 next to LOCA-489's two jobs (00:19:05, 00:19:13), 492 at the second 491's job started (00:24:00), 474 during LOCA-473's jobs (03:09 to 03:18). Tickets filed with no job running got theirs within seconds.
+  - The failed tickets' assignee came 7 to 11 s after creation (488: created 23:14:18, assignee 23:14:25; 474: 03:25:54 to 03:26:05). For a working one it takes about 1 s. That fits the lock waits in DEV-643/DEV-647 (worker holding the storage lock or job registry through `git worktree remove`).
+  - `lotar add` exited 0 (repos.ts reports a failed add), so the lost start was silent. Binary then: lotar 0.15.2 or earlier, before 0.15.3 (installed 2026-11-17 16:00Z).
+
+  ## Check
+  Create a ticket whose created rule assigns an agent while a job in the same tasks dir is starting or cleaning up its worktree: the job is queued or started, or `lotar add` fails and says why.
+
+  ## Done when
+  - [ ] A created rule's agent start is never dropped: it queues the job (on-disk queue) or the command fails with the reason, also under lock contention and while another job starts or ends.
+  - [ ] Test reproducing the case above; fails before the fix.
+  - [ ] If the cause is already fixed in 0.15.3 (DEV-643, DEV-646, DEV-647), the test shows it and this ticket says which commit.
+tags:
+- health
+custom_fields:
+  finding: job-lost:created-rule
+history:
+- at: 2026-11-17T16:15:21.477339+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-643","DEV-646","DEV-647"]}'
+- at: 2026-11-17T16:15:22.721517+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T16:15:27.885305+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T16:15:31.178249+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found by LOCA-500 (local, 2026-11-17).
+
+      ## Found
+      - In local, the rule "Health: start the fix agent" (`on.created`: `set assignee @fix` plus `agent`) set the assignee on 13 tickets filed by `repos.ts --live --report` (`lotar add --finding`), but no job ever ran: no `.tasks/@agent-logs` entry, no `<ID>.context`, nothing in `~/Library/Caches/lotar/agent-queue/queue-*.json`, status still Todo. `lotar --format json agent list-jobs -n 2000` has none of them.
+      - Lost: LOCA-469 (2026-11-16 00:48Z), 470 (00:53), 471 (02:26), 474 (03:25), 488 (23:14), 490 (11-17 00:18), 492 (00:24), 495 (00:50), 496 (00:55), 497 (01:07), 498 (02:20), 499 (02:47). LOCA-471 (disk nearly full, High) sat 38 h until the Mac's disk ran full.
+      - Each was filed while another job in the same tasks dir started, ran or ended: 488 14 s after 487 (whose job started 23:14:26), 490 next to LOCA-489's two jobs (00:19:05, 00:19:13), 492 at the second 491's job started (00:24:00), 474 during LOCA-473's jobs (03:09 to 03:18). Tickets filed with no job running got theirs within seconds.
+      - The failed tickets' assignee came 7 to 11 s after creation (488: created 23:14:18, assignee 23:14:25; 474: 03:25:54 to 03:26:05). For a working one it takes about 1 s. That fits the lock waits in DEV-643/DEV-647 (worker holding the storage lock or job registry through `git worktree remove`).
+      - `lotar add` exited 0 (repos.ts reports a failed add), so the lost start was silent. Binary then: lotar 0.15.2 or earlier, before 0.15.3 (installed 2026-11-17 16:00Z).
+
+      ## Check
+      Create a ticket whose created rule assigns an agent while a job in the same tasks dir is starting or cleaning up its worktree: the job is queued or started, or `lotar add` fails and says why.
+
+      ## Done when
+      - [ ] A created rule's agent start is never dropped: it queues the job (on-disk queue) or the command fails with the reason, also under lock contention and while another job starts or ends.
+      - [ ] Test reproducing the case above; fails before the fix.
+      - [ ] If the cause is already fixed in 0.15.3 (DEV-643, DEV-646, DEV-647), the test shows it and this ticket says which commit.
+    new: |-
+      Found by LOCA-500 (local, 2026-11-17).
+
+      ## Found
+      - In local, the rule "Health: start the fix agent" (`on.created`: `set assignee @fix` plus `agent`) set the assignee on 12 tickets filed by `repos.ts --live --report` (`lotar add --finding`), but no job ever ran: no `.tasks/@agent-logs` entry, no `<ID>.context`, nothing in `~/Library/Caches/lotar/agent-queue/queue-*.json`, status still Todo. `lotar --format json agent list-jobs -n 2000` has none of them.
+      - Lost: LOCA-469 (2026-11-16 00:48Z), 470 (00:53), 471 (02:26), 474 (03:25), 488 (23:14), 490 (11-17 00:18), 492 (00:24), 495 (00:50), 496 (00:55), 497 (01:07), 498 (02:20), 499 (02:47). LOCA-471 (disk nearly full, High) sat 38 h until the Mac's disk ran full.
+      - Each was filed while another job in the same tasks dir started, ran or ended: 488 14 s after 487 (whose job started 23:14:26), 490 next to LOCA-489's two jobs (00:19:05, 00:19:13), 492 at the second 491's job started (00:24:00), 474 during LOCA-473's jobs (03:09 to 03:18). Tickets filed with no job running got theirs within seconds.
+      - The failed tickets' assignee came 7 to 11 s after creation (488: created 23:14:18, assignee 23:14:25; 474: 03:25:54 to 03:26:05). For a working one it takes about 1 s. That fits the lock waits in DEV-643/DEV-647 (worker holding the storage lock or job registry through `git worktree remove`).
+      - `lotar add` exited 0 (repos.ts reports a failed add), so the lost start was silent. Binary then: lotar 0.15.2 or earlier, before 0.15.3 (installed 2026-11-17 16:00Z).
+
+      ## Check
+      Create a ticket whose created rule assigns an agent while a job in the same tasks dir is starting or cleaning up its worktree: the job is queued or started, or `lotar add` fails and says why.
+
+      ## Done when
+      - [ ] A created rule's agent start is never dropped: it queues the job (on-disk queue) or the command fails with the reason, also under lock contention and while another job starts or ends.
+      - [ ] Test reproducing the case above; fails before the fix.
+      - [ ] If the cause is already fixed in 0.15.3 (DEV-643, DEV-646, DEV-647), the test shows it and this ticket says which commit.
+- at: 2026-11-17T16:15:32.791836+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af14f2e6c-276d-42d1-8c0a-5d03c1661ffa
+- at: 2026-11-17T16:17:18.525259+00:00
+  actor: claude
+  changes:
+  - field: comment_added

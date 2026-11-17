@@ -1,16 +1,61 @@
 title: Smoke test 'rejects oversized lines without unbounded buffering' times out under heavy load
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T16:11:23.006068+00:00
-modified: 2026-11-17T16:11:44.934035+00:00
+modified: 2026-11-17T16:39:22.260635+00:00
 relationships:
   related:
   - DEV-638
+  - DEV-314
+comments:
+- date: 2026-11-17T16:31:50.790560+00:00
+  author: claude
+  text: |-
+    Fixed: the test no longer caps the oversized-line wait at 5 s.
+
+    - Cause: the client already fails as soon as the buffer passes the limit (`smoke/helpers/mcp.ts:273`); the test's `awaitResponse(1, 5000)` also had to cover the child's Node startup, which under load took longer.
+    - Repro: a 6 s `Atomics.wait` at the top of `smoke/helpers/fake-mcp-child.mjs` (temporary, reverted) gave the reported `Timed out waiting for MCP response with id 1`.
+    - Fix: `smoke/tests/harness.mcp-client.smoke.spec.ts` uses the client's default 20 s bound, like the other tests in the file; the repro then passes.
+    - Full smoke run passed at load average ~65.
+  report:
+    commits:
+    - hash: dcebbe88f
+      what: drop the 5 s wait in the oversized-line smoke test
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405 at load average ~65
+    - command: slow-child repro (6 s child startup)
+      result: passed
+      reason: failed before the fix, passes after
+    next: Review, then merge
+- date: 2026-11-17T16:38:51.362651+00:00
+  author: claude
+  text: |-
+    Review: passed. The one-line test change does what "Done when" asks; no findings.
+
+    - Reviewed `dcebbe88f` (only commit in `main..HEAD`; `agent/DEV-659` holds nothing newer). One file: `smoke/tests/harness.mcp-client.smoke.spec.ts:82`.
+    - Claim holds: `NdjsonMcpClient.consumeLines` (`smoke/helpers/mcp.ts:273`) fails the queue as soon as the buffer passes `maxLineBytes`, so the rejection doesn't wait for a timeout. The test now uses the default 20 s (`DEFAULT_TIMEOUT_MS`), which only bounds the child's startup. The vitest `testTimeout` is 120 s, so it fits.
+    - Matches the other waits in the file (20 s / 10 s defaults). No stray files, no second branch. Owner decisions not touched.
+    - Main moved on to `66ac7e113` (DEV-638); none of the touched smoke files changed there since 2025 (`git log -5 main -- smoke/...`).
+    - Reran: the spec file alone 3×, 12/12 passed each time (load ~42–59). `npm run test:smoke:agent`: 405/405 passed at load ~65. `prettier --check` and `oxlint` on the file are clean.
+    - Not rerun: the fix agent's 6 s startup-delay repro (it needs a temporary file edit). From the code, the old 5 s budget included the child's startup, which explains the reported timeout.
+- date: 2026-11-17T16:39:09.406492+00:00
+  author: claude
+  text: |-
+    Correction to the review comment: the touched smoke files last changed on main in `7241c9060` (DEV-314, 2026-11-10), not "since 2025".
+
+    - That commit predates the fix's base `af585df7a`, so the fix builds on the current code. The verdict stays: passed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7a1176a-a3a0-44f3-92e1-99a436b78b87
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2d115a50-4496-49e3-a2d1-67ad933d71ae
 description: 'Found in the DEV-638 merge on 2026-11-17: in a full smoke run (load average ~38) smoke/tests/harness.mcp-client.smoke.spec.ts:80 got ''Timed out waiting for MCP response with id 1'' instead of /exceeded maximum/ (5000 ms wait). It passed 3 of 3 runs alone and in a second full run. Check: npm run test:smoke:agent under load. Done when the oversized-line rejection does not depend on a 5 s response wait (e.g. the client rejects as soon as the line passes the limit) and the test passes under load.'
 tags:
 - health
@@ -39,3 +84,44 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7a1176a-a3a0-44f3-92e1-99a436b78b87
+- at: 2026-11-17T16:31:50.790560+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:32:00.326613+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T16:32:05.209422+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2d115a50-4496-49e3-a2d1-67ad933d71ae
+- at: 2026-11-17T16:38:51.362651+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:39:09.406492+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:39:10.243055+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-638"]}'
+    new: '{"related":["DEV-638","DEV-314"]}'
+- at: 2026-11-17T16:39:22.260635+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

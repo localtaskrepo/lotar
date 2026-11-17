@@ -77,7 +77,9 @@ describe('MCP NDJSON smoke client (fake child processes)', () => {
         const client = spawnFakeClient([], { maxLineBytes: 1024 });
         try {
             await client.send({ jsonrpc: '2.0', id: 1, method: 'big', params: { size: 4096 } });
-            await expect(client.awaitResponse(1, 5000)).rejects.toThrow(/exceeded maximum/);
+            // The client fails as soon as the buffered line passes the limit; the default
+            // wait only bounds a child that starts slowly under load.
+            await expect(client.awaitResponse(1)).rejects.toThrow(/exceeded maximum/);
             await expect(client.send({ jsonrpc: '2.0', id: 2, method: 'echo' })).rejects.toThrow();
         } finally {
             await client.dispose();

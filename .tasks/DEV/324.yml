@@ -5,13 +5,16 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-11T19:27:16.036194+00:00
-modified: 2026-11-15T00:46:07.099117+00:00
+modified: 2026-11-17T16:12:37.024126+00:00
 comments:
 - date: 2026-11-11T19:46:26.433353+00:00
   text: 'Upstream already has it: issue https://github.com/pingdotgg/t3code/issues/29863 (CLI: add --effort to t3 thread start and send) and PR https://github.com/pingdotgg/t3code/pull/27189 (open, not reviewed yet as of 2026-11-11), which adds ''t3 thread start --effort <level>'' together with --provider/--model. Once it ships: pass the profile''s/run''s effort as --effort (the runner already passes provider and model), drop the job note. No new upstream request needed.'
 - date: 2026-11-15T00:46:05.604783+00:00
   author: claude
   text: 'Blocked on upstream (stalled-ticket sweep, mallox in the thread 2026-11-14: "Fix the ticket statuses"): T3 Code has no `--effort` yet. Check: `gh pr view 27189 -R pingdotgg/t3code --json state,mergedAt` and the `t3 thread start --help` of the installed T3 Code. Once a release has it, pass the profile''s effort in the t3 runner.'
+- date: 2026-11-17T16:12:37.024126+00:00
+  author: claude
+  text: 'T3 PR #27189 (`t3 thread start --effort`) was closed unmerged on 2026-11-17 04:09Z; the maintainers want a general `--option` PR instead, which I couldn''t find yet. Installed t3 is v0.1.9. Still Blocked; the communication review (standards STD-17) told the owner.'
 references:
 - link: https://github.com/pingdotgg/t3code/pull/27189
 description: |-
@@ -49,3 +52,7 @@ history:
     new: Blocked
   - field: assignee
     new: claude
+- at: 2026-11-17T16:12:37.024126+00:00
+  actor: claude
+  changes:
+  - field: comment_added
