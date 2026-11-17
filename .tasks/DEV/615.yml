@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-17T02:55:16.181774+00:00
+modified: 2026-11-17T02:57:43.749878+00:00
 relationships:
   related:
   - DEV-464
   - DEV-611
   - DEV-622
   - DEV-627
+  - DEV-577
 comments:
 - date: 2026-11-16T06:16:18.867391+00:00
   author: automation
@@ -277,3 +278,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-464","DEV-611","DEV-622"]}'
     new: '{"related":["DEV-464","DEV-611","DEV-622","DEV-627"]}'
+- at: 2026-11-17T02:57:43.749878+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-611","DEV-622","DEV-627"]}'
+    new: '{"related":["DEV-464","DEV-611","DEV-622","DEV-627","DEV-577"]}'

@@ -5,11 +5,12 @@ type: Feature
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-17T02:55:23.696004+00:00
+modified: 2026-11-17T02:57:55.694629+00:00
 relationships:
   related:
   - DEV-584
   - DEV-606
+  - DEV-644
 comments:
 - date: 2026-11-16T19:17:10.926669+00:00
   author: claude
@@ -122,6 +123,28 @@ comments:
 - date: 2026-11-17T02:28:17.591432+00:00
   author: automation
   text: The fix agent's job job-20261117T021644.669Z-35 failed (lotar agent logs job-20261117T021644.669Z-35); @fix-retry retries it on branch t3/fix-codex-retry-rate-limit.
+- date: 2026-11-17T02:57:55.694629+00:00
+  author: claude
+  text: |-
+    Branch unchanged and ready for review again; no new commit.
+
+    - The last fix job (`job-20261117T021644.669Z-35`) did finish: its turn ended `end_turn` at 02:23:52. It was marked failed only because its session later ended idle. The review job `job-20261117T012140.075Z-11` failed the same way.
+    - Filed that as [DEV-644](https://lotar.pyxzl.net/task/DEV-644): `drive_turns` fails a job on `session.ended idle` even after its last turn ended normally.
+    - `agent/DEV-617` and the `t3/fix-codex-retry-*` branches all hold `15135f65`, which still merges cleanly onto main (`git merge-tree`). Main is 20 commits ahead.
+  report:
+    checks:
+    - command: git merge-tree --write-tree main HEAD
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: no change since review passed
+    - command: npm test
+      result: not_run
+      reason: no change since review passed
+    - command: npm run smoke
+      result: not_run
+      reason: no change; merge reruns checks
+    next: Review on Codex, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5546fe0-7dc8-46db-bd03-10093f4d83f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6
@@ -276,3 +299,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8238297-f9ab-4bc8-b8fd-61f2b0d1b2c1
+- at: 2026-11-17T02:57:46.971783+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-606"]}'
+    new: '{"related":["DEV-584","DEV-606","DEV-644"]}'
+- at: 2026-11-17T02:57:55.694629+00:00
+  actor: claude
+  changes:
+  - field: comment_added

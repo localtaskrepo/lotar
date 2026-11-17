@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-17T02:28:15.364464+00:00
+modified: 2026-11-17T02:57:43.747397+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -17,6 +17,10 @@ relationships:
   - DEV-605
   - DEV-594
   - DEV-595
+  - DEV-609
+  - DEV-612
+  - DEV-615
+  - DEV-627
 comments:
 - date: 2026-11-15T19:51:52.799436+00:00
   author: claude
@@ -207,6 +211,35 @@ comments:
 - date: 2026-11-17T02:20:44.433742+00:00
   author: claude
   text: 'Stalled since 2026-11-17T01:48Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-17T02:57:43.563806+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-577 is on main as `c84541f71`.
+
+    - Rebased `e087ae1b` onto main four times, because main moved during the checks (DEV-612, DEV-615, DEV-627). The one conflict was in `dev503_harness_jobs_test.rs`: DEV-609's new test and DEV-577's new test were added at the same place. I kept both. DEV-612 changes `unlanded_ticket_branch` in the same file, a different function from DEV-577's `move_ticket_branch`; git combined them without conflict.
+    - `git -C <root> merge --ff-only` reached `2030199d4`. I amended the open `.tasks` changes into it, which gives `c84541f71`, and pushed `033179f1c..c84541f71`. The main checkout is clean and nothing is unpushed.
+    - Ticket check: the regression test passes on the merged code. Live case: `agent/DEV-577` is checked out, clean, in `agent-DEV-577-128da42a683bf50d`. The installed lotar 0.15.2 has DEV-573 but not this fix, so it detaches that worktree when this job ends.
+    - No lockfile changed, so no `npm ci`. No rule or config files changed, so I didn't run `lotar trust`.
+  report:
+    commits:
+    - hash: c84541f71
+      what: DEV-577 fix on main (rebased from e087ae1b), pushed to origin/main
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent, reran after each rebase
+    - command: npm test
+      result: passed
+      reason: test:agent on 16f2cf2d, 2282 Rust + 1548 UI; later rebases changed only smoke/tests/ui.releases.smoke.spec.ts and cli_serve_features_test.rs, those reran
+    - command: npm run smoke
+      result: passed
+      reason: 405/405 on 14bb18da; the last rebase changed only a Rust test file
+    - command: ticket check (a_merged_thread_leaves_a_ticket_branch_checked_out_elsewhere_and_completes)
+      result: passed
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config files changed
+    next: 'None: the ticket goes to Done when the job ends'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1eaaed6-5fcf-4453-93a1-c602d6736f1c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aebc5a3cc-f4ba-483a-acf0-cf1cdfc7f5c6
@@ -472,3 +505,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8c7fca24-820c-46c7-a848-d438b0ed4118
+- at: 2026-11-17T02:57:43.563806+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T02:57:43.747397+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627"]}'

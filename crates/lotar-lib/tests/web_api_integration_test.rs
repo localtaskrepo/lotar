@@ -28,7 +28,14 @@ fn read_until_deadline(stream: &mut TcpStream, buf: &mut [u8], deadline: Instant
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         assert!(!remaining.is_zero(), "no response from test server within {RESPONSE_DEADLINE:?}");
-        stream.set_read_timeout(Some(remaining)).unwrap();
+        match stream.set_read_timeout(Some(remaining)) {
+            Ok(()) => {}
+            // macOS refuses setsockopt with EINVAL once the socket is shut down in
+            // both directions, e.g. after the server answered 411/503 and closed.
+            // The read below then returns what is left without blocking.
+            Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {}
+            Err(e) => panic!("setting read timeout failed: {e}"),
+        }
         match stream.read(buf) {
             Ok(n) => return n,
             Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut | std::io::ErrorKind::Interrupted) => {}
@@ -842,6 +849,18 @@ fn responses_forbid_cross_site_framing() {
     assert!(headers.contains("frame-ancestors 'self'"), "{headers}");
     assert!(headers.contains("x-content-type-options: nosniff"), "{headers}");
     server.stop();
+}
+
+#[test]
+fn read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let mut stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let (peer, _) = listener.accept().unwrap();
+    drop(peer);
+    // On macOS this makes set_read_timeout fail with EINVAL, as a peer close racing it did.
+    stream.shutdown(std::net::Shutdown::Both).unwrap();
+    let mut buf = [0u8; 16];
+    assert_eq!(read_until_deadline(&mut stream, &mut buf, Instant::now() + RESPONSE_DEADLINE), 0);
 }
 
 #[test]

@@ -1,0 +1,28 @@
+title: A job whose turn ended normally fails when its session later ends idle
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T02:57:46.326002+00:00
+modified: 2026-11-17T02:57:47.370441+00:00
+relationships:
+  related:
+  - DEV-617
+description: 'Found 2026-11-17 on DEV-617: job job-20261117T021644.669Z-35 posted its final message, harnessmux logged turn.finished stop_reason end_turn at 02:23:52, then ''idle for 60s'' and session.ended reason idle at 02:24:52; lotar recorded agent_job_failed ''The session lotar-95e687-DEV-617-fix ended: idle'' and @fix-retry ran the job again. The review job job-20261117T012140.075Z-11 failed the same way. Cause: drive_turns in crates/lotar-lib/src/services/agent_job_service.rs finishes after a turn only when session.idle() is true right then; when status() still shows the turn (or errors), the loop waits, and EventBody::SessionEnded returns RunEnd::Failed whatever the reason. Check: ~/.local/state/harnessmux/sessions/lotar-95e687-DEV-617-fix.events.jsonl ends with turn.finished end_turn, notice idle, session.ended idle; lotar agent logs job-20261117T021644.669Z-35 says failed. Done: a session that ends idle after its last turn finished ends the job with that turn''s outcome (not failed), with a test.'
+tags:
+- health
+custom_fields:
+  finding: agent-job:idle-after-end-turn
+history:
+- at: 2026-11-17T02:57:46.972528+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-617"]}'
+- at: 2026-11-17T02:57:47.370441+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
