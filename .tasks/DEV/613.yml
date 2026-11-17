@@ -1,11 +1,11 @@
 title: 'Flaky test: a_queue_entry_held_by_a_waiting_thread_says_so_once can call remove while the worker holds the entry'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-17T02:55:16.181014+00:00
+modified: 2026-11-17T03:20:14.377511+00:00
 relationships:
   depends_on:
   - DEV-631
@@ -23,6 +23,9 @@ relationships:
   - DEV-630
   - DEV-633
   - DEV-627
+  - DEV-577
+  - DEV-640
+  - DEV-639
 comments:
 - date: 2026-11-16T05:51:33.176016+00:00
   author: claude
@@ -233,6 +236,38 @@ comments:
       result: not_run
       reason: no UI or runtime change
     next: Merge agent rebases 51144732 onto main and reruns the check
+- date: 2026-11-17T03:17:28.935809+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `18fd847bf` is on `main` and `origin/main`.
+
+    - **Rebase:** onto main twice, with no conflicts and no lockfile changes. Main moved on (DEV-577, DEV-640) while the first round of checks ran, so I ran all checks again on the new hash.
+    - **Checks:** `npm run lint:agent`, `npm run test:agent` (2284 Rust, 1548 UI, release and hook tests) and `npm run test:smoke:agent` (405 tests) all passed on the final commit.
+    - **Ticket check:** `cargo nextest run --workspace -E 'test(/dev503_harness_jobs_test|dev522|dev592|queue/)'` passed 58/58 on the merged code. The review's 30-run stress check also passed.
+    - **Ticket files:** the changed `.tasks` files went into the merge commit (amended twice, since `DEV/623.yml` changed again right after the first amend).
+    - **Push:** `c84541f71..18fd847bf`, including DEV-640's finished commit. The pre-push hook passed.
+    - **Trust:** not needed, since no rules or config files changed.
+    - Leftover: branch `t3/6ec6d3a3` (`989c0a39`) still holds an older copy of this fix and can be deleted. I left it alone.
+  report:
+    commits:
+    - hash: 18fd847bf
+      what: DEV-613 test retries remove with wait_for (rebased onto main, ticket files amended in)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2284 Rust, 1548 UI, release and hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: cargo nextest run --workspace -E 'test(/dev503_harness_jobs_test|dev522|dev592|queue/)'
+      result: passed
+      reason: 58/58 on the merged code
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config files changed
+    next: 'None: Done when the job ends'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
@@ -252,8 +287,6 @@ description: |-
   - [ ] The test passes 30 stress runs under load (`--stress-count 30` beside the rest of the dev503 tests).
 tags:
 - health
-- fix-retried
-- review-returned
 history:
 - at: 2026-11-16T05:03:01.911155+00:00
   actor: claude
@@ -558,3 +591,28 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635","DEV-630","DEV-633"]}'
     new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635","DEV-630","DEV-633","DEV-627"]}'
+- at: 2026-11-17T03:17:28.935809+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:17:29.141121+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635","DEV-630","DEV-633","DEV-627"]}'
+    new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635","DEV-630","DEV-633","DEV-627","DEV-577","DEV-640"]}'
+- at: 2026-11-17T03:17:49.011939+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, review-returned
+    new: health
+- at: 2026-11-17T03:20:14.377511+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635","DEV-630","DEV-633","DEV-627","DEV-577","DEV-640"]}'
+    new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624","DEV-609","DEV-635","DEV-630","DEV-633","DEV-627","DEV-577","DEV-640","DEV-639"]}'

@@ -1,12 +1,14 @@
 title: A @fix-codex retry after a Claude rate limit ran on Claude and failed the same way
-status: InProgress
+status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-17T02:57:55.694629+00:00
+modified: 2026-11-17T03:18:57.399188+00:00
 relationships:
+  depends_on:
+  - DEV-644
   related:
   - DEV-584
   - DEV-606
@@ -145,6 +147,49 @@ comments:
       result: not_run
       reason: no change; merge reruns checks
     next: Review on Codex, then merge
+- date: 2026-11-17T03:17:29.434361+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T025505.481Z-52 failed again or on a rate limit (lotar agent logs job-20261117T025505.481Z-52). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T03:18:56.310526+00:00
+  author: triage
+  text: |-
+    Blocked on DEV-644: the last fix job failed only because lotar ends a finished job as failed when its session goes idle.
+
+    - `job-20261117T025505.481Z-52` did its work (branch `15135f65` unchanged, merges cleanly), then `The session lotar-95e687-DEV-617-fix-retry ended: idle`.
+    - Same false failure as `job-20261117T021644.669Z-35` and the review job: [DEV-644](https://lotar.pyxzl.net/task/DEV-644) (open, `@fix`).
+    - A further retry would loop the same way. This continues when DEV-644 is done ("Prerequisites done"); next step is the review on Codex, then merge.
+- date: 2026-11-17T03:18:57.201365+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-644.'
+- date: 2026-11-17T03:18:57.399188+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-617 yet. DEV-617 waits for DEV-644.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5546fe0-7dc8-46db-bd03-10093f4d83f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6
@@ -307,5 +352,52 @@ history:
     new: '{"related":["DEV-584","DEV-606","DEV-644"]}'
 - at: 2026-11-17T02:57:55.694629+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:17:28.905132+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-17T03:17:29.434361+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:18:52.187539+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-606","DEV-644"]}'
+    new: '{"depends_on":["DEV-644"],"related":["DEV-584","DEV-606","DEV-644"]}'
+- at: 2026-11-17T03:18:52.623004+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-17T03:18:52.958597+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-17T03:18:56.310526+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:18:56.902288+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T03:18:57.201365+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:18:57.399188+00:00
+  actor: automation
   changes:
   - field: comment_added

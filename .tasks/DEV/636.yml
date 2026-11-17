@@ -1,11 +1,11 @@
 title: 'harnessmux builds too much debug info per worktree: dev profile without debug info, measured first'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T01:03:37.707996+00:00
-modified: 2026-11-17T03:04:09.433322+00:00
+modified: 2026-11-17T03:26:14.072733+00:00
 relationships:
   related:
   - DEV-579
@@ -78,9 +78,39 @@ comments:
 - date: 2026-11-17T03:04:09.433322+00:00
   author: claude
   text: 'Stalled since 2026-11-17T02:23Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-17T03:21:47.455764+00:00
+  author: claude
+  text: |-
+    Merged: harnessmux `main` fast-forwarded to `c066000`; not pushed.
+
+    - harnessmux: `git merge --ff-only agent/DEV-636` in `~/Development/@localtaskrepo/harnessmux`, `987add9..c066000`. No rebase was needed, since the branch already sat on `main`
+    - Checks skipped: same hash that passed fmt, clippy, nextest (43/43) and deny in the fix and the review
+    - Not pushed: `~/Development/standards/repos.json` doesn't list harnessmux, so the push rule doesn't allow it. `c066000` is the only commit ahead of `origin/main`
+    - lotar: `agent/DEV-636` held only copies of commits already on `main` (`git cherry` marks all 5 `-`). After a rebase it equals `main` (`bb7cc83`), so there was nothing to merge, push or amend
+    - No rule or config files changed, so no `lotar trust` was needed
+    - lotar `.tasks` changes in the main checkout were left alone: its last commit isn't one this job merged
+  report:
+    commits:
+    - hash: c066000
+      what: harnessmux [profile.dev] debug = false, AGENTS.md build note (fast-forwarded onto harnessmux main)
+    checks:
+    - command: cargo fmt --all --check
+      result: not_run
+      reason: skipped, passed in fix and review on c066000, unchanged by the fast-forward
+    - command: cargo clippy -D warnings
+      result: not_run
+      reason: skipped, passed in fix and review on c066000
+    - command: cargo nextest run
+      result: not_run
+      reason: skipped, 43/43 passed in fix and review on c066000
+    - command: cargo deny check
+      result: not_run
+      reason: skipped, passed in fix and review on c066000
+    next: 'Owner: push harnessmux main if wanted (repos.json has no harnessmux entry, so agents don''t push it)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A32b33909-f47c-4bc3-9dea-fe08ed6a6c58
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a7a167-f47b-44f6-aba1-c1e85a08922c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad5ff7695-739a-4ccf-b06a-506173f1adc4
 description: |-
   Owner, 2026-11-17, on DEV-579's harnessmux proposal: "yes I agree with a ticket once measurements are in". So this ticket measures first, then changes.
 
@@ -186,3 +216,18 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T03:20:59.782008+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad5ff7695-739a-4ccf-b06a-506173f1adc4
+- at: 2026-11-17T03:21:47.455764+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:26:14.072733+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

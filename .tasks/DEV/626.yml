@@ -1,12 +1,14 @@
 title: After a restart T3 Code resumes cut-off job threads on its own, outside any lotar job, and their tickets stay HelpNeeded
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-17T02:57:13.686830+00:00
+modified: 2026-11-17T03:39:12.844291+00:00
 relationships:
+  blocks:
+  - DEV-639
   related:
   - DEV-593
   - DEV-594
@@ -98,9 +100,35 @@ comments:
 
     - `agent/DEV-639` holds `66fee083f` (`55e2126a9` cherry-picked onto main, dropping the DEV-620 duplicate) plus `08cd964f2` (DEV-639).
     - DEV-639 changes `on_ticket` in `resumed.rs` and adds two tests to `dev626_resumed_t3_threads_test.rs`; the fix for the `!= "running"` wait doesn't touch those lines.
+- date: 2026-11-17T03:17:34.214098+00:00
+  author: claude
+  text: |-
+    Rework: fixed the flaky wait the review found; the review read HEAD `55e2126a9` (it quotes lines 151 and 182).
+
+    - `dev626_resumed_t3_threads_test.rs`: new `wait_for_end` waits for `completed`, `failed` or `cancelled`, not `!= "running"`, so a taken-over job still `queued` no longer ends the wait. Used at both places (old lines 151 and 182).
+    - Test-only change; the product code is unchanged. The DEV-620 duplicate `1227e5bde` stays below it and drops on rebase.
+    - Amended into `5d6344feb` (signed).
+  report:
+    commits:
+    - hash: 5d6344feb
+      what: adoption of resumed T3 threads; the tests wait for an end status
+    checks:
+    - command: cargo nextest run --workspace -E 'test(/dev626|dev600|dev503|dev378/)' x5
+      result: passed
+      reason: 39/39 each run
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2280 Rust, 1548 web
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review again; land DEV-626 before DEV-639 (agent/DEV-639 cherry-picked the old 55e2126a9, so rebase it on this commit)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ae3bded-6bb0-4dbe-b1d4-32538275daa2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae33ee74-c0c4-408b-b956-bbb269e447c7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cb2062a-9d41-4e06-96a8-4e8fa9bdea6d
 description: |-
   Found by the chief of staff 2026-11-16 (owner: "a few work threads in t3 are stuck for quite a while").
 
@@ -303,3 +331,27 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae33ee74-c0c4-408b-b956-bbb269e447c7
+- at: 2026-11-17T03:17:34.214098+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:18:40.670005+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T03:21:12.874682+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cb2062a-9d41-4e06-96a8-4e8fa9bdea6d
+- at: 2026-11-17T03:39:12.844291+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620"]}'
+    new: '{"blocks":["DEV-639"],"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620"]}'

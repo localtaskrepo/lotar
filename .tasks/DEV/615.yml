@@ -1,11 +1,10 @@
 title: 'Flaky smoke: offers Add to release in the row menu once a release appears (DEV-464) fails under the full suite'
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-17T03:16:26.209405+00:00
+modified: 2026-11-17T03:20:04.749550+00:00
 relationships:
   related:
   - DEV-464
@@ -13,6 +12,7 @@ relationships:
   - DEV-622
   - DEV-627
   - DEV-577
+  - DEV-644
 comments:
 - date: 2026-11-16T06:16:18.867391+00:00
   author: automation
@@ -146,6 +146,19 @@ comments:
 - date: 2026-11-17T02:54:49.328664+00:00
   author: automation
   text: The merge agent's job job-20261117T022707.024Z-42 failed (lotar agent logs job-20261117T022707.024Z-42); the fix agent retries it on branch t3/fix-flaky-add-to-release-smoke.
+- date: 2026-11-17T03:18:51.807891+00:00
+  author: claude
+  text: |-
+    Nothing to fix: the fix already landed on `main` as `dcc5d7eb` and is pushed; the merge job only failed after its turn ended.
+
+    - `892eb10d` on this branch is the pre-amend copy of `dcc5d7eb`; the spec file is identical on `main`
+    - The merge job ended `turn.finished end_turn`, then `session.ended idle` 60 s later, and lotar counted that as failed: that's [DEV-644](https://lotar.pyxzl.net/task/DEV-644), case added there
+  report:
+    checks:
+    - command: git diff 892eb10d main -- smoke/tests/ui.releases.smoke.spec.ts
+      result: passed
+      reason: empty, the fix is on main
+    next: None; the merge job's idle failure is DEV-644
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
@@ -153,8 +166,6 @@ references:
 description: 'Found in DEV-611''s `npm run smoke`: `tests/ui.releases.smoke.spec.ts` > offers Add to release (DEV-464) failed at line 112, `expect(created.ok).toBe(true)` (creating the release returned not ok). Check: `npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts` passes alone (2 of 2). Done: the release creation in that test succeeds under the full suite''s load, or the test waits for it.'
 tags:
 - health
-- fix-retried
-- merge-retried
 custom_fields:
   finding: smoke:ui-releases-add-to-release
 history:
@@ -290,3 +301,27 @@ history:
   - field: status
     old: Merging
     new: InProgress
+- at: 2026-11-17T03:18:45.583401+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-611","DEV-622","DEV-627","DEV-577"]}'
+    new: '{"related":["DEV-464","DEV-611","DEV-622","DEV-627","DEV-577","DEV-644"]}'
+- at: 2026-11-17T03:18:51.807891+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:19:58.688450+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T03:20:04.749550+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, fix-retried, merge-retried
+    new: health

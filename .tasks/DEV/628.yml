@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review-claude'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-17T02:58:04.719251+00:00
+modified: 2026-11-17T03:47:37.606670+00:00
 relationships:
   related:
   - DEV-620
@@ -63,10 +63,37 @@ comments:
     - Done when 2 not met: `docs/help/agent.md:58` says no pick means "all are automation's" and "automation's comments are left out". But `before_hand_back` (`agent_job_service.rs:1257`) doesn't skip automation: an automation "job failed" comment followed by a hand-back to mallox becomes the `Open question`. Only `newest_in` (`:1284`) skips automation. The doc comment at `:1241` ("Automation's comments are left out") is wrong the same way
     - Fix: say automation is left out of the newest fix and review comments only. Give the no-pick case as the code does it: no comment before the last hand-back to a person (except that person's own), no comment with a question, no comment written in a fix or review phase. Skipping automation in `before_hand_back` would change how DEV-620 behaves: only if the owner wants that
     - Not a second blocking review after a rework: the fix agent hasn't reworked it yet
+- date: 2026-11-17T03:47:18.275233+00:00
+  author: claude
+  text: |-
+    Rework: fixed the review's doc finding; commit amended to `b06642d2`.
+
+    - Review read `bc9ba04c`, the HEAD it reworks
+    - `docs/help/agent.md` (Context between phases): no-pick case now as the code does it: no comment with a question, none written before the last hand-back to a person except by that person, and none but automation's written in a fix or review phase (example: the owner's notes before the first fix job)
+    - Same section and the `prompt_comments` doc comment: automation's comments are never the newest fix or review comment, but can be the open question (was: "left out")
+    - Code behaviour unchanged (no DEV-620 decision touched). `no_comment_picked_leaves_one_comments_line` now also checks that an automation comment before a hand-back to mallox is the `Open question`
+  report:
+    commits:
+    - hash: b06642d2
+      what: doc and code comment give the automation rule as the code applies it; test pins it
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2277 Rust, 1548 UI on the 2nd run; the 1st stopped on the known flake a_skipped_session_is_kept_and_the_handoff_names_its_event_log (fixed on main by DEV-621 53e71990, not in this branch's base; 5/5 alone)
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: cargo nextest run -p lotar-lib --lib agent_job_service
+      result: passed
+      reason: '49'
+    next: Review again on another model
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aebace08c-547a-4525-9c19-7bab320bea41
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae582f4d-ee41-45c3-802c-7de9fae349d1
 description: |-
   Found in the DEV-620 review.
 
@@ -81,7 +108,7 @@ description: |-
 tags:
 - fix-retried
 - review-returned
-- review-blocked
+- review-returned-twice
 history:
 - at: 2026-11-16T23:31:43.665837+00:00
   actor: claude
@@ -197,3 +224,36 @@ history:
   - field: tags
     old: fix-retried, review-returned
     new: fix-retried, review-returned, review-blocked
+- at: 2026-11-17T03:18:44.930248+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review-claude'
+    new: '@fix-retry'
+  - field: tags
+    old: fix-retried, review-returned, review-blocked
+    new: fix-retried, review-returned, review-returned-twice
+- at: 2026-11-17T03:21:09.227425+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T03:21:10.645107+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae582f4d-ee41-45c3-802c-7de9fae349d1
+- at: 2026-11-17T03:47:18.275233+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:47:37.606670+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

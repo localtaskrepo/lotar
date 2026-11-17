@@ -1,11 +1,11 @@
 title: lotar serve announces task files written before it started as task_updated
-status: InProgress
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T02:54:54.210554+00:00
+modified: 2026-11-17T03:39:41.376129+00:00
 relationships:
   related:
   - DEV-614
@@ -37,12 +37,105 @@ comments:
 - date: 2026-11-17T02:54:54.210554+00:00
   author: automation
   text: The fix agent's job job-20261117T022652.398Z-41 failed (lotar agent logs job-20261117T022652.398Z-41); @fix-retry retries it on branch agent/DEV-638.
+- date: 2026-11-17T03:19:57.598366+00:00
+  author: claude
+  text: |-
+    Retry: the fix was already done; the first job only failed because its session went idle after finishing.
+
+    - Commit `99ee73da0` (signed) is still the only one beyond `main` on this branch; no changes needed
+    - Reran `cargo nextest run -p lotar-lib watcher_`: 2 passed, including `watcher_skips_files_written_before_it_started`
+    - Full lint/test/smoke passed on this same commit in the first job; not rerun
+  report:
+    commits:
+    - hash: 99ee73da0
+      what: seed the watcher's fingerprints at start
+    checks:
+    - command: cargo nextest run -p lotar-lib watcher_
+      result: passed
+      reason: 2 tests, rerun in the retry
+    - command: npm run lint:agent
+      result: passed
+      reason: first job, same commit
+    - command: npm run test:agent
+      result: passed
+      reason: first job, same commit
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: first job, 405 tests
+    next: Review, then merge
+- date: 2026-11-17T03:29:56.004908+00:00
+  author: claude
+  text: |-
+    Review: passed. `99ee73da0` does what "Done when" asks; no findings, no tickets filed.
+
+    - Diff: `seed_fingerprints` in `crates/lotar-lib/src/web_server.rs` fills `announced` before `watcher.watch()`. Keys are relative paths, same as `process_watch_batch` (it also strips the canonical dir), and dot-entries are skipped the same way
+    - Test `watcher_skips_files_written_before_it_started`: passes. In a scratch copy with an empty map it fails with `task_error`, `task_updated`, `project_changed`, so it catches the bug
+    - Sprint and order snapshots were already seeded at start, so replayed `@sprints` events stay quiet as before
+    - Seeded directories (marker `1`) only suppress the first replayed dir event. Before this, later dir events were already suppressed, and new files or deletions still differ
+    - `main` gained 8 commits since the branch, none to `web_server.rs`; `git merge-tree` merges cleanly
+    - No UI, REST or doc changes; no stray files. The DEV-614 smoke workaround is not on `main`, so there is nothing to remove
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-lib watcher_
+      result: passed
+    - command: new test with an empty fingerprint map (scratch copy)
+      result: failed
+      reason: expected, shows the test catches the bug
+    - command: cargo clippy -p lotar-lib --all-targets
+      result: passed
+    - command: rustfmt --check web_server.rs
+      result: passed
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: change is backend-only, fix agent ran it (405 passed)
+    next: Merge
+- date: 2026-11-17T03:38:23.647437+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T032118.691Z-76 failed or its review thread did (lotar agent logs job-20261117T032118.691Z-76), so the work on branch t3/seed-watcher-prestart-task-fingerprints isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T03:39:01.288978+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job ended 'idle' after it posted its passing review (comment of 03:29), not on the work; check that the review covers HEAD of the branch and send it on to merge.
+  answer:
+    to: 2026-11-17T03:38:23.647437+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job ended ''idle'' after it posted its passing review (comment of 03:29), not on the work; check that the review covers HEAD of the branch and send it on to merge.'
+- date: 2026-11-17T03:39:38.988540+00:00
+  author: automation
+  text: 'The prerequisites could not be checked (Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes). The @fix job waits in the queue, which checks them again before it starts.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22b1bf8c-7133-4be8-b911-a6234f55843e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e669ea5-0714-4b68-9b9c-a06ebd8772d7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae6ab2024-d3f3-4f04-8bb5-0be937e1b3d9
 description: 'Found in the DEV-614 review on 2026-11-16: the tasks watcher (crates/lotar-lib/src/web_server.rs start_tasks_watcher) can still report files written just before the server started (FSEvents delivers recent history), and its ''announced'' fingerprint map starts empty, so it emits task_updated for unchanged files. On the Dependencies page (view/pages/Dependencies.vue changed()) such an event clears an open safe repair preview with ''Task data changed''. DEV-614 worked around it in the smoke test only. Check: start lotar serve right after writing a task file, open /api/events, watch for a task_updated of that file without a new write. Done when the watcher seeds its fingerprints at start (or ignores events for content it saw at start) and a test shows no event for pre-start writes.'
 tags:
 - health
 - fix-retried
+- retry-fix
 custom_fields:
   finding: review:serve-watcher-replays-prestart-writes
 history:
@@ -85,3 +178,63 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T03:18:47.416297+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e669ea5-0714-4b68-9b9c-a06ebd8772d7
+- at: 2026-11-17T03:19:57.598366+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:20:30.208783+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-17T03:21:24.812598+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae6ab2024-d3f3-4f04-8bb5-0be937e1b3d9
+- at: 2026-11-17T03:29:56.004908+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:38:22.304094+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review-claude'
+    new: mallox
+- at: 2026-11-17T03:38:23.647437+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:39:01.288978+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:39:01.434068+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T03:39:38.988540+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:39:41.376129+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fix

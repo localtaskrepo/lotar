@@ -1,12 +1,14 @@
 title: 'The queue worker ignores a project''s max_parallel_jobs: DEV ran 4 jobs with a limit of 2'
-status: Reviewing
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T03:08:20.011006+00:00
+modified: 2026-11-17T03:23:43.167753+00:00
 relationships:
+  blocks:
+  - DEV-646
   related:
   - DEV-626
   - DEV-613
@@ -62,10 +64,14 @@ comments:
 - date: 2026-11-17T03:02:39.751257+00:00
   author: claude
   text: 'Review: filed minor [DEV-646](https://lotar.pyxzl.net/task/DEV-646): `lotar serve` counts only its own jobs and applies one project''s limit to all of them.'
+- date: 2026-11-17T03:20:07.103570+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-630 is assigned to @fix now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad34d9a6c-9f47-4ca3-8837-a89a8c3bce26
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44612340-b192-4390-b809-b4bdc7b925b8
 description: |-
   Found 2026-11-16 in DEV-626 (lotar ran 4 jobs while .tasks/DEV/config.yml sets agent.worktree.max_parallel_jobs: 2).
 
@@ -78,7 +84,7 @@ description: |-
   - [ ] The worker applies each entry's project limit (project config over global), counting the project's running jobs in every process (agent_active_jobs records).
   - [ ] Test: two projects, one with a limit of 1, jobs in two processes; docs in docs/help/agent.md.
 tags:
-- review-blocked
+- review-returned
 history:
 - at: 2026-11-16T23:50:55.844151+00:00
   actor: claude
@@ -178,3 +184,33 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad34d9a6c-9f47-4ca3-8837-a89a8c3bce26
+- at: 2026-11-17T03:17:37.860974+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-17T03:20:07.103570+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:21:04.333753+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T03:21:05.717997+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44612340-b192-4390-b809-b4bdc7b925b8
+- at: 2026-11-17T03:23:43.167753+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-613","DEV-620","DEV-646"]}'
+    new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646"]}'

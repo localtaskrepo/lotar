@@ -1,11 +1,11 @@
 title: A job's end rules that fail on a full disk are never retried, so the ticket stalls at its step
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T00:48:34.144750+00:00
-modified: 2026-11-17T02:54:16.831005+00:00
+modified: 2026-11-17T03:46:21.854164+00:00
 relationships:
   blocks:
   - DEV-642
@@ -19,6 +19,10 @@ relationships:
   - DEV-642
   - DEV-613
   - DEV-620
+  - DEV-640
+  - DEV-639
+  - DEV-635
+  - DEV-530
 comments:
 - date: 2026-11-17T01:28:18.972368+00:00
   author: claude
@@ -65,6 +69,41 @@ comments:
 - date: 2026-11-17T02:54:16.831005+00:00
   author: automation
   text: 'The queued @review job didn''t start: DEV-633 is assigned to @merge now.'
+- date: 2026-11-17T03:17:29.199854+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `9c10760fa` is on `main` and `origin/main`.
+
+    - Rebased onto main 3 times, because main moved while the checks ran. The first rebase dropped the 3 commits already on main (DEV-620/632/624). The later main commits, DEV-640 and DEV-613, touched only tests and `.tasks`, not `automation_service.rs` or `agent_queue_service.rs`.
+    - DEV-613 was amended on main while I rebased (`b0d5507bd` → `18fd847bf`), so I moved only my commit: `git rebase --onto main b0d5507bd`.
+    - Full lint, test and smoke ran on `bde03c77e`, the first rebase. After the later rebases I reran the DEV-640 test file, the automation tests and clippy.
+    - `.tasks/DEV/615.yml`, already changed in the main checkout, was amended into the merge commit, as the owner's rule says.
+    - No rule or profile files changed, so `lotar trust` wasn't needed.
+    - The ticket's check needs a really full disk and wasn't run.
+  report:
+    commits:
+    - hash: 9c10760fa
+      what: retry end rules whose checkpoint a full disk refused (on main, pushed)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on bde03c77e
+    - command: npm test
+      result: passed
+      reason: test:agent on bde03c77e, 2285 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests on bde03c77e
+    - command: cargo nextest web_api_integration_test + automation_service
+      result: passed
+      reason: 53 tests after the rebase onto DEV-640
+    - command: cargo clippy -D warnings
+      result: passed
+      reason: after the rebase
+    - command: ticket check on a really full disk
+      result: not_run
+      reason: needs a full disk; covered by end_rules_whose_checkpoint_cannot_be_saved_run_later
+    next: DEV-641 (docs) and DEV-642 (keep only transient errors) follow up
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac5a64c5-93b0-4a52-9a07-89f589caaf2c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc69ee00-65eb-413b-a296-1a8ad055869b
@@ -197,3 +236,37 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T03:17:29.199854+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:17:29.378788+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640"]}'
+- at: 2026-11-17T03:17:49.676609+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-17T03:20:14.378379+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639"]}'
+- at: 2026-11-17T03:34:35.779403+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635"]}'
+- at: 2026-11-17T03:46:21.854164+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530"]}'

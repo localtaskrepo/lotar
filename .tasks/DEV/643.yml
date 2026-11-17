@@ -1,16 +1,93 @@
 title: lotar CLI writes fail with 'Storage lock still busy' for 40 s and more while the agent worker holds the lock
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T02:28:55.661113+00:00
-modified: 2026-11-17T02:55:13.483919+00:00
+modified: 2026-11-17T03:37:43.521167+00:00
 relationships:
   related:
   - DEV-632
+  - DEV-647
+  - DEV-530
+comments:
+- date: 2026-11-17T03:19:30.416590+00:00
+  author: claude
+  text: |-
+    Fixed: a task update no longer waits for the job registry while it holds the DEV and sprint locks.
+
+    - Cause, measured live (load ~75): a flock probe saw `.tasks/DEV/.task.lock` and `@sprints/.sprints.lock` held together for up to 18 s. `sample 44303` showed the holder waiting on a mutex while another thread waited on `git worktree remove` (38 s).
+    - Chain: `TaskService::update_composed_inner` begins the transaction (both locks), then calls `running_job_id` → `AgentJobService::active_job_id` → `JOB_REGISTRY.lock()`. Worktree cleanup (`cleanup_done_ticket_worktree`, `maybe_cleanup_worktree`) holds `JOB_REGISTRY` through git.
+    - Fix: look the running job up before `MultiFileTransaction::begin`, as `task_move` already does (`crates/lotar-lib/src/services/task_service.rs`).
+    - Test: `a_task_update_waits_for_the_registry_without_holding_the_storage_locks` holds the registry and checks that both locks stay free; it failed before the fix and passes after.
+    - Follow-up filed: [DEV-647](https://lotar.pyxzl.net/task/DEV-647), the registry held through git still stalls job threads.
+  report:
+    commits:
+    - hash: f5893849f
+      what: look up the running job before taking the task/sprint locks
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2283 Rust, 1548 UI, hooks
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: live check against the running worker
+      result: not_run
+      reason: the fix ships with the next lotar build; the worker still runs the old one
+    next: Review, then merge; after the next install rerun the lock probe under load
+- date: 2026-11-17T03:20:12.186677+00:00
+  author: claude
+  text: |-
+    More evidence from the DEV-530 thread: the DEV lock was held for minutes (19:08 to at least 19:16), not a deadlock.
+
+    - Their stacks match mine: the lock holder waits on the job-registry mutex while worktree cleanup holds it through `git worktree remove`. The cleanup runs one removal after another, so the hold lasts minutes.
+    - At 19:20 the lock was free in 38 of 40 checks, and a new `git worktree remove` was running under pid 44303.
+    - `f5893849f` removes the wait under the lock; [DEV-647](https://lotar.pyxzl.net/task/DEV-647) covers the registry held through git.
+- date: 2026-11-17T03:29:52.082264+00:00
+  author: claude
+  text: |-
+    Review: passed. `f5893849f` moves the running-job lookup ahead of the task and sprint locks; the merge can go ahead.
+
+    - Read: the diff, the ticket and its comments, DEV-647, AGENTS.md, and the last 5 commits on main to both touched files.
+    - Cause: `update_composed_inner` took both locks (`MultiFileTransaction::begin` locks `@sprints` and the project), then `running_job_id` waited on `JOB_REGISTRY`. The fix looks the job up first, the same way `task_move::ensure_no_agent_work` does.
+    - No new race: starting a job never takes the storage locks, so checking under them never kept a job from starting in between. If the job ends between the lookup and the write, `record_outcome` returns `None` and `update_composed` applies the held status and assignee directly (`task_service.rs:990`).
+    - Test failed before the fix: with the old `task_service.rs`, the new test failed with `task lock held while the update waits for the registry`. With the fix it passes. Old file put back, tree clean.
+    - Reran: `cargo nextest run -p lotar-lib services::task_service services::agent_job_service services::task_move` (59 passed), `cargo clippy -p lotar-lib --all-targets -- -D warnings` (clean), `rustfmt --edition 2024 --check` on both files (clean).
+    - Not rerun: the full `npm run lint`, `npm test` and `npm run smoke` (the fix agent reports them passed), and the live check under load, because the installed worker is still the old build. The merge agent's check after the install covers that.
+    - Live confirmation of the bug: this comment's first try failed with `DEV/.task.lock is still busy after 2 seconds`.
+    - Still open: worktree cleanup keeps the job registry locked through `git worktree remove`. That is DEV-647, already filed. It no longer blocks CLI writes. No new tickets filed.
+    - No UI changes, no stray files.
+- date: 2026-11-17T03:37:43.521167+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T032117.449Z-75 failed or its review thread did (lotar agent logs job-20261117T032117.449Z-75), so the work on branch t3/lotar-storage-lock-wait isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5de768b9-c6ac-46bb-94a9-f73089fd03a4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80304b10-8469-4561-93fc-5bb7518d560c
 description: 'Found: during the DEV-632 merge job (2026-11-16 ~18:27 PT, load ~60-70), 19 attempts in a row of `lotar --tasks-dir .../lotar/.tasks comment DEV-632 ...` failed with ''Storage lock .tasks/DEV/.task.lock is still busy after 2 seconds; mutation was not run''. lsof showed the lock held by `lotar ... agent worker` (pid 44303, running 1h40m); the 20th try went in. Filing this ticket then hit the same on `.tasks/@sprints/.sprints.lock`. Agent jobs get failed writes and must retry themselves. Check: under load, run lotar comment or add in DEV while the agent worker runs; it should not fail for tens of seconds. Done: the worker holds the locks only briefly, or CLI writes wait long enough, so a write goes in on the first try.'
 tags:
 - health
@@ -33,3 +110,54 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5de768b9-c6ac-46bb-94a9-f73089fd03a4
+- at: 2026-11-17T03:19:06.854095+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-632"]}'
+    new: '{"related":["DEV-632","DEV-647"]}'
+- at: 2026-11-17T03:19:30.416590+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:19:58.727668+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T03:20:12.186677+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:20:12.346086+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-632","DEV-647"]}'
+    new: '{"related":["DEV-632","DEV-647","DEV-530"]}'
+- at: 2026-11-17T03:21:20.949176+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80304b10-8469-4561-93fc-5bb7518d560c
+- at: 2026-11-17T03:29:52.082264+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:37:41.559007+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-17T03:37:43.521167+00:00
+  actor: automation
+  changes:
+  - field: comment_added

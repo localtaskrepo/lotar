@@ -1,0 +1,47 @@
+title: Several Rust tests run together leave .lotar-test-scratch in the test runner's temp folder
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T03:35:00.829240+00:00
+modified: 2026-11-17T03:47:40.688289+00:00
+relationships:
+  related:
+  - DEV-639
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e087eb6-5c16-45be-a23f-eaa19605023d
+description: |-
+  Found in the DEV-639 review (2026-11-16), on branch `agent/DEV-639` (`08cd964f2`).
+
+  ## Found
+  - `node scripts/rust-test-runner.mjs --agent dev510` (9 tests) and `... --agent dev626` (6 tests) pass, then fail with `tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch`. It happened in 2 of 2 dev510 runs and 4 of 4 dev626 runs.
+  - Each dev626 test run alone leaves nothing. So it looks like a race in the scratch-base cleanup (`crates/lotar-lib/tests/common/mod.rs`, `isolate_tmpdir_under_owned_scratch` and its `#[dtor]`) when several test processes end together, not like one test's leftover.
+
+  ## Check
+  - Run `node scripts/rust-test-runner.mjs --agent dev510` a few times: it exits 1 with `.lotar-test-scratch` as the leftover.
+
+  ## Done when
+  - [ ] A filtered run of several tests that all clean up exits 0 with no leftover, in repeated runs of `dev510` and `dev626`.
+  - [ ] A real leftover of one test is still reported.
+tags:
+- health
+custom_fields:
+  finding: test-cleanup:lotar-test-scratch
+history:
+- at: 2026-11-17T03:35:01.675366+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T03:47:35.683803+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T03:47:40.688289+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e087eb6-5c16-45be-a23f-eaa19605023d

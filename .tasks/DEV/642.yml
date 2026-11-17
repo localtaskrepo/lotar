@@ -1,11 +1,11 @@
 title: End rules are kept and retried after any checkpoint error, not only a full disk or busy lock
-status: Blocked
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-17T02:28:24.830886+00:00
-modified: 2026-11-17T02:28:27.130172+00:00
+modified: 2026-11-17T03:47:40.708316+00:00
 relationships:
   depends_on:
   - DEV-633
@@ -15,7 +15,37 @@ comments:
 - date: 2026-11-17T02:28:27.130172+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-633.'
+- date: 2026-11-17T03:42:06.461768+00:00
+  author: claude
+  text: |-
+    Only a full disk keeps a job's end rules now; any other checkpoint error fails as before.
+
+    - `apply_durable_end_action`: keeps the rules only on `StorageFull`, other errors (permission, file where the folder goes) return unchanged
+    - Busy lock is **not** kept: its holder may be this job's checkpoint finishing its steps, so a kept copy could run them twice
+    - `save_unsaved_end_actions`: a kept entry whose retry hits a permanent error is dropped with a log line, so it stops holding the worker; full disk or busy lock retries
+    - New `lock_end_action` helper; a test-only `checkpoint_fault` fakes ENOSPC
+    - Test `end_rules_whose_checkpoint_fails_permanently_are_not_kept`; the DEV-633 test now uses the ENOSPC fake
+  report:
+    commits:
+    - hash: f26bd94c9
+      what: keep end rules only on a full disk
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    next: Merge agent lands agent/DEV-642
+- date: 2026-11-17T03:47:40.708316+00:00
+  author: automation
+  text: The fix agent's job job-20261117T032104.044Z-70 failed (lotar agent logs job-20261117T032104.044Z-70); @fix-retry retries it on branch agent/DEV-642.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A250c2a8c-eb09-4e10-aa80-5c5fc3462ccc
 description: 'Found in the DEV-633 review: `apply_durable_end_action` (`crates/lotar-lib/src/services/automation_service.rs`) keeps every error from `create_dir_all`/`acquire_storage_lock`/`save_end_action` in `UNSAVED_END_ACTIONS`, including permanent ones (permission denied, a file where the folder goes). Those retry every 30 s forever and `has_unsaved_end_actions` keeps the queue worker from exiting. A busy lock (WouldBlock) held by a run of the same job''s checkpoint that then finishes and deletes it would also let the kept copy run the steps a second time. The ticket asked for transient errors (ENOSPC, lock). Done when only StorageFull (and a busy lock, if safe) is kept, and other errors fail as before, with a test.'
+tags:
+- fix-retried
 history:
 - at: 2026-11-17T02:28:25.603469+00:00
   actor: claude
@@ -29,6 +59,34 @@ history:
     old: Todo
     new: Blocked
 - at: 2026-11-17T02:28:27.130172+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:21:04.648787+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T03:21:06.412363+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A250c2a8c-eb09-4e10-aa80-5c5fc3462ccc
+- at: 2026-11-17T03:42:06.461768+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:47:38.281963+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T03:47:40.708316+00:00
   actor: automation
   changes:
   - field: comment_added

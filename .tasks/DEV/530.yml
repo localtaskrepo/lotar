@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-17T02:54:46.653543+00:00
+modified: 2026-11-17T03:47:37.513594+00:00
 relationships:
   blocks:
   - DEV-637
@@ -29,6 +29,8 @@ relationships:
   - DEV-588
   - DEV-592
   - DEV-600
+  - DEV-643
+  - DEV-633
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -718,6 +720,64 @@ comments:
     choice:
     - fix
     note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review thread ended ''idle'' (job-20261117T012844.194Z-21) after it had posted ''Review passed'' at cf8caa2a; not a code error. Rebase onto main is needed anyway (conflicts in agent_queue_service.rs, cli/handlers/agent.rs, docs/help/agent.md; held_by field, agent.md queue line, worker state counts only queued jobs), then send to review again.'
+- date: 2026-11-17T03:17:38.730885+00:00
+  author: claude
+  text: |-
+    Rebased onto main; the three conflicts the review named are resolved, all checks pass.
+
+    - `agent_queue_service.rs`: kept the branch's `from_request`/`into_request`; queue entries fill main's new `held_by: None`; `start_entry` keeps main's `queued_stage_allows_start` check before the prerequisite check.
+    - `cli/handlers/agent.rs`: `lotar agent queue` lists held-back jobs (`waiting_for_prerequisites`) beside main's `worker_state`/`reason`; the worker state still counts only queued jobs.
+    - `docs/help/agent.md`: dropped main's "tickets waiting for prerequisites ... aren't listed"; now says they are listed and don't count as queued. `queue resume` line from main kept.
+    - Ran `npm ci` first: main added `highlight.js`, missing in this worktree.
+    - One signed commit `769a2130` on `t3/held-job-resume-after-prerequisites`.
+  report:
+    commits:
+    - hash: 769a2130
+      what: DEV-530 rebased onto main 033179f1 (was cf8caa2a)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2292 Rust, 1548 web
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    next: Review on another model, then merge
+- date: 2026-11-17T03:46:20.559353+00:00
+  author: claude
+  text: |-
+    Review: passed at `769a2130` (the rebase of `cf8caa2a`, which passed the last review). The merge can go ahead.
+
+    - **Rebase is faithful:** comparing the two patches line by line, the only differences are the conflict resolutions. Queue entries now fill main's `held_by` field. The `lotar agent queue` doc line replaces main's "aren't listed" sentence and keeps main's worker-state text. `worker_state` still counts only `pending`, not parked jobs.
+    - **Main since then** (`bb7cc837`, 4 commits: DEV-633, 613, 640, 577) touches only end-action and worker-exit code. None of it touches the park/unpark paths. `git merge-tree` against main: clean.
+    - **Done when:** a held-back review job resumes with its own prompt and status (`a_held_back_review_job_resumes_with_its_own_prompt_and_status`). A reopened prerequisite parks the queued job again (`a_queued_job_whose_prerequisite_reopened_is_held_back_again`). `docs/help/automation.md` matches the DEV rule, which no longer has the `@agent` exclusion.
+    - **Reran:** `cargo nextest run --workspace -E 'test(/held_back|parked|unpark|prerequisite|unblocked|queue/)'` passed 34 of 34. `cargo clippy --workspace --all-targets` and `cargo fmt --check` are clean. I didn't rerun full lint, test or smoke; the fix agent reports all of them passed on `769a2130`.
+    - **Not UI work:** the diff changes no pages, components or styles. No new findings and no tickets filed ([DEV-637](https://lotar.pyxzl.net/task/DEV-637) is still open from the last review).
+- date: 2026-11-17T03:47:37.513594+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T032108.619Z-73 failed or its review thread did (lotar agent logs job-20261117T032108.619Z-73), so the work on branch t3/resume-held-back-jobs-on-unblock isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -732,6 +792,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a6ef49-966e-4533-9e37-826362e7f5cc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e5b0b9-b153-4cf4-8bda-3e0919bd23c2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A14a0ebb5-4769-4e50-a249-c516350c34c9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A26365793-0068-49f1-8c92-00a0e20ce261
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -1644,3 +1705,50 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A14a0ebb5-4769-4e50-a249-c516350c34c9
+- at: 2026-11-17T03:17:38.730885+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:18:47.334536+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T03:20:12.344103+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600"]}'
+    new: '{"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643"]}'
+- at: 2026-11-17T03:38:22.781874+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A26365793-0068-49f1-8c92-00a0e20ce261
+- at: 2026-11-17T03:46:20.559353+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:46:21.850678+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643"]}'
+    new: '{"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633"]}'
+- at: 2026-11-17T03:47:36.952148+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-17T03:47:37.513594+00:00
+  actor: automation
+  changes:
+  - field: comment_added

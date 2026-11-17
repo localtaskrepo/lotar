@@ -1,11 +1,10 @@
 title: A merge job that landed its work fails when the ticket branch is checked out in another worktree
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-17T02:57:43.747397+00:00
+modified: 2026-11-17T03:47:35.582636+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -21,6 +20,9 @@ relationships:
   - DEV-612
   - DEV-615
   - DEV-627
+  - DEV-613
+  - DEV-644
+  - DEV-635
 comments:
 - date: 2026-11-15T19:51:52.799436+00:00
   author: claude
@@ -240,17 +242,68 @@ comments:
       result: not_run
       reason: no rule or config files changed
     next: 'None: the ticket goes to Done when the job ends'
+- date: 2026-11-17T03:17:31.998668+00:00
+  author: automation
+  text: The merge agent's job job-20261117T021944.917Z-38 failed (lotar agent logs job-20261117T021944.917Z-38); the fix agent retries it on branch t3/merge-job-skip-branch-in-worktree.
+- date: 2026-11-17T03:17:49.786906+00:00
+  author: automation
+  text: 'The queued @merge job didn''t start: DEV-577 is assigned to @fix now.'
+- date: 2026-11-17T03:29:58.016315+00:00
+  author: claude
+  text: |-
+    Nothing to fix: the work is on main as `c84541f71` (pushed), and the last merge job failed for another reason.
+
+    - Job `job-20261117T021944.917Z-38` merged and pushed, posted its final message, then logged `idle for 60s` and `session ... ended: idle`. That's DEV-644 (a finished turn fails when the session later ends idle), not this ticket's branch move.
+    - Every line `e087ae1b` (this branch) adds to `agent_job_service.rs`, `dev503_harness_jobs_test.rs` and `docs/help/agent.md` is already on main. `c84541f71` is its rebased copy, so there's nothing to commit.
+    - The live check needs a lotar release with `c84541f71`; the installed 0.15.2 doesn't have it.
+  report:
+    checks:
+    - command: cargo nextest run --workspace -E 'test(/dev503_harness_jobs_test/)'
+      result: passed
+      reason: 34/35; a_merged_thread_leaves_a_ticket_branch_checked_out_elsewhere_and_completes passed; the 1 failure is DEV-613's flaky test, fixed on main in 18fd847bf, not in this worktree's older base
+    - command: live check (merge job with the ticket branch in another worktree)
+      result: not_run
+      reason: installed lotar 0.15.2 predates c84541f71
+- date: 2026-11-17T03:37:43.396345+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T032057.059Z-67 failed again or on a rate limit (lotar agent logs job-20261117T032057.059Z-67). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1eaaed6-5fcf-4453-93a1-c602d6736f1c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aebc5a3cc-f4ba-483a-acf0-cf1cdfc7f5c6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8c7fca24-820c-46c7-a848-d438b0ed4118
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A246bc10c-4764-4f99-bba6-4cbe3265bf02
 description: |-
   Found: job job-20261115T191640.133Z-8 (standards STD-136) rebased, fast-forwarded main to d0deac4 and pushed, then failed: `git branch --force agent/STD-136 18b8e9c` refused, 'cannot force update the branch used by worktree at .../agent-STD-136-...'. The ticket went back to Merging, assigned to @fix, and a fix agent was started for work already on main.
   Check: run a merge job in a T3 thread whose ticket branch is checked out in a lotar worktree; the job ends failed after the merge.
   Done: when the work is on main, a branch that can't be moved (checked out elsewhere) is skipped or reset in its worktree, and the job doesn't fail; the ticket goes to Done.
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: merge-job:branch-in-use
 history:
@@ -515,3 +568,71 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595"]}'
     new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627"]}'
+- at: 2026-11-17T03:17:05.812544+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, merge-retried
+- at: 2026-11-17T03:17:29.140219+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627","DEV-613"]}'
+- at: 2026-11-17T03:17:31.998668+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:17:49.786906+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:21:04.090965+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-17T03:21:05.594125+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A246bc10c-4764-4f99-bba6-4cbe3265bf02
+- at: 2026-11-17T03:29:58.016315+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:29:58.262127+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627","DEV-613"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627","DEV-613","DEV-644"]}'
+- at: 2026-11-17T03:34:35.776782+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627","DEV-613","DEV-644"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627","DEV-613","DEV-644","DEV-635"]}'
+- at: 2026-11-17T03:37:43.396345+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:38:23.019786+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T03:47:35.582636+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, fix-retried, merge-retried
+    new: health

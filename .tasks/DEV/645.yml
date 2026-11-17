@@ -1,14 +1,24 @@
 title: lotar agent list-jobs shows a memory hold from an old reading once no process reads memory
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T03:02:08.605225+00:00
-modified: 2026-11-17T03:02:11.026136+00:00
+modified: 2026-11-17T03:23:48.590451+00:00
 relationships:
   related:
   - DEV-623
+comments:
+- date: 2026-11-17T03:23:48.590451+00:00
+  author: claude
+  text: |-
+    Plan: `status` reads memory again when the saved hold is older than 60 s; nothing is saved.
+
+    - DEV-623 (memory gate) is not on main yet: this branch carries its commit `d8659a72` cherry-picked onto main (config conflicts resolved, keep both), DEV-645 on top
+    - Merge note: land DEV-623 first or together; once it is on main the cherry-picked commit drops out on rebase
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeca30204-ae6e-4451-9660-94e8242f4b0e
 description: |-
   Found in the DEV-623 review (2026-11-16).
 
@@ -17,11 +27,56 @@ description: |-
   Case: `lotar serve` held a job, then exited (or the held job was removed). Hours later, with memory normal, `lotar agent list-jobs` still says `Queue: new jobs wait for memory: … (held since <old time>)`. `lotar agent queue` hides it while nothing is queued, so it's mainly list-jobs.
 
   ## Done when
-  - [ ] A saved hold whose reading is older than a few recheck intervals (for example 2 × 30 s) is not shown as current: either `status` reads memory again, or it shows the hold as last seen at `<checked_at>`.
-  - [ ] A test with an old saved hold and a normal reading.
+  - [ ] `memory_gate::status` (used by `lotar agent list-jobs`, `lotar agent queue`, the worker state line and `lotar serve`'s waiting reason) reads memory again when the saved reading is older than 2 × 30 s (60 s) or has no time, and that saved reading held or failed. The reading wins over the saved state.
+    - Normal now: no hold is shown. Short of memory now: a hold with that reason, since now. Reading fails now: no hold, the error is shown.
+    - The fresh reading is not saved: only `check` (the worker, `lotar serve`) writes `memory-gate-<hash>.json`, so the settle time of a running gate is unchanged.
+    - A saved reading 60 s old or newer is shown as saved (a held worker rereads every 30 s). A saved open gate (no hold, no error) is shown as before, without a reading.
+  - [ ] A test with an old saved hold and a normal reading: `status` shows no hold; the same hold with a recent reading is still shown.
 history:
 - at: 2026-11-17T03:02:11.026136+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T03:20:31.732580+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T03:20:51.043765+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeca30204-ae6e-4451-9660-94e8242f4b0e
+- at: 2026-11-17T03:23:48.508523+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-623 review (2026-11-16).
+
+      `memory_gate::status` (`crates/lotar-lib/src/services/memory_gate.rs:94`) returns the hold saved in `memory-gate-<hash>.json` without looking at its age. `lotar agent list-jobs` prints it unconditionally (`crates/lotar-lib/src/cli/handlers/agent.rs:311`). Only `check` rereads memory, and only the worker loop, `lotar serve` start paths and its tick call it.
+
+      Case: `lotar serve` held a job, then exited (or the held job was removed). Hours later, with memory normal, `lotar agent list-jobs` still says `Queue: new jobs wait for memory: … (held since <old time>)`. `lotar agent queue` hides it while nothing is queued, so it's mainly list-jobs.
+
+      ## Done when
+      - [ ] A saved hold whose reading is older than a few recheck intervals (for example 2 × 30 s) is not shown as current: either `status` reads memory again, or it shows the hold as last seen at `<checked_at>`.
+      - [ ] A test with an old saved hold and a normal reading.
+    new: |-
+      Found in the DEV-623 review (2026-11-16).
+
+      `memory_gate::status` (`crates/lotar-lib/src/services/memory_gate.rs:94`) returns the hold saved in `memory-gate-<hash>.json` without looking at its age. `lotar agent list-jobs` prints it unconditionally (`crates/lotar-lib/src/cli/handlers/agent.rs:311`). Only `check` rereads memory, and only the worker loop, `lotar serve` start paths and its tick call it.
+
+      Case: `lotar serve` held a job, then exited (or the held job was removed). Hours later, with memory normal, `lotar agent list-jobs` still says `Queue: new jobs wait for memory: … (held since <old time>)`. `lotar agent queue` hides it while nothing is queued, so it's mainly list-jobs.
+
+      ## Done when
+      - [ ] `memory_gate::status` (used by `lotar agent list-jobs`, `lotar agent queue`, the worker state line and `lotar serve`'s waiting reason) reads memory again when the saved reading is older than 2 × 30 s (60 s) or has no time, and that saved reading held or failed. The reading wins over the saved state.
+        - Normal now: no hold is shown. Short of memory now: a hold with that reason, since now. Reading fails now: no hold, the error is shown.
+        - The fresh reading is not saved: only `check` (the worker, `lotar serve`) writes `memory-gate-<hash>.json`, so the settle time of a running gate is unchanged.
+        - A saved reading 60 s old or newer is shown as saved (a held worker rereads every 30 s). A saved open gate (no hold, no error) is shown as before, without a reading.
+      - [ ] A test with an old saved hold and a normal reading: `status` shows no hold; the same hold with a recent reading is still shown.
+- at: 2026-11-17T03:23:48.590451+00:00
+  actor: claude
+  changes:
+  - field: comment_added

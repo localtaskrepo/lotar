@@ -1,23 +1,51 @@
 title: lotar serve counts only its own jobs against max_parallel_jobs and applies the last ticket's project limit to all projects
-status: Todo
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T03:02:27.383761+00:00
-modified: 2026-11-17T03:02:28.412190+00:00
+modified: 2026-11-17T03:29:52.363722+00:00
 relationships:
+  depends_on:
+  - DEV-630
   related:
   - DEV-630
+comments:
+- date: 2026-11-17T03:23:45.870039+00:00
+  author: claude
+  text: |-
+    Blocked on [DEV-630](https://lotar.pyxzl.net/task/DEV-630): this fix needs the limit rule DEV-630 is rewriting right now, so no code yet.
+
+    - DEV-630's rework (thread started 03:21Z) is changing the rule to "global limit = total across projects, a project's own limit on top"; DEV-646 must apply that same rule, so it has to call the worker's function, not copy one under change
+    - Asked the DEV-630 thread to make the slot rule one public function and name it in its hand-off
+    - Wrote "Done when" in the description: every `RespectLimits` start (web, MCP, server-mode automation, `agent run --wait`), cross-process counts, a freed slot in another process starts the waiting job, merge-slot and `0`, reason text, two-process test, `docs/help/agent.md`
+    - Added depends-on DEV-630; the "Prerequisites done" rule restarts this ticket when DEV-630 is Done
+    - No commits, branch `agent/DEV-646` = main
+  report:
+    next: 'Prerequisites done: continue once DEV-630 is Done, calling its shared slot function from agent_job_service.rs'
+- date: 2026-11-17T03:29:52.363722+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-630.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A093ef432-2298-45e6-a33a-c45478867824
 description: |-
   Found in the DEV-630 review (2026-11-16).
 
   ## Found
   - `AgentJobService::start_job` (`crates/lotar-lib/src/services/agent_job_service.rs:334-336`) sets the registry's `max_parallel_jobs` from the starting ticket's project config. It then compares that value with `running_count`, which counts only this process's jobs, from every project.
   - So `lotar serve` ignores jobs that the queue worker and `agent run --wait` run, and one project's limit decides for all of them.
+  - Same path: `process_pending_queue` (starts a waiting job when one of this process's jobs ends), `waiting_reason`, and every `JobStartMode::RespectLimits` caller: web `POST` jobs (`routes/jobs.rs`), MCP (`mcp/server/handlers/agent.rs`), automation in server mode (`automation_service.rs`), `lotar agent run --wait`.
 
   ## Done when
-  - [ ] `lotar serve` applies the same limits as the queue worker after DEV-630 (the same global and per-project rules), counting jobs from every process. Test with two processes.
+  - [ ] Every `RespectLimits` start (list above) starts a job only when the queue worker after DEV-630 would: the same rule (DEV-630 rework: the global `max_parallel_jobs` is a total across all projects, a project's own limit applies to that project on top), through the same function as the worker, not a copy.
+  - [ ] Jobs are counted in every lotar process: this process's registry plus the `agent_active_jobs` records, deduplicated by job id.
+  - [ ] A job without a free slot waits and starts once a slot frees, also when the job that ends ran in another process.
+  - [ ] A merge job still waits for the other merge job; a limit of `0` keeps jobs waiting.
+  - [ ] The waiting reason names the limit that holds the job (total or the project's).
+  - [ ] The config can't be read: the start fails with the error, as today; no job starts past a limit.
+  - [ ] Test with two processes: one runs a job via `agent run --wait`, the other starts jobs through `start_job`; the second job waits for the first process's job to end. Fails on the old code.
+  - [ ] `docs/help/agent.md` says `lotar serve` applies the same limits as the worker.
 history:
 - at: 2026-11-17T03:02:27.945468+00:00
   actor: claude
@@ -30,3 +58,73 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T03:20:50.168824+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T03:20:59.076525+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A093ef432-2298-45e6-a33a-c45478867824
+- at: 2026-11-17T03:23:14.501789+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-630 review (2026-11-16).
+
+      ## Found
+      - `AgentJobService::start_job` (`crates/lotar-lib/src/services/agent_job_service.rs:334-336`) sets the registry's `max_parallel_jobs` from the starting ticket's project config. It then compares that value with `running_count`, which counts only this process's jobs, from every project.
+      - So `lotar serve` ignores jobs that the queue worker and `agent run --wait` run, and one project's limit decides for all of them.
+
+      ## Done when
+      - [ ] `lotar serve` applies the same limits as the queue worker after DEV-630 (the same global and per-project rules), counting jobs from every process. Test with two processes.
+    new: |-
+      Found in the DEV-630 review (2026-11-16).
+
+      ## Found
+      - `AgentJobService::start_job` (`crates/lotar-lib/src/services/agent_job_service.rs:334-336`) sets the registry's `max_parallel_jobs` from the starting ticket's project config. It then compares that value with `running_count`, which counts only this process's jobs, from every project.
+      - So `lotar serve` ignores jobs that the queue worker and `agent run --wait` run, and one project's limit decides for all of them.
+      - Same path: `process_pending_queue` (starts a waiting job when one of this process's jobs ends), `waiting_reason`, and every `JobStartMode::RespectLimits` caller: web `POST` jobs (`routes/jobs.rs`), MCP (`mcp/server/handlers/agent.rs`), automation in server mode (`automation_service.rs`), `lotar agent run --wait`.
+
+      ## Done when
+      - [ ] Every `RespectLimits` start (list above) starts a job only when the queue worker after DEV-630 would: the same rule (DEV-630 rework: the global `max_parallel_jobs` is a total across all projects, a project's own limit applies to that project on top), through the same function as the worker, not a copy.
+      - [ ] Jobs are counted in every lotar process: this process's registry plus the `agent_active_jobs` records, deduplicated by job id.
+      - [ ] A job without a free slot waits and starts once a slot frees, also when the job that ends ran in another process.
+      - [ ] A merge job still waits for the other merge job; a limit of `0` keeps jobs waiting.
+      - [ ] The waiting reason names the limit that holds the job (total or the project's).
+      - [ ] The config can't be read: the start fails with the error, as today; no job starts past a limit.
+      - [ ] Test with two processes: one runs a job via `agent run --wait`, the other starts jobs through `start_job`; the second job waits for the first process's job to end. Fails on the old code.
+      - [ ] `docs/help/agent.md` says `lotar serve` applies the same limits as the worker.
+- at: 2026-11-17T03:23:43.168677+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-630"]}'
+    new: '{"depends_on":["DEV-630"],"related":["DEV-630"]}'
+- at: 2026-11-17T03:23:45.870039+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:26:15.505949+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T03:29:51.592934+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Blocked
+- at: 2026-11-17T03:29:52.363722+00:00
+  actor: automation
+  changes:
+  - field: comment_added
