@@ -1,11 +1,11 @@
 title: The queue starts no new job while the Mac is short of memory
-status: Reviewing
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-16T23:36:44.821264+00:00
+modified: 2026-11-17T00:36:24.287478+00:00
 relationships:
   related:
   - DEV-604
@@ -53,6 +53,31 @@ comments:
     - Everything else matches Done when: the worker uses `JobStartMode::Immediate` and checks the gate before `dequeue_entries`, so `attempts` stay as they were; DEV-378 recovery is not gated; config, docs and the parsing and decision tests are there.
     - Reran `cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(config_validation) | test(agent_queue)'` (with `RUSTC_WRAPPER=`): 43 passed. I did not rerun the full `npm run lint`, `npm test` or `npm run smoke`.
     - Minor, filed: [DEV-629](https://lotar.pyxzl.net/task/DEV-629). `/api/config/show` now also returns `agent_memory_gate`, but `view/api/types.ts` doesn't list it.
+- date: 2026-11-17T00:36:24.287478+00:00
+  author: claude
+  text: |-
+    Rework done: the blocking finding is fixed. In `lotar serve` a job that waits for a slot now also gets the 30 s memory recheck once a hold begins.
+
+    - Fix: `process_pending_queue` starts the memory tick before its early return while the gate holds (`crates/lotar-lib/src/services/agent_job_service.rs`)
+    - Test `a_job_queued_for_a_slot_gets_the_memory_tick_once_a_hold_begins`: a job queued for a slot, then a hold, then a job end. It fails without the fix and passes with it
+    - Test helper `memory_gate::hold_for_test` (test builds only)
+    - DEV-629 (REST types for `agent_memory_gate`) stays its own ticket
+    - Earlier attempt at this rework stopped on a full disk; it ran again with space freed
+  report:
+    commits:
+    - hash: d8659a72
+      what: 'memory gate (amended: lotar serve starts the 30 s memory recheck also for jobs queued before the hold)'
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent, RUSTC_WRAPPER=
+    - command: npm test
+      result: passed
+      reason: test:agent, 2269 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Second review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2723c3a0-e508-468f-a410-efcf7e0b6d36
@@ -191,3 +216,13 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-17T00:10:51.762729+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T00:36:24.287478+00:00
+  actor: claude
+  changes:
+  - field: comment_added

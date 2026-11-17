@@ -1,16 +1,49 @@
 title: 'A dev503 test that times out under heavy load aborts its binary: Harness''s Drop panics again while unwinding'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T21:08:52.852170+00:00
-modified: 2026-11-16T23:24:20.343412+00:00
+modified: 2026-11-17T00:10:54.656711+00:00
 relationships:
   related:
   - DEV-613
+comments:
+- date: 2026-11-16T23:41:38.923229+00:00
+  author: claude
+  text: |-
+    Fixed: a dev503 test that fails while a job runs now reports its own failure instead of aborting the binary.
+
+    - `Harness::drop` checks `std::thread::panicking()`: while unwinding it waits for the jobs with the new `settle` (same 60 s bound, returns a bool), and it doesn't assert. `wait_for` now asserts on `settle`.
+    - Checked with a throwaway test that panics while a job holds its prompt. On `main` it aborts with SIGABRT, with the fix it fails with "the first failure". I removed it again because it takes 60 s.
+    - Decision: the 60 s `wait_for` bound stays. The 602 s run stalled for minutes on single steps at load 110, longer than any reasonable bound; the stall is the machine's, and the other 29 iterations passed.
+    - Builds ran with `RUSTC_WRAPPER=` because the sccache server's temp dir was gone ("Failed to create temp dir").
+  report:
+    commits:
+    - hash: 8af10186
+      what: Harness::drop only waits, without panicking, while the test is already panicking
+    checks:
+    - command: cargo nextest run -E 'test(/dev503_harness_jobs_test/)'
+      result: passed
+      reason: 34/34
+    - command: 'probe: panic while a job is held'
+      result: passed
+      reason: main aborts with SIGABRT (panic in a destructor during cleanup), fix reports the test's own panic as FAIL
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: stress run --stress-count 30 under load
+      result: not_run
+      reason: needs a loaded machine
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeec445cf-bb38-4f44-b052-6a4d7d637810
 description: |-
   Found in the DEV-613 stress run (`--stress-count 30` of `test(/dev503_harness_jobs_test/)`), iteration 30, load average about 110.
 
@@ -48,3 +81,21 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66
+- at: 2026-11-16T23:41:38.923229+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:41:47.445474+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T00:10:54.656711+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeec445cf-bb38-4f44-b052-6a4d7d637810

@@ -1,12 +1,13 @@
 title: 'Flaky test: a_queue_entry_held_by_a_waiting_thread_says_so_once can call remove while the worker holds the entry'
-status: Reviewing
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-16T23:31:42.230629+00:00
+modified: 2026-11-17T00:09:42.847469+00:00
 relationships:
+  depends_on:
+  - DEV-631
   related:
   - DEV-600
   - DEV-625
@@ -14,6 +15,7 @@ relationships:
   - DEV-619
   - DEV-607
   - DEV-612
+  - DEV-631
 comments:
 - date: 2026-11-16T05:51:33.176016+00:00
   author: claude
@@ -111,10 +113,54 @@ comments:
     - The change itself is right and covers "Done when": `wait_for("the waiting entry's removal", || remove(...))`, using the file's existing `wait_for` (line 147).
     - Fix: commit the change on `agent/DEV-613` (on current main, line 814), signed, then drop the copy on `t3/6ec6d3a3` once that's saved, so only one branch holds it.
     - Not rerun: the stress check. There's nothing on the branch to run it on.
+- date: 2026-11-17T00:08:45.760810+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T000834.721Z-1 failed again (lotar agent logs job-20261117T000834.721Z-1). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T00:09:28.762063+00:00
+  author: triage
+  text: |-
+    Waits for DEV-631: the last fix job failed on the checkout, not the work.
+
+    - `job-20261117T000834.721Z-1`: `git worktree add failed`, because `agent/DEV-613` is checked out in the dirty worktree `agent-DEV-613-435bae192ccea1c1`.
+    - That worktree holds the uncommitted one-line fix (`dev503_harness_jobs_test.rs`) the review asked for.
+    - Earlier failures were rate limits. Prerequisite: DEV-631. Continues when it is done.
+- date: 2026-11-17T00:09:30.939825+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-631.'
+- date: 2026-11-17T00:09:31.509379+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-613 yet. DEV-613 waits for DEV-631.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37610913-1767-4f04-b961-4185aa0051da
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46cc50ff-4090-4cf2-a4a6-5565f02e9189
 description: |-
   Found in the DEV-600 review (`af2e42f2`).
 
@@ -277,3 +323,68 @@ history:
   - field: tags
     old: health, fix-retried, review-blocked
     new: health, fix-retried, review-returned
+- at: 2026-11-17T00:08:35.621455+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T00:08:39.623863+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46cc50ff-4090-4cf2-a4a6-5565f02e9189
+- at: 2026-11-17T00:08:43.567778+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-17T00:08:45.760810+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:09:18.328986+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612"]}'
+    new: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631"]}'
+- at: 2026-11-17T00:09:25.859517+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631"]}'
+    new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631"]}'
+- at: 2026-11-17T00:09:27.369710+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-17T00:09:28.762063+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:09:30.297887+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T00:09:30.939825+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:09:31.509379+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:09:42.847469+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'

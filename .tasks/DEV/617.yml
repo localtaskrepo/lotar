@@ -1,11 +1,11 @@
 title: A @fix-codex retry after a Claude rate limit ran on Claude and failed the same way
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-16T23:37:10.605857+00:00
+modified: 2026-11-17T00:20:33.089560+00:00
 relationships:
   related:
   - DEV-584
@@ -25,8 +25,32 @@ comments:
 - date: 2026-11-16T22:32:21.573886+00:00
   author: mallox
   text: 'Answer: rename (Rename profile to @fix-retry, keep it on Claude, don''t retry a job that failed on a rate limit) (answered in INBOX-379)'
+- date: 2026-11-16T23:50:08.209224+00:00
+  author: claude
+  text: |-
+    Rules can now tell a rate-limit failure from other failures; the rename goes to STD-194 in standards.
+
+    - New condition `job: { error: { matches: '(?i)rate limit|usage limit' } }` matches the failed job's last message (`t3 exited ... Claude API rate limit reached`). It never matches on other events. It is validated on save, documented in `docs/help/automation.md`, and the rule editor shows it as YAML-only.
+    - Test: `job_error_condition_tells_a_rate_limit_from_other_failures`, with a rate-limited stub job and a plain failing one.
+    - Rename to `@fix-retry` and the guard in the retry rules: [STD-194](https://standards.pyxzl.net/task/STD-194). The profile and rules live in standards `configs/lotar/`. lotar 0.15.1 reads `job:` as an unknown custom field, so the guard only takes effect from the release that includes this commit.
+    - Disk is almost full (1–2 GB free; about 110 lotar worktrees keep `target/` dirs of up to 10 GB). I deleted only my own incremental cache.
+  report:
+    commits:
+    - hash: 15135f65
+      what: 'job: { error: ... } rule condition for why a job failed'
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2259 Rust, 1549 UI
+    - command: npm run smoke
+      result: not_run
+      reason: disk had 1 GB free, a release build would fill it
+    next: Review on Codex; then STD-194 renames @fix-codex to @fix-retry and adds the rate-limit guard to the shared rules
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5546fe0-7dc8-46db-bd03-10093f4d83f8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6
 description: 'Found 2026-11-16 on DEV-606: job job-20261116T062103.231Z-76 (profile fix-codex) ran in a T3 thread with model claude-opus-5-5 (~/.local/state/harnessmux/sessions/lotar-95e687-DEV-606-fix-codex.json, profile.model) and failed in 7 s with ''Claude API rate limit reached'', just like the @fix job before it, so the ticket went to the owner. Check: that session file shows profile.model claude-opus-5-5 for LOTAR_AGENT_PROFILE fix-codex. Done: a fix-codex job runs on a Codex model (or the profile is renamed to what it runs), with a test; related to DEV-584 (wait through usage limits).'
 tags:
 - health
@@ -84,3 +108,21 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-16T23:50:08.209224+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:50:18.294057+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T00:20:33.089560+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6

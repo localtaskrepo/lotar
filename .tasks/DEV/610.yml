@@ -1,12 +1,13 @@
 title: 'DEV-598 weakened a test: the waits-for-an-answer T3 job''s exit code is no longer checked'
-status: HelpNeeded
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-16T04:40:49.304245+00:00
-modified: 2026-11-16T22:32:44.746976+00:00
+modified: 2026-11-17T00:20:32.221120+00:00
 relationships:
+  depends_on:
+  - local:LOCA-471
   related:
   - DEV-598
 comments:
@@ -29,6 +30,45 @@ comments:
 - date: 2026-11-16T22:32:44.306607+00:00
   author: mallox
   text: 'Answer: c (Wait until DEV-598 is on main, then DEV-610 fixes it) (answered in INBOX-359)'
+- date: 2026-11-16T23:44:10.506474+00:00
+  author: claude
+  text: |-
+    Fix committed, but untested: the disk is full, so nothing compiles.
+
+    - As you answered (INBOX-359): DEV-598 is on main (`18c745f3`). I rebased `agent/DEV-610` onto main and restored `harness.command().assert().failure();` at `dev510_t3_session_test.rs:139` (`9493202d`).
+    - `cargo nextest run --test integration dev510` failed to build: sccache was blocked in the sandbox and also blocked outside it. The `RUSTC_WRAPPER=` fallback then hit `No space left on device`.
+    - I deleted my own `target/debug`. Only 1.9 GiB is free now, and a build needs several GB.
+    - Other lotar worktrees' `target/` dirs use 6–10 GB each (for example `agent-DEV-605` 10G, `DEV-625` 8.3G, `DEV-623` 8.0G). They belong to other sessions, so I left them.
+
+    **Question:** should I delete the `target/` dirs of lotar worktrees whose jobs have finished, or will you free the space yourself? Then I'll run the tests.
+  report:
+    commits:
+    - hash: 9493202d
+      what: line 139 asserts .assert().failure() again
+    checks:
+    - command: cargo nextest run --test integration dev510
+      result: not_run
+      reason: disk full (ENOSPC), 1.9 GiB free
+    - command: npm run lint
+      result: not_run
+      reason: disk full
+    - command: npm test
+      result: not_run
+      reason: disk full
+    - command: npm run smoke
+      result: not_run
+      reason: disk full
+    next: Free disk space, then run the dev510 tests and the final gates
+- date: 2026-11-16T23:44:31.813335+00:00
+  author: triage
+  text: |-
+    Waiting for disk space: it continues when LOCA-471 is done ("Prerequisites done").
+
+    - The Mac's disk is nearly full (`df`: 2.9 GiB free), the live finding LOCA-471; the fix commit `9493202d` only needs its dev510 test run once there is space.
+    - Infrastructure failure, not the work (owner 2026-11-15, `docs/decisions/2026-11-15-inbox-triage.md`), so no question to the owner.
+- date: 2026-11-17T00:20:32.221120+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-471.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A34966937-bfab-4d5a-882e-01ef9581052e
 description: |-
@@ -84,3 +124,53 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-16T23:41:58.008527+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-16T23:44:10.506474+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:44:17.071298+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-16T23:44:31.451928+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-16T23:44:31.813335+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:44:32.198452+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-16T23:44:36.899598+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-598"]}'
+    new: '{"depends_on":["local:LOCA-471"],"related":["DEV-598"]}'
+- at: 2026-11-16T23:44:37.307294+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T00:20:32.221120+00:00
+  actor: automation
+  changes:
+  - field: comment_added

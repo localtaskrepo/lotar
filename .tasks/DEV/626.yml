@@ -1,11 +1,11 @@
 title: After a restart T3 Code resumes cut-off job threads on its own, outside any lotar job, and their tickets stay HelpNeeded
-status: Todo
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-16T22:53:24.272663+00:00
+modified: 2026-11-16T23:50:55.527035+00:00
 relationships:
   related:
   - DEV-593
@@ -16,6 +16,10 @@ relationships:
   - DEV-609
   - DEV-611
   - DEV-612
+  - DEV-600
+  - DEV-630
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ae3bded-6bb0-4dbe-b1d4-32538275daa2
 description: |-
   Found by the chief of staff 2026-11-16 (owner: "a few work threads in t3 are stuck for quite a while").
 
@@ -23,12 +27,18 @@ description: |-
   - The Mac crashed at 23:13 on 2026-11-15; the running jobs failed and their tickets went to HelpNeeded with the retry question (DEV-607, DEV-609, DEV-611, DEV-612).
   - When T3 Code's server started again (2026-11-16 18:39:39Z) it requested a new run on every thread whose turn the crash had cut off (run ordinal 3, 'requestedAt 18:39:39'). Six such threads ran for 4 hours outside any lotar job: lotar list-running showed 4 jobs, T3 10 running threads. DEV-611 had three at once (fix, merge, plain thread) on one branch; each rebuilt lotar from scratch and ran lint, test and smoke while the Mac was overloaded; queued jobs (the v0.15.2 release DEV-591) waited 1.5 h.
   - Their outcome never reaches the ticket: no end rule runs, so a finished merge leaves the ticket HelpNeeded on mallox.
-  - Separately: lotar ran 4 jobs although .tasks/DEV/config.yml sets max_parallel_jobs: 2 (installed 0.15.1; check whether the per-project limit is only on main).
+  - Separately: lotar ran 4 jobs although .tasks/DEV/config.yml sets max_parallel_jobs: 2 (installed 0.15.1). Checked 2026-11-16: main has the same gap: the queue worker takes the limit from the global config only (`resolve_max_parallel` in `agent_queue_service.rs`), and each process counts only its own jobs. Own ticket, not this one.
+
+  ## Decision (claude, 2026-11-16): adopt
+  T3's CLI has no interrupt (`t3 thread` has list, start, send, show; harnessmux 0.1.9 says so too), so lotar can't stop a thread. Adopting keeps the work the thread is doing instead of redoing it (a fresh build and lint, test, smoke).
 
   ## Done when
-  - [ ] When a ticket's earlier job thread is running again without a lotar job (T3 resumed it), lotar either adopts it as a job (records it, counts it toward the limit, runs the end rules when it ends) or stops it and queues the step the ticket needs; say which and why in the ticket.
-  - [ ] Never more than one running thread per ticket; the duplicate is stopped with a comment.
-  - [ ] Tests with the fake t3 (a thread that turns running with no job); docs in docs/help/agent.md.
+  - [ ] The queue worker (each poll, at most every 30 s) and `lotar serve` (every 30 s) look for threads of the tasks directory's ended `t3` jobs that T3 Code runs again (status `running` in `t3 thread list`). They ask T3 Code nothing while no ended t3 job has a thread.
+  - [ ] Such a thread on an open ticket with no active job (any process) and no queued entry is adopted: a new job of the old job's profile with the old session, counted as running (toward `max_parallel_jobs`, so queued jobs wait; it runs even when the limit is full, as it can't be stopped), recorded for takeover like any job. The ticket goes back to `@<profile>` and the `job_started` rules run; the job follows the thread's run without sending a turn and ends like any job, so its end rules run once. A comment names the thread, the old job and the new one.
+  - [ ] Only one process adopts a thread (a lock per ticket); a thread is adopted once per run.
+  - [ ] Not adopted, with one comment per thread run that names the thread and says to stop it in T3 Code: a thread that waits for an answer is left alone (DEV-600 hold, no comment); a second running thread of the same ticket (the newest job's thread is adopted); a thread beside an active job on the ticket; a thread on a done ticket. A ticket with a queued entry is left as it is (the entry waits for the thread, as before).
+  - [ ] When T3 Code can't list its threads, nothing happens and the next look tries again; when the session can't be opened, the new job fails with the reason and its `job_failed` rules run.
+  - [ ] Tests with the fake t3: a thread that turns running with no job is adopted and its end rule runs once; a second running thread on the ticket gets the comment; a waiting thread is left alone. Docs in docs/help/agent.md.
 history:
 - at: 2026-11-16T22:53:23.635327+00:00
   actor: claude
@@ -41,3 +51,62 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T23:44:28.971231+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T23:44:29.758274+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ae3bded-6bb0-4dbe-b1d4-32538275daa2
+- at: 2026-11-16T23:50:19.490998+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found by the chief of staff 2026-11-16 (owner: "a few work threads in t3 are stuck for quite a while").
+
+      ## Found
+      - The Mac crashed at 23:13 on 2026-11-15; the running jobs failed and their tickets went to HelpNeeded with the retry question (DEV-607, DEV-609, DEV-611, DEV-612).
+      - When T3 Code's server started again (2026-11-16 18:39:39Z) it requested a new run on every thread whose turn the crash had cut off (run ordinal 3, 'requestedAt 18:39:39'). Six such threads ran for 4 hours outside any lotar job: lotar list-running showed 4 jobs, T3 10 running threads. DEV-611 had three at once (fix, merge, plain thread) on one branch; each rebuilt lotar from scratch and ran lint, test and smoke while the Mac was overloaded; queued jobs (the v0.15.2 release DEV-591) waited 1.5 h.
+      - Their outcome never reaches the ticket: no end rule runs, so a finished merge leaves the ticket HelpNeeded on mallox.
+      - Separately: lotar ran 4 jobs although .tasks/DEV/config.yml sets max_parallel_jobs: 2 (installed 0.15.1; check whether the per-project limit is only on main).
+
+      ## Done when
+      - [ ] When a ticket's earlier job thread is running again without a lotar job (T3 resumed it), lotar either adopts it as a job (records it, counts it toward the limit, runs the end rules when it ends) or stops it and queues the step the ticket needs; say which and why in the ticket.
+      - [ ] Never more than one running thread per ticket; the duplicate is stopped with a comment.
+      - [ ] Tests with the fake t3 (a thread that turns running with no job); docs in docs/help/agent.md.
+    new: |-
+      Found by the chief of staff 2026-11-16 (owner: "a few work threads in t3 are stuck for quite a while").
+
+      ## Found
+      - The Mac crashed at 23:13 on 2026-11-15; the running jobs failed and their tickets went to HelpNeeded with the retry question (DEV-607, DEV-609, DEV-611, DEV-612).
+      - When T3 Code's server started again (2026-11-16 18:39:39Z) it requested a new run on every thread whose turn the crash had cut off (run ordinal 3, 'requestedAt 18:39:39'). Six such threads ran for 4 hours outside any lotar job: lotar list-running showed 4 jobs, T3 10 running threads. DEV-611 had three at once (fix, merge, plain thread) on one branch; each rebuilt lotar from scratch and ran lint, test and smoke while the Mac was overloaded; queued jobs (the v0.15.2 release DEV-591) waited 1.5 h.
+      - Their outcome never reaches the ticket: no end rule runs, so a finished merge leaves the ticket HelpNeeded on mallox.
+      - Separately: lotar ran 4 jobs although .tasks/DEV/config.yml sets max_parallel_jobs: 2 (installed 0.15.1). Checked 2026-11-16: main has the same gap: the queue worker takes the limit from the global config only (`resolve_max_parallel` in `agent_queue_service.rs`), and each process counts only its own jobs. Own ticket, not this one.
+
+      ## Decision (claude, 2026-11-16): adopt
+      T3's CLI has no interrupt (`t3 thread` has list, start, send, show; harnessmux 0.1.9 says so too), so lotar can't stop a thread. Adopting keeps the work the thread is doing instead of redoing it (a fresh build and lint, test, smoke).
+
+      ## Done when
+      - [ ] The queue worker (each poll, at most every 30 s) and `lotar serve` (every 30 s) look for threads of the tasks directory's ended `t3` jobs that T3 Code runs again (status `running` in `t3 thread list`). They ask T3 Code nothing while no ended t3 job has a thread.
+      - [ ] Such a thread on an open ticket with no active job (any process) and no queued entry is adopted: a new job of the old job's profile with the old session, counted as running (toward `max_parallel_jobs`, so queued jobs wait; it runs even when the limit is full, as it can't be stopped), recorded for takeover like any job. The ticket goes back to `@<profile>` and the `job_started` rules run; the job follows the thread's run without sending a turn and ends like any job, so its end rules run once. A comment names the thread, the old job and the new one.
+      - [ ] Only one process adopts a thread (a lock per ticket); a thread is adopted once per run.
+      - [ ] Not adopted, with one comment per thread run that names the thread and says to stop it in T3 Code: a thread that waits for an answer is left alone (DEV-600 hold, no comment); a second running thread of the same ticket (the newest job's thread is adopted); a thread beside an active job on the ticket; a thread on a done ticket. A ticket with a queued entry is left as it is (the entry waits for the thread, as before).
+      - [ ] When T3 Code can't list its threads, nothing happens and the next look tries again; when the session can't be opened, the new job fails with the reason and its `job_failed` rules run.
+      - [ ] Tests with the fake t3: a thread that turns running with no job is adopted and its end rule runs once; a second running thread on the ticket gets the comment; a waiting thread is left alone. Docs in docs/help/agent.md.
+- at: 2026-11-16T23:50:19.655663+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612"]}'
+    new: '{"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600"]}'
+- at: 2026-11-16T23:50:55.527035+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600"]}'
+    new: '{"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630"]}'

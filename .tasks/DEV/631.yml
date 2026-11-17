@@ -1,0 +1,36 @@
+title: 'A fix job on a branch whose worktree has uncommitted changes fails: git worktree add says the branch is already used'
+status: Todo
+priority: Medium
+type: Feature
+reporter: triage
+assignee: '@fix'
+created: 2026-11-17T00:09:17.368337+00:00
+modified: 2026-11-17T00:09:25.863213+00:00
+relationships:
+  blocks:
+  - DEV-613
+  related:
+  - DEV-613
+description: 'Found: DEV-613 job-20261117T000834.721Z-1 (`lotar agent logs job-20261117T000834.721Z-1`). LoTaR leaves the dirty worktree `agent-DEV-613-435bae192ccea1c1` alone and starts a new T3 thread on `agent/DEV-613`; `git worktree add` fails because the branch is checked out in that worktree. Check: start a fix job on a ticket whose branch worktree has uncommitted changes. Done when: that job continues in the existing worktree (or commits the change) instead of failing. First step for DEV-613: the uncommitted one-line fix in that worktree (`dev503_harness_jobs_test.rs`) gets committed, signed, on `agent/DEV-613`.'
+tags:
+- health
+custom_fields:
+  finding: infra:worktree:agent-branch-in-use
+history:
+- at: 2026-11-17T00:09:18.332311+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-613"]}'
+- at: 2026-11-17T00:09:19.164297+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T00:09:25.863213+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613"]}'
+    new: '{"blocks":["DEV-613"],"related":["DEV-613"]}'

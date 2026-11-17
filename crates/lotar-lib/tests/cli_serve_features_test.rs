@@ -19,6 +19,10 @@ use std::time::{Duration, Instant};
 
 const READY_TIMEOUT: Duration = Duration::from_secs(15);
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
+/// Window for the stdout/stderr readers to drain once the child is reaped.
+/// It starts after the reap, so a child that exits late still gets the full
+/// window (DEV-632).
+const OUTPUT_CAPTURE_TIMEOUT: Duration = Duration::from_secs(15);
 
 struct ServeChild {
     child: Option<Child>,
@@ -110,7 +114,7 @@ fn try_spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeStart {
         Err(_) => match serve.child.take() {
             Some(mut child) => {
                 let status = child.wait().expect("reap failed serve child");
-                serve.finish_output_capture(deadline);
+                serve.finish_output_capture();
                 ServeStart::Failed { status, stdout: serve.stdout_snapshot(), stderr: serve.stderr_snapshot() }
             }
             None => panic!("serve child ownership lost"),
@@ -156,10 +160,10 @@ impl ServeChild {
         self.stderr_dump.lock().map(|s| s.clone()).unwrap_or_default()
     }
 
-    fn finish_output_capture(&self, deadline: Instant) {
+    fn finish_output_capture(&self) {
         // Each reader holds a sender until all its output is captured. Child
         // exit or a stdout banner alone does not synchronize the stderr reader.
-        match self.output_done.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+        match self.output_done.recv_timeout(OUTPUT_CAPTURE_TIMEOUT) {
             Err(mpsc::RecvTimeoutError::Disconnected) => {}
             result => self.fail_with_output(format!("output capture did not finish: {result:?}")),
         }
@@ -244,7 +248,7 @@ impl ServeChild {
                 None => thread::sleep(Duration::from_millis(25)),
             }
         };
-        self.finish_output_capture(deadline);
+        self.finish_output_capture();
         status
     }
 
@@ -302,7 +306,7 @@ fn completed_output_waits_for_stderr_after_stdout_readiness() {
     assert!(serve.stderr_snapshot().is_empty());
     assert_eq!(serve.output_done.try_recv(), Err(mpsc::TryRecvError::Empty));
     release.send(()).unwrap();
-    serve.finish_output_capture(Instant::now() + STOP_TIMEOUT);
+    serve.finish_output_capture();
     assert_eq!(serve.stderr_snapshot(), "late warning\n");
     reader.join().unwrap();
 }

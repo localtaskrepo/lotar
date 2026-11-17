@@ -1,11 +1,11 @@
 title: 'Flaky test: cli_serve_features_test serve tests get no response within the 1.5 s read timeout under load'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T21:05:30.352250+00:00
-modified: 2026-11-16T23:23:47.817048+00:00
+modified: 2026-11-17T00:26:24.586156+00:00
 relationships:
   related:
   - DEV-609
@@ -14,6 +14,7 @@ relationships:
   - DEV-607
   - DEV-611
   - DEV-627
+  - DEV-632
 comments:
 - date: 2026-11-16T22:37:11.900989+00:00
   author: claude
@@ -58,8 +59,23 @@ comments:
       result: not_run
       reason: test-only Rust change
     next: Review, then merge and rerun the check against main
+- date: 2026-11-16T23:54:55.449254+00:00
+  author: automation
+  text: The review job job-20261116T235449.988Z-13 failed (lotar agent logs job-20261116T235449.988Z-13); the merge goes ahead without a review.
+- date: 2026-11-17T00:26:24.586156+00:00
+  author: claude
+  text: |-
+    Review: passed. `10cadb71` does what "Done when" asks; one minor follow-up filed.
+
+    - Read: the diff (only `crates/lotar-lib/tests/cli_serve_features_test.rs`, +5/-1), the ticket and comments, DEV-354 (`RESPONSE_DEADLINE` 15 s in `web_api_integration_test.rs:24`, the same approach), DEV-627, the `/__test/stop` handler in `web_server.rs:400`.
+    - `http_request` now waits up to `RESPONSE_TIMEOUT` (15 s) per read instead of 1.5 s. `stop()` reuses it, and the stop endpoint answers and closes, so teardown doesn't get slower.
+    - Main touched the file only in `3ec533d6` (it was created there); the branch is based on `b1cd11a1` and the diff to main for this file is just this change.
+    - Reran `cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'` 5 times: 15/15 passed each time (load ~6, so no load proof from me). `rustfmt --check` clean.
+    - No test failed before the fix (the fix agent couldn't reproduce it at load ~140 either); "a run under load" is what the ticket accepts.
+    - Minor, not covered here: the comment's DEV-607-merge failure (`output capture did not finish: Err(Timeout)`, `:169`) is the 5 s `STOP_TIMEOUT` wait in `stop()`, not the read wait. Filed as DEV-632.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97fc7517-3464-4ef3-a807-2a602fdbf376
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea92c758-bcce-498d-bf82-98c5c78a5bd4
 description: |-
   Found in the DEV-609 merge (2026-11-16): `npm run test:agent` failed twice on `2b7224a0` (main `804cb0f9` plus one test in another file) while the Mac's load average was 140-170.
 
@@ -133,3 +149,31 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T23:54:50.749344+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea92c758-bcce-498d-bf82-98c5c78a5bd4
+- at: 2026-11-16T23:54:55.247149+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-16T23:54:55.449254+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:25:42.257047+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611","DEV-627"]}'
+    new: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611","DEV-627","DEV-632"]}'
+- at: 2026-11-17T00:26:24.586156+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,0 +1,41 @@
+title: 'The queue worker ignores a project''s max_parallel_jobs: DEV ran 4 jobs with a limit of 2'
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T23:50:55.362369+00:00
+modified: 2026-11-17T00:20:33.468391+00:00
+relationships:
+  related:
+  - DEV-626
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
+description: |-
+  Found 2026-11-16 in DEV-626 (lotar ran 4 jobs while .tasks/DEV/config.yml sets agent.worktree.max_parallel_jobs: 2).
+
+  ## Found
+  - `resolve_max_parallel` in `crates/lotar-lib/src/services/agent_queue_service.rs` reads the global config (`get_resolved_config`); the global .tasks/config.yml sets no limit, so the worker starts every entry (`JobStartMode::Immediate`).
+  - The worker counts only its own process's jobs (`queue_stats().running`); jobs that `lotar serve`, `lotar agent run` or a taken-over job run elsewhere aren't counted.
+  - Same on main (checked at 1227e5bd).
+
+  ## Done when
+  - [ ] The worker applies each entry's project limit (project config over global), counting the project's running jobs in every process (agent_active_jobs records).
+  - [ ] Test: two projects, one with a limit of 1, jobs in two processes; docs in docs/help/agent.md.
+history:
+- at: 2026-11-16T23:50:55.844151+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T00:20:32.622657+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T00:20:33.468391+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98

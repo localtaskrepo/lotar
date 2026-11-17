@@ -1,11 +1,11 @@
 title: DEV-611's failed keep and the t3 handoff's thread line have no test
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-16T23:30:13.874720+00:00
+modified: 2026-11-16T23:55:19.675900+00:00
 relationships:
   related:
   - DEV-611
@@ -36,8 +36,12 @@ comments:
       result: passed
       reason: RUSTC_WRAPPER= npm run test:smoke:agent, 405 passed
     next: Review, then merge (rebase onto main drops 84ef6218)
+- date: 2026-11-16T23:55:19.675900+00:00
+  author: automation
+  text: The review job job-20261116T235517.366Z-15 failed (lotar agent logs job-20261116T235517.366Z-15); the merge goes ahead without a review.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82379814-5465-4e30-9664-a8d68148cac7
 description: |-
   Found in the review of DEV-611 (`3cf93d5e`).
 
@@ -79,3 +83,21 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T23:55:17.961810+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82379814-5465-4e30-9664-a8d68148cac7
+- at: 2026-11-16T23:55:19.494218+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-16T23:55:19.675900+00:00
+  actor: automation
+  changes:
+  - field: comment_added

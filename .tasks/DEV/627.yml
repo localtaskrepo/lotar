@@ -1,14 +1,53 @@
 title: 'Flaky test: serve_reports_requested_port_exactly loses its reserved port to another process before serve binds it'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T23:23:19.131862+00:00
-modified: 2026-11-16T23:23:20.535672+00:00
+modified: 2026-11-17T00:20:33.780872+00:00
 relationships:
   related:
   - DEV-624
+comments:
+- date: 2026-11-16T23:54:29.864615+00:00
+  author: claude
+  text: |-
+    Fixed: requested-port tests retry with a fresh port when another process takes the reserved one first.
+
+    - New `spawn_serve_on_requested_port` in `crates/lotar-lib/tests/cli_serve_features_test.rs`: up to 5 attempts, retries only on `Failed to bind` naming that port; any other early exit still panics
+    - `serve_reports_requested_port_exactly` and `serve_short_port_flag_sets_requested_port` use it, so both still test an explicit `--port` / `-p`
+    - New test `requested_port_retries_when_the_reserved_port_is_taken_first` holds the first port with a live listener; it fails with 1 attempt (`Failed to bind to 127.0.0.1:57352 ... Address already in use`) and passes with the retry
+    - Ticket check: 20 parallel runs, 0 requested-port failures. 2 runs failed in `serve_honors_explicit_tasks_dir_for_api_requests` with status 0 (1.5 s read timeout), which is DEV-624, not filed again
+    - The disk is full (`df`: 250 MB free). I removed only this worktree's own `target/` and built against the main checkout's `target/` (`--cargo-profile local`, `RUSTC_WRAPPER=` because sccache failed with exit 254)
+  report:
+    commits:
+    - hash: d973e73b
+      what: requested-port serve tests retry with a fresh port when the reserved one is taken
+    checks:
+    - command: 'cargo nextest run --cargo-profile local -p lotar-lib --test integration cli_serve_features_test::'
+      result: passed
+      reason: 16/16
+    - command: '20 parallel runs of integration cli_serve_features_test:: --test-threads 15'
+      result: passed
+      reason: requested-port tests 0 failures; 2 runs failed in serve_honors_explicit_tasks_dir_for_api_requests (status 0 read timeout, DEV-624)
+    - command: cargo clippy --profile local -p lotar-lib --test integration -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check cli_serve_features_test.rs
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: disk full (250 MB free), full build impossible
+    - command: npm test
+      result: not_run
+      reason: disk full
+    - command: npm run smoke
+      result: not_run
+      reason: disk full
+    next: Review, then merge; rerun npm run lint/test/smoke once the disk has space
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e311be2-273f-45ee-8c00-e819945c4d5b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fc88e28-8bca-4ddc-a10e-b907a106023b
 description: 'Found in DEV-624 (2026-11-16): 1 of 11 parallel runs of `target/local/deps/integration-* cli_serve_features_test:: --test-threads 15` at load ~140 failed in `serve_reports_requested_port_exactly` (`crates/lotar-lib/tests/cli_serve_features_test.rs:333`): panic at `:48`, serve exited before a readiness banner. Likely cause: `reserve_ephemeral_port` binds port 0, drops the listener, then serve binds the number; another test or process can take it in between (`serve_short_port_flag_sets_requested_port` uses the same pattern). Check: run that command 20 times under load. Done when the requested-port tests no longer fail when the reserved port is taken first (retry with a new port, or another way that still tests an explicit --port).'
 tags:
 - health
@@ -26,3 +65,32 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T23:50:27.639574+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T23:50:28.476714+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e311be2-273f-45ee-8c00-e819945c4d5b
+- at: 2026-11-16T23:54:29.864615+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T23:54:39.677353+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T00:20:33.780872+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fc88e28-8bca-4ddc-a10e-b907a106023b

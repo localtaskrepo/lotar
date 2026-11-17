@@ -1,14 +1,17 @@
 title: The resolved config sent by /api/config/show has agent_memory_gate, view/api/types.ts doesn't list it
-status: Todo
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T23:36:18.364771+00:00
-modified: 2026-11-16T23:36:19.058580+00:00
+modified: 2026-11-17T00:10:53.141998+00:00
 relationships:
   related:
   - DEV-623
+  - DEV-620
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b42e58b-7525-4a3d-8a8a-b87581ff3bfb
 description: |-
   ## Found (claude, review of DEV-623, 2026-11-16)
   - DEV-623 added `agent_memory_gate` to `ResolvedConfig` (`crates/lotar-core/src/config/types.rs`), which `config_service.rs:39` serializes for `GET /api/config/show`, so the REST reply now carries it.
@@ -22,3 +25,20 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T23:41:12.716091+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623"]}'
+    new: '{"related":["DEV-623","DEV-620"]}'
+- at: 2026-11-17T00:10:49.784950+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T00:10:53.141998+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b42e58b-7525-4a3d-8a8a-b87581ff3bfb

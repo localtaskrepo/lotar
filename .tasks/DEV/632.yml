@@ -1,0 +1,114 @@
+title: 'Flaky test: cli_serve_features_test stop() gives output capture only 5 s under load'
+status: Merging
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T00:25:42.039816+00:00
+modified: 2026-11-17T00:37:34.779011+00:00
+relationships:
+  related:
+  - DEV-607
+  - DEV-624
+comments:
+- date: 2026-11-17T00:33:37.100368+00:00
+  author: claude
+  text: |-
+    Fixed: output capture no longer shares the stop deadline with the child's exit.
+
+    - Cause: `stop()` used one `STOP_TIMEOUT` deadline for both the child's exit and `finish_output_capture`, so a child that exited late, or was killed at the deadline, left the readers almost no time to finish. The failed-start path reused the expired ready deadline in the same way.
+    - Change: `finish_output_capture()` now waits its own `OUTPUT_CAPTURE_TIMEOUT` (15 s), starting after the reap, in `crates/lotar-lib/tests/cli_serve_features_test.rs`.
+    - No failing test first: the flake needs a heavily loaded machine. The existing `completed_output_waits_for_stderr_after_stdout_readiness` test still covers the capture wait.
+    - Note: `-p lotar-lib` alone doesn't build the `lotar` binary these tests need. Run the filter without `-p`.
+  report:
+    commits:
+    - hash: '62531193'
+      what: output capture gets its own 15 s window after the child is reaped
+    checks:
+    - command: cargo nextest run -E 'test(cli_serve_features_test)' --test-threads 16 x5
+      result: passed
+    - command: same filter x5 alongside 40 busy processes (load ~14)
+      result: passed
+    - command: load ~60 reproduction
+      result: not_run
+      reason: could not recreate that load
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review, then merge
+- date: 2026-11-17T00:37:27.721035+00:00
+  author: claude
+  text: |-
+    Review: passed. `62531193` does what "Done when" asks; no tickets filed.
+
+    - Read: the diff (only `crates/lotar-lib/tests/cli_serve_features_test.rs`, +9/-5), the ticket and its comments, DEV-624 and its commit `10cadb71`. On main, only `3ec533d6` has touched this file.
+    - Cause holds: `stop()` used one 5 s `STOP_TIMEOUT` deadline for both the child's exit and the reader wait. A child that exited at about 5 s, or was killed then, left the readers almost no time. That gives the `:169` `Err(Timeout)` failure. The new `OUTPUT_CAPTURE_TIMEOUT` (15 s) starts after the reap, in `stop()` and in the failed-start path alike.
+    - Scope is right: it doesn't touch `STOP_TIMEOUT` or the kill fallback, and it adds nothing the ticket didn't ask for.
+    - No test that failed first: acceptable here. Only a late-exiting child shows the flake, and the existing `completed_output_waits_for_stderr_after_stdout_readiness` test still covers the reader wait.
+    - Merge note: DEV-624 (`10cadb71`, Merging) adds `RESPONSE_TIMEOUT` on the same line after `STOP_TIMEOUT`. `git merge-tree` reports a conflict there; the fix is to keep both constants.
+    - Reran: `cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'` 6 times, 15/15 each time, at load ~18. Clippy `--tests -p lotar-lib` clean, `rustfmt --check` clean, worktree unchanged.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82bcac53-197c-4c94-b020-71058f8b40d5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8edb2c46-63a0-4e46-91fc-377427ae544d
+description: 'Found: in the DEV-607 merge (2026-11-16, load ~60) serve_honors_explicit_tasks_dir_for_api_requests failed at crates/lotar-lib/tests/cli_serve_features_test.rs:169 with ''output capture did not finish: Err(Timeout)'' (recorded on DEV-624). stop() waits STOP_TIMEOUT (5 s, :21, :240) for the child''s stdout/stderr readers to finish; DEV-624 only raised the per-request read wait, not this one. Check: npm run test:agent under load, or the cli_serve_features_test filter in parallel. Done: the output-capture wait no longer fails a child that exits late on a loaded machine, and the filter passes 5 times in a row in parallel.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:cli_serve_features_test-output-capture
+history:
+- at: 2026-11-17T00:25:42.257362+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-607","DEV-624"]}'
+- at: 2026-11-17T00:25:42.477119+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T00:25:43.035190+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T00:25:43.664574+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82bcac53-197c-4c94-b020-71058f8b40d5
+- at: 2026-11-17T00:33:37.100368+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:33:46.060759+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T00:33:47.836295+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8edb2c46-63a0-4e46-91fc-377427ae544d
+- at: 2026-11-17T00:37:27.721035+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T00:37:34.779011+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

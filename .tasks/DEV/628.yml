@@ -1,14 +1,18 @@
 title: Job prompt shows an empty Comments section when no comment is picked
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-codex'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-16T23:31:43.665837+00:00
+modified: 2026-11-17T00:08:46.341868+00:00
 relationships:
   related:
   - DEV-620
+comments:
+- date: 2026-11-17T00:08:46.341868+00:00
+  author: automation
+  text: The fix agent's job job-20261117T000835.458Z-2 failed (lotar agent logs job-20261117T000835.458Z-2); @fix-codex retries it on branch agent/DEV-628.
 description: |-
   Found in the DEV-620 review.
 
@@ -20,9 +24,30 @@ description: |-
   ## Done when
   - [ ] No comment picked: the prompt's Comments section is a single line with the count and the `lotar show` / `lotar task timeline` commands, without "below the …"; a unit test covers it.
   - [ ] `docs/help/agent.md` gives the open-question and answer rules as the code applies them.
+tags:
+- fix-retried
 history:
 - at: 2026-11-16T23:31:43.665837+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T00:08:36.639240+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T00:08:45.148460+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T00:08:46.341868+00:00
+  actor: automation
+  changes:
+  - field: comment_added
