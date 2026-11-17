@@ -4,7 +4,7 @@ priority: Low
 type: Chore
 reporter: claude
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-17T02:57:43.514542+00:00
+modified: 2026-11-17T03:07:39.388879+00:00
 relationships:
   related:
   - DEV-611
@@ -137,8 +137,6 @@ description: |-
   ## Done when
   - [ ] A test: keeping fails (for example a read-only sessions folder, or a kept name already taken by a directory); the job ends failed with "Could not keep the session …", no new session record exists, and the old record and event log are still there.
   - [ ] A t3 test (`dev510_t3_session_test.rs`): a rework past `continue_within_minutes` whose prompt names the old thread's id.
-tags:
-- merge-retried
 history:
 - at: 2026-11-16T19:55:39.199285+00:00
   actor: claude
@@ -283,3 +281,9 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-17T03:07:39.388879+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: merge-retried
+    new: ''

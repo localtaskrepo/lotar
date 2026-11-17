@@ -5,11 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T02:53:49.338410+00:00
+modified: 2026-11-17T03:08:20.011006+00:00
 relationships:
   related:
   - DEV-626
   - DEV-613
+  - DEV-620
+  - DEV-646
 comments:
 - date: 2026-11-17T02:03:11.559276+00:00
   author: claude
@@ -43,9 +45,27 @@ comments:
 - date: 2026-11-17T02:53:49.338410+00:00
   author: claude
   text: 'Stalled since 2026-11-17T02:19Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-17T03:02:17.397040+00:00
+  author: claude
+  text: |-
+    Review: blocking. The per-project limit works, but a global limit no longer caps all jobs together, and the owner hasn't decided that.
+
+    **Blocking**
+    - `crates/lotar-lib/src/services/agent_queue_service.rs:478` (`project_slots`): the global `max_parallel_jobs` becomes a separate limit for each project. A global limit of 2 with 3 projects now lets the worker run 6 jobs. Before this change the global limit was a machine-wide total (`docs/help/agent.md:337`: "Limit concurrent agent jobs"). `lotar serve` still applies it as one total (`agent_job_service.rs:334-336`). The limit exists to protect the Mac from load (DEV-626: the Mac was overloaded). "Project config over global" in "Done when" only says which value wins. It doesn't make the global limit per project. The fix agent called this a behavior change only in chat; the owner made no decision.
+    - Fix: keep the global limit as a total across all projects (count every project's jobs in every process), and apply a project's own limit to that project on top of it. Rewrite the `agent.md:346` line to match. If you want the per-project behavior instead, ask mallox first.
+
+    **Checked**
+    - Reran `cargo nextest run --workspace -E 'test(/^dev630_/) | test(/agent_queue_service::tests/)'`: 6 passed.
+    - Counting across processes (this process's registry plus the live `agent_active_jobs` records, deduplicated by job id), a limit of `0`, queue order and the reason text are correct.
+    - HEAD also carries `1227e5bde` (DEV-620), the same patch as `6a78ba884` on main, so a rebase drops it. Not a stray change.
+    - Not rerun: full `npm run lint`, `npm test` and `npm run smoke` (the fix agent reports them passing).
+- date: 2026-11-17T03:02:39.751257+00:00
+  author: claude
+  text: 'Review: filed minor [DEV-646](https://lotar.pyxzl.net/task/DEV-646): `lotar serve` counts only its own jobs and applies one project''s limit to all of them.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad34d9a6c-9f47-4ca3-8837-a89a8c3bce26
 description: |-
   Found 2026-11-16 in DEV-626 (lotar ran 4 jobs while .tasks/DEV/config.yml sets agent.worktree.max_parallel_jobs: 2).
 
@@ -57,6 +77,8 @@ description: |-
   ## Done when
   - [ ] The worker applies each entry's project limit (project config over global), counting the project's running jobs in every process (agent_active_jobs records).
   - [ ] Test: two projects, one with a limit of 1, jobs in two processes; docs in docs/help/agent.md.
+tags:
+- review-blocked
 history:
 - at: 2026-11-16T23:50:55.844151+00:00
   actor: claude
@@ -125,3 +147,34 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T03:02:17.397040+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:02:18.167145+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-613"]}'
+    new: '{"related":["DEV-626","DEV-613","DEV-620"]}'
+- at: 2026-11-17T03:02:19.242806+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-17T03:02:27.944723+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-613","DEV-620"]}'
+    new: '{"related":["DEV-626","DEV-613","DEV-620","DEV-646"]}'
+- at: 2026-11-17T03:02:39.751257+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:08:20.011006+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad34d9a6c-9f47-4ca3-8837-a89a8c3bce26

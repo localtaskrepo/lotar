@@ -1,0 +1,27 @@
+title: lotar agent list-jobs shows a memory hold from an old reading once no process reads memory
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T03:02:08.605225+00:00
+modified: 2026-11-17T03:02:11.026136+00:00
+relationships:
+  related:
+  - DEV-623
+description: |-
+  Found in the DEV-623 review (2026-11-16).
+
+  `memory_gate::status` (`crates/lotar-lib/src/services/memory_gate.rs:94`) returns the hold saved in `memory-gate-<hash>.json` without looking at its age. `lotar agent list-jobs` prints it unconditionally (`crates/lotar-lib/src/cli/handlers/agent.rs:311`). Only `check` rereads memory, and only the worker loop, `lotar serve` start paths and its tick call it.
+
+  Case: `lotar serve` held a job, then exited (or the held job was removed). Hours later, with memory normal, `lotar agent list-jobs` still says `Queue: new jobs wait for memory: … (held since <old time>)`. `lotar agent queue` hides it while nothing is queued, so it's mainly list-jobs.
+
+  ## Done when
+  - [ ] A saved hold whose reading is older than a few recheck intervals (for example 2 × 30 s) is not shown as current: either `status` reads memory again, or it shows the hold as last seen at `<checked_at>`.
+  - [ ] A test with an old saved hold and a normal reading.
+history:
+- at: 2026-11-17T03:02:11.026136+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

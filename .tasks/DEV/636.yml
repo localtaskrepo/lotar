@@ -3,8 +3,9 @@ status: Merging
 priority: Medium
 type: Chore
 reporter: claude
+assignee: '@merge'
 created: 2026-11-17T01:03:37.707996+00:00
-modified: 2026-11-17T02:23:39.458416+00:00
+modified: 2026-11-17T03:04:09.433322+00:00
 relationships:
   related:
   - DEV-579
@@ -74,6 +75,9 @@ comments:
       result: not_run
       reason: fix agent's numbers accepted, not remeasured
     next: Merge harnessmux agent/DEV-636 (c066000) onto harnessmux main; lotar's agent/DEV-636 has nothing to land
+- date: 2026-11-17T03:04:09.433322+00:00
+  author: claude
+  text: 'Stalled since 2026-11-17T02:23Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A32b33909-f47c-4bc3-9dea-fe08ed6a6c58
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a7a167-f47b-44f6-aba1-c1e85a08922c
@@ -173,3 +177,12 @@ history:
   changes:
   - field: assignee
     old: '@review'
+- at: 2026-11-17T03:03:52.868653+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-17T03:04:09.433322+00:00
+  actor: claude
+  changes:
+  - field: comment_added

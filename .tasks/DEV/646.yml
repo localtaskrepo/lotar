@@ -1,0 +1,32 @@
+title: lotar serve counts only its own jobs against max_parallel_jobs and applies the last ticket's project limit to all projects
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T03:02:27.383761+00:00
+modified: 2026-11-17T03:02:28.412190+00:00
+relationships:
+  related:
+  - DEV-630
+description: |-
+  Found in the DEV-630 review (2026-11-16).
+
+  ## Found
+  - `AgentJobService::start_job` (`crates/lotar-lib/src/services/agent_job_service.rs:334-336`) sets the registry's `max_parallel_jobs` from the starting ticket's project config. It then compares that value with `running_count`, which counts only this process's jobs, from every project.
+  - So `lotar serve` ignores jobs that the queue worker and `agent run --wait` run, and one project's limit decides for all of them.
+
+  ## Done when
+  - [ ] `lotar serve` applies the same limits as the queue worker after DEV-630 (the same global and per-project rules), counting jobs from every process. Test with two processes.
+history:
+- at: 2026-11-17T03:02:27.945468+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-630"]}'
+- at: 2026-11-17T03:02:28.412190+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

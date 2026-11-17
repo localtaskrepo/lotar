@@ -1,17 +1,18 @@
 title: The queue starts no new job while the Mac is short of memory
-status: Reviewing
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-17T02:37:51.507566+00:00
+modified: 2026-11-17T03:15:16.553511+00:00
 relationships:
   related:
   - DEV-604
   - DEV-378
   - DEV-525
   - DEV-629
+  - DEV-645
 comments:
 - date: 2026-11-16T22:24:43.617057+00:00
   author: claude
@@ -104,10 +105,23 @@ comments:
       result: passed
       reason: 405 tests
     next: Review on another model, then merge
+- date: 2026-11-17T03:02:40.527731+00:00
+  author: claude
+  text: |-
+    Review: passed — the rework fixes the blocking finding, and the rest matches "Done when".
+
+    - Reviewed `d8659a72` (the only commit on `t3/queue-memory-gate` beyond main; same commit as `t3/memory-gate-queue-hold-1`, so no second copy)
+    - Fixed: `process_pending_queue` starts the 30 s memory tick before its early return (`crates/lotar-lib/src/services/agent_job_service.rs:4705`); test `a_job_queued_for_a_slot_gets_the_memory_tick_once_a_hold_begins` covers the case from the first review
+    - Checked again: the worker checks the gate before `dequeue_entries` (`attempts` unchanged), DEV-378 recovery isn't gated, a failed reading clears the hold, swap total 0 is normal, config/docs/parsing tests are there
+    - Reran `cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(config_validation) | test(agent_queue)'` with `RUSTC_WRAPPER=`: 44 passed. Didn't rerun full `npm run lint`/`npm test`/`npm run smoke` (the fix agent's 02:30Z run passed them)
+    - For the merge agent: rebasing onto main conflicts in `crates/lotar-core/src/config/{fields,normalization,resolution,types}.rs` (main added config keys on the same lines); mechanical, keep both
+    - Note: after a hold ends, `lotar serve` starts held jobs one per 30 s tick or job end, not all at once; I count that as fine (it staggers starts)
+    - Minor, filed: [DEV-645](https://lotar.pyxzl.net/task/DEV-645) `list-jobs` can show a hold from an old reading once no process reads memory
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9cacf34-997b-4cb7-b66c-ddb51aef2329
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2723c3a0-e508-468f-a410-efcf7e0b6d36
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac4dae642-8a2d-47f1-ae9e-19025b0a012e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8184bbe9-c261-4464-99cd-a5af4cdbc6e2
 description: |-
   Owner 2026-11-16, after the Mac crashed (picked option 2 of 4 from the options picker): "Memory gate": lotar starts no new job while swap is nearly full or macOS reports memory pressure.
 
@@ -275,3 +289,27 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-17T03:02:09.361742+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-378","DEV-525","DEV-629"]}'
+    new: '{"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-645"]}'
+- at: 2026-11-17T03:02:40.527731+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:07:31.039712+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8184bbe9-c261-4464-99cd-a5af4cdbc6e2
+- at: 2026-11-17T03:15:16.553511+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox

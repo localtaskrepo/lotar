@@ -1,11 +1,11 @@
 title: 'Flaky test: web_api_integration_test read_until_deadline panics on EINVAL from set_read_timeout after the server closed the socket'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:13:29.874075+00:00
-modified: 2026-11-17T02:31:41.689596+00:00
+modified: 2026-11-17T03:12:03.756915+00:00
 relationships:
   related:
   - DEV-635
@@ -114,3 +114,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T03:12:03.756915+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
