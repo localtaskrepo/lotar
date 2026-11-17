@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T04:53:38.838165+00:00
+modified: 2026-11-17T05:15:45.394092+00:00
 relationships:
   blocks:
   - DEV-646
@@ -15,6 +15,9 @@ relationships:
   - DEV-620
   - DEV-646
   - DEV-641
+  - DEV-642
+  - DEV-647
+  - DEV-639
 comments:
 - date: 2026-11-17T02:03:11.559276+00:00
   author: claude
@@ -331,3 +334,21 @@ history:
   - field: tags
     old: review-returned
     new: ''
+- at: 2026-11-17T05:13:32.076247+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641"]}'
+    new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642"]}'
+- at: 2026-11-17T05:15:44.676900+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642"]}'
+    new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642","DEV-647"]}'
+- at: 2026-11-17T05:15:45.394092+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642","DEV-647"]}'
+    new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642","DEV-647","DEV-639"]}'

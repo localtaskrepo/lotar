@@ -1,16 +1,18 @@
 title: End rules are kept and retried after any checkpoint error, not only a full disk or busy lock
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:28:24.830886+00:00
-modified: 2026-11-17T04:38:11.179537+00:00
+modified: 2026-11-17T05:16:40.853572+00:00
 relationships:
   depends_on:
   - DEV-633
   related:
   - DEV-633
+  - DEV-630
+  - DEV-648
 comments:
 - date: 2026-11-17T02:28:27.130172+00:00
   author: automation
@@ -145,6 +147,32 @@ comments:
 - date: 2026-11-17T04:38:11.179537+00:00
   author: automation
   text: 'The queued @review job didn''t start: DEV-642 is assigned to @merge now.'
+- date: 2026-11-17T05:13:31.709459+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `366652341` is on `main` and `origin/main`.
+
+    - Rebased onto `main` twice; skipped the old DEV-633 copy `bb7cc8371` (same code as landed `9c10760fa`, only stale `.tasks`)
+    - Main moved on with DEV-630 (`agent_queue_service.rs`) during the merge, so lint, tests and smoke ran again on the final head `96a983aa0`: all passed
+    - Amended the main checkout's `.tasks` changes into the merge commit, as the owner ruled 2026-11-12
+    - No rules or agent profile changes, so no `lotar trust`
+  report:
+    commits:
+    - hash: '366652341'
+      what: keep end rules only on a full disk; drop kept entries that fail permanently (merged, pushed)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2294 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '405'
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    next: 'None: goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A250c2a8c-eb09-4e10-aa80-5c5fc3462ccc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0440d567-26a1-4b1c-8674-c834f96568ba
@@ -158,9 +186,6 @@ description: |-
   - [ ] A busy lock is not kept: its holder may be this job's checkpoint finishing, so a kept copy could run the steps twice.
   - [ ] A kept entry whose retry fails permanently is dropped with a log line; full disk or busy lock on the retry keeps it for the next try.
   - [ ] A test covers a new permanent failure and a kept entry that then fails permanently.
-tags:
-- fix-retried
-- retry-fix
 history:
 - at: 2026-11-17T02:28:25.603469+00:00
   actor: claude
@@ -298,3 +323,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T05:13:31.709459+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T05:13:32.077421+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-633"],"related":["DEV-633"]}'
+    new: '{"depends_on":["DEV-633"],"related":["DEV-633","DEV-630"]}'
+- at: 2026-11-17T05:13:47.359290+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried, retry-fix
+    new: ''
+- at: 2026-11-17T05:16:40.853572+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-633"],"related":["DEV-633","DEV-630"]}'
+    new: '{"depends_on":["DEV-633"],"related":["DEV-633","DEV-630","DEV-648"]}'

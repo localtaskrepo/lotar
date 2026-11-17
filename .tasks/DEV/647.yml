@@ -1,17 +1,19 @@
 title: Worktree cleanup holds the job registry through git worktree remove, stalling every job thread for tens of seconds
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T03:19:06.596519+00:00
-modified: 2026-11-17T05:02:30.318047+00:00
+modified: 2026-11-17T05:16:07.844467+00:00
 relationships:
   related:
   - DEV-643
   - DEV-633
   - DEV-640
   - DEV-644
+  - DEV-626
+  - DEV-630
 comments:
 - date: 2026-11-17T03:44:30.221745+00:00
   author: claude
@@ -152,6 +154,21 @@ comments:
       result: not_run
       reason: the new test covers the same lock path
     next: Review again, then merge only 7303c2302 onto main
+- date: 2026-11-17T05:15:44.261807+00:00
+  author: claude
+  text: |-
+    Review: passed. The registry is now held only for the in-memory check, not while git runs, which is what "Done" asks for. Nothing blocks the merge.
+
+    - **Read:** commit `7303c2302`; the ticket and the earlier fix and review comments; the cleanup callers (`finish_job`, cancel, `cleanup_done_worktrees`, `task_service.rs:1444`); job start (`start`, `process_pending_queue`, `adopt_orphaned_job`); new commits on main to `agent_job_service.rs` (`e39ca4b31` DEV-626, `11c077fe6` DEV-630).
+    - **Lock:** every `CleanupClaim` drop runs after its registry guard is gone, so its `Drop` can't deadlock. `start` waits on the condvar, which releases the mutex while it waits. Queued jobs are in `active_by_ticket`, so cleanup still skips their ticket.
+    - **On current main:** `7303c2302` cherry-picks cleanly onto `11c077fe6`. In a scratch copy, which I've since removed:
+      - `cargo nextest run --workspace --retries 0 agent_safety_test`: 30/30 passed
+      - `-E 'test(/agent/)'`: 212/212 passed
+      - `cargo clippy --workspace --all-targets -- -D warnings`: clean
+    - **Test failed before the fix:** the earlier review confirmed this. I didn't rerun it.
+    - **Not rerun:** full `npm test`, smoke, and the ticket's own check (timing job events at load ~75).
+    - **For the merge agent:** land only `7303c2302`. `bb7cc8371` is an old copy of DEV-633, and its `.tasks` files conflict with main.
+    - No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe867e4-6d1f-40dd-94ad-9c8c822d7913
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A41df881b-8829-4eab-a6fe-72fcebb5fd73
@@ -296,3 +313,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc130475-39a6-4173-9e61-6c7b91f4ed38
+- at: 2026-11-17T05:15:44.261807+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T05:15:44.678124+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-633","DEV-640","DEV-644"]}'
+    new: '{"related":["DEV-643","DEV-633","DEV-640","DEV-644","DEV-626","DEV-630"]}'
+- at: 2026-11-17T05:16:07.844467+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

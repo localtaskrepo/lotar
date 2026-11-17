@@ -12,12 +12,12 @@ use crate::utils::git::{clear_repository_env, git_command, verified_common_dir};
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
 use serde_json::json;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::io::Read;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, Condvar, LazyLock, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -35,11 +35,14 @@ static JOB_REGISTRY: LazyLock<Mutex<JobRegistry>> = LazyLock::new(|| {
     Mutex::new(JobRegistry {
         jobs: HashMap::new(),
         active_by_ticket: HashMap::new(),
+        cleaning: HashSet::new(),
         pending_queue: VecDeque::new(),
         running_count: 0,
         max_parallel_jobs: None,
     })
 });
+/// Signalled when a `CleanupClaim` ends.
+static CLEANUP_FINISHED: Condvar = Condvar::new();
 /// Event log lines queued under `JOB_REGISTRY` in sequence order and written
 /// once it is released, so file I/O never holds up other jobs (DEV-521).
 static EVENT_LOG_QUEUE: Mutex<VecDeque<QueuedLogEvent>> = Mutex::new(VecDeque::new());
@@ -155,12 +158,41 @@ struct PendingJob {
 struct JobRegistry {
     jobs: HashMap<String, AgentJobState>,
     active_by_ticket: HashMap<String, String>,
+    /// Tickets whose worktrees a `CleanupClaim` holds.
+    cleaning: HashSet<String>,
     pending_queue: VecDeque<PendingJob>,
     running_count: usize,
     max_parallel_jobs: Option<usize>,
 }
 
 pub struct AgentJobService;
+
+/// Worktree cleanup runs git for tens of seconds under load, so it holds
+/// a ticket's worktrees with this claim instead of `JOB_REGISTRY`
+/// (DEV-647): a job for the ticket waits in `start` until it drops, other
+/// jobs go on.
+struct CleanupClaim(String);
+
+impl CleanupClaim {
+    /// Waits for another cleanup of the ticket to end, then claims it while
+    /// `registry` is held.
+    fn take(registry: MutexGuard<'static, JobRegistry>, ticket_id: &str) -> (MutexGuard<'static, JobRegistry>, Self) {
+        let mut registry = wait_for_cleanup(registry, ticket_id);
+        registry.cleaning.insert(ticket_id.to_string());
+        (registry, Self(ticket_id.to_string()))
+    }
+}
+
+impl Drop for CleanupClaim {
+    fn drop(&mut self) {
+        JOB_REGISTRY.lock().unwrap_or_else(PoisonError::into_inner).cleaning.remove(&self.0);
+        CLEANUP_FINISHED.notify_all();
+    }
+}
+
+fn wait_for_cleanup(registry: MutexGuard<'static, JobRegistry>, ticket_id: &str) -> MutexGuard<'static, JobRegistry> {
+    CLEANUP_FINISHED.wait_while(registry, |registry| registry.cleaning.contains(ticket_id)).unwrap_or_else(PoisonError::into_inner)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentOrchestratorMode {
@@ -325,7 +357,8 @@ impl AgentJobService {
 
         let should_queue: bool;
         {
-            let mut registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
+            let registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
+            let mut registry = wait_for_cleanup(registry, &ticket_id);
 
             if has_active_job(&registry) {
                 return Err(active_job_error());
@@ -2853,11 +2886,14 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
     let Ok(worktrees) = agent_worktrees(&repo_root, branch_prefix) else {
         return;
     };
-    // Holding the registry keeps a job from starting in the worktree meanwhile.
+    // The claim keeps a job from starting in the worktree meanwhile.
     let Ok(registry) = JOB_REGISTRY.lock() else {
         return;
     };
-    if registry.active_by_ticket.contains_key(ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some() {
+    let (registry, _claim) = CleanupClaim::take(registry, ticket_id);
+    let busy = registry.active_by_ticket.contains_key(ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some();
+    drop(registry);
+    if busy {
         return;
     }
     let delete_branches = config.agent_worktree.cleanup_delete_branches;
@@ -2878,7 +2914,6 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
             }
         }
     }
-    drop(registry);
 }
 
 /// A job ended: retry `cleanup_done_ticket_worktree` for every Done ticket
@@ -2927,10 +2962,13 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
         None => return,
     };
     // Do not race a follow-up phase that now owns this ticket's worktree.
-    let Ok(mut registry) = JOB_REGISTRY.lock() else {
+    let Ok(registry) = JOB_REGISTRY.lock() else {
         return;
     };
-    if registry.active_by_ticket.get(ticket_id).is_some_and(|id| id != job_id) {
+    let (registry, claim) = CleanupClaim::take(registry, ticket_id);
+    let taken_over = registry.active_by_ticket.get(ticket_id).is_some_and(|id| id != job_id);
+    drop(registry);
+    if taken_over {
         return;
     }
     if let Err(err) = check_worktree_cleanup(&repo_root, &target.path, target.branch.as_deref(), config.agent_worktree.cleanup_ignored_files) {
@@ -2939,7 +2977,9 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
             other => other.to_string(),
         };
         let note = format!("Kept the worktree {}: {reason}. Remove it with `lotar agent worktree cleanup` once it is safe.", target.path.display());
-        if let Some(state) = registry.jobs.get_mut(job_id) {
+        if let Ok(mut registry) = JOB_REGISTRY.lock()
+            && let Some(state) = registry.jobs.get_mut(job_id)
+        {
             record_and_emit(state, "agent_job_progress", Some(note));
         }
     } else {
@@ -2951,7 +2991,7 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
             &config.agent_worktree.branch_prefix,
         );
     }
-    drop(registry);
+    drop(claim);
     flush_event_log();
     cleanup_done_ticket_worktree(tasks_dir, ticket_id);
 }
@@ -2989,14 +3029,16 @@ fn remove_build_output(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
     else {
         return;
     };
-    // Holding the registry keeps a job from starting in the worktree while
-    // its build output moves out; the slow delete runs after the release.
-    let Ok(mut registry) = JOB_REGISTRY.lock() else {
+    // The claim keeps a job from starting in the worktree while its build
+    // output moves out; the slow delete runs after the release.
+    let Ok(registry) = JOB_REGISTRY.lock() else {
         return;
     };
-    if registry.active_by_ticket.get(ticket_id).is_some_and(|id| id != job_id)
-        || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some()
-    {
+    let (registry, claim) = CleanupClaim::take(registry, ticket_id);
+    let busy = registry.active_by_ticket.get(ticket_id).is_some_and(|id| id != job_id)
+        || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some();
+    drop(registry);
+    if busy {
         return;
     }
     let mut moved = Vec::new();
@@ -3016,13 +3058,14 @@ fn remove_build_output(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
             removed.push(path.as_str());
         }
     }
+    drop(claim);
     if !removed.is_empty()
+        && let Ok(mut registry) = JOB_REGISTRY.lock()
         && let Some(state) = registry.jobs.get_mut(job_id)
     {
         let list = removed.iter().map(|path| format!("`{path}`")).collect::<Vec<_>>().join(", ");
         record_and_emit(state, "agent_job_progress", Some(format!("Deleted build output {list} from the worktree {}.", target.path.display())));
     }
-    drop(registry);
     flush_event_log();
     for parked in moved {
         let _ = remove_path(&parked);

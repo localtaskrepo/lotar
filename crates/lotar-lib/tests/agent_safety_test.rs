@@ -895,6 +895,67 @@ mod git_required {
         assert!(root.join("worktrees").join(&other.id).exists(), "the open ticket's worktree stays");
     }
 
+    /// DEV-647: under load `git worktree remove` ran 38 s while Done's
+    /// cleanup held the job registry, and every job thread waited for it.
+    /// A job for the ticket still waits for the cleanup to end.
+    #[test]
+    fn done_cleanup_leaves_the_job_registry_free_while_git_removes_the_worktree() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path().to_path_buf();
+        let worktree = root.join("worktrees").join(&ticket);
+        git(&root, &["worktree", "add", "-q", "-b", &format!("agent/{ticket}"), worktree.to_str().unwrap()]);
+        let real_git = Command::new("sh").args(["-c", "command -v git"]).output().unwrap();
+        let real_git = String::from_utf8(real_git.stdout).unwrap();
+        let bin = root.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(
+            bin.join("git"),
+            format!(
+                "#!/bin/sh\nif [ \"$1 $2\" = 'worktree remove' ]; then touch '{0}/removing'; while [ ! -f '{0}/release' ]; do sleep 0.05; done; fi\nexec '{1}' \"$@\"\n",
+                root.display(),
+                real_git.trim()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(bin.join("git"), fs::Permissions::from_mode(0o755)).unwrap();
+        // SAFETY: nextest runs each test in a process of its own.
+        unsafe { std::env::set_var("PATH", format!("{}:{}", bin.display(), std::env::var("PATH").unwrap())) };
+
+        let done = {
+            let tasks_root = fixture.tasks_root.clone();
+            let ticket = ticket.clone();
+            std::thread::spawn(move || {
+                let patch = TaskUpdate { status: Some("Done".into()), ..Default::default() };
+                TaskService::update_with_context(
+                    &mut lotar::storage::manager::Storage::new(&tasks_root),
+                    &ticket,
+                    patch,
+                    TaskUpdateContext::automation_disabled(),
+                )
+                .unwrap();
+            })
+        };
+        wait_until(|| root.join("removing").exists());
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || sender.send(AgentJobService::queue_stats()).unwrap());
+        let stats = receiver.recv_timeout(Duration::from_secs(5));
+        let start = {
+            let tasks_root = fixture.tasks_root.clone();
+            let ticket = ticket.clone();
+            std::thread::spawn(move || AgentJobService::start_job_with_tasks_dir(request(&ticket), &tasks_root).map(|job| job.id))
+        };
+        sleep(Duration::from_millis(300));
+        let started_early = start.is_finished();
+        fs::write(root.join("release"), "").unwrap();
+        done.join().unwrap();
+        assert!(stats.is_ok(), "the registry is free while git removes the worktree");
+        assert!(!started_early, "a job for the ticket waits for its cleanup");
+        assert!(!worktree.exists(), "Done removes the worktree");
+        start.join().unwrap().unwrap();
+        wait_idle();
+    }
+
     /// DEV-343: Done set while a job still runs for the ticket waits for
     /// the job's end.
     #[test]

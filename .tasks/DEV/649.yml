@@ -1,0 +1,54 @@
+title: 'Flaky test: read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways panics on ENOTCONN from shutdown on macOS'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T05:24:24.590809+00:00
+modified: 2026-11-17T05:24:43.524331+00:00
+relationships:
+  related:
+  - DEV-639
+  - DEV-640
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca16f28-9a8e-461b-807a-ca9312c22080
+description: |-
+  Found in the DEV-639 merge (2026-11-16).
+
+  ## Found
+  - `crates/lotar-lib/tests/web_api_integration_test.rs:861` (added by DEV-640): `stream.shutdown(Shutdown::Both).unwrap()` panics with `Os { code: 57, kind: NotConnected }` when the dropped peer's reset arrives first.
+  - `node scripts/rust-test-runner.mjs --agent read_until_deadline` failed 1 of 5 runs; `npm run test:agent` failed on it once.
+
+  ## Check
+  - Run `node scripts/rust-test-runner.mjs --agent read_until_deadline` 20 times: every run passes.
+
+  ## Done when
+  - [ ] The test no longer fails when `shutdown` returns `NotConnected` (accept that error, the socket is shut down either way), and still covers the EINVAL path of `read_until_deadline`.
+  - [ ] 20 repeated runs pass.
+tags:
+- health
+custom_fields:
+  finding: flaky-test:web_api_integration_test::read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways
+history:
+- at: 2026-11-17T05:24:25.189328+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-639","DEV-640"]}'
+- at: 2026-11-17T05:24:25.886834+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T05:24:32.306828+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T05:24:43.524331+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca16f28-9a8e-461b-807a-ca9312c22080
