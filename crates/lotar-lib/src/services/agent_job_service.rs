@@ -22,6 +22,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 mod merge;
+mod resumed;
 
 const EVENT_LOG_LIMIT: usize = 200;
 /// How long a runner's descendants may keep its output streams busy after it exits.
@@ -440,6 +441,12 @@ impl AgentJobService {
             adopt_orphaned_job(tasks_dir, &orphan);
         }
         AutomationService::apply_pending_outcomes(tasks_dir);
+    }
+
+    /// Take over the threads of ended `t3` jobs that T3 Code runs again,
+    /// with no job, after a restart (DEV-626); see [`resumed::look`].
+    pub fn adopt_resumed_t3_threads(tasks_dir: &std::path::Path) {
+        resumed::look(tasks_dir);
     }
 
     pub fn list_jobs() -> Vec<AgentJob> {
@@ -2106,6 +2113,25 @@ fn finish_orphaned_job(
         update_job_failure(job_id, ticket_id, message, tasks_dir);
         return;
     };
+    let why = "The lotar process running the job exited before its turn ended";
+    resume_session_to_end(job_id, runner_kind, agent, name, profile, tasks_dir, ticket_id, config, why);
+}
+
+/// Resume the session `name` in this process and end the job with its turn:
+/// a `t3` session follows its thread's run without sending a turn, others
+/// ask the agent to go on. `why` starts the failure when it can't be resumed.
+#[expect(clippy::too_many_arguments, reason = "the job's independent inputs from both of its takeovers")]
+fn resume_session_to_end(
+    job_id: &str,
+    runner_kind: AgentRunnerKind,
+    agent: &str,
+    name: &str,
+    profile: &AgentProfileDetail,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    why: &str,
+) {
     let budget = profile.max_budget_usd;
     let session = (|| {
         let table = crate::services::agent_runner::job_agent_table(agent, profile)?;
@@ -2118,7 +2144,7 @@ fn finish_orphaned_job(
     let session = match session {
         Ok(session) => session,
         Err(err) => {
-            let message = format!("The lotar process running the job exited before its turn ended, and its session {name} could not be resumed: {err}");
+            let message = format!("{why}, and its session {name} could not be resumed: {err}");
             update_job_failure(job_id, ticket_id, message, tasks_dir);
             return;
         }
@@ -3818,6 +3844,16 @@ fn t3_thread_show(program: &std::path::Path, env: &[(String, String)], cwd: &std
     shown.get_mut("thread").map(serde_json::Value::take)
 }
 
+type T3Cli = (std::path::PathBuf, Vec<(String, String)>, std::path::PathBuf);
+
+/// T3's CLI as harnessmux's t3 agent runs it, its environment, and the
+/// directory to run it in (the tasks directory's repository).
+fn t3_cli(tasks_dir: &std::path::Path) -> Option<T3Cli> {
+    let (program, env) = t3_launch()?;
+    let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
+    Some((program, env, cwd))
+}
+
 /// How long the answer for a ticket counts before T3 Code is asked again,
 /// while the ticket's earlier threads stay the same: the queue tries a waiting
 /// ticket every few hundred milliseconds, and each `t3` call takes about half
@@ -3875,8 +3911,7 @@ fn running_t3_thread(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<T3T
         return answer.clone();
     }
     // Unlocked while `t3` runs, so other tickets' starts don't wait for it.
-    let (program, env) = t3_launch()?;
-    let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
+    let (program, env, cwd) = t3_cli(tasks_dir)?;
     let answer = asked.iter().find_map(|thread| {
         let shown = t3_thread_show(&program, &env, &cwd, thread)?;
         let job = threads.iter().find(|(_, known, _)| known == thread).map(|(_, _, job)| job.clone())?;

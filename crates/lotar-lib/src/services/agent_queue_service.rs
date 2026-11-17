@@ -274,6 +274,8 @@ impl AgentQueueService {
                 // run here from now on (DEV-378).
                 if !upgraded {
                     AgentJobService::recover_orphaned_jobs(tasks_dir);
+                    // Threads T3 Code runs again with no job (DEV-626).
+                    AgentJobService::adopt_resumed_t3_threads(tasks_dir);
                 }
                 let max_parallel = resolve_max_parallel(tasks_dir)?;
                 let running = AgentJobService::queue_stats().running;

@@ -1,11 +1,11 @@
 title: After a restart T3 Code resumes cut-off job threads on its own, outside any lotar job, and their tickets stay HelpNeeded
-status: Reviewing
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-17T03:39:12.844291+00:00
+modified: 2026-11-17T03:51:04.557838+00:00
 relationships:
   blocks:
   - DEV-639
@@ -23,6 +23,10 @@ relationships:
   - DEV-604
   - DEV-639
   - DEV-620
+  - DEV-378
+  - DEV-503
+  - DEV-613
+  - DEV-621
 comments:
 - date: 2026-11-17T01:13:44.541125+00:00
   author: claude
@@ -125,6 +129,31 @@ comments:
       result: passed
       reason: 405 tests
     next: Review again; land DEV-626 before DEV-639 (agent/DEV-639 cherry-picked the old 55e2126a9, so rebase it on this commit)
+- date: 2026-11-17T03:49:26.847176+00:00
+  author: claude
+  text: |-
+    Review: passed. I read HEAD `5d6344feb`. The rework fixes the flaky wait, and the change does what "Done when" asks.
+
+    - **Earlier finding fixed:** `wait_for_end` in `crates/lotar-lib/tests/dev626_resumed_t3_threads_test.rs:130` waits for `completed`, `failed` or `cancelled`. Both waits use it. `git range-diff` against `55e2126a9` shows only the test changed.
+    - **Read:** `resumed.rs`, the queue-worker and `lotar serve` hooks, the lock per ticket and the marker per thread run in `agent_active_jobs.rs`, the `resume_session_to_end` split, and the `docs/help/agent.md` text. Each "Done when" point is there. The `max_parallel_jobs` gap stays with DEV-630, as the ticket says.
+    - **Rerun:** the DEV-626, DEV-600, DEV-503 and DEV-378 tests 13 times: 11 runs passed all 39 tests. The 2 failures were in `a_skipped_session_is_kept_and_the_handoff_names_its_event_log` ("already has an active job"), a known flake that DEV-621 fixed on main. The DEV-626 tests never failed.
+    - `npm run lint` passed. `npm test` passed on the second run (2280 Rust, 1548 web). The first run hit the DEV-613 flake `a_queue_entry_held_by_a_waiting_thread_says_so_once`, also fixed on main.
+    - **For the merge:** the branch is 18 commits behind main. A rebase drops the duplicate DEV-620 commit `1227e5bde` and leaves one conflict at `agent_job_service.rs` `running_t3_thread`: main replaced the inline t3 lookup with `t3_launch()`. `t3_cli` should call `t3_launch()`.
+    - No new tickets filed. DEV-639 from the first review still stands.
+  report:
+    checks:
+    - command: cargo nextest dev626|dev600|dev503|dev378 x13
+      result: passed
+      reason: 11 of 13 clean; 2 runs hit dev503 flake fixed on main by DEV-621
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2280 Rust + 1548 web on 2nd run; 1st run hit DEV-613 flake fixed on main
+    - command: npm run smoke
+      result: not_run
+      reason: Rust and docs only, fix agent ran it (405 passed)
+    next: 'Merge: rebase onto main (drops duplicate DEV-620 commit, resolve one conflict in agent_job_service.rs)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ae3bded-6bb0-4dbe-b1d4-32538275daa2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae33ee74-c0c4-408b-b956-bbb269e447c7
@@ -355,3 +384,22 @@ history:
   - field: relationships
     old: '{"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620"]}'
     new: '{"blocks":["DEV-639"],"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620"]}'
+- at: 2026-11-17T03:49:26.847176+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:49:27.528027+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-639"],"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620"]}'
+    new: '{"blocks":["DEV-639"],"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620","DEV-378","DEV-503","DEV-613","DEV-621"]}'
+- at: 2026-11-17T03:51:04.557838+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,11 +1,11 @@
 title: agent.md doesn't say that end rules a full disk refused are kept and retried
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-17T02:28:12.068626+00:00
-modified: 2026-11-17T03:47:43.943966+00:00
+modified: 2026-11-17T04:09:05.324248+00:00
 relationships:
   depends_on:
   - DEV-633
@@ -77,10 +77,61 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-17T03:49:00.444193+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job ended 'idle' after it had posted a passing review (no findings). Not a work failure; check the branch and send it to review again.
+  answer:
+    to: 2026-11-17T03:47:43.943966+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job ended ''idle'' after it had posted a passing review (no findings). Not a work failure; check the branch and send it to review again.'
+- date: 2026-11-17T03:52:48.910706+00:00
+  author: claude
+  text: |-
+    Branch checked: unchanged since the passing review, ready for review again.
+
+    - `agent/DEV-641` = `t3/agent-md-end-rules-full-disk` = HEAD = `c447d2b96`, no new files changed.
+    - Under it is `bb7cc8371`, the pre-merge copy of DEV-633. Its code is the same as main's `9c10760fa` (`git diff bb7cc8371 9c10760fa -- crates docs` is empty); only its `.tasks` edits differ and conflict with main.
+    - So only `c447d2b96` needs landing: `docs/help/agent.md` on main matches its parent, so it applies cleanly on main.
+    - `npx prettier --check docs/help/agent.md` passed.
+  report:
+    commits:
+    - hash: c447d2b96
+      what: end-rules paragraph in docs/help/agent.md covers the busy lock and full-disk cases
+    checks:
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: Review c447d2b96 again, then merge only that commit onto main
+- date: 2026-11-17T04:08:57.802110+00:00
+  author: claude
+  text: |-
+    Review: passed. `c447d2b96` still describes both kept cases in the end-rules paragraph of `docs/help/agent.md`, and each claim matches the code.
+
+    - Branch: HEAD = `agent/DEV-641` = `t3/agent-md-enospc-end-rule-retry` = `c447d2b96`, the same commit the earlier review passed; no rework, no new commits.
+    - Done when: a step failing on `ENOSPC` is kept like a busy-lock step (`is_retryable`); a refused checkpoint is kept in memory and retried every 30 s (`keep_unsaved_end_action`), a worker stays up meanwhile (`has_unsaved_end_actions`, `agent_queue_service.rs:311`), and it's lost on exit (static `UNSAVED_END_ACTIONS`); the outcome waits behind it (`is_unsaved_end_action`, `automation_service.rs:655`, `:682`).
+    - Main: `docs/help/agent.md` on main equals `c447d2b96~1`, and `bb7cc8371`'s code equals main's: only `c447d2b96` needs to land (`bb7cc8371`'s `.tasks/` files conflict with main).
+    - Reran: `npx prettier --check docs/help/agent.md` passed. Docs only, so no lint/test/smoke and no UI review.
+    - Findings: none; no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b405894-ad3f-43bc-ab4a-80324db2aefc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a71d5c7-b8ff-42b3-b52a-df4b8c6def20
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A672ad60e-a391-4f2f-8c50-0d8c6c40098e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae06cfae1-49d1-4b5c-bb8b-f91a9b96879f
 description: 'Found in the DEV-633 review: `docs/help/agent.md:238` says end-rule actions that find the storage lock busy are kept and resumed, but not that end rules whose checkpoint a full disk refused (ENOSPC) are now kept in the process and retried every 30 s, nor that this is lost when the process exits. Done when that paragraph describes both cases.'
+tags:
+- retry-fix
 history:
 - at: 2026-11-17T02:28:14.925851+00:00
   actor: claude
@@ -149,3 +200,61 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T03:49:00.444193+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:49:00.447995+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T03:49:05.039988+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: ''
+    new: retry-fix
+- at: 2026-11-17T03:52:02.503068+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T03:52:05.048340+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A672ad60e-a391-4f2f-8c50-0d8c6c40098e
+- at: 2026-11-17T03:52:48.910706+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:53:41.570619+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T04:07:44.783913+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae06cfae1-49d1-4b5c-bb8b-f91a9b96879f
+- at: 2026-11-17T04:08:57.802110+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:09:05.324248+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

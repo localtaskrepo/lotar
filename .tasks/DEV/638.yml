@@ -1,14 +1,15 @@
 title: lotar serve announces task files written before it started as task_updated
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T03:39:41.376129+00:00
+modified: 2026-11-17T04:30:54.353926+00:00
 relationships:
   related:
   - DEV-614
+  - DEV-644
 comments:
 - date: 2026-11-17T02:46:56.322682+00:00
   author: claude
@@ -127,15 +128,117 @@ comments:
 - date: 2026-11-17T03:39:38.988540+00:00
   author: automation
   text: 'The prerequisites could not be checked (Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes). The @fix job waits in the queue, which checks them again before it starts.'
+- date: 2026-11-17T03:50:45.717104+00:00
+  author: claude
+  text: |-
+    Retry after the failed review job: the passing review covers branch HEAD, so the work goes on to merge.
+
+    - `agent/DEV-638`, `t3/seed-watcher-pre-start-task-events`, `t3/seed-watcher-prestart-task-fingerprints` and `t3/watcher-ignore-pre-start-writes` all point at `99ee73da0`, the commit the 03:29 review passed
+    - Only `crates/lotar-lib/src/web_server.rs` differs from `main`; no new changes in this job
+    - Reran `cargo nextest run -p lotar-lib watcher_`: 2 passed
+  report:
+    commits:
+    - hash: 99ee73da0
+      what: watcher seeds file fingerprints before it starts watching
+    checks:
+    - command: cargo nextest run -p lotar-lib watcher_
+      result: passed
+      reason: 2 passed, rerun in this job
+    - command: npm run lint
+      result: passed
+      reason: first fix job, same commit
+    - command: npm test
+      result: passed
+      reason: first fix job, same commit
+    - command: npm run smoke
+      result: passed
+      reason: first fix job, same commit (405)
+    next: Merge agent lands 99ee73da0 on main
+- date: 2026-11-17T03:55:34.446477+00:00
+  author: claude
+  text: |-
+    Review: passed. Re-review of `99ee73da0`, the same commit the 03:29 review passed; no findings, no tickets filed.
+
+    - All ticket branches (`agent/DEV-638`, `t3/seed-watcher-pre-start-task-events` and the others) point at `99ee73da0`; only `crates/lotar-lib/src/web_server.rs` changes
+    - `seed_fingerprints` fills `announced` before `watcher.watch()`, with the same relative-path keys and dot-entry skip as `process_watch_batch`; meets "Done when"
+    - Test `watcher_skips_files_written_before_it_started` covers pre-start silence and a post-start write; the earlier review showed it fails without the seed
+    - Reran: `cargo nextest run -p lotar-lib watcher_` (2 passed), `cargo clippy -p lotar-lib --all-targets` (clean), `rustfmt --check` (ok), `git merge-tree main HEAD` (no conflicts)
+    - No UI, REST or doc changes; smoke not rerun (server-only, passed in the fix job)
+- date: 2026-11-17T04:07:30.633345+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T035211.071Z-89 failed or its review thread did (lotar agent logs job-20261117T035211.071Z-89), so the work on branch t3/lotar-serve-seed-watcher-fingerprints isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T04:07:56.894398+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): review job-20261117T035211.071Z-89 ended 'idle' again after posting its passing review (04:07); the question offers no fix-fable, so fix. Known cause: DEV-644 (a finished turn fails when the session later ends idle). Both reviews passed on 99ee73da0: send it on to merge.
+  answer:
+    to: 2026-11-17T04:07:30.633345+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): review job-20261117T035211.071Z-89 ended ''idle'' again after posting its passing review (04:07); the question offers no fix-fable, so fix. Known cause: DEV-644 (a finished turn fails when the session later ends idle). Both reviews passed on 99ee73da0: send it on to merge.'
+- date: 2026-11-17T04:30:31.233218+00:00
+  author: claude
+  text: |-
+    Retry after the second idle-ended review job: both passing reviews cover branch HEAD, so the work goes on to merge.
+
+    - `t3/lotar-serve-seed-watcher-fingerprints`, `agent/DEV-638` and the other ticket branches all point at `99ee73da0`, the commit reviewed at 03:29 and 03:55
+    - Only `crates/lotar-lib/src/web_server.rs` differs from `main`; no new changes in this job
+    - Reran `cargo nextest run -p lotar-lib watcher_`: 2 passed
+    - Idle-end failures are DEV-644, not the work
+  report:
+    commits:
+    - hash: 99ee73da0
+      what: seed the tasks watcher's fingerprints at start
+    checks:
+    - command: cargo nextest run -p lotar-lib watcher_
+      result: passed
+      reason: 2 passed
+    - command: npm run lint
+      result: not_run
+      reason: passed on 99ee73da0 in the first fix job; no change since
+    - command: npm test
+      result: not_run
+      reason: passed on 99ee73da0 in the first fix job
+    - command: npm run smoke
+      result: not_run
+      reason: passed on 99ee73da0 in the first fix job (405)
+    next: Merge agent lands 99ee73da0 on main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22b1bf8c-7133-4be8-b911-a6234f55843e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e669ea5-0714-4b68-9b9c-a06ebd8772d7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae6ab2024-d3f3-4f04-8bb5-0be937e1b3d9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a543c38-ef7e-4084-a0be-bdb0b22dcce7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d795fce-8b26-4cd1-a4cb-3181b378e406
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb340442-490c-4554-a7a9-e454bcc4b762
 description: 'Found in the DEV-614 review on 2026-11-16: the tasks watcher (crates/lotar-lib/src/web_server.rs start_tasks_watcher) can still report files written just before the server started (FSEvents delivers recent history), and its ''announced'' fingerprint map starts empty, so it emits task_updated for unchanged files. On the Dependencies page (view/pages/Dependencies.vue changed()) such an event clears an open safe repair preview with ''Task data changed''. DEV-614 worked around it in the smoke test only. Check: start lotar serve right after writing a task file, open /api/events, watch for a task_updated of that file without a new write. Done when the watcher seeds its fingerprints at start (or ignores events for content it saw at start) and a test shows no event for pre-start writes.'
 tags:
 - health
 - fix-retried
 - retry-fix
+- retry-fable
 custom_fields:
   finding: review:serve-watcher-replays-prestart-writes
 history:
@@ -238,3 +341,95 @@ history:
   - field: tags
     old: health, fix-retried
     new: health, fix-retried, retry-fix
+- at: 2026-11-17T03:48:59.547185+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T03:49:10.480134+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a543c38-ef7e-4084-a0be-bdb0b22dcce7
+- at: 2026-11-17T03:50:45.717104+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:51:06.120113+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T03:52:19.390489+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d795fce-8b26-4cd1-a4cb-3181b378e406
+- at: 2026-11-17T03:55:34.446477+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:07:29.946542+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-17T04:07:30.633345+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:07:56.894398+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:07:56.922548+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T04:08:03.055311+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-614"]}'
+    new: '{"related":["DEV-614","DEV-644"]}'
+- at: 2026-11-17T04:08:08.777635+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried, retry-fix
+    new: health, fix-retried, retry-fix, retry-fable
+- at: 2026-11-17T04:08:45.932812+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T04:08:54.473744+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb340442-490c-4554-a7a9-e454bcc4b762
+- at: 2026-11-17T04:30:31.233218+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:30:54.353926+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

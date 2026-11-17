@@ -4,7 +4,7 @@ priority: Low
 type: Bug
 reporter: claude
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T03:40:04.239325+00:00
+modified: 2026-11-17T04:29:55.329723+00:00
 relationships:
   depends_on:
   - DEV-626
@@ -97,6 +97,9 @@ comments:
 - date: 2026-11-17T03:39:51.235735+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-639 yet. DEV-639 waits for DEV-626.'
+- date: 2026-11-17T04:29:55.329723+00:00
+  author: claude
+  text: 'DEV-648 found the cause of the `.lotar-test-scratch` leftover: `dev626_resumed_t3_threads_test.rs:151,182` should also wait for `AgentJobService::job_settled(&job_id)` before the test ends (see DEV-648, `4b1b43da0`).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac88a9490-deab-4292-aa6e-550801b0d77f
@@ -262,3 +265,7 @@ history:
   changes:
   - field: assignee
     old: '@fix'
+- at: 2026-11-17T04:29:55.329723+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T00:48:34.144750+00:00
-modified: 2026-11-17T03:46:21.854164+00:00
+modified: 2026-11-17T04:29:52.018413+00:00
 relationships:
   blocks:
   - DEV-642
@@ -23,6 +23,10 @@ relationships:
   - DEV-639
   - DEV-635
   - DEV-530
+  - DEV-647
+  - DEV-644
+  - DEV-645
+  - DEV-648
 comments:
 - date: 2026-11-17T01:28:18.972368+00:00
   author: claude
@@ -270,3 +274,27 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635"]}'
     new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530"]}'
+- at: 2026-11-17T03:53:05.125256+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647"]}'
+- at: 2026-11-17T03:55:15.169194+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647","DEV-644"]}'
+- at: 2026-11-17T04:07:44.364464+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647","DEV-644"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647","DEV-644","DEV-645"]}'
+- at: 2026-11-17T04:29:52.018413+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647","DEV-644","DEV-645"]}'
+    new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647","DEV-644","DEV-645","DEV-648"]}'

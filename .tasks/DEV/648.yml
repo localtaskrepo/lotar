@@ -1,14 +1,46 @@
 title: Several Rust tests run together leave .lotar-test-scratch in the test runner's temp folder
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T03:35:00.829240+00:00
-modified: 2026-11-17T03:47:40.688289+00:00
+modified: 2026-11-17T04:30:47.550430+00:00
 relationships:
   related:
   - DEV-639
+  - DEV-633
+comments:
+- date: 2026-11-17T04:29:50.434177+00:00
+  author: claude
+  text: |-
+    Fixed: the leftover was a test's own queue files, not a race in the scratch-base cleanup.
+
+    - A kept temp folder showed `.lotar-test-scratch/<pid>/agent-queue/.../job-*.ended` and `.outcome.lock` left in one process's scratch
+    - Cause: `dev510_t3_session_test.rs` waits until the recovered job's status is no longer `running`, then exits while the job's worker thread is still in `RunningJobSlot::drop` → `agent_active_jobs::unregister`; it writes those files during or after the `#[dtor]` removes the scratch
+    - Fix: the three "the job to end" waits also wait for `AgentJobService::job_settled` (worker finished). The runner's leftover check is unchanged, so a real leftover still fails (`scripts/tests/rust-test-runner.test.mjs:523`)
+    - `dev626` tests are only on `agent/DEV-639` (`08cd964f2`) and have the same wait at `dev626_resumed_t3_threads_test.rs:151,182`: that branch needs the same `job_settled` condition
+    - Branch also holds `bb7cc8371` (DEV-633 before it was rebased; main has it as `9c10760fa`): the merge rebase drops it
+  report:
+    commits:
+    - hash: 4b1b43da0
+      what: dev510 tests wait for the job's worker to settle
+    checks:
+    - command: node scripts/rust-test-runner.mjs --agent dev510
+      result: passed
+      reason: '8 of 8 runs exit 0 (before: 2 of 3 failed)'
+    - command: node scripts/rust-test-runner.mjs --agent dev626
+      result: not_run
+      reason: dev626 tests exist only on unmerged agent/DEV-639
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent
+    - command: npm run smoke
+      result: passed
+    next: Review, then merge; DEV-639 applies the same wait to dev626_resumed_t3_threads_test.rs:151,182
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e087eb6-5c16-45be-a23f-eaa19605023d
 description: |-
@@ -45,3 +77,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e087eb6-5c16-45be-a23f-eaa19605023d
+- at: 2026-11-17T04:29:50.434177+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:29:52.019770+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-639"]}'
+    new: '{"related":["DEV-639","DEV-633"]}'
+- at: 2026-11-17T04:30:47.550430+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

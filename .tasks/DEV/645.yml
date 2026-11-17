@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T03:02:08.605225+00:00
-modified: 2026-11-17T03:23:48.590451+00:00
+modified: 2026-11-17T04:08:58.216382+00:00
 relationships:
   related:
   - DEV-623
+  - DEV-633
 comments:
 - date: 2026-11-17T03:23:48.590451+00:00
   author: claude
@@ -17,8 +18,47 @@ comments:
 
     - DEV-623 (memory gate) is not on main yet: this branch carries its commit `d8659a72` cherry-picked onto main (config conflicts resolved, keep both), DEV-645 on top
     - Merge note: land DEV-623 first or together; once it is on main the cherry-picked commit drops out on rebase
+- date: 2026-11-17T03:49:09.238034+00:00
+  author: claude
+  text: |-
+    Fixed: `list-jobs` and `agent queue` no longer show a memory hold from a reading older than 60 s; they read memory themselves.
+
+    - `crates/lotar-lib/src/services/memory_gate.rs`: `status` reads again when a saved hold or failed reading is older than 2 × 30 s; the fresh reading is not saved, so `check` (worker, `lotar serve`) and its settle time are unchanged
+    - Test `status_reads_again_once_no_process_reread_a_held_reading`: hold from 3 h ago + normal reading → no hold, file untouched; a 55 s old hold still shows
+    - `docs/help/agent.md` (memory gate) says so
+    - Branch base: DEV-623 isn't on main yet (HelpNeeded), so its commit is cherry-picked under this one
+  report:
+    commits:
+    - hash: 0beba08b
+      what: status reads memory again for a held or failed reading older than 60 s, not saved; test and agent.md
+    - hash: 3ebc174f
+      what: 'DEV-623''s d8659a72 cherry-picked onto main (config conflicts: keep both); the memory gate this fixes'
+    checks:
+    - command: cargo nextest run -p lotar-lib --lib -E 'test(status_reads_again)'
+      result: passed
+      reason: failed before the fix (hold shown), passes after
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2298 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '405'
+    next: 'Review, then merge: land DEV-623 first or with this branch; rebase onto main drops bb7cc837 (main has DEV-633 as 9c10760f) and, once DEV-623 is on main, 3ebc174f'
+- date: 2026-11-17T04:07:43.905628+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code fix is right, but merging this branch also lands DEV-623 on main, and the owner still holds DEV-623 (HelpNeeded, assigned to mallox since 03:15Z).
+
+    - Reviewed `0beba08b` on `agent/DEV-645` (same commit as HEAD, no newer rework). The fix matches every "Done when" point in `crates/lotar-lib/src/services/memory_gate.rs:99-111`: it reads memory again only for a saved hold or error older than 60 s (or one with no time), the new reading wins and isn't saved, a saved open gate is shown as before
+    - Test `status_reads_again_once_no_process_reread_a_held_reading` fails without the fix (`memory_gate.rs:426`) and passes with it
+    - Reran `cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(agent_queue) | test(worker_state)'` with `RUSTC_WRAPPER=`: 17 passed. Didn't rerun full lint/test/smoke (the fix agent's run passed)
+    - **Blocking 1:** `3ebc174f` is a cherry-pick of DEV-623 (`d8659a72`). The merge rule has no dependency check, so the merge agent would put DEV-623 on main before the owner releases it. Fix: drop `3ebc174f` and base the fix on `agent/DEV-623`, add `depends_on DEV-623` and set DEV-645 to Blocked, so "Prerequisites done" continues it once DEV-623 is Done. Then rebase onto main
+    - **Blocking 2:** `bb7cc837` is an old copy of DEV-633 (main has `9c10760f`). The code is the same but `.tasks` differs, so `git rebase main` stops on it with conflicts in 9 `.tasks/DEV/*.yml` files. Fix: rebase it away (`git rebase --skip` on that commit); after the skip, the other two commits rebase cleanly (tried in a scratch worktree, since removed)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeca30204-ae6e-4451-9660-94e8242f4b0e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A577c8b27-c103-4ecf-b1eb-5dad6f458e1d
 description: |-
   Found in the DEV-623 review (2026-11-16).
 
@@ -32,6 +72,8 @@ description: |-
     - The fresh reading is not saved: only `check` (the worker, `lotar serve`) writes `memory-gate-<hash>.json`, so the settle time of a running gate is unchanged.
     - A saved reading 60 s old or newer is shown as saved (a held worker rereads every 30 s). A saved open gate (no hold, no error) is shown as before, without a reading.
   - [ ] A test with an old saved hold and a normal reading: `status` shows no hold; the same hold with a recent reading is still shown.
+tags:
+- review-returned
 history:
 - at: 2026-11-17T03:02:11.026136+00:00
   actor: claude
@@ -80,3 +122,52 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T03:49:09.238034+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:49:21.627223+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T03:52:05.924294+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A577c8b27-c103-4ecf-b1eb-5dad6f458e1d
+- at: 2026-11-17T04:07:43.905628+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:07:44.365642+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623"]}'
+    new: '{"related":["DEV-623","DEV-633"]}'
+- at: 2026-11-17T04:07:45.029951+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-17T04:08:05.534960+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-17T04:08:58.216382+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress

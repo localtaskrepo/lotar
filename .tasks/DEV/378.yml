@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T18:53:33.811162+00:00
-modified: 2026-11-16T21:00:56.247149+00:00
+modified: 2026-11-17T03:49:27.497220+00:00
 relationships:
   related:
   - DEV-377
@@ -16,6 +16,7 @@ relationships:
   - DEV-478
   - DEV-544
   - DEV-623
+  - DEV-626
 comments:
 - date: 2026-11-12T18:59:44.351508+00:00
   author: claude
@@ -199,3 +200,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401","DEV-457","DEV-478","DEV-544"]}'
     new: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401","DEV-457","DEV-478","DEV-544","DEV-623"]}'
+- at: 2026-11-17T03:49:27.497220+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401","DEV-457","DEV-478","DEV-544","DEV-623"]}'
+    new: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401","DEV-457","DEV-478","DEV-544","DEV-623","DEV-626"]}'

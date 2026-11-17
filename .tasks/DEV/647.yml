@@ -1,14 +1,17 @@
 title: Worktree cleanup holds the job registry through git worktree remove, stalling every job thread for tens of seconds
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-17T03:19:06.596519+00:00
-modified: 2026-11-17T03:47:38.388739+00:00
+modified: 2026-11-17T04:07:35.054871+00:00
 relationships:
   related:
   - DEV-643
+  - DEV-633
+  - DEV-640
+  - DEV-644
 comments:
 - date: 2026-11-17T03:44:30.221745+00:00
   author: claude
@@ -41,8 +44,39 @@ comments:
 - date: 2026-11-17T03:47:38.388739+00:00
   author: automation
   text: The fix agent's job job-20261117T032116.464Z-74 failed (lotar agent logs job-20261117T032116.464Z-74); @fix-retry retries it on branch agent/DEV-647.
+- date: 2026-11-17T03:53:04.178861+00:00
+  author: claude
+  text: |-
+    Retry: the fix from the last job stands; that job failed only because its session went idle (DEV-644), not because of the work.
+
+    - Commit `7303c2302` is signed on the branch; nothing new to change
+    - Reran `cargo nextest run --workspace agent_safety_test`: 30/30 passed, including `done_cleanup_leaves_the_job_registry_free_while_git_removes_the_worktree`
+    - The branch is 2 commits behind main (`bb7cc8371` DEV-633, `841295405` DEV-640); the merge agent rebases it
+  report:
+    commits:
+    - hash: 7303c2302
+      what: release JOB_REGISTRY before git in worktree cleanup, with a regression test
+    checks:
+    - command: cargo nextest run --workspace agent_safety_test
+      result: passed
+      reason: 30/30 on the retry
+    - command: npm run lint
+      result: passed
+      reason: previous job, same commit
+    - command: npm test
+      result: passed
+      reason: previous job, same commit
+    - command: npm run smoke
+      result: passed
+      reason: previous job, same commit
+    - command: ticket load check (time job events at load ~75)
+      result: not_run
+      reason: covered by the new lock-path test
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe867e4-6d1f-40dd-94ad-9c8c822d7913
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A41df881b-8829-4eab-a6fe-72fcebb5fd73
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66bbaaf1-6fb9-4c02-9de5-5cc18cf82b37
 description: 'Found (DEV-643, 2026-11-16, load ~75): `cleanup_done_ticket_worktree` and `maybe_cleanup_worktree` in `crates/lotar-lib/src/services/agent_job_service.rs` hold `JOB_REGISTRY` while they run `git worktree remove` and other git commands; `sample` of the worker showed ~15 threads waiting on the mutex while one `git worktree remove` ran 38 s. DEV-643 moved the task update''s registry lookup out of the storage locks, so CLI writes no longer fail, but job threads still stall. Check: under load, time job events while a done ticket''s worktree is removed. Done: the registry is held only for the in-memory check, not across git.'
 tags:
 - health
@@ -89,3 +123,32 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T03:49:24.887015+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A41df881b-8829-4eab-a6fe-72fcebb5fd73
+- at: 2026-11-17T03:53:04.178861+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:53:05.127310+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643"]}'
+    new: '{"related":["DEV-643","DEV-633","DEV-640","DEV-644"]}'
+- at: 2026-11-17T03:53:15.626001+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-17T04:07:35.054871+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66bbaaf1-6fb9-4c02-9de5-5cc18cf82b37

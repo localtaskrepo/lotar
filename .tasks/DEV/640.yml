@@ -5,13 +5,17 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:13:29.874075+00:00
-modified: 2026-11-17T03:20:14.379167+00:00
+modified: 2026-11-17T03:53:05.125919+00:00
 relationships:
   related:
   - DEV-635
   - DEV-613
   - DEV-633
   - DEV-639
+  - DEV-577
+  - DEV-615
+  - DEV-627
+  - DEV-647
 comments:
 - date: 2026-11-17T02:26:52.165689+00:00
   author: claude
@@ -46,6 +50,35 @@ comments:
     - Other `set_read_timeout(..).unwrap()` calls in the file run before a request is sent or on kept-open SSE streams. They don't hit this race.
     - Reran: `cargo nextest run -p lotar-lib --test integration -E 'test(/^web_api_integration_test::/)'`: 36 passed. `rustfmt --check` on the file passed. I didn't rerun `npm run lint`, `npm test` or `npm run smoke`; the fix agent reports them passed.
     - No UI work, no stray files, no second branch. No tickets filed.
+- date: 2026-11-17T03:49:19.729894+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `bfb2cb83` is on `origin/main`. Rebased onto main 4 times because main kept moving.
+
+    - Main moved during each full check run (DEV-615, DEV-627, DEV-577). The 4th time I fast-forwarded right after a targeted test, then ran the full checks on that exact code. All passed.
+    - The worktree was deleted and recreated at 19:12 by something outside this session, which killed the first smoke run. Rerun after `npm ci`: passed.
+    - My mistake: the step 4 `.tasks` amend ran after DEV-633's commit `9c10760f` had landed and been pushed, so it rewrote a pushed commit (`bb7cc837`, `.tasks` only). With the owner's OK I ran `git reset --soft origin/main` and committed the `.tasks` changes as `84129540`, then pushed. Main is clean and level with origin; `bb7cc837` is in the reflog.
+    - No rules or config changed, so no `lotar trust`.
+  report:
+    commits:
+    - hash: bfb2cb834
+      what: read_until_deadline skips EINVAL from set_read_timeout; test covers it
+    - hash: '841295405'
+      what: ticket updates after the merges (.tasks only)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on 09bf109d (same code as bfb2cb83)
+    - command: npm test
+      result: passed
+      reason: test:agent 2284/2284 Rust, 1548 UI, release, hooks on 09bf109d; an earlier run hit the known DEV-613 flake
+    - command: npm run smoke
+      result: passed
+      reason: 405/405 on bfb2cb83 after npm ci (worktree had been recreated mid-run)
+    - command: web_api_integration_test (ticket check)
+      result: passed
+      reason: 36/36, file identical to main 84129540
+    next: 'None: landed and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fd0d540-0fd0-4658-bfda-b234122bf1b7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6b0aeb7-a4a0-4429-844b-5cc98f305672
@@ -141,3 +174,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-635","DEV-613","DEV-633"]}'
     new: '{"related":["DEV-635","DEV-613","DEV-633","DEV-639"]}'
+- at: 2026-11-17T03:49:19.729894+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:49:19.924260+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635","DEV-613","DEV-633","DEV-639"]}'
+    new: '{"related":["DEV-635","DEV-613","DEV-633","DEV-639","DEV-577","DEV-615","DEV-627"]}'
+- at: 2026-11-17T03:53:05.125919+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635","DEV-613","DEV-633","DEV-639","DEV-577","DEV-615","DEV-627"]}'
+    new: '{"related":["DEV-635","DEV-613","DEV-633","DEV-639","DEV-577","DEV-615","DEV-627","DEV-647"]}'

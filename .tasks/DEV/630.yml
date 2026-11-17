@@ -1,11 +1,11 @@
 title: 'The queue worker ignores a project''s max_parallel_jobs: DEV ran 4 jobs with a limit of 2'
-status: InProgress
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T03:23:43.167753+00:00
+modified: 2026-11-17T04:08:08.570523+00:00
 relationships:
   blocks:
   - DEV-646
@@ -67,11 +67,52 @@ comments:
 - date: 2026-11-17T03:20:07.103570+00:00
   author: automation
   text: 'The queued @review job didn''t start: DEV-630 is assigned to @fix now.'
+- date: 2026-11-17T03:49:03.888326+00:00
+  author: claude
+  text: |-
+    Rework done: the global `max_parallel_jobs` is a machine-wide total again; a project's own limit applies on top.
+
+    - Review finding (global limit became per project): fixed in `agent_queue_service.rs` (`JobSlots`). A queued ticket starts only when the global limit (all jobs of all projects, every process) and its project's limit both have a free slot.
+    - Queue reason names the full limit: `... of the global agent.worktree.max_parallel_jobs 2 running` or `... of LIM's ...`.
+    - For DEV-646: new public `AgentQueueService::slot_wait_reason(tasks_dir, ticket_id, own_jobs)` returns `None` (may start) or the wait reason. `own_jobs` = this process's `(ticket, job id)` list, passed by the caller so it can hold the registry lock; `agent_active_jobs` records are added and deduplicated.
+    - Tests: new `worker_keeps_all_projects_together_at_the_global_limit` (global limit 2, one job in another process); it fails on `076bd5a2c`. New unit test `the_global_limit_caps_all_projects_together_and_a_projects_limit_its_own`.
+    - Docs: `docs/help/agent.md` describes both limits.
+  report:
+    commits:
+    - hash: 3d2c2aae9
+      what: global limit caps all projects' jobs together, project limit on top; public slot_wait_reason
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2279 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: new global test on the old queue code
+      result: failed
+      reason: expected, shows the test catches the bug
+    next: Review again, then merge
+- date: 2026-11-17T04:07:55.741029+00:00
+  author: claude
+  text: |-
+    Review: passed. Read HEAD `3d2c2aae9` (same as the ticket branch). The first review's blocking finding is fixed.
+
+    - **Global limit is a total again:** `JobSlots` in `crates/lotar-lib/src/services/agent_queue_service.rs` checks the global `max_parallel_jobs` across all projects first, then the project's own limit. Each limit is re-read every tick; the config cache checks file fingerprints.
+    - **Counted across processes:** this process's jobs plus `agent_active_jobs::list`, which skips records whose owner process has died. Jobs are deduplicated by (ticket, job id).
+    - **Done when:** project limit over global ✔; jobs counted in every process ✔; test with two projects, one limit of 1, a job in another process ✔; `docs/help/agent.md` ✔.
+    - **Reran:** `cargo nextest run -E 'test(dev630) | test(/agent_queue_service::tests/)'`: 8 passed.
+    - **Fails before the fix:** in a scratch copy with the queue, job and CLI-handler sources taken from `3d2c2aae9^`, both `dev630` tests fail at `dev630_queue_project_parallel_limit_test.rs:72`: the old worker starts every job. Scratch copy removed.
+    - **Not rerun:** full `npm run lint`, `npm test`, `npm run smoke` (the fix agent reports them passed).
+    - **Merge:** `3d2c2aae9` applies cleanly on current main (`git merge-tree`, exit 0). The DEV-620 copy `1227e5bde` matches `6a78ba884` on main (`git cherry`), so a rebase drops it.
+    - No minor tickets filed. Serve's own counting stays with DEV-646.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad34d9a6c-9f47-4ca3-8837-a89a8c3bce26
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44612340-b192-4390-b809-b4bdc7b925b8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A71070fdc-f397-405a-bd46-b33c5b774b93
 description: |-
   Found 2026-11-16 in DEV-626 (lotar ran 4 jobs while .tasks/DEV/config.yml sets agent.worktree.max_parallel_jobs: 2).
 
@@ -214,3 +255,34 @@ history:
   - field: relationships
     old: '{"related":["DEV-626","DEV-613","DEV-620","DEV-646"]}'
     new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646"]}'
+- at: 2026-11-17T03:49:03.888326+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T03:49:25.651654+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T03:52:16.948960+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A71070fdc-f397-405a-bd46-b33c5b774b93
+- at: 2026-11-17T04:07:55.741029+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:08:08.570523+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,11 +1,11 @@
 title: Job prompt shows an empty Comments section when no comment is picked
-status: Reviewing
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review-claude'
+assignee: mallox
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-17T03:47:37.606670+00:00
+modified: 2026-11-17T04:07:30.104583+00:00
 relationships:
   related:
   - DEV-620
@@ -89,11 +89,54 @@ comments:
       result: passed
       reason: '49'
     next: Review again on another model
+- date: 2026-11-17T03:55:24.965860+00:00
+  author: claude
+  text: |-
+    Review: passed. The rework `b06642d2` fixes the blocking doc finding and meets both "Done when" items.
+
+    - **Read:** HEAD `b06642d2`. The ticket branch has no newer commits. The DEV-620 commit on the branch is the same as `6a78ba88` on main (`git cherry`).
+    - **Done when 1:** when no comment is picked, `build_prompt` writes one line, ``Comments (N on the ticket. All of them: `lotar show ID`; the history: `lotar task timeline ID`)``, with no "below the" and no colon.
+      - Test `no_comment_picked_leaves_one_comments_line` asserts that exact line. The old code always wrote "; below the", so the test would have failed on it.
+    - **Done when 2:** `docs/help/agent.md:58` matches `prompt_comments`:
+      - open question: `before_hand_back.max(with_question)`, with the "not by that person" filter;
+      - answer: `comment.answer` or written by the person the ticket was handed to;
+      - `Question` / `Open question` labels;
+      - automation is left out only of `newest_in`;
+      - the no-pick conditions.
+      - The code comment at `agent_job_service.rs:1241` now agrees.
+    - **Reran:** `cargo nextest run -p lotar-lib --lib agent_job_service` (49 passed), `npm run lint` (exit 0), `rustfmt --check`, `prettier --check docs/help/agent.md`. Worktree still clean. I didn't rerun `npm test` / `npm run smoke`.
+    - **UI:** none, since no pages, components or styles changed.
+    - **Tickets filed:** none.
+- date: 2026-11-17T04:07:30.104583+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T034911.202Z-83 failed or its review thread did (lotar agent logs job-20261117T034911.202Z-83), so the work on branch t3/job-prompt-empty-comments-section-2 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aebace08c-547a-4525-9c19-7bab320bea41
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae582f4d-ee41-45c3-802c-7de9fae349d1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7211882e-8293-4060-8a4a-109b8652b8e3
 description: |-
   Found in the DEV-620 review.
 
@@ -257,3 +300,25 @@ history:
   - field: assignee
     old: '@fix-retry'
     new: '@review-claude'
+- at: 2026-11-17T03:51:06.508496+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7211882e-8293-4060-8a4a-109b8652b8e3
+- at: 2026-11-17T03:55:24.965860+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:07:29.564379+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review-claude'
+    new: mallox
+- at: 2026-11-17T04:07:30.104583+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -292,6 +292,15 @@ impl CommandHandler for ServeHandler {
         pin_process_tasks_dir(resolver)?;
         // Jobs of a worker or server that exited before they ended (DEV-378).
         crate::services::agent_job_service::AgentJobService::recover_orphaned_jobs(&resolver.path);
+        // Threads T3 Code runs again with no job, also long after the server
+        // started: T3 Code may come back later (DEV-626).
+        let tasks_dir = resolver.path.clone();
+        std::thread::spawn(move || {
+            loop {
+                crate::services::agent_job_service::AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+                std::thread::sleep(std::time::Duration::from_secs(30));
+            }
+        });
         // Entries a killed worker left behind start now, not at the next
         // enqueue (DEV-592).
         match crate::services::agent_queue_service::AgentQueueService::resume(&resolver.path) {

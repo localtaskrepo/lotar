@@ -302,6 +302,24 @@ fn records(tasks_dir: &Path) -> Vec<ActiveJob> {
     jobs
 }
 
+/// Holds a ticket's lock for its T3 Code threads that run again after their
+/// job ended (DEV-626), so one process at a time adopts or reports them.
+pub fn lock_resumed_threads(tasks_dir: &Path, ticket_id: &str) -> Option<std::fs::File> {
+    let name = safe_name(ticket_id)?;
+    let dir = dir(tasks_dir);
+    std::fs::create_dir_all(&dir).ok()?;
+    crate::storage::safety::acquire_storage_lock_within(&dir, &format!("{name}.resumed"), std::time::Duration::from_secs(5)).ok()
+}
+
+/// Whether this is the first look at the run `run` of the T3 Code thread
+/// `thread` since its job ended (DEV-626); marks it as seen.
+pub fn first_look_at_run(tasks_dir: &Path, thread: &str, run: &str) -> bool {
+    let dir = dir(tasks_dir);
+    let hash = blake3::hash(format!("{thread}\n{run}").as_bytes()).to_hex();
+    let path = dir.join(format!("{}.resumed", &hash[..32]));
+    std::fs::create_dir_all(&dir).is_ok() && std::fs::OpenOptions::new().write(true).create_new(true).open(path).is_ok()
+}
+
 fn read_record(path: &Path) -> Option<ActiveJob> {
     let is_record =
         path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json") && !n.ends_with(".pending.json"));
