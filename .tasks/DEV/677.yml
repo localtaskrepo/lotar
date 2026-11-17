@@ -1,0 +1,117 @@
+title: Review and merge of a ticket whose work is in another repo run in lotar's checkout, find nothing to merge and set it Done
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T21:38:23.343839+00:00
+modified: 2026-11-17T22:00:29.767217+00:00
+relationships:
+  related:
+  - DEV-564
+  - DEV-636
+  - DEV-465
+comments:
+- date: 2026-11-17T21:53:09.388499+00:00
+  author: claude
+  text: |-
+    Fixed: lotar's merge no longer says "Nothing to merge" (and lets the ticket go Done) when the work is in another repo.
+
+    - `merge.rs` `work_elsewhere`: when lotar's `agent/<ID>` is already on main, it reads the paths in the ticket's description, comments and report `next` (absolute or `~/`), and finds each one's repository (lotar's own worktrees skipped). If one has `agent/<ID>` with commits beyond its main checkout's branch (`git cherry`), the merge hands off to the merge agent: "the ticket's work is in another repository: `agent/<ID>` in `<repo>` holds N commits beyond its `main`. Review and merge it there".
+    - Test `a_ticket_whose_work_is_in_another_repository_is_not_done` in `dev605_merge_without_agent_test.rs`: fails without the fix (Nothing to merge), passes with it.
+    - `docs/help/agent.md` merge step 1 describes the exception.
+    - Review jobs aren't changed: they only reported "nothing to review", and it was the merge that set Done.
+  report:
+    commits:
+    - hash: c99370cba
+      what: lotar's merge hands off instead of Nothing to merge when the ticket names another repo whose agent/<ID> has commits
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: real DEV-564 rerun
+      result: not_run
+      reason: covered by the new integration test; the merge agent reruns the check on main
+    next: Review c99370cba, then merge
+- date: 2026-11-17T22:00:18.655969+00:00
+  author: claude
+  text: |-
+    Review: blocking. The merge hand-off works, but if the merge agent's runner fails, the ticket still goes Done.
+
+    - **Read:** `c99370cba` (`merge.rs` `work_elsewhere`, `named_paths`, `common_dir`; the test in `dev605_merge_without_agent_test.rs`; `docs/help/agent.md` step 1), the ticket, the fix comment, `merged_landed` and `merged_despite_failure` in `agent_job_service.rs`.
+    - **Reran:** `npm ci`, `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings` and `npm run test:rust:agent -- merge` (49 passed). With `merge.rs` put back to `HEAD~1`, the new test fails ("Nothing to merge"); with the fix it passes. The file is restored and the worktree is clean. Not rerun: the full `npm test` and `npm run smoke`.
+    - **Blocking:** `crates/lotar-agent/src/services/agent_job_service.rs:4937` `merged_despite_failure`. After the new hand-off, a merge-agent runner that fails (quota, crash, non-zero exit: the DEV-465 case) still completes the job, because lotar's own `agent/<ID>` is on main (`merged_landed`). Automation then sets the ticket Done and the other repo's main stays unchanged, which is the bug this ticket is about. Fix: return `None` there when `work_elsewhere(tasks_dir, ticket_id, &repo_root, &branch)` finds work (make it `pub(super)`). Add a test: a failed runner on such a ticket leaves the job failed.
+    - **Otherwise sound:** lotar's own worktrees are skipped via `--git-common-dir`. `git cherry` counts only patches that aren't on the other repo's main. Paths outside any repo, and repos that have no `agent/<ID>`, are skipped. The docs match the code.
+    - **Limit (already stated by the fix agent):** a ticket that names the other repo only by its name, with no path, still ends as "Nothing to merge".
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1281cd0-9ddf-4d8c-9f38-add5d9fe61ec
+description: 'Found (STD-138, 2026-11-17): DEV-564 lives in lotar''s .tasks but its work is harnessmux branch agent/DEV-564 (9977dec). Twice, review and merge ran in lotar''s checkout, saw lotar''s empty agent/DEV-564, reported ''Nothing to merge: agent/DEV-564 is in main already'' and automation set DEV-564 Done, though the reopen comment named the harnessmux checkout and branch. DEV-636 landed only because its reviewer read the fix comment''s next step. Check: a ticket in lotar''s .tasks with commits only in another repo''s agent/<ID> ends Done with that repo''s main unchanged. Done: jobs for such a ticket run in the repo that holds the work (or the merge refuses Done when the ticket names another repo''s branch with commits beyond its main), with a test.'
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: merge:cross-repo-ticket
+history:
+- at: 2026-11-17T21:38:23.588642+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-564","DEV-636"]}'
+- at: 2026-11-17T21:38:23.826019+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T21:44:37.792089+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T21:44:38.750961+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1281cd0-9ddf-4d8c-9f38-add5d9fe61ec
+- at: 2026-11-17T21:53:09.388499+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:53:24.234896+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T22:00:18.655969+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:00:18.833199+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-564","DEV-636"]}'
+    new: '{"related":["DEV-564","DEV-636","DEV-465"]}'
+- at: 2026-11-17T22:00:19.064571+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-17T22:00:29.767217+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned

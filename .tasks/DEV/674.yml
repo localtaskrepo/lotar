@@ -5,10 +5,12 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T20:09:56.418127+00:00
-modified: 2026-11-17T21:33:36.091566+00:00
+modified: 2026-11-17T22:02:10.936889+00:00
 relationships:
   related:
   - DEV-618
+  - DEV-623
+  - DEV-678
 comments:
 - date: 2026-11-17T20:18:14.823006+00:00
   author: automation
@@ -26,6 +28,58 @@ comments:
 - date: 2026-11-17T21:33:35.615020+00:00
   author: automation
   text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c of the job job-20261117T201713.382Z-33 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T213335.564Z-5: DEV-674 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-17T21:48:53.895436+00:00
+  author: claude
+  text: |-
+    Fixed: a job's Claude settings go only to its own thread's worktree.
+
+    - `t3_worktree_setup.rs`: a record without a branch (thread from the existing ticket branch) now needs the worktree's commit **and** T3 Code's thread in that worktree titled like the job's thread (`t3 thread list --json`, then `t3 thread show <id> --json`). Owner's or another ticket's thread at the same commit doesn't take it.
+    - T3 Code can't be asked: the record isn't claimed, setup warns, exits 0; the job log says why.
+    - Two matching records: the newest wins (was oldest).
+    - `record()` returns a `Recorded` guard; `run_session` early returns (`job_agent_table`, `open_session`, stopped) drop it, which deletes the record.
+    - `setup()` and `record()` delete records older than 10 min (unreadable ones by file age) and leave the job a "script doesn't run the command" result.
+    - `docs/help/agent.md` T3 section says how matching works.
+    - Built on main after DEV-618 landed (`3db41eb3b`); one commit `f8aa497a9`.
+  report:
+    commits:
+    - hash: f8aa497a9
+      what: match commit records by thread title, remove records on every exit, prune expired ones
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2338 Rust tests
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    - command: real T3 CLI
+      result: passed
+      reason: t3 thread show gives thread.worktreePath; no live T3 worktree-script run
+    next: Review on another model, then merge
+- date: 2026-11-17T21:59:32.354844+00:00
+  author: claude
+  text: |-
+    Review: blocking. An expired record overwrites the "T3 Code couldn't be asked" reason, so the job log gives the wrong cause.
+
+    - **Bug:** `crates/lotar-agent/src/services/t3_worktree_setup.rs:146`. `prune()` always writes `NOT_CLAIMED` to `<job>.result`. When T3 Code can't be asked, `setup()` (`:208`–`:216`) writes the reason to `<job>.result` and leaves `<job>.json` in place. Once that record is 10 minutes old, the next `record()` or `setup()` by any job deletes it and replaces the reason with "the script doesn't run `lotar agent worktree setup`". Most sessions run longer than 10 minutes, so `finish()` usually logs the wrong cause. That breaks the Done-when item "the job's log says why the thread started without the settings". The test `a_commit_record_is_left_when_t3_code_cant_say_whose_worktree_it_is` calls `finish()` straight away, so it can't catch this.
+    - **Fix:** in `prune()`, write `NOT_CLAIMED` only when no `.result` exists yet (e.g. `OpenOptions::new().write(true).create_new(true)`). Add a test: T3 Code can't be asked, the record expires, another `record()` runs, and `finish()` still says "T3 Code couldn't say which thread".
+    - **Test gap (same rework):** the Done-when item "unreadable ones by file age" has no test for an *old* unreadable record. `expired_records_are_deleted_and_their_jobs_learn_why` only checks that a fresh one stays. Add one, e.g. set the file's mtime 11 min back with `File::set_modified`.
+    - **Checked and OK:**
+      - Every early return of `run_session` drops `Recorded`, which deletes the record without a log line.
+      - A branch record still matches by branch.
+      - Of two matching records, the newest wins.
+      - `docs/help/agent.md` is updated.
+      - The CLI warns and exits 0 (`crates/lotar-lib/src/cli/handlers/agent.rs:633`).
+    - **Outside claim verified:** the fields `threadId`, `title` and `thread.worktreePath` match `~/.t3/bin/t3 thread list/show --json`. In T3 Code's bundled server, thread start dispatches `thread.metadata.update` with `worktreePath` before `setupScripts.runForThread`, so the title lookup works while the script runs.
+    - **Read:** the diff `main...HEAD` of `f8aa497a9` (3 files), the ticket and its comments, DEV-618, and `git log -5 main` on the touched files. `bcd8bbcd8` (DEV-623) touches `agent_job_service.rs`; `git merge-tree` merges it cleanly.
+    - **Reran:** `npm ci` ok; `cargo nextest run -p lotar-agent t3_worktree_setup` 8/8; `npm run lint:agent` ok; `npm test` 2338/2338; `npm run smoke` 405/405.
+    - **Filed:** a minor follow-up for `.result` files that are never deleted.
+    - No UI changes, so no screenshots needed.
+- date: 2026-11-17T21:59:57.745802+00:00
+  author: claude
+  text: 'Review follow-up filed: DEV-678. When a job dies before `finish()`, its `.result` file in `.git/lotar/t3-worktree-setup/` is never deleted. Minor, doesn''t block the merge.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c
 description: |-
@@ -36,10 +90,16 @@ description: |-
   - Candidates are claimed oldest first, so a retried job's thread can take the earlier job's leftover record; the new job's log then says the script doesn't run the command.
 
   ## Done when
-  - [ ] The record is removed on every exit of `run_session` after it was written (early failures too).
-  - [ ] `setup()` matches a record only to the job's own thread worktree (for example by the thread's title or a job id T3 passes through), not by commit alone; or the docs say the commit match's limits.
-  - [ ] Expired records are deleted when `setup()` or `record()` runs.
-  - [ ] Tests for each case.
+  - [ ] Every exit of `run_session` after the record was written removes it: early failures (`job_agent_table`, `open_session`, a stopped job) delete it without a log line; the normal end keeps `finish()`'s log line.
+  - [ ] A record for a new ticket branch matches only the worktree on that branch (as today: T3 Code makes that branch for the job's thread).
+  - [ ] A record for a thread from an existing ticket branch matches only when the worktree's HEAD is the commit **and** T3 Code's thread whose `worktreePath` is this worktree has the job's thread title (`t3 thread list --json`, then `t3 thread show <id> --json`). The owner's own thread or another ticket's thread at the same commit doesn't take it.
+  - [ ] When T3 Code can't be asked (no `t3`, server down, an error), the commit record isn't claimed; `setup()` warns and exits 0, and the job's log says why the thread started without the settings.
+  - [ ] Two records match (a leftover and a retry, same title): the newest wins.
+  - [ ] `setup()` and `record()` delete expired records (older than `PENDING_SECS`, 10 minutes), also unreadable ones by file age.
+  - [ ] `docs/help/agent.md` says how a thread from the existing ticket branch is matched.
+  - [ ] Unit tests for each case; `npm run lint`, `npm test`, `npm run smoke` pass.
+tags:
+- review-returned
 history:
 - at: 2026-11-17T20:09:57.144073+00:00
   actor: claude
@@ -95,4 +155,90 @@ history:
   changes:
   - field: status
     old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T21:39:11.613164+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found reviewing DEV-618 (`crates/lotar-lib/src/services/t3_worktree_setup.rs`, `agent_job_service.rs` `run_session`).
+
+      - A job whose thread starts from an existing ticket branch records no branch; `setup()` claims it for any new worktree whose HEAD is that commit. A thread the owner starts in worktree mode from the same commit within 10 minutes (`PENDING_SECS`), or another job's thread on a ticket branch at the same commit, can take it: the owner's session then loses tools he keeps (owner 2026-11-15, INBOX-351: "1 and 4 only in job sessions").
+      - `run_session` returns early after `record_t3_worktree_setup` when `job_agent_table` or `open_session` fails, so `finish()` never removes the record. It stays claimable for 10 minutes, and expired records are never deleted from `.git/lotar/t3-worktree-setup/`.
+      - Candidates are claimed oldest first, so a retried job's thread can take the earlier job's leftover record; the new job's log then says the script doesn't run the command.
+
+      ## Done when
+      - [ ] The record is removed on every exit of `run_session` after it was written (early failures too).
+      - [ ] `setup()` matches a record only to the job's own thread worktree (for example by the thread's title or a job id T3 passes through), not by commit alone; or the docs say the commit match's limits.
+      - [ ] Expired records are deleted when `setup()` or `record()` runs.
+      - [ ] Tests for each case.
+    new: |-
+      Found reviewing DEV-618 (`crates/lotar-lib/src/services/t3_worktree_setup.rs`, `agent_job_service.rs` `run_session`).
+
+      - A job whose thread starts from an existing ticket branch records no branch; `setup()` claims it for any new worktree whose HEAD is that commit. A thread the owner starts in worktree mode from the same commit within 10 minutes (`PENDING_SECS`), or another job's thread on a ticket branch at the same commit, can take it: the owner's session then loses tools he keeps (owner 2026-11-15, INBOX-351: "1 and 4 only in job sessions").
+      - `run_session` returns early after `record_t3_worktree_setup` when `job_agent_table` or `open_session` fails, so `finish()` never removes the record. It stays claimable for 10 minutes, and expired records are never deleted from `.git/lotar/t3-worktree-setup/`.
+      - Candidates are claimed oldest first, so a retried job's thread can take the earlier job's leftover record; the new job's log then says the script doesn't run the command.
+
+      ## Done when
+      - [ ] Every exit of `run_session` after the record was written removes it: early failures (`job_agent_table`, `open_session`, a stopped job) delete it without a log line; the normal end keeps `finish()`'s log line.
+      - [ ] A record for a new ticket branch matches only the worktree on that branch (as today: T3 Code makes that branch for the job's thread).
+      - [ ] A record for a thread from an existing ticket branch matches only when the worktree's HEAD is the commit **and** T3 Code's thread whose `worktreePath` is this worktree has the job's thread title (`t3 thread list --json`, then `t3 thread show <id> --json`). The owner's own thread or another ticket's thread at the same commit doesn't take it.
+      - [ ] When T3 Code can't be asked (no `t3`, server down, an error), the commit record isn't claimed; `setup()` warns and exits 0, and the job's log says why the thread started without the settings.
+      - [ ] Two records match (a leftover and a retry, same title): the newest wins.
+      - [ ] `setup()` and `record()` delete expired records (older than `PENDING_SECS`, 10 minutes), also unreadable ones by file age.
+      - [ ] `docs/help/agent.md` says how a thread from the existing ticket branch is matched.
+      - [ ] Unit tests for each case; `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-17T21:48:53.895436+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:49:06.106470+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T21:59:32.354844+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:59:32.641179+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-618"]}'
+    new: '{"related":["DEV-618","DEV-623"]}'
+- at: 2026-11-17T21:59:32.980378+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-17T21:59:44.695158+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-618","DEV-623"]}'
+    new: '{"related":["DEV-618","DEV-623","DEV-678"]}'
+- at: 2026-11-17T21:59:57.745802+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:00:11.126727+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-17T22:02:10.936889+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
     new: InProgress

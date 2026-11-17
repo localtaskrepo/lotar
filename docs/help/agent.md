@@ -442,7 +442,7 @@ agent:
     settle_seconds: 120
 ```
 
-The last reading is kept next to the agent queue (`memory-gate-<hash>.json`), so the worker, `lotar serve` and `lotar agent queue` share it. Tests set `LOTAR_MEMORY_READING` to replace the reading: `normal`, or for example `pressure=warn,swap=9.5/10` (swap in GB).
+The last reading is kept next to the agent queue (`memory-gate-<hash>.json`), so the worker, `lotar serve` and `lotar agent queue` share it. A hold or failed reading that no process read again for 60 s (the worker and `lotar serve` stopped) is not shown as current: `lotar agent queue` and `lotar agent list-jobs` then read memory themselves, without saving it. Tests set `LOTAR_MEMORY_READING` to replace the reading: `normal`, or for example `pressure=warn,swap=9.5/10` (swap in GB).
 
 Cancelling a dispatched job requests termination immediately, but cancellation automation and reassignment wait until process/output teardown and context persistence finish. The job retains its capacity slot through finalization, so a replacement is queued safely and cancellation automation runs once. Cancelling an undispatched queued job finalizes immediately.
 

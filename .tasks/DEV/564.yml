@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T17:40:29.239703+00:00
-modified: 2026-11-17T18:50:45.782726+00:00
+modified: 2026-11-17T21:53:26.506600+00:00
 relationships:
   blocks:
   - DEV-563
@@ -14,6 +14,7 @@ relationships:
   - DEV-563
   - DEV-510
   - DEV-636
+  - DEV-677
 comments:
 - date: 2026-11-15T17:58:44.172268+00:00
   author: claude
@@ -182,6 +183,43 @@ comments:
     - This doesn't approve the harnessmux implementation (rework `9977dec` in the harnessmux repo), which needs a review in its own checkout.
     - No files changed, no checks run; status and assignee unchanged.
 - date: 2026-11-17T18:50:45.486874+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-564` is in `main` already.
+- date: 2026-11-17T21:38:35.114247+00:00
+  author: claude
+  text: |-
+    Reopened again: the signing is still not on harnessmux main; it's now rebased and ready to fast-forward.
+
+    - Last time review and merge ran in lotar's checkout again and set this Done with harnessmux `main` unchanged (`c066000`). Bug filed: [DEV-677](https://lotar.pyxzl.net/task/DEV-677).
+    - **The work:** harnessmux repo, branch `agent/DEV-564-main`, commit `cb1ef5a` = `9977dec` cherry-picked onto `main` `c066000`, signed. Worktree `~/.t3/worktrees/harnessmux/DEV-564-main`. The `AGENTS.md` conflict kept both lines (DEV-636's build note and the install line).
+    - **Review here:** `git -C ~/Development/@localtaskrepo/harnessmux diff main...agent/DEV-564-main`. lotar's own `agent/DEV-564` has nothing; "nothing to merge" there says nothing about this ticket.
+    - **Merge:** `git merge --ff-only agent/DEV-564-main` in `~/Development/@localtaskrepo/harnessmux`. No push: repos.json has no harnessmux entry (as DEV-636).
+    - Original `agent/DEV-564` (`9977dec`) left as it was.
+  report:
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo nextest run
+      result: passed
+      reason: 43/43
+    - command: cargo deny check
+      result: passed
+    - command: cargo xtask install + codesign -dvv ~/.cargo/bin/harnessmux
+      result: passed
+      reason: net.pyxzl.harnessmux, TeamIdentifier=3HKD37M482, runtime
+    next: Review harnessmux cb1ef5a in ~/.t3/worktrees/harnessmux/DEV-564-main, then git merge --ff-only agent/DEV-564-main in ~/Development/@localtaskrepo/harnessmux
+- date: 2026-11-17T21:49:19.153439+00:00
+  author: claude
+  text: |-
+    Review: nothing to review
+
+    - Assigned lotar checkout `agent/DEV-564` is at main `bcd8bbcd8`: `git log main..HEAD` is empty and the ticket branch has no newer commits (`git log HEAD..agent/DEV-564` empty).
+    - This doesn't approve the harnessmux implementation (rework `9977dec` in the harnessmux repo). It still needs a review in a harnessmux checkout; this is the third lotar-side job to hit an empty branch.
+    - No files changed, no checks run; status and assignee unchanged.
+- date: 2026-11-17T21:53:26.352048+00:00
   author: automation
   text: |
     Nothing to merge: `agent/DEV-564` is in `main` already.
@@ -493,6 +531,51 @@ history:
   - field: comment_added
 - at: 2026-11-17T18:50:45.782726+00:00
   actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-17T21:38:23.587334+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-563"],"related":["standards:STD-138","DEV-563","DEV-510","DEV-636"]}'
+    new: '{"blocks":["DEV-563"],"related":["standards:STD-138","DEV-563","DEV-510","DEV-636","DEV-677"]}'
+- at: 2026-11-17T21:38:35.114247+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:38:35.338860+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-17T21:38:35.403378+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@review'
+- at: 2026-11-17T21:49:19.153439+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:49:23.636238+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-17T21:53:26.352048+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:53:26.506600+00:00
+  actor: triage
   changes:
   - field: status
     old: Merging

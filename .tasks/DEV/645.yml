@@ -1,16 +1,17 @@
 title: lotar agent list-jobs shows a memory hold from an old reading once no process reads memory
-status: Blocked
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T03:02:08.605225+00:00
-modified: 2026-11-17T19:39:22.450238+00:00
+modified: 2026-11-17T21:57:10.912471+00:00
 relationships:
   depends_on:
   - DEV-623
   related:
   - DEV-633
+  - DEV-675
 comments:
 - date: 2026-11-17T03:23:48.590451+00:00
   author: claude
@@ -92,9 +93,77 @@ comments:
 - date: 2026-11-17T19:39:22.450238+00:00
   author: claude
   text: 'Moved back to @fix with tag waits (standards STD-209): it was parked on @review before standards STD-207''s fix, so the unblock would have run the fix as @review and merged it unreviewed. Still Blocked on DEV-623.'
+- date: 2026-11-17T21:44:29.415701+00:00
+  author: claude
+  text: |-
+    Rebased onto main now that DEV-623 is Done; the fix needed a small port, all checks pass.
+
+    - `git rebase --onto main d8659a72f`: the branch is now main (`bcd8bbcd8`, DEV-623) plus the fix only
+    - Main moved `memory_gate.rs` to `crates/lotar-agent` and from chrono to jiff, so the fix no longer compiled: `Utc::now()` → `Timestamp::now()`, `Duration::hours(3)` → `SignedDuration::from_hours(3)` in `crates/lotar-agent/src/services/memory_gate.rs`. Logic and test unchanged
+    - Amended into the unpushed commit, signed: `f04b71536`
+  report:
+    commits:
+    - hash: f04b71536
+      what: DEV-645 fix rebased onto main, ported from chrono to jiff
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(agent_queue) | test(worker_state)'
+      result: passed
+      reason: 20 tests, RUSTC_WRAPPER=
+    next: Review f04b71536 on agent/DEV-645
+- date: 2026-11-17T21:44:37.002385+00:00
+  author: automation
+  text: The fix agent's job job-20261117T213823.258Z-6 failed (lotar agent logs job-20261117T213823.258Z-6); @fix-retry retries it on branch t3/memory-hold-stale-reading.
+- date: 2026-11-17T21:51:39.434264+00:00
+  author: claude
+  text: |-
+    The fix was already done. Only the last job's end step failed. This branch now holds it, ready for review.
+
+    - `job-20261117T213823.258Z-6` finished the work (`f04b71536`, one signed commit on main `bcd8bbcd8`). It failed only at its end: `git branch --force agent/DEV-645` refused because worktree `agent-DEV-645-37714fbb27d83b5b` had the branch checked out. DEV-675 fixes that on main, but installed lotar 0.15.3 doesn't have the fix yet
+    - This branch `t3/stale-memory-hold-reread` was on the old pre-rebase commits (`8e9a061e0`, `d8659a72f`, both still on `agent/DEV-645`). I moved it to `f04b71536` with `git reset --hard`. No new code
+    - Reran the 20 memory-gate and queue tests: they pass. I didn't rerun full lint, test and smoke: they passed on this same commit at 21:44Z
+    - The same end-step failure can happen again when this job ends, while that worktree still has `agent/DEV-645` checked out
+  report:
+    commits:
+    - hash: f04b71536
+      what: the fix, rebased on main (bcd8bbcd8)
+    checks:
+    - command: cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(agent_queue) | test(worker_state)'
+      result: passed
+      reason: 20 passed, RUSTC_WRAPPER=
+    - command: npm run lint
+      result: passed
+      reason: in job-20261117T213823.258Z-6 on the same commit
+    - command: npm test
+      result: passed
+      reason: in job-20261117T213823.258Z-6 on the same commit
+    - command: npm run smoke
+      result: passed
+      reason: in job-20261117T213823.258Z-6, 405 tests, same commit
+    next: Review f04b71536, then merge
+- date: 2026-11-17T21:57:03.814851+00:00
+  author: claude
+  text: |-
+    Review: passed. `f04b71536` does what "Done when" asks; the merge can go ahead.
+
+    - Reviewed `git log main..HEAD`: one commit on main `bcd8bbcd8`, touching `crates/lotar-agent/src/services/memory_gate.rs` and `docs/help/agent.md`. HEAD and `t3/stale-memory-hold-reread` are the same commit. The earlier blockers are gone: no DEV-623 cherry-pick or DEV-633 copy, and DEV-623 is Done on main
+    - `memory_gate.rs:117-129`: `status` reads memory again only for a saved hold or error with `checked_at` older than 60 s (`2 × HELD_RECHECK_SECS`) or missing. It starts from an empty state, so a hold now is "since now" and normal now shows no hold. A failed reading shows its error. Nothing is saved, so only `check` writes the file. A saved open gate is shown as before
+    - Callers checked: `agent.rs:316` (list-jobs), `agent.rs:452`, `agent_queue_service.rs:246` (worker state) and `agent_job_service.rs:551` (serve's waiting reason) all get the new behaviour. `check` is unchanged
+    - New test `status_reads_again_once_no_process_reread_a_held_reading`: with the fix turned off for a moment (file restored after) it fails at `memory_gate.rs:444`; with the fix it passes. It reads `normal` because `unit_test_environment.rs:33` sets `LOTAR_MEMORY_READING`, not the real Mac's memory
+    - Ran `npm ci` (ok). Reran `cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(agent_queue) | test(worker_state)'` with `RUSTC_WRAPPER=`: 20 passed. `npm run lint`: passed
+    - Didn't rerun `npm test` or `npm run smoke`: they passed on this same commit at 21:44Z. No UI change, so no screenshots
+    - No minor tickets filed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeca30204-ae6e-4451-9660-94e8242f4b0e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A577c8b27-c103-4ecf-b1eb-5dad6f458e1d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8e1372af-9575-4980-80b0-80ab55fdb0d2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49bbe071-5597-4f60-a3f2-bda5b06f1239
 description: |-
   Found in the DEV-623 review (2026-11-16).
 
@@ -111,6 +180,7 @@ description: |-
 tags:
 - review-returned
 - waits
+- fix-retried
 history:
 - at: 2026-11-17T03:02:11.026136+00:00
   actor: claude
@@ -254,3 +324,68 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T21:38:26.016321+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T21:38:26.868784+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8e1372af-9575-4980-80b0-80ab55fdb0d2
+- at: 2026-11-17T21:44:29.415701+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:44:36.782774+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: review-returned, waits
+    new: review-returned, waits, fix-retried
+- at: 2026-11-17T21:44:37.002385+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:49:28.296320+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49bbe071-5597-4f60-a3f2-bda5b06f1239
+- at: 2026-11-17T21:51:39.434264+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:51:39.722825+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-623"],"related":["DEV-633"]}'
+    new: '{"depends_on":["DEV-623"],"related":["DEV-633","DEV-675"]}'
+- at: 2026-11-17T21:51:48.535423+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-17T21:57:03.814851+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:57:10.912471+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

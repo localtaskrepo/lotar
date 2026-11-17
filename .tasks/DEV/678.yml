@@ -1,0 +1,61 @@
+title: 't3 worktree setup: .result files of jobs that ended without finish() stay in .git/lotar/t3-worktree-setup/ for good'
+status: HelpNeeded
+priority: Low
+type: Bug
+reporter: claude
+assignee: mallox
+created: 2026-11-17T21:59:44.502058+00:00
+modified: 2026-11-17T22:02:09.691745+00:00
+relationships:
+  related:
+  - DEV-674
+comments:
+- date: 2026-11-17T22:01:58.115392+00:00
+  author: claude
+  text: |-
+    Question for mallox: may DEV-678 go into DEV-674's rework instead of its own commit?
+
+    - `prune()` exists only in DEV-674's unmerged commit `f8aa497a9` (`agent/DEV-674`, review returned: blocking). On main (`bcd8bbcd8`) `t3_worktree_setup.rs` has no `prune()` and no expired-record cleanup, so DEV-678 can't be fixed on main.
+    - DEV-674's rework must change the same `prune()` (write `NOT_CLAIMED` only when no `.result` exists). Two branches editing it at once would conflict.
+    - Options: **1 (recommended)** the DEV-674 fix job also deletes `.result` files older than 2 days (by file age) with a test; DEV-678 then closes with DEV-674. **2** build DEV-678 on `f8aa497a9` now (the merge agent must land DEV-674 first). **3** wait until DEV-674 is on main.
+    - No DEV-674 thread runs now; nothing changed in this worktree.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab80873ca-9786-4f14-8955-40e4ffb4833e
+description: |-
+  Found reviewing DEV-674 (`crates/lotar-agent/src/services/t3_worktree_setup.rs`).
+
+  - `prune()` turns an expired `<job>.json` into a `<job>.result`, and `setup()` writes one for each record it claims. Only `finish()` deletes a `.result`. A job whose process died before `finish()` (lotar killed, Mac restarted) leaves its `.result` behind for good. Before DEV-674 the leftover was a `.json`; now it is a `.result`.
+
+  ## Done when
+  - [ ] `prune()` also deletes `.result` files older than a limit long enough for any session to end (for example 2 days, by file age).
+  - [ ] A unit test covers an old `.result` being deleted and a fresh one being kept.
+history:
+- at: 2026-11-17T21:59:45.086258+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T22:00:30.614625+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T22:00:31.435499+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab80873ca-9786-4f14-8955-40e4ffb4833e
+- at: 2026-11-17T22:01:58.115392+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:02:09.691745+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

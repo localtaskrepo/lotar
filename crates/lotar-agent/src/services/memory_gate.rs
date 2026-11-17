@@ -15,6 +15,9 @@ use std::path::{Path, PathBuf};
 pub const HELD_RECHECK_SECS: u64 = 30;
 /// How long an open gate reuses its reading.
 const OPEN_RECHECK_SECS: u64 = 5;
+/// A held or failed reading older than this has no process reading memory
+/// again; `status` reads it itself (DEV-645).
+const STALE_AFTER_SECS: u64 = 2 * HELD_RECHECK_SECS;
 const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,12 +111,20 @@ pub fn check(tasks_dir: &Path) -> Option<MemoryHold> {
     hold_of(&next)
 }
 
-/// The last reading's hold and error, without reading memory.
+/// The last reading's hold and error. A held or failed reading that no
+/// process read again for 60 s is replaced by a reading of its own, which
+/// is not saved: only `check` moves the gate on.
 pub fn status(tasks_dir: &Path) -> GateStatus {
-    if !gate_config(tasks_dir).is_enabled() {
+    let config = gate_config(tasks_dir);
+    if !config.is_enabled() {
         return GateStatus::default();
     }
-    let state = load(&state_path(tasks_dir));
+    let mut state = load(&state_path(tasks_dir));
+    let now = Timestamp::now();
+    let stale = state.checked_at.is_none_or(|at| now - at > seconds(STALE_AFTER_SECS));
+    if stale && (state.held_since.is_some() || state.error.is_some()) {
+        state = decide(&GateState::default(), read_memory(), now, &config);
+    }
     GateStatus { hold: hold_of(&state), error: state.error }
 }
 
@@ -413,6 +424,29 @@ mod tests {
         std::fs::write(&path, serde_json::to_string(&old).unwrap()).unwrap();
         let settling = check(&tasks_dir).unwrap();
         assert!(settling.reason.starts_with("memory is normal again since"), "{}", settling.reason);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn status_reads_again_once_no_process_reread_a_held_reading() {
+        let dir = tempfile::tempdir().unwrap();
+        let tasks_dir = dir.path().join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  memory_gate:\n    enabled: true\n").unwrap();
+        let path = state_path(&tasks_dir);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // Hours ago a process held new jobs, then stopped reading memory.
+        let hours_ago = Timestamp::now() - SignedDuration::from_hours(3);
+        let old = GateState { checked_at: Some(hours_ago), held_since: Some(hours_ago), reason: Some("swap full".to_string()), ..GateState::default() };
+        let saved = serde_json::to_string(&old).unwrap();
+        std::fs::write(&path, &saved).unwrap();
+        // The reading in this test build is normal: no hold, and the saved state stays for `check`.
+        assert_eq!(status(&tasks_dir), GateStatus::default());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), saved);
+        // Read less than 60 s ago, a held worker is still due to read again: the hold stands.
+        let recent = GateState { checked_at: Some(Timestamp::now() - seconds(STALE_AFTER_SECS - 5)), ..old };
+        std::fs::write(&path, serde_json::to_string(&recent).unwrap()).unwrap();
+        assert_eq!(status(&tasks_dir).hold.unwrap().reason, "swap full");
         let _ = std::fs::remove_file(&path);
     }
 }
