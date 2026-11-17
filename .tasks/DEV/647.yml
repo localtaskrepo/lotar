@@ -1,11 +1,11 @@
 title: Worktree cleanup holds the job registry through git worktree remove, stalling every job thread for tens of seconds
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T03:19:06.596519+00:00
-modified: 2026-11-17T05:16:07.844467+00:00
+modified: 2026-11-17T05:37:17.205806+00:00
 relationships:
   related:
   - DEV-643
@@ -169,6 +169,34 @@ comments:
     - **Not rerun:** full `npm test`, smoke, and the ticket's own check (timing job events at load ~75).
     - **For the merge agent:** land only `7303c2302`. `bb7cc8371` is an old copy of DEV-633, and its `.tasks` files conflict with main.
     - No minor tickets filed.
+- date: 2026-11-17T05:34:52.944924+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `5dedb10cf` is on `main` and `origin/main`.
+
+    - Rebased only `7303c2302` onto main (`366652341`). I left out `bb7cc8371`: its code is identical to main's `9c10760fa`, and only its old `.tasks` files differed.
+    - Rebased hash `ba3c9e188`; the main checkout's `.tasks` changes were amended in, giving `5dedb10cf`, signed.
+    - Checks in the worktree after the rebase: `lint:agent`, `test:agent` and `smoke` all passed.
+    - No rules or config changed, so I didn't run `lotar trust`.
+    - Pushed `366652341..5dedb10cf`. That was the only unpushed commit, and the main checkout is clean.
+    - The ticket's own check (timing job events at load ~75) has no command and wasn't run.
+  report:
+    commits:
+    - hash: 5dedb10cf
+      what: worktree cleanup holds the job registry only for its in-memory check (rebased 7303c2302, tickets amended in)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2295 Rust, 1548 UI, release and hooks
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: ticket check (time job events under load ~75)
+      result: not_run
+      reason: no command, needs a loaded machine; the new agent_safety_test test covers the lock path
+    next: 'None: Done when this job ends'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe867e4-6d1f-40dd-94ad-9c8c822d7913
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A41df881b-8829-4eab-a6fe-72fcebb5fd73
@@ -178,8 +206,6 @@ references:
 description: 'Found (DEV-643, 2026-11-16, load ~75): `cleanup_done_ticket_worktree` and `maybe_cleanup_worktree` in `crates/lotar-lib/src/services/agent_job_service.rs` hold `JOB_REGISTRY` while they run `git worktree remove` and other git commands; `sample` of the worker showed ~15 threads waiting on the mutex while one `git worktree remove` ran 38 s. DEV-643 moved the task update''s registry lookup out of the storage locks, so CLI writes no longer fail, but job threads still stall. Check: under load, time job events while a done ticket''s worktree is removed. Done: the registry is held only for the in-memory check, not across git.'
 tags:
 - health
-- fix-retried
-- retry-fix
 custom_fields:
   finding: agent-worker:job-registry-held-through-git
 history:
@@ -332,3 +358,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T05:34:52.944924+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T05:37:17.205806+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, retry-fix
+    new: health

@@ -1,17 +1,46 @@
 title: 'Flaky test: read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways panics on ENOTCONN from shutdown on macOS'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T05:24:24.590809+00:00
-modified: 2026-11-17T05:24:43.524331+00:00
+modified: 2026-11-17T05:45:43.530954+00:00
 relationships:
   related:
   - DEV-639
   - DEV-640
+comments:
+- date: 2026-11-17T05:41:58.862263+00:00
+  author: claude
+  text: |-
+    Fixed: the test accepts `NotConnected` from `shutdown`, so the race no longer panics.
+
+    - `crates/lotar-lib/tests/web_api_integration_test.rs`: `shutdown(Both)` now passes on `Ok` or `NotConnected` and panics on any other error. Either way the socket is shut down, so `read_until_deadline` still runs its EINVAL path.
+    - Before the fix the race didn't show up in 10 runs. After it, 20 out of 20 runs of `node scripts/rust-test-runner.mjs --agent read_until_deadline` passed.
+    - `npm run lint:agent` is clean, and `npm run test:rust:agent` passed all 2294 tests.
+  report:
+    commits:
+    - hash: c9ed2248e
+      what: the test accepts NotConnected from shutdown
+    checks:
+    - command: node scripts/rust-test-runner.mjs --agent read_until_deadline x20
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:rust:agent
+      result: passed
+      reason: 2294 tests
+    - command: npm run test:ui
+      result: not_run
+      reason: Rust test-only change
+    - command: npm run smoke
+      result: not_run
+      reason: Rust test-only change, no server or UI code touched
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca16f28-9a8e-461b-807a-ca9312c22080
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A477dee0d-6db4-436d-9819-dd87be9ea3e8
 description: |-
   Found in the DEV-639 merge (2026-11-16).
 
@@ -52,3 +81,21 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca16f28-9a8e-461b-807a-ca9312c22080
+- at: 2026-11-17T05:41:58.862263+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T05:42:12.745079+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T05:45:43.530954+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A477dee0d-6db4-436d-9819-dd87be9ea3e8

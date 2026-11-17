@@ -126,9 +126,13 @@ fn wait_for(what: &str, mut done: impl FnMut() -> bool) {
     }
 }
 
-// A taken-over job starts as queued, so wait for an end status, not for "not running".
+// A taken-over job starts as queued, so wait for an end status, not for "not running". Settled: its worker has also
+// dropped the job's queue files, which the process scratch cleanup removes (DEV-648).
 fn wait_for_end(job_id: &str) {
-    wait_for("the job to end", || AgentJobService::get_job(job_id).is_some_and(|job| matches!(job.status.as_str(), "completed" | "failed" | "cancelled")));
+    wait_for("the job to end", || {
+        AgentJobService::job_settled(job_id)
+            && AgentJobService::get_job(job_id).is_some_and(|job| matches!(job.status.as_str(), "completed" | "failed" | "cancelled"))
+    });
 }
 
 #[test]

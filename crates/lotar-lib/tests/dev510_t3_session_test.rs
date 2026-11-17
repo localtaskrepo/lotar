@@ -225,7 +225,8 @@ fn take_over(forget_thread: bool, list_fails: bool) -> (Harness, lotar::api_type
     AgentJobService::recover_orphaned_jobs(&tasks_dir);
     let job_id = lotar::services::agent_active_jobs::list(&tasks_dir).first().map(|job| job.job_id.clone());
     let job_id = job_id.unwrap_or_default();
-    wait_for("the job to end", || AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
+    // Settled: its worker has also dropped the job's queue files, which the process scratch cleanup removes (DEV-648).
+    wait_for("the job to end", || AgentJobService::job_settled(&job_id) && AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
     let job = AgentJobService::get_job(&job_id).unwrap();
     assert!(!harness.calls().contains("thread send"), "{}", harness.calls());
     assert_eq!(harness.calls().matches("thread start").count(), 1, "{}", harness.calls());
@@ -268,7 +269,7 @@ fn a_t3_job_killed_before_its_session_started_fails_once_taken_over() {
     assert_eq!(orphans[0].session_id, None, "it names no session it never started");
     let job_id = orphans[0].job_id.clone();
     AgentJobService::recover_orphaned_jobs(&tasks_dir);
-    wait_for("the job to end", || AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
+    wait_for("the job to end", || AgentJobService::job_settled(&job_id) && AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
     let job = AgentJobService::get_job(&job_id).unwrap();
     assert_eq!(job.status, "failed", "{job:?}");
     let reason = job.summary.or(job.last_message).unwrap_or_default();
@@ -354,7 +355,7 @@ fn a_t3_job_killed_during_its_worktree_setup_fails_once_taken_over() {
     assert!(orphans[0].in_setup && orphans[0].session_id.is_none(), "{:?}", orphans[0]);
     let job_id = orphans[0].job_id.clone();
     AgentJobService::recover_orphaned_jobs(&tasks_dir);
-    wait_for("the job to end", || AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
+    wait_for("the job to end", || AgentJobService::job_settled(&job_id) && AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
     let job = AgentJobService::get_job(&job_id).unwrap();
     assert_eq!(job.status, "failed", "{job:?}");
     let reason = job.summary.or(job.last_message).unwrap_or_default();
