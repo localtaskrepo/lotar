@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-15T23:22:25.966473+00:00
-modified: 2026-11-16T23:30:37.573481+00:00
+modified: 2026-11-17T20:03:45.672375+00:00
 relationships:
   related:
   - DEV-596
@@ -20,6 +20,8 @@ relationships:
   - DEV-594
   - DEV-598
   - DEV-577
+  - DEV-673
+  - DEV-619
 comments:
 - date: 2026-11-16T00:06:06.962493+00:00
   author: claude
@@ -398,3 +400,15 @@ history:
   changes:
   - field: releases
     new: '#7'
+- at: 2026-11-17T19:57:32.024160+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593","DEV-592","DEV-563","DEV-594","DEV-598","DEV-577"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593","DEV-592","DEV-563","DEV-594","DEV-598","DEV-577","DEV-673"]}'
+- at: 2026-11-17T20:03:45.672375+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593","DEV-592","DEV-563","DEV-594","DEV-598","DEV-577","DEV-673"]}'
+    new: '{"related":["DEV-596","DEV-573","DEV-581","DEV-601","DEV-602","DEV-520","DEV-588","DEV-593","DEV-592","DEV-563","DEV-594","DEV-598","DEV-577","DEV-673","DEV-619"]}'

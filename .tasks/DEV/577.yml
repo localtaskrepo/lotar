@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-17T06:37:36.876543+00:00
+modified: 2026-11-17T19:57:32.023119+00:00
 relationships:
   depends_on:
   - DEV-583
@@ -24,6 +24,7 @@ relationships:
   - DEV-644
   - DEV-635
   - DEV-640
+  - DEV-673
 comments:
 - date: 2026-11-15T19:51:52.799436+00:00
   author: claude
@@ -650,3 +651,9 @@ history:
   changes:
   - field: releases
     new: '#8'
+- at: 2026-11-17T19:57:32.023119+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627","DEV-613","DEV-644","DEV-635","DEV-640"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-530","DEV-602","DEV-605","DEV-594","DEV-595","DEV-609","DEV-612","DEV-615","DEV-627","DEV-613","DEV-644","DEV-635","DEV-640","DEV-673"]}'

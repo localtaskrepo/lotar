@@ -1839,7 +1839,7 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
     if thread_branch == ticket_branch {
         return Ok(());
     }
-    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &thread_branch, started_from.as_deref())
+    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &thread_branch, started_from.as_deref(), Some(job_id))
         .map_err(|err| format!("{ticket_branch} stays where it is, not at {thread_branch} of the T3 Code thread: {err}"))?;
     let note = match moved {
         BranchMove::Already => None,
@@ -1939,7 +1939,7 @@ fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &Res
             return Ok(None);
         }
     }
-    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &holder, None)
+    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &holder, None, None)
         .map_err(|err| format!("{ticket_branch} can't move to {holder}, which holds {ticket_id}'s newest work that isn't in the main checkout: {err}"))?;
     let tip = rev_parse(&repo_root, &format!("refs/heads/{holder}")).unwrap_or_default();
     Ok(match moved {
@@ -1970,7 +1970,8 @@ enum BranchMove {
 /// A worktree of a finished job that still has `ticket_branch` checked out
 /// (an earlier thread's, which T3 Code leaves when a later thread takes
 /// over the branch, DEV-573) moves with it when clean, else is detached at
-/// its commit first. Any other worktree on it may be an agent's at work and
+/// its commit first; `ending`, the job that moves it, doesn't count as one at
+/// work there (DEV-673). Any other worktree on it may be an agent's at work and
 /// stays as it is (owner 2026-11-15, DEV-577): the branch then stays too,
 /// when the thread's work is in the main checkout, as no job needs it then,
 /// and it is an error otherwise.
@@ -1980,6 +1981,7 @@ fn move_ticket_branch(
     ticket_branch: &str,
     thread_branch: &str,
     started_from: Option<&str>,
+    ending: Option<&str>,
 ) -> Result<BranchMove, String> {
     let git_output = |args: &[&str]| -> Result<String, String> {
         let output = git_command(repo_root).args(args).output().map_err(|err| format!("git {}: {err}", args.join(" ")))?;
@@ -2000,7 +2002,7 @@ fn move_ticket_branch(
             return Err(format!("it has commits that {thread_branch} lacks"));
         }
         let worktrees = linked_worktrees(repo_root).map_err(|err| err.to_string())?;
-        if let Some((path, _)) = worktrees.iter().find(|(path, on)| on.as_deref() == Some(ticket_branch) && finished_job_worktree(tasks_dir, path)) {
+        if let Some((path, _)) = worktrees.iter().find(|(path, on)| on.as_deref() == Some(ticket_branch) && finished_job_worktree(tasks_dir, path, ending)) {
             let in_worktree = |args: &[&str]| -> Result<String, String> {
                 let output = git_command(path).args(args).output().map_err(|err| format!("git {} in {}: {err}", args.join(" "), path.display()))?;
                 if !output.status.success() {
@@ -2031,20 +2033,27 @@ fn move_ticket_branch(
 /// Whether `path` is the worktree of a finished job: an ended job's log
 /// names it, and no job still works there. A job works there while its log
 /// has no end, a running job continues its session, or T3 Code still runs
-/// its thread or waits for an answer in it (DEV-594).
-fn finished_job_worktree(tasks_dir: &std::path::Path, path: &std::path::Path) -> bool {
+/// its thread or waits for an answer in it (DEV-594). The job `ending` is
+/// left out: it may continue the session of the job that left the worktree
+/// while its own thread works elsewhere (DEV-673).
+fn finished_job_worktree(tasks_dir: &std::path::Path, path: &std::path::Path, ending: Option<&str>) -> bool {
     let Ok(path) = fs::canonicalize(path) else {
         return false;
     };
     let names_it = |worktree: Option<&String>| worktree.and_then(|worktree| fs::canonicalize(worktree).ok()).is_some_and(|worktree| worktree == path);
     let jobs: Vec<_> = saved_jobs(tasks_dir)
         .into_iter()
+        .filter(|job| Some(job.header.job_id.as_str()) != ending)
         .filter(|job| names_it(job.header.worktree_path.as_ref()) || names_it(job.status.as_ref().and_then(|status| status.worktree_path.as_ref())))
         .collect();
     if jobs.is_empty() || jobs.iter().any(|job| job.status.is_none()) {
         return false;
     }
-    let running: Vec<String> = crate::services::agent_active_jobs::list(tasks_dir).into_iter().filter_map(|job| job.session_id).collect();
+    let running: Vec<String> = crate::services::agent_active_jobs::list(tasks_dir)
+        .into_iter()
+        .filter(|job| Some(job.job_id.as_str()) != ending)
+        .filter_map(|job| job.session_id)
+        .collect();
     let statuses: Vec<_> = jobs.iter().filter_map(|job| job.status.as_ref()).collect();
     if statuses.iter().any(|status| status.session_id.as_ref().is_some_and(|session| running.contains(session))) {
         return false;

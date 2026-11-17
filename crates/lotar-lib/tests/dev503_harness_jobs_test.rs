@@ -779,6 +779,23 @@ fn the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out() {
     assert!(agent.join("rework.txt").is_file(), "and has the thread's work checked out");
 }
 
+/// DEV-673: an earlier fix job's thread left `agent/TEST-1` checked out in its clean worktree, and the next fix job
+/// ran in the same session on a branch of its own. The ending job's own record names that session, so the worktree
+/// counted as in use and the job failed (`cannot force update the branch used by worktree`). The ending job no longer
+/// counts.
+#[test]
+fn the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_session() {
+    let run = "if git rev-parse -q --verify refs/heads/agent/TEST-1 >/dev/null; then echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; else git checkout -q -b agent/TEST-1; fi";
+    let (fixtures, _env) = t3_harness_with(&[("fix", run, "")]);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let earlier = root.join("t3-trees/0");
+    run_t3(&fixtures, "fix").success();
+    let fix = rev(root, "t3/topic-1");
+    assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch follows the thread");
+    assert!(earlier.join("fix.txt").is_file(), "the earlier worktree moved with it");
+}
+
 /// DEV-594: a fix job's thread hit the usage limit, so the job failed, and T3 Code resumed the thread on its own when
 /// the limit reset. The next fix job started beside it, in a thread of its own on a `t3/*` branch, and both committed.
 /// A job now waits while T3 Code still runs an earlier job's thread on the ticket.

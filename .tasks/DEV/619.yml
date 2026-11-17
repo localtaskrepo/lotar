@@ -1,15 +1,20 @@
 title: 't3 runner: name the thread <ID> <step>: <title> itself, so job prompts drop the rename step'
-status: HelpNeeded
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-17T19:30:37.939726+00:00
+modified: 2026-11-17T20:16:53.028063+00:00
 relationships:
   related:
   - DEV-613
   - DEV-620
+  - DEV-595
+  - DEV-603
+  - DEV-673
+  - DEV-634
+  - DEV-669
 comments:
 - date: 2026-11-16T22:25:19.837146+00:00
   author: claude
@@ -42,8 +47,96 @@ comments:
 - date: 2026-11-17T19:30:37.260057+00:00
   author: mallox
   text: Implement with the internal API, we just need to react when the next version gets installed to check if there API changed or if the garage is available. Don't file but so check if someone already filled it (answered in INBOX-444)
+- date: 2026-11-17T19:52:36.369603+00:00
+  author: claude
+  text: |-
+    Continued T3 threads are renamed now, through T3 Code's internal API, as you decided (INBOX-444).
+
+    - lotar issues a 2-minute `orchestration:operate` session (`t3 auth session issue`), sends `thread.metadata.update` over `/ws` (the call T3 Code's own app makes), then revokes the session. New module `crates/lotar-lib/src/services/t3_thread_api.rs`, new dependency `tungstenite` 0.30.0 (latest, no TLS).
+    - `/mcp` (what `t3_thread_update` uses) accepts only MCP client sessions signed in through OAuth with approval, so lotar can't use it.
+    - When: a continued job with a `thread_name`, after the session opens and before the turn is sent. The job log says `Renamed the T3 Code thread …` or `Could not rename … : <why>`, and the job runs on.
+    - Tried live on T3 Code 0.1.10: renamed this thread and back, a missing thread is refused, no session left over.
+    - Upstream: no issue or PR asks for a CLI rename (searched `pingdotgg/t3code`); nothing filed. `t3` 0.1.10 still has only `list/start/send/show`.
+    - Not filed in standards yet: a new STD ticket goes to `@fix` right away and would drop the rename step before a lotar with this change is installed. The steps are in `--next`.
+    - Docs: `agent.md` (route, failure, what to check after a T3 update), `automation.md`, `config-reference.md`. Commit `224f47363` amends `67fbb375`.
+  report:
+    commits:
+    - hash: 224f47363
+      what: DEV-619 thread_name for new threads, plus renaming continued threads through T3 Code's internal API (amends 67fbb375)
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2269 Rust, 1548 UI
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: '405'
+    - command: live rename against T3 Code 0.1.10
+      result: passed
+      reason: renamed this job's thread and back; a missing thread is refused; no session left behind
+    next: 'After merge and a lotar release: standards sets thread_name in its profiles/rules, drops the rename step from configs/lotar/automation.yml, and adds a T3 upstream-waits item to review-communication (does a continued job''s log still say Renamed; does t3 thread list a rename)'
+- date: 2026-11-17T19:52:48.353490+00:00
+  author: automation
+  text: The fix agent's job job-20261117T193257.014Z-22 failed (lotar agent logs job-20261117T193257.014Z-22); @fix-retry retries it on branch t3/dev-619-thread-name-template.
+- date: 2026-11-17T20:03:45.491999+00:00
+  author: claude
+  text: |-
+    Retry: the work was done. Only lotar's branch move failed, and `agent/DEV-619` now holds `224f47363`.
+
+    - Why the job failed: `git branch --force agent/DEV-619` was refused because the branch is checked out in `~/.t3/worktrees/lotar/agent-DEV-619-199a46778944b399`. That worktree is the first job's: clean, and its job is finished.
+    - Root cause (DEV-595 came back): `finished_job_worktree` compares harnessmux `session_id`s. The first job and the ending job both have `lotar-95e687-DEV-619-fix`, because DEV-603 reuses the name. So the finished worktree counted as in use. Sent to the DEV-673 thread, which is fixing the same failure.
+    - What I did: pointed this branch at `224f47363` (`git reset --keep`) and moved the clean worktree there the way DEV-595 does it (`git -C … reset --keep 224f47363`). `67fbb375` stays in the reflog. No code change.
+    - Rechecked: the rename and T3 session tests pass in this checkout (17).
+  report:
+    commits:
+    - hash: 224f47363
+      what: continued T3 threads renamed through T3 Code's internal API (amends 67fbb375)
+    checks:
+    - command: cargo nextest run --workspace -E 'test(t3_thread_api) | test(dev510)'
+      result: passed
+      reason: 17 tests, this retry
+    - command: npm run lint
+      result: passed
+      reason: previous job on the same commit, not rerun
+    - command: npm test
+      result: passed
+      reason: previous job on the same commit, not rerun
+    - command: npm run smoke
+      result: passed
+      reason: previous job on the same commit, not rerun
+    next: Review 224f47363; after the merge, file the standards follow-up (set thread_name, drop the rename step in configs/lotar/automation.yml, check after each T3 update), as the previous comment says
+- date: 2026-11-17T20:16:39.568374+00:00
+  author: claude
+  text: |-
+    Review: passed. `224f47363` does what "Done when" asks, but it doesn't rebase cleanly onto main: the merge has to move it into `lotar-agent` and swap chrono for jiff.
+
+    - **Read:** the ticket and its comments, the owner answers (INBOX-351, INBOX-444), the diff `main...224f47363` and AGENTS.md. `agent/DEV-619`, `t3/t3-thread-name-template` and `t3/dev-619-thread-name-template` all point at the same commit, so there's no second copy.
+    - **Done when:**
+      - The rule's `thread_name` wins over the profile's, and an empty one keeps the profile's (`resolve_profile`, `thread_name_template`).
+      - The templates are filled in once, when the job starts. An empty result falls back to `<ID> <title>`.
+      - A new thread gets `--title`. A continued thread is renamed before its turn is sent, and only when `thread_name` is set. Without it, names stay as today.
+      - A failed rename is logged and the job runs on.
+      - `POST /api/jobs`: `api_types.rs`, `types.ts` and `openapi.json` agree. The docs are updated.
+    - **T3 Code 0.1.10 is installed now** (`~/.t3/userdata/server-runtime.json`), so this was the first "check after an update":
+      - `t3 thread --help` still lists only list/start/send/show, so there is still no rename command.
+      - `t3 auth session issue` still has `--scope`, `--ttl`, `--label` and `--json`.
+      - The app bundle still has `orchestrationProtocol`, `orchestration.dispatchCommand`, and `thread.metadata.update` with `commandId`, `threadId` and `title`.
+      - The fix agent also renamed a live thread on 0.1.10 and back.
+    - **Reran:**
+      - `npm ci`: OK.
+      - `cargo nextest run --workspace -E 'test(t3_thread) | test(thread_name) | test(a_t3_threads_title) | test(renamed) | test(/dev510_t3_session_test/)'`: 22 passed.
+      - `npm run lint`: passed.
+      - Not rerun: `npm test` and `npm run smoke`. The fix agent passed both on this commit, and they have to run again after the rebase anyway.
+    - **For the merge (not a code fault):** the branch is based on `804cb0f96`, and main has moved about 50 commits since. A trial `git rebase main` conflicts in `Cargo.lock`, `config/types.rs` (DEV-620's `context_entries` and `full_history` sit next to `thread_name`, keep all three), `services/mod.rs` and `agent.md`. Beyond the conflicts:
+      - DEV-634 moved `agent_job_service.rs` into `crates/lotar-agent`. `t3_thread_api.rs` and the `tungstenite` dependency have to move with it, or `crate::services::t3_thread_api` won't resolve.
+      - DEV-669 removed chrono. `t3_thread_api.rs:34` `chrono::Utc::now().timestamp_millis()` needs jiff, for example `jiff::Timestamp::now().as_millisecond()`.
+    - **Follow-up, as the fix agent planned (`--next`):** after the release, a standards ticket sets `thread_name`, drops the rename step from `configs/lotar/automation.yml` and adds the after-update check. Until then, the two open "Done when" boxes stay open.
+    - **Filed:** no tickets. Calling `t3 auth session issue` with no timeout is the same pattern the other `t3` calls use, so it isn't a finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa795617b-c98d-4358-a074-874d80cf95a3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2dfb3e33-0997-4a2c-8ebf-bca335fe7262
 description: |-
   Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposal 2: lotar names the thread itself.
 
@@ -53,13 +146,17 @@ description: |-
   - T3's CLI (t3 0.1.9) sets a title only at `t3 thread start --title`; it has no rename and `thread send` takes no title (2026-11-16).
 
   ## Done when
-  - [ ] A profile (`agents.<name>.thread_name`) and a rule (`agent.thread_name`) set the thread name as a template, for example `thread_name: "${{ticket.id}} fix: ${{ticket.title}}"`. The rule's value wins over the profile's; an empty one keeps the profile's.
-  - [ ] The job fills in the ticket's templates when it starts, once: a ticket title that holds `${{` stays as written. A name that comes out empty falls back to `<ID> <title>`.
-  - [ ] A new thread starts with that name (`t3 thread start --title`).
-  - [ ] A continued thread is renamed to it before its turn is sent (route pending: see the open question). A rename that fails (T3 Code doesn't answer) logs it and the job runs on.
-  - [ ] Without the setting, names stay as today (`<ID> <title>`).
-  - [ ] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
-  - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md); standards then drops the rename step from its prompts (configs/lotar/automation.yml).
+  - [x] A profile (`agents.<name>.thread_name`) and a rule (`agent.thread_name`) set the thread name as a template, for example `thread_name: "${{ticket.id}} fix: ${{ticket.title}}"`. The rule's value wins over the profile's; an empty one keeps the profile's.
+  - [x] The job fills in the ticket's templates when it starts, once: a ticket title that holds `${{` stays as written. A name that comes out empty falls back to `<ID> <title>`.
+  - [x] A new thread starts with that name (`t3 thread start --title`).
+  - [x] A continued thread is renamed to it before its turn is sent, through the T3 Code server's internal API (owner 2026-11-17: "Implement with the internal API", INBOX-444): a short `t3 auth session issue` session, `thread.metadata.update` over `/ws`, session revoked. A rename that fails (T3 Code doesn't answer, the API changed) logs it and the job runs on.
+  - [x] No T3 Code issue is filed (owner: "Don't file"); checked that none asks for a CLI rename yet.
+  - [ ] After each T3 Code update someone checks that the route still works and whether `t3 thread` got a rename command (owner: "we just need to react when the next version gets installed"): standards' daily review, once standards uses `thread_name`.
+  - [x] Without the setting, names stay as today (`<ID> <title>`).
+  - [x] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+  - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md: done); standards then drops the rename step from its prompts (configs/lotar/automation.yml).
+tags:
+- fix-retried
 history:
 - at: 2026-11-16T18:42:07.557371+00:00
   actor: claude
@@ -144,3 +241,112 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-17T19:32:58.373312+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T19:32:59.199352+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa795617b-c98d-4358-a074-874d80cf95a3
+- at: 2026-11-17T19:52:36.151919+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposal 2: lotar names the thread itself.
+
+      ## Found
+      - Every standards job prompt asks the agent first to rename its thread to "<ID> <step>: <title>" (owner 2026-11-13, standards STD-88). ToolSearch ran in 486 of 735 Claude job sessions, nearly all to load t3_thread_update for it: two extra model calls per job, each re-reading about 50k tokens. About $40 in a 40-hour window.
+      - lotar names a new thread "<ID> <title>"; a continued thread keeps its name.
+      - T3's CLI (t3 0.1.9) sets a title only at `t3 thread start --title`; it has no rename and `thread send` takes no title (2026-11-16).
+
+      ## Done when
+      - [ ] A profile (`agents.<name>.thread_name`) and a rule (`agent.thread_name`) set the thread name as a template, for example `thread_name: "${{ticket.id}} fix: ${{ticket.title}}"`. The rule's value wins over the profile's; an empty one keeps the profile's.
+      - [ ] The job fills in the ticket's templates when it starts, once: a ticket title that holds `${{` stays as written. A name that comes out empty falls back to `<ID> <title>`.
+      - [ ] A new thread starts with that name (`t3 thread start --title`).
+      - [ ] A continued thread is renamed to it before its turn is sent (route pending: see the open question). A rename that fails (T3 Code doesn't answer) logs it and the job runs on.
+      - [ ] Without the setting, names stay as today (`<ID> <title>`).
+      - [ ] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+      - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md); standards then drops the rename step from its prompts (configs/lotar/automation.yml).
+    new: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposal 2: lotar names the thread itself.
+
+      ## Found
+      - Every standards job prompt asks the agent first to rename its thread to "<ID> <step>: <title>" (owner 2026-11-13, standards STD-88). ToolSearch ran in 486 of 735 Claude job sessions, nearly all to load t3_thread_update for it: two extra model calls per job, each re-reading about 50k tokens. About $40 in a 40-hour window.
+      - lotar names a new thread "<ID> <title>"; a continued thread keeps its name.
+      - T3's CLI (t3 0.1.9) sets a title only at `t3 thread start --title`; it has no rename and `thread send` takes no title (2026-11-16).
+
+      ## Done when
+      - [x] A profile (`agents.<name>.thread_name`) and a rule (`agent.thread_name`) set the thread name as a template, for example `thread_name: "${{ticket.id}} fix: ${{ticket.title}}"`. The rule's value wins over the profile's; an empty one keeps the profile's.
+      - [x] The job fills in the ticket's templates when it starts, once: a ticket title that holds `${{` stays as written. A name that comes out empty falls back to `<ID> <title>`.
+      - [x] A new thread starts with that name (`t3 thread start --title`).
+      - [x] A continued thread is renamed to it before its turn is sent, through the T3 Code server's internal API (owner 2026-11-17: "Implement with the internal API", INBOX-444): a short `t3 auth session issue` session, `thread.metadata.update` over `/ws`, session revoked. A rename that fails (T3 Code doesn't answer, the API changed) logs it and the job runs on.
+      - [x] No T3 Code issue is filed (owner: "Don't file"); checked that none asks for a CLI rename yet.
+      - [ ] After each T3 Code update someone checks that the route still works and whether `t3 thread` got a rename command (owner: "we just need to react when the next version gets installed"): standards' daily review, once standards uses `thread_name`.
+      - [x] Without the setting, names stay as today (`<ID> <title>`).
+      - [x] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+      - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md: done); standards then drops the rename step from its prompts (configs/lotar/automation.yml).
+- at: 2026-11-17T19:52:36.369603+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:52:48.150090+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T19:52:48.353490+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:58:14.244219+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2dfb3e33-0997-4a2c-8ebf-bca335fe7262
+- at: 2026-11-17T20:03:45.491999+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:03:45.673471+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-620"]}'
+    new: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673"]}'
+- at: 2026-11-17T20:03:56.489346+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-17T20:16:39.568374+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:16:39.754102+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673"]}'
+    new: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669"]}'
+- at: 2026-11-17T20:16:53.028063+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

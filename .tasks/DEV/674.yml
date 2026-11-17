@@ -1,0 +1,59 @@
+title: 't3 worktree setup: a leftover or same-commit record can give a job''s Claude settings to the wrong worktree'
+status: HelpNeeded
+priority: Low
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-17T20:09:56.418127+00:00
+modified: 2026-11-17T20:18:14.823006+00:00
+relationships:
+  related:
+  - DEV-618
+comments:
+- date: 2026-11-17T20:18:14.823006+00:00
+  author: automation
+  text: 'The t3 session waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c
+description: |-
+  Found reviewing DEV-618 (`crates/lotar-lib/src/services/t3_worktree_setup.rs`, `agent_job_service.rs` `run_session`).
+
+  - A job whose thread starts from an existing ticket branch records no branch; `setup()` claims it for any new worktree whose HEAD is that commit. A thread the owner starts in worktree mode from the same commit within 10 minutes (`PENDING_SECS`), or another job's thread on a ticket branch at the same commit, can take it: the owner's session then loses tools he keeps (owner 2026-11-15, INBOX-351: "1 and 4 only in job sessions").
+  - `run_session` returns early after `record_t3_worktree_setup` when `job_agent_table` or `open_session` fails, so `finish()` never removes the record. It stays claimable for 10 minutes, and expired records are never deleted from `.git/lotar/t3-worktree-setup/`.
+  - Candidates are claimed oldest first, so a retried job's thread can take the earlier job's leftover record; the new job's log then says the script doesn't run the command.
+
+  ## Done when
+  - [ ] The record is removed on every exit of `run_session` after it was written (early failures too).
+  - [ ] `setup()` matches a record only to the job's own thread worktree (for example by the thread's title or a job id T3 passes through), not by commit alone; or the docs say the commit match's limits.
+  - [ ] Expired records are deleted when `setup()` or `record()` runs.
+  - [ ] Tests for each case.
+history:
+- at: 2026-11-17T20:09:57.144073+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T20:17:13.774847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T20:17:14.587502+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c
+- at: 2026-11-17T20:18:14.720809+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-17T20:18:14.823006+00:00
+  actor: automation
+  changes:
+  - field: comment_added

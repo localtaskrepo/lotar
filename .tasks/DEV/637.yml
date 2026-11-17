@@ -3,9 +3,9 @@ status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-17T01:56:54.001918+00:00
-modified: 2026-11-17T02:37:51.987295+00:00
+modified: 2026-11-17T19:39:22.254719+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -38,6 +38,12 @@ comments:
 - date: 2026-11-17T02:37:51.987295+00:00
   author: automation
   text: 'The @review job waits for its open prerequisites: DEV-530.'
+- date: 2026-11-17T19:39:11.898280+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-530.'
+- date: 2026-11-17T19:39:22.254719+00:00
+  author: claude
+  text: 'Moved back to @fix with tag waits (standards STD-209): it was parked on @review before standards STD-207''s fix, so the unblock would have run the fix as @review and merged it unreviewed. Still Blocked on DEV-530.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ede6a56-9b89-4ce2-8b1c-a74fa80eb83a
 description: |-
@@ -56,6 +62,8 @@ description: |-
   - [ ] Dropping fails (queue file unreadable or locked): the status change still succeeds, and lotar reports it as an `automation_failed` warning; the entry stays for `lotar agent queue remove`.
   - [ ] `lotar agent queue` no longer lists the ticket, and `lotar task move` moves it.
   - [ ] npm run lint, npm test, npm run smoke pass.
+tags:
+- waits
 history:
 - at: 2026-11-17T01:56:54.623012+00:00
   actor: claude
@@ -141,5 +149,25 @@ history:
     new: Blocked
 - at: 2026-11-17T02:37:51.987295+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:39:11.700839+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+- at: 2026-11-17T19:39:11.898280+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:39:12.078943+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-17T19:39:22.254719+00:00
+  actor: claude
   changes:
   - field: comment_added

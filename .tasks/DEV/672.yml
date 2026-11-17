@@ -1,0 +1,153 @@
+title: A merge job that continues the reviewer's session shows @merge's model (sonnet), but the session ran on the reviewer's (opus)
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T19:35:53.990076+00:00
+modified: 2026-11-17T20:14:59.844831+00:00
+relationships:
+  related:
+  - DEV-530
+  - DEV-671
+comments:
+- date: 2026-11-17T20:03:28.118166+00:00
+  author: claude
+  text: |-
+    Fixed: a job that resumes a session now shows the session's model and effort.
+
+    - Cause: harnessmux resumes with the profile in its session record (lotar swaps only env), but `run_job` recorded the job profile's model.
+    - `crates/lotar-agent/src/services/agent_job_service.rs`: once the session to continue is picked, `profile.model`/`effort` and the job record take the session record's values, before the log header is written. So `/api/jobs`, `agent status`, `list-jobs`, timeline and the Agents page show them.
+    - Jobs that start their own session are unchanged; cost logic untouched (the agent reports cost).
+    - Test `a_continued_session_shows_the_model_and_effort_it_runs_on` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`; `docs/help/agent.md` updated.
+    - Told the DEV-530 thread (same file) what changed.
+  report:
+    commits:
+    - hash: 6c8c4df8a
+      what: a continued session's job records the session's model and effort
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2312 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '405'
+    - command: new test failing before the fix
+      result: passed
+      reason: showed (sonnet, None), expected (opus, high)
+    next: Review, then merge
+- date: 2026-11-17T20:14:50.249976+00:00
+  author: claude
+  text: |-
+    Review: passed. `6c8c4df8a` does what "Done when" asks; no findings, no tickets filed.
+
+    - Read: the diff, the ticket and its comment, DEV-530, `AGENTS.md`, and recent main commits to the touched files (DEV-671's runner check runs before this, so it's compatible).
+    - `run_job` (`crates/lotar-agent/src/services/agent_job_service.rs:3304`) switches to the session's model/effort only after the idle check and the T3 thread check, and before `start_job` writes the log header. Jobs that start their own session, and jobs that fail before this point (worktree setup, `agent.merge`'s own merge → `Fresh`), keep their profile's values.
+    - Resume is unaffected: `open_session` (`agent_runner.rs:240`) copies only `env` into the session record, so the job's profile model doesn't reach a resumed agent. Cost code untouched.
+    - The test fails without the fix (`left: (Some("sonnet"), None)`, checked in a detached copy with the old `agent_job_service.rs`) and passes with it.
+    - No UI or REST changes. The docs line in `docs/help/agent.md` matches the behavior.
+    - Reran: `npm ci` ok; `npm run lint:agent` passed; `npm test` passed (2312 Rust, 1548 UI); `npm run smoke` passed (405). Worktree clean afterwards.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A328c233b-7d5a-4678-9428-c2668685e8f2
+description: |-
+  Found in STD-208 (standards), checking STD-207's headless merge.
+
+  - Job `job-20261117T192917.748Z-5` (STD-207, profile merge, runner claude) continued the review session `standards-04f015-STD-207-review` (Claude session `ec15ec35-d7a5-4d7e-8ea7-63a6a0e3c12a`).
+  - Its transcript (`~/.claude/projects/-Users-mallox--t3-worktrees-standards-agent-STD-207-858b7ce3ee398502/ec15ec35-….jsonl`) has every assistant turn on `claude-opus-5-5`, effort medium, also the merge turn after 19:29Z. harnessmux's `standards-04f015-STD-207-review.json` profile says `model: opus`.
+  - But `/api/jobs`, the Agents page and `lotar task timeline STD-207` show the job as `merge (claude, sonnet)`: @merge's profile model, not the session's. docs/help/agent.md says the continued session keeps its model and effort, and that jobs show their model and effort.
+
+  Cause: harnessmux resumes a session with the profile in its record (lotar replaces only its env), but the job records its own profile's model and effort (`run_job` in `crates/lotar-agent/src/services/agent_job_service.rs`).
+
+  ## Done when
+  - [ ] A job that resumes a session (`session: continue`, of its own or another profile) records the session's model and effort, as harnessmux's session record holds them, in the job record and its log header, so the job list (`/api/jobs`, `lotar agent list-jobs`), `lotar agent status`, `lotar task timeline` and the Agents page show them. The session's values win over the job's profile and over `--model`/`--effort`; a session started without a model or effort shows none (the agent's default), as it runs.
+  - [ ] A job that starts a session of its own (`session: new`/`fresh`, no session to continue, one it can't continue, or one idle past `continue_within_minutes`) still shows its profile's (or `--model`/`--effort`) values.
+  - [ ] Until the job picks its session (queued, worktree setup) it shows its profile's values; a job whose start fails before that keeps them.
+  - [ ] Its cost is unchanged (the agent reports it; nothing in lotar prices by model).
+  - [ ] Test: a continued job of a sonnet profile on an opus session shows opus and the session's effort, in memory and in its log; docs/help/agent.md says so.
+history:
+- at: 2026-11-17T19:35:54.210689+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T19:53:22.651273+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T19:53:23.560185+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A328c233b-7d5a-4678-9428-c2668685e8f2
+- at: 2026-11-17T19:55:33.658896+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in STD-208 (standards), checking STD-207's headless merge.
+
+      - Job `job-20261117T192917.748Z-5` (STD-207, profile merge, runner claude) continued the review session `standards-04f015-STD-207-review` (Claude session `ec15ec35-d7a5-4d7e-8ea7-63a6a0e3c12a`).
+      - Its transcript (`~/.claude/projects/-Users-mallox--t3-worktrees-standards-agent-STD-207-858b7ce3ee398502/ec15ec35-….jsonl`) has every assistant turn on `claude-opus-5-5`, effort medium, also the merge turn after 19:29Z. harnessmux's `standards-04f015-STD-207-review.json` profile says `model: opus`.
+      - But `/api/jobs`, the Agents page and `lotar task timeline STD-207` show the job as `merge (claude, sonnet)`: @merge's profile model, not the session's. docs/help/agent.md says the continued session keeps its model and effort, and that jobs show their model and effort.
+
+      ## Done when
+      - [ ] A job that continues another profile's session records and shows the model and effort the session ran on (job list, `lotar agent status`, timeline, Agents page), with a test.
+      - [ ] A job that starts its own session still shows its profile's model.
+      - [ ] Its cost is unchanged (the agent reports it).
+    new: |-
+      Found in STD-208 (standards), checking STD-207's headless merge.
+
+      - Job `job-20261117T192917.748Z-5` (STD-207, profile merge, runner claude) continued the review session `standards-04f015-STD-207-review` (Claude session `ec15ec35-d7a5-4d7e-8ea7-63a6a0e3c12a`).
+      - Its transcript (`~/.claude/projects/-Users-mallox--t3-worktrees-standards-agent-STD-207-858b7ce3ee398502/ec15ec35-….jsonl`) has every assistant turn on `claude-opus-5-5`, effort medium, also the merge turn after 19:29Z. harnessmux's `standards-04f015-STD-207-review.json` profile says `model: opus`.
+      - But `/api/jobs`, the Agents page and `lotar task timeline STD-207` show the job as `merge (claude, sonnet)`: @merge's profile model, not the session's. docs/help/agent.md says the continued session keeps its model and effort, and that jobs show their model and effort.
+
+      Cause: harnessmux resumes a session with the profile in its record (lotar replaces only its env), but the job records its own profile's model and effort (`run_job` in `crates/lotar-agent/src/services/agent_job_service.rs`).
+
+      ## Done when
+      - [ ] A job that resumes a session (`session: continue`, of its own or another profile) records the session's model and effort, as harnessmux's session record holds them, in the job record and its log header, so the job list (`/api/jobs`, `lotar agent list-jobs`), `lotar agent status`, `lotar task timeline` and the Agents page show them. The session's values win over the job's profile and over `--model`/`--effort`; a session started without a model or effort shows none (the agent's default), as it runs.
+      - [ ] A job that starts a session of its own (`session: new`/`fresh`, no session to continue, one it can't continue, or one idle past `continue_within_minutes`) still shows its profile's (or `--model`/`--effort`) values.
+      - [ ] Until the job picks its session (queued, worktree setup) it shows its profile's values; a job whose start fails before that keeps them.
+      - [ ] Its cost is unchanged (the agent reports it; nothing in lotar prices by model).
+      - [ ] Test: a continued job of a sonnet profile on an opus session shows opus and the session's effort, in memory and in its log; docs/help/agent.md says so.
+- at: 2026-11-17T20:03:28.118166+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:03:28.297694+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-530"]}'
+- at: 2026-11-17T20:03:38.846875+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T20:14:50.249976+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:14:50.455204+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-530"]}'
+    new: '{"related":["DEV-530","DEV-671"]}'
+- at: 2026-11-17T20:14:59.844831+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

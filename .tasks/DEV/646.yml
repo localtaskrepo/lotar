@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T03:02:27.383761+00:00
-modified: 2026-11-17T16:15:21.470769+00:00
+modified: 2026-11-17T20:05:00.489208+00:00
 relationships:
   depends_on:
   - DEV-630
@@ -22,6 +22,7 @@ relationships:
   - DEV-628
   - DEV-644
   - DEV-660
+  - DEV-623
 comments:
 - date: 2026-11-17T03:23:45.870039+00:00
   author: claude
@@ -268,3 +269,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-630"],"related":["DEV-630","DEV-633","DEV-635","DEV-639","DEV-642","DEV-647","DEV-648","DEV-649","DEV-651","DEV-628","DEV-644"]}'
     new: '{"depends_on":["DEV-630"],"related":["DEV-630","DEV-633","DEV-635","DEV-639","DEV-642","DEV-647","DEV-648","DEV-649","DEV-651","DEV-628","DEV-644","DEV-660"]}'
+- at: 2026-11-17T20:05:00.489208+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-630"],"related":["DEV-630","DEV-633","DEV-635","DEV-639","DEV-642","DEV-647","DEV-648","DEV-649","DEV-651","DEV-628","DEV-644","DEV-660"]}'
+    new: '{"depends_on":["DEV-630"],"related":["DEV-630","DEV-633","DEV-635","DEV-639","DEV-642","DEV-647","DEV-648","DEV-649","DEV-651","DEV-628","DEV-644","DEV-660","DEV-623"]}'

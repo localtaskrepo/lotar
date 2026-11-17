@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T08:14:39.859239+00:00
-modified: 2026-11-17T09:16:52.442418+00:00
+modified: 2026-11-17T20:05:00.489756+00:00
 relationships:
   blocks:
   - DEV-656
@@ -14,6 +14,7 @@ relationships:
   - DEV-495
   - DEV-656
   - DEV-654
+  - DEV-623
 comments:
 - date: 2026-11-17T08:45:49.346506+00:00
   author: claude
@@ -381,3 +382,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-17T20:05:00.489756+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-656"],"related":["DEV-634","DEV-495","DEV-656","DEV-654"]}'
+    new: '{"blocks":["DEV-656"],"related":["DEV-634","DEV-495","DEV-656","DEV-654","DEV-623"]}'

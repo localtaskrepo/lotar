@@ -1,15 +1,16 @@
 title: 't3 runner: give job threads the profile''s tools.disallowed and env'
-status: InProgress
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-16T18:41:59.400479+00:00
-modified: 2026-11-17T19:28:00.658323+00:00
+modified: 2026-11-17T20:10:13.228856+00:00
 relationships:
   related:
   - DEV-596
   - DEV-620
+  - DEV-674
 comments:
 - date: 2026-11-16T19:14:25.198550+00:00
   author: claude
@@ -36,23 +37,87 @@ comments:
 - date: 2026-11-17T19:27:57.681568+00:00
   author: mallox
   text: We already call npm ci or a different command in all repos. Maybe we just default to run npm in all projects if a package.json exists or recommend a better approach with a different default command to run on triggers. Also, onWorktree might not trigger since t3 isn't creating work trees (answered in INBOX-445)
+- date: 2026-11-17T19:48:30.271692+00:00
+  author: claude
+  text: |-
+    Done, your way: the existing worktree script (`npm ci`) gets lotar in front of it. No new default command needed.
+
+    - T3 does make the job worktrees: lotar starts job threads with `t3 thread start --worktree <base>`. Your own threads don't get one, because your T3 default is `local`. The doc line "T3 Code threads no longer create worktrees" was wrong, and I fixed it in `docs/help/agent.md`.
+    - Your scripts run for CLI-started job threads too: this thread's worktree got `node_modules` 1s after it was created. T3 runs only the **first** script with `runOnWorktreeCreate`, so lotar has to be in that same command: `lotar agent worktree setup; npm ci`. It always exits 0, so `npm ci` runs every time.
+    - How it works: before `t3 thread start`, the job leaves a record in `.git/lotar/t3-worktree-setup/`. The command claims it in the new worktree (matched by branch, or by commit when the thread starts from the existing ticket branch) and merges the record into `.claude/settings.local.json`: deny rules added, profile env keys win. If git doesn't ignore the file yet, it is added to `.git/info/exclude`. In your own threads and in other repos the command does nothing.
+    - The job log says `Wrote …`, or why not (the settings file is tracked or isn't valid JSON), or that the script doesn't run the command.
+    - T3's Claude sessions load `user`, `project` and `local` settings (from T3 Code's bundled Claude adapter).
+    - Connectors: list them as `mcp__claude_ai_*` in `tools.disallowed`. `ENABLE_CLAUDEAI_MCP_SERVERS` in the file does nothing (17 Nov comment).
+    - Tests: `t3_worktree_setup` unit tests, plus 2 job tests in `dev510_t3_session_test.rs` (a fake t3 makes the worktree and runs the command). I also ran the built binary by hand in throwaway repos.
+  report:
+    commits:
+    - hash: f46d2852f
+      what: lotar agent worktree setup writes the job profile's tools.disallowed and env into the new T3 worktree's .claude/settings.local.json
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2264 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: real T3 thread with the new script
+      result: not_run
+      reason: needs your T3 script change first
+    next: 'You: set lotar''s T3 worktree script (Install deps) to `lotar agent worktree setup; npm ci` (same pattern in the other repos); the next t3 job''s log then says `Wrote .claude/settings.local.json`'
+- date: 2026-11-17T19:48:47.624192+00:00
+  author: automation
+  text: The fix agent's job job-20261117T192759.167Z-20 failed (lotar agent logs job-20261117T192759.167Z-20); @fix-retry retries it on branch t3/t3-job-profile-tools-env.
+- date: 2026-11-17T19:58:04.110436+00:00
+  author: claude
+  text: |-
+    Retry: nothing to redo. The work was finished; only the branch move at the job's end failed.
+
+    - The failure: `git branch --force agent/DEV-618 f46d2852f` was refused because `agent/DEV-618` was checked out in `/Users/mallox/.t3/worktrees/lotar/agent-DEV-618-ce67c36f9c700d50`.
+    - `agent/DEV-618` is at `f46d2852f` now, the same commit as this branch, so this job's end has nothing to move.
+    - No new edits, so I didn't rerun the checks. The previous job passed them all on `f46d2852f`.
+  report:
+    commits:
+    - hash: f46d2852f
+      what: lotar agent worktree setup writes the job profile's tools.disallowed and env into a t3 worktree's .claude/settings.local.json; docs/help/agent.md
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: on f46d2852f, previous job
+    - command: npm test
+      result: passed
+      reason: on f46d2852f, previous job (2264 Rust, 1548 UI)
+    - command: npm run smoke
+      result: passed
+      reason: on f46d2852f, previous job (405)
+    - command: real T3 job thread with the new worktree script
+      result: not_run
+      reason: needs the owner's T3 script change
+    next: Review f46d2852f; owner sets T3 Code's worktree script to lotar agent worktree setup; npm ci
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef1ab-19d5-4a1d-9e83-87eed3e27274
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67416213-09db-42c9-9957-6856b853ac51
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A582a6ec4-2269-4595-9529-0b3a0947e77d
 description: |-
   Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six; 1 and 4 only in job sessions" (answered in INBOX-351): unused tools and the claude.ai connectors go off in job sessions only, his own sessions keep them.
+
+  Owner 2026-11-17 (INBOX-445): "We already call npm ci or a different command in all repos. Maybe we just default to run npm in all projects if a package.json exists or recommend a better approach with a different default command to run on triggers." So: the file is written by the T3 project's worktree-create script (the one that runs `npm ci` today), which calls a new `lotar agent worktree setup` first.
 
   ## Found
   - A Claude T3 job's first call is 50k to 60k tokens. The Artifact tool alone is 12.8k; Artifact, Workflow, ScheduleWakeup and ReportFindings were used in 1 of 735 job sessions; claude.ai connectors in 3.
   - The claude and codex runners already pass a profile's tools.disallowed and env. The t3 runner can't: "T3's CLI has no effort, permissions, MCP servers or interrupt" (docs/help/agent.md).
-  - Measured: a Claude settings file `{"permissions":{"deny":["Artifact","Workflow","ScheduleWakeup","ReportFindings"]},"env":{"ENABLE_CLAUDEAI_MCP_SERVERS":"false"}}` takes a bare Opus session's first call from 40.2k to 20.9k tokens.
+  - Measured: a Claude settings file with `permissions.deny` takes a bare Opus session's first call from 40.2k to about 20k tokens. `env.ENABLE_CLAUDEAI_MCP_SERVERS` in the file does not turn connectors off; deny rules on `mcp__claude_ai_*` do.
+  - T3 Code makes a job's worktree (`t3 thread start --worktree`), runs the project's one `runOnWorktreeCreate` script in it (with `T3CODE_WORKTREE_PATH`; `async: false` holds the agent), also for threads started from the CLI. T3's Claude sessions load `user`, `project` and `local` settings.
 
   ## Done when
-  - [ ] A t3 job with provider claudeAgent whose profile sets tools.disallowed or env starts its thread in a worktree whose `.claude/settings.local.json` holds them (deny rules and env), written before the thread starts.
-  - [ ] A settings.local.json already there keeps its own keys; the profile's deny entries are added, its env keys win.
-  - [ ] The file never lands in a commit: not in LoTaR's commit of leftovers at the job's end, not in the agent's (git info/exclude or equivalent); the worktree's own .gitignore stays unchanged.
-  - [ ] Profiles without these keys, other providers and threads outside job worktrees are unchanged; writing the file fails: the job logs why and starts the thread without it.
-  - [ ] docs/help/agent.md says which profile keys reach a t3 thread.
+  - [ ] `lotar agent worktree setup`, run in a new T3 worktree, writes `.claude/settings.local.json` there with the job profile's `tools.disallowed` as `permissions.deny` and its `env` as `env`, when a t3 job of that repository that runs provider claudeAgent (or no provider) is starting a new thread on that worktree's branch or commit (lotar records that before `t3 thread start`).
+  - [ ] A settings.local.json already there keeps its own keys; the profile's deny entries are added (no duplicates), its env keys win.
+  - [ ] The file never lands in a commit: when git doesn't ignore it already, it goes into the repository's `info/exclude`; the worktree's own .gitignore stays unchanged.
+  - [ ] The command does nothing and exits 0 outside a job worktree (the owner's own threads, other repos, no git). It exits 0 when writing fails too, and says why; the job's log says whether the file was written, why not, or that the script never ran the command. Profiles without these keys, other providers and continued threads are unchanged.
+  - [ ] docs/help/agent.md says which profile keys reach a t3 thread and the script command to set in T3 Code (`lotar agent worktree setup; npm ci`).
+tags:
+- fix-retried
 history:
 - at: 2026-11-16T18:42:01.701153+00:00
   actor: claude
@@ -120,3 +185,88 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67416213-09db-42c9-9957-6856b853ac51
+- at: 2026-11-17T19:35:44.317749+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six; 1 and 4 only in job sessions" (answered in INBOX-351): unused tools and the claude.ai connectors go off in job sessions only, his own sessions keep them.
+
+      ## Found
+      - A Claude T3 job's first call is 50k to 60k tokens. The Artifact tool alone is 12.8k; Artifact, Workflow, ScheduleWakeup and ReportFindings were used in 1 of 735 job sessions; claude.ai connectors in 3.
+      - The claude and codex runners already pass a profile's tools.disallowed and env. The t3 runner can't: "T3's CLI has no effort, permissions, MCP servers or interrupt" (docs/help/agent.md).
+      - Measured: a Claude settings file `{"permissions":{"deny":["Artifact","Workflow","ScheduleWakeup","ReportFindings"]},"env":{"ENABLE_CLAUDEAI_MCP_SERVERS":"false"}}` takes a bare Opus session's first call from 40.2k to 20.9k tokens.
+
+      ## Done when
+      - [ ] A t3 job with provider claudeAgent whose profile sets tools.disallowed or env starts its thread in a worktree whose `.claude/settings.local.json` holds them (deny rules and env), written before the thread starts.
+      - [ ] A settings.local.json already there keeps its own keys; the profile's deny entries are added, its env keys win.
+      - [ ] The file never lands in a commit: not in LoTaR's commit of leftovers at the job's end, not in the agent's (git info/exclude or equivalent); the worktree's own .gitignore stays unchanged.
+      - [ ] Profiles without these keys, other providers and threads outside job worktrees are unchanged; writing the file fails: the job logs why and starts the thread without it.
+      - [ ] docs/help/agent.md says which profile keys reach a t3 thread.
+    new: |-
+      Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six; 1 and 4 only in job sessions" (answered in INBOX-351): unused tools and the claude.ai connectors go off in job sessions only, his own sessions keep them.
+
+      Owner 2026-11-17 (INBOX-445): "We already call npm ci or a different command in all repos. Maybe we just default to run npm in all projects if a package.json exists or recommend a better approach with a different default command to run on triggers." So: the file is written by the T3 project's worktree-create script (the one that runs `npm ci` today), which calls a new `lotar agent worktree setup` first.
+
+      ## Found
+      - A Claude T3 job's first call is 50k to 60k tokens. The Artifact tool alone is 12.8k; Artifact, Workflow, ScheduleWakeup and ReportFindings were used in 1 of 735 job sessions; claude.ai connectors in 3.
+      - The claude and codex runners already pass a profile's tools.disallowed and env. The t3 runner can't: "T3's CLI has no effort, permissions, MCP servers or interrupt" (docs/help/agent.md).
+      - Measured: a Claude settings file with `permissions.deny` takes a bare Opus session's first call from 40.2k to about 20k tokens. `env.ENABLE_CLAUDEAI_MCP_SERVERS` in the file does not turn connectors off; deny rules on `mcp__claude_ai_*` do.
+      - T3 Code makes a job's worktree (`t3 thread start --worktree`), runs the project's one `runOnWorktreeCreate` script in it (with `T3CODE_WORKTREE_PATH`; `async: false` holds the agent), also for threads started from the CLI. T3's Claude sessions load `user`, `project` and `local` settings.
+
+      ## Done when
+      - [ ] `lotar agent worktree setup`, run in a new T3 worktree, writes `.claude/settings.local.json` there with the job profile's `tools.disallowed` as `permissions.deny` and its `env` as `env`, when a t3 job of that repository that runs provider claudeAgent (or no provider) is starting a new thread on that worktree's branch or commit (lotar records that before `t3 thread start`).
+      - [ ] A settings.local.json already there keeps its own keys; the profile's deny entries are added (no duplicates), its env keys win.
+      - [ ] The file never lands in a commit: when git doesn't ignore it already, it goes into the repository's `info/exclude`; the worktree's own .gitignore stays unchanged.
+      - [ ] The command does nothing and exits 0 outside a job worktree (the owner's own threads, other repos, no git). It exits 0 when writing fails too, and says why; the job's log says whether the file was written, why not, or that the script never ran the command. Profiles without these keys, other providers and continued threads are unchanged.
+      - [ ] docs/help/agent.md says which profile keys reach a t3 thread and the script command to set in T3 Code (`lotar agent worktree setup; npm ci`).
+- at: 2026-11-17T19:48:30.271692+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:48:47.414577+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T19:48:47.624192+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:57:13.150830+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A582a6ec4-2269-4595-9529-0b3a0947e77d
+- at: 2026-11-17T19:58:04.110436+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:58:10.002844+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-17T20:09:56.626088+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-596","DEV-620"]}'
+    new: '{"related":["DEV-596","DEV-620","DEV-674"]}'
+- at: 2026-11-17T20:10:13.228856+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T18:13:11.087662+00:00
-modified: 2026-11-17T19:26:15.735052+00:00
+modified: 2026-11-17T20:17:05.719970+00:00
 relationships:
   related:
   - DEV-122
@@ -13,6 +13,10 @@ relationships:
   - DEV-654
   - DEV-668
   - DEV-585
+  - DEV-530
+  - DEV-623
+  - DEV-619
+  - DEV-673
 comments:
 - date: 2026-11-17T18:43:35.138632+00:00
   author: claude
@@ -328,3 +332,27 @@ history:
   - field: tags
     old: review-returned
     new: ''
+- at: 2026-11-17T19:56:46.441123+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585"]}'
+    new: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530"]}'
+- at: 2026-11-17T20:05:00.490355+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530"]}'
+    new: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530","DEV-623"]}'
+- at: 2026-11-17T20:16:39.755438+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530","DEV-623"]}'
+    new: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530","DEV-623","DEV-619"]}'
+- at: 2026-11-17T20:17:05.719970+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530","DEV-623","DEV-619"]}'
+    new: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530","DEV-623","DEV-619","DEV-673"]}'

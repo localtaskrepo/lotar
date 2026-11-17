@@ -3,9 +3,9 @@ status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-17T03:02:08.605225+00:00
-modified: 2026-11-17T04:33:45.239555+00:00
+modified: 2026-11-17T19:39:22.450238+00:00
 relationships:
   depends_on:
   - DEV-623
@@ -86,6 +86,12 @@ comments:
 - date: 2026-11-17T04:33:45.239555+00:00
   author: automation
   text: 'The @review job waits for its open prerequisites: DEV-623.'
+- date: 2026-11-17T19:39:12.333962+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-623.'
+- date: 2026-11-17T19:39:22.450238+00:00
+  author: claude
+  text: 'Moved back to @fix with tag waits (standards STD-209): it was parked on @review before standards STD-207''s fix, so the unblock would have run the fix as @review and merged it unreviewed. Still Blocked on DEV-623.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeca30204-ae6e-4451-9660-94e8242f4b0e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A577c8b27-c103-4ecf-b1eb-5dad6f458e1d
@@ -104,6 +110,7 @@ description: |-
   - [ ] A test with an old saved hold and a normal reading: `status` shows no hold; the same hold with a recent reading is still shown.
 tags:
 - review-returned
+- waits
 history:
 - at: 2026-11-17T03:02:11.026136+00:00
   actor: claude
@@ -225,5 +232,25 @@ history:
     new: Blocked
 - at: 2026-11-17T04:33:45.239555+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:39:12.136518+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+- at: 2026-11-17T19:39:12.333962+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:39:12.519018+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, waits
+- at: 2026-11-17T19:39:22.450238+00:00
+  actor: claude
   changes:
   - field: comment_added

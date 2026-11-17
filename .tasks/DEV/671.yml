@@ -1,11 +1,15 @@
 title: 'A session: continue job resumes another runner''s session: tell_agent''s @review job (runner claude) ran on t3 in the fix thread'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T18:59:30.165294+00:00
-modified: 2026-11-17T19:28:19.191753+00:00
+modified: 2026-11-17T20:17:05.720546+00:00
+relationships:
+  related:
+  - DEV-672
+  - DEV-673
 comments:
 - date: 2026-11-17T19:18:28.632110+00:00
   author: claude
@@ -44,6 +48,32 @@ comments:
     - Reran: `npm ci` ok; `cargo nextest run --workspace -E 'test(dev503_harness_jobs_test::) | test(dev510_t3_session_test::)'` 49 passed; `npm run lint` passed. `npm test` and `npm run smoke` not rerun (test-only change).
     - Note for reviewers: these integration tests run `target/debug/lotar`; with `-p lotar-lib` alone that binary can be stale, so a mutation check passes falsely (`tests/common/mod.rs:30` says so). Use `--workspace`.
     - No findings, no tickets filed.
+- date: 2026-11-17T19:32:54.182081+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-671` is in `main`.
+
+    - Rebased `agent/DEV-671` onto `main` (`84fb9ca90df7`): `3102aed4d4b8`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `3102aed4d4b8`
+    - Amended the pending `.tasks` changes into the merged commit: `e3b2a41976ac`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[e2e:continue-across-runners]`
+  report:
+    commits:
+    - hash: e3b2a4197
+      what: 'DEV-671 A session: continue job resumes another runner''s session: tell_agent''s @review job (runner claude) ran on t3 in the fix thread'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7d340b2d-0883-4227-8ee1-842ef56c412b
 description: |-
@@ -100,3 +130,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T19:32:54.182081+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:32:54.346340+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-17T20:14:50.454717+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-672"]}'
+- at: 2026-11-17T20:17:05.720546+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-672"]}'
+    new: '{"related":["DEV-672","DEV-673"]}'

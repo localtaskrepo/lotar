@@ -1,0 +1,160 @@
+title: 'Job end can''t move agent/DEV-530 to the thread''s branch: the branch is checked out in the ticket worktree (DEV-595 and DEV-577 came back)'
+status: Merging
+priority: Medium
+type: Feature
+reporter: triage
+assignee: '@merge'
+created: 2026-11-17T19:57:31.784714+00:00
+modified: 2026-11-17T20:17:13.000595+00:00
+relationships:
+  blocks:
+  - DEV-530
+  related:
+  - DEV-530
+  - DEV-577
+  - DEV-595
+  - DEV-619
+  - DEV-603
+  - DEV-634
+  - DEV-669
+  - DEV-671
+comments:
+- date: 2026-11-17T20:07:27.811407+00:00
+  author: claude
+  text: |-
+    Fixed: the job that ends no longer counts as working in an earlier job's worktree, so the ticket branch moves there.
+
+    - Cause: the earlier fix job (`job-20261115T213415.235Z-72`) left `/Users/mallox/.t3/worktrees/lotar/DEV-530` clean on `agent/DEV-530`. The failing job `job-20261117T194848.004Z-23` ran in the same harnessmux session `lotar-95e687-DEV-530-fix`. `finished_job_worktree` saw that session in the ending job's own active record ("a running job continues its session"), so the worktree looked in use. DEV-595's move-in-worktree step was skipped and `git branch --force` failed.
+    - DEV-595's test passed because its two jobs used different profiles, so different sessions.
+    - Change: `move_ticket_branch` and `finished_job_worktree` in `crates/lotar-agent/src/services/agent_job_service.rs` take the ending job's id and leave it out. The job end passes it; the job start (`follow_ticket_work`) passes none.
+    - Test: `the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_session` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`. Before the fix it failed with the DEV-530 error.
+    - Docs: `docs/help/agent.md` line on finished job worktrees updated in place.
+  report:
+    commits:
+    - hash: 290b9b18
+      what: the ending job no longer marks an earlier job's worktree as in use
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: Rust 2312/2312, UI 1548/1548, release and hooks
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    - command: ticket check (rerun DEV-530 job end)
+      result: not_run
+      reason: covered by new test the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_session; DEV-530 itself still needs its job rerun after merge
+    next: Review on another model, then merge; then rerun DEV-530's job end
+- date: 2026-11-17T20:07:51.251846+00:00
+  author: claude
+  text: |-
+    DEV-619 hit the same failure; `290b9b18` covers it too.
+
+    - Job `job-20261117T193257.014Z-22`: `git branch --force agent/DEV-619 224f47363` refused, branch used by `~/.t3/worktrees/lotar/agent-DEV-619-199a46778944b399`.
+    - Same cause, found in the DEV-619 fix-retry thread: the finished job `job-20261116T184212.060Z-2` and the ending job share session `lotar-95e687-DEV-619-fix`, because DEV-603 reuses the name for a fresh session.
+    - After the merge, rerun the job ends of DEV-619 and DEV-530.
+- date: 2026-11-17T20:07:55.577911+00:00
+  author: automation
+  text: 'The queued @review job waits: T3 Code still runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6528b5b-b6bf-4cfe-af1b-ddf5cdcb30b9 of the job job-20261117T195810.428Z-1. The job starts once the thread ends.'
+- date: 2026-11-17T20:17:05.543498+00:00
+  author: claude
+  text: |-
+    Review: passed. `290b9b18` fixes the self-count at job end and has a test that failed before the fix.
+
+    - Read: the diff (`agent_job_service.rs`, `dev503_harness_jobs_test.rs`, `docs/help/agent.md`), the ticket and fix comments, and the last 5 main commits to the touched files (DEV-671, DEV-669, DEV-634: no conflict).
+    - Logic: `finished_job_worktree` now leaves the ending job out of both the job logs and the running sessions. Other running jobs in the same session still count. The job-start path (`follow_ticket_work`, `None`) can't count itself: its setup record has `session_id: None`. A continued thread on the ticket branch returns early, before this check.
+    - Test failed before the fix: in a detached worktree at `e3b2a419` with only the new test, `the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_session` failed with `cannot force update the branch 'agent/TEST-1' used by worktree`, the DEV-530 error. All other 40 dev503 tests passed there.
+    - At HEAD: `npm ci` ok. `cargo nextest run --test integration -E 'test(/dev503_harness_jobs_test::/)'` 41/41 passed. `cargo clippy -p lotar-agent --all-targets` clean. `rustfmt --check` on both Rust files clean.
+    - Not rerun: the full `npm run lint`, `npm test`, `npm run smoke` (the fix agent reports them passed).
+    - Docs line in `docs/help/agent.md` matches the code. No stray files, one commit.
+    - Still open, as the fix agent says: after the merge, rerun the job ends of DEV-530 and DEV-619 to meet "Done when" on the real case.
+    - Findings: none. Tickets filed: none.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6528b5b-b6bf-4cfe-af1b-ddf5cdcb30b9
+description: 'Found: job-20261117T194848.004Z-23 (DEV-530) finished its rebase (commit 254749ae on t3/resume-held-jobs-after-prerequisites-2) and failed at the end: git branch --force agent/DEV-530 254749ae failed, agent/DEV-530 is checked out at /Users/mallox/.t3/worktrees/lotar/DEV-530 (still at 769a2130). DEV-595 and DEV-577 (Done) were meant to cover this. Check: rerun the job end with the ticket branch checked out in a worktree; the branch moves, or the job ends the worktree first. Done when: the DEV-530 case ends without error and a test covers it.'
+tags:
+- health
+custom_fields:
+  finding: infra:branch-in-worktree:DEV-530
+history:
+- at: 2026-11-17T19:57:32.024858+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-530","DEV-577","DEV-595"]}'
+- at: 2026-11-17T19:57:32.268269+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T19:57:37.223086+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-530","DEV-577","DEV-595"]}'
+    new: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595"]}'
+- at: 2026-11-17T19:58:10.849238+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T19:58:11.479946+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6528b5b-b6bf-4cfe-af1b-ddf5cdcb30b9
+- at: 2026-11-17T20:03:45.674042+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595"]}'
+    new: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619"]}'
+- at: 2026-11-17T20:07:27.811407+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:07:51.251846+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:07:51.426535+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619"]}'
+    new: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619","DEV-603"]}'
+- at: 2026-11-17T20:07:54.771278+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T20:07:55.577911+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:17:05.543498+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:17:05.720855+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619","DEV-603"]}'
+    new: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619","DEV-603","DEV-634","DEV-669","DEV-671"]}'
+- at: 2026-11-17T20:17:13.000595+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
