@@ -345,7 +345,7 @@ agent:
     cleanup_paths: [target]       # Build output deleted when a job ends; the worktree stays (default: none)
 ```
 
-Change these on the Config page (Agents) or with `config set`, globally or per project, for example `lotar config set agent_worktree_max_parallel_jobs 2 --global` or `lotar config set agent_worktree_cleanup_on_done true -p APP`. A job limit of `0` pauses new jobs; an empty value removes the limit. The queue worker applies two limits: the global one caps all running jobs together, and a project's own limit caps that project's jobs on top of it. It counts the running jobs of every lotar process (`lotar serve`, `agent run --wait`, jobs taken over after a restart).
+Change these on the Config page (Agents) or with `config set`, globally or per project, for example `lotar config set agent_worktree_max_parallel_jobs 2 --global` or `lotar config set agent_worktree_cleanup_on_done true -p APP`. A job limit of `0` pauses new jobs; an empty value removes the limit. The queue worker, `lotar serve` (web, MCP, automation) and `agent run --wait` apply the same two limits: the global one caps all running jobs together, and a project's own limit caps that project's jobs on top of it. They count the running jobs of every lotar process (the queue worker, `lotar serve`, `agent run --wait`, jobs taken over after a restart). A job without a free slot waits in its process and starts once a slot frees, also when the job that ends ran in another process; its ticket says which limit holds it.
 
 When enabled:
 - Each ticket gets a dedicated worktree at `<dir>/<repo>/<ticket-id>`

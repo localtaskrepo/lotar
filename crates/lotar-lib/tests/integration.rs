@@ -179,6 +179,7 @@ mod dev60_shared_mutation_test;
 mod dev61_reference_kinds_test;
 mod dev626_resumed_t3_threads_test;
 mod dev630_queue_project_parallel_limit_test;
+mod dev646_serve_shared_job_limits_test;
 mod dev64_mcp_schema_contract_test;
 mod dev67_sync_events_test;
 mod dev71_config_set_candidate_test;

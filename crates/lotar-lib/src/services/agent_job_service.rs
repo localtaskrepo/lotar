@@ -364,13 +364,16 @@ impl AgentJobService {
                 return Err(active_job_error());
             }
 
-            // Update max_parallel_jobs from config (allows runtime changes)
-            registry.max_parallel_jobs = config.agent_worktree.max_parallel_jobs;
-
-            let parallel_limit_reached = registry.max_parallel_jobs.is_some_and(|max| registry.running_count >= max);
+            // The limits are the queue worker's, counting every process's jobs (DEV-646).
+            let slot_wait = match mode {
+                JobStartMode::RespectLimits => slot_wait_reason(&registry, tasks_dir, &ticket_id)?,
+                JobStartMode::Immediate => None,
+            };
             let merge_slot_busy = is_merge_job && has_active_merge_job(&registry);
 
-            should_queue = matches!(mode, JobStartMode::RespectLimits) && (parallel_limit_reached || merge_slot_busy);
+            should_queue = matches!(mode, JobStartMode::RespectLimits) && (slot_wait.is_some() || merge_slot_busy);
+            registry.max_parallel_jobs =
+                crate::config::resolution::config_for_project(tasks_dir, None).ok().and_then(|global| global.agent_worktree.max_parallel_jobs);
 
             // Compute workspace root (parent of tasks_dir)
             let workspace_root = tasks_dir_buf.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir_buf.clone());
@@ -435,7 +438,9 @@ impl AgentJobService {
             }
         }
 
-        if !should_queue {
+        if should_queue {
+            watch_pending_queue();
+        } else {
             // Start job immediately
             let job_id_clone = job_id.clone();
             let user_prompt_clone = user_prompt.clone();
@@ -544,10 +549,8 @@ impl AgentJobService {
             .jobs
             .iter()
             .any(|(id, state)| id != job_id && state.record.is_merge_job && matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running));
-        Some(match registry.max_parallel_jobs {
-            Some(max) if registry.running_count >= max => {
-                format!("it waits for a free slot: {} jobs run, agent.worktree.max_parallel_jobs is {max}", registry.running_count)
-            }
+        Some(match slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id) {
+            Ok(Some(reason)) => format!("it is {reason}"),
             _ if pending.is_merge_job && merge_busy => "it waits for the other merge job to end".to_string(),
             _ => "it waits in the job queue".to_string(),
         })
@@ -5149,37 +5152,30 @@ where
     flush_event_log();
 }
 
-/// Process the pending job queue - starts the next job if a slot is available
+/// Start the waiting jobs that have a free slot, in queue order.
 fn process_pending_queue() {
-    let pending_job: Option<PendingJob> = {
-        let mut registry = match JOB_REGISTRY.lock() {
-            Ok(r) => r,
-            Err(_) => return,
-        };
-
-        // Check if we can start another job
-        let can_start = registry.max_parallel_jobs.is_none_or(|max| registry.running_count < max);
-
-        if !can_start {
+    let started: Vec<PendingJob> = {
+        let Ok(mut registry) = JOB_REGISTRY.lock() else {
             return;
-        }
-
-        let running_merge_job = has_running_merge_job(&registry);
-        let next_index = registry.pending_queue.iter().position(|pending| !(pending.is_merge_job && running_merge_job));
-
-        if let Some(index) = next_index {
-            let Some(pending) = registry.pending_queue.remove(index) else {
-                return;
+        };
+        let mut started = Vec::new();
+        loop {
+            let merge_busy = has_dispatched_merge_job(&registry);
+            // A config that can't be read keeps the job waiting.
+            let next = registry.pending_queue.iter().position(|pending| {
+                !(pending.is_merge_job && merge_busy) && matches!(slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id), Ok(None))
+            });
+            let Some(pending) = next.and_then(|index| registry.pending_queue.remove(index)) else {
+                break;
             };
             registry.running_count += 1;
-            Some(pending)
-        } else {
-            None
+            started.push(pending);
         }
+        started
     };
 
-    // Start the job outside the lock
-    if let Some(pending) = pending_job {
+    // Start the jobs outside the lock
+    for pending in started {
         thread::spawn(move || {
             run_job(
                 pending.job_id,
@@ -5195,8 +5191,56 @@ fn process_pending_queue() {
     }
 }
 
-fn has_running_merge_job(registry: &JobRegistry) -> bool {
-    registry.jobs.values().any(|state| state.record.is_merge_job && state.record.status == AgentJobStatus::Running)
+/// Why a job for the ticket waits under `agent.worktree.max_parallel_jobs`:
+/// the queue worker's rule, with the jobs that hold this process's slots.
+fn slot_wait_reason(registry: &JobRegistry, tasks_dir: &std::path::Path, ticket_id: &str) -> LoTaRResult<Option<String>> {
+    crate::services::agent_queue_service::AgentQueueService::slot_wait_reason(tasks_dir, ticket_id, slot_jobs(registry))
+}
+
+/// The jobs (ticket, job id) that hold one of this process's slots: those
+/// dispatched or still running, not those waiting in its queue.
+fn slot_jobs(registry: &JobRegistry) -> Vec<(String, String)> {
+    let waiting: HashSet<&str> = registry.pending_queue.iter().map(|pending| pending.job_id.as_str()).collect();
+    let mut jobs: HashSet<(String, String)> =
+        registry.active_by_ticket.iter().filter(|(_, job)| !waiting.contains(job.as_str())).map(|(ticket, job)| (ticket.clone(), job.clone())).collect();
+    jobs.extend(registry.jobs.iter().filter(|(_, state)| state.worker_running).map(|(job, state)| (state.record.ticket_id.clone(), job.clone())));
+    jobs.into_iter().collect()
+}
+
+static QUEUE_WATCHED: AtomicBool = AtomicBool::new(false);
+const QUEUE_WATCH_INTERVAL: Duration = Duration::from_millis(500);
+
+/// A job of another process frees a slot without telling this one: while
+/// jobs wait in this process's queue, look for a free slot (DEV-646).
+fn watch_pending_queue() {
+    if QUEUE_WATCHED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let waiting = || JOB_REGISTRY.lock().is_ok_and(|registry| !registry.pending_queue.is_empty());
+    thread::spawn(move || {
+        loop {
+            thread::sleep(QUEUE_WATCH_INTERVAL);
+            process_pending_queue();
+            if waiting() {
+                continue;
+            }
+            QUEUE_WATCHED.store(false, Ordering::SeqCst);
+            // A job queued meanwhile found the watch still running.
+            if !waiting() || QUEUE_WATCHED.swap(true, Ordering::SeqCst) {
+                return;
+            }
+        }
+    });
+}
+
+/// A merge job holds the merge slot from its dispatch on, also while it
+/// still sets up its worktree (status queued).
+fn has_dispatched_merge_job(registry: &JobRegistry) -> bool {
+    registry.jobs.iter().any(|(id, state)| {
+        state.record.is_merge_job
+            && matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running)
+            && !registry.pending_queue.iter().any(|pending| &pending.job_id == id)
+    })
 }
 
 fn has_active_merge_job(registry: &JobRegistry) -> bool {

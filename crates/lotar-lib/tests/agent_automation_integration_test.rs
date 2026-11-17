@@ -3235,7 +3235,7 @@ echo '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\"
     assert!(
         said.iter().any(|text| text.contains("told no agent")
             && text.contains(&format!("Agent job {} is queued", job.id))
-            && text.contains("agent.worktree.max_parallel_jobs is 1")),
+            && text.contains("waiting for a free slot (1 of the global agent.worktree.max_parallel_jobs 1 running)")),
         "{said:?}"
     );
 
