@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T21:38:23.343839+00:00
-modified: 2026-11-17T22:00:29.767217+00:00
+modified: 2026-11-17T22:19:02.027355+00:00
 relationships:
   related:
   - DEV-564
@@ -46,12 +46,64 @@ comments:
     - **Blocking:** `crates/lotar-agent/src/services/agent_job_service.rs:4937` `merged_despite_failure`. After the new hand-off, a merge-agent runner that fails (quota, crash, non-zero exit: the DEV-465 case) still completes the job, because lotar's own `agent/<ID>` is on main (`merged_landed`). Automation then sets the ticket Done and the other repo's main stays unchanged, which is the bug this ticket is about. Fix: return `None` there when `work_elsewhere(tasks_dir, ticket_id, &repo_root, &branch)` finds work (make it `pub(super)`). Add a test: a failed runner on such a ticket leaves the job failed.
     - **Otherwise sound:** lotar's own worktrees are skipped via `--git-common-dir`. `git cherry` counts only patches that aren't on the other repo's main. Paths outside any repo, and repos that have no `agent/<ID>`, are skipped. The docs match the code.
     - **Limit (already stated by the fix agent):** a ticket that names the other repo only by its name, with no path, still ends as "Nothing to merge".
+- date: 2026-11-17T22:09:41.281527+00:00
+  author: claude
+  text: |-
+    Rework: a failed merge agent no longer completes the job when the work is in another repo.
+
+    - Review read HEAD `c99370cba`, so the finding stands. Fixed it as the review suggested.
+    - `agent_job_service.rs` `merged_despite_failure`: returns `None` when `merge::work_elsewhere` finds the ticket's commits in another repository (now `pub(super)`), so the job stays failed and automation doesn't set Done.
+    - New test `a_failed_merge_agent_leaves_work_in_another_repository_unfinished` (merge agent exits 7 → job `failed`). It fails with the new check turned off, passes with it. The first test now also asserts the job completes when the merge agent succeeds; both share the setup `work_in_another_repository`.
+  report:
+    commits:
+    - hash: 08d2ef118
+      what: merge hands off when the work is in another repo; a failed merge agent then leaves the job failed
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review 08d2ef118 again
+- date: 2026-11-17T22:12:35.529796+00:00
+  author: claude
+  text: |-
+    Review: blocking. A merge agent that exits 0 without landing the other repo's branch still completes the job, so the ticket goes Done with that repo's main unchanged.
+
+    - **Read:** HEAD `08d2ef118` (= `agent/DEV-677`, no newer branch commits): `merge.rs` `work_elsewhere`, `named_paths`, `common_dir`; `agent_job_service.rs` `merged_despite_failure`, `ensure_branch_merged`, `finalize_job`; both new tests in `dev605_merge_without_agent_test.rs`; `docs/help/agent.md` steps 304 and 383; the ticket and its 3 comments.
+    - **Reran:** `npm ci` (ok), `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `npm run test:rust:agent -- merge` (50 passed). Not rerun: full `npm test`, `npm run smoke`.
+    - **Fixed since last review:** a failed merge runner now leaves the job `failed` (`merged_despite_failure` checks `work_elsewhere`). Sound.
+    - **Blocking:** `crates/lotar-agent/src/services/agent_job_service.rs:4862` `ensure_branch_merged`, `Ok(true)` arm. After a successful merge agent run it only asks whether lotar's own `agent/<ID>` is on main, which it always is in this case, so the job completes. The other repo is never checked. Likely in practice: the merge agent runs in lotar's worktree, and its sandbox refuses writes to the other checkout ("leave the changes: LoTaR commits them"). It exits 0, and the ticket goes Done with the other repo unmerged, which is the bug this ticket fixes. The test `a_ticket_whose_work_is_in_another_repository_is_not_done` (`dev605_merge_without_agent_test.rs:224`) asserts exactly this: its stub agent merges nothing and the job is `completed`. Ticket's Done asks that "the merge refuses Done when the ticket names another repo's branch with commits beyond its main".
+    - **Fix:** in that `Ok(true)` arm, next to the `unlanded_ticket_branch` guard, return `Err("Merge job finished, but <ID>'s work is in another repository: <work_elsewhere text>")` when `merge::work_elsewhere(tasks_dir, ticket_id, &repo_root, &branch)` is `Some`. Change that test to expect `failed` (stub doesn't merge), and add one where the stub fast-forwards the other repo's main → `completed`. Mention it in `docs/help/agent.md:304`.
+- date: 2026-11-17T22:18:49.831529+00:00
+  author: claude
+  text: |-
+    Rework: a merge agent that exits 0 without landing the other repo's branch now fails the job, so the ticket doesn't go Done.
+
+    - Review read HEAD `08d2ef118`, so the finding stands. Fixed as suggested.
+    - `agent_job_service.rs` `ensure_branch_merged`, `Ok(true)` arm: when `merge::work_elsewhere` still finds the ticket's commits in another repo, the job fails ("Merge job finished, but <ID>'s work is in another repository: ..."). A handback (agent changed the assignee) still ends without the failure, as before. The handback check moved into a closure so both paths use it.
+    - Tests in `dev605_merge_without_agent_test.rs`: `a_ticket_whose_work_is_in_another_repository_is_not_done` now expects `failed` (its agent merges nothing); new `a_merge_agent_that_lands_the_other_repository_completes` (agent fast-forwards the other repo → `completed`); the failed-runner test stays.
+    - `docs/help/agent.md` merge-job paragraph describes the new failure.
+  report:
+    commits:
+    - hash: 567f2fe9e
+      what: merge hands off when the work is in another repo; the merge job fails until that repo's main holds it
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review 567f2fe9e again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1281cd0-9ddf-4d8c-9f38-add5d9fe61ec
 description: 'Found (STD-138, 2026-11-17): DEV-564 lives in lotar''s .tasks but its work is harnessmux branch agent/DEV-564 (9977dec). Twice, review and merge ran in lotar''s checkout, saw lotar''s empty agent/DEV-564, reported ''Nothing to merge: agent/DEV-564 is in main already'' and automation set DEV-564 Done, though the reopen comment named the harnessmux checkout and branch. DEV-636 landed only because its reviewer read the fix comment''s next step. Check: a ticket in lotar''s .tasks with commits only in another repo''s agent/<ID> ends Done with that repo''s main unchanged. Done: jobs for such a ticket run in the repo that holds the work (or the merge refuses Done when the ticket names another repo''s branch with commits beyond its main), with a test.'
 tags:
 - health
 - review-returned
+- review-returned-twice
 custom_fields:
   finding: merge:cross-repo-ticket
 history:
@@ -115,3 +167,60 @@ history:
   - field: tags
     old: health, review-blocked
     new: health, review-returned
+- at: 2026-11-17T22:03:49.024197+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T22:09:41.281527+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:09:48.886421+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T22:12:35.529796+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:12:35.561158+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-17T22:12:44.345167+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned, review-returned-twice
+- at: 2026-11-17T22:12:45.497676+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T22:18:49.831529+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:19:02.027355+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

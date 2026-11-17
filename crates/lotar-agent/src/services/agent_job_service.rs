@@ -3908,7 +3908,8 @@ fn run_session(
     }
     let repo_root = resolve_repo_root(tasks_dir);
     let mut worktrees_before = None;
-    let mut t3_setup_recorded = false;
+    // Dropped on an early return, which removes the record (DEV-674).
+    let mut t3_setup = None;
     let mut t3_rename_to = None;
     if launch.runner_kind == AgentRunnerKind::T3 {
         let task = Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, ticket_id, None).ok());
@@ -3923,7 +3924,9 @@ fn run_session(
             if !launch.resume
                 && let Some(root) = repo_root.as_deref()
             {
-                t3_setup_recorded = record_t3_worktree_setup(job_id, root, ticket_id, plan, profile, session_profile.provider.as_deref());
+                let thread =
+                    crate::services::t3_worktree_setup::NewThread { base: &plan.base, branch: plan.branch.as_deref(), title: session_profile.title.as_deref() };
+                t3_setup = record_t3_worktree_setup(job_id, root, ticket_id, &thread, profile, session_profile.provider.as_deref());
             }
         }
         // A continued thread makes no worktree: it keeps the one run_job
@@ -3964,8 +3967,8 @@ fn run_session(
         record_and_emit(state, "agent_job_progress", Some(note));
     });
     let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile.max_budget_usd, context_messages);
-    if t3_setup_recorded && let Some(root) = repo_root.as_deref() {
-        let note = crate::services::t3_worktree_setup::finish(root, job_id);
+    if let Some(recorded) = t3_setup.take() {
+        let note = recorded.finish();
         update_job(job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
@@ -3988,23 +3991,23 @@ fn record_t3_worktree_setup(
     job_id: &str,
     repo_root: &std::path::Path,
     ticket_id: &str,
-    plan: &T3Worktree,
+    thread: &crate::services::t3_worktree_setup::NewThread<'_>,
     profile: &AgentProfileDetail,
     provider: Option<&str>,
-) -> bool {
+) -> Option<crate::services::t3_worktree_setup::Recorded> {
     if provider.is_some_and(|provider| !provider.to_ascii_lowercase().contains("claude")) {
-        return false;
+        return None;
     }
     let deny = profile.tools.as_ref().map(|tools| tools.disallowed.clone()).unwrap_or_default();
     let env = crate::services::agent_runner::expand_env_map(&profile.env).into_iter().collect();
-    match crate::services::t3_worktree_setup::record(repo_root, job_id, ticket_id, &plan.base, plan.branch.as_deref(), &deny, env) {
+    match crate::services::t3_worktree_setup::record(repo_root, job_id, ticket_id, thread, &deny, env) {
         Ok(recorded) => recorded,
         Err(err) => {
             let note = format!("The thread starts without the profile's tools.disallowed and env: {err}");
             update_job(job_id, |state| {
                 record_and_emit(state, "agent_job_progress", Some(note.clone()));
             });
-            false
+            None
         }
     }
 }

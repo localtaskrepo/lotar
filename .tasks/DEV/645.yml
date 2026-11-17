@@ -1,17 +1,18 @@
 title: lotar agent list-jobs shows a memory hold from an old reading once no process reads memory
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T03:02:08.605225+00:00
-modified: 2026-11-17T21:57:10.912471+00:00
+modified: 2026-11-17T22:14:40.606079+00:00
 relationships:
   depends_on:
   - DEV-623
   related:
   - DEV-633
   - DEV-675
+  - DEV-674
 comments:
 - date: 2026-11-17T03:23:48.590451+00:00
   author: claude
@@ -159,6 +160,29 @@ comments:
     - Ran `npm ci` (ok). Reran `cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(agent_queue) | test(worker_state)'` with `RUSTC_WRAPPER=`: 20 passed. `npm run lint`: passed
     - Didn't rerun `npm test` or `npm run smoke`: they passed on this same commit at 21:44Z. No UI change, so no screenshots
     - No minor tickets filed
+- date: 2026-11-17T22:03:42.045897+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-645` is in `main`.
+
+    - Rebase onto `main` changed nothing (`f04b71536fbe`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `f04b71536fbe`
+    - Amended the pending `.tasks` changes into the merged commit: `7d0ada7fe608`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 7d0ada7fe
+      what: DEV-645 lotar agent list-jobs shows a memory hold from an old reading once no process reads memory
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeca30204-ae6e-4451-9660-94e8242f4b0e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A577c8b27-c103-4ecf-b1eb-5dad6f458e1d
@@ -178,9 +202,7 @@ description: |-
     - A saved reading 60 s old or newer is shown as saved (a held worker rereads every 30 s). A saved open gate (no hold, no error) is shown as before, without a reading.
   - [ ] A test with an old saved hold and a normal reading: `status` shows no hold; the same hold with a recent reading is still shown.
 tags:
-- review-returned
 - waits
-- fix-retried
 history:
 - at: 2026-11-17T03:02:11.026136+00:00
   actor: claude
@@ -389,3 +411,22 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-17T22:03:42.045897+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:03:42.226890+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned, waits, fix-retried
+    new: waits
+- at: 2026-11-17T22:14:40.606079+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-623"],"related":["DEV-633","DEV-675"]}'
+    new: '{"depends_on":["DEV-623"],"related":["DEV-633","DEV-675","DEV-674"]}'

@@ -1,16 +1,17 @@
 title: 't3 worktree setup: a leftover or same-commit record can give a job''s Claude settings to the wrong worktree'
-status: InProgress
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T20:09:56.418127+00:00
-modified: 2026-11-17T22:02:10.936889+00:00
+modified: 2026-11-17T22:14:49.879479+00:00
 relationships:
   related:
   - DEV-618
   - DEV-623
   - DEV-678
+  - DEV-645
 comments:
 - date: 2026-11-17T20:18:14.823006+00:00
   author: automation
@@ -80,6 +81,43 @@ comments:
 - date: 2026-11-17T21:59:57.745802+00:00
   author: claude
   text: 'Review follow-up filed: DEV-678. When a job dies before `finish()`, its `.result` file in `.git/lotar/t3-worktree-setup/` is never deleted. Minor, doesn''t block the merge.'
+- date: 2026-11-17T22:07:48.720174+00:00
+  author: claude
+  text: |-
+    Rework: both review findings fixed; amended to `5a339d8ca`.
+
+    - **Bug** (`prune()` overwrote the "T3 Code couldn't be asked" reason): `prune()` now writes the "script doesn't run the command" result only when no `.result` exists (`OpenOptions::create_new`). New test `an_expired_record_keeps_the_reason_t3_code_couldnt_be_asked`: T3 unreachable, record expires, another `record()` prunes it, `finish()` still names the T3 error.
+    - **Test gap** (old unreadable record): `expired_records_are_deleted_and_their_jobs_learn_why` now sets the broken record's mtime 11 min back (`File::set_modified`) and checks `setup()` deletes it.
+    - Review read HEAD `f8aa497a9`, the commit it reviewed.
+    - DEV-678 (leftover `.result` files) stays a separate follow-up.
+  report:
+    commits:
+    - hash: 5a339d8ca
+      what: amended; prune keeps an earlier result, tests for both findings
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2339 Rust tests
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    next: Review again, then merge
+- date: 2026-11-17T22:14:40.349858+00:00
+  author: claude
+  text: |-
+    Review: passed. `5a339d8ca` (HEAD, the only commit on `agent/DEV-674`) does what "Done when" asks.
+
+    - Read the diff `main...HEAD` (`t3_worktree_setup.rs`, `agent_job_service.rs` `run_session`, `docs/help/agent.md`), the ticket, DEV-618 and DEV-678, and main's newer commits (DEV-623, DEV-645). Those touch other parts of `agent_job_service.rs`, so no conflict.
+    - Every early exit in `run_session` after `record()` (`job_agent_table`, `open_session`, a stopped job) drops the `Recorded` guard, which deletes the record without a log line. The normal end still logs `finish()`.
+    - Records without a branch now need the worktree's commit **and** T3 Code's thread in that worktree with the job's title. Newest record wins. If T3 Code can't be asked: nothing is claimed, `.result` names the reason, and the CLI warns and exits 0 (`handlers/agent.rs:629`).
+    - `prune()` runs in `setup()` and `record()`. An unreadable record expires by file age, and an existing `.result` reason is kept (`create_new`).
+    - The tests cover every case. The old code fails the owner-thread and newest-wins tests.
+    - Reran: `npm ci` ok, `cargo nextest run -p lotar-agent t3_worktree_setup` 9/9, `npm run lint:agent` passed, `npm run test:agent` passed (2339 Rust, 1548 UI), `npm run test:smoke:agent` passed (405). Worktree clean afterwards.
+    - Not checked live: `t3` isn't on PATH in this job, so I didn't call `t3 thread list/show` myself. The earlier review confirmed that T3 Code stores `worktreePath` before it runs the setup script.
+    - No UI changes. No new tickets: DEV-678 already covers leftover `.result` files.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c
 description: |-
@@ -242,3 +280,35 @@ history:
   - field: status
     old: Reviewing
     new: InProgress
+- at: 2026-11-17T22:07:48.720174+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:07:55.806508+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T22:14:40.349858+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:14:40.606810+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-618","DEV-623","DEV-678"]}'
+    new: '{"related":["DEV-618","DEV-623","DEV-678","DEV-645"]}'
+- at: 2026-11-17T22:14:49.879479+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
