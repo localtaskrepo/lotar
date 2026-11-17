@@ -1,11 +1,11 @@
 title: The queue worker loses an entry it took without a word when it dies before the job registers, or when the entry's retries run out
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-17T21:07:33.330234+00:00
+modified: 2026-11-17T21:07:43.099870+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -235,8 +235,6 @@ description: |-
   - [ ] Tests for both; they fail before the fix.
 tags:
 - health
-- fix-retried
-- retry-fix
 custom_fields:
   finding: queue:lost-entry
 history:
@@ -438,3 +436,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T21:07:43.099870+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, retry-fix
+    new: health

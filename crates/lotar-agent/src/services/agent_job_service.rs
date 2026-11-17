@@ -2049,16 +2049,20 @@ fn finished_job_worktree(tasks_dir: &std::path::Path, path: &std::path::Path, en
         .filter(|job| Some(job.header.job_id.as_str()) != ending)
         .filter(|job| names_it(job.header.worktree_path.as_ref()) || names_it(job.status.as_ref().and_then(|status| status.worktree_path.as_ref())))
         .collect();
-    if jobs.is_empty() || jobs.iter().any(|job| job.status.is_none()) {
+    let active: Vec<_> = crate::services::agent_active_jobs::list(tasks_dir).into_iter().filter(|job| Some(job.job_id.as_str()) != ending).collect();
+    // A log with an end event but no status ended too, when its job no longer
+    // runs: its end rules failed before they wrote the status (DEV-675).
+    let ended = |job: &crate::services::agent_log_service::SavedJob| {
+        job.status.is_some()
+            || (job.events.iter().any(|event| ["agent_job_completed", "agent_job_failed", "agent_job_cancelled"].contains(&event.kind.as_str()))
+                && !active.iter().any(|running| running.job_id == job.header.job_id))
+    };
+    if jobs.is_empty() || !jobs.iter().all(ended) {
         return false;
     }
-    let running: Vec<String> = crate::services::agent_active_jobs::list(tasks_dir)
-        .into_iter()
-        .filter(|job| Some(job.job_id.as_str()) != ending)
-        .filter_map(|job| job.session_id)
-        .collect();
+    let running: Vec<&String> = active.iter().filter_map(|job| job.session_id.as_ref()).collect();
     let statuses: Vec<_> = jobs.iter().filter_map(|job| job.status.as_ref()).collect();
-    if statuses.iter().any(|status| status.session_id.as_ref().is_some_and(|session| running.contains(session))) {
+    if statuses.iter().any(|status| status.session_id.as_ref().is_some_and(|session| running.contains(&session))) {
         return false;
     }
     let threads: Vec<&str> = statuses.iter().filter_map(|status| status.agent_session.as_deref()).collect();

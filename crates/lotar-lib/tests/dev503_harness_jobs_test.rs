@@ -819,6 +819,35 @@ fn the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out() {
     assert!(agent.join("rework.txt").is_file(), "and has the thread's work checked out");
 }
 
+/// DEV-675: a fix job ran out of disk space in its end rules, so its log has its `agent_job_completed` event but no
+/// final status, and its clean worktree kept `agent/TEST-1` checked out. That job counted as still at work there, and
+/// every later job failed (`cannot force update the branch used by worktree`). A log with an end event whose job no
+/// longer runs now counts as ended.
+#[test]
+fn the_tickets_branch_moves_in_the_worktree_of_a_job_whose_log_lost_its_status() {
+    let (fixtures, _env) =
+        t3_harness_with(&[(STALE.0, STALE.1, ""), ("rework", "echo rework > rework.txt && git add rework.txt && git commit -qm TEST-1-rework", "")]);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, STALE.0).success();
+    // Like the log of a job that continued in the worktree: its header names it, and the status line is gone.
+    for entry in std::fs::read_dir(fixtures.tasks_root.join("@agent-logs")).unwrap() {
+        let path = entry.unwrap().path();
+        let log = std::fs::read_to_string(&path).unwrap_or_default();
+        if !log.contains("agent_job_completed") {
+            continue;
+        }
+        let mut lines: Vec<serde_json::Value> = log.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+        let status = lines.iter().position(|line| line["type"] == "status").expect("the log has a status line");
+        let worktree = lines.remove(status)["worktree_path"].clone();
+        assert!(worktree.is_string(), "the status names the worktree");
+        lines[0]["worktree_path"] = worktree;
+        std::fs::write(&path, lines.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
+    }
+    run_t3(&fixtures, "rework").success();
+    assert_eq!(rev(root, "agent/TEST-1"), rev(root, "t3/topic-1"), "the ticket's branch follows the thread");
+    assert!(root.join("t3-trees/0/rework.txt").is_file(), "the earlier worktree moved with it");
+}
+
 /// DEV-673: an earlier fix job's thread left `agent/TEST-1` checked out in its clean worktree, and the next fix job
 /// ran in the same session on a branch of its own. The ending job's own record names that session, so the worktree
 /// counted as in use and the job failed (`cannot force update the branch used by worktree`). The ending job no longer
