@@ -4,7 +4,7 @@ priority: High
 type: Feature
 reporter: claude
 created: 2026-11-13T22:44:58.128976+00:00
-modified: 2026-11-17T03:49:27.497857+00:00
+modified: 2026-11-17T17:54:54.117376+00:00
 relationships:
   depends_on:
   - DEV-504
@@ -45,6 +45,7 @@ relationships:
   - DEV-594
   - DEV-600
   - DEV-626
+  - DEV-353
 comments:
 - date: 2026-11-13T23:03:55.195485+00:00
   author: claude
@@ -1089,3 +1090,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519","DEV-522","DEV-524","DEV-468","DEV-530","DEV-533","DEV-467","DEV-550","DEV-565","DEV-594","DEV-600"]}'
     new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519","DEV-522","DEV-524","DEV-468","DEV-530","DEV-533","DEV-467","DEV-550","DEV-565","DEV-594","DEV-600","DEV-626"]}'
+- at: 2026-11-17T17:54:54.117376+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519","DEV-522","DEV-524","DEV-468","DEV-530","DEV-533","DEV-467","DEV-550","DEV-565","DEV-594","DEV-600","DEV-626"]}'
+    new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519","DEV-522","DEV-524","DEV-468","DEV-530","DEV-533","DEV-467","DEV-550","DEV-565","DEV-594","DEV-600","DEV-626","DEV-353"]}'

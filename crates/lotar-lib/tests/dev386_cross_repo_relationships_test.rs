@@ -111,6 +111,38 @@ fn automation_run_fires_unblocked_once_a_prerequisite_in_another_repo_is_done() 
     assert_eq!(std::fs::read_to_string(standards.join("STD/1.yml")).unwrap().matches("Waited for").count(), 1);
 }
 
+/// DEV-663: a ticket whose prerequisites are all in its repo and done, but
+/// whose `unblocked` event never fired, gets it from `lotar automation run`.
+#[test]
+fn automation_run_fires_unblocked_for_a_done_prerequisite_in_the_same_repo() {
+    let sandbox = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
+    let (_, standards) = repos(sandbox.path());
+    std::fs::write(standards.join("config.yml"), "default:\n  project: STD\nissue:\n  states: [Todo, Blocked, InProgress, Done]\n").unwrap();
+    std::fs::write(
+        standards.join("automation.yml"),
+        "automation:\n  rules:\n    - name: Prerequisites done\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          set:\n            status: InProgress\n          comment: \"Waited for ${{unblocked.by}}\"\n",
+    )
+    .unwrap();
+    ok(run(&standards, &["add", "Prerequisite"]));
+    // STD-2 is done before STD-1 depends on it, so no close fires the event.
+    ok(run(&standards, &["status", "STD-2", "Done"]));
+    ok(run(&standards, &["task", "relationships", "add", "STD-1", "STD-2", "--kind", "depends-on"]));
+    ok(run(&standards, &["status", "STD-1", "Blocked"]));
+    ok(run(&standards, &["add", "No prerequisites"]));
+    ok(run(&standards, &["status", "STD-3", "Blocked"]));
+    assert!(std::fs::read_to_string(standards.join("STD/1.yml")).unwrap().contains("status: Blocked"));
+
+    let dry = ok(run(&standards, &["automation", "run", "Prerequisites done", "--select", "id:STD-1", "--dry-run"]));
+    assert!(dry.contains("Would run 'Prerequisites done' on STD-1"), "{dry}");
+    let ran = ok(run(&standards, &["automation", "run"]));
+    assert!(ran.contains("Ran 'Prerequisites done' on STD-1"), "{ran}");
+    assert!(!ran.contains("STD-3"), "{ran}");
+    let stored = std::fs::read_to_string(standards.join("STD/1.yml")).unwrap();
+    assert!(stored.contains("status: InProgress"), "{stored}");
+    assert!(stored.contains("Waited for STD-2 (Prerequisite)"), "{stored}");
+    assert!(std::fs::read_to_string(standards.join("STD/3.yml")).unwrap().contains("status: Blocked"));
+}
+
 #[test]
 fn unresolved_cross_repo_tasks_are_refused_on_write_and_stay_open() {
     let sandbox = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();

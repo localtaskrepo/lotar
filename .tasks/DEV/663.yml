@@ -1,0 +1,130 @@
+title: lotar automation run fires unblocked only for prerequisites in another repo, so a lost in-repo unblocked event can't be replayed
+status: Merging
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T17:28:46.731803+00:00
+modified: 2026-11-17T17:48:16.220740+00:00
+relationships:
+  related:
+  - DEV-660
+  - DEV-584
+comments:
+- date: 2026-11-17T17:42:12.007485+00:00
+  author: claude
+  text: |-
+    `lotar automation run` now replays `unblocked` for in-repo prerequisites too.
+
+    - `run_cross_repo_unblocked` → `run_unblocked` in `crates/lotar-agent/src/services/automation_service.rs`: fires on every open ticket with at least one `depends_on` and none open, not only ones with a `repo:ID` prerequisite. `${{unblocked.by}}` is set as before.
+    - Default, no flag: the rule's own `when` (e.g. `status: Blocked` + a `set` out of it) already keeps it from firing every run, as docs required for cross-repo rules.
+    - Test `automation_run_fires_unblocked_for_a_done_prerequisite_in_the_same_repo` in `crates/lotar-lib/tests/dev386_cross_repo_relationships_test.rs`: `--select id:STD-1 --dry-run` lists STD-1; a Blocked ticket without prerequisites stays untouched. Failed before the fix.
+    - Docs: `docs/help/automation.md` ("When prerequisites are done", `automation run`), `docs/openapi.json`, CLI help.
+    - Commit `f70e32dcf`. The STD-200 workaround in standards `scripts/repos.ts` can go back to running the unblocked rule.
+  report:
+    commits:
+    - hash: f70e32dcf
+      what: manual runs fire unblocked rules for in-repo prerequisites too
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: ticket check (dry-run lists STD-1 for an in-repo done prerequisite)
+      result: passed
+      reason: new test, fails without the fix
+    next: Review, then merge
+- date: 2026-11-17T17:48:06.394490+00:00
+  author: claude
+  text: |-
+    Review: passed. `f70e32dcf` does what "Done when" asks, and nothing else.
+
+    - Read: the diff (5 files), the ticket, DEV-660, AGENTS.md, the recent main commits on `automation_service.rs` and `automation.md`, the shared rule in standards `configs/lotar/automation.yml` and `scripts/repos.ts` `unblockAcross`.
+    - Code: `run_unblocked` (`crates/lotar-agent/src/services/automation_service.rs:985`) now checks `depends_on.is_empty()` instead of requiring a `repo:ID` prerequisite. `blocked_dependencies` still counts other tickets' `blocks`, and `relationships add A B --kind blocks` writes B's `depends_on` too (tried in a scratch repo).
+    - Test: `automation_run_fires_unblocked_for_a_done_prerequisite_in_the_same_repo` fails with the old condition put back (`dev386_cross_repo_relationships_test.rs:136`) and passes with the fix. The file is restored.
+    - Reran: `cargo nextest run --workspace -E 'test(/automation|unblock|relationship/)'` 264/264 passed, `cargo clippy --workspace --all-targets -D warnings` is clean, `rustfmt --check` and `prettier --check` on the changed files pass.
+    - Real repos: dry-run `automation run "Prerequisites done: continue the waiting ticket"` with the new build in all 13 repos lists the same 8 tickets (DEV-584, LOCA-317/385, STD-124/138/146/162/188), all cross-repo. The default without a flag starts nothing new today.
+    - Docs: `automation.md`, `openapi.json` and the CLI help agree. No stale "another repo only" text is left.
+    - Not rerun: full `npm run lint`, `npm test`, `npm run smoke` (they take longer than a review allows).
+    - Follow-up: removing the repos.ts workaround is already filed as [STD-201](https://standards.pyxzl.net/task/STD-201). No new tickets filed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A033243f3-585e-4e8b-ad35-24d266d73da4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91105668-a66f-4d5f-a054-2e5cff890e9f
+description: |-
+  ## Found
+  - `lotar automation run <rule> --select id:<ID>` fires an `unblocked` rule only for a ticket with a prerequisite in another repo (`run_cross_repo_unblocked` in `crates/lotar-agent/src/services/automation_service.rs`, docs/help/automation.md "When prerequisites are done"). lotar 0.15.3.
+  - When the in-repo event is lost (a close while another job starts or ends, like DEV-660), a Blocked ticket whose prerequisites are all in its repo and done waits forever: nothing can fire its `unblocked` rule again. The standards live check (`scripts/repos.ts`, STD-200) now works around it by setting the ticket InProgress and running a manual restart rule, which loses the rule's `${{unblocked.by}}` message.
+  - A `manual` action on the unblocked rule is no fix: a manual run without --select would start every Blocked ticket, prerequisites open or not.
+
+  ## Check
+  In a repo with a Blocked ticket A that depends on B in the same repo, B done, and A's unblocked rule never fired: `lotar automation run "<unblocked rule>" --select id:A --dry-run` lists an entry for A.
+
+  ## Done when
+  - [ ] A manual run fires `unblocked` rules for every open ticket with at least one prerequisite and none open, in its repo or another, the same way it does for cross-repo ones now (or behind a flag such as `--unblocked`), documented in docs/help/automation.md.
+  - [ ] A test with an in-repo prerequisite.
+tags:
+- health
+custom_fields:
+  finding: automation:unblocked-in-repo
+history:
+- at: 2026-11-17T17:28:46.966957+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-660"]}'
+- at: 2026-11-17T17:28:47.176520+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T17:28:48.700621+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T17:28:49.542+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A033243f3-585e-4e8b-ad35-24d266d73da4
+- at: 2026-11-17T17:42:12.007485+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:42:20.295992+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T17:42:22.235542+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91105668-a66f-4d5f-a054-2e5cff890e9f
+- at: 2026-11-17T17:48:06.394490+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:48:06.675850+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-660"]}'
+    new: '{"related":["DEV-660","DEV-584"]}'
+- at: 2026-11-17T17:48:16.220740+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

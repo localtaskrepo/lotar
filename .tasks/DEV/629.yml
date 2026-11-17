@@ -5,12 +5,13 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T23:36:18.364771+00:00
-modified: 2026-11-17T16:53:04.070931+00:00
+modified: 2026-11-17T17:12:49.179636+00:00
 relationships:
   related:
   - DEV-623
   - DEV-620
   - DEV-659
+  - DEV-660
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b42e58b-7525-4a3d-8a8a-b87581ff3bfb
 description: |-
@@ -49,3 +50,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-623","DEV-620"]}'
     new: '{"related":["DEV-623","DEV-620","DEV-659"]}'
+- at: 2026-11-17T17:12:49.179636+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-620","DEV-659"]}'
+    new: '{"related":["DEV-623","DEV-620","DEV-659","DEV-660"]}'

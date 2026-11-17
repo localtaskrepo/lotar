@@ -1,14 +1,147 @@
 title: The queue worker loses an entry it took without a word when it dies before the job registers, or when the entry's retries run out
-status: InProgress
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-17T16:53:17.735450+00:00
+modified: 2026-11-17T17:42:13.789054+00:00
 relationships:
+  depends_on:
+  - local:LOCA-501
   related:
   - DEV-660
+comments:
+- date: 2026-11-17T17:21:46.437045+00:00
+  author: automation
+  text: The fix agent's job job-20261117T165313.639Z-6 failed (lotar agent logs job-20261117T165313.639Z-6); @fix-retry retries it on branch agent/DEV-661.
+- date: 2026-11-17T17:21:48.310743+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T172146.855Z-11 failed again or on a rate limit (lotar agent logs job-20261117T172146.855Z-11). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T17:22:15.897791+00:00
+  author: triage
+  text: |-
+    Blocked on LOCA-501: T3 Code isn't running, so both fix jobs failed at start.
+
+    - `job-20261117T172146.855Z-11`: `No running T3 Code server uses /Users/mallox/.t3`; the first job lost its thread the same way.
+    - Work so far stays on branch `agent/DEV-661`.
+    - Continues when LOCA-501 is done (T3 Code started).
+- date: 2026-11-17T17:22:16.520213+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-501.'
+- date: 2026-11-17T17:22:16.531484+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-661 yet. DEV-661 waits for local:LOCA-501.'
+- date: 2026-11-17T17:23:23.632140+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74 of the job job-20261117T165313.639Z-6 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T172323.623Z-1: DEV-661 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-17T17:41:04.383377+00:00
+  author: claude
+  text: |-
+    Taken queue entries now survive a dead worker, and an entry that runs out of retries comments the reason on its ticket.
+
+    - `crates/lotar-agent/src/services/agent_queue_service.rs`: `dequeue_startable` moves entries to a new `taken` list in the queue file, not out of it. They leave `taken` once `start_entry` returns. A new worker puts leftovers back at the front (`restore_taken`), and so does a worker that exits on an error. `list_pending`, `flush` and `remove` include taken entries, so `resume` starts a worker for them.
+    - After its last retry, an entry comments the error on its ticket: `The queued @implement job did not start after 4 tries and left the queue: …`
+    - A removed entry that a worker holds is not queued again by its retry. This fixed a hang in `dev503 a_queue_entry_held_by_a_waiting_thread_says_so_once`.
+    - `lotar add` now warns when a created rule fails; before, this showed only with `LOTAR_DEBUG_STATUS`.
+    - New tests: `a_taken_entry_stays_queued_until_its_job_is_registered` and `an_entry_given_up_after_its_retries_says_why_on_its_ticket`. Their assertions fail on the old code: taken entries were missing from the queue, and no comment was made.
+    - Docs: `docs/help/agent.md` (queue worker paragraph).
+    - Small leftover window: a worker killed after the job registers but before its entry leaves `taken` runs the job a second time once the first one ends.
+  report:
+    commits:
+    - hash: 0cdcf8fe3
+      what: taken entries persist until their job registers; a dropped entry comments its ticket; lotar add warns on failed rules
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2308 Rust and 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: kill the worker between take and start
+      result: not_run
+      reason: covered by the unit test, which simulates the dead worker; no real worker was killed
+    next: Review on another model, then merge
+- date: 2026-11-17T17:41:11.604218+00:00
+  author: claude
+  text: 'Correction: I didn''t run the new tests against the old code. "They fail before" is from reading the code: they call helpers the old code lacks, and the old `dequeue_startable` empties the queue file.'
+- date: 2026-11-17T17:41:31.501081+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T172323.623Z-1 failed again or on a rate limit (lotar agent logs job-20261117T172323.623Z-1). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T17:42:12.577886+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261117T172323.623Z-1 ended with 'The t3 runner exited with code 1' after the thread's run ended 'queued'; the work itself is committed (0cdcf8fe3 on agent/DEV-661) and its checks passed, so @fix only needs to hand off for review.
+  answer:
+    to: 2026-11-17T17:41:31.501081+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261117T172323.623Z-1 ended with ''The t3 runner exited with code 1'' after the thread''s run ended ''queued''; the work itself is committed (0cdcf8fe3 on agent/DEV-661) and its checks passed, so @fix only needs to hand off for review.'
+- date: 2026-11-17T17:42:12.815202+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-501.'
+- date: 2026-11-17T17:42:13.577866+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-501.'
+- date: 2026-11-17T17:42:13.592762+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-661 yet. DEV-661 waits for local:LOCA-501.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74
 description: |-
@@ -28,6 +161,8 @@ description: |-
   - [ ] Tests for both; they fail before the fix.
 tags:
 - health
+- fix-retried
+- retry-fix
 custom_fields:
   finding: queue:lost-entry
 history:
@@ -53,3 +188,134 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74
+- at: 2026-11-17T17:21:46.199484+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-17T17:21:46.437045+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:21:48.227060+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-17T17:21:48.310743+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:14.881268+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-660"]}'
+    new: '{"depends_on":["local:LOCA-501"],"related":["DEV-660"]}'
+- at: 2026-11-17T17:22:15.582062+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-17T17:22:15.897791+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:16.314137+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T17:22:16.520213+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:16.531484+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:21.761912+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T17:23:23.595118+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T17:23:23.632140+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:23:23.948911+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T17:41:04.383377+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:41:11.604218+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:41:28.292359+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-17T17:41:31.501081+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:42:12.577886+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:42:12.579453+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T17:42:12.782420+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-17T17:42:12.815202+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:42:13.577866+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:42:13.592762+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:42:13.789054+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fix

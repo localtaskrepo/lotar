@@ -1,0 +1,307 @@
+title: 'automation run --select ''id:STD-12'' also selects STD-120 to STD-129: no way to select exactly one ticket'
+status: Blocked
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T17:12:58.754510+00:00
+modified: 2026-11-17T17:25:02.567832+00:00
+relationships:
+  depends_on:
+  - local:LOCA-501
+comments:
+- date: 2026-11-17T17:21:30.555668+00:00
+  author: automation
+  text: The fix agent's job job-20261117T171300.278Z-9 failed (lotar agent logs job-20261117T171300.278Z-9); @fix-retry retries it on branch agent/DEV-662.
+- date: 2026-11-17T17:21:32.870412+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T172130.931Z-10 failed again or on a rate limit (lotar agent logs job-20261117T172130.931Z-10). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T17:22:22.187136+00:00
+  author: triage
+  text: |-
+    Blocked: both fix jobs failed because T3 Code isn't running, not on the work.
+
+    - `job-20261117T171300.278Z-9`: the fix was done and checks passed, then the T3 server stopped (`could not read the T3 Code thread`).
+    - `job-20261117T172130.931Z-10`: `t3 thread` says "No running T3 Code server uses /Users/mallox/.t3".
+    - Prerequisite: local:LOCA-501 (start T3 Code). Worktree `~/.t3/worktrees/lotar/agent-DEV-662-aed82e7ae3a98f2c` on `agent/DEV-662` holds the work. Continue from it when the prerequisite is done.
+- date: 2026-11-17T17:22:22.630155+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-501.'
+- date: 2026-11-17T17:22:22.641745+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-662 yet. DEV-662 waits for local:LOCA-501.'
+- date: 2026-11-17T17:23:24.297742+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0b90132-f2dd-4516-bcf2-9a9f3aa8f9e7 of the job job-20261117T171300.278Z-9 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T172324.288Z-2: DEV-662 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-17T17:24:13.169104+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T172324.288Z-2 failed again or on a rate limit (lotar agent logs job-20261117T172324.288Z-2). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T17:24:59.087441+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261117T172324.288Z-2 ended 'The t3 runner exited with code 1' right after the thread went to waiting; the work is committed as acf7cf281 on agent/DEV-662 and only smoke plus the hand-off comment were left. Continue from there.
+  answer:
+    to: 2026-11-17T17:24:13.169104+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261117T172324.288Z-2 ended ''The t3 runner exited with code 1'' right after the thread went to waiting; the work is committed as acf7cf281 on agent/DEV-662 and only smoke plus the hand-off comment were left. Continue from there.'
+- date: 2026-11-17T17:24:59.564024+00:00
+  author: claude
+  text: |-
+    Fixed: `id:STD-12` now selects STD-12 only, not STD-120 to STD-129.
+
+    - Cause: `id:` values matched as substrings (`crates/lotar-core/src/utils/text_search.rs`).
+    - Fix: a full ID after `id:` (also quoted, any case) must equal the ID or a moved-from ID. Partial IDs (`id:STD`, `id:120`) and plain `STD-12` still match as text.
+    - Test `id_scope_with_a_full_id_matches_that_task_only`; `docs/help/list.md` says scripts use `--select 'id:<ID>'`.
+    - Callers in standards (`scripts/repos.ts`, inbox, prompts) need no change once the merged build is installed.
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: acf7cf281
+      what: id:<full ID> matches that ticket only; docs say to use it in scripts
+    checks:
+    - command: cargo nextest run -p lotar-core (new test fails before fix)
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2308 Rust, 1548 UI, release, hooks
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: 'standards: lotar list ''id:STD-12'''
+      result: passed
+      reason: 1 task with new build (11 with installed)
+    - command: 'standards: automation run ''Stalled: restart the health fix agent'' --select ''id:STD-12'' --dry-run'
+      result: passed
+      reason: checks 1 task (11 before)
+    next: Review, then merge; rerun the check with the merged build in standards
+- date: 2026-11-17T17:24:59.769294+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-501.'
+- date: 2026-11-17T17:25:01.993601+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-501.'
+- date: 2026-11-17T17:25:02.035838+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-662 yet. DEV-662 waits for local:LOCA-501.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0b90132-f2dd-4516-bcf2-9a9f3aa8f9e7
+description: |-
+  Found while reworking standards STD-199 (2026-11-17).
+
+  ## Found
+  - `lotar list 'id:STD-12'` in standards lists STD-12 and STD-120 to STD-129; `lotar automation run "<rule>" --select 'id:STD-12' --dry-run` checks 11 tickets and would act on STD-124.
+  - `id:"STD-12"` matches the same; `id:=STD-12` matches nothing. docs/help/list.md has no exact form.
+  - Callers that mean one ticket: standards `scripts/repos.ts` stall recovery (`--select id:<ID>`, restarts agents), inbox "triage again", and the standards automation prompts ("lotar automation run ... --select 'id:STD-199'"). Restarting STD-12 can start agents on STD-120 to 129 too.
+
+  ## Check
+  `lotar list 'id:STD-12'` (standards) lists only STD-12; `automation run ... --select 'id:STD-12' --dry-run` checks 1 ticket.
+
+  ## Done when
+  - `id:<full ID>` matches that ticket only (or a documented exact form exists, and the docs say which one to use for scripts); a test covers it.
+tags:
+- health
+- fix-retried
+- retry-fix
+custom_fields:
+  finding: select:id-prefix
+history:
+- at: 2026-11-17T17:12:59.235089+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T17:13:01.263610+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T17:13:03.112914+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0b90132-f2dd-4516-bcf2-9a9f3aa8f9e7
+- at: 2026-11-17T17:21:30.159759+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-17T17:21:30.555668+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:21:32.800100+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-17T17:21:32.870412+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:21.552152+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"depends_on":["local:LOCA-501"]}'
+- at: 2026-11-17T17:22:21.927532+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-17T17:22:22.187136+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:22.428590+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T17:22:22.630155+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:22.641745+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:22:25.438719+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T17:23:24.259161+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T17:23:24.297742+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:23:24.497044+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T17:24:12.785800+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-17T17:24:13.169104+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:24:59.087441+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:24:59.103605+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T17:24:59.533930+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-17T17:24:59.564024+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:24:59.769294+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:25:01.993601+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:25:02.035838+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:25:02.567832+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fix

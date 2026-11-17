@@ -848,7 +848,7 @@ pub struct ManualRunEntry {
 pub struct ManualRunReport {
     pub dry_run: bool,
     /// Rules with an `on.manual` action that were considered, and
-    /// `unblocked` rules run for a prerequisite in another repo (DEV-388).
+    /// `unblocked` rules run on tickets whose prerequisites are done (DEV-388, DEV-663).
     pub rules: Vec<String>,
     /// How many tasks were checked against them.
     pub checked: usize,
@@ -963,7 +963,7 @@ impl AutomationService {
                 }
                 entries.push(entry);
             }
-            entries.extend(Self::run_cross_repo_unblocked(storage, &task, changed, &config, &file, &wanted, dry_run));
+            entries.extend(Self::run_unblocked(storage, &task, changed, &config, &file, &wanted, dry_run));
         }
 
         if let Some(missing) = wanted.iter().find(|name| checked > 0 && !found.contains(*name)) {
@@ -977,11 +977,12 @@ impl AutomationService {
 
 impl AutomationService {
     /// A prerequisite in another repo never tells this one it closed
-    /// (DEV-388), so a manual run fires `unblocked` on each open ticket that
-    /// waits for one and has no open prerequisite left. The rule's own
-    /// conditions (`when: status: Blocked` plus a `set` that leaves Blocked)
-    /// keep it from firing on every run.
-    fn run_cross_repo_unblocked(
+    /// (DEV-388), and an in-repo close can lose its event (DEV-663), so a
+    /// manual run fires `unblocked` on each open ticket that has
+    /// prerequisites and none open. The rule's own conditions (`when:
+    /// status: Blocked` plus a `set` that leaves Blocked) keep it from
+    /// firing on every run.
+    fn run_unblocked(
         storage: &mut Storage,
         task: &TaskDTO,
         changed: bool,
@@ -1003,7 +1004,7 @@ impl AutomationService {
         } else {
             task
         };
-        if !task.relationships.depends_on.iter().any(|dep| crate::services::external_tasks::parse(dep).is_some())
+        if task.relationships.depends_on.is_empty()
             || task.task_state.as_ref().is_some_and(|state| state.is_done)
             || !find_blocked_dependencies(storage, task).is_ok_and(|open| open.is_empty())
         {

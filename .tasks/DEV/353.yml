@@ -1,11 +1,11 @@
 title: Drop the t3 job's foreground-only prompt line once T3 Code's --wait waits for background work
-status: Blocked
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-12T04:05:45.260312+00:00
-modified: 2026-11-17T16:12:37.224139+00:00
+modified: 2026-11-17T17:55:07.537542+00:00
 relationships:
   related:
   - DEV-335
@@ -13,16 +13,60 @@ relationships:
   - DEV-400
   - DEV-652
   - DEV-657
+  - DEV-503
 comments:
 - date: 2026-11-17T16:12:37.224139+00:00
   author: claude
   text: T3 Code v0.1.10 (stable, 2026-11-17 01:44Z) contains merge commit 671f854 (`--wait` waits for background work). The Mac still runs v0.1.9; once it's installed, the next step is the owner's (assign @fix). Noted by the communication review (standards STD-17).
+- date: 2026-11-17T17:33:26.317312+00:00
+  author: claude
+  text: 'Owner 2026-11-17 (chief of staff picker): "Yes, start DEV-353". T3 Code v0.1.10 is installed (t3 --version) and has #34696 ("thread --wait returns once background work the agent waits on has ended", merge 671f854). Note: the CLI waits only up to 10 s for the run the background work wakes; check a slow case on a real thread and say what happens.'
+- date: 2026-11-17T17:54:53.607493+00:00
+  author: claude
+  text: |-
+    Removed the t3 prompt line: T3 Code v0.1.10's `--wait` now waits for awaited background work, and a real lotar t3 job ended only after the wake run
+
+    - Check, `t3 v0.1.10`: background `sleep 90` + `t3_background_wait`, then end turn → `--wait` returned after 104 s with run ordinal 2's `WAKE-REPLY: BG-DONE`. Same with `sleep 4`, the short case the PR warns about.
+    - lotar job `job-20261117T174538.196Z-1` (scratch TEST project, `--runner t3`): `lotar agent logs` shows the first turn's "Waiting for the background sleep." at 17:46:11, `agent_job_completed` at 17:47:12, summary `WAKE-REPLY: BG-DONE`. I removed its worktree and `agent/TEST-1` branch afterwards. The 3 test threads are still in T3 Code.
+    - Removed the "job ends with your turn… run checks in the foreground" line and its code comment in `crates/lotar-agent/src/services/agent_job_service.rs` `t3_thread_notes`.
+    - `tests/dev318_t3_runner_test.rs` was removed in DEV-503, so no test assertion was left to drop.
+    - `docs/help/agent.md` (T3 Code threads) now says the job ends after the wake run (0.1.10+). It names the limit left: T3's CLI looks for the wake run for only 10 s.
+    - Standards `configs/lotar/automation.yml` work prompt step 4 ("Don't end your turn while tests or other background work still run"): for t3 jobs it can go. Keep it if the prompt also runs on non-t3 runners: their jobs still end at turn end. Not changed here (other repo).
+  report:
+    commits:
+    - hash: 84f033d52
+      what: drop the t3 prompt line and its code note, reword the docs/help/agent.md note
+    checks:
+    - command: t3 thread start --wait, 90 s background wait
+      result: passed
+      reason: returned after 104 s with the wake run's reply
+    - command: t3 thread start --wait, 4 s background wait
+      result: passed
+      reason: wake run's reply after 18 s
+    - command: lotar agent run TEST-1 --runner t3 --wait, 60 s background wait (scratch tasks dir)
+      result: passed
+      reason: 'completed after 94 s, summary WAKE-REPLY: BG-DONE'
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2307 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: wake run that starts more than 10 s late
+      result: not_run
+      reason: no way to force it
+    next: Review, then merge
 references:
 - link: https://github.com/pingdotgg/t3code/pull/34696
 - link: https://github.com/pingdotgg/t3code/issues/34688
 - code: src/services/agent_job_service.rs#1170-1181
 - code: tests/dev318_t3_runner_test.rs#147-148
 - file: docs/help/agent.md
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0945bb5d-10c1-4125-90c0-71b793b9cca9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16380bec-54a4-4c33-b7c2-c3a7129e4723
 description: |-
   T3 Code fixed [#34688](https://github.com/pingdotgg/t3code/issues/34688) in [PR #34696](https://github.com/pingdotgg/t3code/pull/34696), merged 2026-11-12 03:56 UTC: `t3 thread start --wait` and `t3 thread send --wait` now wait for background work the agent waits on and print the run it wakes. Until a release has it, lotar keeps the DEV-335 workaround. Once one does, the workaround goes. Filed by claude on mallox's go-ahead (2026-11-12).
 
@@ -176,3 +220,48 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T17:33:26.317312+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:33:26.670317+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T17:33:26.733556+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T17:41:53.813469+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0945bb5d-10c1-4125-90c0-71b793b9cca9
+- at: 2026-11-17T17:54:53.607493+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:54:54.116498+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652","DEV-657"]}'
+    new: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652","DEV-657","DEV-503"]}'
+- at: 2026-11-17T17:55:05.804677+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T17:55:07.537542+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16380bec-54a4-4c33-b7c2-c3a7129e4723

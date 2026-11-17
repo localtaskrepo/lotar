@@ -1,11 +1,11 @@
 title: A ticket created while another job in its tasks dir starts or ends gets its agent assignee from the created rule but no job
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:15:20.189944+00:00
-modified: 2026-11-17T17:03:51.795022+00:00
+modified: 2026-11-17T17:28:46.966397+00:00
 relationships:
   related:
   - DEV-643
@@ -13,6 +13,8 @@ relationships:
   - DEV-647
   - DEV-661
   - DEV-659
+  - DEV-629
+  - DEV-663
 comments:
 - date: 2026-11-17T16:17:18.525259+00:00
   author: claude
@@ -59,6 +61,30 @@ comments:
     - **Reran:** `rustfmt --check` on the changed Rust files, `cargo clippy -p lotar-agent -p lotar-lib --all-targets -D warnings`, and the 27 queue/worker tests: all pass. I did not rerun the full `npm run lint`, `npm test` or `npm run smoke`; the fix agent reports them passed.
     - **Scope:** "never dropped" is only partly met here. A worker killed between taking an entry and registering its job still loses it, and `lotar add` doesn't report a failed created rule. Both are in [DEV-661](https://lotar.pyxzl.net/task/DEV-661) (InProgress), so the cause found here is fixed and the rest is tracked.
     - No stray files, no second branch or copy of the fix, and no owner decision touched. No tickets filed.
+- date: 2026-11-17T17:12:48.983992+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `0c6c03497` is on `main` and `origin/main`.
+
+    - Rebased onto `2d4031e30` (DEV-659): no conflicts, no lockfile change. Fast-forwarded the main checkout, then amended the pending `.tasks` changes (DEV-629, 659, 660, 661) into the commit, as the owner's 2026-11-12 rule says.
+    - Checks on the rebased commit: `npm run lint:agent` passed, `npm run test:agent` passed (2307 Rust, 1548 UI, 60 release and 7 hook tests), `npm run smoke` passed (405 tests).
+    - `lotar trust` not needed: no `automation.yml` or `config.yml` changed.
+    - The ticket's check is a scenario, not a command. Its regression test, `dev660_worker_outlives_its_launcher_test`, passed in `test:agent`.
+    - Pushed with the pre-push hook (Rust formatting and clippy passed). No other unpushed commits.
+  report:
+    commits:
+    - hash: 0c6c03497
+      what: queue worker in its own process group, regression test, docs
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config files changed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af14f2e6c-276d-42d1-8c0a-5d03c1661ffa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe5fb4e-b8ca-4da6-9b91-78ba9196fe3d
@@ -191,3 +217,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T17:12:48.983992+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:12:49.179894+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661","DEV-659"]}'
+    new: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661","DEV-659","DEV-629"]}'
+- at: 2026-11-17T17:12:58.174332+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-17T17:28:46.966397+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661","DEV-659","DEV-629"]}'
+    new: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661","DEV-659","DEV-629","DEV-663"]}'
