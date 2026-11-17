@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-17T23:52:07.336095+00:00
-modified: 2026-11-18T02:26:41.972123+00:00
+modified: 2026-11-18T02:44:33.078424+00:00
 relationships:
   related:
   - DEV-584
@@ -131,6 +131,27 @@ comments:
       result: not_run
       reason: lotar unchanged
     next: Review harnessmux branch agent/DEV-683 (85a7484, 98b9bf7), then merge
+- date: 2026-11-18T02:44:24.594106+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code and tests are good, but the CHANGELOG puts the change in the already released 0.1.10, and the second "Done when" item has no handoff.
+
+    Reviewed harnessmux `agent/DEV-683` (`85a7484`, `98b9bf7`) against `main` `0f7afe7`. lotar's own `agent/DEV-683` has no commits.
+
+    **Blocking**
+    - `CHANGELOG.md:43-52`: the new lines sit under `## 0.1.10 (2026-11-17)`. But `v0.1.10` is already tagged on `0f7afe7` and pushed to origin, so 0.1.10 doesn't contain this change. The change also breaks the library API (`TurnFailed { error }` now needs `..`, as the entry itself says). lotar asks for `harnessmux = "0.1.9"` (`Cargo.toml:23`), so a 0.1.11 would come in with `cargo update` and break `agent_job_service.rs:4502`. Fix: put the lines under a new section for the next version, `## 0.2.0 (unreleased)`, so the release bumps the minor version.
+    - "Done when" 2 (lotar uses `kind` and `resets_at`, DEV-584) isn't done. Nothing hands it over: DEV-584's "Done when" doesn't mention it. Once this merges, DEV-683 goes Done with that box unchecked. Fix: add a "Done when" to DEV-584: bump harnessmux, match `TurnFailed { error, .. }`, read `kind` and `resets_at`. Then mark item 2 here as moved to DEV-584.
+
+    **Checked, fine**
+    - `src/failure.rs`: `errorKind` and `authRequired` take priority, and the text match is the fallback. A `rateLimit.resetsAt` in seconds or milliseconds becomes RFC 3339. A text-only limit is typed `rate_limited` with no `resets_at`, which matches the live error from the review that failed.
+    - The kind lists in `failure::TEXTS` and `acp_map::FAILURE_TEXTS` agree on the new limit texts. `raw` keeps the JSON-RPC error. `mcp.rs` and the CLI printer show the new fields. The README event table and the AGENTS.md scrub rule (`_claude/rateLimit` is allowed) match the code.
+    - The recording `tests/recordings/claude-limit-then-auth.jsonl` was written by hand from the adapter's source, not captured live, as the fix agent says. It contains no account data.
+
+    **Reran** (in `~/.t3/worktrees/harnessmux/DEV-683`, nothing changed)
+    - `cargo fmt --all --check`: passed
+    - `cargo clippy --all-targets --all-features -- -D warnings`: passed
+    - `cargo nextest run`: 56 passed
+    - Not run: `cargo deny check`, and lotar's `npm run lint`, `npm test` and `npm run smoke` (lotar unchanged).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A99135d3c-e4c5-4c4b-8d8b-1698f984e0be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af17f6c15-5bff-4902-9be0-e260d7ed3582
@@ -153,6 +174,7 @@ description: |-
   - [ ] lotar's usage-limit handling uses them (DEV-584)
 tags:
 - proposal
+- review-returned
 history:
 - at: 2026-11-17T23:52:07.552972+00:00
   actor: claude
@@ -263,3 +285,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T02:44:24.594106+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:44:24.973513+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal
+    new: proposal, review-blocked
+- at: 2026-11-18T02:44:33.078424+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: proposal, review-blocked
+    new: proposal, review-returned

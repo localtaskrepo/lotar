@@ -1,11 +1,11 @@
 title: Release v0.15.4
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T16:01:03.148737+00:00
-modified: 2026-11-18T02:36:19.134620+00:00
+modified: 2026-11-18T02:42:38.124408+00:00
 relationships:
   depends_on:
   - DEV-681
@@ -15,6 +15,7 @@ relationships:
   - DEV-651
   - DEV-681
   - DEV-353
+  - DEV-685
 comments:
 - date: 2026-11-18T00:02:41.977638+00:00
   author: mallox
@@ -88,6 +89,29 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-502)
+- date: 2026-11-18T02:42:29.892601+00:00
+  author: claude
+  text: |-
+    Branch checked after the failed review (usage limit): unchanged, all gates green, ready for review again.
+
+    - `agent/DEV-658` = `866cfc8a7`, only `Cargo.toml` and `Cargo.lock` (0.15.3 → 0.15.4); no new commit needed
+    - main moved to `9d8613379` (DEV-685); `git merge-tree main HEAD` is clean, the merge agent rebases
+    - Built binary prints `lotar 0.15.4`
+    - Lint, tests and smoke all passed on this branch
+  report:
+    commits:
+    - hash: 866cfc8a7
+      what: workspace version and =0.15.4 pins, Cargo.lock
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2358 Rust, 1548 UI, release and hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    next: Review agent-DEV-658 again, then merge onto main (rebase over 9d8613379)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0fb4ee5-0af2-43c2-9ff2-844d5e38cc7d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae66d2417-c918-4f65-9cd1-a23b637ba16e
@@ -211,3 +235,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae66d2417-c918-4f65-9cd1-a23b637ba16e
+- at: 2026-11-18T02:42:29.892601+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:42:30.072212+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-681"],"blocks":["DEV-688"],"related":["DEV-651","DEV-681","DEV-353"]}'
+    new: '{"depends_on":["DEV-681"],"blocks":["DEV-688"],"related":["DEV-651","DEV-681","DEV-353","DEV-685"]}'
+- at: 2026-11-18T02:42:38.124408+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

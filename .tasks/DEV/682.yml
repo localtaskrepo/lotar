@@ -1,11 +1,11 @@
 title: 'Proposal: agent jobs end on a stall timeout and stop when their ticket goes Done or to a person'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T23:52:06.189581+00:00
-modified: 2026-11-18T02:23:42.978606+00:00
+modified: 2026-11-18T02:42:36.977630+00:00
 relationships:
   related:
   - DEV-657
@@ -107,6 +107,7 @@ comments:
     note: (answered in INBOX-492)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab633688f-62e2-4bd0-a509-75f41d400c27
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5f40a7a6-4bc2-4399-aa2f-498af6e18e69
 description: |-
   A running agent job that hangs holds its parallel slot and its ticket indefinitely, and a job keeps running (and spending tokens) after its ticket goes Done or is reassigned. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section lotar).
 
@@ -196,3 +197,14 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-18T02:42:36.126593+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:42:36.977630+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5f40a7a6-4bc2-4399-aa2f-498af6e18e69

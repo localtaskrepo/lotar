@@ -1,16 +1,18 @@
 title: follow_ticket_work's DEV-687 rule (another branch keeps the ticket tip) has no test
-status: Todo
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-18T02:27:08.953170+00:00
-modified: 2026-11-18T02:27:09.799138+00:00
+modified: 2026-11-18T02:44:35.027812+00:00
 relationships:
   related:
   - DEV-687
   - DEV-602
   - TEST-1
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa6b0b5b-e3f3-4a1b-854e-3d73db613432
 description: |-
   Found: in review of DEV-687, follow_ticket_work (crates/lotar-agent/src/services/agent_job_service.rs) now moves agent/<ID> to a newer holder that doesn't build on the ticket tip when branch_keeping finds another local branch containing that tip. No test covers this path, and branch_keeping takes any branch: an older t3/topic-N that the ticket branch was pointed at earlier usually contains the tip, so the DEV-602 guard (the ticket branch stays when the newer branch doesn't build on its work) rarely holds now. The moved-away work then stays out of the review and merge.
 
@@ -31,3 +33,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T02:44:34.229179+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T02:44:35.027812+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa6b0b5b-e3f3-4a1b-854e-3d73db613432

@@ -4364,6 +4364,8 @@ fn drive_turns(
         link_session(job_id, tasks_dir, ticket_id, link);
     }
     let mut waiting = false;
+    // A turn runs or was prompted: the job's first from the start.
+    let mut in_turn = true;
     loop {
         if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
             let _ = AgentJobService::cancel_job(job_id);
@@ -4381,6 +4383,9 @@ fn drive_turns(
             continue;
         }
         let ended = event.body.ends_turn();
+        if matches!(event.body, EventBody::TurnStarted { .. }) {
+            in_turn = true;
+        }
         if matches!(event.body, EventBody::ToolStarted { .. } | EventBody::PermissionRequested { .. })
             && let Some(part) = reply.flush()
         {
@@ -4503,6 +4508,8 @@ fn drive_turns(
                 progress(error);
                 exit_code = 1;
             }
+            // A session idle after its last turn ended stops the agent (DEV-644): the turn's outcome stands.
+            EventBody::SessionEnded { reason } if reason == "idle" && !in_turn => return finish(exit_code, reported_cost),
             EventBody::SessionEnded { reason } => {
                 return RunEnd::Failed(format!("The session {} ended: {reason}", session.name()));
             }
@@ -4515,6 +4522,7 @@ fn drive_turns(
             reply_part(part);
         }
         reply = ReplyStream::default();
+        in_turn = false;
         turns += 1;
         update_job(job_id, |state| state.record.question = None);
         if waiting {
@@ -6855,6 +6863,50 @@ mod dev520_session_events_tests {
             seen.push((event.seq, event.turn));
         }
         assert_eq!(seen, [(2, Some(2)), (3, Some(2))]);
+    }
+
+    /// harnessmux still shows the turn when the job asks, so the job waits for the next event.
+    struct Busy;
+
+    impl TurnControl for Busy {
+        fn name(&self) -> &str {
+            "s"
+        }
+
+        fn cancel(&self) {}
+
+        fn idle(&self) -> bool {
+            false
+        }
+    }
+
+    /// `bodies` from seq 1 in turn 1, then the session ends idle.
+    fn ends_idle_after(bodies: Vec<EventBody>, tasks_dir: &Path) -> RunEnd {
+        let (tx, rx) = tokio::sync::broadcast::channel(16);
+        let (mut events, _) = SessionEvents::open(Err("no log".into()), || rx);
+        let mut seq = 0;
+        for body in bodies {
+            seq += 1;
+            tx.send(event(seq, 1, body)).unwrap();
+        }
+        tx.send(Event { turn: None, ..event(seq + 1, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
+        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, agent: "fake", link: None };
+        drive_turns("dev644-test", tasks_dir, &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new())
+    }
+
+    #[test]
+    fn a_session_that_ends_idle_after_its_turn_ended_keeps_the_turns_outcome() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(ends_idle_after(vec![finished()], dir.path()), RunEnd::Exited(Some(0))));
+        let failed = EventBody::TurnFailed { error: "boom".into() };
+        assert!(matches!(ends_idle_after(vec![failed], dir.path()), RunEnd::Exited(Some(1))));
+
+        // A turn that started and didn't end: the session's end fails the job.
+        let RunEnd::Failed(why) = ends_idle_after(vec![finished(), EventBody::TurnStarted { prompt: "more".into() }], dir.path()) else {
+            panic!("a session that ends during a turn fails the job")
+        };
+        assert!(why.contains("ended: idle"), "{why}");
+        let RunEnd::Failed(_) = ends_idle_after(vec![], dir.path()) else { panic!("a session that ends before the first turn ends fails the job") };
     }
 }
 

@@ -1,14 +1,15 @@
 title: 't3 worktree setup: .result files of jobs that ended without finish() stay in .git/lotar/t3-worktree-setup/ for good'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T21:59:44.502058+00:00
-modified: 2026-11-18T02:08:52.215583+00:00
+modified: 2026-11-18T02:42:30.128039+00:00
 relationships:
   related:
   - DEV-674
+  - DEV-685
 comments:
 - date: 2026-11-17T22:01:58.115392+00:00
   author: claude
@@ -125,6 +126,45 @@ comments:
     - The doc line in `docs/help/agent.md` describes the new behavior correctly. Nothing outside the ticket changed.
     - Reran: `npm ci` passed, `cargo nextest run -p lotar-agent t3_worktree_setup` (10 passed), `cargo clippy -p lotar-agent --all-targets` (no warnings), `rustfmt --check` passed. I did not rerun the full `npm run lint`, `npm test` or `npm run smoke`: the fix agent reported them passing on this same commit.
     - No UI changes, so no screenshot review. No findings and no tickets filed.
+- date: 2026-11-18T02:41:47.540988+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    9d8613379 DEV-685 A merge job whose runner fails still sets a ticket Done when nothing was built for it
+    ```.
+
+    - Rebased `agent/DEV-678` onto `main` (`9d8613379a15`): `e8f6218e6697`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `e8f6218e6697`
+    - Amended the pending `.tasks` changes into the merged commit: `67922f5f4dfa`
+  report:
+    commits:
+    - hash: e8f6218e6
+      what: 'DEV-678 t3 worktree setup: .result files of jobs that ended without finish() stay in .git/lotar/t3-worktree-setup/ for good'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
+- date: 2026-11-18T02:42:26.904023+00:00
+  author: claude
+  text: |-
+    Merged: `main` holds DEV-678 as `67922f5f4`; not pushed.
+
+    - LoTaR had already rebased onto `main` (`9d8613379`), ran `npm run -s lint:agent`, `test:agent` and `smoke` (all passed), fast-forwarded `main` and amended the `.tasks` changes into `67922f5f4`. I confirmed `git -C <root> log -1` is that commit.
+    - Rules/agent profiles unchanged by the merge (no `automation.yml` or `config.yml` diff), so no `lotar trust` needed.
+    - Not pushed: the main checkout is not clean (`.tasks/DEV/678.yml` modified, ticket state written after the amend) and `DEV-658` (release) is InProgress. `67922f5f4` and `9d8613379` (DEV-685) are still unpushed, ready for the next push once the checkout is clean.
+    - No health ticket, so no check to rerun.
+  report:
+    commits:
+    - hash: 67922f5f4
+      what: .result files older than 2 days are deleted by prune()
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab80873ca-9786-4f14-8955-40e4ffb4833e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5b8118c-5073-4af9-aa10-5c2824821be6
@@ -137,8 +177,6 @@ description: |-
   ## Done when
   - [ ] `prune()` also deletes `.result` files older than a limit long enough for any session to end (for example 2 days, by file age).
   - [ ] A unit test covers an old `.result` being deleted and a fresh one being kept.
-tags:
-- fix-retried
 history:
 - at: 2026-11-17T21:59:45.086258+00:00
   actor: claude
@@ -271,3 +309,26 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-18T02:41:47.540988+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:42:26.904023+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:42:27.084987+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-674"]}'
+    new: '{"related":["DEV-674","DEV-685"]}'
+- at: 2026-11-18T02:42:30.128039+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''
