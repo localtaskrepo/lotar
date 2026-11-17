@@ -307,7 +307,9 @@ impl AgentQueueService {
                 }
 
                 let stats = AgentJobService::queue_stats();
-                if stats.running == 0 && stats.queued == 0 && (upgraded || pending_count(tasks_dir)? == 0) {
+                // End rules a full disk kept from their checkpoint live only in this process (DEV-633).
+                let unsaved_end_rules = crate::services::automation_service::has_unsaved_end_actions();
+                if stats.running == 0 && stats.queued == 0 && !unsaved_end_rules && (upgraded || pending_count(tasks_dir)? == 0) {
                     break;
                 }
 

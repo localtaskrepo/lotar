@@ -652,7 +652,7 @@ impl AutomationService {
                 without_agent_reporter_hand_back(outcome, &task, rule_assigns)
             })
         {
-            if end_action_path(tasks_dir, job_id).exists() {
+            if end_action_path(tasks_dir, job_id).exists() || is_unsaved_end_action(tasks_dir, job_id) {
                 crate::services::agent_active_jobs::defer_outcome(tasks_dir, job_id);
                 failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} waits for its end rules; the next worker or server applies it"));
             } else {
@@ -679,7 +679,7 @@ impl AutomationService {
     pub fn apply_pending_outcomes(tasks_dir: &Path) {
         replay_end_actions(tasks_dir);
         for pending in crate::services::agent_active_jobs::pending_outcomes(tasks_dir) {
-            if end_action_path(tasks_dir, &pending.outcome.job_id).exists() {
+            if end_action_path(tasks_dir, &pending.outcome.job_id).exists() || is_unsaved_end_action(tasks_dir, &pending.outcome.job_id) {
                 continue;
             }
             let project = crate::storage::TaskId::parse(&pending.ticket_id).map(|parsed| parsed.project).unwrap_or_default();
@@ -1992,6 +1992,60 @@ fn save_end_action(path: &Path, pending: &PendingEndAction) -> LoTaRResult<()> {
     Ok(())
 }
 
+/// Job ends whose checkpoint couldn't be written (DEV-633): a full disk
+/// refuses even its lock file. None of their steps ran; this process keeps
+/// them and saves them at the next look for pending outcomes, which runs them.
+static UNSAVED_END_ACTIONS: std::sync::LazyLock<Mutex<Vec<(std::path::PathBuf, String, PendingEndAction)>>> =
+    std::sync::LazyLock::new(|| Mutex::new(Vec::new()));
+
+/// Whether a thread retries [`UNSAVED_END_ACTIONS`]; set and cleared under its lock.
+static RETRYING_UNSAVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Keep a job end whose checkpoint couldn't be saved, and retry it every
+/// half minute while this process runs: a server's job has no worker poll.
+fn keep_unsaved_end_action(tasks_dir: &Path, key: &str, pending: PendingEndAction) {
+    use std::sync::atomic::Ordering;
+    let Ok(mut unsaved) = UNSAVED_END_ACTIONS.lock() else {
+        return;
+    };
+    unsaved.push((tasks_dir.to_path_buf(), key.to_string(), pending));
+    if RETRYING_UNSAVED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(|| {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(30));
+            let dirs: HashSet<std::path::PathBuf> = {
+                let Ok(unsaved) = UNSAVED_END_ACTIONS.lock() else {
+                    return;
+                };
+                if unsaved.is_empty() {
+                    RETRYING_UNSAVED.store(false, Ordering::SeqCst);
+                    return;
+                }
+                unsaved.iter().map(|(dir, _, _)| dir.clone()).collect()
+            };
+            for dir in dirs {
+                AutomationService::apply_pending_outcomes(&dir);
+            }
+        }
+    });
+}
+
+/// Whether this process keeps job ends it couldn't save yet; a worker waits for them.
+pub fn has_unsaved_end_actions() -> bool {
+    UNSAVED_END_ACTIONS.lock().is_ok_and(|unsaved| !unsaved.is_empty())
+}
+
+fn is_unsaved_end_action(tasks_dir: &Path, key: &str) -> bool {
+    UNSAVED_END_ACTIONS.lock().is_ok_and(|unsaved| unsaved.iter().any(|(dir, job, _)| dir == tasks_dir && job == key))
+}
+
+/// A step that failed because the disk was full runs again: it didn't write the ticket.
+fn is_retryable(err: &LoTaRError) -> bool {
+    is_busy(err) || matches!(err, LoTaRError::IoError(err) if err.kind() == std::io::ErrorKind::StorageFull)
+}
+
 fn finish_end_action(path: &Path, storage: &mut Storage, config: &ResolvedConfig, pending: &mut PendingEndAction) -> LoTaRResult<()> {
     while let Some((rule, step)) = pending.steps.first() {
         let context = AutomationActionContext {
@@ -2004,7 +2058,7 @@ fn finish_end_action(path: &Path, storage: &mut Storage, config: &ResolvedConfig
         };
         if let Err(err) = retry_while_busy(|| apply_action(storage, &pending.current, config, step, &context)) {
             // Permanent failures must not replay external commands on every poll.
-            if !is_busy(&err) {
+            if !is_retryable(&err) {
                 std::fs::remove_file(path)?;
             }
             return Err(err);
@@ -2016,6 +2070,51 @@ fn finish_end_action(path: &Path, storage: &mut Storage, config: &ResolvedConfig
     Ok(())
 }
 
+fn end_action_steps(actions: &[(String, AutomationAction)]) -> Vec<(String, AutomationAction)> {
+    let mut steps = Vec::new();
+    for (rule, action) in actions {
+        let mut push = |step| steps.push((rule.clone(), step));
+        let mut patch = action.clone();
+        patch.comment = None;
+        patch.run = None;
+        patch.tell_agent = None;
+        patch.archive = None;
+        if let Some(sprint) = patch.add.as_mut().and_then(|add| add.sprint.take()) {
+            push(AutomationAction { add: Some(AutomationTagAction { sprint: Some(sprint), ..Default::default() }), ..Default::default() });
+        }
+        if let Some(sprint) = patch.remove.as_mut().and_then(|remove| remove.sprint.take()) {
+            push(AutomationAction { remove: Some(AutomationTagAction { sprint: Some(sprint), ..Default::default() }), ..Default::default() });
+        }
+        push(patch);
+        if let Some(comment) = &action.comment {
+            push(AutomationAction { comment: Some(comment.clone()), ..Default::default() });
+        }
+        if let Some(run) = &action.run {
+            push(AutomationAction { run: Some(run.clone()), ..Default::default() });
+        }
+        if let Some(tell) = &action.tell_agent {
+            push(AutomationAction { tell_agent: Some(tell.clone()), agent: action.agent.clone(), ..Default::default() });
+        }
+        if let Some(archive) = action.archive {
+            push(AutomationAction { archive: Some(archive), ..Default::default() });
+        }
+    }
+    steps
+}
+
+/// Save a new checkpoint under its lock; an existing one wins.
+fn save_new_end_action(tasks_dir: &Path, key: &str, pending: &PendingEndAction) -> LoTaRResult<()> {
+    let dir = end_actions_dir(tasks_dir);
+    std::fs::create_dir_all(&dir)?;
+    let name = crate::services::agent_queue_service::queue_hash(Path::new(key));
+    let _lock = crate::storage::safety::acquire_storage_lock(&dir, &name)?;
+    let path = end_action_path(tasks_dir, key);
+    if !path.exists() {
+        save_end_action(&path, pending)?;
+    }
+    Ok(())
+}
+
 fn apply_durable_end_action(
     storage: &mut Storage,
     current: &TaskDTO,
@@ -2024,50 +2123,40 @@ fn apply_durable_end_action(
     context: &AutomationActionContext,
     key: &str,
 ) -> LoTaRResult<()> {
-    let dir = end_actions_dir(&storage.root_path);
-    std::fs::create_dir_all(&dir)?;
+    let tasks_dir = storage.root_path.clone();
+    let dir = end_actions_dir(&tasks_dir);
     let name = crate::services::agent_queue_service::queue_hash(Path::new(key));
-    let _lock = crate::storage::safety::acquire_storage_lock(&dir, &name)?;
-    let path = end_action_path(&storage.root_path, key);
+    let path = end_action_path(&tasks_dir, key);
+    let fresh = PendingEndAction { current: current.clone(), event: context.event, job: context.job.clone(), steps: end_action_steps(actions) };
+    let keep = |err: LoTaRError, pending: PendingEndAction| {
+        keep_unsaved_end_action(&tasks_dir, key, pending);
+        LoTaRError::ValidationError(format!("{err}; the end rules are kept and run once their checkpoint can be saved"))
+    };
+    let _lock = match std::fs::create_dir_all(&dir).and_then(|()| crate::storage::safety::acquire_storage_lock(&dir, &name)) {
+        Ok(lock) => lock,
+        Err(err) => return Err(keep(err.into(), fresh)),
+    };
     let mut pending = if path.exists() {
         serde_json::from_str(&std::fs::read_to_string(&path)?).map_err(|err| LoTaRError::ValidationError(err.to_string()))?
     } else {
-        let mut steps = Vec::new();
-        for (rule, action) in actions {
-            let mut push = |step| steps.push((rule.clone(), step));
-            let mut patch = action.clone();
-            patch.comment = None;
-            patch.run = None;
-            patch.tell_agent = None;
-            patch.archive = None;
-            if let Some(sprint) = patch.add.as_mut().and_then(|add| add.sprint.take()) {
-                push(AutomationAction { add: Some(AutomationTagAction { sprint: Some(sprint), ..Default::default() }), ..Default::default() });
-            }
-            if let Some(sprint) = patch.remove.as_mut().and_then(|remove| remove.sprint.take()) {
-                push(AutomationAction { remove: Some(AutomationTagAction { sprint: Some(sprint), ..Default::default() }), ..Default::default() });
-            }
-            push(patch);
-            if let Some(comment) = &action.comment {
-                push(AutomationAction { comment: Some(comment.clone()), ..Default::default() });
-            }
-            if let Some(run) = &action.run {
-                push(AutomationAction { run: Some(run.clone()), ..Default::default() });
-            }
-            if let Some(tell) = &action.tell_agent {
-                push(AutomationAction { tell_agent: Some(tell.clone()), agent: action.agent.clone(), ..Default::default() });
-            }
-            if let Some(archive) = action.archive {
-                push(AutomationAction { archive: Some(archive), ..Default::default() });
-            }
+        if let Err(err) = save_end_action(&path, &fresh) {
+            return Err(keep(err, fresh));
         }
-        let pending = PendingEndAction { current: current.clone(), event: context.event, job: context.job.clone(), steps };
-        save_end_action(&path, &pending)?;
-        pending
+        fresh
     };
     finish_end_action(&path, storage, config, &mut pending)
 }
 
+/// Save the checkpoints of this tasks directory's kept job ends, so the replay runs them.
+fn save_unsaved_end_actions(tasks_dir: &Path) {
+    let Ok(mut unsaved) = UNSAVED_END_ACTIONS.lock() else {
+        return;
+    };
+    unsaved.retain(|(dir, key, pending)| dir != tasks_dir || save_new_end_action(tasks_dir, key, pending).is_err());
+}
+
 fn replay_end_actions(tasks_dir: &Path) {
+    save_unsaved_end_actions(tasks_dir);
     let dir = end_actions_dir(tasks_dir);
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return;
@@ -3611,6 +3700,58 @@ mod pending_outcome_tests {
         assert_eq!(task.status.as_str(), "Todo", "completed patch must not replay");
         assert_eq!(task.comments.iter().filter(|comment| comment.text == "finished").count(), 2);
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    /// DEV-633: a full disk refused the checkpoint's lock file, and the end
+    /// rules were lost. They are kept and run once the checkpoint saves.
+    #[test]
+    fn end_rules_whose_checkpoint_cannot_be_saved_run_later() {
+        let queue = tempfile::tempdir().unwrap();
+        // SAFETY: test-local queue override, as for the outcome regression below.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue.path()) };
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        std::fs::create_dir_all(tasks_dir.join("PX")).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "issue:\n  states: [Todo, Done]\n").unwrap();
+        std::fs::write(
+            tasks_dir.join("PX/1.yml"),
+            "title: t1\nstatus: Todo\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n",
+        )
+        .unwrap();
+        std::fs::write(tasks_dir.join("automation.yml"), "automation:\n  rules:\n    - name: Failed\n      on:\n        job_failed:\n          set:\n            status: Done\n          comment: merge without it\n").unwrap();
+        // A file where the checkpoint directory goes fails like a full disk: nothing can be written there.
+        let blocked = end_actions_dir(&tasks_dir);
+        std::fs::create_dir_all(blocked.parent().unwrap()).unwrap();
+        std::fs::write(&blocked, "").unwrap();
+        let job = AutomationJobContext {
+            job_id: "disk-full".into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
+        let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job)).unwrap_err();
+        assert!(err.to_string().contains("kept"), "{err}");
+        assert!(has_unsaved_end_actions());
+        AutomationService::apply_pending_outcomes(&tasks_dir);
+        assert_eq!(TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().status.as_str(), "Todo");
+        std::fs::remove_file(&blocked).unwrap();
+        AutomationService::apply_pending_outcomes(&tasks_dir);
+        let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
+        assert_eq!(task.status.as_str(), "Done");
+        assert_eq!(task.comments.iter().filter(|comment| comment.text == "merge without it").count(), 1);
+        assert!(!has_unsaved_end_actions());
+        AutomationService::apply_pending_outcomes(&tasks_dir);
+        assert_eq!(TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().comments.len(), 1);
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    #[test]
+    fn a_step_refused_by_a_full_disk_is_retried() {
+        assert!(is_retryable(&LoTaRError::IoError(std::io::Error::from(std::io::ErrorKind::StorageFull))));
+        assert!(!is_retryable(&LoTaRError::IoError(std::io::Error::from(std::io::ErrorKind::PermissionDenied))));
     }
 
     /// DEV-528 on a kept outcome: a hand-back to an agent reporter that an
