@@ -1,11 +1,11 @@
 title: Drop the t3 job's foreground-only prompt line once T3 Code's --wait waits for background work
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-12T04:05:45.260312+00:00
-modified: 2026-11-17T17:55:07.537542+00:00
+modified: 2026-11-17T17:58:43.142142+00:00
 relationships:
   related:
   - DEV-335
@@ -14,6 +14,8 @@ relationships:
   - DEV-652
   - DEV-657
   - DEV-503
+  - DEV-318
+  - DEV-663
 comments:
 - date: 2026-11-17T16:12:37.224139+00:00
   author: claude
@@ -59,6 +61,36 @@ comments:
       result: not_run
       reason: no way to force it
     next: Review, then merge
+- date: 2026-11-17T17:58:33.255248+00:00
+  author: claude
+  text: |-
+    Review: passed. `84f033d52` does what "Done when" asks, and nothing else.
+
+    - **Fix in T3 Code:** the installed `t3` is v0.1.10. `gh api …/compare/671f854…v0.1.10` gives `behind_by: 0`, so the release has merge commit `671f854`.
+    - **DEV-335 check:** the job record (`r3.json` in the fix agent's scratchpad) shows `job-20261117T174538.196Z-1` `completed` at 17:47:12 with `last_message: "WAKE-REPLY: BG-DONE"`, so the job ended after the wake run.
+    - **Diff:** removes the prompt line and its code comment in `crates/lotar-agent/src/services/agent_job_service.rs` (`t3_thread_notes`). Rewords `docs/help/agent.md:173`, which now also names the 10 s limit from the PR.
+    - **Leftovers:** none. `grep` finds no other copy of the line or of the 0.1.9 note. The DEV-318 test file went in DEV-503, as the fix agent says. No stray files, and the scratch tasks dir and the `agent/TEST-1` worktree are gone.
+    - **Main:** main gained `285356174` (DEV-663) since this branch. It doesn't touch these lines.
+    - **Left to the owner:** the step "Don't end your turn while…" in standards `configs/lotar/automation.yml` (lines 127, 214, 309, 491, 773). The fix agent left it alone and said only when it could go, which is right: it lives in another repo and only the owner decides. No ticket filed.
+    - **Findings:** none, blocking or minor.
+  report:
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: cargo nextest run --workspace -E 'test(/t3/) | test(/agent_job/) | test(/prompt/)'
+      result: passed
+      reason: 76 tests
+    - command: npm run lint
+      result: not_run
+      reason: fix agent ran it; I reran fmt and clippy on the changed crate
+    - command: npm test
+      result: not_run
+      reason: fix agent ran it; I reran the t3 and agent job tests
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or REST change
 references:
 - link: https://github.com/pingdotgg/t3code/pull/34696
 - link: https://github.com/pingdotgg/t3code/issues/34688
@@ -265,3 +297,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16380bec-54a4-4c33-b7c2-c3a7129e4723
+- at: 2026-11-17T17:58:33.255248+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:58:33.514078+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652","DEV-657","DEV-503"]}'
+    new: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652","DEV-657","DEV-503","DEV-318","DEV-663"]}'
+- at: 2026-11-17T17:58:43.142142+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

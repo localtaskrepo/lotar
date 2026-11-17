@@ -1616,8 +1616,6 @@ struct T3Worktree {
 /// A T3 Code thread runs on the T3 server and doesn't get the job's
 /// environment (`LOTAR_TASKS_DIR`), so its lotar commands name the tasks
 /// folder; in a worktree they would otherwise change the worktree's copy.
-/// `t3 thread start --wait` returns when the turn ends, even while
-/// `t3_background_wait` keeps the thread working (T3 Code 0.1.9, DEV-335).
 /// A retried or resumed job's thread starts in a new worktree (DEV-583), so
 /// the notes name the ticket's worktrees that hold uncommitted work. They
 /// stay there after a job carried them over or dropped them, so the note
@@ -1627,9 +1625,7 @@ fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_
     let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
     let mut notes = format!(
         "- A T3 Code thread doesn't get LoTaR's environment: add `--tasks-dir \"{}\"` to every lotar command, \
-so it changes the ticket in the main checkout, not a worktree copy.\n\
-- The job ends with your turn, even while `t3_background_wait` keeps the thread working: run checks in the foreground \
-and finish before your final message.\n",
+so it changes the ticket in the main checkout, not a worktree copy.\n",
         dir.display()
     );
     if is_merge_job {

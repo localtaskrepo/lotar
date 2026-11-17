@@ -1,15 +1,17 @@
 title: lotar automation run fires unblocked only for prerequisites in another repo, so a lost in-repo unblocked event can't be replayed
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T17:28:46.731803+00:00
-modified: 2026-11-17T17:48:16.220740+00:00
+modified: 2026-11-17T17:58:33.514544+00:00
 relationships:
   related:
   - DEV-660
   - DEV-584
+  - DEV-324
+  - DEV-353
 comments:
 - date: 2026-11-17T17:42:12.007485+00:00
   author: claude
@@ -49,6 +51,33 @@ comments:
     - Docs: `automation.md`, `openapi.json` and the CLI help agree. No stale "another repo only" text is left.
     - Not rerun: full `npm run lint`, `npm test`, `npm run smoke` (they take longer than a review allows).
     - Follow-up: removing the repos.ts workaround is already filed as [STD-201](https://standards.pyxzl.net/task/STD-201). No new tickets filed.
+- date: 2026-11-17T17:56:05.531532+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `285356174`, on `origin` (`0c6c03497..285356174`).
+
+    - No rebase needed: `f70e32dcf` already sat on main `0c6c03497`. Fast-forwarded, then amended the pending `.tasks` changes (DEV-324, 353, 503, 584, 629, 660, 661, 662, 663) into it.
+    - Checks in the worktree: `npm run lint:agent`, `npm run test:agent` (2308 Rust, 1548 UI) and `npm run test:smoke:agent` (405) all passed. The pre-push hook passed too.
+    - No rule or config files changed, so `lotar trust` wasn't needed.
+    - Ticket check rerun in a scratch repo: `lotar automation run "Prerequisites done" --select id:STD-1 --dry-run` lists STD-1, whose only prerequisite is in the same repo and done.
+    - Pushed: the main checkout is clean, and the only unpushed commit was this one.
+  report:
+    commits:
+    - hash: '285356174'
+      what: DEV-663 automation run replays unblocked for in-repo prerequisites (f70e32dcf plus .tasks amended in)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2308 Rust, 1548 UI, 7 hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: 'ticket check: automation run --select id:A --dry-run'
+      result: passed
+      reason: lists A
+    next: 'Standards: drop the STD-200 workaround in scripts/repos.ts once a lotar release has this (STD-201)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A033243f3-585e-4e8b-ad35-24d266d73da4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91105668-a66f-4d5f-a054-2e5cff890e9f
@@ -128,3 +157,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T17:56:05.531532+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:56:05.704872+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-660","DEV-584"]}'
+    new: '{"related":["DEV-660","DEV-584","DEV-324"]}'
+- at: 2026-11-17T17:56:18.446214+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-17T17:58:33.514544+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-660","DEV-584","DEV-324"]}'
+    new: '{"related":["DEV-660","DEV-584","DEV-324","DEV-353"]}'
