@@ -1,11 +1,11 @@
 title: A resumed T3 thread is taken over while a newer thread of the ticket waits for an answer
-status: Blocked
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T04:33:45.254709+00:00
+modified: 2026-11-17T04:39:11.828259+00:00
 relationships:
   depends_on:
   - DEV-626
@@ -105,6 +105,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac88a9490-deab-4292-aa6e-550801b0d77f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66c92db0-9d76-461f-a4fb-c32ecc03c77a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A390fff61-8b3b-4374-958b-bd3219f8db8f
 description: |-
   Found in the DEV-626 review (2026-11-16).
 
@@ -275,3 +276,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T04:38:15.167526+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T04:39:11.828259+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A390fff61-8b3b-4374-958b-bd3219f8db8f

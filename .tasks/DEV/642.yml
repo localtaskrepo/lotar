@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:28:24.830886+00:00
-modified: 2026-11-17T04:36:48.747691+00:00
+modified: 2026-11-17T04:38:11.179537+00:00
 relationships:
   depends_on:
   - DEV-633
@@ -142,6 +142,9 @@ comments:
 
     - Commit `f26bd94c9` is unchanged, with no new changes
     - `pending_outcome_tests`: 9 passed in this retry; status and assignee left for review and merge
+- date: 2026-11-17T04:38:11.179537+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-642 is assigned to @merge now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A250c2a8c-eb09-4e10-aa80-5c5fc3462ccc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0440d567-26a1-4b1c-8674-c834f96568ba
@@ -291,3 +294,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T04:38:11.179537+00:00
+  actor: automation
+  changes:
+  - field: comment_added

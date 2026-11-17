@@ -434,7 +434,7 @@ impl AgentHandler {
                 stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
                 // And the on-disk queue this command lists (DEV-522).
                 stats.queued = stats.queued.max(pending.len());
-                let (state, reason) = AgentQueueService::worker_state(tasks_dir, pending.len(), stats.running);
+                let (state, reason) = AgentQueueService::worker_state(tasks_dir, &pending);
                 let worker_running = state == WorkerState::Active;
 
                 if matches!(renderer.format, OutputFormat::Json) {

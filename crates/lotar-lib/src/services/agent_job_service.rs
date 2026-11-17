@@ -520,6 +520,11 @@ impl AgentJobService {
         })
     }
 
+    /// The tickets and jobs this process runs (or queues).
+    pub fn active_jobs() -> Vec<(String, String)> {
+        JOB_REGISTRY.lock().map(|registry| registry.active_by_ticket.iter().map(|(ticket, job)| (ticket.clone(), job.clone())).collect()).unwrap_or_default()
+    }
+
     /// The job this process runs (or queues) for the ticket.
     pub fn active_job_id(ticket_id: &str) -> Option<String> {
         JOB_REGISTRY.lock().ok().and_then(|registry| registry.active_by_ticket.get(ticket_id).cloned())

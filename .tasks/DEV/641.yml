@@ -1,11 +1,11 @@
 title: agent.md doesn't say that end rules a full disk refused are kept and retried
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:28:12.068626+00:00
-modified: 2026-11-17T04:09:05.324248+00:00
+modified: 2026-11-17T04:39:13.523937+00:00
 relationships:
   depends_on:
   - DEV-633
@@ -124,14 +124,41 @@ comments:
     - Main: `docs/help/agent.md` on main equals `c447d2b96~1`, and `bb7cc8371`'s code equals main's: only `c447d2b96` needs to land (`bb7cc8371`'s `.tasks/` files conflict with main).
     - Reran: `npx prettier --check docs/help/agent.md` passed. Docs only, so no lint/test/smoke and no UI review.
     - Findings: none; no tickets filed.
+- date: 2026-11-17T04:38:13.473538+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `ef3d7dabc` is on main and `origin/main`.
+
+    - Rebase onto main (`e39ca4b31`): skipped `bb7cc8371`, the stale copy of DEV-633. Its code is on main as `9c10760fa` (no diff outside `.tasks/`); only its old ticket files conflicted, and main's are newer.
+    - `c447d2b96` rebased cleanly to `cfce20d5e`, signed; fast-forwarded main, then amended the open `.tasks/` changes into it per step 4: `ef3d7dabc`.
+    - No lockfile, rules or config changed: no `npm ci`, no `lotar trust`.
+    - Pushed `e39ca4b31..ef3d7dabc` (repos.json `"push": true`, main clean, nothing else unpushed).
+  report:
+    commits:
+    - hash: ef3d7dabc
+      what: end-rules paragraph in docs/help/agent.md covers ENOSPC steps and checkpoints kept in memory
+    checks:
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: cargo nextest run -p lotar-lib --lib help
+      result: passed
+      reason: 2 tests
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change, AGENTS.md asks link and consistency checks
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b405894-ad3f-43bc-ab4a-80324db2aefc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a71d5c7-b8ff-42b3-b52a-df4b8c6def20
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A672ad60e-a391-4f2f-8c50-0d8c6c40098e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae06cfae1-49d1-4b5c-bb8b-f91a9b96879f
 description: 'Found in the DEV-633 review: `docs/help/agent.md:238` says end-rule actions that find the storage lock busy are kept and resumed, but not that end rules whose checkpoint a full disk refused (ENOSPC) are now kept in the process and retried every 30 s, nor that this is lost when the process exits. Done when that paragraph describes both cases.'
-tags:
-- retry-fix
 history:
 - at: 2026-11-17T02:28:14.925851+00:00
   actor: claude
@@ -258,3 +285,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T04:38:13.473538+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:39:13.523937+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: retry-fix
+    new: ''

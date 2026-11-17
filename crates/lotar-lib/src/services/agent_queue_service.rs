@@ -5,6 +5,7 @@ use crate::services::agent_job_service::{AgentJobService, JobStartMode};
 use chrono::Utc;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -222,22 +223,32 @@ impl AgentQueueService {
     }
 
     /// The worker's state and, with entries queued, what they wait for.
-    /// `running` counts the jobs of every process for this tasks directory.
-    pub fn worker_state(tasks_dir: &Path, pending: usize, running: usize) -> (WorkerState, Option<String>) {
+    pub fn worker_state(tasks_dir: &Path, pending: &[AgentQueueEntry]) -> (WorkerState, Option<String>) {
         if !Self::is_worker_running(tasks_dir) {
-            if pending == 0 {
+            if pending.is_empty() {
                 return (WorkerState::Idle, None);
             }
             return (WorkerState::Stopped, Some("no worker process runs; start one with `lotar agent queue resume`".to_string()));
         }
-        if pending == 0 {
+        if pending.is_empty() {
             return (WorkerState::Active, None);
         }
-        let reason = match resolve_max_parallel(tasks_dir).ok().flatten() {
-            Some(max) if running >= max => format!("waiting for a free slot ({running} of agent.worktree.max_parallel_jobs {max} running)"),
-            _ => "waiting for the running jobs of their tickets to end".to_string(),
-        };
+        let reason = job_slots(tasks_dir, pending, AgentJobService::active_jobs())
+            .ok()
+            .and_then(|slots| pending.iter().find_map(|entry| slots.wait_reason(entry_project(entry).as_deref())))
+            .unwrap_or_else(|| "waiting for the running jobs of their tickets to end".to_string());
         (WorkerState::Active, Some(reason))
+    }
+
+    /// Why a job for the ticket must wait for a free slot under
+    /// `agent.worktree.max_parallel_jobs` (the global limit for all jobs
+    /// together, its project's for that project's), or `None` when it may
+    /// start. `own_jobs` are this process's jobs (ticket, job id); the
+    /// records of the other processes are added (DEV-630).
+    pub fn slot_wait_reason(tasks_dir: &Path, ticket_id: &str, own_jobs: Vec<(String, String)>) -> LoTaRResult<Option<String>> {
+        let project = ticket_project(ticket_id);
+        let slots = job_slots_for(tasks_dir, project.iter().cloned(), own_jobs)?;
+        Ok(slots.wait_reason(project.as_deref()))
     }
 
     pub fn ensure_worker(tasks_dir: &Path) -> LoTaRResult<()> {
@@ -277,15 +288,8 @@ impl AgentQueueService {
                     // Threads T3 Code runs again with no job (DEV-626).
                     AgentJobService::adopt_resumed_t3_threads(tasks_dir);
                 }
-                let max_parallel = resolve_max_parallel(tasks_dir)?;
-                let running = AgentJobService::queue_stats().running;
-                let capacity = match max_parallel {
-                    Some(max) => max.saturating_sub(running),
-                    None => usize::MAX,
-                };
-
-                if capacity > 0 && !upgraded {
-                    let entries = dequeue_entries(tasks_dir, capacity)?;
+                if !upgraded {
+                    let entries = dequeue_startable(tasks_dir)?;
                     for entry in entries {
                         match start_entry(tasks_dir, entry.clone()) {
                             Ok(()) => {}
@@ -442,13 +446,102 @@ fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<bo
     Ok(true)
 }
 
-fn dequeue_entries(tasks_dir: &Path, limit: usize) -> LoTaRResult<Vec<AgentQueueEntry>> {
-    let mut entries = Vec::new();
+/// Take the entries that have a free slot, in queue order; the others stay
+/// queued (DEV-630).
+fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
+    let mut entries = Ok(Vec::new());
     with_locked_queue(tasks_dir, |state| {
-        let count = limit.min(state.pending.len());
-        entries.extend(state.pending.drain(0..count));
+        let mut slots = match job_slots(tasks_dir, &state.pending, AgentJobService::active_jobs()) {
+            Ok(slots) => slots,
+            Err(err) => {
+                entries = Err(err);
+                return;
+            }
+        };
+        let (take, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut state.pending).into_iter().partition(|entry| slots.take(entry));
+        state.pending = keep;
+        entries = Ok(take);
     })?;
-    Ok(entries)
+    entries
+}
+
+/// A limit of `agent.worktree.max_parallel_jobs` and the jobs it counts.
+#[derive(Debug, Clone, Copy)]
+struct Slot {
+    running: usize,
+    limit: Option<usize>,
+}
+
+/// The global limit caps every project's jobs together, the limit of an
+/// entry's project (its own, else the global one) that project's jobs.
+#[derive(Debug)]
+struct JobSlots {
+    total: Slot,
+    projects: HashMap<String, Slot>,
+}
+
+impl JobSlots {
+    /// Take a slot for the entry when the global and its project's limit
+    /// both have one free.
+    fn take(&mut self, entry: &AgentQueueEntry) -> bool {
+        let project = entry_project(entry);
+        if self.wait_reason(project.as_deref()).is_some() {
+            return false;
+        }
+        self.total.running += 1;
+        if let Some(slot) = project.and_then(|project| self.projects.get_mut(&project)) {
+            slot.running += 1;
+        }
+        true
+    }
+
+    /// Why a job of the project waits, the global limit first.
+    fn wait_reason(&self, project: Option<&str>) -> Option<String> {
+        if let Slot { running, limit: Some(max) } = self.total
+            && running >= max
+        {
+            return Some(format!("waiting for a free slot ({running} of the global agent.worktree.max_parallel_jobs {max} running)"));
+        }
+        let project = project?;
+        match self.projects.get(project) {
+            Some(&Slot { running, limit: Some(max) }) if running >= max => {
+                Some(format!("waiting for a free slot ({running} of {project}'s agent.worktree.max_parallel_jobs {max} running)"))
+            }
+            _ => None,
+        }
+    }
+}
+
+fn job_slots(tasks_dir: &Path, entries: &[AgentQueueEntry], own_jobs: Vec<(String, String)>) -> LoTaRResult<JobSlots> {
+    job_slots_for(tasks_dir, entries.iter().filter_map(entry_project), own_jobs)
+}
+
+/// The slots for the projects. The jobs are counted in every process: this
+/// process's own, also before they record themselves, and the records of
+/// `lotar serve`, `agent run --wait` and taken-over jobs.
+fn job_slots_for(tasks_dir: &Path, projects: impl Iterator<Item = String>, own_jobs: Vec<(String, String)>) -> LoTaRResult<JobSlots> {
+    let mut jobs: HashSet<(String, String)> = own_jobs.into_iter().collect();
+    jobs.extend(crate::services::agent_active_jobs::list(tasks_dir).into_iter().map(|job| (job.ticket_id, job.job_id)));
+    let global = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+    let total = Slot { running: jobs.len(), limit: global.get_resolved_config().agent_worktree.max_parallel_jobs };
+    let mut slots = HashMap::new();
+    for project in projects {
+        if slots.contains_key(&project) {
+            continue;
+        }
+        let config = crate::config::resolution::config_for_project(tasks_dir, Some(&project)).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let running = jobs.iter().filter(|(ticket, _)| ticket_project(ticket).as_deref() == Some(project.as_str())).count();
+        slots.insert(project, Slot { running, limit: config.agent_worktree.max_parallel_jobs });
+    }
+    Ok(JobSlots { total, projects: slots })
+}
+
+fn entry_project(entry: &AgentQueueEntry) -> Option<String> {
+    ticket_project(&entry.ticket_id)
+}
+
+fn ticket_project(ticket_id: &str) -> Option<String> {
+    crate::storage::TaskId::parse(ticket_id).ok().map(|id| id.project)
 }
 
 fn pending_count(tasks_dir: &Path) -> LoTaRResult<usize> {
@@ -506,11 +599,6 @@ fn save_state(file: &mut File, state: &AgentQueueState) -> LoTaRResult<()> {
     file.write_all(payload.as_bytes()).map_err(LoTaRError::IoError)?;
     file.flush().map_err(LoTaRError::IoError)?;
     Ok(())
-}
-
-fn resolve_max_parallel(tasks_dir: &Path) -> LoTaRResult<Option<usize>> {
-    let cfg_mgr = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
-    Ok(cfg_mgr.get_resolved_config().agent_worktree.max_parallel_jobs)
 }
 
 fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
@@ -626,7 +714,7 @@ mod tests {
             ..Default::default()
         };
         assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
-        let entries = dequeue_entries(&tasks_dir, 10).unwrap();
+        let entries = dequeue_startable(&tasks_dir).unwrap();
         assert_eq!(entries[0].model.as_deref(), Some("haiku"));
         assert_eq!(entries[0].effort.as_deref(), Some("low"));
 
@@ -672,7 +760,7 @@ mod tests {
             ..Default::default()
         };
         assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
-        let entries = dequeue_entries(&tasks_dir, 10).unwrap();
+        let entries = dequeue_startable(&tasks_dir).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].ticket_id, "TEST-1", "padded alias canonicalized");
     }
@@ -714,16 +802,17 @@ mod tests {
     }
 
     #[test]
-    fn dequeue_removes_entries() {
+    fn dequeue_takes_entries_up_to_their_projects_limit() {
         let dir = tempdir().unwrap();
         let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
         let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
         let tasks_dir = dir.path().join("tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  worktree:\n    max_parallel_jobs: 2\n").unwrap();
 
         for idx in 1..=3 {
             let req = AgentJobCreateRequest {
-                ticket_id: format!("TEST-{idx}"),
+                ticket_id: format!("DQL-{idx}"),
                 prompt: "hello".to_string(),
                 runner: None,
                 agent: Some("implement".to_string()),
@@ -732,8 +821,40 @@ mod tests {
             let _ = AgentQueueService::enqueue(&tasks_dir, req).unwrap();
         }
 
-        let drained = dequeue_entries(&tasks_dir, 2).unwrap();
+        let drained = dequeue_startable(&tasks_dir).unwrap();
         assert_eq!(drained.len(), 2);
         assert_eq!(pending_count(&tasks_dir).unwrap(), 1);
+    }
+
+    #[test]
+    fn the_global_limit_caps_all_projects_together_and_a_projects_limit_its_own() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(tasks_dir.join("GLA")).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  worktree:\n    max_parallel_jobs: 3\n").unwrap();
+        std::fs::write(tasks_dir.join("GLA/config.yml"), "agent:\n  worktree:\n    max_parallel_jobs: 1\n").unwrap();
+
+        for ticket in ["GLA-1", "GLA-2", "GLB-1", "GLB-2", "GLB-3"] {
+            let req = AgentJobCreateRequest {
+                ticket_id: ticket.to_string(),
+                prompt: "hello".to_string(),
+                agent: Some("implement".to_string()),
+                ..Default::default()
+            };
+            let _ = AgentQueueService::enqueue(&tasks_dir, req).unwrap();
+        }
+
+        let drained: Vec<_> = dequeue_startable(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(drained, ["GLA-1", "GLB-1", "GLB-2"], "GLA gets one slot, the global limit 3 in all");
+        assert_eq!(pending_count(&tasks_dir).unwrap(), 2);
+
+        let running: Vec<_> = drained.iter().enumerate().map(|(idx, ticket)| (ticket.clone(), format!("job-{idx}"))).collect();
+        let reason = AgentQueueService::slot_wait_reason(&tasks_dir, "GLC-1", running.clone()).unwrap();
+        assert_eq!(reason.as_deref(), Some("waiting for a free slot (3 of the global agent.worktree.max_parallel_jobs 3 running)"));
+        let reason = AgentQueueService::slot_wait_reason(&tasks_dir, "GLA-2", running[..1].to_vec()).unwrap();
+        assert_eq!(reason.as_deref(), Some("waiting for a free slot (1 of GLA's agent.worktree.max_parallel_jobs 1 running)"));
+        assert_eq!(AgentQueueService::slot_wait_reason(&tasks_dir, "GLB-3", running[..1].to_vec()).unwrap(), None);
     }
 }

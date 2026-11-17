@@ -3,13 +3,14 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-17T03:35:00.829240+00:00
-modified: 2026-11-17T04:33:53.034192+00:00
+modified: 2026-11-17T04:44:02.521817+00:00
 relationships:
   related:
   - DEV-639
   - DEV-633
+  - DEV-626
 comments:
 - date: 2026-11-17T04:29:50.434177+00:00
   author: claude
@@ -41,6 +42,18 @@ comments:
     - command: npm run smoke
       result: passed
     next: Review, then merge; DEV-639 applies the same wait to dev626_resumed_t3_threads_test.rs:151,182
+- date: 2026-11-17T04:43:32.359716+00:00
+  author: claude
+  text: |-
+    Review: blocking. dev510 is fixed, but dev626 still leaves `.lotar-test-scratch` on main (3 of 4 runs).
+
+    - Read: the ticket, the fix comment, `4b1b43da0`, `job_settled` and `RunningJobSlot::drop` in `agent_job_service.rs` (`worker_running` goes false only after `agent_active_jobs::unregister` writes `.ended`), and the recovery path `finish_orphaned_job`. The cause and the fix are correct for dev510.
+    - Rerun: `node scripts/rust-test-runner.mjs --agent dev510` exited 0 in 4 of 4 runs here, and in 2 of 2 on main plus the fix.
+    - **Blocking:** DEV-626 landed on main as `e39ca4b31` (20:31), after this fix (20:29). `crates/lotar-lib/tests/dev626_resumed_t3_threads_test.rs:130` `wait_for_end` waits only for an end status. On main plus `4b1b43da0`, `--agent dev626` exited 1 in 3 of 4 runs with `tests left 1 entries ... .lotar-test-scratch`. "Done when" asks for repeated dev626 runs to pass.
+    - Fix: rebase onto main and add `AgentJobService::job_settled(job_id) &&` to the `wait_for_end` condition. I tried that in a scratch copy: dev626 exited 0 in 4 of 4 runs, dev510 in 2 of 2.
+    - A real leftover is still reported: the runner is unchanged, and `scripts/tests/rust-test-runner.test.mjs:523` covers it.
+    - The branch still has `bb7cc8371`. Its code matches main's `9c10760fa`, so the rebase drops it.
+    - Not rerun: lint, the full test suite and smoke (the diff is in tests only, and the rework changes it anyway).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e087eb6-5c16-45be-a23f-eaa19605023d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44a89add-4cbd-46fa-8e3d-78c425619b72
@@ -59,6 +72,7 @@ description: |-
   - [ ] A real leftover of one test is still reported.
 tags:
 - health
+- review-returned
 custom_fields:
   finding: test-cleanup:lotar-test-scratch
 history:
@@ -102,3 +116,28 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44a89add-4cbd-46fa-8e3d-78c425619b72
+- at: 2026-11-17T04:43:32.359716+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:43:33.402736+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-639","DEV-633"]}'
+    new: '{"related":["DEV-639","DEV-633","DEV-626"]}'
+- at: 2026-11-17T04:43:34.658634+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-17T04:44:02.521817+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
