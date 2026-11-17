@@ -1,11 +1,11 @@
 title: 'A fix job fails when its ticket branch agent/<ID> is checked out in another worktree: git branch --force refuses'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: triage
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T20:51:41.239885+00:00
-modified: 2026-11-17T20:53:23.716635+00:00
+modified: 2026-11-17T21:05:27.868759+00:00
 relationships:
   blocks:
   - DEV-623
@@ -22,6 +22,30 @@ comments:
     - `finished_job_worktree` treats `job.status.is_none()` as a job still at work, so the clean worktree (at `d8659a72`) stays, and `git branch --force agent/DEV-623` then fails in jobs 32 and 39.
     - Fix idea: a log with an `agent_job_completed`/`agent_job_failed` event whose job isn't in the active list counts as ended; test with a log like job-5 (no status line).
     - Safe to move afterwards: the worktree is clean, no job runs there, and `d8659a72` stays on `agent/DEV-645` and `t3/memory-gate-queue-hold-1`.
+- date: 2026-11-17T21:05:16.520680+00:00
+  author: claude
+  text: |-
+    Fixed: a job whose end rules failed (no status line) no longer holds its worktree, so the ticket branch moves.
+
+    - `finished_job_worktree` (`crates/lotar-agent/src/services/agent_job_service.rs`) now counts a log with `agent_job_completed`/`failed`/`cancelled` as ended when the job isn't in the active list
+    - Test `the_tickets_branch_moves_in_the_worktree_of_a_job_whose_log_lost_its_status` (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`) uses a log like job-5's: failed before the fix with `cannot force update the branch`, passes now
+    - Moved `agent/DEV-623` to `3c5d8a729` with `git reset --keep` in its clean worktree `agent-DEV-623-fdc58bb7d25a0a16` (no job runs there; `d8659a72` stays on `agent/DEV-645` and `t3/memory-gate-queue-hold-1`), so DEV-623 can go to review
+    - No guidance correction
+  report:
+    commits:
+    - hash: f53249bab
+      what: a log with an end event and no status counts as ended when its job no longer runs
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2331 Rust + 138 UI files
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb8ee33f-ec17-499f-892b-84afeba5dd1e
 description: |-
@@ -65,3 +89,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb8ee33f-ec17-499f-892b-84afeba5dd1e
+- at: 2026-11-17T21:05:16.520680+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:05:27.868759+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-17T20:56:59.911214+00:00
+modified: 2026-11-17T21:07:33.330234+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -201,6 +201,20 @@ comments:
       result: not_run
       reason: unit test simulates it
     next: 'Merge: rebase onto main, resolve the docs/help/agent.md paragraph by keeping both sentences'
+- date: 2026-11-17T21:02:37.912602+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-661` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-661` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-17T21:07:33.330234+00:00
+  author: claude
+  text: |-
+    Merged into `main` as `a29c56674` (fast-forward); pushed.
+
+    - Rebase conflict in `docs/help/agent.md`: kept both sides, i.e. DEV-660's process-group sentence and DEV-661's taken-entries and given-up-comment sentences in the one queue-worker paragraph.
+    - Not a rules/profile change, so no `lotar trust` needed.
+    - Checks on the rebased code (hash changed): `npm ci`, `npm run lint:agent`, `npm run test:agent`, `npm run test:smoke:agent` all passed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad512610d-e2c3-4b6c-b7fa-c9cbe1d49747
@@ -416,3 +430,11 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T21:02:37.912602+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T21:07:33.330234+00:00
+  actor: claude
+  changes:
+  - field: comment_added

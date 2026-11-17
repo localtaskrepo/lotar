@@ -933,7 +933,7 @@ fn a_queue_entry_held_by_a_waiting_thread_says_so_once() {
     wait_for("the waiting entry's comment", || !comments().is_empty());
     // Several more retries of the entry.
     std::thread::sleep(Duration::from_millis(1500));
-    // The worker takes the entry out of the queue on each retry, so a remove can miss it once (DEV-613).
+    // A remove also finds the entry while the worker holds it, and its retry then does not queue it again (DEV-661).
     wait_for("the waiting entry's removal", || AgentQueueService::remove(&tasks_dir, "TEST-1").unwrap());
     worker.join().unwrap().unwrap();
     let comments = comments();

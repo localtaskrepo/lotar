@@ -26,6 +26,10 @@ struct AgentQueueState {
     tasks_dir: String,
     updated_at: String,
     pending: Vec<AgentQueueEntry>,
+    /// Entries a worker took and has not registered a job for yet: a worker
+    /// that dies before that leaves them here for the next one (DEV-661).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    taken: Vec<AgentQueueEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,7 +155,8 @@ impl AgentQueueService {
         Ok(inserted)
     }
 
-    /// List all pending entries without modifying the queue.
+    /// List all pending entries, also those a worker took and has not
+    /// started yet, without modifying the queue.
     pub fn list_pending(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
         let queue_path = queue_file_path(tasks_dir);
         if !queue_path.exists() {
@@ -159,7 +164,7 @@ impl AgentQueueService {
         }
         let mut entries = Vec::new();
         with_locked_queue(tasks_dir, |state| {
-            entries = state.pending.clone();
+            entries = state.taken.iter().chain(&state.pending).cloned().collect();
         })?;
         Ok(entries)
     }
@@ -172,8 +177,9 @@ impl AgentQueueService {
         }
         let mut count = 0;
         with_locked_queue(tasks_dir, |state| {
-            count = state.pending.len();
+            count = state.pending.len() + state.taken.len();
             state.pending.clear();
+            state.taken.clear();
         })?;
         Ok(count)
     }
@@ -182,9 +188,10 @@ impl AgentQueueService {
     pub fn remove(tasks_dir: &Path, ticket_id: &str) -> LoTaRResult<bool> {
         let mut removed = false;
         with_locked_queue(tasks_dir, |state| {
-            let before = state.pending.len();
+            let before = state.pending.len() + state.taken.len();
             state.pending.retain(|e| e.ticket_id != ticket_id);
-            removed = state.pending.len() < before;
+            state.taken.retain(|e| e.ticket_id != ticket_id);
+            removed = state.pending.len() + state.taken.len() < before;
         })?;
         Ok(removed)
     }
@@ -273,6 +280,8 @@ impl AgentQueueService {
         if lock_file.try_lock_exclusive().is_err() {
             return Ok(());
         }
+        // Entries a worker that died took: this worker starts them.
+        restore_taken(tasks_dir)?;
 
         // After an upgrade, take no new entries: once the running jobs end,
         // this worker exits and the next one starts from the new build
@@ -295,7 +304,7 @@ impl AgentQueueService {
                     let entries = dequeue_startable(tasks_dir)?;
                     for entry in entries {
                         match start_entry(tasks_dir, entry.clone()) {
-                            Ok(()) => {}
+                            Ok(()) => settle_taken(tasks_dir, &entry, None)?,
                             // The ticket's previous job is still running
                             // (maybe in another process): wait for it rather
                             // than spend retries (DEV-279).
@@ -304,10 +313,10 @@ impl AgentQueueService {
                                 if err.to_string().contains("the T3 Code thread") {
                                     say_why_entry_waits(tasks_dir, &mut entry);
                                 }
-                                requeue_entry_unchanged(tasks_dir, &entry)?;
+                                settle_taken(tasks_dir, &entry, Some(&entry))?;
                             }
                             Err(err) => {
-                                if !requeue_entry(tasks_dir, entry)? {
+                                if !requeue_entry(tasks_dir, entry, &err)? {
                                     exhausted_error = Some(err);
                                 }
                             }
@@ -335,6 +344,8 @@ impl AgentQueueService {
             }
             thread::sleep(Duration::from_millis(WORKER_POLL_MS));
         }
+        // Entries a failed queue write left taken go back for the next worker.
+        let _ = restore_taken(tasks_dir);
         // An entry queued while this worker was exiting saw the lock held and
         // spawned no worker; start the next one now (DEV-279).
         let _ = lock_file.unlock();
@@ -404,7 +415,7 @@ fn say_why_entry_waits(tasks_dir: &Path, entry: &mut AgentQueueEntry) {
     if entry.held_by.as_deref() == Some(hold.thread.as_str()) {
         return;
     }
-    let who = if entry.agent.is_empty() { entry.runner.clone().unwrap_or_default() } else { format!("@{}", entry.agent) };
+    let who = entry_label(entry);
     let thread = hold.link.as_deref().unwrap_or(&hold.thread);
     let text = if hold.waiting {
         format!(
@@ -414,39 +425,67 @@ fn say_why_entry_waits(tasks_dir: &Path, entry: &mut AgentQueueEntry) {
     } else {
         format!("The queued {who} job waits: T3 Code still runs the thread {thread} of the job {}. The job starts once the thread ends.", hold.job)
     };
-    let mut storage = crate::storage::manager::Storage::new(tasks_dir);
-    let commented = crate::services::task_service::TaskService::add_comment_with_context(
-        &mut storage,
-        &entry.ticket_id,
-        &text,
-        crate::services::task_service::CommentContext::automation(),
-    );
-    if commented.is_ok() {
+    if comment_entry_ticket(tasks_dir, entry, &text) {
         entry.held_by = Some(hold.thread);
     }
 }
 
-/// Put an entry back without counting an attempt.
-fn requeue_entry_unchanged(tasks_dir: &Path, entry: &AgentQueueEntry) -> LoTaRResult<()> {
+fn entry_label(entry: &AgentQueueEntry) -> String {
+    if entry.agent.is_empty() { entry.runner.clone().unwrap_or_default() } else { format!("@{}", entry.agent) }
+}
+
+fn comment_entry_ticket(tasks_dir: &Path, entry: &AgentQueueEntry, text: &str) -> bool {
+    let mut storage = crate::storage::manager::Storage::new(tasks_dir);
+    crate::services::task_service::TaskService::add_comment_with_context(
+        &mut storage,
+        &entry.ticket_id,
+        text,
+        crate::services::task_service::CommentContext::automation(),
+    )
+    .is_ok()
+}
+
+fn same_entry(a: &AgentQueueEntry, b: &AgentQueueEntry) -> bool {
+    a.ticket_id == b.ticket_id && a.agent == b.agent && a.runner == b.runner
+}
+
+/// Drop a taken entry, once its job is registered or it is given up, and
+/// queue `again` in its place unless the entry was removed meanwhile.
+fn settle_taken(tasks_dir: &Path, entry: &AgentQueueEntry, again: Option<&AgentQueueEntry>) -> LoTaRResult<()> {
     with_locked_queue(tasks_dir, |state| {
-        if !state.pending.iter().any(|item| item.ticket_id == entry.ticket_id && item.agent == entry.agent && item.runner == entry.runner) {
-            state.pending.push(entry.clone());
+        let Some(pos) = state.taken.iter().position(|item| same_entry(item, entry)) else {
+            return;
+        };
+        state.taken.remove(pos);
+        if let Some(again) = again
+            && !state.pending.iter().any(|item| same_entry(item, again))
+        {
+            state.pending.push(again.clone());
         }
     })
 }
 
-fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<bool> {
+/// Queue the taken entries again, ahead of the others.
+fn restore_taken(tasks_dir: &Path) -> LoTaRResult<()> {
+    with_locked_queue(tasks_dir, |state| {
+        let mut restored: Vec<_> =
+            std::mem::take(&mut state.taken).into_iter().filter(|entry| !state.pending.iter().any(|item| same_entry(item, entry))).collect();
+        restored.append(&mut state.pending);
+        state.pending = restored;
+    })
+}
+
+/// Queue a failed entry again with one attempt more, or give it up after
+/// its last retry and say why on its ticket (DEV-661). False when given up.
+fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry, err: &LoTaRError) -> LoTaRResult<bool> {
     entry.attempts = entry.attempts.saturating_add(1);
     if entry.attempts > MAX_ATTEMPTS {
+        settle_taken(tasks_dir, &entry, None)?;
+        let text = format!("The queued {} job did not start after {} tries and left the queue: {err}", entry_label(&entry), entry.attempts);
+        let _ = comment_entry_ticket(tasks_dir, &entry, &text);
         return Ok(false);
     }
-
-    with_locked_queue(tasks_dir, |state| {
-        if !state.pending.iter().any(|item| item.ticket_id == entry.ticket_id && item.agent == entry.agent && item.runner == entry.runner) {
-            state.pending.push(entry.clone());
-        }
-    })?;
-
+    settle_taken(tasks_dir, &entry, Some(&entry))?;
     Ok(true)
 }
 
@@ -464,6 +503,7 @@ fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
         };
         let (take, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut state.pending).into_iter().partition(|entry| slots.take(entry));
         state.pending = keep;
+        state.taken.extend(take.iter().cloned());
         entries = Ok(take);
     })?;
     entries
@@ -585,6 +625,7 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
             tasks_dir: tasks_dir.to_string_lossy().to_string(),
             updated_at: time::now_rfc3339(),
             pending: Vec::new(),
+            taken: Vec::new(),
         });
     }
     let mut state: AgentQueueState = serde_json::from_str(&buf).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
@@ -867,5 +908,69 @@ mod tests {
         let reason = AgentQueueService::slot_wait_reason(&tasks_dir, "GLA-2", running[..1].to_vec()).unwrap();
         assert_eq!(reason.as_deref(), Some("waiting for a free slot (1 of GLA's agent.worktree.max_parallel_jobs 1 running)"));
         assert_eq!(AgentQueueService::slot_wait_reason(&tasks_dir, "GLB-3", running[..1].to_vec()).unwrap(), None);
+    }
+
+    #[test]
+    fn a_taken_entry_stays_queued_until_its_job_is_registered() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        for ticket in ["TKN-1", "TKN-2"] {
+            let req = AgentJobCreateRequest {
+                ticket_id: ticket.to_string(),
+                prompt: "hello".to_string(),
+                agent: Some("implement".to_string()),
+                ..Default::default()
+            };
+            assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+        }
+
+        // A worker takes both and dies before it starts their jobs.
+        assert_eq!(dequeue_startable(&tasks_dir).unwrap().len(), 2);
+        let listed: Vec<_> = AgentQueueService::list_pending(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(listed, ["TKN-1", "TKN-2"], "taken entries are still queued");
+
+        // The next worker takes them again, in their order.
+        restore_taken(&tasks_dir).unwrap();
+        let entries = dequeue_startable(&tasks_dir).unwrap();
+        assert_eq!(entries.iter().map(|entry| entry.ticket_id.as_str()).collect::<Vec<_>>(), ["TKN-1", "TKN-2"]);
+
+        // A removed entry is not queued again by its retry.
+        assert!(AgentQueueService::remove(&tasks_dir, "TKN-1").unwrap());
+        settle_taken(&tasks_dir, &entries[0], Some(&entries[0])).unwrap();
+        let listed: Vec<_> = AgentQueueService::list_pending(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(listed, ["TKN-2"]);
+    }
+
+    #[test]
+    fn an_entry_given_up_after_its_retries_says_why_on_its_ticket() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: GVU\n").unwrap();
+        let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
+        crate::services::task_service::TaskService::create(
+            &mut storage,
+            crate::api_types::TaskCreate { title: "Given up".to_string(), project: Some("GVU".to_string()), ..Default::default() },
+        )
+        .unwrap();
+        let req =
+            AgentJobCreateRequest { ticket_id: "GVU-1".to_string(), prompt: "hello".to_string(), agent: Some("implement".to_string()), ..Default::default() };
+        assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+
+        let err = LoTaRError::ValidationError("runner missing".to_string());
+        for attempt in 0..=MAX_ATTEMPTS {
+            let entry = dequeue_startable(&tasks_dir).unwrap().remove(0);
+            assert_eq!(requeue_entry(&tasks_dir, entry, &err).unwrap(), attempt < MAX_ATTEMPTS);
+        }
+
+        assert!(AgentQueueService::list_pending(&tasks_dir).unwrap().is_empty());
+        let task = crate::services::task_service::TaskService::get(&storage, "GVU-1", None).unwrap();
+        let said: Vec<_> = task.comments.iter().map(|comment| comment.text.as_str()).collect();
+        assert_eq!(said, ["The queued @implement job did not start after 4 tries and left the queue: Validation error: runner missing"]);
     }
 }

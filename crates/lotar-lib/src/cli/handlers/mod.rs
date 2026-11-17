@@ -515,9 +515,8 @@ impl AddHandler {
         if std::env::var("RUST_TEST_THREADS").is_err()
             && let Ok(dto) = crate::services::task_service::TaskService::get(&storage, &task_id, Some(&project_for_storage))
             && let Err(err) = crate::services::automation_service::AutomationService::apply_task_update(&mut storage, None, &dto, &config)
-            && std::env::var("LOTAR_DEBUG_STATUS").is_ok()
         {
-            eprintln!("[lotar][debug] add automation apply failed for {}: {}", task_id, err);
+            renderer.emit_warning(format_args!("Automation rules for {task_id} failed: {err}"));
         }
 
         let finding = finding_key.zip(finding_state).map(|(key, state)| {
