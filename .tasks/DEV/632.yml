@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T00:25:42.039816+00:00
-modified: 2026-11-17T02:52:10.130923+00:00
+modified: 2026-11-17T06:37:38.199581+00:00
 relationships:
   related:
   - DEV-607
@@ -87,6 +87,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82bcac53-197c-4c94-b020-71058f8b40d5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8edb2c46-63a0-4e46-91fc-377427ae544d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37135741-340a-4ee2-9150-b8471036eb2b
+releases:
+- 8
 description: 'Found: in the DEV-607 merge (2026-11-16, load ~60) serve_honors_explicit_tasks_dir_for_api_requests failed at crates/lotar-lib/tests/cli_serve_features_test.rs:169 with ''output capture did not finish: Err(Timeout)'' (recorded on DEV-624). stop() waits STOP_TIMEOUT (5 s, :21, :240) for the child''s stdout/stderr readers to finish; DEV-624 only raised the per-request read wait, not this one. Check: npm run test:agent under load, or the cli_serve_features_test filter in parallel. Done: the output-capture wait no longer fails a child that exits late on a loaded machine, and the filter passes 5 times in a row in parallel.'
 tags:
 - health
@@ -187,3 +189,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-17T06:37:38.199581+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

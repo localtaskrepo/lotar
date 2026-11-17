@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-17T02:16:16.593552+00:00
+modified: 2026-11-17T06:37:36.778657+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -479,6 +479,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92ad2009-c48f-4cf1-8221-9f55b80e87cd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A85e148be-757e-4b3c-9ab4-497d264a1967
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A821aedb8-b488-4be5-bf28-a9fd5d021e92
+releases:
+- 8
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -962,3 +964,8 @@ history:
   - field: tags
     old: fix-retried, merge-retried
     new: ''
+- at: 2026-11-17T06:37:36.778657+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-16T20:55:33.664464+00:00
-modified: 2026-11-17T02:16:33.080785+00:00
+modified: 2026-11-17T06:37:37.636719+00:00
 relationships:
   related:
   - DEV-615
@@ -158,6 +158,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97311ebc-5de8-4aba-8a30-299833e99d18
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7d549f7-09b6-44a9-bf7f-6b7bf7b38330
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A836bc07a-65ca-40a8-a9d1-42aeb42c9c6a
+releases:
+- 8
 description: 'Found while on DEV-615: `handle_connection` in `crates/lotar-lib/src/web_server.rs` reads headers and body with `stream.read(..).unwrap_or_default()`, so an `Interrupted` or timed-out read counts as EOF and the handler gets a cut body (a misleading 400 `Invalid body`). Check: a unit test feeding a stream that returns `Interrupted` once mid-body. Done: `Interrupted` is retried, other read errors close the connection without dispatching.'
 tags:
 - health
@@ -325,3 +327,8 @@ history:
   - field: tags
     old: health, merge-retried
     new: health
+- at: 2026-11-17T06:37:37.636719+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

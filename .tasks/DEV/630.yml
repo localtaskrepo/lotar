@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T05:15:45.394092+00:00
+modified: 2026-11-17T06:37:38.097062+00:00
 relationships:
   blocks:
   - DEV-646
@@ -18,6 +18,7 @@ relationships:
   - DEV-642
   - DEV-647
   - DEV-639
+  - DEV-651
 comments:
 - date: 2026-11-17T02:03:11.559276+00:00
   author: claude
@@ -144,6 +145,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad34d9a6c-9f47-4ca3-8837-a89a8c3bce26
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44612340-b192-4390-b809-b4bdc7b925b8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A71070fdc-f397-405a-bd46-b33c5b774b93
+releases:
+- 8
 description: |-
   Found 2026-11-16 in DEV-626 (lotar ran 4 jobs while .tasks/DEV/config.yml sets agent.worktree.max_parallel_jobs: 2).
 
@@ -352,3 +355,14 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642","DEV-647"]}'
     new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642","DEV-647","DEV-639"]}'
+- at: 2026-11-17T06:35:46.601082+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642","DEV-647","DEV-639"]}'
+    new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641","DEV-642","DEV-647","DEV-639","DEV-651"]}'
+- at: 2026-11-17T06:37:38.097062+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T06:01:25.542667+00:00
+modified: 2026-11-17T06:38:40.005553+00:00
 relationships:
   depends_on:
   - DEV-626
@@ -19,6 +19,7 @@ relationships:
   - DEV-630
   - DEV-649
   - DEV-647
+  - DEV-646
 comments:
 - date: 2026-11-17T02:52:38.519606+00:00
   author: claude
@@ -170,6 +171,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66c92db0-9d76-461f-a4fb-c32ecc03c77a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A390fff61-8b3b-4374-958b-bd3219f8db8f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae30cde7b-bee5-4d2e-9e5e-e970f07ea139
+releases:
+- 8
 description: |-
   Found in the DEV-626 review (2026-11-16).
 
@@ -411,3 +414,14 @@ history:
   - field: tags
     old: fix-retried
     new: ''
+- at: 2026-11-17T06:37:38.583824+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'
+- at: 2026-11-17T06:38:40.005553+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-626"],"related":["DEV-626","DEV-600","DEV-613","DEV-633","DEV-640","DEV-648","DEV-630","DEV-649","DEV-647"]}'
+    new: '{"depends_on":["DEV-626"],"related":["DEV-626","DEV-600","DEV-613","DEV-633","DEV-640","DEV-648","DEV-630","DEV-649","DEV-647","DEV-646"]}'

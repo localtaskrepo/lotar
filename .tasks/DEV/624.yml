@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-16T21:05:30.352250+00:00
-modified: 2026-11-17T01:50:55.607586+00:00
+modified: 2026-11-17T06:37:37.731061+00:00
 relationships:
   related:
   - DEV-609
@@ -150,6 +150,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea92c758-bcce-498d-bf82-98c5c78a5bd4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2108886e-a33a-4c82-95eb-9cb7e6df900c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af806f627-7ce9-4189-87fe-402a1eddd782
+releases:
+- 8
 description: |-
   Found in the DEV-609 merge (2026-11-16): `npm run test:agent` failed twice on `2b7224a0` (main `804cb0f9` plus one test in another file) while the Mac's load average was 140-170.
 
@@ -314,3 +316,8 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-17T06:37:37.731061+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

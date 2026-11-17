@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-17T05:15:44.675191+00:00
+modified: 2026-11-17T06:37:37.909919+00:00
 relationships:
   blocks:
   - DEV-639
@@ -188,6 +188,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ae3bded-6bb0-4dbe-b1d4-32538275daa2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae33ee74-c0c4-408b-b956-bbb269e447c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cb2062a-9d41-4e06-96a8-4e8fa9bdea6d
+releases:
+- 8
 description: |-
   Found by the chief of staff 2026-11-16 (owner: "a few work threads in t3 are stuck for quite a while").
 
@@ -456,3 +458,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-639"],"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620","DEV-378","DEV-503","DEV-613","DEV-621","DEV-648"]}'
     new: '{"blocks":["DEV-639"],"related":["DEV-593","DEV-594","DEV-598","DEV-591","DEV-607","DEV-609","DEV-611","DEV-612","DEV-600","DEV-630","DEV-604","DEV-639","DEV-620","DEV-378","DEV-503","DEV-613","DEV-621","DEV-648","DEV-647"]}'
+- at: 2026-11-17T06:37:37.909919+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

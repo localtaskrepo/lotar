@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T04:41:56.236036+00:00
+modified: 2026-11-17T06:47:32.200690+00:00
 relationships:
   related:
   - DEV-614
   - DEV-644
+  - DEV-652
 comments:
 - date: 2026-11-17T02:46:56.322682+00:00
   author: claude
@@ -509,3 +510,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T06:47:32.200690+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-614","DEV-644"]}'
+    new: '{"related":["DEV-614","DEV-644","DEV-652"]}'

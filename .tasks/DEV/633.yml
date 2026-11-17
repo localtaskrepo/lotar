@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T00:48:34.144750+00:00
-modified: 2026-11-17T05:34:07.490363+00:00
+modified: 2026-11-17T06:37:38.314126+00:00
 relationships:
   blocks:
   - DEV-642
@@ -112,6 +112,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac5a64c5-93b0-4a52-9a07-89f589caaf2c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc69ee00-65eb-413b-a296-1a8ad055869b
+releases:
+- 8
 description: |-
   Found in LOCA-493: DEV-625's review job `job-20261117T001051.648Z-6` failed at 00:10Z (T3 setup script exited 1 while the disk was full), then its end rules failed: "Cannot open storage lock .../agent-queue/end-actions-.../*.lock: No space left on device (os error 28); mutation was not run" (`lotar agent logs job-20261117T001051.648Z-6`). Nothing retried them, so "Review failed: merge without it" never ran and the ticket stayed Reviewing/@review with no job. repos.ts `nextStep` skips tickets whose last job failed (it leaves them to the failure rules), so the live check could only report the stall, not recover it. DEV-604 pauses the queue on a full disk before a job starts, but doesn't cover a job that is already running.
 
@@ -305,3 +307,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647","DEV-644","DEV-645","DEV-648"]}'
     new: '{"blocks":["DEV-642","DEV-641"],"related":["DEV-604","DEV-625","DEV-624","DEV-543","DEV-641","DEV-642","DEV-613","DEV-620","DEV-640","DEV-639","DEV-635","DEV-530","DEV-647","DEV-644","DEV-645","DEV-648","DEV-646"]}'
+- at: 2026-11-17T06:37:38.314126+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

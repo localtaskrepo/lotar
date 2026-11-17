@@ -1,0 +1,103 @@
+title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
+status: InProgress
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix-retry'
+created: 2026-11-17T06:47:32.006217+00:00
+modified: 2026-11-17T06:54:25.467087+00:00
+relationships:
+  blocks:
+  - DEV-653
+  related:
+  - DEV-318
+  - DEV-579
+  - DEV-635
+  - DEV-638
+  - DEV-644
+comments:
+- date: 2026-11-17T06:49:42.579878+00:00
+  author: claude
+  text: |-
+    Scope widened. Owner 2026-11-17 (chief of staff picker), after his idea "we could even drive work trees from the automation system in lotar ... make things even easier and more reliable": "Add to DEV-652".
+
+    ## Also in this ticket
+    - Making the worktree stays in the job's code (a job never runs without one, even with rules off or the repo untrusted). Cleanup moves to rules.
+    - A cleanup command rules can run (`lotar agent worktree ...`): remove the build output of a ticket's older worktrees, keeping the newest; remove the build of a ticket that waits (HelpNeeded, Blocked) longer than a given time. Idempotent; never touches a worktree of a running job.
+    - The Done cleanup (`cleanup_on_done`) and STD-95 ("build output stays until Done", owner 2026-11-13) written as rules in .tasks/DEV/automation.yml and the standards copy (configs/lotar/automation.yml, a standards ticket for that part), so each repo sees and sets its own. Changing STD-95 itself stays the owner's call: the default rules keep today's behaviour; the waiting-ticket rule is proposed, off until he says yes.
+    - Done when, added: a scheduled rule (manual action from cron) removes older builds of a ticket on a real ticket; docs/help/automation.md and agent.md say how.
+- date: 2026-11-17T06:54:12.983456+00:00
+  author: automation
+  text: The fix agent's job job-20261117T064733.178Z-159 failed (lotar agent logs job-20261117T064733.178Z-159); @fix-retry retries it on branch agent/DEV-652.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
+description: |-
+  Owner 2026-11-17 (DEV-579): "I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux." Owner 2026-11-16 (chief of staff options picker): "lotar makes them, T3 shows".
+
+  ## Found
+  - Every standards profile but two runs on harnessmux's `t3` agent. For those, `plan_t3_worktree` (agent_job_service.rs, DEV-318) has harnessmux start the thread with `t3 thread start --worktree agent/<ID>`, so T3 Code makes a new worktree in ~/.t3/worktrees on a new `t3/...` branch for every new thread. Only claude/codex jobs use `prepare_worktree`.
+  - Result on 2026-11-16: DEV-638 had 6 worktrees, DEV-644 3, others 2, each with its own cold build (1-7 GB); 129 GB in ~/.t3/worktrees. DEV-635's build clone skips them.
+
+  ## What
+  - A t3 job gets its worktree from `prepare_worktree` like any other runner: one per ticket on `agent/<ID>`, reused by later jobs (fix, review, merge), build cloned (DEV-635). The T3 thread runs in that checkout; T3 Code makes no worktree.
+  - First find out how: whether `t3 thread start` can take an existing checkout (a worktree path as project, or another option), and what harnessmux's t3 agent needs (`worktree_base`/`branch` may go). A harnessmux change is a ticket there.
+  - Remove what only served T3-made worktrees (moving detached T3 worktrees aside, pointing the ticket branch at the thread's `t3/...` branch) once nothing needs it; docs/help/agent.md and the standards comment in configs/lotar/agents.yml ("T3 Code makes it in ~/.t3/worktrees") say the new state.
+
+  ## Done when
+  - [ ] A ticket with fix, review and merge jobs on the t3 runner has one worktree, under lotar's worktree folder, and ~/.t3/worktrees gets nothing new (checked on a real ticket, not assumed).
+  - [ ] Threads still show in T3 Code with their title and link on the ticket; `session: continue` still continues the thread.
+  - [ ] lint, tests and smoke pass.
+tags:
+- fix-retried
+history:
+- at: 2026-11-17T06:47:32.201695+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644"]}'
+- at: 2026-11-17T06:47:32.445820+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T06:47:33.575739+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T06:47:34.500889+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
+- at: 2026-11-17T06:49:42.579878+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:51:34.775028+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644"]}'
+    new: '{"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644"]}'
+- at: 2026-11-17T06:54:12.449198+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T06:54:12.983456+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:54:25.467087+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c

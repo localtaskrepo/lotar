@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:13:29.874075+00:00
-modified: 2026-11-17T05:51:47.497884+00:00
+modified: 2026-11-17T06:37:38.731812+00:00
 relationships:
   related:
   - DEV-635
@@ -84,6 +84,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fd0d540-0fd0-4658-bfda-b234122bf1b7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6b0aeb7-a4a0-4429-844b-5cc98f305672
+releases:
+- 8
 description: |-
   ## Found
   - 2026-11-17, DEV-635's measurement run at load 140: `web_api_integration_test::chunked_bodies_get_411_and_overload_gets_503` panicked at `crates/lotar-lib/tests/web_api_integration_test.rs:31` with `Os { code: 22, kind: InvalidInput, message: "Invalid argument" }` from `stream.set_read_timeout(..).unwrap()`. It passed in the run before and after.
@@ -204,3 +206,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-635","DEV-613","DEV-633","DEV-639","DEV-577","DEV-615","DEV-627","DEV-647","DEV-649"]}'
     new: '{"related":["DEV-635","DEV-613","DEV-633","DEV-639","DEV-577","DEV-615","DEV-627","DEV-647","DEV-649","DEV-650"]}'
+- at: 2026-11-17T06:37:38.731812+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

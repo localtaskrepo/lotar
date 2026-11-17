@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:23:19.131862+00:00
-modified: 2026-11-17T03:49:19.923913+00:00
+modified: 2026-11-17T06:37:38.002417+00:00
 relationships:
   related:
   - DEV-624
@@ -95,6 +95,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e311be2-273f-45ee-8c00-e819945c4d5b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6fc88e28-8bca-4ddc-a10e-b907a106023b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A96301267-0cef-48b0-be52-a1dab8661472
+releases:
+- 8
 description: 'Found in DEV-624 (2026-11-16): 1 of 11 parallel runs of `target/local/deps/integration-* cli_serve_features_test:: --test-threads 15` at load ~140 failed in `serve_reports_requested_port_exactly` (`crates/lotar-lib/tests/cli_serve_features_test.rs:333`): panic at `:48`, serve exited before a readiness banner. Likely cause: `reserve_ephemeral_port` binds port 0, drops the listener, then serve binds the number; another test or process can take it in between (`serve_short_port_flag_sets_requested_port` uses the same pattern). Check: run that command 20 times under load. Done when the requested-port tests no longer fail when the reserved port is taken first (retry with a new port, or another way that still tests an explicit --port).'
 tags:
 - health
@@ -187,3 +189,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-624","DEV-612","DEV-613","DEV-615","DEV-620","DEV-577"]}'
     new: '{"related":["DEV-624","DEV-612","DEV-613","DEV-615","DEV-620","DEV-577","DEV-640"]}'
+- at: 2026-11-17T06:37:38.002417+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T03:19:06.596519+00:00
-modified: 2026-11-17T06:01:09.312595+00:00
+modified: 2026-11-17T06:38:40.012942+00:00
 relationships:
   related:
   - DEV-643
@@ -16,6 +16,7 @@ relationships:
   - DEV-630
   - DEV-648
   - DEV-639
+  - DEV-646
 comments:
 - date: 2026-11-17T03:44:30.221745+00:00
   author: claude
@@ -205,6 +206,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66bbaaf1-6fb9-4c02-9de5-5cc18cf82b37
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4f5af38b-2522-4c8e-8ac7-e1199dd7910c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc130475-39a6-4173-9e61-6c7b91f4ed38
+releases:
+- 8
 description: 'Found (DEV-643, 2026-11-16, load ~75): `cleanup_done_ticket_worktree` and `maybe_cleanup_worktree` in `crates/lotar-lib/src/services/agent_job_service.rs` hold `JOB_REGISTRY` while they run `git worktree remove` and other git commands; `sample` of the worker showed ~15 threads waiting on the mutex while one `git worktree remove` ran 38 s. DEV-643 moved the task update''s registry lookup out of the storage locks, so CLI writes no longer fail, but job threads still stall. Check: under load, time job events while a done ticket''s worktree is removed. Done: the registry is held only for the in-memory check, not across git.'
 tags:
 - health
@@ -385,3 +388,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-643","DEV-633","DEV-640","DEV-644","DEV-626","DEV-630","DEV-648"]}'
     new: '{"related":["DEV-643","DEV-633","DEV-640","DEV-644","DEV-626","DEV-630","DEV-648","DEV-639"]}'
+- at: 2026-11-17T06:37:39.140184+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'
+- at: 2026-11-17T06:38:40.012942+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-633","DEV-640","DEV-644","DEV-626","DEV-630","DEV-648","DEV-639"]}'
+    new: '{"related":["DEV-643","DEV-633","DEV-640","DEV-644","DEV-626","DEV-630","DEV-648","DEV-639","DEV-646"]}'

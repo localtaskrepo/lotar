@@ -1,17 +1,24 @@
 title: lotar serve counts only its own jobs against max_parallel_jobs and applies the last ticket's project limit to all projects
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T03:02:27.383761+00:00
-modified: 2026-11-17T05:34:43.090904+00:00
+modified: 2026-11-17T06:39:00.875009+00:00
 relationships:
   depends_on:
   - DEV-630
   related:
   - DEV-630
   - DEV-633
+  - DEV-635
+  - DEV-639
+  - DEV-642
+  - DEV-647
+  - DEV-648
+  - DEV-649
+  - DEV-651
 comments:
 - date: 2026-11-17T03:23:45.870039+00:00
   author: claude
@@ -57,9 +64,39 @@ comments:
       result: passed
       reason: test:smoke:agent, 405 tests
     next: Review on another model, then merge
+- date: 2026-11-17T06:38:35.583996+00:00
+  author: claude
+  text: |-
+    Merged: DEV-646 is on `main` as `72687ab60`, not pushed (the main checkout holds the running release's changes).
+
+    - Rebased 4 times while DEV-642, DEV-647, DEV-648, DEV-639, DEV-649 and DEV-635 landed; no conflicts, no lockfile changes
+    - Found in a rerun: `merge_jobs_are_serialized_even_with_parallel_slots` failed once, and the cause was this change. The new 500 ms queue watch started the second merge job while the first was dispatched but still `queued` (setting up its worktree)
+    - Fixed in `agent_job_service.rs` (`has_dispatched_merge_job`): a merge job holds the merge slot from dispatch on. Amended into the DEV-646 commit; the test passed 5 targeted runs and the full suite
+    - One smoke run failed 25 tests with `EADDRNOTAVAIL` / `ERR_ADDRESS_INVALID` (local ports, not the change); the rerun passed 405 of 405, as did the final run on the DEV-635 base
+    - Last rebase: DEV-635 was amended with a ticket file only (`120f5e56b` → `5181b1410`), so the checked code is unchanged
+    - Not amended: the main checkout's `.tasks` changes (`@releases/8.yml`, `releases: [8]` on tickets) belong to the [DEV-651](https://lotar.pyxzl.net/task/DEV-651) release job running there since 06:35Z, not to no ticket; told its thread
+    - Not pushed: the main checkout isn't clean, and DEV-651 is InProgress
+    - No rule or config files changed, so no `lotar trust`
+  report:
+    commits:
+    - hash: 72687ab60
+      what: on main, rebased onto DEV-635; amended with the merge-slot fix
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on the DEV-635 base
+    - command: npm test
+      result: passed
+      reason: test:agent, 2302 Rust, 1548 UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405
+    next: Push main once the DEV-651 release has committed its .tasks changes
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A093ef432-2298-45e6-a33a-c45478867824
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A643c216b-c924-4963-ae9a-537eb8e3ecbd
+releases:
+- 8
 description: |-
   Found in the DEV-630 review (2026-11-16).
 
@@ -189,3 +226,24 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T06:37:39.050281+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'
+- at: 2026-11-17T06:38:35.583996+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:38:40.012033+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-630"],"related":["DEV-630","DEV-633"]}'
+    new: '{"depends_on":["DEV-630"],"related":["DEV-630","DEV-633","DEV-635","DEV-639","DEV-642","DEV-647","DEV-648","DEV-649","DEV-651"]}'
+- at: 2026-11-17T06:39:00.875009+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

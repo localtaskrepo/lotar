@@ -1,0 +1,212 @@
+title: Release v0.15.3
+status: Merging
+priority: High
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T06:35:46.386700+00:00
+modified: 2026-11-17T06:49:52.390392+00:00
+relationships:
+  related:
+  - DEV-630
+  - DEV-646
+  - DEV-464
+  - DEV-611
+comments:
+- date: 2026-11-17T06:36:13.087182+00:00
+  author: claude
+  text: 'Owner 2026-11-16 (options picker): "Release 0.15.3": the DEV-630 fix (max_parallel_jobs) is on main but not in 0.15.2, so 4 lotar jobs ran with a limit of 2. After the release the chief of staff installs it with brew and restarts the queue worker.'
+- date: 2026-11-17T06:46:39.990016+00:00
+  author: claude
+  text: |-
+    Version bump to 0.15.3 committed on `agent/DEV-651`; release record 0.15.3 created.
+
+    - Added a `## Done when` with checkboxes for every step
+    - Record `#8` 0.15.3 holds this ticket and the 26 tickets from `git log v0.15.2..main` that were in no release, plus DEV-646 (still Merging; it is about the same max_parallel_jobs limit as DEV-630; if it misses the tag, `lotar release move 0.15.4 DEV-646`)
+    - No ticket depends on this one yet (`relationships --kind blocks` lists none)
+    - Bump commit `2a1567de2`: `[workspace.package]` and the three `=0.15.3` pins, `Cargo.lock`; no doc names 0.15.2
+    - The tag, its push, `brew upgrade` and closing this ticket are still to do: the bump has to land on main and pass QA first, and pushing the tag publishes the release, so it waits for mallox's OK
+  report:
+    commits:
+    - hash: 2a1567de2
+      what: version 0.15.2 -> 0.15.3 in Cargo.toml and Cargo.lock
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2300 Rust, 1548 UI, 7 hook tests
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    - command: Quality Assurance on main
+      result: not_run
+      reason: bump not on main yet
+    - command: Release workflow
+      result: not_run
+      reason: tag waits for merge, green QA and owner OK
+    next: 'After merge and green QA on main: ask mallox for OK, then git tag -s v0.15.3 -m v0.15.3, push the tag, lotar release release 0.15.3, brew upgrade, close; open Release v0.15.4'
+- date: 2026-11-17T06:46:50.042554+00:00
+  author: automation
+  text: 'The queued @review job waits: T3 Code still runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac988b53a-2c2c-41a5-bee0-c5224a72cd11 of the job job-20261117T063547.481Z-132. The job starts once the thread ends.'
+- date: 2026-11-17T06:46:55.463972+00:00
+  author: claude
+  text: |-
+    DEV-646 landed on local main (`72687ab60`, not pushed); it is already in record 0.15.3.
+
+    - The bump `2a1567de2` sits on `5181b1410`, an ancestor of `72687ab60`: the merge rebases it cleanly
+    - The uncommitted `.tasks` changes in the main checkout (`@releases/8.yml`, `releases: [8]`, DEV-651) belong to this release and go into the next commit there
+- date: 2026-11-17T06:49:40.548066+00:00
+  author: claude
+  text: |-
+    Review: passed. The bump `2a1567de2` can be merged; no findings, no tickets filed.
+
+    - Diff: only `Cargo.toml` (`[workspace.package]` version and the three `=0.15.3` pins) and `Cargo.lock` (4 workspace crates). `cargo metadata --locked` shows the lock file matches.
+    - No doc names 0.15.2 as the current release. The remaining `0.14`/`0.15.0` mentions in `docs/help/releases.md` and `docs/release-guide.md` are examples or history.
+    - Record `#8` 0.15.3: every DEV ticket in `git log v0.15.2..main` is in it, DEV-646 (now on main as `72687ab60`) and DEV-651 included. DEV-464 and DEV-611 were already in earlier releases (5 and 7).
+    - The branch sits on `5181b1410`, an ancestor of main `72687ab60`, so the merge rebases it cleanly. QA on main then runs the tests again with DEV-646 in.
+    - Nothing blocks on this ticket, so no Blocked tickets wait for the release. The tag push still waits for the owner's OK (step 4), as "Done when" says.
+    - I reran `npm run lint` and it passed. I didn't rerun test or smoke: they take longer than a few minutes, and the fix agent passed them on this commit.
+  report:
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo metadata --locked
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: version-only bump; fix agent ran it on 2a1567de2, QA on main reruns it
+    - command: npm run smoke
+      result: not_run
+      reason: same reason
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac988b53a-2c2c-41a5-bee0-c5224a72cd11
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9e344aa4-d2b0-4bef-bbf4-a2b6e20781a4
+releases:
+- 8
+description: |-
+  Next lotar release, a patch bump to v0.15.3, mainly for DEV-630 (the queue worker honors max_parallel_jobs; 0.15.2 ran 4 lotar jobs with a limit of 2 and filled the disk).
+
+  Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
+
+  ## Done when
+
+  Patch bump: "a patch by default" (owner, 2026-11-11, release guide). Pushing the tag publishes the release, so it waits for the owner's OK (release skill step 4); a failing step stops the release there and is commented here.
+
+  - [ ] Release record 0.15.3 exists and holds this ticket and every DEV ticket from `git log v0.15.2..main` that was in no release (`lotar list 'release:none'` shows none of them).
+  - [ ] `Cargo.toml` `[workspace.package]` version and the three `=X.Y.Z` pins under `[workspace.dependencies]` say 0.15.3; `Cargo.lock` matches; no doc still names 0.15.2 as the current release.
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass on the bump commit `DEV-651 Release v0.15.3`; a failure is fixed or reported, never skipped.
+  - [ ] The bump is on main and its Quality Assurance run succeeded (`gh run list --workflow "Quality Assurance" --commit <sha>`).
+  - [ ] With the owner's OK: signed tag `v0.15.3` pushed, `lotar release release 0.15.3`; every job of the Release run is green (a failed job is re-run once, then reported).
+  - [ ] `brew upgrade lotar`; `lotar --version` prints 0.15.3 and `codesign -dvv` shows the Developer ID identity.
+  - [ ] This ticket Done; the Blocked tickets that depend on it are with @fix.
+  - [ ] Ticket `Release v0.15.4` (Chore, assignee mallox) and release record 0.15.4 holding it exist.
+history:
+- at: 2026-11-17T06:35:46.601741+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-630"]}'
+- at: 2026-11-17T06:35:46.805803+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T06:35:48.378180+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T06:35:49.204216+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac988b53a-2c2c-41a5-bee0-c5224a72cd11
+- at: 2026-11-17T06:36:13.087182+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:37:23.361699+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Next lotar release, a patch bump to v0.15.3, mainly for DEV-630 (the queue worker honors max_parallel_jobs; 0.15.2 ran 4 lotar jobs with a limit of 2 and filled the disk).
+
+      Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
+    new: |-
+      Next lotar release, a patch bump to v0.15.3, mainly for DEV-630 (the queue worker honors max_parallel_jobs; 0.15.2 ran 4 lotar jobs with a limit of 2 and filled the disk).
+
+      Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
+
+      ## Done when
+
+      Patch bump: "a patch by default" (owner, 2026-11-11, release guide). Pushing the tag publishes the release, so it waits for the owner's OK (release skill step 4); a failing step stops the release there and is commented here.
+
+      - [ ] Release record 0.15.3 exists and holds this ticket and every DEV ticket from `git log v0.15.2..main` that was in no release (`lotar list 'release:none'` shows none of them).
+      - [ ] `Cargo.toml` `[workspace.package]` version and the three `=X.Y.Z` pins under `[workspace.dependencies]` say 0.15.3; `Cargo.lock` matches; no doc still names 0.15.2 as the current release.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass on the bump commit `DEV-651 Release v0.15.3`; a failure is fixed or reported, never skipped.
+      - [ ] The bump is on main and its Quality Assurance run succeeded (`gh run list --workflow "Quality Assurance" --commit <sha>`).
+      - [ ] With the owner's OK: signed tag `v0.15.3` pushed, `lotar release release 0.15.3`; every job of the Release run is green (a failed job is re-run once, then reported).
+      - [ ] `brew upgrade lotar`; `lotar --version` prints 0.15.3 and `codesign -dvv` shows the Developer ID identity.
+      - [ ] This ticket Done; the Blocked tickets that depend on it are with @fix.
+      - [ ] Ticket `Release v0.15.4` (Chore, assignee mallox) and release record 0.15.4 holding it exist.
+- at: 2026-11-17T06:37:36.698337+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'
+- at: 2026-11-17T06:38:40.015744+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-630"]}'
+    new: '{"related":["DEV-630","DEV-646"]}'
+- at: 2026-11-17T06:46:39.990016+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:46:48.652427+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T06:46:50.042554+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:46:55.463972+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:47:20.996335+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9e344aa4-d2b0-4bef-bbf4-a2b6e20781a4
+- at: 2026-11-17T06:49:40.548066+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:49:40.712631+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-630","DEV-646"]}'
+    new: '{"related":["DEV-630","DEV-646","DEV-464","DEV-611"]}'
+- at: 2026-11-17T06:49:52.390392+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

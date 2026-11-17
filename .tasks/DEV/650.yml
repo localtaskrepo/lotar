@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T05:51:46.365057+00:00
-modified: 2026-11-17T06:31:12.926789+00:00
+modified: 2026-11-17T06:37:39.396847+00:00
 relationships:
   related:
   - DEV-649
   - DEV-640
+  - DEV-635
 comments:
 - date: 2026-11-17T06:10:05.995417+00:00
   author: claude
@@ -84,6 +85,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A00256ffb-802a-4b43-ab31-14d448816fc5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0e424a4-8b62-4f6e-87fe-7aee22f5fc8f
+releases:
+- 8
 description: |-
   Found in the DEV-649 review (2026-11-16).
 
@@ -156,3 +159,14 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-17T06:33:34.246748+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-649","DEV-640"]}'
+    new: '{"related":["DEV-649","DEV-640","DEV-635"]}'
+- at: 2026-11-17T06:37:39.396847+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

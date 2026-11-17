@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T03:35:00.829240+00:00
-modified: 2026-11-17T05:50:00.317087+00:00
+modified: 2026-11-17T06:38:40.014089+00:00
 relationships:
   related:
   - DEV-639
@@ -13,6 +13,7 @@ relationships:
   - DEV-626
   - DEV-642
   - DEV-647
+  - DEV-646
 comments:
 - date: 2026-11-17T04:29:50.434177+00:00
   author: claude
@@ -134,6 +135,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e087eb6-5c16-45be-a23f-eaa19605023d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44a89add-4cbd-46fa-8e3d-78c425619b72
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f51fc5-a187-419a-9d3a-a1944e058862
+releases:
+- 8
 description: |-
   Found in the DEV-639 review (2026-11-16), on branch `agent/DEV-639` (`08cd964f2`).
 
@@ -279,3 +282,14 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-17T06:37:39.226257+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'
+- at: 2026-11-17T06:38:40.014089+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-639","DEV-633","DEV-626","DEV-642","DEV-647"]}'
+    new: '{"related":["DEV-639","DEV-633","DEV-626","DEV-642","DEV-647","DEV-646"]}'

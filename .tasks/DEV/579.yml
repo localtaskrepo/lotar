@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:57:40.271694+00:00
-modified: 2026-11-17T02:16:13.862832+00:00
+modified: 2026-11-17T06:51:34.773136+00:00
 relationships:
   related:
   - DEV-499
@@ -21,6 +21,8 @@ relationships:
   - DEV-622
   - DEV-563
   - DEV-625
+  - DEV-652
+  - DEV-653
 comments:
 - date: 2026-11-15T20:40:48.024583+00:00
   author: claude
@@ -189,6 +191,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177f2d09-0dcb-419d-a0f0-ad691d43efb0
+releases:
+- 8
 description: |-
   Owner, 2026-11-15, in his words: "we need to find a solution for the space being used up. Tasks need to clean up after them properly. At least on lotar we need to do something to optimize the build and development process." Related standing rule (owner 2026-11-15, STD-131): keep projects small and focused; lotar is the example of one that got so big it's hard to change, with long build times.
 
@@ -413,3 +417,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563"]}'
     new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563","DEV-625"]}'
+- at: 2026-11-17T06:37:36.972798+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'
+- at: 2026-11-17T06:47:32.199616+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563","DEV-625"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563","DEV-625","DEV-652"]}'
+- at: 2026-11-17T06:51:34.773136+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563","DEV-625","DEV-652"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563","DEV-625","DEV-652","DEV-653"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T21:08:52.852170+00:00
-modified: 2026-11-17T02:16:45.167518+00:00
+modified: 2026-11-17T06:37:37.828070+00:00
 relationships:
   related:
   - DEV-613
@@ -113,6 +113,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b45555b-0137-4f6f-9e80-fa7bd7748e66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeec445cf-bb38-4f44-b052-6a4d7d637810
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab0c2dd98-94bd-48cb-8629-0001a77e3447
+releases:
+- 8
 description: |-
   Found in the DEV-613 stress run (`--stress-count 30` of `test(/dev503_harness_jobs_test/)`), iteration 30, load average about 110.
 
@@ -237,3 +239,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-17T06:37:37.828070+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

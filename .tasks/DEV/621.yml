@@ -4,7 +4,7 @@ priority: Low
 type: Chore
 reporter: claude
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-17T03:49:27.527326+00:00
+modified: 2026-11-17T06:37:37.534599+00:00
 relationships:
   related:
   - DEV-611
@@ -127,6 +127,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4aab10b9-d823-4940-9b0a-d794d6939114
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad882e4bc-369e-48f8-86e8-cb22a79054ce
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ce127ea-d05c-4a52-84df-d603ab0f69c2
+releases:
+- 8
 description: |-
   Found in the review of DEV-611 (`3cf93d5e`).
 
@@ -294,3 +296,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-611","DEV-624","DEV-579","DEV-591","DEV-620","DEV-622"]}'
     new: '{"related":["DEV-611","DEV-624","DEV-579","DEV-591","DEV-620","DEV-622","DEV-626"]}'
+- at: 2026-11-17T06:37:37.534599+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

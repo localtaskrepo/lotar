@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T02:28:12.068626+00:00
-modified: 2026-11-17T04:53:08.579252+00:00
+modified: 2026-11-17T06:37:38.840080+00:00
 relationships:
   depends_on:
   - DEV-633
@@ -159,6 +159,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a71d5c7-b8ff-42b3-b52a-df4b8c6def20
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A672ad60e-a391-4f2f-8c50-0d8c6c40098e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae06cfae1-49d1-4b5c-bb8b-f91a9b96879f
+releases:
+- 8
 description: 'Found in the DEV-633 review: `docs/help/agent.md:238` says end-rule actions that find the storage lock busy are kept and resumed, but not that end rules whose checkpoint a full disk refused (ENOSPC) are now kept in the process and retried every 30 s, nor that this is lost when the process exits. Done when that paragraph describes both cases.'
 history:
 - at: 2026-11-17T02:28:14.925851+00:00
@@ -305,3 +307,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-633"],"related":["DEV-633"]}'
     new: '{"depends_on":["DEV-633"],"related":["DEV-633","DEV-630"]}'
+- at: 2026-11-17T06:37:38.840080+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#8'

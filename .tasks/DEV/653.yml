@@ -1,0 +1,29 @@
+title: 'Partial cleanup per step: each job step removes the build output the next step doesn''t use, measured'
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-17T06:51:34.275016+00:00
+relationships:
+  depends_on:
+  - DEV-652
+  related:
+  - DEV-579
+description: |-
+  Owner 2026-11-17, in his words: "We could even do partial cleanup this way for things that are no longer need after a phase". He picked "Follow-up after DEV-652" (chief of staff options picker).
+
+  Builds on DEV-652: one lotar-made worktree per ticket, shared by fix, review and merge, and a cleanup command that automation rules run.
+
+  ## What
+  1. Measure first, in a lotar worktree after lint + tests + smoke: size of `target/debug/incremental`, the workspace crates' own artifacts, dependencies, smoke reports/artifacts, coverage, other profiles. And what removing each costs the next step (time to rebuild before lint/tests/smoke run again).
+  2. One rule per step (configs in .tasks/DEV/automation.yml, standards copy in configs/lotar/automation.yml through a standards ticket), each kept only if it saves space and doesn't make the next step noticeably slower:
+     - Fix done, review next: smoke reports and artifacts, coverage, release/ci builds.
+     - Review passed, merge next: test scratch and leftovers; incremental only if the merge rebuilds anyway.
+     - Waiting (HelpNeeded, Blocked): incremental and the workspace crates' artifacts, dependencies kept. This one changes STD-95 ("build output stays until Done", owner 2026-11-13): proposed, off until the owner says yes (HelpNeeded, one question).
+     - Done: everything (as today).
+  3. Never touches a worktree with a running job; a rework after a failed review keeps everything.
+
+  ## Done when
+  - [ ] Measurements in a comment (sizes per part, rebuild time per step, before and after).
+  - [ ] The kept rules run on a real ticket through fix, review and merge (checked, not assumed); docs/help/automation.md and agent.md say so.
+  - [ ] lint, tests and smoke pass.
