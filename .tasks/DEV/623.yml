@@ -5,14 +5,15 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-17T03:15:16.553511+00:00
+modified: 2026-11-17T04:33:11.029478+00:00
 relationships:
+  blocks:
+  - DEV-645
   related:
   - DEV-604
   - DEV-378
   - DEV-525
   - DEV-629
-  - DEV-645
 comments:
 - date: 2026-11-16T22:24:43.617057+00:00
   author: claude
@@ -313,3 +314,9 @@ history:
   - field: assignee
     old: '@review'
     new: mallox
+- at: 2026-11-17T04:33:11.029478+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-645"]}'
+    new: '{"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629"]}'

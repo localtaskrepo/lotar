@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-17T03:35:00.829240+00:00
-modified: 2026-11-17T04:30:47.550430+00:00
+modified: 2026-11-17T04:33:53.034192+00:00
 relationships:
   related:
   - DEV-639
@@ -43,6 +43,7 @@ comments:
     next: Review, then merge; DEV-639 applies the same wait to dev626_resumed_t3_threads_test.rs:151,182
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e087eb6-5c16-45be-a23f-eaa19605023d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44a89add-4cbd-46fa-8e3d-78c425619b72
 description: |-
   Found in the DEV-639 review (2026-11-16), on branch `agent/DEV-639` (`08cd964f2`).
 
@@ -96,3 +97,8 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-17T04:33:53.034192+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44a89add-4cbd-46fa-8e3d-78c425619b72

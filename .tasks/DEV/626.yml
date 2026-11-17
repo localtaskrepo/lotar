@@ -1,11 +1,11 @@
 title: After a restart T3 Code resumes cut-off job threads on its own, outside any lotar job, and their tickets stay HelpNeeded
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T22:53:21.812089+00:00
-modified: 2026-11-17T03:51:04.557838+00:00
+modified: 2026-11-17T04:33:29.163524+00:00
 relationships:
   blocks:
   - DEV-639
@@ -154,6 +154,34 @@ comments:
       result: not_run
       reason: Rust and docs only, fix agent ran it (405 passed)
     next: 'Merge: rebase onto main (drops duplicate DEV-620 commit, resolve one conflict in agent_job_service.rs)'
+- date: 2026-11-17T04:31:46.110444+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-626 is on `main` as `e39ca4b31`.
+
+    - **Rebase onto main** `841295405`: git dropped the duplicate DEV-620 commit `1227e5bde`. One conflict in `agent_job_service.rs` `running_t3_thread`: main had extracted `t3_launch()`. I kept the branch's `t3_cli(tasks_dir)` call and built `t3_cli` on `t3_launch()`, so both sides are kept. No lockfile changed.
+    - **Checks on the rebased commit `00beb6789`:**
+      - `npm run lint`: passed.
+      - `npm test`: all 2290 Rust tests passed. 6 web tests timed out in the full run while the machine's load average was 56 to 136 from other builds. The change has no `view/` files, and the 5 failing files pass when run alone (108 tests).
+      - `npm run smoke`: 405 tests passed.
+    - **Main checkout:** fast-forwarded with `git merge --ff-only`. Other `.tasks` changes, all ticket edits, were amended into the commit as the job says (`00beb6789` became `e39ca4b31`).
+    - **Pushed:** `841295405..e39ca4b31`. The main checkout was clean, and no other commit was waiting.
+    - **Trust:** not needed, as no rules or agent profiles changed.
+    - **Next:** DEV-639 copies the old commit, so it needs a rebase onto `e39ca4b31`.
+  report:
+    commits:
+    - hash: e39ca4b31
+      what: DEV-626 adopt T3 Code threads that run again after their job ended (on main, pushed)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2290 Rust passed; 6 UI tests in 5 files timed out at load avg 56-136 (no view/ files changed), all 5 files pass alone (108 tests)
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: 'None: ticket goes to Done; DEV-639 next needs a rebase onto e39ca4b31'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ae3bded-6bb0-4dbe-b1d4-32538275daa2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae33ee74-c0c4-408b-b956-bbb269e447c7
@@ -177,8 +205,6 @@ description: |-
   - [ ] Not adopted, with one comment per thread run that names the thread and says to stop it in T3 Code: a second running thread of the same ticket (the newest job's thread is adopted); a thread beside an active job on the ticket. Left alone without a comment: a thread that waits for an answer (DEV-600 hold), a ticket with a queued entry (the entry waits for the thread, as before), a done ticket's thread (the owner's own use), and the thread of a cancelled job (the cancel said no job follows it).
   - [ ] When T3 Code can't list its threads, nothing happens and the next look tries again; when the session can't be opened, the new job fails with the reason and its `job_failed` rules run.
   - [ ] Tests with the fake t3: a thread that turns running with no job is adopted and its end rule runs once; a second running thread on the ticket gets the comment; a waiting thread is left alone. Docs in docs/help/agent.md.
-tags:
-- review-returned
 history:
 - at: 2026-11-16T22:53:23.635327+00:00
   actor: claude
@@ -403,3 +429,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T04:31:46.110444+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:33:29.163524+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned
+    new: ''

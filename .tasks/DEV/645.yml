@@ -1,14 +1,15 @@
 title: lotar agent list-jobs shows a memory hold from an old reading once no process reads memory
-status: InProgress
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T03:02:08.605225+00:00
-modified: 2026-11-17T04:08:58.216382+00:00
+modified: 2026-11-17T04:33:45.239555+00:00
 relationships:
-  related:
+  depends_on:
   - DEV-623
+  related:
   - DEV-633
 comments:
 - date: 2026-11-17T03:23:48.590451+00:00
@@ -56,6 +57,35 @@ comments:
     - Reran `cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(agent_queue) | test(worker_state)'` with `RUSTC_WRAPPER=`: 17 passed. Didn't rerun full lint/test/smoke (the fix agent's run passed)
     - **Blocking 1:** `3ebc174f` is a cherry-pick of DEV-623 (`d8659a72`). The merge rule has no dependency check, so the merge agent would put DEV-623 on main before the owner releases it. Fix: drop `3ebc174f` and base the fix on `agent/DEV-623`, add `depends_on DEV-623` and set DEV-645 to Blocked, so "Prerequisites done" continues it once DEV-623 is Done. Then rebase onto main
     - **Blocking 2:** `bb7cc837` is an old copy of DEV-633 (main has `9c10760f`). The code is the same but `.tasks` differs, so `git rebase main` stops on it with conflicts in 9 `.tasks/DEV/*.yml` files. Fix: rebase it away (`git rebase --skip` on that commit); after the skip, the other two commits rebase cleanly (tried in a scratch worktree, since removed)
+- date: 2026-11-17T04:33:21.002734+00:00
+  author: claude
+  text: |-
+    Rework: both review findings fixed; the branch is now only DEV-645 on top of DEV-623, and the ticket waits for DEV-623.
+
+    - Finding 1 (DEV-623 would land too): dropped the cherry-pick `3ebc174f`; `git rebase --onto agent/DEV-623 3ebc174f` put the fix on `d8659a72` as `8e9a061e`. `git log main..HEAD` is `d8659a72` (DEV-623, still on its own branch) + `8e9a061e`
+    - DEV-623 moved from related to depends-on; status Blocked, so "Prerequisites done: continue the waiting ticket" picks it up once DEV-623 is Done
+    - Finding 2 (old DEV-633 copy `bb7cc837`): gone with the same rebase; main has it as `9c10760f`
+    - Nothing discarded: `3ebc174f`/`bb7cc837` are copies of `d8659a72` (on `agent/DEV-623`) and `9c10760f` (on main)
+  report:
+    commits:
+    - hash: 8e9a061e
+      what: the fix, now on top of agent/DEV-623 (d8659a72); same diff as 0beba08b
+    checks:
+    - command: cargo nextest run --workspace -E 'test(memory_gate) | test(dev623) | test(agent_queue) | test(worker_state)'
+      result: passed
+      reason: '17'
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: not_run
+      reason: code diff unchanged since the full run on 0beba08b; only the base moved to agent/DEV-623, whose own full run passed
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: same reason
+    next: 'Waits for DEV-623 (Blocked, depends-on). Once DEV-623 is Done: rebase onto main (d8659a72 drops out), rerun lint/test/smoke, review'
+- date: 2026-11-17T04:33:45.239555+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-623.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeca30204-ae6e-4451-9660-94e8242f4b0e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A577c8b27-c103-4ecf-b1eb-5dad6f458e1d
@@ -171,3 +201,29 @@ history:
   - field: status
     old: Reviewing
     new: InProgress
+- at: 2026-11-17T04:33:11.031908+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-633"]}'
+    new: '{"depends_on":["DEV-623"],"related":["DEV-633"]}'
+- at: 2026-11-17T04:33:21.002734+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:33:44.792466+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T04:33:45.194561+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-17T04:33:45.239555+00:00
+  actor: automation
+  changes:
+  - field: comment_added

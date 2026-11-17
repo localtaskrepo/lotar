@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T04:30:54.353926+00:00
+modified: 2026-11-17T04:33:43.767165+00:00
 relationships:
   related:
   - DEV-614
@@ -226,6 +226,9 @@ comments:
       result: not_run
       reason: passed on 99ee73da0 in the first fix job (405)
     next: Merge agent lands 99ee73da0 on main
+- date: 2026-11-17T04:33:43.767165+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-638 is assigned to @review now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22b1bf8c-7133-4be8-b911-a6234f55843e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e669ea5-0714-4b68-9b9c-a06ebd8772d7
@@ -433,3 +436,7 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-17T04:33:43.767165+00:00
+  actor: automation
+  changes:
+  - field: comment_added
