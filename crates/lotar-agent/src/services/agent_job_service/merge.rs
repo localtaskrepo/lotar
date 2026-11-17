@@ -130,13 +130,16 @@ impl Merge<'_> {
         if rev_parse(&root, &format!("refs/heads/{branch}")).is_none() {
             return Err(hand_off(format!("`{branch}` doesn't exist")));
         }
-        if merged_landed(&root, self.tasks_dir, &branch).unwrap_or(false) {
-            if let Some(elsewhere) = work_elsewhere(self.tasks_dir, self.ticket_id, &root, &branch) {
-                return Err(hand_off(format!(
-                    "`{branch}` is in `{}` already, but the ticket's work is in another repository: {elsewhere}. Review and merge it there",
-                    self.main
-                )));
-            }
+        let landed = merged_landed(&root, self.tasks_dir, &branch).unwrap_or(false);
+        // Work in another repository is merged there first (DEV-677), also
+        // when this branch has commits of its own (DEV-679).
+        if let Some(elsewhere) = work_elsewhere(self.tasks_dir, self.ticket_id, &root, &branch) {
+            let here = if landed { format!("`{branch}` is in `{}` already", self.main) } else { format!("`{branch}` isn't merged yet") };
+            return Err(hand_off(format!(
+                "{here}, but the ticket's work is in another repository: {elsewhere}. Review and merge it there, and `{branch}` here too"
+            )));
+        }
+        if landed {
             return Err(Stop::Nothing(format!("`{branch}` is in `{}` already", self.main)));
         }
         let trusted_before = TrustService::state(self.tasks_dir) == TrustState::Trusted;

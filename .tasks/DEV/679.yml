@@ -1,14 +1,49 @@
 title: A merge job lands lotar's agent/<ID> and sets the ticket Done while another repo's agent/<ID> still holds the ticket's unmerged commits
-status: InProgress
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T22:20:59.906600+00:00
-modified: 2026-11-17T22:22:39.890893+00:00
+modified: 2026-11-17T22:35:40.854715+00:00
 relationships:
   related:
   - DEV-677
+comments:
+- date: 2026-11-17T22:29:38.755441+00:00
+  author: claude
+  text: |-
+    Fixed: a merge no longer lands lotar's branch or completes while another repo the ticket names still holds unmerged commits on its `agent/<ID>`.
+
+    - Built on `agent/DEV-677` (`a369866a7`, not on main yet): this fix needs its `work_elsewhere`. Merge DEV-677 first; the rebase then drops it.
+    - `merge.rs` `land`: checks `work_elsewhere` before the rebase, whether or not lotar's branch is on main, and hands off to the merge agent without landing anything.
+    - `agent_job_service.rs` `ensure_branch_merged`: checks `work_elsewhere` before the fast-forward too. Job fails ("Merge job finished, but <ID>'s work is in another repository: ..."), lotar's branch stays unmerged. A handback still wins. `merged_despite_failure` unchanged (it only applies once lotar's branch is on main).
+    - New tests in `dev605_merge_without_agent_test.rs`: deterministic hand-off, agent path fails, agent path that lands the other repo completes and lotar fast-forwards. The first two fail without the fix.
+    - `docs/help/agent.md`: merge-job paragraph and merge step 1.
+  report:
+    commits:
+    - hash: de3eaede6
+      what: merge refuses to complete or land lotar's branch while another repo's agent/<ID> holds unmerged commits
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review de3eaede6; it builds on DEV-677's a369866a7 (not on main yet), so merge DEV-677 first
+- date: 2026-11-17T22:35:34.186062+00:00
+  author: claude
+  text: |-
+    Review: passed. `de3eaede6` does all that "Done when" asks; no findings, no tickets filed.
+
+    - Read: the ticket, DEV-677 (now on main as `45fd197f9`, same code as `a369866a7`), `AGENTS.md`, the diff of `merge.rs` `land`, `agent_job_service.rs` `ensure_branch_merged`, `merge::work_elsewhere`, the new tests and `docs/help/agent.md`.
+    - Deterministic merge: `work_elsewhere` now runs before the rebase whether or not lotar's branch is on main, and hands off naming the other repo.
+    - `ensure_branch_merged`: a branch git can't judge still passes; `work_elsewhere` runs before the fast-forward and fails the job, a handback still wins; the landed path and `merged_despite_failure` are unchanged.
+    - Failing test first: with the old `crates/lotar-agent` (from `a369866a7`) in a scratch worktree, `lotars_merge_hands_off_before_landing_when_the_work_is_in_both_repositories` and `a_merge_agent_that_leaves_the_other_repository_unmerged_fails` fail; with the fix all 17 `dev605` tests pass.
+    - Merge note: `a369866a7` (DEV-677) is on main now as `45fd197f9`; the rebase will drop it or conflict only in `.tasks`. `de3eaede6` cherry-picks cleanly onto `main`.
+    - Reran: `npm ci` passed; `npm run lint:agent` passed; `npm run test:rust:agent` passed (2357); `npm run test:smoke:agent` passed (405). Didn't rerun `test:ui`, `test:release` or `test:hooks`: the change doesn't touch the UI or the scripts.
+    - No UI changes, no stray files; the worktree is left clean.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac11cca5c-ca9e-495f-a496-7fc2dd72e741
 description: |-
@@ -61,3 +96,29 @@ history:
       - [ ] `git` can't judge lotar's branch: passes as before.
       - [ ] Tests in `dev605_merge_without_agent_test.rs` for the deterministic hand-off, the agent path failing, and the agent path completing; each fails without the fix where it can.
       - [ ] `docs/help/agent.md` describes the case.
+- at: 2026-11-17T22:29:38.755441+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:29:47.303389+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T22:35:34.186062+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:35:40.854715+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

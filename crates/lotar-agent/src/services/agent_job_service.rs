@@ -4848,7 +4848,9 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// ticket) is not fast-forwarded: it passes with the branch unmerged. A
 /// branch that had nothing beyond main when the job started fails while
 /// another of the ticket's branches (`prefix` names them) holds work main
-/// lacks (DEV-602): the merge missed the fix.
+/// lacks (DEV-602): the merge missed the fix. A merge fails, and leaves the
+/// branch unmerged, while another repository the ticket names still holds
+/// its work (`merge::work_elsewhere`, DEV-677, DEV-679).
 fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, prefix: &str) -> Result<Option<String>, String> {
     let Some((branch, start, assignee_at_start)) =
         JOB_REGISTRY.lock().ok().and_then(|registry| {
@@ -4880,30 +4882,30 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
             format!("The agent handed {ticket_id} back ({to}): LoTaR leaves {branch} unmerged")
         })
     };
-    match merged_landed(&repo_root, tasks_dir, &branch) {
-        Ok(true) => {
-            // The ticket's work is in another repository (DEV-677): lotar's
-            // branch on main says nothing about it.
-            if let Some(elsewhere) = merge::work_elsewhere(tasks_dir, ticket_id, &repo_root, &branch) {
-                return match handed_back() {
-                    Some(handed_back) => Ok(Some(handed_back)),
-                    None => Err(format!("Merge job finished, but {ticket_id}'s work is in another repository: {elsewhere}")),
-                };
-            }
-            let brought_nothing = start.as_deref().is_some_and(|start| {
-                git_stdout(&repo_root, &["cherry", start, &format!("refs/heads/{branch}")]).is_ok_and(|out| !out.lines().any(|line| line.starts_with('+')))
-            });
-            if brought_nothing && let Some(holder) = unlanded_ticket_branch(tasks_dir, ticket_id, prefix, Some(&branch)) {
-                return Err(format!(
-                    "Merge job finished, but {branch} has nothing beyond the main checkout's branch, while {holder} holds {ticket_id}'s work that isn't in it: the merge missed the fix"
-                ));
-            }
-            record_landing(&repo_root, &branch);
-            return Ok(None);
+    // A branch git can't judge passes, like a merged one.
+    let Ok(landed) = merged_landed(&repo_root, tasks_dir, &branch) else {
+        return Ok(None);
+    };
+    // The ticket's work is (also) in another repository (DEV-677, DEV-679):
+    // lotar's branch says nothing about it, and stays unmerged until that
+    // repository's main holds the work.
+    if let Some(elsewhere) = merge::work_elsewhere(tasks_dir, ticket_id, &repo_root, &branch) {
+        return match handed_back() {
+            Some(handed_back) => Ok(Some(handed_back)),
+            None => Err(format!("Merge job finished, but {ticket_id}'s work is in another repository: {elsewhere}")),
+        };
+    }
+    if landed {
+        let brought_nothing = start.as_deref().is_some_and(|start| {
+            git_stdout(&repo_root, &["cherry", start, &format!("refs/heads/{branch}")]).is_ok_and(|out| !out.lines().any(|line| line.starts_with('+')))
+        });
+        if brought_nothing && let Some(holder) = unlanded_ticket_branch(tasks_dir, ticket_id, prefix, Some(&branch)) {
+            return Err(format!(
+                "Merge job finished, but {branch} has nothing beyond the main checkout's branch, while {holder} holds {ticket_id}'s work that isn't in it: the merge missed the fix"
+            ));
         }
-        // A branch git can't judge passes, like a merged one.
-        Err(_) => return Ok(None),
-        Ok(false) => {}
+        record_landing(&repo_root, &branch);
+        return Ok(None);
     }
     if let Some(handed_back) = handed_back() {
         return Ok(Some(handed_back));

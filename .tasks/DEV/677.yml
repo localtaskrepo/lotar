@@ -1,11 +1,11 @@
 title: Review and merge of a ticket whose work is in another repo run in lotar's checkout, find nothing to merge and set it Done
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T21:38:23.343839+00:00
-modified: 2026-11-17T22:21:18.412374+00:00
+modified: 2026-11-17T22:25:50.834655+00:00
 relationships:
   related:
   - DEV-564
@@ -109,13 +109,37 @@ comments:
     - **Done-when:** "the merge refuses Done when the ticket names another repo's branch with commits beyond its main". This holds on all three paths: the merge without an agent hands off, a successful agent run fails the job, a failed runner fails it. The test `a_ticket_whose_work_is_in_another_repository_is_not_done` would end `completed` without the fix: "Nothing to merge", as in the bug.
     - **Reran:** `npm ci` (ok), `cargo fmt --all --check` (ok), `cargo clippy --all-targets --all-features -- -D warnings` (ok), `npm run test:rust:agent -- merge` (51 passed). Not rerun: full `npm test` and `npm run smoke` (the fix agent reports both passed).
     - **Minor, filed:** [DEV-679](https://lotar.pyxzl.net/task/DEV-679). When lotar's branch has commits too, the merge lands it and completes without checking the other repo. That case is outside this ticket's "commits only in another repo".
+- date: 2026-11-17T22:25:50.681990+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-677` is in `main`.
+
+    - Rebased `agent/DEV-677` onto `main` (`a6fd74304cc0`): `a369866a7ae0`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `a369866a7ae0`
+    - Amended the pending `.tasks` changes into the merged commit: `45fd197f992f`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[merge:cross-repo-ticket]`
+  report:
+    commits:
+    - hash: 45fd197f9
+      what: DEV-677 Review and merge of a ticket whose work is in another repo run in lotar's checkout, find nothing to merge and set it Done
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1281cd0-9ddf-4d8c-9f38-add5d9fe61ec
 description: 'Found (STD-138, 2026-11-17): DEV-564 lives in lotar''s .tasks but its work is harnessmux branch agent/DEV-564 (9977dec). Twice, review and merge ran in lotar''s checkout, saw lotar''s empty agent/DEV-564, reported ''Nothing to merge: agent/DEV-564 is in main already'' and automation set DEV-564 Done, though the reopen comment named the harnessmux checkout and branch. DEV-636 landed only because its reviewer read the fix comment''s next step. Check: a ticket in lotar''s .tasks with commits only in another repo''s agent/<ID> ends Done with that repo''s main unchanged. Done: jobs for such a ticket run in the repo that holds the work (or the merge refuses Done when the ticket names another repo''s branch with commits beyond its main), with a test.'
 tags:
 - health
-- review-returned
-- review-returned-twice
 custom_fields:
   finding: merge:cross-repo-ticket
 history:
@@ -261,3 +285,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T22:25:50.681990+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:25:50.834655+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned, review-returned-twice
+    new: health

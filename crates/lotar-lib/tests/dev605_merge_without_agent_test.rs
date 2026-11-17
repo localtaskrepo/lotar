@@ -263,6 +263,49 @@ fn a_failed_merge_agent_leaves_work_in_another_repository_unfinished() {
     assert_eq!(status, "failed", "lotar's branch on main doesn't complete the job: the work is in the other repository");
 }
 
+/// DEV-679: lotar's branch has commits too. The merge agent `lands` the
+/// other repository's branch or not.
+fn work_in_both_repositories(merge_config: &str, lands: bool) -> (Repo, String, Option<String>) {
+    let repo = Repo::new(merge_config);
+    repo.commit_fix("feature.txt", "feature\n");
+    let other = work_in_another_repository(&repo);
+    if lands {
+        let agent = repo.outside.path().join("merge-agent.sh");
+        let script = fs::read_to_string(&agent).expect("read agent");
+        fs::write(&agent, format!("{script}cd '{}' && git merge -q --ff-only {BRANCH}\n", other.display())).expect("write agent");
+    }
+    let (status, prompt) = repo.merge();
+    (repo, status, prompt)
+}
+
+#[test]
+fn lotars_merge_hands_off_before_landing_when_the_work_is_in_both_repositories() {
+    let (repo, status, prompt) = work_in_both_repositories(CHECKS, false);
+
+    let prompt = prompt.expect("the merge agent ran");
+    assert!(prompt.contains("isn't merged yet, but the ticket's work is in another repository") && prompt.contains("holds 1 commit beyond"), "{prompt}");
+    assert!(!repo.on_main("feature.txt"), "lotar's branch waits for the other repository");
+    assert_eq!(status, "failed", "the merge agent left the other repository's branch unmerged");
+}
+
+#[test]
+fn a_merge_agent_that_leaves_the_other_repository_unmerged_fails() {
+    let (repo, status, prompt) = work_in_both_repositories("", false);
+
+    assert!(prompt.is_some(), "the merge agent ran");
+    assert_eq!(status, "failed", "the other repository's main lacks the work");
+    assert!(!repo.on_main("feature.txt"), "lotar doesn't fast-forward its own branch meanwhile");
+}
+
+#[test]
+fn a_merge_agent_that_lands_the_other_repository_lands_lotars_branch_too() {
+    let (repo, status, prompt) = work_in_both_repositories("", true);
+
+    assert!(prompt.is_some(), "the merge agent ran");
+    assert_eq!(status, "completed");
+    assert!(repo.on_main("feature.txt"), "lotar fast-forwards its own branch");
+}
+
 #[test]
 fn a_conflict_hands_off_to_the_merge_agent() {
     let repo = Repo::new(CHECKS);
