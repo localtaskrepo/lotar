@@ -3885,6 +3885,7 @@ fn run_session(
     }
     let repo_root = resolve_repo_root(tasks_dir);
     let mut worktrees_before = None;
+    let mut t3_setup_recorded = false;
     if launch.runner_kind == AgentRunnerKind::T3 {
         let title =
             Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, ticket_id, None).ok()).map(|task| task.title).unwrap_or_default();
@@ -3892,6 +3893,11 @@ fn run_session(
         if let Some(plan) = launch.t3_plan.as_ref() {
             session_profile.worktree_base = Some(plan.base.clone());
             session_profile.branch = plan.branch.clone();
+            if !launch.resume
+                && let Some(root) = repo_root.as_deref()
+            {
+                t3_setup_recorded = record_t3_worktree_setup(job_id, root, ticket_id, plan, profile, session_profile.provider.as_deref());
+            }
         }
         // A continued thread makes no worktree: it keeps the one run_job
         // checked for it, not one another job's thread made meanwhile.
@@ -3925,6 +3931,12 @@ fn run_session(
         record_and_emit(state, "agent_job_progress", Some(note));
     });
     let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile.max_budget_usd, context_messages);
+    if t3_setup_recorded && let Some(root) = repo_root.as_deref() {
+        let note = crate::services::t3_worktree_setup::finish(root, job_id);
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
+        });
+    }
     if let (Some(root), Some(before)) = (repo_root.as_deref(), worktrees_before.as_deref()) {
         let thread = crate::services::agent_runner::registry().load(launch.name).ok().and_then(|record| record.agent_session);
         let program = table.get(launch.agent).ok().and_then(|spec| block_on(spec.launch_command()).ok()).map(|(program, _)| program);
@@ -3932,6 +3944,36 @@ fn run_session(
         record_t3_worktree(job_id, root, before, named);
     }
     end
+}
+
+/// Leave the profile's `tools.disallowed` and `env` for the T3 project's
+/// worktree script, which writes them into the new thread's Claude settings
+/// (DEV-618). Only Claude threads read them: provider `claudeAgent`, or none
+/// (the project's default model). A failure is logged and the thread starts
+/// without them.
+fn record_t3_worktree_setup(
+    job_id: &str,
+    repo_root: &std::path::Path,
+    ticket_id: &str,
+    plan: &T3Worktree,
+    profile: &AgentProfileDetail,
+    provider: Option<&str>,
+) -> bool {
+    if provider.is_some_and(|provider| !provider.to_ascii_lowercase().contains("claude")) {
+        return false;
+    }
+    let deny = profile.tools.as_ref().map(|tools| tools.disallowed.clone()).unwrap_or_default();
+    let env = crate::services::agent_runner::expand_env_map(&profile.env).into_iter().collect();
+    match crate::services::t3_worktree_setup::record(repo_root, job_id, ticket_id, &plan.base, plan.branch.as_deref(), &deny, env) {
+        Ok(recorded) => recorded,
+        Err(err) => {
+            let note = format!("The thread starts without the profile's tools.disallowed and env: {err}");
+            update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+            false
+        }
+    }
 }
 
 /// The worktree T3 Code runs `thread` in, from `t3 thread show <thread> --json`.

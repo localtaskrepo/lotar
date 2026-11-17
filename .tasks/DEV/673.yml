@@ -1,11 +1,11 @@
 title: 'Job end can''t move agent/DEV-530 to the thread''s branch: the branch is checked out in the ticket worktree (DEV-595 and DEV-577 came back)'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-17T19:57:31.784714+00:00
-modified: 2026-11-17T20:17:13.000595+00:00
+modified: 2026-11-17T20:21:34.913859+00:00
 relationships:
   blocks:
   - DEV-530
@@ -70,6 +70,32 @@ comments:
     - Docs line in `docs/help/agent.md` matches the code. No stray files, one commit.
     - Still open, as the fix agent says: after the merge, rerun the job ends of DEV-530 and DEV-619 to meet "Done when" on the real case.
     - Findings: none. Tickets filed: none.
+- date: 2026-11-17T20:21:34.703510+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-673` is in `main`.
+
+    - Rebase onto `main` changed nothing (`290b9b180adc`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `290b9b180adc`
+    - Amended the pending `.tasks` changes into the merged commit: `a11c67715081`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[infra:branch-in-worktree:DEV-530]`
+  report:
+    commits:
+    - hash: a11c67715
+      what: 'DEV-673 Job end can''t move agent/DEV-530 to the thread''s branch: the branch is checked out in the ticket worktree (DEV-595 and DEV-577 came back)'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6528b5b-b6bf-4cfe-af1b-ddf5cdcb30b9
 description: 'Found: job-20261117T194848.004Z-23 (DEV-530) finished its rebase (commit 254749ae on t3/resume-held-jobs-after-prerequisites-2) and failed at the end: git branch --force agent/DEV-530 254749ae failed, agent/DEV-530 is checked out at /Users/mallox/.t3/worktrees/lotar/DEV-530 (still at 769a2130). DEV-595 and DEV-577 (Done) were meant to cover this. Check: rerun the job end with the ticket branch checked out in a worktree; the branch moves, or the job ends the worktree first. Done when: the DEV-530 case ends without error and a test covers it.'
@@ -158,3 +184,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T20:21:34.703510+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:21:34.913859+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: Done

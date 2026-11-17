@@ -45,6 +45,10 @@ impl AgentHandler {
             AgentAction::Worktree(args) => match args.action {
                 WorktreeAction::List => Self::worktree_list(resolver, renderer),
                 WorktreeAction::Cleanup(cleanup_args) => Self::worktree_cleanup(&cleanup_args, resolver, renderer),
+                WorktreeAction::Setup => {
+                    Self::worktree_setup(renderer);
+                    Ok(())
+                }
             },
             AgentAction::Worker(args) => Self::worker(args, resolver),
         }
@@ -616,6 +620,18 @@ impl AgentHandler {
             renderer.emit_raw_stdout(format_args!("  {} -> {}{} [{}]{}", wt.ticket_id, detached, wt.branch, wt.path, status));
         }
         Ok(())
+    }
+
+    /// Runs in T3 Code's worktree script before the project's own setup
+    /// (`npm ci`), so it never fails: a worktree no job is starting a thread
+    /// in is left as it is (DEV-618).
+    fn worktree_setup(renderer: &OutputRenderer) {
+        let worktree = std::env::var_os("T3CODE_WORKTREE_PATH").map(std::path::PathBuf::from).or_else(|| std::env::current_dir().ok());
+        match worktree.map(|worktree| crate::services::t3_worktree_setup::setup(&worktree)) {
+            Some(Ok(Some(done))) => renderer.emit_info(done),
+            Some(Err(err)) => renderer.emit_warning(format!("lotar agent worktree setup: {err}")),
+            Some(Ok(None)) | None => {}
+        }
     }
 
     fn worktree_cleanup(args: &WorktreeCleanupArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {

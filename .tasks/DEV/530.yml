@@ -1,10 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-17T20:03:28.295481+00:00
+modified: 2026-11-17T20:29:54.935666+00:00
 relationships:
   depends_on:
   - DEV-673
@@ -854,6 +855,28 @@ comments:
 
     - The rebase work is finished: `254749ae` on `t3/resume-held-jobs-after-prerequisites-2`, checks passed.
     - The job failed only at its end: `git branch --force agent/DEV-530 254749ae` refused, the branch is checked out in `/Users/mallox/.t3/worktrees/lotar/DEV-530` (at `769a2130`). Infrastructure, not the work (owner 2026-11-15, `docs/decisions/2026-11-15-inbox-triage.md`).
+- date: 2026-11-17T20:29:48.402556+00:00
+  author: claude
+  text: |-
+    DEV-673 is done; the finished work is on this job's branch again and ready to merge.
+
+    - Cherry-picked the reviewed rebase `254749ae` onto main `a11c6771` (one new commit, DEV-673): applied cleanly, no file changes beyond it.
+    - New commit `7c62efa9` on `t3/resume-held-jobs-after-prerequisites-3`, signed, not pushed.
+    - `npm run lint`, `npm test` (2322 Rust, 1548 frontend) and `npm run smoke` (405) passed.
+  report:
+    commits:
+    - hash: 7c62efa9
+      what: DEV-530 replayed onto main a11c6771 (DEV-673)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2322 Rust, 1548 frontend
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Merge agent lands 7c62efa9 on main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -870,6 +893,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A14a0ebb5-4769-4e50-a249-c516350c34c9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A26365793-0068-49f1-8c92-00a0e20ce261
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8841da47-b3e2-4fc1-9a39-9ff8db727eb5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade442be8-2502-4950-b6e5-487f4bbfd53d
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -1906,3 +1930,32 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-673"],"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673"]}'
     new: '{"depends_on":["DEV-673"],"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672"]}'
+- at: 2026-11-17T20:21:37.433319+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T20:22:00.117466+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T20:22:00.736316+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade442be8-2502-4950-b6e5-487f4bbfd53d
+- at: 2026-11-17T20:29:48.402556+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:29:54.935666+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

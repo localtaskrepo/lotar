@@ -415,7 +415,7 @@ pub fn validate_run_setting(name: &str, value: &str) -> LoTaRResult<()> {
     if valid { Ok(()) } else { Err(LoTaRError::ValidationError(format!("Invalid agent {name} '{value}': use letters, digits and . _ - : / @ [ ] only"))) }
 }
 
-fn expand_env_map(env: &BTreeMap<String, String>) -> HashMap<String, String> {
+pub(crate) fn expand_env_map(env: &BTreeMap<String, String>) -> HashMap<String, String> {
     env.iter().map(|(key, value)| (key.clone(), expand_env_value(value))).collect()
 }
 

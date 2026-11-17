@@ -15,10 +15,17 @@ use std::time::{Duration, Instant};
 
 /// `t3 thread start` appends its prompt to `prompts`, names thread t1, prints "Started." and exits with `start-exit` after `start-sleep` seconds;
 /// `thread send` prints "Sent."; `thread show` prints `show.json`; `thread list` prints `list.json` (or fails while
-/// `list-fail` exists). Every call goes to `calls`.
+/// `list-fail` exists). Every call goes to `calls`. While `setup` names a lotar binary, `thread start` makes the
+/// thread's worktree in `worktree` and runs `lotar agent worktree setup` there, as T3 Code's worktree script does.
 const FAKE_T3: &str = r#"#!/bin/sh
 dir=$(dirname "$0")
 echo "$1 $2" >> "$dir/calls"
+if [ "$1 $2" = "thread start" ] && [ -f "$dir/setup" ]; then
+  prev=""
+  for arg in "$@"; do case "$prev" in --worktree) base=$arg ;; --branch) branch=$arg ;; esac; prev=$arg; done
+  git -C "$3" worktree add -q -b "$branch" "$dir/worktree" "$base"
+  T3CODE_WORKTREE_PATH="$dir/worktree" "$(cat "$dir/setup")" agent worktree setup >> "$dir/setup-out" 2>&1
+fi
 case "$1 $2" in
   "thread start") cat >> "$dir/prompts"; echo "Thread t1" >&2; sleep "$(cat "$dir/start-sleep")"; echo "Started."; exit "$(cat "$dir/start-exit")" ;;
   "thread send") cat > /dev/null; echo "Sent." ;;
@@ -404,4 +411,58 @@ fn a_job_whose_worktree_setup_fails_logs_the_failure() {
     let jobs = cli(&["--format", "json", "agent", "list-jobs"]);
     assert!(jobs.contains("\"status\":\"failed\"") && jobs.contains("Worktree setup failed"), "{jobs}");
     assert!(!harness.calls().contains("thread"), "no session was started: {}", harness.calls());
+}
+
+/// DEV-618: a job whose profile sets `tools.disallowed` and `env` gets them into its thread's new worktree through
+/// T3 Code's worktree script, its log says so, and no commit takes the file.
+#[test]
+fn a_t3_job_gives_its_thread_worktree_the_profiles_tools_and_env() {
+    let harness = harness(0, 0);
+    let config = harness.fixtures.tasks_root.join("config.yml");
+    let text = std::fs::read_to_string(&config)
+        .unwrap()
+        .replace("    model: m\n", "    model: m\n    tools:\n      disallowed: [Artifact]\n    env:\n      FOO: bar\n");
+    std::fs::write(&config, text).unwrap();
+    with_worktrees(&harness);
+    std::fs::write(harness.dir.join("setup"), crate::common::lotar_bin().to_string_lossy().as_ref()).unwrap();
+    harness.show("completed", "null", 0, "Started.");
+    harness.command().assert().success();
+
+    let settings = std::fs::read_to_string(harness.dir.join("worktree/.claude/settings.local.json"))
+        .unwrap_or_else(|err| panic!("{err}: {}", std::fs::read_to_string(harness.dir.join("setup-out")).unwrap_or_default()));
+    let settings: serde_json::Value = serde_json::from_str(&settings).unwrap();
+    assert_eq!(settings, serde_json::json!({"permissions": {"deny": ["Artifact"]}, "env": {"FOO": "bar"}}));
+    let cli = |args: &[&str]| {
+        let output = crate::common::lotar_cmd().unwrap().current_dir(harness.fixtures.get_temp_path()).args(args).output().unwrap();
+        String::from_utf8_lossy(&output.stdout).to_string()
+    };
+    let jobs: serde_json::Value = serde_json::from_str(&cli(&["--format", "json", "agent", "list-jobs"])).unwrap();
+    let id = jobs["jobs"][0]["id"].as_str().or_else(|| jobs[0]["id"].as_str()).unwrap_or_else(|| panic!("{jobs}")).to_string();
+    let logs = cli(&["agent", "logs", &id]);
+    assert!(logs.contains("Wrote .claude/settings.local.json"), "{logs}");
+    let root = harness.fixtures.get_temp_path();
+    let committed = std::process::Command::new("git").args(["log", "--name-only", "--format=", "main..agent/TEST-1"]).current_dir(root).output().unwrap();
+    assert!(!String::from_utf8_lossy(&committed.stdout).contains(".claude"), "{}", String::from_utf8_lossy(&committed.stdout));
+}
+
+/// DEV-618: without the worktree script's `lotar agent worktree setup` the job says so; a profile without
+/// `tools.disallowed` or `env` leaves no record and no note.
+#[test]
+fn a_t3_job_says_when_the_worktree_script_left_out_the_setup() {
+    let harness = harness(0, 0);
+    let config = harness.fixtures.tasks_root.join("config.yml");
+    let text = std::fs::read_to_string(&config).unwrap().replace("    model: m\n", "    model: m\n    tools:\n      disallowed: [Artifact]\n");
+    std::fs::write(&config, text).unwrap();
+    with_worktrees(&harness);
+    harness.show("completed", "null", 0, "Started.");
+    harness.command().assert().success();
+    let cli = |args: &[&str]| {
+        let output = crate::common::lotar_cmd().unwrap().current_dir(harness.fixtures.get_temp_path()).args(args).output().unwrap();
+        String::from_utf8_lossy(&output.stdout).to_string()
+    };
+    let jobs: serde_json::Value = serde_json::from_str(&cli(&["--format", "json", "agent", "list-jobs"])).unwrap();
+    let id = jobs["jobs"][0]["id"].as_str().or_else(|| jobs[0]["id"].as_str()).unwrap_or_else(|| panic!("{jobs}")).to_string();
+    let logs = cli(&["agent", "logs", &id]);
+    assert!(logs.contains("doesn't run `lotar agent worktree setup`"), "{logs}");
+    assert!(!harness.fixtures.get_temp_path().join(".git/lotar/t3-worktree-setup").read_dir().unwrap().any(|_| true), "the record is gone");
 }

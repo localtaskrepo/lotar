@@ -11,3 +11,4 @@ pub mod agent_runner;
 pub mod automation_matching;
 pub mod automation_service;
 pub mod automation_validation;
+pub mod t3_worktree_setup;
