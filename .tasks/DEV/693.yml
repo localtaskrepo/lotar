@@ -1,0 +1,32 @@
+title: 'Agent job history: keep job records and logs by age (14 days) instead of the last 500 per repo'
+status: Todo
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T03:06:47.346896+00:00
+modified: 2026-11-18T03:06:47.837245+00:00
+relationships:
+  related:
+  - DEV-211
+  - DEV-560
+description: |-
+  Owner 2026-11-17 in the cos thread, on lotar and T3 performance, picked "Job history by age" (keep job logs by days, for example 14, instead of the last 500 per repo).
+
+  Measured 2026-11-17: @agent-logs is capped at 500 (MAX_JOB_LOGS), 3.0-3.4 MB per repo; lotar ran 284 jobs on 2026-11-17 (UTC), so the cap keeps about 2 days. Older jobs drop out of `lotar agent list-jobs`, `lotar agent logs` and the timeline while their tickets still link them (comments name job IDs). Related: DEV-211 (keep job logs by default, Done), DEV-560 (timeline showed only the last 200 events).
+
+  Change: keep job records and logs for a configurable age (default 14 days) with a size guard instead of a count; never drop a job of an open ticket or a running one.
+
+  Done when: the setting is documented in docs/help/agent.md, a test shows a 15-day-old job of a Done ticket removed and a 15-day-old job of an open ticket kept, and lotar's current size per repo at 14 days is estimated in a comment.
+history:
+- at: 2026-11-18T03:06:47.596115+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-211","DEV-560"]}'
+- at: 2026-11-18T03:06:47.837245+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,11 +1,11 @@
 title: DEV-604 is Done, but its work e4edce9b never reached main
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T02:02:14.561899+00:00
-modified: 2026-11-18T02:32:57.124824+00:00
+modified: 2026-11-18T03:04:32.004642+00:00
 relationships:
   blocks:
   - DEV-664
@@ -54,6 +54,32 @@ comments:
     - **Old branches:** `agent/DEV-604`, `t3/b9902be4`, `t3/09cc8d99` and `t3/ae62354d` hold only `e4edce9b`. `t3/pause-queue-on-signing-disk-failure` holds only `6fc5011a`, the version before the rework, and `t3/acb65239` holds only `48d4054e6`. Nothing on them is lost by landing this.
     - **Not done here:** "Done when" also asks to delete those branches, which can only happen after the merge. I filed [DEV-690](https://lotar.pyxzl.net/task/DEV-690) (depends on DEV-686) for the branches and the two worktrees on them.
     - **For the merge:** `git merge-base --is-ancestor e4edce9b main` stays false because the hash changes. Check for this commit on main instead.
+- date: 2026-11-18T03:04:31.829544+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-686` is in `main`.
+
+    - Rebased `agent/DEV-686` onto `main` (`3cbe25d9b975`): `affd106f6358`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `affd106f6358`
+    - Amended the pending `.tasks` changes into the merged commit: `978bedf02cb5`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[unlanded:DEV-604]`
+  report:
+    commits:
+    - hash: 978bedf02
+      what: DEV-686 DEV-604 is Done, but its work e4edce9b never reached main
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57e721af-2a57-41c3-9276-69e61d0592fa
 - attachment: DEV-604-agents-after-dark-1440.952b0eddfc66399766af64ead144a82a.png
@@ -207,3 +233,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T03:04:31.829544+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:04:32.004642+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

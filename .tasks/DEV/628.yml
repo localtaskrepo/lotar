@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-18T02:31:18.704045+00:00
+modified: 2026-11-18T03:04:50.676694+00:00
 relationships:
   blocks:
   - DEV-664
@@ -310,6 +310,9 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: prompt text and docs only, no UI
+- date: 2026-11-18T03:04:50.676694+00:00
+  author: claude
+  text: 'Stalled since 2026-11-18T02:31Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
@@ -664,3 +667,17 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T03:04:49.233788+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-18T03:04:50.015997+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-18T03:04:50.676694+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-18T02:35:00.655688+00:00
+modified: 2026-11-18T03:07:41.415959+00:00
 relationships:
   depends_on:
   - DEV-657
@@ -717,3 +717,9 @@ history:
   - field: status
     old: HelpNeeded
     new: Todo
+- at: 2026-11-18T03:07:41.415959+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

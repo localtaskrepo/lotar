@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-18T02:27:08.953170+00:00
-modified: 2026-11-18T02:54:14.515461+00:00
+modified: 2026-11-18T03:07:15.128399+00:00
 relationships:
   related:
   - DEV-687
@@ -40,6 +40,9 @@ comments:
       result: passed
       reason: 405 tests
     next: 'Owner decides: does an older t3 branch of the same ticket count as keeping the work? Then review and merge (after DEV-687)'
+- date: 2026-11-18T03:07:14.274485+00:00
+  author: mallox
+  text: 'Answer: outside-only (Only branches outside the ticket''s own thread branches count) (answered in INBOX-519)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa6b0b5b-e3f3-4a1b-854e-3d73db613432
 description: |-
@@ -86,3 +89,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-18T03:07:14.274485+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:07:15.128399+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
