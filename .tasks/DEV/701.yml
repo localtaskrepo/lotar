@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-18T04:40:49.336024+00:00
-modified: 2026-11-18T05:55:39.384642+00:00
+modified: 2026-11-18T06:08:10.428412+00:00
 relationships:
   related:
   - DEV-653
@@ -32,11 +32,22 @@ comments:
     - command: npm run smoke
       result: passed
     next: Review, then merge
+- date: 2026-11-18T06:07:54.785408+00:00
+  author: claude
+  text: |-
+    Review: blocking. The manual path is fixed, but `lotar automation run` still prints "Queue agent job" without queueing one when it replays an `unblocked` rule.
+
+    - Reviewed `2e50a083d` (the only commit in `main..HEAD`; the branch has no newer rework). Main moved since (`c763f96e9`), but no commit there touches the changed files.
+    - Reran: `npm ci` ok; `cargo nextest run -p lotar-lib --test integration -E 'test(/agent_automation_integration_test::/)'` 53 passed; the new test fails with the old `automation_service.rs` (no job at `agent_automation_integration_test.rs:3422`) and passes with the fix; `cargo clippy -p lotar-agent --all-targets -D warnings`, `rustfmt --check` and `prettier --check` on the changed files are clean. Full `npm run lint/test/smoke` not rerun.
+    - **Blocking: the unblocked path still prints the false line.** `run_unblocked` (`crates/lotar-agent/src/services/automation_service.rs:1036`) builds its output with `describe_action`, which adds "Queue agent job for profile 'X'" whenever `set.assignee` names an agent profile (`:1240-1265`). `apply_action` queues only for `AutomationEvent::Manual` (`reassigns_agent`, `:2332`). An unblocked rule sets the assignee to the agent the ticket already has (blocking keeps the agent as assignee, `docs/help/automation.md:45`), so `maybe_queue_agent_on_assignment` returns at `previous == new` (`:2818`). The run then prints "Queue agent job" with no job and no `note:`, which breaks the ticket's Done ("the CLI never prints 'Queue agent job' without queueing one").
+    - Fix: make `describe_action` print the `queue_agent` line only when a job will be queued: manual events, or `current.assignee` differs from the new one. Otherwise print e.g. "assignee unchanged, no job (use tell_agent)", as the docs at `automation.md:480` already describe. Add a test that replays an unblocked rule on a ticket already assigned to the agent and checks the output.
+    - Note, not blocking: running the same manual rule twice now starts a second job once the first has ended (the fix agent says so). The docs say to use a cooldown or a condition for that, so it's fine.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b20c500-78e5-4ed1-9442-566d04a6100c
 description: 'Found 2026-11-17 by the chief of staff: standards INBOX-397 had assignee @triage with no job. lotar automation run "Inbox: triage again" --select id:INBOX-397 (set assignee @triage, agent triage) printed "Set assignee to agent ''triage''" and "Queue agent job for profile ''triage''", yet lotar agent list-jobs showed no job. After lotar task edit INBOX-397 --assignee mallox the same command queued job-20261118T044015.808Z-1 at once. The same rule queued jobs for INBOX-402, 441 and 443, which had other assignees. Check: an automation run whose agent action targets a ticket already assigned to that agent queues a job (or says why not). Done: a failing test first, then the fix; the CLI never prints "Queue agent job" without queueing one.'
 tags:
 - health
+- review-returned
 custom_fields:
   finding: automation:agent-same-assignee
 history:
@@ -75,3 +86,22 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-653"]}'
+- at: 2026-11-18T06:07:54.785408+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:07:54.844023+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-18T06:08:10.428412+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned

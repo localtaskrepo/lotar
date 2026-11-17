@@ -1,11 +1,11 @@
 title: Job-log pruning removes the logs of a ticket whose ID is ambiguous across tasks roots
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T04:18:55.334249+00:00
-modified: 2026-11-18T05:55:39.384371+00:00
+modified: 2026-11-18T06:01:16.894782+00:00
 relationships:
   related:
   - DEV-693
@@ -38,6 +38,31 @@ comments:
       result: passed
       reason: '405'
     next: Review; merge after DEV-693 lands (rebase drops the cherry-picked 02a098f0f)
+- date: 2026-11-18T06:01:16.193571+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-697` is in `main`.
+
+    - Rebased `agent/DEV-697` onto `main` (`f0fc02a1fee7`): `dbe563777821`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `dbe563777821`
+    - Amended the pending `.tasks` changes into the merged commit: `c763f96e9dbe`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: 00313c5a5
+      what: 'DEV-693 Agent job history: keep job records and logs by age (14 days) instead of the last 500 per repo'
+    - hash: c763f96e9
+      what: DEV-697 Job-log pruning removes the logs of a ticket whose ID is ambiguous across tasks roots
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25b351b7-9605-42e4-8c6c-25a2d0eecb84
 description: |-
@@ -152,3 +177,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-693","DEV-703"]}'
     new: '{"related":["DEV-693","DEV-703","DEV-653"]}'
+- at: 2026-11-18T06:01:16.193571+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:01:16.894782+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

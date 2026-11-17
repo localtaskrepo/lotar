@@ -5944,6 +5944,45 @@ mod tests {
         assert_eq!(resolved, "You are in the TESTING phase.");
     }
 
+    /// Worktree cleanup holds the registry through slow git commands; an
+    /// update waiting for it must not hold the task and sprint locks
+    /// meanwhile, or CLI writes fail as busy (DEV-643).
+    #[test]
+    fn a_task_update_waits_for_the_registry_without_holding_the_storage_locks() {
+        let dir = tempdir().unwrap();
+        let tasks_dir = dir.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+        fs::write(tasks_dir.join("config.yml"), "default:\n  project: LCK\n").unwrap();
+        // SAFETY: test-local override, as in the tests around it.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", dir.path().join("queue")) };
+        let mut storage = Storage::new(&tasks_dir);
+        let created = crate::services::task_service::TaskService::create(
+            &mut storage,
+            crate::api_types::TaskCreate { title: "Locks".to_string(), project: Some("LCK".to_string()), ..Default::default() },
+        )
+        .unwrap();
+
+        let registry = JOB_REGISTRY.lock().unwrap();
+        let update_dir = tasks_dir.clone();
+        let update = std::thread::spawn(move || {
+            let patch = crate::api_types::TaskUpdate { title: Some("Locks renamed".to_string()), ..Default::default() };
+            crate::services::task_service::TaskService::update(&mut Storage::new(&update_dir), &created.id, patch)
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+        while std::time::Instant::now() < deadline {
+            for (dir, name) in [(tasks_dir.join("LCK"), "task"), (tasks_dir.join("@sprints"), crate::storage::safety::sprint_lock_name())] {
+                if dir.is_dir() {
+                    let lock = crate::storage::safety::acquire_storage_lock_within(&dir, name, std::time::Duration::ZERO);
+                    assert!(lock.is_ok(), "{name} lock held while the update waits for the registry: {lock:?}");
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        drop(registry);
+        assert_eq!(update.join().unwrap().unwrap().title, "Locks renamed");
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
     #[test]
     fn instructions_expand_to_literal_ticket_values() {
         let dir = tempdir().unwrap();

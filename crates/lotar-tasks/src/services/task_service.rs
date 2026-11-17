@@ -1040,6 +1040,10 @@ impl TaskService {
         // together under the sprints + project locks. Errors leave every
         // affected file unchanged; automation runs strictly post-commit.
         let changes_relationships = patch.relationships.is_some() || relationship_delta.is_some();
+        // Looked up before the locks: the job registry can be busy for
+        // seconds (worktree cleanup holds it through git), and waiting for
+        // it under the locks turns other writers away (DEV-643).
+        let running_job = Self::running_job_id(storage.root_path.as_path(), &canonical);
         let relationship_context = if changes_relationships { Some(crate::services::relationships::external_locks(storage)?) } else { None };
         let mut txn = if changes_relationships {
             MultiFileTransaction::begin_all(&storage.root_path, std::slice::from_ref(&derived))?
@@ -1105,9 +1109,7 @@ impl TaskService {
         // actions carrying the job's id) is held back and recorded as the
         // job's outcome, applied when the job ends. Other fields stay
         // editable so people can still talk to the agent.
-        if let Some(job_id) = Self::running_job_id(storage.root_path.as_path(), &canonical)
-            .filter(|job_id| !context.bypass_active_job_lock && !Self::is_job_lifecycle(job_id, &canonical))
-        {
+        if let Some(job_id) = running_job.filter(|job_id| !context.bypass_active_job_lock && !Self::is_job_lifecycle(job_id, &canonical)) {
             let mut outcome = crate::api_types::JobOutcome { job_id, ..Default::default() };
             if let Some(next) = patch.assignee.take() {
                 let trimmed = next.trim();
