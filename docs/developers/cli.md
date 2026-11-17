@@ -35,7 +35,7 @@ Each section links to relevant source files and tests. Additions should follow t
 - **User help:** [../help/list.md](../help/list.md)
 - **Args & handler:** `TaskSearchArgs` in `crates/lotar-lib/src/cli/args/task.rs`; `SearchHandler` and `TaskPostFilters` in `crates/lotar-lib/src/cli/handlers/task/search.rs`.
 - **Core services:** `storage::manager::Storage` for reads and text/custom-field filtering, the post-filter pipeline in `search.rs`, and the shared `services::task_query` sorting executor.
-- **Features:** alias `ls`, multi-project resolution, the web search syntax as the positional query (`crates/lotar-core/src/utils/search_syntax.rs`, checked against `crates/lotar-core/tests/fixtures/search_syntax_cases.json` together with the web parser), value flags that add to it, the shared task query (`crates/lotar-lib/src/services/task_list.rs`), limit/sort combination, text and JSON output. `table`/`markdown`/`md` are text aliases; malformed terms fail before searching.
+- **Features:** alias `ls`, multi-project resolution, the web search syntax as the positional query (`crates/lotar-core/src/utils/search_syntax.rs`, checked against `crates/lotar-core/tests/fixtures/search_syntax_cases.json` together with the web parser), value flags that add to it, the shared task query (`crates/lotar-tasks/src/services/task_list.rs`), limit/sort combination, text and JSON output. `table`/`markdown`/`md` are text aliases; malformed terms fail before searching.
 - **Tests:** `crates/lotar-lib/tests/cli_list_alias_test.rs`, `crates/lotar-lib/tests/cli_list_effort_filters_and_sort_test.rs`, `crates/lotar-lib/tests/cli_list_pagination_test.rs`, `crates/lotar-lib/tests/dev75_cli_list_contract_test.rs`.
 
 ### lotar status

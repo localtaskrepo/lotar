@@ -13,8 +13,6 @@ use std::path::{Path, PathBuf};
 use crate::api_types::{TaskMoveChange, TaskMoveRequest, TaskMoveResponse};
 use crate::config::types::ResolvedConfig;
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::services::agent_job_service::AgentJobService;
-use crate::services::agent_queue_service::AgentQueueService;
 use crate::services::attachment_service::AttachmentService;
 use crate::services::task_service::TaskService;
 use crate::services::task_validation as validation;
@@ -218,9 +216,7 @@ impl TaskService {
     /// A job running on the task, or waiting in the queue, works on its old
     /// ID and files; moving underneath it would split the work.
     fn ensure_no_agent_work(root: &Path, id: &str) -> LoTaRResult<()> {
-        let queued =
-            AgentQueueService::list_pending(root).unwrap_or_default().iter().any(|entry| crate::storage::identity::aliases_match(&entry.ticket_id, id));
-        if AgentJobService::has_active_job(id) || queued {
+        if crate::hooks::get().agent_work_pending(root, id) {
             return Err(LoTaRError::ValidationError(format!(
                 "Task '{id}' has an agent job running or queued; wait for it to finish or stop it before moving the task"
             )));

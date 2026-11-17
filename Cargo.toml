@@ -1,12 +1,14 @@
 # DEV-497: a workspace, so a web-only change rebuilds only the embedded assets
 # (crates/lotar-web-assets) and the `lotar` binary (this package). The library
-# and its tests (crates/lotar-lib) don't depend on the assets. The binary's
+# and its tests (crates/lotar-lib) don't depend on the assets. Below the
+# library: lotar-agent, then lotar-tasks, then lotar-core (DEV-499, DEV-634),
+# so a change in one recompiles only it and the crates above. The binary's
 # package is the root one, named `lotar`, so `cargo install lotar` and
 # `cargo install --path .` install the `lotar` command.
 [workspace]
-members = [".", "crates/lotar-core", "crates/lotar-lib", "crates/lotar-web-assets"]
+members = [".", "crates/lotar-core", "crates/lotar-tasks", "crates/lotar-agent", "crates/lotar-lib", "crates/lotar-web-assets"]
 # Without this, cargo at the root builds and tests only the binary's package.
-default-members = [".", "crates/lotar-core", "crates/lotar-lib", "crates/lotar-web-assets"]
+default-members = [".", "crates/lotar-core", "crates/lotar-tasks", "crates/lotar-agent", "crates/lotar-lib", "crates/lotar-web-assets"]
 resolver = "3"
 
 [workspace.package]
@@ -43,6 +45,8 @@ clap = { version = "4.6.7", features = ["derive", "std", "env", "error-context",
 # these with [workspace.package] (docs/release-guide.md).
 # The library picks lotar-core's features (parallel, schema) through its own.
 lotar-core = { path = "crates/lotar-core", version = "=0.15.3", default-features = false }
+lotar-tasks = { path = "crates/lotar-tasks", version = "=0.15.3" }
+lotar-agent = { path = "crates/lotar-agent", version = "=0.15.3" }
 lotar-lib = { path = "crates/lotar-lib", version = "=0.15.3" }
 lotar-web-assets = { path = "crates/lotar-web-assets", version = "=0.15.3" }
 

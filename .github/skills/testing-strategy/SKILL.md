@@ -37,7 +37,7 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
 - Fast clippy-only loop (lib+bins, no `--all-targets`/`--all-features`): `npm run lint:backend:fast`
 - `npm run test:rust` and `test:rust:agent` run `npm run build:web` first; `include_dir!` (crates/lotar-web-assets) requires the generated `target/web-embed` directory. In a fresh worktree run `npm run build:web` yourself before other cargo commands (raw nextest, clippy).
 - Don't narrow Rust runs with `-p lotar-lib`: its tests run the `lotar` binary of the root package, which only a workspace run rebuilds. Filter with `-E` instead.
-- The core modules' unit tests (`crates/lotar-core`, DEV-499) run no binary: `cargo nextest run --cargo-profile dev -p lotar-core` builds only that crate.
+- The unit tests of `crates/lotar-core` (DEV-499), `crates/lotar-tasks` and `crates/lotar-agent` (DEV-634) run no binary, so `-p` works for them: `cargo nextest run --cargo-profile dev -p lotar-agent` builds that crate and the ones below it.
 - Sandbox denial is not a code failure: when cargo stops before compiling with `sccache` (the `rustc-wrapper` in `~/.cargo/config.toml`) and `Operation not permitted`, the agent sandbox blocked the cache server. Rerun the same command with the harness's approval for unsandboxed execution; if that is refused, rerun it with `RUSTC_WRAPPER=` (empty disables the wrapper; a slower, uncached build). Report which retry ran.
 
 ## UI unit tests (vitest)

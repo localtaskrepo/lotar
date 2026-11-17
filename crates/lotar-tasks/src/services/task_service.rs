@@ -1,9 +1,7 @@
 use crate::api_types::{DeletionFilter, TaskCreate, TaskDTO, TaskDeleteResponse, TaskListFilter, TaskUpdate};
 use crate::config::types::{GlobalConfig, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::services::agent_job_service::AgentJobService;
 use crate::services::attachment_service::AttachmentService;
-use crate::services::automation_service::AutomationService;
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::task_validation::{self as validation};
 use crate::storage::TaskId;
@@ -123,7 +121,7 @@ pub(crate) struct PushedComment {
 
 /// Extras for [`TaskService::create_with`].
 #[derive(Debug, Default)]
-pub(crate) struct CreateOptions {
+pub struct CreateOptions {
     /// Stored as the `finding` custom field after validation.
     pub finding: Option<String>,
     /// Leave the `created` automation to the caller, which runs it after
@@ -199,7 +197,7 @@ pub fn normalize_report(report: crate::types::CommentReport) -> LoTaRResult<Opti
 /// "<author> (...):" or "<author>, <date>:": the comment records its author
 /// already, so the name would show twice (DEV-470). Text that is only the
 /// name is refused.
-pub(crate) fn strip_author_prefix<'a>(text: &'a str, author: Option<&str>) -> LoTaRResult<&'a str> {
+pub fn strip_author_prefix<'a>(text: &'a str, author: Option<&str>) -> LoTaRResult<&'a str> {
     let Some(author) = author.map(str::trim).filter(|author| !author.is_empty()) else {
         return Ok(text);
     };
@@ -282,7 +280,7 @@ impl TaskService {
     /// project (`default.project`, `LOTAR_PROJECT`) when set (DEV-311), else
     /// an existing project (DEV-312), else a prefix from the repository
     /// folder name.
-    pub(crate) fn resolve_create_project(tasks_root: &Path, project: Option<String>) -> String {
+    pub fn resolve_create_project(tasks_root: &Path, project: Option<String>) -> String {
         project.unwrap_or_else(|| {
             if let Ok(config) = crate::config::resolution::load_and_merge_configs(Some(tasks_root)) {
                 let default = config.default_project.trim();
@@ -309,7 +307,7 @@ impl TaskService {
     }
 
     /// [`Self::create`] with the extras a finding report needs (DEV-317).
-    pub(crate) fn create_with(storage: &mut Storage, req: TaskCreate, options: CreateOptions) -> LoTaRResult<TaskDTO> {
+    pub fn create_with(storage: &mut Storage, req: TaskCreate, options: CreateOptions) -> LoTaRResult<TaskDTO> {
         let TaskCreate {
             title,
             project,
@@ -492,7 +490,7 @@ impl TaskService {
         if options.skip_automation {
             return Ok(dto);
         }
-        let _ = AutomationService::apply_task_update(storage, None, &dto, &config);
+        crate::hooks::get().task_saved(storage, None, &dto, &config);
 
         // Re-fetch after automation may have mutated the task
         let dto = Self::get(storage, &id, Some(&project)).unwrap_or(dto);
@@ -830,7 +828,7 @@ impl TaskService {
             dto = Self::get(storage, &dto.id, Some(&project)).unwrap_or(dto);
         }
         if fire_commented {
-            let _ = AutomationService::apply_comment_event(storage, &dto, &comment, &config);
+            crate::hooks::get().comment_added(storage, &dto, &comment, &config);
             dto = Self::get(storage, &dto.id, Some(&project)).unwrap_or(dto);
         }
         dto
@@ -956,7 +954,7 @@ impl TaskService {
 
     /// Internal collection deltas compose against the task read under the same
     /// transaction that validates and publishes the rule's complete candidate.
-    pub(crate) fn update_with_relationship_delta(
+    pub fn update_with_relationship_delta(
         storage: &mut Storage,
         id: &str,
         patch: TaskUpdate,
@@ -987,7 +985,7 @@ impl TaskService {
                 held.status.clone_from(&outcome.status);
                 held.assignee.clone_from(&outcome.assignee);
             }
-            match crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)? {
+            match crate::hooks::get().defer_job_outcome(&storage.root_path, &outcome)? {
                 Some(recorded) => receipt.deferred = Some(recorded).filter(|recorded| !recorded.is_empty()),
                 None => {
                     let applied = Self::update_composed(storage, &receipt.dto.id, held, retry_context, None::<fn(&mut crate::types::TaskRelationships)>)?;
@@ -1437,14 +1435,14 @@ impl TaskService {
         }
 
         if context.allow_agent_automation && (context.question_answer.is_none() || fields_changed) {
-            let _ = AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
+            crate::hooks::get().task_saved(storage, Some(&previous_dto), &dto, &config);
         }
 
         if previous_dto.status != dto.status {
-            crate::services::agent_job_service::cleanup_done_ticket_worktree(storage.root_path.as_path(), &canonical);
+            crate::hooks::get().status_changed(storage.root_path.as_path(), &canonical);
         }
         // Every close, automation's own included, can unblock dependents (DEV-385).
-        AutomationService::fire_unblocked_dependents(storage, &previous_dto, &dto);
+        crate::hooks::get().dependents_unblocked(storage, &previous_dto, &dto);
 
         Ok(TaskUpdateReceipt { dto, changed: true, deferred: None })
     }
@@ -1548,7 +1546,7 @@ impl TaskService {
     /// The agent job running (or queued) for the ticket: in this process,
     /// or in another one for the same tasks directory (DEV-279).
     fn running_job_id(tasks_root: &Path, id: &str) -> Option<String> {
-        AgentJobService::active_job_id(id).or_else(|| crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_root, id).map(|job| job.job_id))
+        crate::hooks::get().running_job_id(tasks_root, id)
     }
 
     /// Whether this process is part of the job's lifecycle: an automation
@@ -1557,7 +1555,7 @@ impl TaskService {
     /// `LOTAR_AUTOMATION_EVENT`. The job's agent carries the first two but
     /// no event (DEV-531), and T3 threads none, so their changes become the
     /// job's outcome.
-    pub(crate) fn is_job_lifecycle(job_id: &str, id: &str) -> bool {
+    pub fn is_job_lifecycle(job_id: &str, id: &str) -> bool {
         let env = |name: &str| std::env::var(name).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
         // Canonical alias comparison: padded aliases of the ticket match;
         // unparseable values never do.
@@ -2006,7 +2004,7 @@ impl TaskService {
     /// [`Self::list`] including move stubs, for scans that must recognize
     /// them (sync pulls match a remote issue to its stub and skip it instead
     /// of importing it again).
-    pub(crate) fn list_with_moved(storage: &Storage, filter: &TaskListFilter) -> Vec<(String, TaskDTO)> {
+    pub fn list_with_moved(storage: &Storage, filter: &TaskListFilter) -> Vec<(String, TaskDTO)> {
         Self::list_matching(storage, filter, true)
     }
 
@@ -2136,7 +2134,7 @@ impl TaskService {
         }
     }
 
-    pub(crate) fn load_sprint_lookup(storage: &Storage) -> HashMap<String, BTreeMap<u32, u32>> {
+    pub fn load_sprint_lookup(storage: &Storage) -> HashMap<String, BTreeMap<u32, u32>> {
         let mut map = Self::sprint_lookup_for_root(storage);
 
         // DEV-56: merge sprint orders from sibling workspace roots so
@@ -2278,7 +2276,7 @@ impl TaskService {
         Ok(())
     }
 
-    pub(crate) fn missing_members_for_task(task: &Task, config: &ResolvedConfig) -> Vec<String> {
+    pub fn missing_members_for_task(task: &Task, config: &ResolvedConfig) -> Vec<String> {
         if !config.auto_populate_members {
             return Vec::new();
         }
@@ -2318,7 +2316,7 @@ impl TaskService {
         missing
     }
 
-    pub(crate) fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
+    pub fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
         crate::config::resolution::config_for_project(tasks_root, Some(project_prefix)).unwrap_or_else(|error| {
             let mut fallback = ResolvedConfig::from_global(GlobalConfig::default());
             crate::config::resolution::apply_cli_overrides(&mut fallback);
@@ -2336,7 +2334,7 @@ impl TaskService {
     /// Config for validating a write: unlike
     /// [`Self::resolve_config_for_project`], a broken config file fails the
     /// write instead of validating against built-in defaults (DEV-265).
-    pub(crate) fn resolve_config_for_mutation(tasks_root: &Path, project_prefix: &str) -> LoTaRResult<ResolvedConfig> {
+    pub fn resolve_config_for_mutation(tasks_root: &Path, project_prefix: &str) -> LoTaRResult<ResolvedConfig> {
         crate::config::resolution::config_for_project_strict(tasks_root, Some(project_prefix)).map_err(|err| LoTaRError::ValidationError(err.to_string()))
     }
 
@@ -2380,7 +2378,7 @@ impl TaskService {
         }
     }
 
-    pub(crate) fn enforce_membership(task: &Task, config: &ResolvedConfig, project: &str) -> LoTaRResult<()> {
+    pub fn enforce_membership(task: &Task, config: &ResolvedConfig, project: &str) -> LoTaRResult<()> {
         if !config.strict_members {
             return Ok(());
         }

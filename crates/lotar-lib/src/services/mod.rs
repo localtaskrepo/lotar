@@ -1,49 +1,21 @@
-pub mod agent_active_jobs;
-pub mod agent_context_service;
-pub mod agent_job_service;
-pub mod agent_log_service;
-pub mod agent_queue_service;
-pub mod agent_runner;
-pub mod attachment_metadata;
-pub mod attachment_previews;
-pub mod attachment_service;
+// Agent jobs, automation and the task services are crates of their own
+// (DEV-634); re-exported so `crate::services::task_service` here and
+// `lotar::services::agent_job_service` in tests and binaries keep working.
+pub use lotar_agent::services::*;
+
 pub mod audit_service;
-pub mod automation_matching;
-pub mod automation_service;
-pub mod automation_validation;
 pub mod branding_service;
-pub mod completion;
 pub mod config_service;
-pub mod external_tasks;
 pub mod finding_service;
-pub mod memory_cache;
 pub mod project_service;
-pub mod reference_service;
-pub mod relationships;
-pub mod release_service;
 pub mod repo_file_service;
 pub mod scan_anchor_service;
 pub mod scan_service;
 pub mod sprint_analytics;
-pub mod sprint_assignment;
-pub mod sprint_integrity;
-pub mod sprint_metrics;
 pub mod sprint_reports;
-pub mod sprint_service;
-pub mod sprint_status;
 pub mod sprint_timing;
 pub mod sprint_velocity;
 pub mod sync_report_service;
 pub mod sync_service;
-pub mod task_order;
-pub mod task_service;
 pub mod task_timeline;
-pub mod task_validation;
 pub mod theme_file;
-
-pub mod task_list;
-pub mod task_move;
-pub mod task_query;
-pub mod task_questions;
-pub mod task_renumber;
-pub mod task_reviews;

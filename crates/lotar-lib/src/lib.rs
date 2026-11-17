@@ -16,9 +16,12 @@ compile_error!(
 // The core modules are a crate of their own (DEV-499); re-exported so
 // `crate::config` here and `lotar::config` in tests and binaries keep working.
 pub use lotar_core::{api_events, api_types, config, errors, output, project, scanner, storage, types, utils, workspace};
+// Automation and agent jobs are crates/lotar-agent, the task services below
+// them crates/lotar-tasks (DEV-634). The task services reach automation
+// through hooks, which every entry point installs with `install_hooks()`.
+pub use lotar_agent::{automation, hooks, install_hooks};
 
 pub mod api_server;
-pub mod automation;
 pub mod cli;
 pub mod help;
 pub mod mcp;
@@ -40,3 +43,18 @@ pub(crate) mod test_env;
 #[cfg(test)]
 #[path = "../../lotar-core/tests/common/unit_test_environment.rs"]
 mod test_environment;
+
+// Unit tests run without main(), so they install the hooks themselves.
+#[cfg(test)]
+#[ctor::ctor(unsafe)]
+fn install_hooks_for_tests() {
+    install_hooks();
+}
+
+#[cfg(test)]
+mod hooks_installed_test {
+    #[test]
+    fn unit_tests_run_with_the_agent_hooks_installed() {
+        assert!(crate::hooks::installed(), "lotar_agent::install_hooks() must run before any task mutation");
+    }
+}

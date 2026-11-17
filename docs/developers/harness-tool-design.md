@@ -43,10 +43,10 @@ of its own after the switch.
 
 ## What lotar has today
 
-- `crates/lotar-lib/src/services/agent_runner.rs` (1771 lines): 12 runner kinds (`codex`, `claude`, `copilot`, `gemini`, `cursor`,
+- `crates/lotar-agent/src/services/agent_runner.rs` (1771 lines): 12 runner kinds (`codex`, `claude`, `copilot`, `gemini`, `cursor`,
   `amp`, `droid`, `opencode`, `kilo`, `antigravity`, `t3`, `command`), flag mapping for model, effort, permissions
   and MCP, and one stream parser per CLI. Almost none of it is lotar-specific.
-- `crates/lotar-lib/src/services/agent_job_service.rs` (4629 lines): mostly lotar's own job logic (queue, prompts, worktrees,
+- `crates/lotar-agent/src/services/agent_job_service.rs` (4629 lines): mostly lotar's own job logic (queue, prompts, worktrees,
   landing, rules), plus generic process handling: spawn through the wrapper, kill the process tree, read pipes,
   write stdin messages.
 - `AgentProfileDetail` (`crates/lotar-core/src/config/types.rs`): runner, permissions, model, effort, provider, session, budget,

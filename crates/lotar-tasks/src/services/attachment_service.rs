@@ -451,18 +451,14 @@ impl AttachmentService {
             let _store_guard = Self::lock_store(&root).map_err(UploadFailure::Failed)?;
             let (stored, created) = Self::store_bytes(&root, filename, &bytes).map_err(|e| UploadFailure::Store(e.to_string()))?;
 
-            #[cfg(test)]
             upload_fault::park_after_store_if_armed();
 
             let mut storage = Storage::new(tasks_root);
-            #[cfg(test)]
             let outcome = if upload_fault::take_fail_next_attach() {
                 Err(LoTaRError::ValidationError("injected attach failure".to_string()))
             } else {
                 Self::attach_managed_reference(&mut storage, task_id, &stored)
             };
-            #[cfg(not(test))]
-            let outcome = Self::attach_managed_reference(&mut storage, task_id, &stored);
             drop(storage);
 
             // A failure here is a write/lock error: remove the file this call
@@ -669,11 +665,13 @@ thread_local! {
     static STORE_LOCKS_HELD: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// Test-only fault injection for the upload store/attach/cleanup sequence.
+/// Fault injection for tests of the upload store/attach/cleanup sequence.
 /// Thread-local, like the DEV-55 transaction fault hooks: production code
-/// paths can never trigger it, and it is compiled out of release builds.
-#[cfg(test)]
-pub(crate) mod upload_fault {
+/// paths can never trigger it. lotar-lib's unit tests inject these faults,
+/// and `cfg(test)` doesn't reach across crates (DEV-634), so the checks are
+/// always compiled and the setters are public and hidden.
+#[doc(hidden)]
+pub mod upload_fault {
     use std::cell::{Cell, RefCell};
     use std::sync::mpsc::{Receiver, Sender};
 
@@ -684,7 +682,7 @@ pub(crate) mod upload_fault {
     }
 
     /// Make the next attach on this thread fail after the blob was stored.
-    pub(crate) fn fail_next_attach() {
+    pub fn fail_next_attach() {
         FAIL_NEXT_ATTACH.with(|cell| cell.set(true));
     }
 
@@ -694,7 +692,7 @@ pub(crate) mod upload_fault {
 
     /// Park the next store->attach transition on this thread: signal
     /// `stored` once the blob exists, then block until `release`.
-    pub(crate) fn arm_park_after_store(stored: Sender<()>, release: Receiver<()>) {
+    pub fn arm_park_after_store(stored: Sender<()>, release: Receiver<()>) {
         PARK_AFTER_STORE.with(|slot| *slot.borrow_mut() = Some((stored, release)));
     }
 

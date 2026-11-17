@@ -66,6 +66,8 @@ fn is_valid_command(command: &str) -> bool {
     )
 }
 fn main() {
+    // Automation and agent jobs react to task changes through these (DEV-634).
+    lotar::install_hooks();
     lotar::web_server::set_embedded_assets(lotar_web_assets::get);
     let args: Vec<String> = env::args().collect();
 

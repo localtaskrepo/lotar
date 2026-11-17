@@ -14,6 +14,7 @@ function fixture() {
     const root = mkdtempSync(join(tmpdir(), 'lotar-stage-crates-'));
     mkdirSync(join(root, 'docs', 'help'), { recursive: true });
     writeFileSync(join(root, 'docs', 'help', 'main.md'), '# main');
+    writeFileSync(join(root, 'docs', 'help', 'agent-instructions.md'), '# agent');
     writeFileSync(join(root, 'docs', 'openapi.json'), '{}');
     mkdirSync(join(root, 'target', 'web-embed', 'assets'), { recursive: true });
     writeFileSync(join(root, 'target', 'web-embed', 'index.html.gz'), 'gz');
@@ -29,6 +30,10 @@ test('copies the docs and the web embed into the crate folders', (t) => {
 
     assert.equal(readFileSync(join(root, 'crates', 'lotar-lib', 'docs', 'help', 'main.md'), 'utf8'), '# main');
     assert.equal(readFileSync(join(root, 'crates', 'lotar-lib', 'docs', 'openapi.json'), 'utf8'), '{}');
+    assert.equal(
+        readFileSync(join(root, 'crates', 'lotar-agent', 'docs', 'help', 'agent-instructions.md'), 'utf8'),
+        '# agent',
+    );
     assert.ok(existsSync(join(root, 'crates', 'lotar-web-assets', 'web-embed', 'index.html.gz')));
     assert.ok(existsSync(join(root, 'crates', 'lotar-web-assets', 'web-embed', 'assets', 'app.js.gz')));
 });

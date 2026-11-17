@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// Copies the files two workspace crates read from outside their folder into
+// Copies the files three workspace crates read from outside their folder into
 // the folder, so `cargo package` and `cargo publish` carry them (DEV-507):
-//   docs/help, docs/openapi.json -> crates/lotar-lib/docs/
-//   target/web-embed             -> crates/lotar-web-assets/web-embed/
+//   docs/help, docs/openapi.json   -> crates/lotar-lib/docs/
+//   docs/help/agent-instructions.md -> crates/lotar-agent/docs/help/ (DEV-634)
+//   target/web-embed               -> crates/lotar-web-assets/web-embed/
 // Inside the workspace the build scripts read the originals; a packaged crate
 // reads these copies (both are gitignored). Run `npm run build:web` first.
-import { cpSync, existsSync, realpathSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { cpSync, existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Each copy is rebuilt from scratch, so files deleted at the source don't
@@ -15,6 +16,10 @@ export function stageCrates(root) {
     const copies = [
         [join(root, 'docs', 'help'), join(root, 'crates', 'lotar-lib', 'docs', 'help')],
         [join(root, 'docs', 'openapi.json'), join(root, 'crates', 'lotar-lib', 'docs', 'openapi.json')],
+        [
+            join(root, 'docs', 'help', 'agent-instructions.md'),
+            join(root, 'crates', 'lotar-agent', 'docs', 'help', 'agent-instructions.md'),
+        ],
         [join(root, 'target', 'web-embed'), join(root, 'crates', 'lotar-web-assets', 'web-embed')],
     ];
     if (!existsSync(join(root, 'target', 'web-embed', 'index.html.gz'))) {
@@ -25,6 +30,7 @@ export function stageCrates(root) {
     }
     for (const [source, dest] of copies) {
         rmSync(dest, { recursive: true, force: true });
+        mkdirSync(dirname(dest), { recursive: true });
         cpSync(source, dest, { recursive: true });
     }
     return copies.map(([, dest]) => dest);

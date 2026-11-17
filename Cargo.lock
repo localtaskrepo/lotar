@@ -1392,6 +1392,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "lotar-agent"
+version = "0.15.3"
+dependencies = [
+ "blake3",
+ "chrono",
+ "ctor",
+ "dirs",
+ "dtor",
+ "fs2",
+ "harnessmux",
+ "libc",
+ "lotar-core",
+ "lotar-tasks",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "sysinfo",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "lotar-core"
 version = "0.15.3"
 dependencies = [
@@ -1434,6 +1457,7 @@ dependencies = [
  "ignore",
  "image",
  "libc",
+ "lotar-agent",
  "lotar-core",
  "notify",
  "predicates",
@@ -1445,9 +1469,28 @@ dependencies = [
  "serde_yaml_ng",
  "sysinfo",
  "tempfile",
- "thiserror",
- "tokio",
  "ureq",
+]
+
+[[package]]
+name = "lotar-tasks"
+version = "0.15.3"
+dependencies = [
+ "blake3",
+ "chrono",
+ "clap",
+ "ctor",
+ "dirs",
+ "dtor",
+ "fs2",
+ "ignore",
+ "image",
+ "libc",
+ "lotar-core",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "tempfile",
 ]
 
 [[package]]

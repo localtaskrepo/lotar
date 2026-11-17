@@ -9,7 +9,6 @@
 use crate::api_types::TaskDTO;
 use crate::config::types::ResolvedConfig;
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::services::automation_service::option_set_patch;
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
 use crate::services::task_validation as validation;
 use crate::storage::manager::Storage;
@@ -145,7 +144,7 @@ pub(crate) fn prepare_answer(
     let patch = if let Some(set) = merged_set(spec, &answer.choice) {
         validate_option_set("answer", &set, config)?;
         let current = TaskService::to_dto(id, task.clone(), None, config, chrono::Utc::now());
-        option_set_patch(storage, &current, config, &set)?
+        crate::hooks::get().option_set_patch(storage, &current, config, &set)?
     } else {
         Default::default()
     };

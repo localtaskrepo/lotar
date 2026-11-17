@@ -1,0 +1,43 @@
+# Agent jobs, their queue and runner, and automation (DEV-634), on the task
+# services (crates/lotar-tasks). crates/lotar-lib builds the CLI and the
+# servers on it and re-exports its modules, so `lotar::services::*` and
+# `lotar::automation` keep working. It never depends on the layers above it.
+[package]
+name = "lotar-agent"
+description = "Agent jobs, queue, runner and automation of the lotar library, on lotar-tasks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+# docs/ is the copy scripts/stage-crates.mjs makes for cargo package.
+include = ["/src/**", "/build.rs", "/docs/**"]
+
+[lints]
+workspace = true
+
+[dependencies]
+lotar-core.workspace = true
+lotar-tasks.workspace = true
+blake3.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+fs2.workspace = true
+harnessmux.workspace = true
+libc.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
+tokio.workspace = true
+
+[dev-dependencies]
+ctor.workspace = true
+dtor.workspace = true
+tempfile.workspace = true
+
+[features]
+# Must follow lotar-core's `schema`: it changes the custom field value type.
+schema = ["lotar-core/schema"]

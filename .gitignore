@@ -26,4 +26,5 @@ __pycache__/
 
 # Copies scripts/stage-crates.mjs makes for cargo package (DEV-507)
 /crates/lotar-lib/docs/
+/crates/lotar-agent/docs/
 /crates/lotar-web-assets/web-embed/

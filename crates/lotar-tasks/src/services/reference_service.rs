@@ -1,6 +1,5 @@
 use crate::api_types::{ReferenceSnippetDTO, ReferenceSnippetLineDTO, TaskDTO};
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::services::automation_service::AutomationService;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
 use crate::storage::task::Task;
@@ -57,7 +56,7 @@ impl ReferenceService {
             return;
         };
         let config = TaskService::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
-        let _ = AutomationService::apply_task_update(storage, Some(previous), &outcome.task, &config);
+        crate::hooks::get().task_saved(storage, Some(previous), &outcome.task, &config);
     }
 
     /// Shared locked commit for reference mutations: parses the canonical

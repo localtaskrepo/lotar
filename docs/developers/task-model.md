@@ -161,7 +161,7 @@ task lock cannot prove that such a file is abandoned or was created by LoTaR.
 | Scanner source replacement | Source locks; outer `.lotar-scan-*` stage plus inner atomic temp | Separate explicit source-parent scope; never inferred from a recursive workspace scan |
 
 The current production call sites are in [storage operations](../../crates/lotar-core/src/storage/operations.rs),
-[sprint service](../../crates/lotar-lib/src/services/sprint_service.rs), [config operations](../../crates/lotar-core/src/config/operations.rs),
+[sprint service](../../crates/lotar-tasks/src/services/sprint_service.rs), [config operations](../../crates/lotar-core/src/config/operations.rs),
 [init scaffolds](../../crates/lotar-lib/src/cli/handlers/config/init/scaffolds.rs),
 [sync service](../../crates/lotar-lib/src/services/sync_service/mod.rs), and [source preparation](../../crates/lotar-core/src/utils/scan.rs).
 These atomic helpers do not establish ownership of home artifacts, agent logs,

@@ -243,3 +243,10 @@ mod task_suggestion_ranking_test;
 mod task_yaml_tolerance_unit_test;
 mod web_api_integration_test;
 mod workspace_unit_test;
+
+// The ctor in common installs the agent hooks (DEV-634); without them the
+// task services would skip automation silently.
+#[test]
+fn integration_tests_run_with_the_agent_hooks_installed() {
+    assert!(lotar::hooks::installed(), "common's ctor must call lotar::install_hooks()");
+}

@@ -694,9 +694,10 @@ jobs:
 
   publish-crates:
     name: Publish crates
-    # lotar-web-assets, lotar-core, lotar-lib, then lotar on crates.io (DEV-507) through
-    # trusted publishing only (DEV-508). Cargo.toml holds the version without the
-    # tag's suffix, so prereleases publish nothing here.
+    # lotar-web-assets, lotar-core, lotar-tasks, lotar-agent, lotar-lib, then lotar
+    # on crates.io (DEV-507, DEV-634) through trusted publishing only (DEV-508).
+    # Cargo.toml holds the version without the tag's suffix, so prereleases
+    # publish nothing here.
     needs: build-and-release
     if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
@@ -761,7 +762,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           # Versions already on crates.io are skipped, so the job can be re-run.
           packages=()
-          for crate in lotar-web-assets lotar-core lotar-lib lotar; do
+          for crate in lotar-web-assets lotar-core lotar-tasks lotar-agent lotar-lib lotar; do
             status="$(curl -s -o /dev/null -w '%{http_code}' -A 'lotar release (github.com/localtaskrepo/lotar)' \
               "https://crates.io/api/v1/crates/${crate}/${version}")"
             if [ "$status" = 200 ]; then

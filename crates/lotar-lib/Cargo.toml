@@ -1,9 +1,10 @@
-# The lotar library (crate name `lotar`), built on crates/lotar-core (DEV-499).
+# The lotar library (crate name `lotar`), built on crates/lotar-core (DEV-499)
+# and crates/lotar-agent (DEV-634), whose modules it re-exports.
 # The root package builds the `lotar` binary from it plus the embedded web UI
 # (DEV-497).
 [package]
 name = "lotar-lib"
-description = "The lotar library: services, automation, CLI handlers and the web server, on lotar-core"
+description = "The lotar library: services, CLI handlers, MCP and the web server, on lotar-agent and lotar-core"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -29,14 +30,12 @@ flate2 = { version = "1.1.10", default-features = false, features = ["rust_backe
 
 [dependencies]
 lotar-core.workspace = true
+lotar-agent.workspace = true
 harnessmux.workspace = true
-tokio.workspace = true
-regex.workspace = true
 chrono.workspace = true
 serde.workspace = true
 serde_yaml_ng.workspace = true
 serde_json.workspace = true
-thiserror = "2.0.21"
 dirs.workspace = true
 clap.workspace = true
 clap_complete = "4.6.11"
@@ -44,7 +43,6 @@ ignore.workspace = true
 notify = "8.2.0"
 pulldown-cmark = { version = "0.13.6", default-features = false }
 blake3.workspace = true
-image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "ico", "tiff"] }
 base64.workspace = true
 ureq = { version = "3.4.2", features = ["json"] }
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
@@ -58,6 +56,8 @@ schemars = { workspace = true, optional = true }
 bstr = "1.13.1"
 
 [dev-dependencies]
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "ico", "tiff"] }
+regex.workspace = true
 assert_cmd = "2.2.2"
 # No default features: its regex feature would turn on regex defaults (DEV-495).
 predicates = { version = "3.1.4", default-features = false }
@@ -67,7 +67,7 @@ dtor.workspace = true
 
 [features]
 default = ["parallel"]
-schema = ["schemars", "lotar-core/schema"]
+schema = ["schemars", "lotar-core/schema", "lotar-agent/schema"]
 
 # Optional features
 parallel = ["lotar-core/parallel"]

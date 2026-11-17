@@ -12,7 +12,7 @@ excludeAgent: ["code-review"]
 - API/server surface: `crates/lotar-lib/src/api_server.rs`, `crates/lotar-lib/src/web_server.rs`, `crates/lotar-lib/src/routes/` (custom HTTP transport, not Axum).
 - DTOs/contracts: `crates/lotar-core/src/api_types.rs`.
 - Storage/domain: `crates/lotar-core/src/storage/`, `crates/lotar-core/src/project.rs`, `crates/lotar-core/src/workspace.rs`.
-- Services: `crates/lotar-lib/src/services/` (task, sprint, sync, agent, automation, …).
+- Services: task and sprint services in `crates/lotar-tasks/src/services/`; agent jobs and automation in `crates/lotar-agent/src/` (reached from the task services through `lotar_tasks::hooks`); config, sync, scan and the rest in `crates/lotar-lib/src/services/` (DEV-634).
 - MCP server (stdio): `crates/lotar-lib/src/mcp/`.
 
 ## Tests + lint

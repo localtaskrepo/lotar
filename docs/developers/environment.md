@@ -103,7 +103,7 @@ All rows below are defined in `crates/lotar-core/src/config/env_overrides.rs`. E
 | --- | --- | --- |
 | `LOTAR_TEST_SILENT` | `1` | Suppresses most warnings during automated tests (`crates/lotar-core/src/output/mod.rs`, CLI handlers). |
 | `LOTAR_VERBOSE` | `1` | Re-enables informational logs (such as config creation) even when tests are silenced. |
-| `LOTAR_DEBUG` | Any non-empty | Appends `stats effort --transitions` internals to `/tmp/lotar_transitions_debug.log` (`crates/lotar-lib/src/cli/handlers/stats/effort.rs`) and prints mention-linking failures to stderr (`crates/lotar-lib/src/services/task_service.rs`). |
+| `LOTAR_DEBUG` | Any non-empty | Appends `stats effort --transitions` internals to `/tmp/lotar_transitions_debug.log` (`crates/lotar-lib/src/cli/handlers/stats/effort.rs`) and prints mention-linking failures to stderr (`crates/lotar-tasks/src/services/task_service.rs`). |
 | `LOTAR_DEBUG_ADD` | `1` | Emits detailed payload logs for `lotar add` into `/tmp/lotar_add_debug.log`. |
 | `LOTAR_DEBUG_STATUS` | Any non-empty | Emits verbose `status` command and storage logs. |
 | `LOTAR_TEST_FAST_IO` | `1` | Shortens SSE debounce timers and heartbeats for local tests (`crates/lotar-lib/src/web_server.rs`). |

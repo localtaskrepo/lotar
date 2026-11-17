@@ -61,6 +61,8 @@ unsafe fn init_lotar_test_environment() {
     scrub_repository_routing_env();
     isolate_tmpdir_under_owned_scratch();
     reset_lotar_test_environment();
+    // Tests that call the services in process need automation (DEV-634).
+    lotar::install_hooks();
 }
 
 /// Remove inherited Git repository-routing variables once per test process.

@@ -71,7 +71,7 @@ Counts are static source counts (`#[test]` / `#[tokio::test]`), not run results;
 - 1498 test functions across `crates/lotar-lib/src/` and `crates/lotar-lib/tests/`
 - 35 agent automation integration tests (`crates/lotar-lib/tests/agent_automation_integration_test.rs`): lifecycle, failure, cancel, multi-phase chaining
 - Related suites: `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-lib/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs`
-- `on.commented` is implemented and covered: `AutomationEvent::Commented` exists in `crates/lotar-lib/src/services/automation_service.rs` and is dispatched by `TaskService::add_comment_with_context` (`crates/lotar-lib/src/services/task_service.rs`); automation's own comment actions use `CommentContext::automation()` and never re-dispatch it (recursion guard). Tested in `crates/lotar-lib/tests/dev60_shared_mutation_test.rs` and the CLI comment tests.
+- `on.commented` is implemented and covered: `AutomationEvent::Commented` exists in `crates/lotar-agent/src/services/automation_service.rs` and is dispatched by `TaskService::add_comment_with_context` (`crates/lotar-tasks/src/services/task_service.rs`); automation's own comment actions use `CommentContext::automation()` and never re-dispatch it (recursion guard). Tested in `crates/lotar-lib/tests/dev60_shared_mutation_test.rs` and the CLI comment tests.
 
 ### Smoke Tests (278 tests across 71 files; static `it(` count)
 
@@ -212,12 +212,12 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 
 | Area | Files |
 |------|-------|
-| Runner adapters | `crates/lotar-lib/src/services/agent_runner.rs` (harnessmux sessions and command runner) |
-| Job lifecycle | `crates/lotar-lib/src/services/agent_job_service.rs` |
-| Job event logs | `crates/lotar-lib/src/services/agent_log_service.rs` |
-| File-backed queue | `crates/lotar-lib/src/services/agent_queue_service.rs` |
-| Automation engine | `crates/lotar-lib/src/services/automation_service.rs`, `crates/lotar-lib/src/services/automation_matching.rs` |
-| Automation types | `crates/lotar-lib/src/automation/types.rs`, `crates/lotar-lib/src/automation/persistence.rs`, `crates/lotar-lib/src/automation/template.rs` |
+| Runner adapters | `crates/lotar-agent/src/services/agent_runner.rs` (harnessmux sessions and command runner) |
+| Job lifecycle | `crates/lotar-agent/src/services/agent_job_service.rs` |
+| Job event logs | `crates/lotar-agent/src/services/agent_log_service.rs` |
+| File-backed queue | `crates/lotar-agent/src/services/agent_queue_service.rs` |
+| Automation engine | `crates/lotar-agent/src/services/automation_service.rs`, `crates/lotar-agent/src/services/automation_matching.rs` |
+| Automation types | `crates/lotar-agent/src/automation/types.rs`, `crates/lotar-agent/src/automation/persistence.rs`, `crates/lotar-agent/src/automation/template.rs` |
 | Config types | `crates/lotar-core/src/config/types.rs` (agent profiles, automation config, worktree config) |
 | Config normalization | `crates/lotar-core/src/config/normalization.rs` (parses dotted aliases such as `issue.states/types/priorities` listed in `crates/lotar-core/src/config/fields.rs`) |
 | CLI args/handlers | `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/src/cli/handlers/agent.rs`, `crates/lotar-lib/src/cli/handlers/mod.rs` |
@@ -251,6 +251,6 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 | Former bug | Resolution |
 |-----|---------|
 | `on.commented` not implemented | `AutomationEvent::Commented` exists and is dispatched by `TaskService::add_comment_with_context`; automation comment actions cannot recurse (`CommentContext::automation()`). |
-| `TaskService::create` returned pre-automation DTO | `create()` re-fetches the task after `apply_task_update` and returns the post-automation state (`crates/lotar-lib/src/services/task_service.rs`). |
+| `TaskService::create` returned pre-automation DTO | `create()` re-fetches the task after `apply_task_update` and returns the post-automation state (`crates/lotar-tasks/src/services/task_service.rs`). |
 | `lotar init --project` mis-placed configs / unset default project | Project config written under the tasks root; `ensure_global_config_has_default` always sets `default.project`. |
 | CLI single-field commands bypassed automation | `priority`/`status`/`assignee`/`due`/`effort` route through `TaskService::update`; covered by `crates/lotar-lib/tests/cli_single_field_automation_test.rs`. |

@@ -16,7 +16,7 @@ automation and the manual checks to run after every tag.
     musl binaries (`packaging/nfpm.yaml`), attached to the same release.
   - npm packages: `@localtaskrepo/lotar` (a small Node launcher that installs the `lotar` command) and one `@localtaskrepo/lotar-<platform>`
     package per binary, assembled by `scripts/npm-packages.mjs` from the release archives.
-  - Crates on crates.io: `lotar` (the binary, `cargo install lotar`), `lotar-lib`, `lotar-core` and `lotar-web-assets`.
+  - Crates on crates.io: `lotar` (the binary, `cargo install lotar`), `lotar-lib`, `lotar-agent`, `lotar-tasks`, `lotar-core` and `lotar-web-assets`.
   - Docker image `mallox/lotar:<version>` built via Buildx, also tagged `latest` (or `next`
     for a prerelease).
   - Homebrew tap update pushed to `localtaskrepo/homebrew-lotar`. The formula installs the
@@ -96,7 +96,7 @@ release ticket is in its own release.
 ## Pre-Release Checklist
 
 1. Update the version under `[workspace.package]` in the root `Cargo.toml`, which every
-   workspace package inherits, and the exact versions of `lotar-core`, `lotar-lib` and `lotar-web-assets`
+   workspace package inherits, and the exact versions of `lotar-core`, `lotar-tasks`, `lotar-agent`, `lotar-lib` and `lotar-web-assets`
    under `[workspace.dependencies]` (a mismatch fails the build), plus `Cargo.lock`, which the
    next `cargo build` updates, and any docs that mention the release number. The root `package.json` keeps its own workspace
    version; the npm packages take theirs from the tag. The owner picks the bump:
@@ -274,13 +274,13 @@ publisher matching this repository and `release.yml`, or its configuration expir
    - `publish-npm`: publishes the platform packages, then `@localtaskrepo/lotar`, with npm provenance.
      Versions that are already on npm are skipped, so the job can be re-run. Prerelease
      tags (`v1.0.0-rc.1`) publish under the `next` dist-tag instead of `latest`.
-   - `publish-crates`: publishes `lotar-web-assets`, `lotar-core`, `lotar-lib` and `lotar` to crates.io
+   - `publish-crates`: publishes `lotar-web-assets`, `lotar-core`, `lotar-tasks`, `lotar-agent`, `lotar-lib` and `lotar` to crates.io
      through trusted publishing in the GitHub `release` environment (restricted to `v*` tags),
-     with `id-token: write` and the pinned `rust-lang/crates-io-auth-action`. `lotar-lib` and `lotar-web-assets` read files outside their folder, which
+     with `id-token: write` and the pinned `rust-lang/crates-io-auth-action`. `lotar-lib`, `lotar-agent` and `lotar-web-assets` read files outside their folder, which
      `cargo package` leaves out, so `node scripts/stage-crates.mjs` first copies `docs/help`,
-     `docs/openapi.json` and `target/web-embed` (after `npm run build:web`) into them. Versions
+     `docs/openapi.json`, `docs/help/agent-instructions.md` and `target/web-embed` (after `npm run build:web`) into them. Versions
      already on crates.io are skipped. To check the packages locally:
-     `npm run build:web && node scripts/stage-crates.mjs && cargo package --allow-dirty -p lotar-web-assets -p lotar-core -p lotar-lib -p lotar`.
+     `npm run build:web && node scripts/stage-crates.mjs && cargo package --allow-dirty -p lotar-web-assets -p lotar-core -p lotar-tasks -p lotar-agent -p lotar-lib -p lotar`.
    - `update-release-page`: injects quick download links and snapshot-linked
      ticket references in the custom commit list.
    - `publish-docker-image`: builds/pushes the Docker image to Docker Hub as
@@ -410,9 +410,11 @@ release.
 
 ## crates.io trusted publishing setup
 
-Each of `lotar-web-assets`, `lotar-core`, `lotar-lib` and `lotar` has a GitHub trusted publisher on
-crates.io (owner `localtaskrepo`, repository `lotar`, workflow `release.yml`, environment
-`release`) and "trusted publishing only" turned on, so no API token can publish them and
-the repository stores none. A new crate must be published once with a token before its
-publisher can be registered; register it right after, revoke that token, and delete it
-from the repository secrets.
+Each of `lotar-web-assets`, `lotar-core`, `lotar-tasks`, `lotar-agent`, `lotar-lib` and `lotar` has
+a GitHub trusted publisher on crates.io (owner `localtaskrepo`, repository `lotar`, workflow
+`release.yml`, environment `release`) and "trusted publishing only" turned on, so no API token can
+publish them and the repository stores none. A new crate must be published once with a token before
+its publisher can be registered: publish a `0.0.0` placeholder (no code, no dependencies) that
+claims the name, as DEV-634 did for `lotar-tasks` and `lotar-agent`, then register the publisher.
+The token for that stays in 1Password (vault Agents, item "LoTaR Crates.io publish token", read
+through opgate), for the next crate; it never goes into the repository secrets.

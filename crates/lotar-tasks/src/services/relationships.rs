@@ -1273,7 +1273,7 @@ pub(crate) fn stage_task_change(
 
 /// Check a new task's links the way creating it does, without writing:
 /// `lotar add --dry-run` fails where `lotar add` would (DEV-494).
-pub(crate) fn check_new_task(storage: &Storage, id: &str, candidate: &TaskRelationships) -> LoTaRResult<()> {
+pub fn check_new_task(storage: &Storage, id: &str, candidate: &TaskRelationships) -> LoTaRResult<()> {
     plan_task_change(storage, id, &TaskRelationships::default(), candidate, None).map(|_| ())
 }
 
