@@ -1,11 +1,11 @@
 title: 'The queue worker ignores a project''s max_parallel_jobs: DEV ran 4 jobs with a limit of 2'
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T04:08:08.570523+00:00
+modified: 2026-11-17T04:53:38.838165+00:00
 relationships:
   blocks:
   - DEV-646
@@ -14,6 +14,7 @@ relationships:
   - DEV-613
   - DEV-620
   - DEV-646
+  - DEV-641
 comments:
 - date: 2026-11-17T02:03:11.559276+00:00
   author: claude
@@ -107,6 +108,33 @@ comments:
     - **Not rerun:** full `npm run lint`, `npm test`, `npm run smoke` (the fix agent reports them passed).
     - **Merge:** `3d2c2aae9` applies cleanly on current main (`git merge-tree`, exit 0). The DEV-620 copy `1227e5bde` matches `6a78ba884` on main (`git cherry`), so a rebase drops it.
     - No minor tickets filed. Serve's own counting stays with DEV-646.
+- date: 2026-11-17T04:53:07.535822+00:00
+  author: claude
+  text: |-
+    Merged: DEV-630 is on `main` as `11c077fe6` and pushed to origin.
+
+    - Rebased onto main three times: DEV-626 and then DEV-641 landed in between. The DEV-620 copy `1227e5bde` was dropped as already applied.
+    - One conflict in `crates/lotar-lib/tests/integration.rs`: both sides added a test module to the list. I kept both, `dev626_…` then `dev630_…`.
+    - `docs/help/agent.md` merged with DEV-641's edit on its own.
+    - Ran the checks on `75e77cc72` (rebased onto DEV-626): `npm run lint:agent`, `npm run test:agent` (2293 Rust, 1548 UI, release and hooks tests), `npm run test:smoke:agent` (405). All passed.
+    - The last rebase onto DEV-641 brought in only a docs change, so the code is identical to what was checked. I didn't rerun the checks for it.
+    - Fast-forwarded the main checkout, then amended the pending `.tasks` changes into the commit (`e04fe56e2` → `11c077fe6`, signed).
+    - No rule or config files changed, so `lotar trust` wasn't needed. No lockfile changed.
+    - Pushed: the main checkout was clean, and `11c077fe6` was the only unpushed commit (`ef3d7dabc..11c077fe6`).
+  report:
+    commits:
+    - hash: 11c077fe6
+      what: queue worker applies the global and per-project max_parallel_jobs, counting jobs in every process
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2293 Rust, 1548 UI, release and hooks tests
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
@@ -124,8 +152,6 @@ description: |-
   ## Done when
   - [ ] The worker applies each entry's project limit (project config over global), counting the project's running jobs in every process (agent_active_jobs records).
   - [ ] Test: two projects, one with a limit of 1, jobs in two processes; docs in docs/help/agent.md.
-tags:
-- review-returned
 history:
 - at: 2026-11-16T23:50:55.844151+00:00
   actor: claude
@@ -286,3 +312,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T04:53:07.535822+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:53:08.575807+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646"]}'
+    new: '{"blocks":["DEV-646"],"related":["DEV-626","DEV-613","DEV-620","DEV-646","DEV-641"]}'
+- at: 2026-11-17T04:53:38.838165+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned
+    new: ''

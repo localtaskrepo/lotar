@@ -1,11 +1,11 @@
 title: A resumed T3 thread is taken over while a newer thread of the ticket waits for an answer
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T02:10:24.525264+00:00
-modified: 2026-11-17T04:39:11.828259+00:00
+modified: 2026-11-17T05:03:53.434417+00:00
 relationships:
   depends_on:
   - DEV-626
@@ -101,11 +101,37 @@ comments:
 - date: 2026-11-17T04:29:55.329723+00:00
   author: claude
   text: 'DEV-648 found the cause of the `.lotar-test-scratch` leftover: `dev626_resumed_t3_threads_test.rs:151,182` should also wait for `AgentJobService::job_settled(&job_id)` before the test ends (see DEV-648, `4b1b43da0`).'
+- date: 2026-11-17T05:02:47.974285+00:00
+  author: claude
+  text: |-
+    DEV-626 is on main now, so I rebased the branch onto main. All checks pass.
+
+    - I ran `git rebase --onto main 66fee083f`. That dropped the old copy of DEV-626's commit. The fix applied cleanly on top of DEV-626's version on main (`e39ca4b31`).
+    - I added the wait that DEV-648 asked for (`4b1b43da0`). `wait_for_end` in `dev626_resumed_t3_threads_test.rs` now also waits for `AgentJobService::job_settled`. Before, a filtered `dev626` run left `.lotar-test-scratch` behind.
+    - I amended this into the one DEV-639 commit (signed): `60e5e3187`. It is the only commit in `main..HEAD`.
+    - Checks: `npm run lint` passed and `npm test` passed. `npm run smoke` passed 405/405. I ran `--agent dev626` 3 times; each run passed 6/6 and left no leftover.
+  report:
+    commits:
+    - hash: 60e5e3187
+      what: DEV-639 fix rebased onto main, plus DEV-648's job_settled wait in the dev626 tests
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 405/405
+    - command: node scripts/rust-test-runner.mjs --agent dev626
+      result: passed
+      reason: 3 of 3 runs, 6/6, no leftover
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae13ef3fb-ec6f-40fe-a02e-20c89ecb076d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac88a9490-deab-4292-aa6e-550801b0d77f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66c92db0-9d76-461f-a4fb-c32ecc03c77a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A390fff61-8b3b-4374-958b-bd3219f8db8f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae30cde7b-bee5-4d2e-9e5e-e970f07ea139
 description: |-
   Found in the DEV-626 review (2026-11-16).
 
@@ -287,3 +313,21 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A390fff61-8b3b-4374-958b-bd3219f8db8f
+- at: 2026-11-17T05:02:47.974285+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T05:02:55.753190+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T05:03:53.434417+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae30cde7b-bee5-4d2e-9e5e-e970f07ea139

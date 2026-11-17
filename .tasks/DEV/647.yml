@@ -1,11 +1,11 @@
 title: Worktree cleanup holds the job registry through git worktree remove, stalling every job thread for tens of seconds
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T03:19:06.596519+00:00
-modified: 2026-11-17T04:44:10.231584+00:00
+modified: 2026-11-17T05:02:30.318047+00:00
 relationships:
   related:
   - DEV-643
@@ -122,11 +122,42 @@ comments:
     choice:
     - fix
     note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job ended ''idle'' after it posted its passing review (the DEV-644 bug), not a work failure. Go on to the merge step; the review comment of 04:39 stands (only 7303c2302 goes onto main).'
+- date: 2026-11-17T04:56:36.368911+00:00
+  author: claude
+  text: |-
+    Recheck after the failed review job: the fix stands, nothing to change, ready for review again.
+
+    - The review job only failed by going idle after its passing review (DEV-644), as triage said
+    - Branch has 2 commits beyond `main`: `bb7cc8371` (old copy of DEV-633, its code is identical to `9c10760fa` on main) and the fix `7303c2302`
+    - `7303c2302` cherry-picks cleanly onto current `main` (`git merge-tree` exit 0); merging the whole branch conflicts on `bb7cc8371`'s `.tasks` files, so the merge agent should take only `7303c2302`
+    - Reran `cargo nextest run --workspace --retries 0 agent_safety_test`: 30/30 passed
+  report:
+    commits:
+    - hash: 7303c2302
+      what: cleanup holds JOB_REGISTRY only for the in-memory check, git runs under a per-ticket claim
+    checks:
+    - command: cargo nextest run --workspace --retries 0 agent_safety_test
+      result: passed
+      reason: 30/30
+    - command: npm run lint
+      result: not_run
+      reason: passed in the first fix job on 7303c2302, no code change since
+    - command: npm test
+      result: not_run
+      reason: passed in the first fix job on 7303c2302
+    - command: npm run smoke
+      result: not_run
+      reason: passed in the first fix job on 7303c2302
+    - command: load check (time job events at load ~75)
+      result: not_run
+      reason: the new test covers the same lock path
+    next: Review again, then merge only 7303c2302 onto main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe867e4-6d1f-40dd-94ad-9c8c822d7913
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A41df881b-8829-4eab-a6fe-72fcebb5fd73
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66bbaaf1-6fb9-4c02-9de5-5cc18cf82b37
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4f5af38b-2522-4c8e-8ac7-e1199dd7910c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc130475-39a6-4173-9e61-6c7b91f4ed38
 description: 'Found (DEV-643, 2026-11-16, load ~75): `cleanup_done_ticket_worktree` and `maybe_cleanup_worktree` in `crates/lotar-lib/src/services/agent_job_service.rs` hold `JOB_REGISTRY` while they run `git worktree remove` and other git commands; `sample` of the worker showed ~15 threads waiting on the mutex while one `git worktree remove` ran 38 s. DEV-643 moved the task update''s registry lookup out of the storage locks, so CLI writes no longer fail, but job threads still stall. Check: under load, time job events while a done ticket''s worktree is removed. Done: the registry is held only for the in-memory check, not across git.'
 tags:
 - health
@@ -247,3 +278,21 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4f5af38b-2522-4c8e-8ac7-e1199dd7910c
+- at: 2026-11-17T04:56:36.368911+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T04:57:05.526250+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T05:02:30.318047+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc130475-39a6-4173-9e61-6c7b91f4ed38

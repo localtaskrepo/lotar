@@ -1965,6 +1965,19 @@ mod action_read_barrier {
     }
 }
 
+/// Fails the next checkpoint locks of this thread as a full disk would.
+#[cfg(test)]
+mod checkpoint_fault {
+    use std::cell::Cell;
+    thread_local! { static DISK_FULL: Cell<bool> = const { Cell::new(false) }; }
+    pub(super) fn set_disk_full(full: bool) {
+        DISK_FULL.with(|slot| slot.set(full));
+    }
+    pub(super) fn disk_full() -> bool {
+        DISK_FULL.with(Cell::get)
+    }
+}
+
 // Each checkpoint contains the uncompleted steps of one job-end dispatch. Keep
 // its original template inputs even if a preceding part changed the ticket.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -1995,6 +2008,8 @@ fn save_end_action(path: &Path, pending: &PendingEndAction) -> LoTaRResult<()> {
 /// Job ends whose checkpoint couldn't be written (DEV-633): a full disk
 /// refuses even its lock file. None of their steps ran; this process keeps
 /// them and saves them at the next look for pending outcomes, which runs them.
+/// Other errors aren't kept (DEV-642): a permanent one would retry forever,
+/// and a busy lock's holder may be this job's checkpoint finishing its steps.
 static UNSAVED_END_ACTIONS: std::sync::LazyLock<Mutex<Vec<(std::path::PathBuf, String, PendingEndAction)>>> =
     std::sync::LazyLock::new(|| Mutex::new(Vec::new()));
 
@@ -2041,9 +2056,13 @@ fn is_unsaved_end_action(tasks_dir: &Path, key: &str) -> bool {
     UNSAVED_END_ACTIONS.lock().is_ok_and(|unsaved| unsaved.iter().any(|(dir, job, _)| dir == tasks_dir && job == key))
 }
 
+fn is_storage_full(err: &LoTaRError) -> bool {
+    matches!(err, LoTaRError::IoError(err) if err.kind() == std::io::ErrorKind::StorageFull)
+}
+
 /// A step that failed because the disk was full runs again: it didn't write the ticket.
 fn is_retryable(err: &LoTaRError) -> bool {
-    is_busy(err) || matches!(err, LoTaRError::IoError(err) if err.kind() == std::io::ErrorKind::StorageFull)
+    is_busy(err) || is_storage_full(err)
 }
 
 fn finish_end_action(path: &Path, storage: &mut Storage, config: &ResolvedConfig, pending: &mut PendingEndAction) -> LoTaRResult<()> {
@@ -2102,12 +2121,21 @@ fn end_action_steps(actions: &[(String, AutomationAction)]) -> Vec<(String, Auto
     steps
 }
 
-/// Save a new checkpoint under its lock; an existing one wins.
-fn save_new_end_action(tasks_dir: &Path, key: &str, pending: &PendingEndAction) -> LoTaRResult<()> {
+/// Lock a job end's checkpoint, creating its folder.
+fn lock_end_action(tasks_dir: &Path, key: &str) -> std::io::Result<std::fs::File> {
+    #[cfg(test)]
+    if checkpoint_fault::disk_full() {
+        return Err(std::io::ErrorKind::StorageFull.into());
+    }
     let dir = end_actions_dir(tasks_dir);
     std::fs::create_dir_all(&dir)?;
     let name = crate::services::agent_queue_service::queue_hash(Path::new(key));
-    let _lock = crate::storage::safety::acquire_storage_lock(&dir, &name)?;
+    crate::storage::safety::acquire_storage_lock(&dir, &name)
+}
+
+/// Save a new checkpoint under its lock; an existing one wins.
+fn save_new_end_action(tasks_dir: &Path, key: &str, pending: &PendingEndAction) -> LoTaRResult<()> {
+    let _lock = lock_end_action(tasks_dir, key)?;
     let path = end_action_path(tasks_dir, key);
     if !path.exists() {
         save_end_action(&path, pending)?;
@@ -2124,15 +2152,16 @@ fn apply_durable_end_action(
     key: &str,
 ) -> LoTaRResult<()> {
     let tasks_dir = storage.root_path.clone();
-    let dir = end_actions_dir(&tasks_dir);
-    let name = crate::services::agent_queue_service::queue_hash(Path::new(key));
     let path = end_action_path(&tasks_dir, key);
     let fresh = PendingEndAction { current: current.clone(), event: context.event, job: context.job.clone(), steps: end_action_steps(actions) };
     let keep = |err: LoTaRError, pending: PendingEndAction| {
+        if !is_storage_full(&err) {
+            return err;
+        }
         keep_unsaved_end_action(&tasks_dir, key, pending);
         LoTaRError::ValidationError(format!("{err}; the end rules are kept and run once their checkpoint can be saved"))
     };
-    let _lock = match std::fs::create_dir_all(&dir).and_then(|()| crate::storage::safety::acquire_storage_lock(&dir, &name)) {
+    let _lock = match lock_end_action(&tasks_dir, key) {
         Ok(lock) => lock,
         Err(err) => return Err(keep(err.into(), fresh)),
     };
@@ -2147,12 +2176,25 @@ fn apply_durable_end_action(
     finish_end_action(&path, storage, config, &mut pending)
 }
 
-/// Save the checkpoints of this tasks directory's kept job ends, so the replay runs them.
+/// Save the checkpoints of this tasks directory's kept job ends, so the replay
+/// runs them; one that fails other than on a full disk or busy lock is dropped.
 fn save_unsaved_end_actions(tasks_dir: &Path) {
     let Ok(mut unsaved) = UNSAVED_END_ACTIONS.lock() else {
         return;
     };
-    unsaved.retain(|(dir, key, pending)| dir != tasks_dir || save_new_end_action(tasks_dir, key, pending).is_err());
+    unsaved.retain(|(dir, key, pending)| {
+        if dir != tasks_dir {
+            return true;
+        }
+        match save_new_end_action(tasks_dir, key, pending) {
+            Ok(()) => false,
+            Err(err) if is_retryable(&err) => true,
+            Err(err) => {
+                eprintln!("End rules for {}: {err}", pending.current.id);
+                false
+            }
+        }
+    });
 }
 
 fn replay_end_actions(tasks_dir: &Path) {
@@ -3719,10 +3761,7 @@ mod pending_outcome_tests {
         )
         .unwrap();
         std::fs::write(tasks_dir.join("automation.yml"), "automation:\n  rules:\n    - name: Failed\n      on:\n        job_failed:\n          set:\n            status: Done\n          comment: merge without it\n").unwrap();
-        // A file where the checkpoint directory goes fails like a full disk: nothing can be written there.
-        let blocked = end_actions_dir(&tasks_dir);
-        std::fs::create_dir_all(blocked.parent().unwrap()).unwrap();
-        std::fs::write(&blocked, "").unwrap();
+        checkpoint_fault::set_disk_full(true);
         let job = AutomationJobContext {
             job_id: "disk-full".into(),
             runner: "t3".into(),
@@ -3737,7 +3776,7 @@ mod pending_outcome_tests {
         assert!(has_unsaved_end_actions());
         AutomationService::apply_pending_outcomes(&tasks_dir);
         assert_eq!(TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().status.as_str(), "Todo");
-        std::fs::remove_file(&blocked).unwrap();
+        checkpoint_fault::set_disk_full(false);
         AutomationService::apply_pending_outcomes(&tasks_dir);
         let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
         assert_eq!(task.status.as_str(), "Done");
@@ -3745,6 +3784,55 @@ mod pending_outcome_tests {
         assert!(!has_unsaved_end_actions());
         AutomationService::apply_pending_outcomes(&tasks_dir);
         assert_eq!(TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().comments.len(), 1);
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    /// DEV-642: only a full disk keeps the end rules. A permanent error (a
+    /// file where the checkpoint folder goes) fails as before, also for end
+    /// rules kept earlier, so they don't retry forever and hold the worker.
+    #[test]
+    fn end_rules_whose_checkpoint_fails_permanently_are_not_kept() {
+        let queue = tempfile::tempdir().unwrap();
+        // SAFETY: test-local queue override, as for the outcome regression below.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue.path()) };
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        std::fs::create_dir_all(tasks_dir.join("PX")).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "issue:\n  states: [Todo, Done]\n").unwrap();
+        for id in [1, 2] {
+            std::fs::write(
+                tasks_dir.join(format!("PX/{id}.yml")),
+                "title: t\nstatus: Todo\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n",
+            )
+            .unwrap();
+        }
+        std::fs::write(
+            tasks_dir.join("automation.yml"),
+            "automation:\n  rules:\n    - name: Failed\n      on:\n        job_failed:\n          set:\n            status: Done\n",
+        )
+        .unwrap();
+        let job = |id: &str| AutomationJobContext {
+            job_id: id.into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
+        checkpoint_fault::set_disk_full(true);
+        let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job("kept"))).unwrap_err();
+        assert!(err.to_string().contains("kept"), "{err}");
+        checkpoint_fault::set_disk_full(false);
+        let blocked = end_actions_dir(&tasks_dir);
+        std::fs::create_dir_all(blocked.parent().unwrap()).unwrap();
+        std::fs::write(&blocked, "").unwrap();
+        AutomationService::apply_pending_outcomes(&tasks_dir);
+        assert!(!has_unsaved_end_actions());
+        let err = AutomationService::apply_job_event(&tasks_dir, "PX-2", AutomationEvent::JobFailed, Some(job("blocked"))).unwrap_err();
+        assert!(!err.to_string().contains("kept"), "{err}");
+        assert!(!has_unsaved_end_actions());
+        assert_eq!(TaskService::get(&Storage::new(&tasks_dir), "PX-2", None).unwrap().status.as_str(), "Todo");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 

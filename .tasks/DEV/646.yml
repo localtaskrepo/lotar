@@ -1,11 +1,11 @@
 title: lotar serve counts only its own jobs against max_parallel_jobs and applies the last ticket's project limit to all projects
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-17T03:02:27.383761+00:00
-modified: 2026-11-17T03:29:52.363722+00:00
+modified: 2026-11-17T04:59:35.937847+00:00
 relationships:
   depends_on:
   - DEV-630
@@ -29,6 +29,7 @@ comments:
   text: 'The @review job waits for its open prerequisites: DEV-630.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A093ef432-2298-45e6-a33a-c45478867824
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A643c216b-c924-4963-ae9a-537eb8e3ecbd
 description: |-
   Found in the DEV-630 review (2026-11-16).
 
@@ -128,3 +129,14 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T04:57:29.161754+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: Reviewing
+- at: 2026-11-17T04:59:35.937847+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A643c216b-c924-4963-ae9a-537eb8e3ecbd
