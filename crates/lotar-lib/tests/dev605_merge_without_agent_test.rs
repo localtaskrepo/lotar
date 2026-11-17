@@ -191,14 +191,31 @@ fn a_check_that_passed_on_the_unchanged_commit_is_skipped() {
 }
 
 #[test]
-fn a_branch_without_new_commits_has_nothing_to_merge() {
+fn a_branch_landed_already_has_nothing_to_merge() {
     let repo = Repo::new(CHECKS);
+    repo.commit_fix("feature.txt", "feature\n");
+    git(&repo.root(), &["merge", "-q", "--ff-only", BRANCH]);
 
     let (status, prompt) = repo.merge();
 
     assert_eq!(status, "completed");
     assert_eq!(prompt, None);
     assert!(repo.comments().iter().any(|comment| comment.text.starts_with("Nothing to merge")));
+}
+
+/// DEV-680: the fix job committed nothing anywhere (DEV-657), so main holds
+/// no commit named after the ticket. The merge fails, which sends the
+/// ticket back to the fix step instead of Done.
+#[test]
+fn a_ticket_nothing_was_built_for_is_not_done() {
+    let repo = Repo::new(CHECKS);
+
+    let (status, prompt) = repo.merge();
+
+    assert_eq!(status, "failed");
+    assert_eq!(prompt, None, "no agent started");
+    let summary = AgentJobService::list_jobs_in(&repo.fixtures.tasks_root).into_iter().find_map(|job| job.summary).unwrap_or_default();
+    assert!(summary.contains("nothing was built"), "{summary}");
 }
 
 /// DEV-677: lotar's branch is empty, the ticket's commits are on the same

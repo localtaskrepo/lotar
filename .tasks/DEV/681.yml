@@ -1,11 +1,11 @@
 title: 'CI red on main: dev623_memory_gate_test a_queued_job_waits_while_memory_is_short fails'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T23:42:58.849777+00:00
-modified: 2026-11-18T00:09:28.265623+00:00
+modified: 2026-11-18T00:13:54.653080+00:00
 relationships:
   blocks:
   - DEV-658
@@ -56,6 +56,32 @@ comments:
     - Reran: `npm ci` passed, `npm run lint` passed, the dev623 test passed 5 runs in a row, and the queue and memory-gate tests in `lotar-agent` and `lotar-lib` passed (36 tests). The worktree is unchanged.
     - Not run: the full `npm test` and `npm run smoke`, since the fix agent ran them and this change touches nothing they cover beyond the above. QA green on main can only be checked after the merge.
     - No minor findings, no tickets filed.
+- date: 2026-11-18T00:13:54.478737+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-681` is in `main`.
+
+    - Rebase onto `main` changed nothing (`b437760c459a`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `b437760c459a`
+    - Amended the pending `.tasks` changes into the merged commit: `748263aa785f`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[ci:dev623_memory_gate_test]`
+  report:
+    commits:
+    - hash: 748263aa7
+      what: 'DEV-681 CI red on main: dev623_memory_gate_test a_queued_job_waits_while_memory_is_short fails'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf565c24-5200-4aa0-bd06-76d7ab47feaf
 description: 'Found: Quality Assurance on main 2f8b1cb (2026-11-17 22:39) failed in Rust Quality Checks: lotar-lib::integration dev623_memory_gate_test::a_queued_job_waits_while_memory_is_short panicked at crates/lotar-lib/tests/dev623_memory_gate_test.rs:64:5 (the queue shows TEST-1 pending, worker_running true). The run before (45fd197) was green. Check: gh run list -b main -w ''Quality Assurance''. Done: QA green on main; the v0.15.4 release (DEV-658) needs it.'
@@ -124,3 +150,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T00:13:54.478737+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:13:54.653080+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

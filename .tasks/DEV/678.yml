@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T21:59:44.502058+00:00
-modified: 2026-11-17T22:02:09.691745+00:00
+modified: 2026-11-18T00:14:56.666594+00:00
 relationships:
   related:
   - DEV-674
@@ -19,6 +19,9 @@ comments:
     - DEV-674's rework must change the same `prune()` (write `NOT_CLAIMED` only when no `.result` exists). Two branches editing it at once would conflict.
     - Options: **1 (recommended)** the DEV-674 fix job also deletes `.result` files older than 2 days (by file age) with a test; DEV-678 then closes with DEV-674. **2** build DEV-678 on `f8aa497a9` now (the merge agent must land DEV-674 first). **3** wait until DEV-674 is on main.
     - No DEV-674 thread runs now; nothing changed in this worktree.
+- date: 2026-11-18T00:14:53.337519+00:00
+  author: mallox
+  text: 'Answer: inside (DEV-674''s fix job also deletes .result files older than 2 days, with a test; DEV-678 closes with DEV-674) (answered in INBOX-470)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab80873ca-9786-4f14-8955-40e4ffb4833e
 description: |-
@@ -59,3 +62,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-18T00:14:53.337519+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:14:56.666594+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

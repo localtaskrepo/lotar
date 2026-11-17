@@ -439,12 +439,50 @@ fn passed_checks(tasks_dir: &Path, ticket_id: &str, head: &str) -> Vec<String> {
 /// checkout branch: lotar's own branch being on main then says nothing
 /// about the ticket's work (lotar DEV-677).
 pub(super) fn work_elsewhere(tasks_dir: &Path, ticket_id: &str, root: &Path, branch: &str) -> Option<String> {
+    named_checkouts(tasks_dir, ticket_id, root)?.into_iter().find_map(|(checkout, main)| {
+        let ahead =
+            git(&checkout, &["cherry", &main, &format!("refs/heads/{branch}")]).map(|cherry| cherry.lines().filter(|line| line.starts_with('+')).count());
+        match ahead {
+            Ok(ahead @ 1..) => {
+                Some(format!("`{branch}` in `{}` holds {ahead} commit{} beyond its `{main}`", checkout.display(), if ahead == 1 { "" } else { "s" }))
+            }
+            _ => None,
+        }
+    })
+}
+
+/// Whether a commit named after the ticket is on the main checkout's branch
+/// of `root` or of another repository the ticket names. A fix job that
+/// wrote nothing leaves none (lotar DEV-680). `true` when lotar can't tell.
+pub(super) fn built_anywhere(tasks_dir: &Path, ticket_id: &str, root: &Path) -> bool {
+    let Some(others) = named_checkouts(tasks_dir, ticket_id, root) else {
+        return true;
+    };
+    // The subject starts with the ID: `DEV-1 Title`, `DEV-1: ...`, `DEV-1-fix`, not `DEV-10`.
+    let starts_with_id = |subject: &str| {
+        subject.get(..ticket_id.len()).is_some_and(|start| start.eq_ignore_ascii_case(ticket_id))
+            && !subject[ticket_id.len()..].starts_with(|ch: char| ch.is_ascii_alphanumeric())
+    };
+    let names_ticket = |dir: &Path, main: &str| {
+        git(dir, &["log", "--format=%s", "--regexp-ignore-case", "--fixed-strings", &format!("--grep={ticket_id}"), main])
+            .map(|subjects| subjects.lines().any(starts_with_id))
+    };
+    if names_ticket(root, "HEAD").unwrap_or(true) {
+        return true;
+    }
+    others.iter().any(|(checkout, main)| names_ticket(checkout, main).unwrap_or(true))
+}
+
+/// The main checkouts of the other repositories the ticket names, by a path
+/// in its description or comments, with their current branch.
+fn named_checkouts(tasks_dir: &Path, ticket_id: &str, root: &Path) -> Option<Vec<(PathBuf, String)>> {
     let storage = crate::storage::manager::Storage::new(tasks_dir);
     let task = crate::services::task_service::TaskService::get(&storage, ticket_id, None).ok()?;
     let ours = common_dir(root)?;
     let texts = std::iter::once(task.description.unwrap_or_default())
         .chain(task.comments.into_iter().flat_map(|comment| std::iter::once(comment.text).chain(comment.report.and_then(|report| report.next))));
     let mut seen = vec![ours];
+    let mut checkouts = Vec::new();
     for path in texts.flat_map(|text| named_paths(&text)) {
         let Some(common) = path.ancestors().find(|dir| dir.exists()).and_then(crate::utils::git::find_repo_root).and_then(|repo| common_dir(&repo)) else {
             continue;
@@ -459,13 +497,9 @@ pub(super) fn work_elsewhere(tasks_dir: &Path, ticket_id: &str, root: &Path, bra
         let Ok(main) = git(checkout, &["symbolic-ref", "--quiet", "--short", "HEAD"]) else {
             continue;
         };
-        let ahead =
-            git(checkout, &["cherry", &main, &format!("refs/heads/{branch}")]).map(|cherry| cherry.lines().filter(|line| line.starts_with('+')).count());
-        if let Ok(ahead @ 1..) = ahead {
-            return Some(format!("`{branch}` in `{}` holds {ahead} commit{} beyond its `{main}`", checkout.display(), if ahead == 1 { "" } else { "s" }));
-        }
+        checkouts.push((checkout.to_path_buf(), main));
     }
-    None
+    Some(checkouts)
 }
 
 /// The repository's shared git directory, which its worktrees share too.

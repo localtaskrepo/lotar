@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T23:52:07.336095+00:00
-modified: 2026-11-17T23:53:01.911784+00:00
+modified: 2026-11-18T00:14:16.989088+00:00
 relationships:
   related:
   - DEV-584
@@ -31,6 +31,9 @@ comments:
       set:
         status: WontDo
     recommended: yes
+- date: 2026-11-18T00:14:15.524343+00:00
+  author: mallox
+  text: 'Answer: build (Yes, build it as proposed) (answered in INBOX-475)'
 description: |-
   harnessmux reports a failed turn as `turn.failed {error: String}`, built from the error's text, and drops what the adapters already send: the kind of failure and when a usage limit resets. DEV-584 (pause a job until the usage-limit reset) has to guess both from text. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
 
@@ -67,3 +70,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-584"]}'
     new: '{"related":["DEV-584","DEV-657"]}'
+- at: 2026-11-18T00:14:15.524343+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:14:16.989088+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

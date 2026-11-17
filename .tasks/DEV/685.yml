@@ -1,15 +1,45 @@
 title: A merge job whose runner fails still sets a ticket Done when nothing was built for it
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T00:09:53.272240+00:00
-modified: 2026-11-18T00:09:54.093389+00:00
+modified: 2026-11-18T00:22:35.878134+00:00
 relationships:
   related:
   - DEV-680
   - DEV-657
+  - DEV-503
+comments:
+- date: 2026-11-18T00:22:24.120141+00:00
+  author: claude
+  text: |-
+    No code fix needed: DEV-680's guard already covers the failed-runner path. Added a test that proves it.
+
+    - In `finalize_job`, `merged_despite_failure` only sets `success = true`. `ensure_branch_merged` still runs after it, and DEV-680's `built_anywhere` check there fails the job.
+    - The test named in the ticket (`dev318_t3_runner_test.rs`) was removed in DEV-503, so the new test sits next to DEV-680's in `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs`: `a_failed_merge_agent_of_a_ticket_nothing_was_built_for_fails` (merge agent exits 1, empty branch → job `failed`, "nothing was built").
+    - Without DEV-680's guard the test fails (`completed`). With it, the test passes.
+    - Doc line on `merged_despite_failure` in `crates/lotar-agent/src/services/agent_job_service.rs`.
+    - DEV-680 (`c30990af7`) is still Merging, not on main. The branch builds on a cherry-pick of it (`1093eb7cc`). Merge DEV-685 after DEV-680: the rebase then drops the duplicate.
+  report:
+    commits:
+    - hash: 11b344bdd
+      what: regression test + doc line
+    - hash: 1093eb7cc
+      what: cherry-pick of DEV-680's c30990af7 (not on main yet)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2359 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review, then merge after DEV-680 lands (rebase drops 1093eb7cc)
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acfa57c10-e695-4c16-8ef0-8464fd0dd5a0
 description: 'Found reviewing DEV-680 (c30990af7), 2026-11-17: the new nothing-was-built guard (merge::built_anywhere) runs only in ensure_branch_merged. merged_despite_failure (crates/lotar-agent/src/services/agent_job_service.rs, ~line 4965) completes a merge job whose runner failed when the branch is on main, checking work_elsewhere but not built_anywhere. So a merge agent that crashes on a ticket whose fix job committed nothing (the DEV-657 case) still runs job_completed rules and sets it Done. Check: a merge job for a ticket with no commit named after it anywhere, whose runner exits 1 with an empty branch, ends completed. Done: it fails like the ensure_branch_merged path, with a test next to a_merge_job_that_fails_after_its_branch_reached_main_completes in dev318_t3_runner_test.rs.'
 tags:
 - health
@@ -25,3 +55,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T00:13:55.972115+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T00:13:56.827342+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acfa57c10-e695-4c16-8ef0-8464fd0dd5a0
+- at: 2026-11-18T00:22:24.120141+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:22:24.524830+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-680","DEV-657"]}'
+    new: '{"related":["DEV-680","DEV-657","DEV-503"]}'
+- at: 2026-11-18T00:22:35.878134+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

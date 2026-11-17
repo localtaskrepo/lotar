@@ -4850,7 +4850,9 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// another of the ticket's branches (`prefix` names them) holds work main
 /// lacks (DEV-602): the merge missed the fix. A merge fails, and leaves the
 /// branch unmerged, while another repository the ticket names still holds
-/// its work (`merge::work_elsewhere`, DEV-677, DEV-679).
+/// its work (`merge::work_elsewhere`, DEV-677, DEV-679). So does one
+/// whose branch brought nothing while no commit named after the ticket is
+/// on main anywhere (`merge::built_anywhere`, DEV-680): nothing was built.
 fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, prefix: &str) -> Result<Option<String>, String> {
     let Some((branch, start, assignee_at_start)) =
         JOB_REGISTRY.lock().ok().and_then(|registry| {
@@ -4903,6 +4905,17 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
             return Err(format!(
                 "Merge job finished, but {branch} has nothing beyond the main checkout's branch, while {holder} holds {ticket_id}'s work that isn't in it: the merge missed the fix"
             ));
+        }
+        // The branch brought nothing and no commit names the ticket on any
+        // main it names: the fix job wrote nothing, so the ticket goes back
+        // instead of Done (DEV-680).
+        if brought_nothing && !merge::built_anywhere(tasks_dir, ticket_id, &repo_root) {
+            return match handed_back() {
+                Some(handed_back) => Ok(Some(handed_back)),
+                None => Err(format!(
+                    "Merge job finished, but no commit named after {ticket_id} is on the main checkout's branch, here or in a repository the ticket names: nothing was built, so {ticket_id} isn't done"
+                )),
+            };
         }
         record_landing(&repo_root, &branch);
         return Ok(None);

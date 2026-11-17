@@ -2751,6 +2751,9 @@ profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
 printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
 sid="${{profile}}-$$"
 printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+if [ "$profile" = implement ]; then
+  git commit -q --allow-empty -m "$LOTAR_TICKET_ID work" || exit 4
+fi
 printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
 exit 0
 "#,
@@ -2979,6 +2982,13 @@ exit 0\n",
                 TaskUpdateContext::automation_disabled(),
             )
             .expect("set task to merging");
+            // Each ticket's work is on main already, so its merge has nothing to do (DEV-680).
+            let landed = Command::new("git")
+                .args(["-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", &format!("{ticket_id} work")])
+                .current_dir(fixtures.get_temp_path())
+                .status()
+                .expect("git");
+            assert!(landed.success(), "commit the ticket's work");
         }
 
         let first_job = AgentJobService::start_job_with_tasks_dir(

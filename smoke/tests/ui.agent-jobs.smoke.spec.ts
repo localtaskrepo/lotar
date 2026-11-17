@@ -610,6 +610,9 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
                         expect(await waitForJobCountViaApi(server.url, taskId, 2)).toBeGreaterThanOrEqual(2);
 
+                        // The mock agent writes nothing: the ticket's work lands on main
+                        // here, or the merge fails as nothing was built (DEV-680).
+                        await workspace.runGit(['commit', '-q', '--allow-empty', '-m', `${taskId} work`]);
                         await updateTaskViaApi(server.url, { id: taskId, assignee: '@merge' });
                         const doneRowText = await waitForTaskRowText(tasksPage, taskTitle, 'Done');
                         expect(doneRowText).toContain(taskTitle);

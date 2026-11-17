@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T18:08:11.962632+00:00
-modified: 2026-11-17T18:13:28.943553+00:00
+modified: 2026-11-18T00:17:32.765816+00:00
 relationships:
   related:
   - DEV-567
@@ -27,6 +27,9 @@ comments:
     - Check now: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `unpushed:branches` with 5 commits on those three branches
 
     Question: delete the two `backup/*` branches as superseded drafts, or keep them (then push them to origin)?
+- date: 2026-11-18T00:17:30.657834+00:00
+  author: mallox
+  text: 'Answer: delete (Delete both backup branches) (answered in INBOX-442)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
 description: |-
@@ -88,3 +91,13 @@ history:
   - field: assignee
     old: '@fix-light'
     new: mallox
+- at: 2026-11-18T00:17:30.657834+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:17:32.765816+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
