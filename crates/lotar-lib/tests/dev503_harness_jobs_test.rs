@@ -242,6 +242,46 @@ fn session_continue_resumes_a_session_used_within_the_time() {
     assert!(log.contains("\"method\":\"session/resume\"") && !log.contains("Handoff:"), "{log}");
 }
 
+/// The header of the job's log, where `lotar agent status`, the job list and the timeline read a job of another process.
+fn log_header(harness: &Harness, job_id: &str) -> serde_json::Value {
+    let logs = harness.fixtures.tasks_root.join("@agent-logs");
+    let log = std::fs::read_dir(&logs)
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
+        .find(|log| log.contains(job_id))
+        .expect("the job's log");
+    serde_json::from_str(log.lines().next().unwrap_or_default()).unwrap()
+}
+
+/// DEV-672: a merge that continued the reviewer's opus session showed the merge profile's sonnet. A job that resumes a
+/// session shows the model and effort the session runs on; one that starts its own shows its profile's.
+#[test]
+fn a_continued_session_shows_the_model_and_effort_it_runs_on() {
+    let harness = harness("    model: sonnet\n", &[]);
+    harness.run(&["--model", "opus", "--effort", "high"]).success();
+    let shown = |job: &str| AgentJobService::get_job(job).map(|job| (job.model, job.effort)).unwrap();
+    let opus = (Some("opus".to_string()), Some("high".to_string()));
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let req = AgentJobCreateRequest {
+        ticket_id: "TEST-1".into(),
+        prompt: "Merge it".into(),
+        agent: Some("fixer".into()),
+        session: Some(lotar::config::types::AgentSession::Continue),
+        ..Default::default()
+    };
+    let continued = AgentJobService::start_job_with_tasks_dir(req, harness.fixtures.tasks_root.as_path()).unwrap().id;
+    wait_for("the job's end", || status(&continued) == "completed");
+    wait_for_jobs_to_end(&harness.fixtures.tasks_root);
+    assert!(harness.log().contains("\"method\":\"session/resume\""), "{}", harness.log());
+    assert_eq!(shown(&continued), opus, "the job shows the session's model, not its profile's");
+    let header = log_header(&harness, &continued);
+    assert_eq!((header["model"].as_str(), header["effort"].as_str()), (Some("opus"), Some("high")), "{header}");
+    let own = harness.start();
+    wait_for("the job's end", || status(&own) == "completed");
+    assert_eq!(shown(&own), (Some("sonnet".to_string()), None), "a new session runs on the profile's model");
+    assert_eq!(log_header(&harness, &own)["model"].as_str(), Some("sonnet"));
+}
+
 /// DEV-603: a session idle for longer than `continue_within_minutes` is not resumed: the job starts a new session and
 /// its prompt carries a handoff with the ticket's newest comments.
 #[test]

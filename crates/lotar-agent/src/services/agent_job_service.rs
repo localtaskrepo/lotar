@@ -3310,6 +3310,16 @@ fn run_job(
             }
         }
     }
+    // A resumed session runs on the model and effort it started with, also
+    // a merge that continues the reviewer's (DEV-672): the job shows those.
+    if let Some(record) = continued.as_ref() {
+        profile.model = record.profile.model.clone();
+        profile.effort = record.profile.effort.map(|effort| effort.as_str().to_string());
+        update_job(&job_id, |state| {
+            state.record.model = profile.model.clone();
+            state.record.effort = profile.effort.clone();
+        });
+    }
     // A job that starts a new session starts its profile's own, never
     // replacing another profile's.
     let name = continued.as_ref().map_or(own_name, |record| record.name.clone());

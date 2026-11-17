@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-17T20:16:53.028063+00:00
+modified: 2026-11-17T20:33:08.032781+00:00
 relationships:
   related:
   - DEV-613
@@ -133,6 +133,12 @@ comments:
       - DEV-669 removed chrono. `t3_thread_api.rs:34` `chrono::Utc::now().timestamp_millis()` needs jiff, for example `jiff::Timestamp::now().as_millisecond()`.
     - **Follow-up, as the fix agent planned (`--next`):** after the release, a standards ticket sets `thread_name`, drops the rename step from `configs/lotar/automation.yml` and adds the after-update check. Until then, the two open "Done when" boxes stay open.
     - **Filed:** no tickets. Calling `t3 auth session issue` with no timeout is the same pattern the other `t3` calls use, so it isn't a finding.
+- date: 2026-11-17T20:33:08.032781+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-619` onto `main` conflicts in `Cargo.lock`, `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-core/src/config/types.rs`, `crates/lotar-lib/src/services/mod.rs`, `crates/lotar-lib/tests/dev510_t3_session_test.rs`, `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-619` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa795617b-c98d-4358-a074-874d80cf95a3
@@ -350,3 +356,7 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-17T20:33:08.032781+00:00
+  actor: automation
+  changes:
+  - field: comment_added

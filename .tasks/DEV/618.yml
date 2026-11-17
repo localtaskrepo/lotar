@@ -1,11 +1,11 @@
 title: 't3 runner: give job threads the profile''s tools.disallowed and env'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:41:59.400479+00:00
-modified: 2026-11-17T20:21:42.072856+00:00
+modified: 2026-11-17T20:32:54.259991+00:00
 relationships:
   related:
   - DEV-596
@@ -101,6 +101,16 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-618` onto `main` conflicts in `crates/lotar-lib/src/services/mod.rs`, `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-618` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-17T20:32:51.312295+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `3db41eb3b` is on `main` (`a11c67715..3db41eb3b`).
+
+    - Rebase onto `main` conflicted in `crates/lotar-lib/src/services/mod.rs` and `docs/help/agent.md`. I kept both sides in each.
+    - `main` had moved `services` into `crates/lotar-agent`, so `t3_worktree_setup.rs` now lives there (`crates/lotar-agent/src/services/`). The first lint run failed with `could not find t3_worktree_setup in services`, and the move fixed it.
+    - The commit was amended to include the move. The `.tasks` changes in the main checkout went into it too.
+    - `npm ci` ran. After the rebase and move, `npm run lint`, `npm test` (2318 Rust tests, 60 + 7 node tests) and `npm run smoke` (405) passed.
+    - No rules or agent profiles changed, so I didn't run `lotar trust`.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef1ab-19d5-4a1d-9e83-87eed3e27274
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67416213-09db-42c9-9957-6856b853ac51
@@ -122,8 +132,6 @@ description: |-
   - [ ] The file never lands in a commit: when git doesn't ignore it already, it goes into the repository's `info/exclude`; the worktree's own .gitignore stays unchanged.
   - [ ] The command does nothing and exits 0 outside a job worktree (the owner's own threads, other repos, no git). It exits 0 when writing fails too, and says why; the job's log says whether the file was written, why not, or that the script never ran the command. Profiles without these keys, other providers and continued threads are unchanged.
   - [ ] docs/help/agent.md says which profile keys reach a t3 thread and the script command to set in T3 Code (`lotar agent worktree setup; npm ci`).
-tags:
-- fix-retried
 history:
 - at: 2026-11-16T18:42:01.701153+00:00
   actor: claude
@@ -280,3 +288,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T20:32:51.312295+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:32:54.259991+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''
