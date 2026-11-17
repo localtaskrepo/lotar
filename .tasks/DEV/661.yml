@@ -1,11 +1,11 @@
 title: The queue worker loses an entry it took without a word when it dies before the job registers, or when the entry's retries run out
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-17T20:39:10.983212+00:00
+modified: 2026-11-17T20:56:59.911214+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -167,6 +167,40 @@ comments:
       result: not_run
       reason: the unit test simulates the dead worker
     next: Review on another model, then merge
+- date: 2026-11-17T20:56:48.719963+00:00
+  author: claude
+  text: |-
+    Review: passed. `0cdcf8fe3` does what "Done when" asks; all checks pass again.
+
+    - **Taken entries:** `dequeue_startable` now moves entries to a `taken` list in the queue file instead of dropping them. They leave that list once `start_entry` returns. `restore_taken` puts them back at the front when a worker starts, and again when it exits. Only one worker holds the lock, so a live worker's entries are never restored by another. The old `pending`-only queue files still load (`serde(default)`).
+    - **Given-up entry:** after the 4th failed start, `requeue_entry` comments the error on the ticket (`agent_queue_service.rs:474-486`).
+    - **Tests fail before the fix:** the fix agent only reasoned this out. I checked it: I ported both tests to `main`'s code (`2d4031e30`) in a scratch worktree. They fail there (`list_pending` returns `[]`, no comment is posted), and they pass on the branch.
+    - **`lotar add` warning:** it goes to stderr through `emit_warning`, so JSON output on stdout stays clean. The ticket's "Found" asked for it.
+    - **Merge conflict:** `docs/help/agent.md` conflicts with `main` (`git merge-tree main HEAD`). DEV-660 (`0c6c03497`) added a process-group sentence to the same queue-worker paragraph. Keep both sentences. The code merges cleanly with `main`'s `thread_name` and `time::` changes.
+    - **Not filed:** the double start the fix agent named. It needs a kill between job registration and the next queue write, a window of a few milliseconds. The queued-stage check also stops most of these second starts, because the first job moves the ticket's assignee.
+    - No UI changes, stray files or second branch. The worktree is clean after the checks.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: cargo nextest run -p lotar-agent agent_queue_service
+      result: passed
+      reason: 8 tests
+    - command: new tests' assertions on old code (scratch worktree at 2d4031e30)
+      result: passed
+      reason: both fail before the fix
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2308 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: kill a real worker between take and start
+      result: not_run
+      reason: unit test simulates it
+    next: 'Merge: rebase onto main, resolve the docs/help/agent.md paragraph by keeping both sentences'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad512610d-e2c3-4b6c-b7fa-c9cbe1d49747
@@ -369,3 +403,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-17T20:56:48.719963+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:56:59.911214+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

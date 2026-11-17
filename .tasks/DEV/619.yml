@@ -1,11 +1,11 @@
 title: 't3 runner: name the thread <ID> <step>: <title> itself, so job prompts drop the rename step'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-17T20:33:08.032781+00:00
+modified: 2026-11-17T20:43:50.531990+00:00
 relationships:
   related:
   - DEV-613
@@ -15,6 +15,7 @@ relationships:
   - DEV-673
   - DEV-634
   - DEV-669
+  - DEV-672
 comments:
 - date: 2026-11-16T22:25:19.837146+00:00
   author: claude
@@ -139,6 +140,16 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-619` onto `main` conflicts in `Cargo.lock`, `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-core/src/config/types.rs`, `crates/lotar-lib/src/services/mod.rs`, `crates/lotar-lib/tests/dev510_t3_session_test.rs`, `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-619` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-17T20:43:45.876500+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `fc7a834ad` is on `main` (`7ae502358..fc7a834ad`).
+
+    - **Rebase:** the first try conflicted because of the crate split. I moved `t3_thread_api.rs` into `crates/lotar-agent/src/services/`, swapped chrono for `jiff::Timestamp::now().as_millisecond()`, and put `tungstenite` in `lotar-agent` (the lotar-lib tests that fake T3 Code's server get it as a dev-dependency). The other conflicts were separate hunks in `config/types.rs`, `agent_job_service.rs`, `dev510_t3_session_test.rs` and `docs/help/agent.md`. I kept both sides in each. `Cargo.lock` is regenerated.
+    - **Checks on the rebased commit:** `npm ci`, `npm run lint`, `npm run test:rust` (2330 passed) all passed. `npm run test` (UI, release, hooks) and `npm run smoke` (405 passed) passed on the first rebase. Main then moved one commit (DEV-672), so I rebased again and reran only lint and `test:rust`. `test:ui`, `test:release`, `test:hooks` and smoke were not rerun on that last delta, which has no frontend change.
+    - **.tasks:** other tickets' pending changes (`661`, `662`, `672`) went into the commit by amend, per the owner's 2026-11-12 rule.
+    - **Trust:** the merge changes no rules or profiles in `.tasks`, so no `lotar trust`.
+    - **Still open from "Done when":** the post-update check of T3's rename route and the standards change that drops the rename step from its prompts.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa795617b-c98d-4358-a074-874d80cf95a3
@@ -161,8 +172,6 @@ description: |-
   - [x] Without the setting, names stay as today (`<ID> <title>`).
   - [x] `POST /api/jobs` takes `thread_name` like `provider`; `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
   - [ ] Docs say so (agent.md T3 section, automation.md, config-reference.md: done); standards then drops the rename step from its prompts (configs/lotar/automation.yml).
-tags:
-- fix-retried
 history:
 - at: 2026-11-16T18:42:07.557371+00:00
   actor: claude
@@ -360,3 +369,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T20:43:45.876500+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:43:46.202043+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669"]}'
+    new: '{"related":["DEV-613","DEV-620","DEV-595","DEV-603","DEV-673","DEV-634","DEV-669","DEV-672"]}'
+- at: 2026-11-17T20:43:50.531990+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''

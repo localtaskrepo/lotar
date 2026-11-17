@@ -1,0 +1,67 @@
+title: 'A fix job fails when its ticket branch agent/<ID> is checked out in another worktree: git branch --force refuses'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: triage
+assignee: '@fix'
+created: 2026-11-17T20:51:41.239885+00:00
+modified: 2026-11-17T20:53:23.716635+00:00
+relationships:
+  blocks:
+  - DEV-623
+  related:
+  - DEV-623
+comments:
+- date: 2026-11-17T20:53:20.312383+00:00
+  author: claude
+  text: |-
+    Root cause (from STD-211, same finding): a job killed by the full disk left the worktree marked busy.
+
+    - `move_ticket_branch` (`crates/lotar-agent/src/services/agent_job_service.rs:2006`) only moves a worktree's branch when `finished_job_worktree` says every job that named it has ended.
+    - `job-20261117T001050.777Z-5` (DEV-623 fix, worktree `agent-DEV-623-fdc58bb7d25a0a16`) has an `agent_job_completed` event, but its end rules failed with `No space left on device`, so its log has no `"type":"status"` line.
+    - `finished_job_worktree` treats `job.status.is_none()` as a job still at work, so the clean worktree (at `d8659a72`) stays, and `git branch --force agent/DEV-623` then fails in jobs 32 and 39.
+    - Fix idea: a log with an `agent_job_completed`/`agent_job_failed` event whose job isn't in the active list counts as ended; test with a log like job-5 (no status line).
+    - Safe to move afterwards: the worktree is clean, no job runs there, and `d8659a72` stays on `agent/DEV-645` and `t3/memory-gate-queue-hold-1`.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb8ee33f-ec17-499f-892b-84afeba5dd1e
+description: |-
+  Found: DEV-623 fix jobs job-20261117T201653.430Z-32 and job-20261117T204356.974Z-39 did the work (commits 474c69575, 3c5d8a729; checks passed) and then failed: git branch --force agent/DEV-623 <sha> refused, because agent/DEV-623 is checked out in worktree /Users/mallox/.t3/worktrees/lotar/agent-DEV-623-fdc58bb7d25a0a16 (still at d8659a72). Retries repeat the failure.
+  Check: git worktree list shows agent/DEV-623 in a worktree; the move fails.
+  Done when: agent/DEV-623 points at the reworked commit (t3/memory-gate-queue-hold-2, 3c5d8a729) so DEV-623 can go to review, and a job whose ticket branch is checked out in another worktree moves that worktree's branch (or checks out the new commit there) instead of failing, with a test.
+tags:
+- health
+custom_fields:
+  finding: infra:branch-in-worktree:DEV-623
+history:
+- at: 2026-11-17T20:51:41.482534+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-623"]}'
+- at: 2026-11-17T20:51:41.713784+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T20:51:47.620098+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623"]}'
+    new: '{"blocks":["DEV-623"],"related":["DEV-623"]}'
+- at: 2026-11-17T20:53:20.312383+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T20:53:22.544940+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T20:53:23.716635+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb8ee33f-ec17-499f-892b-84afeba5dd1e

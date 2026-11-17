@@ -15,6 +15,8 @@
 //! - `title:login`, `comment:"needs repro"` or `desc:/oauth2?/` limit a term
 //!   to one field (id, title, subtitle, desc/description, criteria/acceptance,
 //!   tag(s), ref(s)/reference(s), comment(s)); `-title:draft` excludes.
+//!   A full task ID after `id:` (`id:STD-12`) matches that ID only, not
+//!   STD-120; partial IDs (`id:STD`) still match as text.
 //!
 //! Matching ignores case and common Latin accents (`uber` finds `über`), and
 //! keeps the old substring behaviour (`redir` finds `redirect`, `ATLS-2` finds
@@ -84,6 +86,9 @@ enum Matcher {
     /// Folded text with whitespace collapsed to single spaces.
     Phrase(String),
     Regex(regex::Regex),
+    /// Folded text that must equal the whole field: a full task ID after
+    /// `id:` (DEV-662), so `id:STD-12` does not also find STD-120.
+    Exact(String),
 }
 
 #[derive(Clone, Debug)]
@@ -192,8 +197,14 @@ impl SearchQuery {
                 i += len;
                 fields
             });
-            let (matcher, next) = read_value(&chars, i, strict)?;
+            let (mut matcher, next) = read_value(&chars, i, strict)?;
             i = next;
+            if scope == Some(ID_SCOPE)
+                && let Some(Matcher::Word(text) | Matcher::Phrase(text)) = &matcher
+                && is_full_id(text)
+            {
+                matcher = Some(Matcher::Exact(text.clone()));
+            }
             if let Some(matcher) = matcher {
                 terms.push(Term { matcher, negated, scope });
             }
@@ -249,6 +260,16 @@ impl SearchQuery {
     }
 }
 
+const ID_SCOPE: &[Field] = &[Field::Id];
+
+/// Whether folded text is a whole task ID such as `std-12`: a project
+/// prefix, a dash and a number.
+fn is_full_id(text: &str) -> bool {
+    text.split_once('-').is_some_and(|(prefix, number)| {
+        !prefix.is_empty() && prefix.chars().all(char::is_alphanumeric) && !number.is_empty() && number.chars().all(|c| c.is_ascii_digit())
+    })
+}
+
 /// A field prefix such as `title:` at `start`, with its length including the
 /// colon. Unknown names (`status:todo`, `http://`) stay ordinary text.
 fn scope_prefix(chars: &[char], start: usize) -> Option<(&'static [Field], usize)> {
@@ -263,7 +284,7 @@ fn scope_prefix(chars: &[char], start: usize) -> Option<(&'static [Field], usize
     }
     let name: String = chars[start..colon].iter().collect::<String>().to_ascii_lowercase();
     let fields: &'static [Field] = match name.as_str() {
-        "id" => &[Field::Id],
+        "id" => ID_SCOPE,
         "title" => &[Field::Title],
         "subtitle" => &[Field::Subtitle],
         "desc" | "description" => &[Field::Description],
@@ -435,6 +456,7 @@ fn best_match(term: &Term, fields: &[FoldedField<'_>]) -> Option<u32> {
             Matcher::Word(text) => substring_strength(&field.text, text),
             Matcher::Phrase(text) => collapse_whitespace(&field.text).contains(text.as_str()).then_some(Strength::Word),
             Matcher::Regex(regex) => regex.is_match(field.raw).then_some(Strength::Word),
+            Matcher::Exact(text) => (field.text == *text).then_some(Strength::Word),
         };
         if let Some(strength) = strength {
             let points = field.field.weight() * strength as u32;
@@ -738,6 +760,26 @@ mod tests {
         // space (a literal word that this task does not contain).
         assert!(!matches("status:todo", &task));
         assert!(!matches("title: login", &task));
+    }
+
+    #[test]
+    fn id_scope_with_a_full_id_matches_that_task_only() {
+        // DEV-662: `id:STD-12` must not select STD-120 to STD-129.
+        let exact = doc("STD-12", "Twelve", None, &[]);
+        let longer = doc("STD-120", "Mentions STD-12", None, &[]);
+        for query in ["id:STD-12", "id:std-12", "id:\"STD-12\""] {
+            assert!(matches(query, &exact), "{query}");
+            assert!(!matches(query, &longer), "{query}");
+        }
+        assert!(!matches("-id:STD-12", &exact));
+        assert!(matches("-id:STD-12", &longer));
+        // A moved task keeps its old ID.
+        let moved = SearchDocument { moved_from: &["STD-12".to_string()], ..doc("WEB-3", "Moved", None, &[]) };
+        assert!(matches("id:STD-12", &moved));
+        // Partial IDs still match as text.
+        assert!(matches("id:STD", &longer));
+        assert!(matches("id:120", &longer));
+        assert!(matches("STD-12", &longer));
     }
 
     #[test]
