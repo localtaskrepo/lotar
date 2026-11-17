@@ -1,0 +1,55 @@
+title: The queue worker loses an entry it took without a word when it dies before the job registers, or when the entry's retries run out
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T16:52:16.648521+00:00
+modified: 2026-11-17T16:53:17.735450+00:00
+relationships:
+  related:
+  - DEV-660
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74
+description: |-
+  Found while fixing DEV-660 (2026-11-17).
+
+  ## Found
+  - `dequeue_startable` (`crates/lotar-agent/src/services/agent_queue_service.rs`) removes entries from the on-disk queue before `start_entry` registers their job. A worker killed in between (reboot, kill, a crash with `panic = abort`) loses them: no job, no comment, no queue entry. DEV-660 took one cause away (launchd killing the worker's process group); the window stays.
+  - An entry whose start fails 4 times is dropped; the error only reaches the worker's stderr, which is `/dev/null`. The ticket keeps its agent assignee and says nothing.
+  - `lotar add` prints a created rule's failure only with `LOTAR_DEBUG_STATUS` (`crates/lotar-lib/src/cli/handlers/mod.rs`, around line 515).
+
+  ## Check
+  Kill the worker after it takes an entry and before its job starts, or make a start fail 4 times: the entry is queued again, or the ticket says why its job didn't start.
+
+  ## Done when
+  - [ ] A taken entry stays recoverable until its job is registered.
+  - [ ] A dropped entry comments the reason on its ticket.
+  - [ ] Tests for both; they fail before the fix.
+tags:
+- health
+custom_fields:
+  finding: queue:lost-entry
+history:
+- at: 2026-11-17T16:52:17.315191+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-660"]}'
+- at: 2026-11-17T16:52:17.854123+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T16:53:15.331563+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T16:53:17.735450+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74

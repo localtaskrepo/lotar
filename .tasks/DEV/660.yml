@@ -1,16 +1,18 @@
 title: A ticket created while another job in its tasks dir starts or ends gets its agent assignee from the created rule but no job
-status: InProgress
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T16:15:20.189944+00:00
-modified: 2026-11-17T16:17:18.525259+00:00
+modified: 2026-11-17T17:03:51.795022+00:00
 relationships:
   related:
   - DEV-643
   - DEV-646
   - DEV-647
+  - DEV-661
+  - DEV-659
 comments:
 - date: 2026-11-17T16:17:18.525259+00:00
   author: claude
@@ -19,8 +21,47 @@ comments:
 
     - 2026-11-17 16:16:48Z: `lotar assignee LOCA-471 --clear`, then `@fix`, with LOCA-500's job running in local. The job started at 16:16:52 (status InProgress).
     - So the loss needs more than one running job, e.g. a job starting or ending (worktree cleanup, DEV-647) when the ticket is created. All 12 losses happened on 0.15.2 or earlier.
+- date: 2026-11-17T16:53:05.052184+00:00
+  author: claude
+  text: |-
+    Fixed: the queue worker no longer dies when the launch agent's run ends.
+
+    - **Cause:** the first `lotar add` of a `repos.ts` run spawned the queue worker in the launchd job's process group. When the run ended, launchd killed the group (no `AbandonProcessGroup`), and the entry the worker had already taken off the disk queue was lost. `live-checks.log` shows it: LOCA-487 and 488 filed in one run, 491 and 492 in another. 0.15.3 (DEV-643, DEV-646, DEV-647) didn't touch this.
+    - **Fix:** `spawn_worker` in `crates/lotar-agent/src/services/agent_queue_service.rs` starts the worker with `process_group(0)`; `docs/help/agent.md` says so.
+    - **Test:** `crates/lotar-lib/tests/dev660_worker_outlives_its_launcher_test.rs` kills the launcher's process group while one job runs and one waits; the waiting job must still start. Failed before the fix, passes after.
+    - **Left over:** a worker killed between taking an entry and registering its job still loses it, and a dropped entry leaves no comment: filed as [DEV-661](https://lotar.pyxzl.net/task/DEV-661).
+  report:
+    commits:
+    - hash: 0a370d1e2
+      what: queue worker starts in its own process group
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent variant
+    - command: npm test
+      result: passed
+      reason: test:agent, 2307 Rust + 1548 UI + release + hooks
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    - command: cargo nextest dev660
+      result: passed
+      reason: fails before the fix
+    next: Review, then merge
+- date: 2026-11-17T17:03:41.704671+00:00
+  author: claude
+  text: |-
+    Review: passed. `0a370d1e2` puts the queue worker in its own process group, so it survives the launch agent's run ending; the new test fails without the fix and passes with it.
+
+    - **Read:** the diff (`agent_queue_service.rs` `spawn_worker`, the new test, `integration.rs`, `docs/help/agent.md`), the ticket and both comments, DEV-661, `AGENTS.md`, and the last 5 commits on main to `agent_queue_service.rs` and `agent.md`. Main is one unrelated commit ahead (DEV-659, a smoke test).
+    - **Cause holds:** `~/Library/LaunchAgents/net.pyxzl.live-checks.plist` has no `AbandonProcessGroup`. In `~/Library/Logs/live-checks.log`, only the first ticket of each run got a job (487 yes, 488 lost; 489 yes, 490 lost; 491 yes, 492 lost). `dequeue_startable` takes entries off disk before `start_entry` registers their job, so a killed worker drops them.
+    - **Reran:** `cargo nextest run -p lotar-lib --test integration dev660` passes (after `cargo build`: the test needs `target/debug/lotar`). With `process_group(0)` commented out it fails with "the second ticket's job did not start…" after 30 s. File restored: `git status` is clean.
+    - **Reran:** `rustfmt --check` on the changed Rust files, `cargo clippy -p lotar-agent -p lotar-lib --all-targets -D warnings`, and the 27 queue/worker tests: all pass. I did not rerun the full `npm run lint`, `npm test` or `npm run smoke`; the fix agent reports them passed.
+    - **Scope:** "never dropped" is only partly met here. A worker killed between taking an entry and registering its job still loses it, and `lotar add` doesn't report a failed created rule. Both are in [DEV-661](https://lotar.pyxzl.net/task/DEV-661) (InProgress), so the cause found here is fixed and the rest is tracked.
+    - No stray files, no second branch or copy of the fix, and no owner decision touched. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af14f2e6c-276d-42d1-8c0a-5d03c1661ffa
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe5fb4e-b8ca-4da6-9b91-78ba9196fe3d
 description: |-
   Found by LOCA-500 (local, 2026-11-17).
 
@@ -107,3 +148,46 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T16:52:17.314263+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-646","DEV-647"]}'
+    new: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661"]}'
+- at: 2026-11-17T16:53:04.072107+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661"]}'
+    new: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661","DEV-659"]}'
+- at: 2026-11-17T16:53:05.052184+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:53:14.333506+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T16:53:19.877215+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe5fb4e-b8ca-4da6-9b91-78ba9196fe3d
+- at: 2026-11-17T17:03:41.704671+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T17:03:51.795022+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

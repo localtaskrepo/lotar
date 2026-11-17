@@ -174,6 +174,7 @@ mod dev626_resumed_t3_threads_test;
 mod dev630_queue_project_parallel_limit_test;
 mod dev646_serve_shared_job_limits_test;
 mod dev64_mcp_schema_contract_test;
+mod dev660_worker_outlives_its_launcher_test;
 mod dev67_sync_events_test;
 mod dev71_config_set_candidate_test;
 mod dev75_cli_list_contract_test;

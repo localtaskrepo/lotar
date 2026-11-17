@@ -609,6 +609,13 @@ fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
     cmd.arg("--tasks-dir").arg(tasks_dir).arg("agent").arg("worker");
     cmd.env("LOTAR_TASKS_DIR", tasks_dir);
     cmd.stdin(Stdio::null());
+    // Its own process group: launchd kills a job's group when the job ends,
+    // and the worker would die with the entries it took (DEV-660).
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
 
     if std::env::var("LOTAR_AGENT_WORKER_VERBOSE").is_ok() {
         cmd.stdout(Stdio::inherit());

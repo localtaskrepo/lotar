@@ -1,15 +1,17 @@
 title: Smoke test 'rejects oversized lines without unbounded buffering' times out under heavy load
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:11:23.006068+00:00
-modified: 2026-11-17T16:39:22.260635+00:00
+modified: 2026-11-17T16:53:12.235683+00:00
 relationships:
   related:
   - DEV-638
   - DEV-314
+  - DEV-629
+  - DEV-660
 comments:
 - date: 2026-11-17T16:31:50.790560+00:00
   author: claude
@@ -53,6 +55,33 @@ comments:
     Correction to the review comment: the touched smoke files last changed on main in `7241c9060` (DEV-314, 2026-11-10), not "since 2025".
 
     - That commit predates the fix's base `af585df7a`, so the fix builds on the current code. The verdict stays: passed.
+- date: 2026-11-17T16:53:03.705974+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `2d4031e30` on origin.
+
+    - Rebased `dcebbe88f` onto `66ac7e113` (DEV-638) with no conflicts and no lockfile change, which gave `67c6d26cd`. Fast-forwarded the main checkout, then amended the pending `.tasks` edits in, which gave `2d4031e30`.
+    - The rebase changed the hash, so all checks ran again in the worktree: `npm run lint:agent`, `npm run test:agent`, `npm run test:smoke:agent` (405/405 at load ~70). All passed.
+    - No rules or config changed, so `lotar trust` wasn't needed.
+    - Pushed with `git push`, hooks on. The only unpushed commit was this one. DEV-660 and DEV-629 are in progress in their own worktrees.
+    - The main checkout now shows `.tasks/DEV/660.yml` and `661.yml`. Another session edited them after the push; I left them as they are.
+  report:
+    commits:
+    - hash: 2d4031e30
+      what: test uses the client's default 20 s wait for the oversized-line rejection (plus pending .tasks edits)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2306 Rust, 1548 UI tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405 at load ~70, ticket check rerun after the rebase
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config files changed
+    next: 'None: ticket goes to Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7a1176a-a3a0-44f3-92e1-99a436b78b87
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2d115a50-4496-49e3-a2d1-67ad933d71ae
@@ -125,3 +154,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T16:53:03.705974+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:53:04.071430+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-638","DEV-314"]}'
+    new: '{"related":["DEV-638","DEV-314","DEV-629","DEV-660"]}'
+- at: 2026-11-17T16:53:12.235683+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
