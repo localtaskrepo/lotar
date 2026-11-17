@@ -856,14 +856,13 @@ fn read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let mut stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
     let (peer, _) = listener.accept().unwrap();
-    drop(peer);
     // On macOS this makes set_read_timeout fail with EINVAL, as a peer close racing it did.
-    // When the peer's close lands first, macOS answers ENOTCONN; the socket is shut down either way.
-    match stream.shutdown(std::net::Shutdown::Both) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotConnected => {}
-        Err(e) => panic!("shutting down the socket failed: {e}"),
-    }
+    // Shut down while the peer is alive: after its close, shutdown answers ENOTCONN and
+    // set_read_timeout succeeds, so the EINVAL branch would go untested.
+    stream.shutdown(std::net::Shutdown::Both).unwrap();
+    drop(peer);
+    #[cfg(target_os = "macos")]
+    assert_eq!(stream.set_read_timeout(Some(RESPONSE_DEADLINE)).unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
     let mut buf = [0u8; 16];
     assert_eq!(read_until_deadline(&mut stream, &mut buf, Instant::now() + RESPONSE_DEADLINE), 0);
 }

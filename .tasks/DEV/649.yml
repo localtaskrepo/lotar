@@ -1,11 +1,11 @@
 title: 'Flaky test: read_until_deadline_returns_eof_on_a_socket_shut_down_both_ways panics on ENOTCONN from shutdown on macOS'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T05:24:24.590809+00:00
-modified: 2026-11-17T05:52:23.769417+00:00
+modified: 2026-11-17T06:20:15.052357+00:00
 relationships:
   related:
   - DEV-639
@@ -61,6 +61,33 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: no UI or server change
+- date: 2026-11-17T06:20:06.248164+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `ba2a58301` is on `main` and `origin/main`.
+
+    - Rebased twice: main moved on during the first round of checks (DEV-639 landed), so the checks ran again on the final commit.
+    - Lint, tests and smoke all passed on that commit.
+    - `.tasks` changes from the main checkout were amended into `ba2a58301` (the owner's rule from 2026-11-12).
+    - No rules or config changed, so no `lotar trust` was needed.
+    - Ticket check in the main checkout: 20/20 passed.
+    - Follow-up still open: [DEV-650](https://lotar.pyxzl.net/task/DEV-650).
+  report:
+    commits:
+    - hash: ba2a58301
+      what: accept NotConnected from shutdown(Both) in the read_until_deadline EOF test
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2297 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: node scripts/rust-test-runner.mjs --agent read_until_deadline x20 (main checkout)
+      result: passed
+    next: 'DEV-650: make every run reach the EINVAL branch'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ca16f28-9a8e-461b-807a-ca9312c22080
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A477dee0d-6db4-436d-9819-dd87be9ea3e8
@@ -141,3 +168,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T06:20:06.248164+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:20:15.052357+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
