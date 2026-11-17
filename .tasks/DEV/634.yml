@@ -1,11 +1,11 @@
 title: Split agent jobs and automation out of lotar-lib into a crate lotar-agent
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T01:03:27.180760+00:00
-modified: 2026-11-17T02:13:45.938877+00:00
+modified: 2026-11-17T07:35:38.886934+00:00
 relationships:
   related:
   - DEV-498
@@ -28,20 +28,68 @@ comments:
     - (B) The task services get their own crate, `lotar-tasks`: lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core. lotar-agent stays about 14k lines, as named. The 8 calls go through a hook that lotar-agent registers. Risk: if an entry point doesn't register the hook, automation silently doesn't run, so a test checks that CLI, server and MCP all register it. About twice the work of (A).
     - (C) Like (B), but the task services move into `lotar-core` (24k -> 35k lines) instead of a new crate.
     - (D) lotar-agent calls the task services through a trait that lotar-lib implements. That changes about 80 call sites, and the automation tests couldn't run in lotar-agent without lotar-lib. I don't recommend it.
+- date: 2026-11-17T07:01:58.899218+00:00
+  author: automation
+  text: 'The queued @fix job waits: T3 Code still runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe9cf8d5-29d4-4949-9c63-1e8aed77afa5 of the job job-20261117T012605.591Z-14. The job starts once the thread ends.'
+- date: 2026-11-17T07:35:38.886934+00:00
+  author: claude
+  text: |-
+    Split done (option B): `lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core`, no cycle.
+
+    - `crates/lotar-tasks`: task services (CRUD, comments, questions, reviews, move, renumber, relationships, references, attachments, sprints, releases). `impl TaskService` blocks had to move with it (orphan rule).
+    - `crates/lotar-agent`: automation engine and types, agent jobs, queue, runners, logs, context.
+    - Task services call automation through `lotar_tasks::hooks::TaskHooks`; `lotar_agent::install_hooks()` registers them. Called in `src/main.rs` (CLI, server, MCP) and in ctors of lotar-lib's unit and integration tests and lotar-agent's unit tests.
+    - Without hooks, saving fires no automation and an answer that sets fields fails. Tests catch a missing install: `hooks::installed()` asserts in lib unit and integration tests; with the call removed from `main.rs`, `cli_priority_set_routes_through_automation_and_persists` fails (checked).
+    - `lotar::services::*` and `lotar::automation` paths keep working via re-exports.
+    - Test-only fault setters `upload_fault` are always compiled, `#[doc(hidden)] pub` (same as core's transaction faults).
+    - `scripts/stage-crates.mjs` stages `docs/help/agent-instructions.md` for lotar-agent; release workflow and guide list both new crates.
+
+    Build times after a one-line change in `agent_job_service.rs` (warm, load ~20):
+    - before: `-p lotar-lib` build 8.1–8.6 s, 320 agent/automation tests 73–82 s
+    - after: `-p lotar-agent` build 1.1 s, its 106 tests 14.5 s; `-p lotar-lib` build 6.9 s
+
+    Next split candidates (lotar-lib now 45.2k lines): `mcp/` 9.1k, `sync_service` 5.4k.
+  report:
+    commits:
+    - hash: ed8ce0976
+      what: split into lotar-tasks and lotar-agent, hooks, docs and release scripts
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2304 Rust, 1548 UI, script tests
+    - command: npm run smoke
+      result: passed
+      reason: 118 files, 405 tests
+    - command: cargo tree -p lotar-lib
+      result: passed
+      reason: lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core
+    - command: cargo package --list -p lotar-tasks -p lotar-agent
+      result: passed
+    - command: cargo publish of the new crates
+      result: not_run
+      reason: needs the owner's first publish with a token
+    next: Review on Codex (started now); before the next release the owner publishes lotar-tasks and lotar-agent once with a token and registers their trusted publishers (docs/release-guide.md)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe9cf8d5-29d4-4949-9c63-1e8aed77afa5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A52e16d4b-4fb9-4039-aef7-67dd650ad494
 description: |-
   Owner, 2026-11-17, on DEV-579 choosing option A: "Okay, A sounds good." Continues DEV-499's workspace split; STD-131: keep projects small and focused.
+
+  Owner, 2026-11-17, on where the task services go (they and automation call each other): "B" — task services get their own crate `lotar-tasks`; their calls back into automation and agent jobs go through a hook lotar-agent installs at startup.
 
   ## Why
   - `lotar-lib` src is ~72k lines; agent jobs, runner, queue and automation are ~13.4k and get most of this month's changes, yet every change rebuilds all of lotar-lib and links the 59k-line integration test binary (DEV-579 measurements).
 
   ## What
   - New crate `crates/lotar-agent`: `services/agent_*`, `services/automation*`, `agent_runner`, with their own tests.
-  - lotar-lib depends on it; nothing in lotar-agent calls up into cli, routes or mcp (as DEV-498 did for core).
+  - New crate `crates/lotar-tasks`: the task services agent code calls (task, list, query, sprints, releases, relationships, references, attachments, ...).
+  - lotar-lib depends on lotar-agent; nothing in lotar-agent or lotar-tasks calls up into cli, routes or mcp (as DEV-498 did for core).
 
   ## Done when
-  - [ ] `crates/lotar-agent` holds agent jobs, queue, runner and automation; `cargo tree` shows lotar-lib -> lotar-agent -> lotar-core, no cycle.
+  - [ ] `crates/lotar-agent` holds agent jobs, queue, runner and automation; `crates/lotar-tasks` the task services; `cargo tree` shows lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core, no cycle.
+  - [ ] The task services call automation and agent jobs only through `lotar_tasks::hooks`; the CLI binary, `lotar serve` and MCP install the hooks, and a test fails when an entry point doesn't (without hooks automation would silently not run).
   - [ ] The agent and automation tests live in the new crate and run with `cargo nextest run -p lotar-agent --cargo-profile dev`; testing-strategy says so.
   - [ ] Measured, before and after: build and test time and `target/debug` size for a one-line change in `agent_job_service.rs`.
   - [ ] No behaviour change: `npm run lint`, `npm test`, `npm run smoke` pass; REST and CLI output unchanged.
@@ -88,3 +136,74 @@ history:
   - field: relationships
     old: '{"related":["DEV-498","DEV-499","DEV-579"]}'
     new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635"]}'
+- at: 2026-11-17T07:01:45.372167+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner, 2026-11-17, on DEV-579 choosing option A: "Okay, A sounds good." Continues DEV-499's workspace split; STD-131: keep projects small and focused.
+
+      ## Why
+      - `lotar-lib` src is ~72k lines; agent jobs, runner, queue and automation are ~13.4k and get most of this month's changes, yet every change rebuilds all of lotar-lib and links the 59k-line integration test binary (DEV-579 measurements).
+
+      ## What
+      - New crate `crates/lotar-agent`: `services/agent_*`, `services/automation*`, `agent_runner`, with their own tests.
+      - lotar-lib depends on it; nothing in lotar-agent calls up into cli, routes or mcp (as DEV-498 did for core).
+
+      ## Done when
+      - [ ] `crates/lotar-agent` holds agent jobs, queue, runner and automation; `cargo tree` shows lotar-lib -> lotar-agent -> lotar-core, no cycle.
+      - [ ] The agent and automation tests live in the new crate and run with `cargo nextest run -p lotar-agent --cargo-profile dev`; testing-strategy says so.
+      - [ ] Measured, before and after: build and test time and `target/debug` size for a one-line change in `agent_job_service.rs`.
+      - [ ] No behaviour change: `npm run lint`, `npm test`, `npm run smoke` pass; REST and CLI output unchanged.
+      - [ ] MCP and sync as next candidates: noted in a comment with their size, not done here.
+    new: '-'
+- at: 2026-11-17T07:01:45.464165+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T07:01:46.543723+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T07:01:58.899218+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:31:13.062280+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A52e16d4b-4fb9-4039-aef7-67dd650ad494
+- at: 2026-11-17T07:32:29.567209+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: '-'
+    new: |-
+      Owner, 2026-11-17, on DEV-579 choosing option A: "Okay, A sounds good." Continues DEV-499's workspace split; STD-131: keep projects small and focused.
+
+      Owner, 2026-11-17, on where the task services go (they and automation call each other): "B" — task services get their own crate `lotar-tasks`; their calls back into automation and agent jobs go through a hook lotar-agent installs at startup.
+
+      ## Why
+      - `lotar-lib` src is ~72k lines; agent jobs, runner, queue and automation are ~13.4k and get most of this month's changes, yet every change rebuilds all of lotar-lib and links the 59k-line integration test binary (DEV-579 measurements).
+
+      ## What
+      - New crate `crates/lotar-agent`: `services/agent_*`, `services/automation*`, `agent_runner`, with their own tests.
+      - New crate `crates/lotar-tasks`: the task services agent code calls (task, list, query, sprints, releases, relationships, references, attachments, ...).
+      - lotar-lib depends on lotar-agent; nothing in lotar-agent or lotar-tasks calls up into cli, routes or mcp (as DEV-498 did for core).
+
+      ## Done when
+      - [ ] `crates/lotar-agent` holds agent jobs, queue, runner and automation; `crates/lotar-tasks` the task services; `cargo tree` shows lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core, no cycle.
+      - [ ] The task services call automation and agent jobs only through `lotar_tasks::hooks`; the CLI binary, `lotar serve` and MCP install the hooks, and a test fails when an entry point doesn't (without hooks automation would silently not run).
+      - [ ] The agent and automation tests live in the new crate and run with `cargo nextest run -p lotar-agent --cargo-profile dev`; testing-strategy says so.
+      - [ ] Measured, before and after: build and test time and `target/debug` size for a one-line change in `agent_job_service.rs`.
+      - [ ] No behaviour change: `npm run lint`, `npm test`, `npm run smoke` pass; REST and CLI output unchanged.
+      - [ ] MCP and sync as next candidates: noted in a comment with their size, not done here.
+- at: 2026-11-17T07:35:38.886934+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: mallox
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-17T06:54:25.467087+00:00
+modified: 2026-11-17T07:01:34.762601+00:00
 relationships:
   blocks:
   - DEV-653
@@ -15,6 +15,7 @@ relationships:
   - DEV-635
   - DEV-638
   - DEV-644
+  - DEV-353
 comments:
 - date: 2026-11-17T06:49:42.579878+00:00
   author: claude
@@ -29,9 +30,53 @@ comments:
 - date: 2026-11-17T06:54:12.983456+00:00
   author: automation
   text: The fix agent's job job-20261117T064733.178Z-159 failed (lotar agent logs job-20261117T064733.178Z-159); @fix-retry retries it on branch agent/DEV-652.
+- date: 2026-11-17T06:59:05.091861+00:00
+  author: automation
+  text: 'The queued @review-claude job waits: T3 Code still runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66 of the job job-20261117T064733.178Z-159. The job starts once the thread ends.'
+- date: 2026-11-17T06:59:30.149632+00:00
+  author: claude
+  text: |-
+    Blocked: T3 Code's CLI can't start a thread in an existing checkout, so lotar can't hand it its own worktree yet. One question for you below.
+
+    - `t3 thread start` (T3 Code 0.1.9, and upstream main too) only has `--worktree <base>` = a new worktree in `~/.t3/worktrees`. A path as `<project>` maps to the registered project, so the thread would run in the main checkout.
+    - T3's server already supports it: `t3_thread_launch` takes `workspaceStrategy: {type: existing_worktree, worktreePath}`. Only the CLI lacks a flag for it. harnessmux's t3 agent (`src/backend/t3.rs`) only knows `--worktree`/`--branch`.
+    - Earlier T3 asks went fast upstream (DEV-353: issue #34688 fixed in PR #34696 within a day).
+    - Two jobs ran DEV-652 at once (threads `mcp:753f88c8` and `mcp:e7928dfd`); each got its own new T3 worktree, the very thing this ticket removes. I asked the second to stop without changes.
+    - No code changed; nothing committed. The cleanup-rules part (your scope comment) doesn't need T3 and can go first as its own commit if you want.
+
+    **Question:** How should a t3 job's thread get lotar's worktree?
+    1. (Recommended) I file a T3 Code issue for a `t3 thread start` flag that binds an existing worktree (`existing_worktree`); harnessmux and lotar switch once a release has it.
+    2. harnessmux's t3 agent calls T3's `t3_thread_launch` tool itself, without the CLI (a harnessmux ticket; leans on T3 internals).
+    3. Now, with no upstream change: lotar registers each ticket worktree as its own T3 project and starts the thread there (one extra T3 project per ticket in the sidebar, removed at cleanup).
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: no code change, blocked before coding
+    - command: npm test
+      result: not_run
+      reason: no code change
+    - command: npm run smoke
+      result: not_run
+      reason: no code change
+    next: Owner picks how a T3 thread binds lotar's worktree; then a job does the worktree part, and the cleanup rules as their own commit
+- date: 2026-11-17T07:00:16.202348+00:00
+  author: claude
+  text: |-
+    Why two jobs ran: no lotar bug.
+
+    - Job `job-20261117T064733.178Z-159` failed at 06:54 on an API error (`SSL certificate hostname mismatch`); `@fix-retry` started `job-…-161`. A "Continue" then resumed the first thread, so both worked the ticket until I asked the retry to stop.
+- date: 2026-11-17T07:01:34.762601+00:00
+  author: claude
+  text: |-
+    Review: nothing to review
+
+    - `git log main..HEAD`, `main..agent/DEV-652`, `main..t3/t3-job-lotar-worktree`: no commits (all at `72687ab60`)
+    - The fix agent made no changes and handed back with a question (HelpNeeded, assigned to mallox)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1e2226ce-5f74-40ec-bf11-141509e5ee1a
 description: |-
   Owner 2026-11-17 (DEV-579): "I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux." Owner 2026-11-16 (chief of staff options picker): "lotar makes them, T3 shows".
 
@@ -101,3 +146,51 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
+- at: 2026-11-17T06:59:02.329473+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-17T06:59:05.091861+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:59:30.149632+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T06:59:33.128528+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644"]}'
+    new: '{"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353"]}'
+- at: 2026-11-17T06:59:34.903811+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+- at: 2026-11-17T06:59:35.003628+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review-claude'
+    new: mallox
+- at: 2026-11-17T07:00:16.202348+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:00:53.188282+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1e2226ce-5f74-40ec-bf11-141509e5ee1a
+- at: 2026-11-17T07:01:34.762601+00:00
+  actor: claude
+  changes:
+  - field: comment_added

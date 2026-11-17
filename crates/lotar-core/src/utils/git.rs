@@ -368,8 +368,7 @@ mod timeout_tests {
         assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
         assert!(started.elapsed() < Duration::from_secs(5), "took {:?}", started.elapsed());
         let pid = std::fs::read_to_string(&pid_file).expect("pid file");
-        let alive = Command::new("kill").arg("-0").arg(pid.trim()).status().expect("kill -0");
-        assert!(!alive.success(), "the hanging child {pid} is still running");
+        assert!(stops_running(pid.trim()), "the hanging child {pid} is still running");
     }
 
     /// A command that exits while a process it started still holds its output
@@ -379,14 +378,29 @@ mod timeout_tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let pid_file = dir.path().join("pid");
         let mut command = Command::new("sh");
-        command.arg("-c").arg(format!("sleep 3 & echo $! > {}; exit 0", pid_file.display()));
+        command.arg("-c").arg(format!("sleep 30 & echo $! > {}; exit 0", pid_file.display()));
         let started = Instant::now();
         let error = output_within(&mut command, Duration::from_millis(300)).expect_err("open output must time out");
         assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
         assert!(started.elapsed() < Duration::from_secs(2), "took {:?}", started.elapsed());
         let pid = std::fs::read_to_string(&pid_file).expect("pid file");
-        let alive = Command::new("kill").arg("-0").arg(pid.trim()).status().expect("kill -0");
-        assert!(!alive.success(), "the child {pid} holding the output is still running");
+        assert!(stops_running(pid.trim()), "the child {pid} holding the output is still running");
+    }
+
+    /// Whether `pid` is gone or a zombie within a few seconds. A killed child
+    /// stays in the process table until its new parent reaps it (DEV-654).
+    fn stops_running(pid: &str) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let ps = Command::new("ps").args(["-o", "stat=", "-p", pid]).output().expect("ps");
+            if !ps.status.success() || String::from_utf8_lossy(&ps.stdout).trim_start().starts_with('Z') {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 
     #[test]

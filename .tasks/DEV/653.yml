@@ -4,11 +4,13 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-17T06:51:34.275016+00:00
+modified: 2026-11-17T07:05:48.712571+00:00
 relationships:
   depends_on:
   - DEV-652
   related:
   - DEV-579
+  - DEV-651
 description: |-
   Owner 2026-11-17, in his words: "We could even do partial cleanup this way for things that are no longer need after a phase". He picked "Follow-up after DEV-652" (chief of staff options picker).
 
@@ -27,3 +29,10 @@ description: |-
   - [ ] Measurements in a comment (sizes per part, rebuild time per step, before and after).
   - [ ] The kept rules run on a real ticket through fix, review and merge (checked, not assumed); docs/help/automation.md and agent.md say so.
   - [ ] lint, tests and smoke pass.
+history:
+- at: 2026-11-17T07:05:48.712571+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-652"],"related":["DEV-579"]}'
+    new: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651"]}'

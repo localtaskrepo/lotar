@@ -1,0 +1,213 @@
+title: 'Flaky test: hanging_command_is_killed_at_the_timeout sees the killed sleep still alive on CI'
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T06:57:37.267960+00:00
+modified: 2026-11-17T07:35:30.939584+00:00
+relationships:
+  related:
+  - DEV-635
+  - DEV-651
+  - DEV-466
+comments:
+- date: 2026-11-17T07:08:47.514767+00:00
+  author: claude
+  text: |-
+    Fixed: the timeout tests no longer read a zombie or a not-yet-dead child as running.
+
+    - Cause: `kill -0` succeeds for a SIGKILLed process until it is reaped (zombie), or while the signal is still being delivered
+    - `crates/lotar-core/src/utils/git.rs`: new test helper `stops_running` polls `ps -o stat= -p <pid>` for up to 5s; gone or state `Z` counts as stopped
+    - Applied to both `hanging_command_is_killed_at_the_timeout` and `child_holding_the_output_open_is_killed_at_the_timeout` (same pattern)
+  report:
+    commits:
+    - hash: 1bdfc8370
+      what: timeout tests wait up to 5s for the killed child to be gone or a zombie
+    checks:
+    - command: cargo nextest run -p lotar-core timeout_tests --stress-count 50 (8 busy loops)
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2302 Rust, 1548 frontend
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: next QA runs on CI
+      result: not_run
+      reason: needs the merge
+    next: Review, then merge; watch the next QA runs
+- date: 2026-11-17T07:11:35.918909+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix works for the flaky test, but now the second timeout test passes even when the kill is missing.
+
+    - `crates/lotar-core/src/utils/git.rs:381`: `child_holding_the_output_open_is_killed_at_the_timeout` starts `sleep 3`. `stops_running` waits up to 5s, so an unkilled `sleep 3` exits on its own and the test still passes.
+    - Evidence: in a scratch copy with the `libc::kill(-pid, SIGKILL)` line in `kill_process_group` (`git.rs:126`) removed, `hanging_command_is_killed_at_the_timeout` fails (good), but `child_holding_the_output_open_is_killed_at_the_timeout` passes. Before `1bdfc8370`, its immediate `kill -0` would have caught this.
+    - Fix: make the sleep outlive the deadline, e.g. `sleep 30`. Verified in the scratch copy: with `sleep 30` the test fails without the kill and passes (0.3s) with it.
+    - Otherwise fine: counting the zombie as stopped is right (on CI, PID 1 in a container may never reap it), and `ps -o stat= -p` behaves the same on Linux and macOS.
+    - Reran: `cargo nextest run -p lotar-core timeout_tests --stress-count 30` with 8 busy loops: 30/30 passed. I did not rerun lint/test/smoke.
+    - Scratch worktree removed; no files changed here.
+- date: 2026-11-17T07:17:18.312363+00:00
+  author: claude
+  text: |-
+    Rework done: the output-holding test catches a missing kill again.
+
+    - Review read HEAD `1bdfc8370`, so I applied its finding
+    - `crates/lotar-core/src/utils/git.rs:381`: `sleep 3` → `sleep 30`, longer than the 5s wait in `stops_running`
+    - Checked: with `libc::kill(-pid, SIGKILL)` (`git.rs:126`) commented out, `child_holding_the_output_open_is_killed_at_the_timeout` fails ("still running"); put back, it passes
+    - Amended into `fb9ecb994`
+  report:
+    commits:
+    - hash: fb9ecb994
+      what: timeout tests wait up to 5s for the killed child to be gone or a zombie; output-holding child sleeps 30s
+    checks:
+    - command: cargo nextest run -p lotar-core child_holding_the_output_open_is_killed_at_the_timeout (process-group kill removed)
+      result: failed
+      reason: as intended, proves the test catches a missing kill
+    - command: cargo nextest run -p lotar-core timeout_tests --stress-count 50 (8 busy loops)
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2302 Rust, 1548 frontend
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: next QA runs on CI
+      result: not_run
+      reason: needs the merge
+    next: Review again, then merge; watch the next QA runs
+- date: 2026-11-17T07:35:21.172895+00:00
+  author: claude
+  text: |-
+    Review: passed. `fb9ecb994` fixes the flake and both timeout tests still catch a missing kill.
+
+    - Read: ticket and comments, the diff in `crates/lotar-core/src/utils/git.rs`, `kill_process_group` (`git.rs:121`), recent main commits to the file (`50cfad9a2` DEV-466), CI runners (`ubuntu-latest`, `ps` available)
+    - Earlier finding fixed: `child_holding_the_output_open_is_killed_at_the_timeout` now starts `sleep 30`, longer than the 5s wait in `stops_running`
+    - Mutation check in a scratch copy: with `libc::kill(-pid, SIGKILL)` removed, both `hanging_command_is_killed_at_the_timeout` and `child_holding_the_output_open_is_killed_at_the_timeout` fail with "still running"
+    - Reran: `cargo nextest run -p lotar-core timeout_tests --stress-count 30` with 8 busy loops: 30/30 passed
+    - Not rerun: `npm run lint`, `npm test`, `npm run smoke` (fix agent reports them passed); whether QA stops failing shows only after the merge
+    - No stray files; no minor findings filed; scratch copy removed
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4a141ed-0d1d-4696-b833-5d123ae895a9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d2a4eb5-f5fc-431b-aa61-611790f229dd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec64b5e4-64fd-4df4-a998-043799c3d0dc
+description: 'Found: Quality Assurance run 44032088895 (main 5181b1410, DEV-635) failed in `crates/lotar-core/src/utils/git.rs:372`: ''the hanging child 6080 is still running''. Locally the test passes (2302 Rust tests on 93bf6ed47). Likely cause: `kill -0` right after the kill also succeeds for a killed process that its new parent hasn''t reaped yet (a zombie). Check: `cargo nextest run -p lotar-core hanging_command_is_killed_at_the_timeout` repeated under load, and the next QA runs. Done: the test waits briefly for the child to disappear or checks that it is a zombie, and QA no longer fails on it.'
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: qa:hanging_command_is_killed_at_the_timeout
+history:
+- at: 2026-11-17T06:57:37.475554+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-635"]}'
+- at: 2026-11-17T06:57:37.671748+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T06:57:38.970627+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T06:57:39.800930+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4a141ed-0d1d-4696-b833-5d123ae895a9
+- at: 2026-11-17T06:57:42.747009+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635"]}'
+    new: '{"related":["DEV-635","DEV-651"]}'
+- at: 2026-11-17T07:08:47.514767+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:08:53.799230+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T07:09:04.731926+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d2a4eb5-f5fc-431b-aa61-611790f229dd
+- at: 2026-11-17T07:11:35.918909+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:11:35.947737+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-17T07:11:44.164512+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-17T07:11:53.863399+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T07:17:18.312363+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:17:24.329307+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T07:17:35.021735+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec64b5e4-64fd-4df4-a998-043799c3d0dc
+- at: 2026-11-17T07:35:21.172895+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T07:35:21.593992+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635","DEV-651"]}'
+    new: '{"related":["DEV-635","DEV-651","DEV-466"]}'
+- at: 2026-11-17T07:35:30.939584+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
