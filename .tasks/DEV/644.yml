@@ -1,11 +1,11 @@
 title: A job whose turn ended normally fails when its session later ends idle
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-17T02:57:46.326002+00:00
-modified: 2026-11-17T09:13:32.117934+00:00
+modified: 2026-11-17T09:16:52.610538+00:00
 relationships:
   blocks:
   - DEV-617
@@ -17,6 +17,8 @@ relationships:
   - DEV-633
   - DEV-638
   - DEV-652
+  - DEV-635
+  - DEV-646
 comments:
 - date: 2026-11-17T03:18:45.333426+00:00
   author: claude
@@ -153,6 +155,42 @@ comments:
 - date: 2026-11-17T09:13:22.512097+00:00
   author: automation
   text: 'The queued @fix job didn''t start: DEV-644 is assigned to @review now.'
+- date: 2026-11-17T09:16:17.023903+00:00
+  author: claude
+  text: |-
+    Review: passed. `19c7f5472` does what "Done when" asks; ready for the merge agent.
+
+    - Ticket branch `t3/job-turn-end-idle-session-fix` is at the same commit as HEAD (`19c7f5472`): no rework to review instead.
+    - Change: `drive_turns` in `crates/lotar-lib/src/services/agent_job_service.rs` tracks `in_turn`; `SessionEnded idle` with no open turn returns the last turn's exit code. Mid-turn, before the first turn, or another reason still fails.
+    - Test failed before the fix: with the `SessionEnded … idle && !in_turn` arm removed, `a_session_that_ends_idle_after_its_turn_ended_keeps_the_turns_outcome` fails (`Exited(Some(0))` assertion); restored, it passes. File put back, worktree clean.
+    - Reran: `cargo nextest run -p lotar-lib dev520_session_events_tests` (6 passed), `rustfmt --edition 2024 --check` on the file (ok). Not rerun: `npm run lint`, `npm test`, `npm run smoke` (passed in the fix job on this commit).
+    - Main's later changes to the file (DEV-646, DEV-635, DEV-647) don't touch the `drive_turns` lines the fix relies on.
+    - Merge note: branch still carries `bb7cc8371` (DEV-633), already on main as `9c10760fa`; drop it in the rebase.
+    - No UI changes; no tickets filed.
+- date: 2026-11-17T09:16:52.610538+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T091325.173Z-30 failed or its review thread did (lotar agent logs job-20261117T091325.173Z-30), so the work on branch t3/fix-job-turn-end-idle-session isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a9e27ee-393b-4db4-b306-f8d87cbaddf7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0b1f365-faca-4cdd-a969-a39d7d4494a0
@@ -334,3 +372,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9bdac82c-5ac7-4176-ba7f-b26084e3e159
+- at: 2026-11-17T09:16:17.023903+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:16:17.390459+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-617"],"related":["DEV-617","DEV-615","DEV-577","DEV-647","DEV-633","DEV-638","DEV-652"]}'
+    new: '{"blocks":["DEV-617"],"related":["DEV-617","DEV-615","DEV-577","DEV-647","DEV-633","DEV-638","DEV-652","DEV-635","DEV-646"]}'
+- at: 2026-11-17T09:16:52.550745+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-17T09:16:52.610538+00:00
+  actor: automation
+  changes:
+  - field: comment_added

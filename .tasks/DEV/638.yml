@@ -1,16 +1,18 @@
 title: lotar serve announces task files written before it started as task_updated
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T01:58:28.742090+00:00
-modified: 2026-11-17T09:13:27.166163+00:00
+modified: 2026-11-17T16:11:38.062420+00:00
 relationships:
   related:
   - DEV-614
   - DEV-644
   - DEV-652
+  - DEV-634
+  - DEV-659
 comments:
 - date: 2026-11-17T02:46:56.322682+00:00
   author: claude
@@ -319,6 +321,76 @@ comments:
 - date: 2026-11-17T09:13:22.878178+00:00
   author: automation
   text: 'The queued @fix job didn''t start: DEV-638 is assigned to @review now.'
+- date: 2026-11-17T09:16:01.406201+00:00
+  author: claude
+  text: |-
+    Review: passed. Fourth review of `99ee73da0`, same commit the earlier reviews passed; nothing to fix or file.
+
+    - Branches: `HEAD`, `agent/DEV-638` and `t3/seed-tasks-watcher-fingerprints` all point at `99ee73da0`; only `crates/lotar-lib/src/web_server.rs` changes
+    - Fix: `seed_fingerprints` fills the `announced` map before `watcher.watch`, keyed by relative path and skipping dot-entries like the watcher; meets "Done when"
+    - Test: `watcher_skips_files_written_before_it_started` (earlier review showed it fails without the seed)
+    - Reran: `cargo nextest run -p lotar-lib watcher_` (2 passed); `git merge-tree` with `main`: no conflicts; no `main` commits touch the file since
+    - Not rerun: smoke suite (server-only change, passed on this commit in the first fix job); no UI changes, so no ui-review
+- date: 2026-11-17T09:17:38.658404+00:00
+  author: automation
+  text: The merge agent's job job-20261117T091645.311Z-47 failed (lotar agent logs job-20261117T091645.311Z-47); the fix agent retries it on branch t3/serve-ignore-prestart-task-updates.
+- date: 2026-11-17T09:18:31.401425+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T091751.275Z-51 failed again or on a rate limit (lotar agent logs job-20261117T091751.275Z-51). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T16:03:21.644492+00:00
+  author: claude
+  text: |-
+    Fix unchanged and ready to merge; the last merge and fix jobs failed only on a Claude rate limit.
+
+    - Logs `job-20261117T091645.311Z-47` and `job-20261117T091751.275Z-51`: `Claude API rate limit reached`, nothing about the work
+    - `99ee73da0` is still HEAD; it changes only `crates/lotar-lib/src/web_server.rs`; `git merge-tree` with `main` (incl. the DEV-634 crate split): no conflicts
+    - Reran `cargo nextest run -p lotar-lib watcher_`: 2 passed
+  report:
+    commits:
+    - hash: 99ee73da0
+      what: seed the tasks watcher's fingerprints at start
+    checks:
+    - command: cargo nextest run -p lotar-lib watcher_
+      result: passed
+    - command: npm run lint
+      result: passed
+      reason: first fix job, same commit
+    - command: npm test
+      result: passed
+      reason: first fix job, same commit
+    - command: npm run smoke
+      result: passed
+      reason: first fix job, same commit (405)
+    next: Merge agent lands 99ee73da0 on main
+- date: 2026-11-17T16:11:36.009114+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab038bc22-ff75-4512-be20-7e30f3381097 of the job job-20261117T091645.311Z-47 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T161135.978Z-1: DEV-638 goes back to @merge, and the job''s end rules run when the thread''s run ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22b1bf8c-7133-4be8-b911-a6234f55843e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e669ea5-0714-4b68-9b9c-a06ebd8772d7
@@ -329,12 +401,14 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aed5ea785-3761-4e25-9f43-ad590a86979d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d6ef080-734c-4fc2-8e96-543bdb90c946
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab038bc22-ff75-4512-be20-7e30f3381097
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8f2a9cca-4981-4e5c-8f15-0a9c871e6ea7
 description: 'Found in the DEV-614 review on 2026-11-16: the tasks watcher (crates/lotar-lib/src/web_server.rs start_tasks_watcher) can still report files written just before the server started (FSEvents delivers recent history), and its ''announced'' fingerprint map starts empty, so it emits task_updated for unchanged files. On the Dependencies page (view/pages/Dependencies.vue changed()) such an event clears an open safe repair preview with ''Task data changed''. DEV-614 worked around it in the smoke test only. Check: start lotar serve right after writing a task file, open /api/events, watch for a task_updated of that file without a new write. Done when the watcher seeds its fingerprints at start (or ignores events for content it saw at start) and a test shows no event for pre-start writes.'
 tags:
 - health
 - fix-retried
 - retry-fix
 - retry-fable
+- merge-retried
 custom_fields:
   finding: review:serve-watcher-replays-prestart-writes
 history:
@@ -604,3 +678,85 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab038bc22-ff75-4512-be20-7e30f3381097
+- at: 2026-11-17T09:16:01.406201+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:16:13.050908+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-17T09:17:38.444071+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health, fix-retried, retry-fix, retry-fable
+    new: health, fix-retried, retry-fix, retry-fable, merge-retried
+- at: 2026-11-17T09:17:38.658404+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:18:08.651115+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-17T09:18:17.721990+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8f2a9cca-4981-4e5c-8f15-0a9c871e6ea7
+- at: 2026-11-17T09:18:31.341226+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-17T09:18:31.401425+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:03:21.644492+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:03:22.339158+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-614","DEV-644","DEV-652"]}'
+    new: '{"related":["DEV-614","DEV-644","DEV-652","DEV-634"]}'
+- at: 2026-11-17T16:11:24.244468+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-614","DEV-644","DEV-652","DEV-634"]}'
+    new: '{"related":["DEV-614","DEV-644","DEV-652","DEV-634","DEV-659"]}'
+- at: 2026-11-17T16:11:35.917491+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@merge'
+- at: 2026-11-17T16:11:36.009114+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:11:38.062420+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Merging

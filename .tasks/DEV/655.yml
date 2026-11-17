@@ -1,11 +1,11 @@
 title: Move the two remaining service-only automation tests from lotar-lib to lotar-agent
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T08:14:39.859239+00:00
-modified: 2026-11-17T09:11:15.837667+00:00
+modified: 2026-11-17T09:16:52.442418+00:00
 relationships:
   blocks:
   - DEV-656
@@ -122,6 +122,38 @@ comments:
     - Reran: `cargo nextest run -p lotar-agent --cargo-profile dev` 142 passed; the 9 `ci_windows_reporting` contract tests passed.
     - Not rerun: `npm run lint`, `npm test`, `npm run smoke`. They passed on this same hash in the 08:49 review.
     - Findings: none new; [DEV-656](https://lotar.pyxzl.net/task/DEV-656) (stale header comment) still stands as the one minor follow-up.
+- date: 2026-11-17T09:16:13.559808+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-634 and DEV-655 are on `main` at `af585df7a`.
+
+    - No rebase needed; main was still `b7a9cb85e`. Fast-forwarded the main checkout.
+    - Reworded the fix commit `7486679f0` "DEV-655: changes from the fix agent" to the ticket title. Same tree, so the checks were skipped: lint, tests and smoke passed on it at 08:49.
+    - Main checkout `.tasks` changes amended into `af585df7a` as the owner set (2026-11-12).
+    - No rules or config changed, so no `lotar trust`.
+    - `git push`: `b7a9cb85e..af585df7a`. DEV-634 set to Done per INBOX-415.
+  report:
+    commits:
+    - hash: bafbec164
+      what: DEV-634 lotar-agent split
+    - hash: 62c863ac8
+      what: DEV-634 lotar-agent split
+    - hash: af585df7a
+      what: DEV-655 move the two tests (reworded from 7486679f0, same tree)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: on tree of 7486679f0 (review 08:49); merge changed only the message, main unmoved
+    - command: npm test
+      result: passed
+      reason: same tree, review 08:49
+    - command: npm run smoke
+      result: passed
+      reason: same tree, review 08:49
+    - command: cargo nextest run -p lotar-agent --cargo-profile dev
+      result: passed
+      reason: 142, review 09:10
+    next: Windows CI run on af585df7a confirms lotar-agent's windows_regressions runs; DEV-656 follow-up
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22cc2ed8-b7a2-4bb2-992f-a68f1bcd0471
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ebc7200-d4b6-4e1c-a6bb-3de3bc166a8e
@@ -339,3 +371,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T09:16:13.559808+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:16:52.442418+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

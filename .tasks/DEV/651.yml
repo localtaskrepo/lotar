@@ -1,11 +1,10 @@
 title: Release v0.15.3
-status: InProgress
+status: Done
 priority: High
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-17T06:35:46.386700+00:00
-modified: 2026-11-17T09:06:31.193765+00:00
+modified: 2026-11-17T16:02:11.469067+00:00
 relationships:
   related:
   - DEV-630
@@ -15,6 +14,7 @@ relationships:
   - DEV-654
   - DEV-635
   - DEV-653
+  - DEV-658
 comments:
 - date: 2026-11-17T06:36:13.087182+00:00
   author: claude
@@ -116,10 +116,73 @@ comments:
 - date: 2026-11-17T09:06:28.505468+00:00
   author: mallox
   text: 'Answer: yes (Yes, push the tag and publish 0.15.3) (answered in INBOX-413)'
+- date: 2026-11-17T09:17:28.182082+00:00
+  author: automation
+  text: The fix agent's job job-20261117T090629.403Z-2 failed (lotar agent logs job-20261117T090629.403Z-2); @fix-retry retries it on branch t3/release-v0-15-3.
+- date: 2026-11-17T09:18:16.582939+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261117T091739.734Z-50 failed again or on a rate limit (lotar agent logs job-20261117T091739.734Z-50). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T16:01:31.386513+00:00
+  author: claude
+  text: |-
+    Released: v0.15.3 is published and installed here, as you OK'd in INBOX-413.
+
+    - Signed tag `v0.15.3` on `fcc715939` (QA run `44034966654` green), pushed; `lotar release release 0.15.3` marks record `#8` released.
+    - Release run `44052593619`: every job succeeded first time (builds, macOS signing and notarizing, npm, crates, Docker, Homebrew, Scoop, .deb/.rpm). GitHub shows v0.15.3 as Latest.
+    - `brew upgrade lotar`: `lotar --version` prints `lotar 0.15.3`; `codesign -dvv` shows `Developer ID Application: Ravi Gairola (3HKD37M482)`, `Identifier=net.pyxzl.lotar`.
+    - No Blocked tickets depend on this one, so none go to @fix.
+    - Next: DEV-658 `Release v0.15.4` (Chore, mallox) in new record `#9` 0.15.4.
+    - No file changes to commit; the `.tasks` edits sit in the main checkout for the next commit there.
+  report:
+    checks:
+    - command: gh run list --workflow Release (run 44052593619)
+      result: passed
+      reason: every job green, no re-runs
+    - command: lotar --version
+      result: passed
+      reason: lotar 0.15.3
+    - command: codesign -dvv /opt/homebrew/opt/lotar/bin/lotar
+      result: passed
+      reason: 'Developer ID Application: Ravi Gairola (3HKD37M482), net.pyxzl.lotar'
+    next: 'Next release: DEV-658'
+- date: 2026-11-17T16:02:11.469067+00:00
+  author: claude
+  text: |-
+    Retry job: nothing left to do. The 16:01 session had already finished the release.
+
+    - Rechecked: tag `v0.15.3` on origin, Release run `44052593619` green (20 of 20 jobs), `lotar --version` prints 0.15.3, the Developer ID signature is in place, DEV-658 and record `#9` 0.15.4 exist.
+    - I made a duplicate `Release v0.15.4` (DEV-659) before I saw DEV-658, and deleted it.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac988b53a-2c2c-41a5-bee0-c5224a72cd11
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9e344aa4-d2b0-4bef-bbf4-a2b6e20781a4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9fc2ace4-392c-4105-8806-e306a86aadea
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ed2d5ed-208d-4443-bfdd-eee2986e3773
 releases:
 - 8
 description: |-
@@ -293,3 +356,65 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9fc2ace4-392c-4105-8806-e306a86aadea
+- at: 2026-11-17T09:17:27.986280+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-17T09:17:28.182082+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:18:03.334719+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ed2d5ed-208d-4443-bfdd-eee2986e3773
+- at: 2026-11-17T09:18:16.522113+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-17T09:18:16.582939+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:01:31.386513+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:01:34.949062+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-630","DEV-646","DEV-464","DEV-611","DEV-654","DEV-635","DEV-653"]}'
+    new: '{"related":["DEV-630","DEV-646","DEV-464","DEV-611","DEV-654","DEV-635","DEV-653","DEV-658"]}'
+- at: 2026-11-17T16:01:38.704005+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-17T16:01:38.999654+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: fix-retried
+    new: ''
+- at: 2026-11-17T16:01:53.074815+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-17T16:02:11.469067+00:00
+  actor: claude
+  changes:
+  - field: comment_added

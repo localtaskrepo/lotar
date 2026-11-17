@@ -1,17 +1,40 @@
 title: harnessmux's t3 agent starts a thread in an existing worktree through T3's t3_thread_launch
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T09:09:23.082971+00:00
-modified: 2026-11-17T09:11:14.462633+00:00
+modified: 2026-11-17T09:16:10.097097+00:00
 relationships:
   blocks:
   - DEV-652
   related:
   - DEV-652
   - DEV-318
+  - DEV-353
+comments:
+- date: 2026-11-17T09:15:01.176254+00:00
+  author: claude
+  text: |-
+    Blocked: harnessmux can't call `t3_thread_launch` itself without losing full access. Only T3's own CLI gets a full-access token. One question below.
+
+    - T3 caps a thread's mode at its caller's access ("modes cannot exceed yours", `t3_thread_launch`). `t3 thread start` signs in internally with `access: "full-access"`.
+    - The only headless token, `t3 auth session issue --subject mcp-client --scope orchestration:read --scope orchestration:operate`, is accepted by `/mcp`, but without a mode ceiling. `authenticateMcpClient` then falls back to `"approval-required"`. Same in upstream main (`apps/server/src/auth/EnvironmentAuth.ts:1542`). A thread launched that way would stop at every permission prompt, so lotar jobs couldn't run unattended.
+    - The other way to full access is T3's MCP OAuth sign-in: you approve harnessmux once in T3 Code, and the token lasts 30 days (`MCP_CLIENT_SESSION_TTL`). Then you approve it again.
+    - Checked in the 0.1.9 bundle (`app.asar`) and upstream `pingdotgg/t3code` main (`d6419d9`). No live launch (it would start a real thread).
+    - No code changed, nothing committed, so I told no other thread about file changes.
+
+    **Question:** How should a t3 job get a full-access thread in lotar's worktree?
+    1. (Recommended) Upstream: I file a T3 Code issue (or PR) for `t3 thread start --worktree-path <path>`. That flag maps to `existing_worktree`, a few lines in `launchWorkspaceStrategy`. harnessmux passes it, and DEV-652 waits for the T3 release (DEV-353 was fixed upstream within a day).
+    2. harnessmux's own MCP OAuth sign-in with your one-time approval in T3 Code, renewed every 30 days. Much more code, and a job fails when the approval runs out.
+    3. Without T3 changes: lotar registers each ticket worktree as its own T3 project (an extra project per ticket in the sidebar, removed at cleanup).
+  report:
+    checks:
+    - command: cargo fmt/clippy/nextest/deny
+      result: not_run
+      reason: no code change, blocked before coding
+    next: Owner picks how harnessmux gets a full-access T3 thread in an existing worktree
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1efc943f-fca5-4376-bd67-e786b4bdf9f9
 description: |-
@@ -69,3 +92,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1efc943f-fca5-4376-bd67-e786b4bdf9f9
+- at: 2026-11-17T09:15:01.176254+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:15:01.657476+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318"]}'
+    new: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318","DEV-353"]}'
+- at: 2026-11-17T09:16:10.097097+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

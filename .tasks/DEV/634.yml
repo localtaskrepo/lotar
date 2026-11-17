@@ -1,11 +1,10 @@
 title: Split agent jobs and automation out of lotar-lib into a crate lotar-agent
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
 created: 2026-11-17T01:03:27.180760+00:00
-modified: 2026-11-17T09:06:37.100368+00:00
+modified: 2026-11-17T16:03:22.337355+00:00
 relationships:
   related:
   - DEV-498
@@ -15,6 +14,8 @@ relationships:
   - DEV-655
   - DEV-654
   - DEV-656
+  - DEV-628
+  - DEV-638
 comments:
 - date: 2026-11-17T01:29:07.217603+00:00
   author: claude
@@ -253,6 +254,12 @@ comments:
 
     - DEV-655's branch `agent/DEV-655` carries this ticket's two commits (`bafbec164`, `62c863ac8`, copies of `4fc0e04b6`, `1192c4e54`) under DEV-655's `7486679f0`.
     - The DEV-655 merge lands them; this ticket goes to Done afterwards.
+- date: 2026-11-17T09:15:50.884071+00:00
+  author: claude
+  text: |-
+    Landed on main with DEV-655 and pushed, as the owner decided (INBOX-415): "Land DEV-634 and DEV-655 together, then close DEV-634".
+
+    - `bafbec164`, `62c863ac8` on `main`, pushed with DEV-655's `af585df7a`.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe9cf8d5-29d4-4949-9c63-1e8aed77afa5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A52e16d4b-4fb9-4039-aef7-67dd650ad494
@@ -278,9 +285,6 @@ description: |-
   - [ ] Measured, before and after: build and test time and `target/debug` size for a one-line change in `agent_job_service.rs`.
   - [ ] No behaviour change: `npm run lint`, `npm test`, `npm run smoke` pass; REST and CLI output unchanged.
   - [ ] MCP and sync as next candidates: noted in a comment with their size, not done here.
-tags:
-- fix-retried
-- retry-fix
 history:
 - at: 2026-11-17T01:03:29.381350+00:00
   actor: claude
@@ -520,3 +524,36 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T09:15:50.884071+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:15:51.576823+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-17T09:15:51.643477+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: fix-retried, retry-fix
+    new: ''
+- at: 2026-11-17T09:16:12.812518+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-17T16:03:17.289700+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656"]}'
+    new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628"]}'
+- at: 2026-11-17T16:03:22.337355+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628"]}'
+    new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628","DEV-638"]}'

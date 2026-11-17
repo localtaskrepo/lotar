@@ -1003,6 +1003,12 @@ fn start_tasks_watcher() {
             return;
         }
 
+        // Content last announced per file: the native and the poll watcher
+        // (and repeated notifications) report one change several times.
+        // Seeded before watching, so files written before the server started
+        // (FSEvents replays recent history) are not announced (DEV-638).
+        let mut announced = seed_fingerprints(&tasks_dir);
+
         if watcher.watch(&tasks_dir, RecursiveMode::Recursive).is_err() {
             return;
         }
@@ -1047,9 +1053,6 @@ fn start_tasks_watcher() {
         // sprint is announced once per burst (DEV-273).
         let mut sprint_members: HashMap<Option<u32>, HashSet<String>> =
             order_snapshots.iter().map(|(id, tasks)| (*id, tasks.iter().cloned().collect())).collect();
-        // Content last announced per file: the native and the poll watcher
-        // (and repeated notifications) report one change several times.
-        let mut announced: HashMap<PathBuf, u64> = HashMap::new();
         while let Ok(first) = rx.recv() {
             let mut paths: Vec<PathBuf> = Vec::new();
             let mut collect = |res: notify::Result<notify::Event>| {
@@ -1193,6 +1196,29 @@ fn process_watch_batch(
     for project in projects {
         crate::api_events::emit(&crate::api_events::ApiEvent { kind: "project_changed".to_string(), data: serde_json::json!({ "name": project }) });
     }
+}
+
+/// Fingerprints of every watched file and directory under `tasks_dir`,
+/// keyed by relative path; dot-entries are skipped as the watcher skips them.
+fn seed_fingerprints(tasks_dir: &Path) -> HashMap<PathBuf, u64> {
+    let mut fingerprints = HashMap::new();
+    let mut pending = vec![tasks_dir.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if entry.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            if let Ok(relative) = path.strip_prefix(tasks_dir) {
+                fingerprints.insert(relative.to_path_buf(), file_fingerprint(&path));
+            }
+            if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                pending.push(path);
+            }
+        }
+    }
+    fingerprints
 }
 
 /// Content fingerprint of a watched file; directories and missing files
@@ -1456,5 +1482,37 @@ mod tests {
         // Extension matching is case-sensitive, matching Vite's lowercase
         // output; anything else must not claim a type it cannot prove.
         assert_eq!(content_type_for("assets/UPPER.SVG"), "application/octet-stream");
+    }
+
+    #[test]
+    fn watcher_skips_files_written_before_it_started() {
+        // DEV-638: FSEvents replays recent history, and an empty fingerprint
+        // map announced unchanged pre-start files as task_updated.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let task = dir.path().join("SEED").join("1.yml");
+        std::fs::create_dir_all(task.parent().expect("parent")).expect("project dir");
+        std::fs::write(&task, "title: before start\n").expect("write task");
+
+        let mut announced = super::seed_fingerprints(dir.path());
+        let events = crate::api_events::subscribe();
+        let batch = |announced: &mut _| {
+            let paths = [task.clone(), task.parent().expect("parent").to_path_buf()];
+            super::process_watch_batch(dir.path(), &paths, &mut Default::default(), &mut Default::default(), announced);
+        };
+        // Events of this test's project; other tests share the event bus.
+        let seen = || -> Vec<String> {
+            events
+                .try_iter()
+                .filter(|e| e.data.get("id").or_else(|| e.data.get("name")).and_then(|v| v.as_str()).is_some_and(|v| v.starts_with("SEED")))
+                .map(|e| e.kind)
+                .collect()
+        };
+
+        batch(&mut announced);
+        assert_eq!(seen(), Vec::<String>::new(), "no event for a file written before start");
+
+        std::fs::write(&task, "title: after start\n").expect("rewrite task");
+        batch(&mut announced);
+        assert!(seen().contains(&"task_updated".to_string()), "a write after start is announced");
     }
 }

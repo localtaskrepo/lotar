@@ -5,13 +5,14 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T04:05:45.260312+00:00
-modified: 2026-11-17T06:59:33.127840+00:00
+modified: 2026-11-17T09:15:01.656763+00:00
 relationships:
   related:
   - DEV-335
   - DEV-401
   - DEV-400
   - DEV-652
+  - DEV-657
 references:
 - link: https://github.com/pingdotgg/t3code/pull/34696
 - link: https://github.com/pingdotgg/t3code/issues/34688
@@ -161,3 +162,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-335","DEV-401","DEV-400"]}'
     new: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652"]}'
+- at: 2026-11-17T09:15:01.656763+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652"]}'
+    new: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652","DEV-657"]}'

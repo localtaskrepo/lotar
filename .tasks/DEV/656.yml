@@ -1,11 +1,11 @@
 title: lotar-lib windows_regressions.rs header says the Windows job links only that binary
-status: Blocked
+status: HelpNeeded
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-17T08:49:43.891209+00:00
-modified: 2026-11-17T08:57:13.602012+00:00
+modified: 2026-11-17T16:04:03.887625+00:00
 relationships:
   depends_on:
   - DEV-655
@@ -71,6 +71,57 @@ comments:
 - date: 2026-11-17T08:57:13.602012+00:00
   author: automation
   text: 'The @review job waits for its open prerequisites: DEV-655.'
+- date: 2026-11-17T09:18:03.347825+00:00
+  author: automation
+  text: |-
+    The review job job-20261117T091731.495Z-49 failed or its review thread did (lotar agent logs job-20261117T091731.495Z-49), so the work on branch t3/windows-regressions-header-comment isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-17T16:04:03.887625+00:00
+  author: claude
+  text: |-
+    DEV-655 is on main now, so I rebased DEV-656 onto it. The header now describes main as it is.
+
+    - Rebased `c061d26fa` onto main (`af585df7a`, DEV-655) with no conflicts: `47eba0a62`, signed. The diff is unchanged.
+    - The things the header names now exist on main: `crates/lotar-agent/tests/windows_regressions.rs`, and the ci.yml comment (lines 607-610) names both binaries.
+    - `cargo nextest list --all-features --test windows_regressions --bin lotar-agent-wrapper` lists exactly `lotar-agent::windows_regressions`, `lotar-lib::windows_regressions` and `lotar-agent-wrapper`'s tests, which is what the header says.
+    - `npm run lint` passes.
+    - The 09:18 question (review again, merge yourself, or WontDo) gets the "fix" option from this run: the branch is checked and goes to review again.
+  report:
+    commits:
+    - hash: 47eba0a62
+      what: header names both windows_regressions binaries and lotar-agent-wrapper, rebased onto main after DEV-655
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest list --all-features --test windows_regressions --bin lotar-agent-wrapper
+      result: passed
+      reason: lists lotar-agent::windows_regressions, lotar-lib::windows_regressions and lotar-agent-wrapper, as the header says
+    - command: npm test
+      result: not_run
+      reason: only a code comment changed
+    - command: npm run smoke
+      result: not_run
+      reason: only a code comment changed
+    next: Review again, then merge (the branch is already on top of main)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A470291bc-a890-4691-8707-69a67da72fae
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1908d8b6-e7b5-41be-a44e-cd371940dad9
@@ -172,5 +223,28 @@ history:
     new: Blocked
 - at: 2026-11-17T08:57:13.602012+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T09:17:43.996793+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: Reviewing
+- at: 2026-11-17T09:18:03.279031+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-17T09:18:03.347825+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T16:04:03.887625+00:00
+  actor: claude
   changes:
   - field: comment_added
