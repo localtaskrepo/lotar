@@ -1,11 +1,11 @@
 title: 'Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-17T18:58:41.830563+00:00
+modified: 2026-11-17T19:04:52.981959+00:00
 relationships:
   related:
   - DEV-510
@@ -229,6 +229,15 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-585` onto `main` conflicts in `crates/lotar-lib/src/web_server.rs`; lotar aborted the rebase, `agent/DEV-585` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-17T19:04:48.909633+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `7b973e172` on `main` (the fix `220c28240`, rebased, plus the pending `.tasks` files).
+
+    - Rebase onto `a17cce1a7` conflicted once in `crates/lotar-lib/src/web_server.rs`; resolved as the review said (dropped the old `announced` lines, kept `drop(settled);` before the receive loop).
+    - `npm ci`, `npm run -s lint:agent`, `npm run -s test:agent` (Rust 2308/2308, UI 1548/1548, release and hooks passed) and `npm run -s smoke` (405/405) all passed on the rebased head.
+    - No rules or agent profiles changed, so no `lotar trust` was needed.
+    - Not run: repeated loaded runs on the final head (the review did 10/10 at load ~141 on an equivalent rebase).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab03303e3-95f6-4964-b850-05c9841e7ba5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6d0ae523-068a-40cd-9cbb-a988f1097835
@@ -531,3 +540,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-17T19:04:48.909633+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:04:52.981959+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

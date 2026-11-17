@@ -1,11 +1,39 @@
 title: 'A session: continue job resumes another runner''s session: tell_agent''s @review job (runner claude) ran on t3 in the fix thread'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T18:59:30.165294+00:00
-modified: 2026-11-17T18:59:30.420075+00:00
+modified: 2026-11-17T19:18:39.537350+00:00
+comments:
+- date: 2026-11-17T19:18:28.632110+00:00
+  author: claude
+  text: |-
+    No lotar bug: the job ran on t3 because ~/.lotar still gave @review `runner: t3` when it started. Added the ticket's check as a test.
+
+    - Job log `job-20261117T183404.304Z-25.jsonl` (standards): header `runner: t3`, `agent_profile: review`, created 18:34:06Z.
+    - STD-124 (review → `runner: claude`) was committed 18:32:46Z, but `~/.lotar` was rewritten (global.ts install) at 18:34:55Z, 49 s *after* the job started. Until then the home config had the pre-STD-124 profiles.
+    - lotar takes the runner from the profile (`resolve_profile`), and `continuable_session` in `crates/lotar-agent/src/services/agent_runner.rs` already refuses a session of another runner ("runs the t3 agent, not claude; this job starts a new one."). docs/help/agent.md is correct as written.
+    - New test `a_continued_job_on_another_runner_starts_a_session_of_its_own` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: fix thread on t3, then a `session: continue` review on claude → job runner `claude`, log says why, nothing sent to the thread. It fails when that runner check is disabled.
+  report:
+    commits:
+    - hash: '515435888'
+      what: regression test for the ticket's check
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2309 tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: test fails with the runner check in continuable_session disabled
+      result: passed
+    next: Review the test, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7d340b2d-0883-4227-8ee1-842ef56c412b
 description: |-
   Found in standards STD-207 (lotar 0.15.3).
 
@@ -23,3 +51,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T19:06:01.707956+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T19:06:02.509693+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7d340b2d-0883-4227-8ee1-842ef56c412b
+- at: 2026-11-17T19:18:28.632110+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:18:39.537350+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

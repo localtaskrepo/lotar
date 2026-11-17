@@ -226,7 +226,19 @@ fn take_over(forget_thread: bool, list_fails: bool) -> (Harness, lotar::api_type
     let job_id = lotar::services::agent_active_jobs::list(&tasks_dir).first().map(|job| job.job_id.clone());
     let job_id = job_id.unwrap_or_default();
     // Settled: its worker has also dropped the job's queue files, which the process scratch cleanup removes (DEV-648).
-    wait_for("the job to end", || AgentJobService::job_settled(&job_id) && AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
+    let ended = || AgentJobService::job_settled(&job_id) && AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while !ended() {
+        // DEV-670: a rare timeout here didn't recur; the job's state tells where it stopped next time.
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for job {job_id:?} to end: {:?}\nevents: {:#?}\nt3 calls:\n{}",
+            AgentJobService::get_job(&job_id),
+            AgentJobService::events_for(&job_id),
+            harness.calls()
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
     let job = AgentJobService::get_job(&job_id).unwrap();
     assert!(!harness.calls().contains("thread send"), "{}", harness.calls());
     assert_eq!(harness.calls().matches("thread start").count(), 1, "{}", harness.calls());

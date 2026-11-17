@@ -1,11 +1,11 @@
 title: Replace unmaintained chrono (RUSTSEC-2026-0543) with jiff or time
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T18:13:11.087662+00:00
-modified: 2026-11-17T18:58:36.191960+00:00
+modified: 2026-11-17T19:15:41.574055+00:00
 relationships:
   related:
   - DEV-122
@@ -51,6 +51,42 @@ comments:
     - No owner decision touched. DEV-122's "won't do" was about YAML; this ticket asked for the migration.
     - Reran: `npm ci`, `npm run lint:agent`, `npm run test:agent` (2310 Rust + 138 UI files passed), `npm run test:smoke:agent` (405 passed), `cargo deny check` (ok). Time/due/DST tests passed under `TZ=America/New_York` and `Asia/Kolkata`. The worktree is clean afterwards.
     - Minor findings: none. Tickets filed: none.
+- date: 2026-11-17T19:10:06.987645+00:00
+  author: claude
+  text: |-
+    Review finding fixed: the branch is rebased onto main and `deny.toml` no longer ignores RUSTSEC-2026-0543.
+
+    - The review read HEAD `8cbe1729f`, so its finding applied.
+    - Rebased onto main (`7b973e172`, includes DEV-665 `a17cce1a7` and DEV-585) with no conflicts. Deleted the chrono ignore and its two comment lines from `deny.toml`.
+    - `cargo deny check` passes without it: advisories ok, bans ok, licenses ok, sources ok.
+    - Reran everything after the rebase: lint, `npm test` (2310 Rust tests, 1548 UI), smoke (405).
+    - Amended into one signed commit `da0698327`, not pushed. Ticked the last Done-when item.
+  report:
+    commits:
+    - hash: da0698327
+      what: DEV-669 chrono → jiff, RUSTSEC-2026-0543 ignore dropped from deny.toml
+    checks:
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review again
+- date: 2026-11-17T19:15:31.132415+00:00
+  author: claude
+  text: |-
+    Review: passed. The rework fixes the one blocking finding: `deny.toml` no longer ignores RUSTSEC-2026-0543, and `cargo deny check` passes.
+
+    - Read HEAD `da0698327`, the only commit in `main..HEAD`; no newer `agent/DEV-669` commits exist elsewhere.
+    - `git range-diff` against the reviewed `8cbe1729f` shows the rebase onto main `7b973e172` changed nothing but the 3 deleted `deny.toml` lines. The earlier full-diff review of the jiff migration still holds.
+    - No `chrono` in any `.rs` or `Cargo.toml` file (only doc comments that name chrono's shapes). `Cargo.lock` keeps the one unbuilt serde_with entry; `cargo tree -i chrono --target all` prints nothing.
+    - Reran: `npm ci` ok; `cargo deny check`: advisories, bans, licenses and sources ok; `npm run lint:agent` passed; `npm run test:rust:agent`: 2310/2310 passed.
+    - Not rerun: UI tests and `npm run smoke`, because the rework touched no Rust or UI code beyond the rebase. The fix agent ran both after the rebase (1548 UI, 405 smoke).
+    - No UI changes (only `crates/`, `Cargo.*` and `deny.toml`), so no screenshots were needed. Worktree left clean.
+    - Findings: none. Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac6b1fa-471d-4f08-ab90-a091782b3058
 description: |-
@@ -64,7 +100,7 @@ description: |-
   - [x] Task files with existing timestamps load and save without byte changes (existing no-op round-trip tests pass).
   - [x] Local-time behaviour stays the same: date-only and naive inputs are local midnight/local time in the system zone (`TZ` wins over `/etc/localtime`); day offsets stay on the same calendar date across DST.
   - [x] Display formats (`%Y-%m-%d`, `%b %-d %H:%M`, compact `%Y%m%dT%H%M%SZ` ...) print the same text as before.
-  - [ ] The `RUSTSEC-2026-0543` ignore entry is not in `deny.toml` once DEV-665 and this ticket are both on main, and `cargo deny check` passes.
+  - [x] The `RUSTSEC-2026-0543` ignore entry is not in `deny.toml` once DEV-665 and this ticket are both on main, and `cargo deny check` passes.
   - [x] `npm run lint`, `npm test`, `npm run smoke` pass.
 tags:
 - review-returned
@@ -189,3 +225,65 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-17T19:05:28.021699+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-17T19:10:06.930018+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      RUSTSEC-2026-0543 marks chrono unmaintained (no vulnerability, no safe upgrade). DEV-665 added a deny.toml ignore to unblock CI. chrono is a workspace dependency in lotar-core, lotar-lib, lotar-agent and lotar-tasks (~185 uses). Evaluate jiff/time like DEV-122 did for YAML: prove task YAML date/time round-trips stay byte-compatible, serde formats and timezone handling; then migrate and drop the ignore entry from deny.toml.
+
+      ## Done when
+
+      - [x] chrono is gone: no `chrono` in any `Cargo.toml`, `Cargo.lock` or `.rs` file; jiff (latest stable, already a transitive dependency via serde_with) replaces it. Cargo.lock keeps one `chrono` entry: an optional dependency of serde_with (via harnessmux) that is not enabled, so it is never built and `cargo tree -i chrono` finds nothing.
+      - [x] Timestamps written to task YAML, history, comments, sprints, audit and the REST/MCP/JSON output keep chrono's exact `to_rfc3339()` shape: UTC as `+00:00` (not `Z`), fractional seconds as 0, 3, 6 or 9 digits. A unit test pins this for whole seconds, millis, micros and nanos.
+      - [x] Every timestamp shape chrono's `parse_from_rfc3339` accepted still parses to the same instant (`Z`, `+00:00`, other offsets, fractions); a value that fails to parse is handled as before (skipped / error message), not a panic.
+      - [x] Task files with existing timestamps load and save without byte changes (existing no-op round-trip tests pass).
+      - [x] Local-time behaviour stays the same: date-only and naive inputs are local midnight/local time in the system zone (`TZ` wins over `/etc/localtime`); day offsets stay on the same calendar date across DST.
+      - [x] Display formats (`%Y-%m-%d`, `%b %-d %H:%M`, compact `%Y%m%dT%H%M%SZ` ...) print the same text as before.
+      - [ ] The `RUSTSEC-2026-0543` ignore entry is not in `deny.toml` once DEV-665 and this ticket are both on main, and `cargo deny check` passes.
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass.
+    new: |-
+      RUSTSEC-2026-0543 marks chrono unmaintained (no vulnerability, no safe upgrade). DEV-665 added a deny.toml ignore to unblock CI. chrono is a workspace dependency in lotar-core, lotar-lib, lotar-agent and lotar-tasks (~185 uses). Evaluate jiff/time like DEV-122 did for YAML: prove task YAML date/time round-trips stay byte-compatible, serde formats and timezone handling; then migrate and drop the ignore entry from deny.toml.
+
+      ## Done when
+
+      - [x] chrono is gone: no `chrono` in any `Cargo.toml`, `Cargo.lock` or `.rs` file; jiff (latest stable, already a transitive dependency via serde_with) replaces it. Cargo.lock keeps one `chrono` entry: an optional dependency of serde_with (via harnessmux) that is not enabled, so it is never built and `cargo tree -i chrono` finds nothing.
+      - [x] Timestamps written to task YAML, history, comments, sprints, audit and the REST/MCP/JSON output keep chrono's exact `to_rfc3339()` shape: UTC as `+00:00` (not `Z`), fractional seconds as 0, 3, 6 or 9 digits. A unit test pins this for whole seconds, millis, micros and nanos.
+      - [x] Every timestamp shape chrono's `parse_from_rfc3339` accepted still parses to the same instant (`Z`, `+00:00`, other offsets, fractions); a value that fails to parse is handled as before (skipped / error message), not a panic.
+      - [x] Task files with existing timestamps load and save without byte changes (existing no-op round-trip tests pass).
+      - [x] Local-time behaviour stays the same: date-only and naive inputs are local midnight/local time in the system zone (`TZ` wins over `/etc/localtime`); day offsets stay on the same calendar date across DST.
+      - [x] Display formats (`%Y-%m-%d`, `%b %-d %H:%M`, compact `%Y%m%dT%H%M%SZ` ...) print the same text as before.
+      - [x] The `RUSTSEC-2026-0543` ignore entry is not in `deny.toml` once DEV-665 and this ticket are both on main, and `cargo deny check` passes.
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-17T19:10:06.987645+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:10:21.422683+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T19:15:31.132415+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:15:41.574055+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

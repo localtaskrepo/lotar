@@ -1,16 +1,18 @@
 title: dev510 test a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads times out on main, also run alone
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T18:25:53.916459+00:00
-modified: 2026-11-17T18:38:49.339406+00:00
+modified: 2026-11-17T19:11:40.747453+00:00
 relationships:
   related:
   - DEV-520
   - DEV-585
   - DEV-590
+  - DEV-579
+  - DEV-648
 comments:
 - date: 2026-11-17T18:32:36.578412+00:00
   author: claude
@@ -18,6 +20,46 @@ comments:
     Flaky rather than always broken: the test passed in two later full runs under load.
 
     - It timed out in `npm run -s test:agent` and once alone, then passed in 2 of 2 runs of `node scripts/rust-test-runner.mjs --agent` (load average about 39) on the same tree (`51c66b0b`).
+- date: 2026-11-17T19:05:48.257459+00:00
+  author: claude
+  text: |-
+    Couldn't reproduce the timeout; the test now says where it stopped if it times out again.
+
+    - The ticket's check can't run as written: profile `local` is gone (DEV-579), and `-p lotar-lib` doesn't build the `lotar` binary the test spawns (`crates/lotar-lib/tests/common/mod.rs:33` warns it may be stale or missing). A stale binary probably explains the timeout when the test ran alone. Working check: `cargo build && cargo nextest run --cargo-profile dev --test integration -E 'test(/a_t3_job_taken_over_before_its_thread_id_was_saved_fails/)'`
+    - Timed it with temporary probes: the takeover ends in about 8.5 s every time (two rounds of 3 `t3 thread list` tries, 2 s apart, in harnessmux 0.1.9 `backend/t3.rs`). Its other two variants end in under 1 s. At load 120 it was no slower.
+    - Checked and ruled out: harnessmux clears the turn before it answers the next `status` call, the storage locks are `flock`s the kernel releases when the killed process dies, and a socket the leftover `sleep 30` child held would fail the resume rather than hang it.
+    - Change in `crates/lotar-lib/tests/dev510_t3_session_test.rs`: the "job to end" wait now times out with the job, its events and the fake T3's calls (checked by shortening the deadline to 1 s for one run).
+  report:
+    commits:
+    - hash: 01ec28778
+      what: the takeover test's 60 s wait reports the job, its events and the fake t3 calls when it times out
+    checks:
+    - command: cargo nextest run --cargo-profile dev --test integration -E 'test(/dev510_t3_session_test/)'
+      result: passed
+      reason: 5 of 5, plus 15 + 48 stress iterations of the takeover tests (6 in parallel)
+    - command: node scripts/rust-test-runner.mjs --agent
+      result: passed
+      reason: 3 of 3 (2308/2308), load 20 to 120, two with 10 yes processes
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2308 Rust, 1548 UI, release and hooks
+    - command: npm run -s smoke
+      result: passed
+      reason: 118 files, 405 tests
+    next: 'Review, then merge 01ec28778. If the timeout comes back, its message names the stuck step: file that'
+- date: 2026-11-17T19:11:34.407787+00:00
+  author: claude
+  text: |-
+    Review: passed. `01ec28778` adds timeout diagnostics only; the test passes, which is what "Done when" asks.
+
+    - Read: the ticket and both comments, the diff in `crates/lotar-lib/tests/dev510_t3_session_test.rs:229-241`, `crates/lotar-lib/tests/common/mod.rs:29-40`, and main's newer commits (DEV-585 `7b973e172`, DEV-648 `847b12b28`). Neither touches this file, and the branch merges cleanly onto main.
+    - The fix agent's claim holds: with `-p lotar-lib`, the test can run against an old `lotar` binary, as `common/mod.rs:33` warns. The ticket's `--cargo-profile local` no longer exists (DEV-579).
+    - Reran: `cargo build && cargo nextest run --cargo-profile dev --test integration -E 'test(/dev510_t3_session_test/)'`, 3 of 3 passed (9 tests, about 8.5 s each run, matching the fix agent's timing).
+    - `rustfmt --edition 2024 --check` on the file passed. No stray files, and no second branch.
+    - Not rerun: `npm run test:agent`, lint and smoke (the fix agent reports all passed). A failing test before the change doesn't apply: the timeout never reproduced, so this is a diagnostic, not a bug fix.
+    - No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24d11501-1b19-4a0f-9117-2db78a77dbea
 description: |-
@@ -57,3 +99,41 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24d11501-1b19-4a0f-9117-2db78a77dbea
+- at: 2026-11-17T19:05:48.257459+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:05:48.431300+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-585","DEV-590"]}'
+    new: '{"related":["DEV-520","DEV-585","DEV-590","DEV-579"]}'
+- at: 2026-11-17T19:06:00.846205+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T19:11:34.407787+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T19:11:34.582711+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-585","DEV-590","DEV-579"]}'
+    new: '{"related":["DEV-520","DEV-585","DEV-590","DEV-579","DEV-648"]}'
+- at: 2026-11-17T19:11:40.747453+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
