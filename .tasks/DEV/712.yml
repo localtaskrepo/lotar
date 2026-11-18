@@ -1,11 +1,11 @@
 title: 'Waiting cleanup for waits lotar or a rule sets: a job''s end drops the build output of a ticket it leaves HelpNeeded or Blocked'
-status: HelpNeeded
+status: InProgress
 priority: Low
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-18T20:06:24.875941+00:00
-modified: 2026-11-18T20:35:29.535890+00:00
+modified: 2026-11-18T23:04:34.675566+00:00
 relationships:
   related:
   - DEV-653
@@ -23,8 +23,12 @@ comments:
     1. **(Recommended) A command lotar runs:** new setting `agent.worktree.waiting_run: [cargo, clean, --workspace]`. Lotar runs it in the ticket's worktrees when it or a rule leaves the ticket HelpNeeded or Blocked: after the job is unregistered, and in `mark_task_blocked` when no job runs. This covers all three waits and saves 3.4 to 0.7 GB, the same as the rule. A repository's config needs `lotar trust` before lotar runs it, as with profiles. If the command fails, the job's log says so and nothing else changes.
     2. **Paths only:** new setting `agent.worktree.waiting_cleanup_paths: [target/debug/incremental]`. It reuses the safe deletion that `cleanup_paths` already does, runs nothing and needs no trust, but saves only about 1.4 GB per ticket.
     3. **Not worth it:** WontDo. The docs already name the waits that keep their build output.
+- date: 2026-11-18T22:53:48.366712+00:00
+  author: mallox
+  text: 'Answer: command (A command lotar runs: setting agent.worktree.waiting_run (cargo clean --workspace), needs lotar trust) (answered in INBOX-550)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b0cdad9-7699-4555-8e71-ac718d9fa284
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b8d09ba-3650-447c-80e2-286e292666cb
 description: |-
   Found in DEV-653's review (2026-11-18): the waiting rule (`updated` on HelpNeeded/Blocked → `lotar agent worktree run <ticket> -- cargo clean --workspace`) fires only on a person's status change and an agent's hand-back. These waits write with `TaskUpdateContext::automation_disabled()` and fire no rule, so their build output (~2 GB each) stays until Done:
   - rules that hand a ticket to mallox: review failed, third blocking review, fix failed again, merge failed again (`.tasks/DEV/automation.yml`; "A rule's own change fires no other rule")
@@ -33,12 +37,18 @@ description: |-
 
   Adding the command to those rules' `run` doesn't work: end rules run while the job is still registered, so `worktree run` skips.
 
-  ## Idea
-  The job's end (`finalize_job`, next to `remove_build_output`) cleans a ticket it leaves waiting, without firing other rules: for example a config list of commands or paths for waiting tickets. Needs a design choice on how lotar knows "waiting" generically.
+  ## Decision
+  Owner 2026-11-18 (INBOX-550): "command (A command lotar runs: setting agent.worktree.waiting_run (cargo clean --workspace), needs lotar trust)".
 
   ## Done when
-  - [ ] A ticket a rule or lotar sets waiting loses its workspace build output once its job ended; a test shows it (flip the last assertion of `waiting_rule_drops_build_output_on_hand_back_and_person_change_only` in `crates/lotar-lib/tests/agent_safety_test.rs`).
-  - [ ] docs/help/agent.md "Build output while a ticket waits" and the rule comment in `.tasks/DEV/automation.yml` say so.
+  - [ ] New setting `agent.worktree.waiting_run` (list, program first, no shell; default none; global or per project, a project's replaces the global; `config set agent_worktree_waiting_run`, empty value turns it off).
+  - [ ] A job's end (completed, failed, cancelled; not paused) with the ticket HelpNeeded or Blocked runs it in each of the ticket's worktrees, after the end rules, so a rule's own `set` and lotar's T3 hand-back count. A test shows it (the last assertion of the waiting-rule test in `crates/lotar-lib/tests/agent_safety_test.rs`, flipped).
+  - [ ] A job held back for open prerequisites (`mark_task_blocked`) runs it when the ticket goes Blocked; the same test shows it.
+  - [ ] Runs nothing while another job runs for the ticket (any process) or its T3 thread runs a turn; a thread waiting for an answer doesn't hold it back (the job just ended on that question). A job for the ticket waits to start until the command ends.
+  - [ ] From a repository config it runs only when trusted: `lotar trust` fingerprints it, `trust --status` lists it; untrusted, the job log (stderr without a job) says skipped. Test shows the untrusted case.
+  - [ ] Each run and each failure (exit status, last stderr line) goes to the job log; a failure changes nothing else.
+  - [ ] `.tasks/DEV/config.yml` sets `[cargo, clean, --workspace]`; the DEV rule stays for a person's status change.
+  - [ ] docs/help/agent.md "Build output while a ticket waits", config-reference.md, trust.md and the rule comment in `.tasks/DEV/automation.yml` say so; `view/api/types.ts` lists the field.
 history:
 - at: 2026-11-18T20:06:25.107799+00:00
   actor: claude
@@ -75,3 +85,62 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-18T22:53:48.366712+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T22:53:49.517101+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T22:54:56.924887+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T22:54:57.833037+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b8d09ba-3650-447c-80e2-286e292666cb
+- at: 2026-11-18T23:04:34.675566+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-653's review (2026-11-18): the waiting rule (`updated` on HelpNeeded/Blocked → `lotar agent worktree run <ticket> -- cargo clean --workspace`) fires only on a person's status change and an agent's hand-back. These waits write with `TaskUpdateContext::automation_disabled()` and fire no rule, so their build output (~2 GB each) stays until Done:
+      - rules that hand a ticket to mallox: review failed, third blocking review, fix failed again, merge failed again (`.tasks/DEV/automation.yml`; "A rule's own change fires no other rule")
+      - a T3 thread that waits for an answer (`hand_back_waiting_job`, `crates/lotar-agent/src/services/agent_job_service.rs`)
+      - Blocked on open prerequisites when a job would start (`mark_task_blocked`, `automation_service.rs`)
+
+      Adding the command to those rules' `run` doesn't work: end rules run while the job is still registered, so `worktree run` skips.
+
+      ## Idea
+      The job's end (`finalize_job`, next to `remove_build_output`) cleans a ticket it leaves waiting, without firing other rules: for example a config list of commands or paths for waiting tickets. Needs a design choice on how lotar knows "waiting" generically.
+
+      ## Done when
+      - [ ] A ticket a rule or lotar sets waiting loses its workspace build output once its job ended; a test shows it (flip the last assertion of `waiting_rule_drops_build_output_on_hand_back_and_person_change_only` in `crates/lotar-lib/tests/agent_safety_test.rs`).
+      - [ ] docs/help/agent.md "Build output while a ticket waits" and the rule comment in `.tasks/DEV/automation.yml` say so.
+    new: |-
+      Found in DEV-653's review (2026-11-18): the waiting rule (`updated` on HelpNeeded/Blocked → `lotar agent worktree run <ticket> -- cargo clean --workspace`) fires only on a person's status change and an agent's hand-back. These waits write with `TaskUpdateContext::automation_disabled()` and fire no rule, so their build output (~2 GB each) stays until Done:
+      - rules that hand a ticket to mallox: review failed, third blocking review, fix failed again, merge failed again (`.tasks/DEV/automation.yml`; "A rule's own change fires no other rule")
+      - a T3 thread that waits for an answer (`hand_back_waiting_job`, `crates/lotar-agent/src/services/agent_job_service.rs`)
+      - Blocked on open prerequisites when a job would start (`mark_task_blocked`, `automation_service.rs`)
+
+      Adding the command to those rules' `run` doesn't work: end rules run while the job is still registered, so `worktree run` skips.
+
+      ## Decision
+      Owner 2026-11-18 (INBOX-550): "command (A command lotar runs: setting agent.worktree.waiting_run (cargo clean --workspace), needs lotar trust)".
+
+      ## Done when
+      - [ ] New setting `agent.worktree.waiting_run` (list, program first, no shell; default none; global or per project, a project's replaces the global; `config set agent_worktree_waiting_run`, empty value turns it off).
+      - [ ] A job's end (completed, failed, cancelled; not paused) with the ticket HelpNeeded or Blocked runs it in each of the ticket's worktrees, after the end rules, so a rule's own `set` and lotar's T3 hand-back count. A test shows it (the last assertion of the waiting-rule test in `crates/lotar-lib/tests/agent_safety_test.rs`, flipped).
+      - [ ] A job held back for open prerequisites (`mark_task_blocked`) runs it when the ticket goes Blocked; the same test shows it.
+      - [ ] Runs nothing while another job runs for the ticket (any process) or its T3 thread runs a turn; a thread waiting for an answer doesn't hold it back (the job just ended on that question). A job for the ticket waits to start until the command ends.
+      - [ ] From a repository config it runs only when trusted: `lotar trust` fingerprints it, `trust --status` lists it; untrusted, the job log (stderr without a job) says skipped. Test shows the untrusted case.
+      - [ ] Each run and each failure (exit status, last stderr line) goes to the job log; a failure changes nothing else.
+      - [ ] `.tasks/DEV/config.yml` sets `[cargo, clean, --workspace]`; the DEV rule stays for a person's status change.
+      - [ ] docs/help/agent.md "Build output while a ticket waits", config-reference.md, trust.md and the rule comment in `.tasks/DEV/automation.yml` say so; `view/api/types.ts` lists the field.

@@ -20,7 +20,8 @@ pub trait TaskHooks: Sync {
     fn task_saved(&self, storage: &mut Storage, previous: Option<&TaskDTO>, task: &TaskDTO, config: &ResolvedConfig);
     /// A comment was added: fire `on.commented`.
     fn comment_added(&self, storage: &mut Storage, task: &TaskDTO, comment: &TaskComment, config: &ResolvedConfig);
-    /// A task changed; when it closed, fire `on.unblocked` for its dependents.
+    /// A task changed; when it closed, drop the job it held back for its
+    /// prerequisites and fire `on.unblocked` for its dependents.
     fn dependents_unblocked(&self, storage: &mut Storage, previous: &TaskDTO, task: &TaskDTO);
     /// The ticket's status changed: remove its job worktree once it is done.
     fn status_changed(&self, tasks_dir: &Path, ticket_id: &str);

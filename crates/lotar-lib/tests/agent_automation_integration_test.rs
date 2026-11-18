@@ -3687,3 +3687,86 @@ fn a_held_back_job_on_a_blocked_ticket_resumes_alone() {
     let held = TaskService::get(&storage, &held.id, None).unwrap();
     assert_eq!((held.status.as_str(), held.assignee.as_deref()), ("Blocked", Some("@review")));
 }
+
+/// DEV-637: a ticket whose job waits for its prerequisites drops the job
+/// when it is closed by hand, so the queue no longer lists it and it can be
+/// moved. A change between two open states, or between two done states,
+/// leaves the job alone. A queue that can't be read keeps the job and
+/// reports it; the status change stands.
+#[cfg(unix)]
+#[test]
+fn a_held_back_job_is_dropped_when_its_ticket_is_closed() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let queue_dir = root.join("queue");
+    let _queue = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", queue_dir.to_str().unwrap());
+    let _no_worker = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let review = write_stub_agent_script(root, "stub-review.sh", "#!/bin/sh\necho ok\n");
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "issue:\n  states: [Todo, Blocked, InProgress, Done, WontDo]\n  done_states: [Done, WontDo]\nagents:\n  review:\n    runner: command\n    command: \"{}\"\n",
+            review.display()
+        ),
+    );
+
+    let mut storage = fixtures.create_storage();
+    let create = |storage: &mut lotar::Storage, title: &str, project: &str, depends_on: Vec<String>| {
+        TaskService::create(
+            storage,
+            TaskCreate {
+                title: title.to_string(),
+                project: Some(project.to_string()),
+                relationships: Some(lotar::types::TaskRelationships { depends_on, ..Default::default() }),
+                ..Default::default()
+            },
+        )
+        .expect("create task")
+    };
+    let set_status = |storage: &mut lotar::Storage, id: &str, status: &str| {
+        TaskService::update(storage, id, TaskUpdate { status: Some(status.into()), ..Default::default() }).expect("set status")
+    };
+    let parked = |id: &str| AgentQueueService::list_parked(&fixtures.tasks_root).expect("list parked").iter().any(|item| item.entry.ticket_id == id);
+    let prerequisite = create(&mut storage, "Prerequisite", "PK", Vec::new());
+    create(&mut storage, "Elsewhere", "PM", Vec::new());
+    let held = create(&mut storage, "Held review", "PK", vec![prerequisite.id.clone()]);
+    TaskService::update(&mut storage, &held.id, TaskUpdate { assignee: Some("@review".into()), ..Default::default() }).expect("assign @review");
+    assert!(parked(&held.id), "the job waits for the prerequisite");
+
+    set_status(&mut storage, &held.id, "InProgress");
+    assert!(parked(&held.id), "open to open keeps the job");
+
+    set_status(&mut storage, &held.id, "Done");
+    assert!(!parked(&held.id), "closing the ticket drops the job");
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != held.id), "no job started");
+    let moved = TaskService::move_task(&mut storage, &lotar::api_types::TaskMoveRequest { id: held.id.clone(), project: "PM".into(), ..Default::default() });
+    assert!(moved.is_ok(), "{moved:?}");
+
+    let done = create(&mut storage, "Closed before", "PK", Vec::new());
+    set_status(&mut storage, &done.id, "Done");
+    let req = AgentJobCreateRequest { ticket_id: done.id.clone(), prompt: "Review".into(), agent: Some("review".into()), ..Default::default() };
+    AgentQueueService::park(&fixtures.tasks_root, &lotar::services::agent_queue_service::AgentQueueEntry::retry_of(&req, None, None), None).expect("park");
+    set_status(&mut storage, &done.id, "WontDo");
+    assert!(parked(&done.id), "done to done keeps the job");
+
+    let unreadable = create(&mut storage, "Queue unreadable", "PK", vec![prerequisite.id.clone()]);
+    TaskService::update(&mut storage, &unreadable.id, TaskUpdate { assignee: Some("@review".into()), ..Default::default() }).expect("assign @review");
+    assert!(parked(&unreadable.id));
+    let queue_file = fs::read_dir(queue_dir.join("agent-queue"))
+        .expect("queue dir")
+        .map(|entry| entry.expect("entry").path())
+        .find(|path| path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("queue-")))
+        .expect("queue file");
+    let saved = fs::read(&queue_file).expect("read queue");
+    fs::write(&queue_file, "not json").expect("break queue");
+    let events = lotar::api_events::subscribe();
+    let updated = TaskService::update(&mut storage, &unreadable.id, TaskUpdate { status: Some("Done".into()), ..Default::default() });
+    fs::write(&queue_file, saved).expect("restore queue");
+    assert_eq!(updated.expect("the status change stands").status.as_str(), "Done");
+    let failure =
+        events.try_iter().find(|event| event.kind == "automation_failed" && event.data["id"] == unreadable.id.as_str()).expect("automation_failed event");
+    assert!(failure.data["message"].as_str().is_some_and(|message| message.contains("lotar agent queue remove")), "{failure:?}");
+    assert!(parked(&unreadable.id), "the job stays for `lotar agent queue remove`");
+}

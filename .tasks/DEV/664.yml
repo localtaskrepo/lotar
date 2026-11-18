@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-17T18:08:11.962632+00:00
-modified: 2026-11-18T21:12:27.578100+00:00
+modified: 2026-11-18T22:54:33.627844+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -163,11 +163,43 @@ comments:
       result: failed
       reason: '[unpushed:branches] still lists 7 DEV-530 draft branches (8 commits)'
     next: 'Owner: delete the 7 DEV-530 draft branches, or keep them'
+- date: 2026-11-18T22:53:05.398973+00:00
+  author: mallox
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    (answered in INBOX-552)
+  answer:
+    to: 2026-11-18T01:12:41.790584+00:00
+    choice:
+    - fix-fable
+    note: (answered in INBOX-552)
+- date: 2026-11-18T22:54:26.202604+00:00
+  author: claude
+  text: |-
+    Delete the 7 leftover DEV-530 draft branches, or keep them and push them to origin?
+
+    - Your click in INBOX-552 didn't decide this: the inbox showed the options of an old retry question (`fix`/`fix-fable`/`fix-retry`/`wontdo`), so it only started this job. Filed as STD-247.
+    - Check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` still lists `[unpushed:branches]`, 8 commits: `t3/dev-530-review-held-job-resume` (`f5a440856`), `t3/resume-held-job-after-prerequisites` (`6564ad129`), `t3/resume-held-jobs-after-prerequisites` (`b76f5dda3`), `t3/resume-held-jobs-when-unblocked` (`4e2f775ad`), `t3/review-dev-530-held-job-resume` (`7c998bc75`, `500370cdd`), `t3/review-dev-530-held-job-resume-1` (`fb7de8791`), `t3/review-dev-530-held-job-resume-2` (`c5fd40f2b`)
+    - All are DEV-530 attempts from 2026-11-13; main has the reworked fix as `77ff5dce8`. No worktree uses them. `git cherry origin/main` shows none of them on main as is, so deleting drops those drafts for good.
+    - You said to keep them in INBOX-490 while DEV-530 was open, so I deleted nothing. No files changed, no commit.
+
+    Options:
+    - delete: Delete the 7 DEV-530 branches (recommended)
+    - keep: Keep them and push them to origin
+  question:
+    options:
+    - key: delete
+      label: Delete the 7 DEV-530 branches
+    - key: keep
+      label: Keep them and push them to origin
+    recommended: delete
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A947f85ae-287b-4f05-a37c-5169f75e92ce
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab20a1a2b-4a46-4d17-972e-679a85c035e9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad68a754a-1ba9-49be-a2b8-9a7cb7731736
 description: |-
   11 commits on no remote, only on this Mac: agent/DEV-516 1, agent/DEV-528 1, agent/DEV-585 1, agent/DEV-628 1, backup/DEV-466-896309c0 3, backup/DEV-585-d6dbec07 1, t3/b9902be4 1, t3/review-held-job-resume 2 (git log <branch> --not --remotes)
 
@@ -425,4 +457,38 @@ history:
     new: HelpNeeded
   - field: assignee
     old: '@fix'
+    new: mallox
+- at: 2026-11-18T22:53:05.398973+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T22:53:05.401721+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'
+- at: 2026-11-18T22:53:07.576747+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T22:53:08.478317+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad68a754a-1ba9-49be-a2b8-9a7cb7731736
+- at: 2026-11-18T22:54:26.202604+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T22:54:33.627844+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-fable'
     new: mallox

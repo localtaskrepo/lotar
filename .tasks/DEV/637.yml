@@ -1,16 +1,17 @@
 title: A job held back for prerequisites stays parked when its ticket is closed by hand
-status: Blocked
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-17T01:56:54.001918+00:00
-modified: 2026-11-18T21:18:01.490820+00:00
+modified: 2026-11-18T23:01:38.762735+00:00
 relationships:
   depends_on:
   - DEV-530
   related:
   - DEV-612
+  - DEV-706
 comments:
 - date: 2026-11-17T02:31:27.922310+00:00
   author: claude
@@ -71,9 +72,109 @@ comments:
       result: passed
       reason: 405 tests
     next: Review and merge agent/DEV-637
+- date: 2026-11-18T22:21:33.651403+00:00
+  author: claude
+  text: |-
+    Stalled twice at the same step: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket") at 2026-11-18T20:59Z, and it stalled again. Retry with @fix-fable, take it over, or WontDo?
+
+    Options:
+    - fix-fable: Retry with @fix-fable
+    - owner: I take it over
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: owner
+      label: I take it over
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-18T22:49:48.027307+00:00
+  author: mallox
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    (answered in INBOX-553)
+  answer:
+    to: 2026-11-18T22:21:33.651403+00:00
+    choice:
+    - fix-fable
+    note: (answered in INBOX-553)
+- date: 2026-11-18T22:51:19.079163+00:00
+  author: claude
+  text: |-
+    Retry as @fix-fable: the fix `55fd0880` is complete and unchanged; nothing new to commit.
+
+    - The earlier job stalled after its work was done, not in it: the commit, test and docs were already on the branch.
+    - Reran the regression test `a_held_back_job_is_dropped_when_its_ticket_is_closed` on the branch: passed.
+    - Main has 3 newer commits (`d37a26bb`, `9bef87ac`, `b98cd767`); `git merge-tree main HEAD` merges without conflict. Not rebased: the merge agent does that.
+    - Full lint, test and smoke were not rerun: they passed on this exact commit.
+  report:
+    commits:
+    - hash: 55fd0880
+      what: drop a closed ticket's parked job, with test and help doc
+    checks:
+    - command: cargo nextest run --workspace -E 'test(a_held_back_job_is_dropped_when_its_ticket_is_closed)'
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: passed on this same commit at 2026-11-18T21:17Z, no file changed since
+    - command: npm test
+      result: not_run
+      reason: passed on this same commit at 2026-11-18T21:17Z
+    - command: npm run smoke
+      result: not_run
+      reason: passed on this same commit at 2026-11-18T21:17Z
+    next: Review and merge the branch (one commit beyond main)
+- date: 2026-11-18T22:52:23.805308+00:00
+  author: claude
+  text: |-
+    Found why it stalled: the stale tag `waits` kept the review away. Removed it; the fix `55fd0880` is unchanged.
+
+    - With `waits`, each job end ran "Fix waits: Blocked until its prerequisites are done" instead of "Fix done: review on Codex" (history: InProgress → Blocked at 21:18Z and 22:51Z).
+    - DEV-530 is Done, so the tag no longer applies: `lotar task edit DEV-637 --untag waits`.
+    - The rule "Stalled: continue the unblocked ticket" removes the tag itself since the config copy `fa45d884` (DEV-706, 21:04Z); the stalled run at 20:59Z was before it. No new bug to file.
+    - No file changed in this turn.
+  report:
+    commits:
+    - hash: 55fd0880
+      what: drop a closed ticket's parked job, with test and help doc
+    checks:
+    - command: cargo nextest run --workspace -E 'test(a_held_back_job_is_dropped_when_its_ticket_is_closed)'
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: passed on this same commit at 2026-11-18T21:17Z
+    - command: npm test
+      result: not_run
+      reason: passed on this same commit at 2026-11-18T21:17Z
+    - command: npm run smoke
+      result: not_run
+      reason: passed on this same commit at 2026-11-18T21:17Z
+    next: Review, then merge (one commit beyond main)
+- date: 2026-11-18T23:01:32.814847+00:00
+  author: claude
+  text: |-
+    Review: passed. `55fd0880` drops the parked job when the ticket closes, and meets every "Done when" item.
+
+    - Reviewed: `HEAD` = `t3/dev-637-drop-parked-job-on-done` (no rework branch), 4 files, no stray files.
+    - Fix: `fire_unblocked_dependents` (`crates/lotar-agent/src/services/automation_service.rs:524`) calls `take_parked` on open→done by the project's `is_done`. It runs from `TaskService::update_with_relationship_delta` (`task_service.rs:1449`) after the commit, on every update path (CLI, REST, MCP, rules), automation off included.
+    - Failure path: `report_automation_failure` emits `automation_failed` with a `lotar agent queue remove` hint; the status change stands.
+    - Queue and move: `lotar agent queue` (`cli/handlers/agent.rs:446`) and `ensure_no_agent_work` (`task_hooks.rs:57`) read the same `list_parked` the test checks.
+    - Test `a_held_back_job_is_dropped_when_its_ticket_is_closed` fails on `HEAD^` ("closing the ticket drops the job") and passes with the fix. It covers open→open, open→done, done→done, an unreadable queue and `move_task`.
+    - Docs: `docs/help/automation.md` matches the behaviour.
+    - Branch is behind `main` (`d37a26bb`, `b98cd767`); `git merge-tree` shows no conflicts.
+    - Reran after `npm ci`: `npm run lint:agent` passed, `npm run test:rust:agent` passed (2392 tests), `npm run test:smoke:agent` passed (405 tests). `test:ui`, `test:release`, `test:hooks` not run: the change touches no frontend or script.
+    - No UI change, no owner decision touched, no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ede6a56-9b89-4ce2-8b1c-a74fa80eb83a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad5bbc3be-75a9-412d-a943-c1f706afa6b0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A85f3f6f0-a0a5-43b7-952e-12deaa9bdfdf
 description: |-
   Found in the DEV-530 review (`cf8caa2a`).
 
@@ -90,8 +191,6 @@ description: |-
   - [ ] Dropping fails (queue file unreadable or locked): the status change still succeeds, and lotar reports it as an `automation_failed` warning; the entry stays for `lotar agent queue remove`.
   - [ ] `lotar agent queue` no longer lists the ticket, and `lotar task move` moves it.
   - [ ] npm run lint, npm test, npm run smoke pass.
-tags:
-- waits
 history:
 - at: 2026-11-17T01:56:54.623012+00:00
   actor: claude
@@ -224,3 +323,94 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-18T22:21:33.651403+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T22:21:33.823917+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: HelpNeeded
+- at: 2026-11-18T22:21:34.259996+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T22:49:48.027307+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T22:49:48.029344+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'
+- at: 2026-11-18T22:49:50.744870+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T22:49:51.550119+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A85f3f6f0-a0a5-43b7-952e-12deaa9bdfdf
+- at: 2026-11-18T22:51:19.079163+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T22:51:25.188457+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-18T22:51:26.472974+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T22:52:23.760798+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-18T22:52:23.805308+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T22:52:24.001434+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-530"],"related":["DEV-612"]}'
+    new: '{"depends_on":["DEV-530"],"related":["DEV-612","DEV-706"]}'
+- at: 2026-11-18T22:52:29.932499+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-fable'
+    new: '@review'
+- at: 2026-11-18T23:01:32.814847+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:01:38.762735+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

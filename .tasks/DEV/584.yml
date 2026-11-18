@@ -1,11 +1,11 @@
 title: A job that fails on a provider's usage limit pauses until the reset instead of failing into retries and owner questions
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-18T21:18:52.121358+00:00
+modified: 2026-11-18T21:34:06.507203+00:00
 relationships:
   depends_on:
   - standards:STD-133
@@ -24,6 +24,7 @@ relationships:
   - standards:STD-246
   - DEV-530
   - DEV-704
+  - DEV-713
 comments:
 - date: 2026-11-16T00:14:23.282323+00:00
   author: claude
@@ -211,6 +212,21 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-584` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-584` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-18T21:34:02.300595+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-584 is on `main` as `b98cd7671`.
+
+    - **Rebase:** two conflicts, both kept both sides.
+      - `agent_queue_service.rs`: main moved entry building into `queue_entry`. I used it; `not_before` comes from `retry_of`.
+      - `dev626_resumed_t3_threads_test.rs`: DEV-713's test and the two DEV-584 tests, appended side by side.
+    - **Main moved once during the merge** (DEV-713), so I rebased and checked again.
+    - **Checks on the final rebased commit:** `npm ci`, `npm run -s lint:agent`, `npm run -s test:agent`, `npm run -s smoke` passed. 57 targeted nextest tests (usage limit, queue, paused, dev626, dev713) passed.
+    - **Smoke:** one earlier run failed one test on the first rebase and passed on rerun, as did every later run.
+    - **Not run:** the full nextest suite.
+    - **Tickets:** `.tasks/DEV/713.yml` folded into the commit, as the owner decided on 2026-11-12.
+    - **Trust:** not needed; no rules or profiles changed.
+    - **Push:** `git push` succeeded; only this commit was unpushed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae237cd7b-56b1-4808-8d93-a5027ca90283
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e0c894c-8d31-47dc-b9c6-2d4724c64a55
@@ -228,8 +244,6 @@ description: |-
   - [ ] Rules can match the new event (for example `job_paused`), so standards' rules can comment once instead of asking.
   - [ ] ~~Uses harnessmux's typed failures~~ Moved to DEV-711 (owner 2026-11-18, INBOX-549: split, land the text match now). DEV-584 matches only `EventBody::TurnFailed { error }`, the runner's own report; DEV-711 bumps harnessmux to 0.2.0 and reads `kind` and `resets_at` first.
   - [ ] Tests with a fake t3 that prints Codex's message, as in standards `scripts/automation.test.ts` (STD-130).
-tags:
-- review-returned
 history:
 - at: 2026-11-16T00:14:23.282323+00:00
   actor: claude
@@ -531,3 +545,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T21:34:02.300595+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:34:02.493173+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626","standards:STD-246","DEV-530","DEV-704"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626","standards:STD-246","DEV-530","DEV-704","DEV-713"]}'
+- at: 2026-11-18T21:34:06.507203+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned
+    new: ''

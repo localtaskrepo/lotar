@@ -519,11 +519,20 @@ impl AutomationService {
 
     /// Called after every committed update (DEV-385): when `current` went
     /// from open to done, by its own project's policy, fire `unblocked` on
-    /// each open dependent whose prerequisites are all done now.
+    /// each open dependent whose prerequisites are all done now. A job
+    /// `current` itself held back for its prerequisites is dropped: the
+    /// ticket needs it no more (DEV-637).
     pub(crate) fn fire_unblocked_dependents(storage: &mut Storage, previous: &TaskDTO, current: &TaskDTO) {
         let is_done = |task: &TaskDTO| task.task_state.as_ref().is_some_and(|state| state.is_done);
         if is_done(previous) || !is_done(current) {
             return;
+        }
+        if let Err(err) = AgentQueueService::take_parked(&storage.root_path, &current.id) {
+            report_automation_failure(
+                &current.id,
+                "done",
+                &format!("Could not drop the job that waited for the prerequisites ({err}): remove it with `lotar agent queue remove {}`", current.id),
+            );
         }
         let mut dependents: Vec<String> = current.relationships.blocks.clone();
         for (id, task, _) in storage.search_located(&crate::storage::TaskFilter::default()) {
