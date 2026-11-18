@@ -3131,16 +3131,14 @@ fn prune_job_logs(
 
 /// Whether a ticket's job logs are kept whatever their age: it is open, its
 /// file can't be read to tell, or its ID is held by several tasks roots
-/// (DEV-697). Done, archived, deleted and malformed tickets' are not.
+/// (DEV-697). Done, archived (whatever their status), deleted and malformed
+/// tickets' are not.
 fn ticket_keeps_its_jobs(tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
     use crate::storage::identity::TaskLookupError;
-    match ticket_done_state(tasks_dir, ticket_id) {
-        Some(done) => !done,
-        None => match crate::storage::manager::Storage::new(tasks_dir).resolve_task_location(ticket_id) {
-            Ok(location) => !location.archived,
-            Err(TaskLookupError::Ambiguous { .. }) => true,
-            Err(TaskLookupError::NotFound(_) | TaskLookupError::Invalid(_)) => false,
-        },
+    match crate::storage::manager::Storage::new(tasks_dir).resolve_task_location(ticket_id) {
+        Ok(location) => !location.archived && ticket_done_state(tasks_dir, ticket_id).is_none_or(|done| !done),
+        Err(TaskLookupError::Ambiguous { .. }) => true,
+        Err(TaskLookupError::NotFound(_) | TaskLookupError::Invalid(_)) => false,
     }
 }
 
@@ -6988,6 +6986,47 @@ mod dev21_ticket_done_state_tests {
         prune_job_logs(&tasks, &root_a, logs.to_str().unwrap(), &by_age, "job-starting");
         assert!(logs.join("job-ambiguous.jsonl").exists(), "an ambiguous ticket's 15-day-old job stays");
         assert!(!logs.join("job-done.jsonl").exists(), "a Done ticket's 15-day-old job goes");
+    }
+
+    /// DEV-703: an archived ticket's old log goes, also when its status is open,
+    /// and so does a log whose header names no ticket ID.
+    #[test]
+    fn old_job_logs_of_archived_and_malformed_tickets_go() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write_config(root, "Done");
+        write_task(root, "PX", 1, "Todo");
+        write_task(root, "PX", 2, "Todo");
+        let project = root.join(".tasks").join("PX");
+        let archive = project.join("@archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        std::fs::rename(project.join("1.yml"), archive.join("1.yml")).unwrap();
+        let tasks = root.join(".tasks");
+        let logs = tasks.join("@agent-logs");
+        let fifteen_days_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(15 * 86_400);
+        for (job, ticket) in [("job-archived", "PX-1"), ("job-malformed", "not-a-ticket"), ("job-open", "PX-2")] {
+            let header = crate::services::agent_log_service::JobLogHeader {
+                job_id: job.to_string(),
+                ticket_id: ticket.to_string(),
+                runner: "claude".to_string(),
+                created_at: "2026-11-01T00:00:00Z".to_string(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: None,
+                effort: None,
+                agent_profile: None,
+            };
+            AgentLogService::init_log(root, logs.to_str(), header).unwrap();
+            let path = logs.join(format!("{job}.jsonl"));
+            std::fs::File::options().write(true).open(&path).unwrap().set_modified(fifteen_days_ago).unwrap();
+        }
+
+        let history = crate::config::types::AgentJobHistoryConfig::default();
+        prune_job_logs(&tasks, root, logs.to_str().unwrap(), &history, "none");
+
+        assert!(!logs.join("job-archived.jsonl").exists(), "an archived ticket's 15-day-old job goes");
+        assert!(!logs.join("job-malformed.jsonl").exists(), "a 15-day-old job without a valid ticket ID goes");
+        assert!(logs.join("job-open.jsonl").exists(), "an open ticket's 15-day-old job stays");
     }
 }
 
