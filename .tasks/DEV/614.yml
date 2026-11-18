@@ -1,11 +1,11 @@
 title: 'Flaky smoke: relationships reciprocal repair test waits on an element under full-suite load'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-18T05:22:44.326685+00:00
+modified: 2026-11-18T05:27:57.495566+00:00
 relationships:
   related:
   - DEV-606
@@ -130,6 +130,32 @@ comments:
 - date: 2026-11-18T05:22:44.326685+00:00
   author: automation
   text: 'The queued @fix job didn''t start: DEV-614 is assigned to @merge now.'
+- date: 2026-11-18T05:27:57.284952+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-614` is in `main`.
+
+    - Rebased `agent/DEV-614` onto `main` (`da8d50d0e545`): `f3b5029fad43`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `f3b5029fad43`
+    - Amended the pending `.tasks` changes into the merged commit: `59c8fa77e67c`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[smoke:ui.relationships-reciprocal-repair]`
+  report:
+    commits:
+    - hash: 59c8fa77e
+      what: 'DEV-614 Flaky smoke: relationships reciprocal repair test waits on an element under full-suite load'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a918fc-ce4e-4947-96ea-4af19c6d46ae
@@ -137,7 +163,6 @@ references:
 description: 'Found in the DEV-606 review on 2026-11-15: 1 of 4 full smoke runs (`npm run -s test:smoke:quick:agent`, worktree of agent/DEV-606) failed `smoke/tests/ui.relationships.smoke.spec.ts:313` ''previews safe reciprocal repair without writes and applies only after confirmation'' (log: 2 × waiting for element to be visible, enabled and stable); the other 3 runs passed 405/405. Check: `npm run test:smoke:agent` repeatedly. Done when the test no longer depends on load and the full smoke passes repeatedly.'
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: smoke:ui.relationships-reciprocal-repair
 history:
@@ -287,3 +312,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T05:27:57.284952+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:27:57.495566+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried
+    new: health

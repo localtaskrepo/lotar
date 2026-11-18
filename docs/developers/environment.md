@@ -107,6 +107,7 @@ All rows below are defined in `crates/lotar-core/src/config/env_overrides.rs`. E
 | `LOTAR_DEBUG_ADD` | `1` | Emits detailed payload logs for `lotar add` into `/tmp/lotar_add_debug.log`. |
 | `LOTAR_DEBUG_STATUS` | Any non-empty | Emits verbose `status` command and storage logs. |
 | `LOTAR_TEST_FAST_IO` | `1` | Shortens SSE debounce timers and heartbeats for local tests (`crates/lotar-lib/src/web_server.rs`). |
+| `LOTAR_TEST_MOVED_ON_GRACE_MS` | Integer milliseconds | Shortens the 120 s an agent job may still run after its ticket went Done or to a person, and looks at the ticket that often when it is under 5 s (`crates/lotar-agent/src/services/agent_job_service/watch.rs`). |
 | `LOTAR_TEST_FAST_NET` | `1` | Integration-test helper that shrinks HTTP client timeouts (`crates/lotar-lib/tests/web_api_integration_test.rs`). |
 
 Related docs: [Configuration Reference](./config-reference.md), [Precedence](./precedence.md), [serve](./serve.md), and [sse](./sse.md).

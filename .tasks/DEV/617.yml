@@ -1,11 +1,11 @@
 title: A @fix-codex retry after a Claude rate limit ran on Claude and failed the same way
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-18T05:02:58.622516+00:00
+modified: 2026-11-18T05:32:00.349127+00:00
 relationships:
   depends_on:
   - DEV-644
@@ -301,6 +301,26 @@ comments:
 - date: 2026-11-18T03:15:59.056896+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-617 yet. DEV-617 waits for DEV-694.'
+- date: 2026-11-18T05:31:53.112630+00:00
+  author: claude
+  text: |-
+    Since DEV-694, `agent/DEV-617` points at the finished fix `b4d875195`. Nothing was left to do, so I changed no files.
+
+    - `git branch -v --list agent/DEV-617` shows `b4d875195`, the signed commit (`%G?` = `G`) that the last job rebased with the review's two `error: None,` fixes.
+    - Main has moved on to `59c8fa77e`. `git merge-tree` against it shows no conflicts, and the 3 new main commits add no `AutomationJobContext` literals, so the earlier build break can't come back that way.
+    - Not rerun here: lint, tests and smoke. They passed on `b4d875195` in `job-20261118T030735.468Z-23`; the merge agent runs them again on main.
+  report:
+    commits:
+    - hash: b4d875195
+      what: DEV-617 fix, rebased, review findings fixed
+    checks:
+    - command: git merge-tree --write-tree main HEAD
+      result: passed
+      reason: no conflicts with main 59c8fa77e
+    - command: npm run lint, npm test, npm run smoke
+      result: passed
+      reason: in the previous job on b4d875195, not rerun
+    next: Review b4d875195
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5546fe0-7dc8-46db-bd03-10093f4d83f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6
@@ -308,6 +328,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af893bf8e-db36-4bbf-8cfa-1d26038346ca
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8238297-f9ab-4bc8-b8fd-61f2b0d1b2c1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A597b9085-d698-4828-aa24-30df4ebefbbc
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa60c867-3dfd-4876-bd00-bf287aa88c75
 description: 'Found 2026-11-16 on DEV-606: job job-20261116T062103.231Z-76 (profile fix-codex) ran in a T3 thread with model claude-opus-5-5 (~/.local/state/harnessmux/sessions/lotar-95e687-DEV-606-fix-codex.json, profile.model) and failed in 7 s with ''Claude API rate limit reached'', just like the @fix job before it, so the ticket went to the owner. Check: that session file shows profile.model claude-opus-5-5 for LOTAR_AGENT_PROFILE fix-codex. Done: a fix-codex job runs on a Codex model (or the profile is renamed to what it runs), with a test; related to DEV-584 (wait through usage limits).'
 tags:
 - health
@@ -636,3 +657,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T05:31:21.532260+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T05:31:23.003931+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa60c867-3dfd-4876-bd00-bf287aa88c75
+- at: 2026-11-18T05:31:53.112630+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:32:00.349127+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

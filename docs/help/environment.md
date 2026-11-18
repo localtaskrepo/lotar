@@ -152,5 +152,6 @@ All rows below are defined inside the same override table and map directly to th
 | `LOTAR_DEBUG_ADD` | `1` | Emits detailed payload logs for `lotar add` into `/tmp/lotar_add_debug.log`. |
 | `LOTAR_DEBUG_STATUS` | Any non-empty | Emits verbose `status` command and storage logs. |
 | `LOTAR_TEST_FAST_IO` | `1` | Shortens SSE debounce timers and heartbeats for local tests. |
+| `LOTAR_TEST_MOVED_ON_GRACE_MS` | Integer milliseconds | Shortens the 120 s an agent job may still run after its ticket went Done or to a person. |
 
 Related docs: [Configuration Reference](./config-reference.md), [Precedence](./precedence.md), [serve](./serve.md), and [sse](./sse.md).

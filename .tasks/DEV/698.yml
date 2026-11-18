@@ -1,14 +1,15 @@
 title: 'config-reference: agent.job_history lines split the agent.memory_gate keys'
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-18T04:18:56.381152+00:00
-modified: 2026-11-18T04:47:26.888525+00:00
+modified: 2026-11-18T05:28:47.366929+00:00
 relationships:
   related:
   - DEV-693
+  - DEV-682
 comments:
 - date: 2026-11-18T04:47:05.647451+00:00
   author: claude
@@ -35,6 +36,17 @@ comments:
       result: not_run
       reason: docs-only
     next: Review, then merge after DEV-693 lands
+- date: 2026-11-18T05:28:39.260853+00:00
+  author: claude
+  text: |-
+    Review: passed. The memory gate keys sit together again, and the change applies cleanly on main.
+
+    - Read: the ticket, DEV-693, AGENTS.md, `git log -5 main -- docs/help/config-reference.md`, and the diff of `69d9fb732`. The diff moves only `agent.memory_gate.settle_seconds` up one line, so lines 45-47 are now the three `agent.memory_gate.*` keys and lines 48-49 the two `agent.job_history.*` keys. Nothing else changed and there are no stray files.
+    - DEV-693 is now on main as `78dd34675`, and main still has the split at lines 47-49. The branch still carries the old DEV-693 copy, `76504c10b`. The only real change in the main copy is DEV-682's `stall_timeout_seconds` line, which the merge added at line 76.
+    - `git merge-tree --merge-base=76504c10b main 69d9fb732` applies cleanly, so the rebase leaves only `69d9fb732`.
+    - Reran: `npm ci` passed. `npx prettier --check docs/help/config-reference.md` passed.
+    - Docs only, so no lint, test or smoke run (AGENTS.md). No UI, so no screenshots.
+    - No findings, no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0dcd910-8bc5-4f36-ab9d-42888de91562
 description: |-
@@ -85,3 +97,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T05:28:39.260853+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:28:39.456621+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-693"]}'
+    new: '{"related":["DEV-693","DEV-682"]}'
+- at: 2026-11-18T05:28:47.366929+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

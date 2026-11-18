@@ -1,0 +1,28 @@
+title: 'Job-log pruning: no test that archived and malformed-ID tickets'' logs go'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T05:30:51.047164+00:00
+modified: 2026-11-18T05:30:51.670854+00:00
+relationships:
+  related:
+  - DEV-697
+  - DEV-693
+description: |-
+  Found in the DEV-697 review, 2026-11-17.
+
+  The pruning tests in `dev21_ticket_done_state_tests` (`crates/lotar-agent/src/services/agent_job_service.rs`) cover Done, open, deleted (NotFound), running and (DEV-697) ambiguous tickets. Two cases `ticket_keeps_its_jobs` and `docs/help/agent.md` (job history) promise have no test: an archived ticket's old log goes, and a log whose header ticket ID is malformed (`TaskLookupError::Invalid`) goes.
+
+  ## Done when
+
+  - [ ] A test shows a 15-day-old log of an archived ticket is removed by age.
+  - [ ] A test shows a 15-day-old log whose header ticket ID is malformed (e.g. `not-a-ticket`) is removed.
+  - [ ] Both fail when `ticket_keeps_its_jobs` returns true for that case.
+history:
+- at: 2026-11-18T05:30:51.670854+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

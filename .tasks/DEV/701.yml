@@ -1,11 +1,34 @@
 title: Agent action queues no job when the ticket's assignee is already that agent
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T04:40:49.336024+00:00
-modified: 2026-11-18T05:25:53.147962+00:00
+modified: 2026-11-18T05:38:08.379502+00:00
+comments:
+- date: 2026-11-18T05:38:00.171921+00:00
+  author: claude
+  text: |-
+    Fixed: a manual rule that assigns the agent the ticket already has now queues its job.
+
+    - Cause: `apply_action` only queued when the assignee changed (`maybe_queue_agent_on_assignment` returns early when previous == new), while `describe_action` always printed "Queue agent job".
+    - Fix in `crates/lotar-agent/src/services/automation_service.rs`: for `manual` events with `set.assignee`, queue even if unchanged (as `tell_agent` already does); event rules keep "only on change" so they don't loop.
+    - When the job can't start (active job, prerequisites, `max_iterations`), `lotar automation run` now prints the reason as a `note:` under the action.
+    - Failing test first: `manual_rule_queues_a_job_for_the_agent_the_ticket_already_has` in `crates/lotar-lib/tests/agent_automation_integration_test.rs` (failed with no job, passes now).
+    - Docs: `docs/help/automation.md` manual-run section.
+  report:
+    commits:
+    - hash: 2e50a083d
+      what: manual run starts the job of an agent the ticket already has, prints why when it can't
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b20c500-78e5-4ed1-9442-566d04a6100c
 description: 'Found 2026-11-17 by the chief of staff: standards INBOX-397 had assignee @triage with no job. lotar automation run "Inbox: triage again" --select id:INBOX-397 (set assignee @triage, agent triage) printed "Set assignee to agent ''triage''" and "Queue agent job for profile ''triage''", yet lotar agent list-jobs showed no job. After lotar task edit INBOX-397 --assignee mallox the same command queued job-20261118T044015.808Z-1 at once. The same rule queued jobs for INBOX-402, 441 and 443, which had other assignees. Check: an automation run whose agent action targets a ticket already assigned to that agent queues a job (or says why not). Done: a failing test first, then the fix; the CLI never prints "Queue agent job" without queueing one.'
@@ -30,3 +53,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b20c500-78e5-4ed1-9442-566d04a6100c
+- at: 2026-11-18T05:38:00.171921+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:38:08.379502+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

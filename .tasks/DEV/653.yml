@@ -1,17 +1,19 @@
 title: 'Partial cleanup per step: each job step removes the build output the next step doesn''t use, measured'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T06:51:34.275016+00:00
-modified: 2026-11-18T05:18:02.937474+00:00
+modified: 2026-11-18T05:32:03.458467+00:00
 relationships:
   depends_on:
   - DEV-652
   related:
   - DEV-579
   - DEV-651
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A509492fe-d1ac-4c44-887b-244e75950add
 description: |-
   Owner 2026-11-17, in his words: "We could even do partial cleanup this way for things that are no longer need after a phase". He picked "Follow-up after DEV-652" (chief of staff options picker).
 
@@ -42,3 +44,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T05:32:02.304556+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T05:32:03.458467+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A509492fe-d1ac-4c44-887b-244e75950add

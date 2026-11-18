@@ -1,14 +1,15 @@
 title: Job-log pruning removes the logs of a ticket whose ID is ambiguous across tasks roots
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-18T04:18:55.334249+00:00
-modified: 2026-11-18T04:48:19.320272+00:00
+modified: 2026-11-18T05:31:10.319588+00:00
 relationships:
   related:
   - DEV-693
+  - DEV-703
 comments:
 - date: 2026-11-18T04:48:08.956147+00:00
   author: claude
@@ -129,3 +130,18 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T05:30:51.262234+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-693"]}'
+    new: '{"related":["DEV-693","DEV-703"]}'
+- at: 2026-11-18T05:31:10.319588+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

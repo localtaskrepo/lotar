@@ -488,6 +488,28 @@ fn a_silent_agent_fails_its_job_as_stalled() {
     wait_for("the cancel", || harness.log().contains("\"method\":\"session/cancel\""));
 }
 
+/// DEV-695: a ticket set Done while its job's agent holds a prompt cancels the job once the grace is over
+/// (`LOTAR_TEST_MOVED_ON_GRACE_MS` shortens it from 120s), and the job's log says so twice: when it was seen and
+/// at the cancel.
+#[test]
+fn a_job_whose_ticket_goes_done_mid_run_ends_cancelled() {
+    let root = tempfile::tempdir().unwrap();
+    let hold = root.path().join("hold");
+    let _grace = EnvVarGuard::set("LOTAR_TEST_MOVED_ON_GRACE_MS", "300");
+    let harness = harness("", &[("FAKE_HOLD", hold.to_string_lossy().to_string())]);
+    let job = harness.start();
+    wait_for("the held prompt", || hold.exists());
+    let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+    TaskService::update(&mut harness.fixtures.create_storage(), "TEST-1", update).unwrap();
+    wait_for("the cancel", || status(&job) == "cancelled");
+    wait_for("the agent's cancel", || harness.log().contains("\"method\":\"session/cancel\""));
+    let notes: Vec<String> =
+        AgentJobService::events_for(&job).into_iter().filter(|event| event.kind == "agent_job_progress").filter_map(|event| event.message).collect();
+    assert!(notes.iter().any(|note| note.starts_with("TEST-1 went Done while the job ran; LoTaR cancels the job unless")), "{notes:?}");
+    assert!(notes.iter().any(|note| note == "TEST-1 went Done while the job ran: LoTaR cancelled the job."), "{notes:?}");
+    wait_for("the job's end", || AgentJobService::job_settled(&job));
+}
+
 /// DEV-511: a reply shows in the job log while the agent writes it, not only when its turn ends.
 #[test]
 fn a_reply_streams_into_the_job_log_as_the_agent_writes_it() {

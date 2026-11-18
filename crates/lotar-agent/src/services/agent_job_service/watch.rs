@@ -15,6 +15,9 @@ const LOOK_EVERY: Duration = Duration::from_secs(5);
 /// its last step, and then ends its turn by itself.
 pub(super) const MOVED_ON_GRACE: Duration = Duration::from_secs(120);
 
+/// The grace, in milliseconds, for a test that can't wait 120s; the ticket is then also looked at that often.
+const TEST_GRACE_VAR: &str = "LOTAR_TEST_MOVED_ON_GRACE_MS";
+
 /// Why the watch ends the job.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum WatchEnd {
@@ -38,6 +41,7 @@ pub(super) struct JobWatch {
     status_at_start: Option<String>,
     reconcile: bool,
     grace: Duration,
+    look_every: Duration,
     /// Since when the ticket has moved on, and how.
     moved_on: Option<(Instant, String)>,
 }
@@ -53,6 +57,7 @@ impl JobWatch {
             crate::config::resolution::config_for_project(tasks_dir, prefix).map(|config| determine_done_statuses_from_config(&config)).unwrap_or_default()
         };
         let status_at_start = ticket_state(tasks_dir, ticket_id).map(|(status, _)| status.to_ascii_lowercase());
+        let grace = std::env::var(TEST_GRACE_VAR).ok().and_then(|ms| ms.trim().parse().ok()).map_or(MOVED_ON_GRACE, Duration::from_millis);
         Self {
             job_id: job_id.to_string(),
             tasks_dir: tasks_dir.to_path_buf(),
@@ -64,7 +69,8 @@ impl JobWatch {
             done_statuses,
             status_at_start,
             reconcile: !is_merge_job,
-            grace: MOVED_ON_GRACE,
+            grace,
+            look_every: LOOK_EVERY.min(grace),
             moved_on: None,
         }
     }
@@ -103,7 +109,7 @@ impl JobWatch {
             return None;
         }
         if now >= self.next_look {
-            self.next_look = now + LOOK_EVERY;
+            self.next_look = now + self.look_every;
             match self.moved_on_now() {
                 Some(how) if self.moved_on.as_ref().is_none_or(|(_, seen)| *seen != how) => {
                     let wait = self.grace.as_secs();
