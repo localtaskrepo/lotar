@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T01:56:54.001918+00:00
-modified: 2026-11-18T20:59:22.141568+00:00
+modified: 2026-11-18T21:09:32.707531+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -49,6 +49,7 @@ comments:
   text: 'Stalled since 2026-11-17T19:39Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ede6a56-9b89-4ce2-8b1c-a74fa80eb83a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad5bbc3be-75a9-412d-a943-c1f706afa6b0
 description: |-
   Found in the DEV-530 review (`cf8caa2a`).
 
@@ -184,3 +185,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-18T21:09:32.707531+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad5bbc3be-75a9-412d-a943-c1f706afa6b0

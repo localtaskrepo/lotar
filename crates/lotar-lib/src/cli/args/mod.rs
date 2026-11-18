@@ -15,7 +15,7 @@ pub mod task;
 // Re-exports for ergonomic imports from crate::cli::args
 pub use agent::{
     AgentAction, AgentArgs, AgentCheckArgs, AgentListJobsArgs, AgentQueueAction, AgentQueueArgs, AgentRunArgs, AgentWorkerArgs, WorktreeAction, WorktreeArgs,
-    WorktreeCleanupArgs,
+    WorktreeCleanupArgs, WorktreeRunArgs,
 };
 pub use automation::{AutomationAction, AutomationArgs, AutomationRunArgs, AutomationSimulateArgs};
 pub use common::parse_key_value;

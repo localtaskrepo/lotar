@@ -19,6 +19,7 @@ LoTaR runs agent CLIs (Claude Code, Codex CLI, Copilot CLI, T3 Code and the othe
 - `lotar agent check [--status <value>] [--assignee <handle>]`
 - `lotar agent worktree list` — list agent worktrees
 - `lotar agent worktree cleanup [--all] [--delete-branches] [--dry-run]` — remove stale worktrees
+- `lotar agent worktree run <TICKET> -- <command> [args...]` — run a command in the ticket's worktrees while no job runs for it, for example `lotar agent worktree run DEV-7 -- cargo clean --workspace` (see [Build output while a ticket waits](#build-output-while-a-ticket-waits))
 
 Agent profiles defined in the repository's config files only start after you trust the repository with [`lotar trust`](trust.md), because they pick the program that runs. Profiles from your home config and `--runner` jobs without a profile always start.
 
@@ -438,6 +439,28 @@ lotar agent worktree cleanup --dry-run
 ```
 
 Worktrees with active jobs are never removed, even with `--all`. Cleanup refuses dirty worktrees (including untracked or ignored files), unknown Git state, and branches with commits that are not in the repository checkout's `HEAD`; a branch that landed rebased, cherry-picked or reworked counts as merged, and a done ticket's version that main supersedes is archived and removed, as described above. Branches are deleted with `git branch -D`, because `-d` refuses a rebased branch, and only after these checks pass. `--all` broadens ticket selection only; it is not a force-delete option. Refusals are reported and return a nonzero exit status.
+
+### Build output while a ticket waits
+
+A ticket that waits for a person or another ticket keeps its worktree, and with it its build output, until it is done. `lotar agent worktree run <TICKET> -- <command> [args...]` runs a command in each of the ticket's worktrees (its T3 Code thread worktrees included), so an automation rule can delete part of that build output when the ticket starts to wait. The command's output goes to stderr, its exit status decides the command's own. It runs nothing, and says why, when the ticket has no worktree or a job runs for it in any process: the job shares the worktree. The check comes right before the command runs; a job that starts while the command runs isn't held back. Git's repository-selection variables (`GIT_DIR`, `GIT_WORK_TREE`, …) are removed from its environment.
+
+LoTaR's own development rules drop the workspace crates' build output (`target/debug/incremental` and the workspace's own artifacts; dependencies stay) when a ticket goes to HelpNeeded or Blocked through a change that fires `updated`: a person sets the status, or an agent hands the ticket back during its job (its change applies, and fires the rule, once the job has ended). Waits that LoTaR or a rule sets fire no rule, so their build output stays until Done: a rule's own `set` (a failed review or merge that hands the ticket to its owner), a T3 Code thread that waits for an answer, and a ticket blocked on open prerequisites when its job would start. The rule:
+
+```yaml
+- name: "Waiting: drop the workspace build output"
+  when:
+    any:
+      - status: HelpNeeded
+      - status: Blocked
+  on:
+    updated:
+      run:
+        command: lotar
+        args: [agent, worktree, run, "${{ticket.id}}", --, cargo, clean, --workspace]
+        ignore_failure: true
+```
+
+In a lotar worktree after lint, tests and smoke this took `target/` from 3.4 GB to 0.7 GB in about a second; the job that resumes the ticket rebuilds the workspace crates in about a minute more (`cargo build --bins --tests`: 55 s with the Mac under heavy load). The steps between fix, review and merge keep their build output: the next step reuses it, and the job's end starts the next step before `cleanup_paths` would run. Done cleanup removes the rest.
 
 Default CLI cleanup and all automatic cleanup require a readable, valid ticket in a configured done state. Missing, malformed, unreadable, or unknown-status tickets are preserved, even with `--all`. Failure/cancellation cleanup settings only enable cleanup when that same done-state and Git safety check succeeds.
 

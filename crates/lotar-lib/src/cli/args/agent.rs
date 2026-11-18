@@ -45,6 +45,17 @@ pub enum WorktreeAction {
     List,
     /// Remove stale agent worktrees and optionally their branches
     Cleanup(WorktreeCleanupArgs),
+    /// Run a command in a ticket's worktrees while no job runs for the ticket
+    Run(WorktreeRunArgs),
+}
+
+#[derive(Args)]
+pub struct WorktreeRunArgs {
+    /// Ticket id (e.g. TEST-1)
+    pub ticket: String,
+    /// The command and its arguments, after `--` (e.g. `-- cargo clean --workspace`)
+    #[arg(last = true, required = true)]
+    pub command: Vec<String>,
 }
 
 #[derive(Args)]

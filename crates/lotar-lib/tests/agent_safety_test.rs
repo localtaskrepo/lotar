@@ -449,6 +449,133 @@ mod git_required {
         assert!(stdout.contains(&branch), "{stdout}");
     }
 
+    /// `agent worktree run` (DEV-653): the command runs in the ticket's
+    /// worktree, never in the main checkout, and not at all while a job runs
+    /// for the ticket.
+    #[test]
+    fn cli_worktree_run_runs_in_the_ticket_worktree_only_while_no_job_runs() {
+        use lotar::services::agent_active_jobs::{self, ActiveJob};
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let run = |ticket: &str| {
+            Command::new(crate::common::lotar_bin())
+                .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "agent", "worktree", "run", ticket, "--", "sh", "-c", "touch ran-here"])
+                .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+                .current_dir(root)
+                .output()
+                .unwrap()
+        };
+        let output = run(&ticket);
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(String::from_utf8_lossy(&output.stdout).contains("has no agent worktree"), "{}", String::from_utf8_lossy(&output.stdout));
+        assert!(!root.join("ran-here").exists(), "nothing runs in the main checkout");
+
+        let wt = root.join("worktrees").join(&ticket);
+        git(root, &["worktree", "add", "-b", &format!("agent/{ticket}"), wt.to_str().unwrap()]);
+        let busy = ActiveJob {
+            job_id: "job-busy".into(),
+            ticket_id: ticket.clone(),
+            runner: "claude".into(),
+            agent: Some("safety".into()),
+            owner_pid: 1,
+            child_pid: 1,
+            started_at: "2026-11-18T00:00:00Z".into(),
+            session_id: None,
+            merge: false,
+            assignee_at_start: None,
+            in_setup: false,
+        };
+        agent_active_jobs::register(&fixture.tasks_root, &busy);
+        let output = run(&ticket);
+        agent_active_jobs::unregister(&fixture.tasks_root, &busy.job_id);
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(String::from_utf8_lossy(&output.stdout).contains("a job runs for"), "{}", String::from_utf8_lossy(&output.stdout));
+        assert!(!wt.join("ran-here").exists(), "a running job's worktree is left alone");
+
+        let output = run(&ticket.to_lowercase());
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(wt.join("ran-here").exists());
+        assert!(!root.join("ran-here").exists());
+
+        let failing = Command::new(crate::common::lotar_bin())
+            .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "agent", "worktree", "run", &ticket, "--", "sh", "-c", "exit 3"])
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(!failing.status.success(), "a failing command fails the run");
+    }
+
+    /// DEV-653's waiting rule end to end: an `updated` rule that runs
+    /// `agent worktree run` drops the build output when the agent hands the
+    /// ticket back during its job (applied once the job ended) and when a
+    /// person sets the status. A rule's own HelpNeeded fires no rule, so the
+    /// build output stays then.
+    #[test]
+    fn waiting_rule_drops_build_output_on_hand_back_and_person_change_only() {
+        common::require_git();
+        let bin = crate::common::lotar_bin();
+        let (fixture, ticket) = setup(
+            &format!(
+                "mkdir -p target/debug && touch target/debug/built\nif [ ! -f \"$LOTAR_TASKS_DIR/../no-hand-back\" ]; then LOTAR_IGNORE_HOME_CONFIG=1 '{}' --tasks-dir \"$LOTAR_TASKS_DIR\" status \"$LOTAR_TICKET_ID\" HelpNeeded; fi",
+                bin.display()
+            ),
+            true,
+        );
+        let root = fixture.get_temp_path();
+        let path = fixture.tasks_root.join("config.yml");
+        let mut config: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        config["issue"]["states"] = serde_yaml_ng::from_str("[Todo, HelpNeeded, Done]").unwrap();
+        fs::write(path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
+        fs::write(root.join(".gitignore"), "target/\n").unwrap();
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "Ignore build output"]);
+        let rule = |extra: &str| {
+            format!(
+                "automation:\n  rules:\n{extra}    - name: Waiting\n      when:\n        any:\n          - status: HelpNeeded\n      on:\n        updated:\n          run:\n            command: '{}'\n            args: [agent, worktree, run, \"${{{{ticket.id}}}}\", --, sh, -c, 'rm -rf target/debug']\n",
+                bin.display()
+            )
+        };
+        fs::write(fixture.tasks_root.join("automation.yml"), rule("")).unwrap();
+        let status = |status: &str| {
+            let output = Command::new(&bin)
+                .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "status", &ticket, status])
+                .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+                .env_remove("LOTAR_AGENT_JOB_ID")
+                .current_dir(root)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        };
+
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_idle();
+        let job = AgentJobService::get_job(&job.id).unwrap();
+        assert_eq!(job.status, "completed", "{:?}", job.last_message);
+        assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "HelpNeeded");
+        let worktree = Path::new(job.worktree_path.as_deref().unwrap()).to_path_buf();
+        assert!(worktree.join("target").exists() && !worktree.join("target/debug").exists(), "the agent's hand-back drops the build output");
+
+        fs::create_dir_all(worktree.join("target/debug")).unwrap();
+        status("Todo");
+        assert!(worktree.join("target/debug").exists(), "a ticket that doesn't wait keeps it");
+        status("HelpNeeded");
+        assert!(!worktree.join("target/debug").exists(), "a person's HelpNeeded drops it");
+
+        status("Todo");
+        fs::write(root.join("no-hand-back"), "").unwrap();
+        fs::write(
+            fixture.tasks_root.join("automation.yml"),
+            rule("    - name: Failed\n      on:\n        job_completed:\n          set:\n            status: HelpNeeded\n"),
+        )
+        .unwrap();
+        AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_idle();
+        assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "HelpNeeded");
+        assert!(worktree.join("target/debug/built").exists(), "a rule's own HelpNeeded fires no rule (DEV-712)");
+    }
+
     #[test]
     fn automatic_cleanup_preserves_missing_malformed_dirty_and_unmerged_worktrees() {
         common::require_git();

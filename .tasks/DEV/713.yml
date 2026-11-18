@@ -1,11 +1,11 @@
 title: lotar agent worktree run runs while the ticket's T3 Code thread still runs or waits for an answer
-status: InProgress
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T20:46:28.278416+00:00
-modified: 2026-11-18T21:01:17.904563+00:00
+modified: 2026-11-18T21:08:44.432523+00:00
 relationships:
   depends_on:
   - DEV-653
@@ -13,6 +13,37 @@ relationships:
   - DEV-653
   - DEV-594
   - DEV-600
+comments:
+- date: 2026-11-18T21:08:33.277905+00:00
+  author: claude
+  text: |-
+    `worktree run` now runs nothing while the ticket's T3 Code thread runs or waits for an answer.
+
+    - `worktree run` exists only on DEV-653's branch (in Merging), so `05ea0d37e` is cherry-picked as `1614afdde` under the fix; DEV-713 now depends on DEV-653.
+    - `AgentJobService::t3_thread_holding` wraps `running_t3_thread`, the same check a new job's start makes; `worktree_run` calls it after the lotar-job check, so a running job is named first.
+    - Says "Ran nothing: the T3 Code thread t1 of the job … still runs / waits for an answer". T3 Code can't be asked: the thread doesn't count and the command runs, as `finished_job_worktree` does.
+    - Test `worktree_run_runs_nothing_while_the_ticket_thread_runs_or_waits_for_an_answer` (fake `t3`, in `dev626_resumed_t3_threads_test.rs`) fails without the fix and passes with it.
+    - `docs/help/agent.md` "Build output while a ticket waits" and the command list say so.
+    - Not changed: `worktree cleanup --all` still checks lotar jobs only (out of scope).
+  report:
+    commits:
+    - hash: d4c089f25
+      what: worktree run skips a ticket whose T3 Code thread runs or waits
+    - hash: 1614afdde
+      what: DEV-653 cherry-picked (worktree run exists only there)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2394 Rust tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    next: Review; merge after DEV-653 lands (depends-on set), the rebase drops the cherry-picked copy
+- date: 2026-11-18T21:08:44.432523+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-653.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A111244fc-866c-4402-97df-07ad00791c5d
 description: |-
@@ -96,3 +127,26 @@ history:
   - field: relationships
     old: '{"related":["DEV-653","DEV-594","DEV-600"]}'
     new: '{"depends_on":["DEV-653"],"related":["DEV-653","DEV-594","DEV-600"]}'
+- at: 2026-11-18T21:08:33.277905+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:08:44.165179+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T21:08:44.397294+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Blocked
+- at: 2026-11-18T21:08:44.432523+00:00
+  actor: automation
+  changes:
+  - field: comment_added

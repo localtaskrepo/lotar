@@ -2,6 +2,7 @@ use crate::api_types::AgentJobCreateRequest;
 use crate::automation::types::AutomationFile;
 use crate::cli::args::{
     AgentAction, AgentCheckArgs, AgentListJobsArgs, AgentQueueAction, AgentQueueArgs, AgentRunArgs, AgentWorkerArgs, WorktreeAction, WorktreeCleanupArgs,
+    WorktreeRunArgs,
 };
 use crate::config::manager::ConfigManager;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -45,6 +46,7 @@ impl AgentHandler {
             AgentAction::Worktree(args) => match args.action {
                 WorktreeAction::List => Self::worktree_list(resolver, renderer),
                 WorktreeAction::Cleanup(cleanup_args) => Self::worktree_cleanup(&cleanup_args, resolver, renderer),
+                WorktreeAction::Run(run_args) => Self::worktree_run(&run_args, resolver, renderer),
             },
             AgentAction::Worker(args) => Self::worker(args, resolver),
         }
@@ -810,6 +812,51 @@ impl AgentHandler {
         }
 
         if errors.is_empty() { Ok(()) } else { Err("Some worktrees were preserved because cleanup was unsafe or failed".into()) }
+    }
+
+    /// Run a command in each of the ticket's worktrees, such as
+    /// `cargo clean --workspace` when the ticket starts to wait (DEV-653).
+    /// Runs nothing while a job runs for the ticket: the job shares them.
+    fn worktree_run(args: &WorktreeRunArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path).map_err(|e| e.to_string())?;
+        let config = config_manager.get_resolved_config();
+        let ticket = args.ticket.trim();
+        let (program, program_args) = args.command.split_first().ok_or("Name the command after `--`")?;
+        let worktrees: Vec<WorktreeInfo> = list_agent_worktrees(resolver, config)?.into_iter().filter(|wt| wt.ticket_id.eq_ignore_ascii_case(ticket)).collect();
+        let skipped = if worktrees.is_empty() {
+            Some(format!("{ticket} has no agent worktree"))
+        } else if AgentJobService::has_active_job(ticket) || running_job_for_ticket(&resolver.path, ticket).is_some() {
+            Some(format!("a job runs for {ticket}"))
+        } else {
+            None
+        };
+        if let Some(reason) = skipped {
+            if matches!(renderer.format, OutputFormat::Json) {
+                renderer.emit_json(&serde_json::json!({ "ran_in": [], "skipped": reason }));
+            } else {
+                renderer.emit_info(format!("Ran nothing: {reason}"));
+            }
+            return Ok(());
+        }
+        let mut ran_in = Vec::new();
+        let mut errors = Vec::new();
+        for wt in &worktrees {
+            let mut command = std::process::Command::new(program);
+            command.args(program_args).current_dir(&wt.path).stdin(std::process::Stdio::null()).stdout(std::io::stderr());
+            crate::utils::git::clear_repository_env(&mut command);
+            match command.status() {
+                Ok(status) if status.success() => {
+                    renderer.emit_success(format!("Ran `{}` in {}", args.command.join(" "), wt.path));
+                    ran_in.push(wt.path.clone());
+                }
+                Ok(status) => errors.push(format!("{}: {status}", wt.path)),
+                Err(err) => errors.push(format!("{}: {err}", wt.path)),
+            }
+        }
+        if matches!(renderer.format, OutputFormat::Json) {
+            renderer.emit_json(&serde_json::json!({ "ran_in": ran_in, "errors": errors }));
+        }
+        if errors.is_empty() { Ok(()) } else { Err(format!("`{}` failed in {}", args.command.join(" "), errors.join("; "))) }
     }
 }
 

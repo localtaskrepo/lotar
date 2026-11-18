@@ -1,11 +1,11 @@
 title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T18:04:32.586592+00:00
-modified: 2026-11-18T20:40:08.314539+00:00
+modified: 2026-11-18T21:04:38.414527+00:00
 relationships:
   related:
   - DEV-568
@@ -93,6 +93,40 @@ comments:
     - Not run: lint, tests, smoke (rules YAML only)
     - Before merging: if the standard moves again, re-`cmp`; run `lotar trust` after the merge
     - No minor findings, no tickets filed
+- date: 2026-11-18T21:04:37.914490+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-706` is in `main`.
+
+    - Rebased `agent/DEV-706` onto `main` (`812ea6abc7dc`): `0058812eb83d`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-706` onto `main` (`77ff5dce85e4`): `5d83150a5b40`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `5d83150a5b40`
+    - Amended the pending `.tasks` changes into the merged commit: `fa45d884bf06`
+    - The merge changed rules, agent profiles or `agent.merge`: ran `lotar trust`
+    - Pushed 2 commits to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[drift:.tasks/DEV/automation.yml]`
+  report:
+    commits:
+    - hash: 77ff5dce8
+      what: DEV-530 A job the dependency check held back resumes as it was when its prerequisites are done
+    - hash: fa45d884b
+      what: 'DEV-706 Config copy behind the standard: .tasks/DEV/automation.yml'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A705af74a-f7b4-4889-b67b-169c4fb3e567
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9351309b-53ad-46ed-865a-93b0ce6995ff
@@ -111,7 +145,6 @@ description: |-
 tags:
 - health
 - light
-- review-returned
 custom_fields:
   finding: drift:.tasks/DEV/automation.yml
 history:
@@ -200,3 +233,16 @@ history:
   - field: assignee
     old: '@review-light'
     new: '@merge'
+- at: 2026-11-18T21:04:37.914490+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:04:38.414527+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, light, review-returned
+    new: health, light

@@ -396,6 +396,8 @@ In the short form, template values never become part of the script text. Each `$
 - inside double quotes, `echo "New: ${{ticket.title}}"` becomes `echo "New: ${LOTAR_TEMPLATE_1}"`
 - inside single quotes, `sh -c 'echo ${{ticket.title}}'` becomes `sh -c 'echo ${LOTAR_TEMPLATE_1}'`, which the nested shell expands. Without a nested shell, single quotes keep the reference literal, so put placeholders outside single quotes.
 
+A command runs in the workspace root, or in `cwd`. To run one in the ticket's agent worktree, run it through `lotar agent worktree run`, which skips it while a job runs for the ticket: `args: [agent, worktree, run, "${{ticket.id}}", --, cargo, clean, --workspace]` drops a waiting ticket's workspace build output (see [Build output while a ticket waits](agent.md#build-output-while-a-ticket-waits)).
+
 The structured form passes `args` to the program directly, without a shell. If you start a shell there yourself (`command: sh`, `args: [-c, ...]`), read values from the `LOTAR_TICKET_*` variables (`"$LOTAR_TICKET_TITLE"`) rather than placing `${{...}}` in the script. On Windows the short form runs through `cmd`, which cannot keep values out of the command line, so a short-form command with placeholders is refused there; use the structured form or the environment variables.
 
 #### Synchronous vs asynchronous execution
