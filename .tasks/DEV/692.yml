@@ -1,11 +1,11 @@
 title: 'Ticket list API and web view: leave comments and history out of list rows, gzip responses, refresh only the changed ticket'
-status: Done
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-18T03:06:46.818129+00:00
-modified: 2026-11-18T04:03:57.421517+00:00
+modified: 2026-11-18T04:29:20.883325+00:00
 comments:
 - date: 2026-11-18T04:03:32.949630+00:00
   author: claude
@@ -47,6 +47,19 @@ comments:
       result: passed
       reason: list, board, insights, panel, live ids refresh
     next: review the commit on agent/DEV-692, then merge to main
+- date: 2026-11-18T04:29:12.381216+00:00
+  author: claude
+  text: |-
+    **Review: passed.** `deac780bd` does what "Done when" asks. I found no blocking or minor findings and filed no tickets.
+
+    - **Read:** the ticket and the fix comment, AGENTS.md, and the whole diff (`git show deac780bd`; `main..HEAD` also shows main's newer release commit inverted). No main commit since the branch base touches these files.
+    - **API:** list rows leave out description, comments and history, and carry `comment_count`, `history_count`, `open_question` and `status_since`. `include=history` brings history back; any other `include` value is a 400. `ids=` returns `positions` and the full `total`, and more than 100 IDs is a 400. `api_types.rs`, `types.ts`, `openapi.json` and `docs/help` agree.
+    - **Web view:** `invalidateTaskIds` falls back to a full reload as the ticket says. A row with the same `modified` keeps the stored ticket's details. The task panel fetches the full ticket instead of merging a row.
+    - **Other repos:** nothing in `~/Development` or `~/.t3` calls `/api/tasks/list`. In the view, only the task panel reads description, comments or history (Insights asks for `include=history`), and the automation preview uses `getTask`.
+    - **Checks rerun:** `npm ci` passed. `npm run lint` passed. `npm run test:agent` passed (2379 Rust, 1561 UI, plus release and hooks). `npm run test:smoke:agent` passed (405). The worktree is clean afterwards.
+    - **App:** I ran `lotar serve` on the `--demo` seed. The list answer is gzipped with `Vary: Accept-Encoding`. After a ticket update, the open list sent only `list?...&ids=ATLS-31` and the row updated in place.
+    - **Screenshots:** I read the fix agent's (list, board, panel, list at 390 dark). I took my own of list, board and insights in light and dark at 1920, 1440 and 390, plus calendar and the panel. No visual problems and no console errors. The panel shows the full description.
+    - **Note, not a defect:** HEAD on a JSON endpoint now gets the same gzip headers as GET. The ticket says HEAD "goes out as before", but matching GET is correct HTTP.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A740a70fc-3c79-42cd-9f65-62e36bbc5792
 - attachment: after-board-dark-1440.f7d2cf3670c356bcf8335d44f69250f2.png
@@ -291,3 +304,22 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-18T04:21:37.811169+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-18T04:29:12.381216+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:29:20.883325+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

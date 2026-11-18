@@ -1,0 +1,18 @@
+title: Check DEV-652 on a real t3 ticket once a build with it is installed
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T04:32:01.039948+00:00
+modified: 2026-11-18T04:32:01.683877+00:00
+relationships:
+  related:
+  - DEV-652
+description: 'Found (review of DEV-652): ''Done when'' asks for checks on a real ticket, not assumed, and none ran: the installed lotar is 0.15.3 without `f16031633`. Tests cover them with a fake t3 (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`). Check on a ticket with fix, review and merge jobs on the t3 runner: one worktree under lotar''s worktree folder, nothing new in `~/.t3/worktrees` (`ls -t ~/.t3/worktrees/lotar | head`); the thread shows in T3 Code with its title and is linked on the ticket; `session: continue` continues it; a job that ends with the ticket moving on logs `Settled the T3 Code thread`, one that ends HelpNeeded or failed logs `stays active`. Done: each point seen on that ticket, with the job IDs in a comment.'
+history:
+- at: 2026-11-18T04:32:01.683877+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

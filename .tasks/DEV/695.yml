@@ -1,0 +1,112 @@
+title: A job whose ticket goes Done mid-run has no end-to-end test of its cancel
+status: Reviewing
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-18T04:14:08.203839+00:00
+modified: 2026-11-18T04:37:03.277287+00:00
+relationships:
+  related:
+  - DEV-682
+  - TEST-1
+comments:
+- date: 2026-11-18T04:36:52.328387+00:00
+  author: claude
+  text: |-
+    Added the end-to-end test: a job whose ticket goes Done mid-run ends `cancelled`, with both notes in its log.
+
+    - New test `a_job_whose_ticket_goes_done_mid_run_ends_cancelled` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: the fake agent holds its prompt, the test sets TEST-1 Done, and the job ends `cancelled`. Both notes are in its log and the agent got `session/cancel`. It runs in about 1s.
+    - `watch.rs`: `LOTAR_TEST_MOVED_ON_GRACE_MS` replaces the 120s grace. While the grace is shorter than 5s, the job also checks the ticket that often. If the variable is unset or not a number, the 120s grace stays.
+    - Docs: the variable is listed with the other test variables in `docs/developers/environment.md` and `docs/help/environment.md`.
+    - Built on `agent/DEV-682` (`bdbffc029`, still Merging), because that code isn't on main yet. Merge DEV-682 first; after that, the rebase onto main keeps only `f6be0c9f5`.
+  report:
+    commits:
+    - hash: f6be0c9f5
+      what: harness test of the Done-mid-run cancel, LOTAR_TEST_MOVED_ON_GRACE_MS
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2365 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '405'
+    next: 'Review, then merge after DEV-682: this branch sits on agent/DEV-682 (bdbffc029)'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e9d9bf-5491-4e57-a598-0ec2fb68f499
+description: |-
+  DEV-682's reconcile is tested only at the watch: `a_job_whose_ticket_moved_on_is_cancelled_after_the_grace` (`crates/lotar-agent/src/services/agent_job_service/watch.rs`) checks that `JobWatch::check_at` returns `MovedOn` and logs the notes. Nothing runs a job and sees it end as cancelled with `job_cancelled` rules, through `drive_turns` or `run_command` (`agent_job_service.rs`).
+
+  Builds on DEV-682 (`agent/DEV-682`, not on main yet).
+
+  ## Done when
+  - [ ] a harness test in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` sets the ticket Done while a held fake agent runs, and the job ends `cancelled` with both notes ("went Done while the job ran; LoTaR cancels…" and "…LoTaR cancelled the job.") in its log, and the agent got `session/cancel`
+  - [ ] the 120s grace (`MOVED_ON_GRACE`) can be shortened for that test with `LOTAR_TEST_MOVED_ON_GRACE_MS` (milliseconds), so it finishes in seconds; the ticket is then also looked at every that-many ms when that is shorter than the usual 5s
+  - [ ] unset, empty or not a number: the 120s grace and 5s look stay (no error); the variable is listed with the other test variables in `docs/developers/environment.md` and `docs/help/environment.md`
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass
+tags:
+- tests
+history:
+- at: 2026-11-18T04:14:08.442604+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-682"]}'
+- at: 2026-11-18T04:14:08.662494+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T04:29:23.921245+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T04:29:24.701515+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e9d9bf-5491-4e57-a598-0ec2fb68f499
+- at: 2026-11-18T04:30:37.605204+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      DEV-682's reconcile is tested only at the watch: `a_job_whose_ticket_moved_on_is_cancelled_after_the_grace` (`crates/lotar-agent/src/services/agent_job_service/watch.rs`) checks that `JobWatch::check_at` returns `MovedOn` and logs the notes. Nothing runs a job and sees it end as cancelled with `job_cancelled` rules, through `drive_turns` or `run_command` (`agent_job_service.rs`).
+
+      ## Done when
+      - [ ] a harness test in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` sets the ticket Done while a held fake agent runs, and the job ends cancelled with both notes in its log
+      - [ ] the 120s grace (`MOVED_ON_GRACE`) can be shortened for that test, so it finishes in seconds
+    new: |-
+      DEV-682's reconcile is tested only at the watch: `a_job_whose_ticket_moved_on_is_cancelled_after_the_grace` (`crates/lotar-agent/src/services/agent_job_service/watch.rs`) checks that `JobWatch::check_at` returns `MovedOn` and logs the notes. Nothing runs a job and sees it end as cancelled with `job_cancelled` rules, through `drive_turns` or `run_command` (`agent_job_service.rs`).
+
+      Builds on DEV-682 (`agent/DEV-682`, not on main yet).
+
+      ## Done when
+      - [ ] a harness test in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` sets the ticket Done while a held fake agent runs, and the job ends `cancelled` with both notes ("went Done while the job ran; LoTaR cancels…" and "…LoTaR cancelled the job.") in its log, and the agent got `session/cancel`
+      - [ ] the 120s grace (`MOVED_ON_GRACE`) can be shortened for that test with `LOTAR_TEST_MOVED_ON_GRACE_MS` (milliseconds), so it finishes in seconds; the ticket is then also looked at every that-many ms when that is shorter than the usual 5s
+      - [ ] unset, empty or not a number: the 120s grace and 5s look stay (no error); the variable is listed with the other test variables in `docs/developers/environment.md` and `docs/help/environment.md`
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass
+- at: 2026-11-18T04:36:52.328387+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:36:52.624793+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-682"]}'
+    new: '{"related":["DEV-682","TEST-1"]}'
+- at: 2026-11-18T04:37:03.277287+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

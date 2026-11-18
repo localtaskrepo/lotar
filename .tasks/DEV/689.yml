@@ -1,11 +1,11 @@
 title: follow_ticket_work's DEV-687 rule (another branch keeps the ticket tip) has no test
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-18T02:27:08.953170+00:00
-modified: 2026-11-18T03:45:41.395377+00:00
+modified: 2026-11-18T04:21:36.756890+00:00
 relationships:
   related:
   - DEV-687
@@ -68,6 +68,30 @@ comments:
       result: passed
       reason: 405 tests
     next: Review on another model, then merge after DEV-687 (this commit builds on 7303f1e1b)
+- date: 2026-11-18T04:21:30.699888+00:00
+  author: claude
+  text: |-
+    Review: passed. `d9d678448` does what the owner decided (only branches outside the ticket's own thread branches count) and covers both paths with tests.
+
+    - **Read:** the diff (`branch_keeping`, new `logged_branches`, `follow_ticket_work`, `move_ticket_branch` in `crates/lotar-agent/src/services/agent_job_service.rs`), the two new tests in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`, DEV-687 and its review, the owner's answer (INBOX-519), and the last 5 commits on `main` to both files.
+    - **Done when:** a test covers the `follow_ticket_work` path, and the owner decided (outside-only). The code matches that decision; `move_ticket_branch` gets the same rule, and that is the same decision.
+    - **Test fails before the fix:** with `main`'s `agent_job_service.rs`, `the_tickets_branch_stays_at_its_fix_that_only_its_own_thread_branch_also_has` fails; with the patch it passes. The backup test passes on both, which is expected.
+    - **Base:** DEV-687 is on `main` now (`3cbe25d9b`). `git rebase main` drops `7303f1e1b` as already upstream and leaves one clean commit, so the merge can go ahead.
+    - **Reran** on `main` plus the patch, in a scratch worktree (removed afterwards): `npm ci`, a workspace build, the dev503 tests, lint, and the agent tests. This worktree is unchanged.
+    - No blocking or minor findings; no tickets filed.
+  report:
+    checks:
+    - command: cargo nextest run --workspace --test integration dev503
+      result: passed
+      reason: 47 tests, on main plus the patch
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2372 Rust, 1548 UI
+    - command: npm run smoke
+      result: not_run
+      reason: backend-only change, the fix agent ran it
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa6b0b5b-e3f3-4a1b-854e-3d73db613432
 description: |-
@@ -143,3 +167,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T04:21:30.699888+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:21:36.756890+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

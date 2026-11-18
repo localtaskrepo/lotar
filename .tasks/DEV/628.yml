@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-18T03:28:02.416853+00:00
+modified: 2026-11-18T04:11:42.416420+00:00
 relationships:
   blocks:
   - DEV-664
@@ -17,6 +17,7 @@ relationships:
   - DEV-646
   - DEV-634
   - DEV-664
+  - DEV-652
 comments:
 - date: 2026-11-17T00:08:46.341868+00:00
   author: automation
@@ -747,3 +748,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T04:11:42.416420+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-664"],"related":["DEV-620","DEV-631","DEV-635","DEV-639","DEV-646","DEV-634","DEV-664"]}'
+    new: '{"blocks":["DEV-664"],"related":["DEV-620","DEV-631","DEV-635","DEV-639","DEV-646","DEV-634","DEV-664","DEV-652"]}'

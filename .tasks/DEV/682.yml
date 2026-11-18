@@ -1,16 +1,18 @@
 title: 'Proposal: agent jobs end on a stall timeout and stop when their ticket goes Done or to a person'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-17T23:52:06.189581+00:00
-modified: 2026-11-18T03:25:33.314854+00:00
+modified: 2026-11-18T04:35:50.820472+00:00
 relationships:
   related:
   - DEV-657
   - DEV-688
   - DEV-694
+  - DEV-695
+  - DEV-644
 comments:
 - date: 2026-11-17T23:52:34.645149+00:00
   author: claude
@@ -160,6 +162,38 @@ comments:
       result: not_run
       reason: same commit passed there (405 tests)
     next: review on another model, then merge
+- date: 2026-11-18T04:14:34.655592+00:00
+  author: claude
+  text: |-
+    Review: passed. Stall timeout and reconcile do what the ticket and the owner's "both" ask; one minor gap filed as DEV-695.
+
+    - Reviewed `main..HEAD` = `485ac56fb` + `bdbffc029` (same as `t3/stall-timeout-job-reconcile`; no rework pending).
+    - Read: ticket, comments, owner answer "both" (INBOX-474), DEV-657/688/694 (not about this code), `docs/help/agent.md`, `docs/help/automation.md`, the `job_cancelled` rules in the init templates.
+    - Stall: `JobWatch` in `agent_job_service/watch.rs`, checked every 200ms in `drive_turns` and in `run_command`. A permission question resets the timer. Unset or `0` means no limit. The harness test `a_silent_agent_fails_its_job_as_stalled` covers the Done-when item.
+    - Reconcile: a done status, or a person as assignee (both checked against the start state, outcome first), logs a note, then cancels after 120s. Merge jobs are left out. The `bdbffc029` fix (ticket already Done at start) has its own test. No REST/UI shape changed (`AgentProfileDetail` is not in `api_types`/`openapi`).
+    - Not built: the optional retry with backoff. The ticket marks it optional, and `job_failed` rules can retry.
+    - Merge note: `main` moved 8 commits. `git merge-tree` finds one trivial conflict at `agent_job_service.rs` in `drive_turns`: DEV-644's `let mut in_turn = true;` next to `let mut watch = …`. Keep both.
+    - Minor, filed: [DEV-695](https://lotar.pyxzl.net/task/DEV-695). The Done-when item "job set Done mid-run is cancelled and logged" is tested only at `JobWatch::check_at`, with no harness test that runs a job to cancelled.
+    - Reran: watch unit tests (5) and `dev503` harness tests (44) pass. The worktree was left clean.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2364 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '405'
+    next: 'merge: rebase onto main, resolve the one-line conflict in drive_turns'
+- date: 2026-11-18T04:35:50.820472+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-682` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-682` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab633688f-62e2-4bd0-a509-75f41d400c27
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5f40a7a6-4bc2-4399-aa2f-498af6e18e69
@@ -306,3 +340,32 @@ history:
   - field: assignee
     old: '@fix-retry'
     new: '@review-claude'
+- at: 2026-11-18T04:14:08.441946+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-657","DEV-688","DEV-694"]}'
+    new: '{"related":["DEV-657","DEV-688","DEV-694","DEV-695"]}'
+- at: 2026-11-18T04:14:34.655592+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:14:34.835091+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-657","DEV-688","DEV-694","DEV-695"]}'
+    new: '{"related":["DEV-657","DEV-688","DEV-694","DEV-695","DEV-644"]}'
+- at: 2026-11-18T04:14:44.211505+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'
+- at: 2026-11-18T04:35:50.820472+00:00
+  actor: automation
+  changes:
+  - field: comment_added

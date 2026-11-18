@@ -1,11 +1,11 @@
 title: Release v0.15.4
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:01:03.148737+00:00
-modified: 2026-11-18T03:17:33.162932+00:00
+modified: 2026-11-18T04:04:55.299949+00:00
 relationships:
   depends_on:
   - DEV-681
@@ -122,6 +122,29 @@ comments:
     - Main is 6 commits ahead (`de2a61629`). `git merge-tree main HEAD` is clean. The prerequisite DEV-681 is Done. No `t3/release-v0-15-4` rework branch is ahead of HEAD.
     - Before the tag (release step 1, ticket edits on main): `DEV-644`, `DEV-656`, `DEV-678`, `DEV-685`, `DEV-686` and `DEV-687` are merged since `v0.15.3` but are in no release. Add them with `lotar release add 0.15.4 <ID>`. This is part of this ticket's remaining steps, so I filed no ticket.
     - No stray files and no owner decisions touched (patch bump is the default). Tickets filed: none.
+- date: 2026-11-18T04:04:55.152551+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-658` is in `main`.
+
+    - Rebased `agent/DEV-658` onto `main` (`41d1d43a5cb8`): `7088b36c2c59`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `7088b36c2c59`
+    - Amended the pending `.tasks` changes into the merged commit: `592abd9c4ca9`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 592abd9c4
+      what: DEV-658 Release v0.15.4
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0fb4ee5-0af2-43c2-9ff2-844d5e38cc7d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae66d2417-c918-4f65-9cd1-a23b637ba16e
@@ -277,3 +300,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T04:04:55.152551+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:04:55.299949+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -1,0 +1,36 @@
+title: configs/lotar/agents.yml says T3 Code makes the fix worktree in ~/.t3/worktrees; after lotar DEV-652 lotar makes it
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T04:31:29.251976+00:00
+modified: 2026-11-18T04:31:32.619810+00:00
+deleted_at: 2026-11-18T04:31:49.912438+00:00
+relationships:
+  related:
+  - DEV-581
+  - DEV-618
+  - DEV-652
+description: 'Found (review of lotar DEV-652): the header comment of `configs/lotar/agents.yml` (line 4-6) says ''T3 Code makes it in ~/.t3/worktrees for the fix, and the headless review and merge work in that one (lotar DEV-581)''. DEV-652 asks for this comment to say the new state, but its commit `f16031633` changes only lotar. With DEV-652, every t3 job runs in lotar''s own worktree for the ticket (`<dir>/<repo>/<ID>` on `agent/<ID>`), T3 Code makes none, and a completed job settles its thread. Check: `sed -n 4,6p configs/lotar/agents.yml`. Also check whether T3 Code''s lotar project script still starts with `lotar agent worktree setup;` (DEV-618): DEV-652 removed that command. Done: the comment says the new state once DEV-652 is on lotar main and installed; the script line is gone if present.'
+tags:
+- health
+custom_fields:
+  finding: stale-doc:configs/lotar/agents.yml:t3-worktrees
+history:
+- at: 2026-11-18T04:31:30.925333+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-581","DEV-618","DEV-652"]}'
+- at: 2026-11-18T04:31:32.619810+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T04:31:49.912438+00:00
+  actor: claude
+  changes:
+  - field: deleted
+    new: 2026-11-18T04:31:49.912438+00:00

@@ -1,0 +1,87 @@
+title: 'A merge job says ''nothing to merge'' when the work is in another repo: DEV-684''s harnessmux commit never reached harnessmux main'
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+created: 2026-11-18T04:14:23.112150+00:00
+modified: 2026-11-18T04:35:48.325102+00:00
+relationships:
+  related:
+  - DEV-684
+  - DEV-691
+  - DEV-677
+  - DEV-679
+comments:
+- date: 2026-11-18T04:35:39.710329+00:00
+  author: claude
+  text: |-
+    Fixed without a lotar change: harnessmux main now holds both commits; the cross-repo check is already on lotar main.
+
+    - Cause: the DEV-684 merge ran on the installed lotar **0.15.3** (`/opt/homebrew/opt/lotar/bin/lotar`, worker since 6:02PM). The cross-repo check `work_elsewhere` (`merge.rs:136`) came later, in DEV-677/DEV-679 (`45fd197f9`, `2f8b1cb78`), which are in v0.15.4 (`592abd9c4`), not in 0.15.3
+    - On main the DEV-684 case hands off: DEV-684's comments name `~/.t3/worktrees/harnessmux/DEV-684`, and test `a_ticket_whose_work_is_in_another_repository_is_not_done` covers this shape (passed)
+    - Landed: `git merge --ff-only agent/DEV-691` in harnessmux main: `0f7afe7..c00cd57`, holds `65a95a0` and `c00cd57` (both reviews passed). Check command passes
+    - Not pushed: harnessmux has no entry in `~/Development/standards/repos.json`; main is 2 ahead of `origin/main`
+    - Until 0.15.4 is installed and the worker restarts, merge jobs still run 0.15.3. DEV-691's queued merge will say "nothing to merge", which is now true
+  report:
+    checks:
+    - command: git -C ~/Development/@localtaskrepo/harnessmux merge-base --is-ancestor c00cd57 main
+      result: passed
+    - command: cargo nextest run (harnessmux main)
+      result: passed
+      reason: 54 of 54
+    - command: cargo nextest run -p lotar-lib -E 'test(another_repository)'
+      result: passed
+      reason: 2 of 2
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: no lotar change
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2a3325b1-8c7e-401a-b243-c74f8f373425
+description: |-
+  Found in the review of DEV-691 (2026-11-17).
+
+  - DEV-684 is Done after the merge job commented "Nothing to merge: `agent/DEV-684` is in `main` already." That checked lotar's `agent/DEV-684` (no commits). The work is harnessmux commit `65a95a0` on harnessmux `agent/DEV-684`, and it isn't on harnessmux `main` (`0f7afe7`): `git -C ~/Development/@localtaskrepo/harnessmux merge-base --is-ancestor 65a95a0 main` fails.
+  - The check is in `crates/lotar-agent/src/services/agent_job_service/merge.rs:137-143`: it only looks at the ticket's own repo.
+  - DEV-691 will go the same way: its work is harnessmux `c00cd57` on harnessmux `agent/DEV-691` (on top of `65a95a0`); lotar's `agent/DEV-691` has no commits.
+
+  Check: `git -C ~/Development/@localtaskrepo/harnessmux merge-base --is-ancestor c00cd57 main`.
+  Done: harnessmux `65a95a0` and `c00cd57` are on harnessmux main (fast-forward of `agent/DEV-691`, which holds both), and a merge job no longer reports "nothing to merge" for a ticket whose commits are in another repo.
+tags:
+- health
+custom_fields:
+  finding: unlanded:DEV-684
+history:
+- at: 2026-11-18T04:14:23.721759+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T04:32:20.899508+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T04:32:21.686554+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2a3325b1-8c7e-401a-b243-c74f8f373425
+- at: 2026-11-18T04:35:39.710329+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:35:40.054609+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-684","DEV-691"]}'
+    new: '{"related":["DEV-684","DEV-691","DEV-677","DEV-679"]}'
+- at: 2026-11-18T04:35:48.325102+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

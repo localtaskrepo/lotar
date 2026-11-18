@@ -1,0 +1,91 @@
+title: Job-log pruning removes the logs of a ticket whose ID is ambiguous across tasks roots
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T04:18:55.334249+00:00
+modified: 2026-11-18T04:39:33.002247+00:00
+relationships:
+  related:
+  - DEV-693
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25b351b7-9605-42e4-8c6c-25a2d0eecb84
+description: |-
+  Job-log pruning (DEV-693) removes a job's log when its ticket ID resolves to more than one tasks root, though the ticket exists and may be open. Found in the DEV-693 review, 2026-11-17.
+
+  ## Cause
+
+  `ticket_keeps_its_jobs` in `crates/lotar-agent/src/services/agent_job_service.rs` falls back to `Storage::resolve_task_location(..).is_ok_and(..)` when `ticket_done_state` returns `None`. `resolve_task_location` returns `TaskLookupError::Ambiguous` when several roots hold the ID (nested workspaces with the same prefix, see `dev21_ticket_done_state_tests`), and that counts as "no longer exists", so the log goes. Everywhere else an ambiguous identity is indeterminate and skips cleanup.
+
+  ## Fix
+
+  Remove only on `TaskLookupError::NotFound` (and `Invalid`); keep the log on `Ambiguous`.
+
+  ## Done when
+
+  - [ ] A job whose ticket ID is ambiguous across roots keeps its log past `keep_days` and under the size guard.
+  - [ ] Unchanged: a ticket ID no tasks root holds (`NotFound`) or a malformed one (`Invalid`) still lets its job's log go; archived tickets' logs still go.
+  - [ ] `docs/help/agent.md` (job history) lists an ID held by several roots among the never-removed cases.
+  - [ ] A test with two roots holding the same ID shows it.
+tags:
+- agent
+history:
+- at: 2026-11-18T04:18:55.668585+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-693"]}'
+- at: 2026-11-18T04:18:56.075233+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T04:37:06.135295+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T04:37:06.935420+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25b351b7-9605-42e4-8c6c-25a2d0eecb84
+- at: 2026-11-18T04:39:33.002247+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Job-log pruning (DEV-693) removes a job's log when its ticket ID resolves to more than one tasks root, though the ticket exists and may be open. Found in the DEV-693 review, 2026-11-17.
+
+      ## Cause
+
+      `ticket_keeps_its_jobs` in `crates/lotar-agent/src/services/agent_job_service.rs` falls back to `Storage::resolve_task_location(..).is_ok_and(..)` when `ticket_done_state` returns `None`. `resolve_task_location` returns `TaskLookupError::Ambiguous` when several roots hold the ID (nested workspaces with the same prefix, see `dev21_ticket_done_state_tests`), and that counts as "no longer exists", so the log goes. Everywhere else an ambiguous identity is indeterminate and skips cleanup.
+
+      ## Fix
+
+      Remove only on `TaskLookupError::NotFound` (and `Invalid`); keep the log on `Ambiguous`.
+
+      ## Done when
+
+      - [ ] A job whose ticket ID is ambiguous across roots keeps its log past `keep_days` and under the size guard.
+      - [ ] A test with two roots holding the same ID shows it.
+    new: |-
+      Job-log pruning (DEV-693) removes a job's log when its ticket ID resolves to more than one tasks root, though the ticket exists and may be open. Found in the DEV-693 review, 2026-11-17.
+
+      ## Cause
+
+      `ticket_keeps_its_jobs` in `crates/lotar-agent/src/services/agent_job_service.rs` falls back to `Storage::resolve_task_location(..).is_ok_and(..)` when `ticket_done_state` returns `None`. `resolve_task_location` returns `TaskLookupError::Ambiguous` when several roots hold the ID (nested workspaces with the same prefix, see `dev21_ticket_done_state_tests`), and that counts as "no longer exists", so the log goes. Everywhere else an ambiguous identity is indeterminate and skips cleanup.
+
+      ## Fix
+
+      Remove only on `TaskLookupError::NotFound` (and `Invalid`); keep the log on `Ambiguous`.
+
+      ## Done when
+
+      - [ ] A job whose ticket ID is ambiguous across roots keeps its log past `keep_days` and under the size guard.
+      - [ ] Unchanged: a ticket ID no tasks root holds (`NotFound`) or a malformed one (`Invalid`) still lets its job's log go; archived tickets' logs still go.
+      - [ ] `docs/help/agent.md` (job history) lists an ID held by several roots among the never-removed cases.
+      - [ ] A test with two roots holding the same ID shows it.

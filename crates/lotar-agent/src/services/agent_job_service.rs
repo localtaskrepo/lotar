@@ -7254,7 +7254,7 @@ mod dev520_session_events_tests {
             tx.send(event(seq, 1, body)).unwrap();
         }
         tx.send(Event { turn: None, ..event(seq + 1, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
-        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, agent: "fake", link: None };
+        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None };
         drive_turns("dev644-test", tasks_dir, &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new())
     }
 

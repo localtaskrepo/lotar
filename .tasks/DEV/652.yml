@@ -1,11 +1,11 @@
 title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
-status: HelpNeeded
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix-fable'
+assignee: '@merge'
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-18T03:24:58.125645+00:00
+modified: 2026-11-18T04:32:20.040476+00:00
 relationships:
   depends_on:
   - DEV-657
@@ -29,6 +29,9 @@ relationships:
   - DEV-604
   - DEV-672
   - DEV-687
+  - DEV-628
+  - DEV-699
+  - DEV-700
 comments:
 - date: 2026-11-17T06:49:42.579878+00:00
   author: claude
@@ -392,6 +395,46 @@ comments:
     choice:
     - fix-fable
     note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the same error came back after the @fix retry (retry-fix), so fix-fable. The work is done and checks pass: rebased commit 6c723f0cf on t3/t3-job-lotar-worktree-4. Do not redo it. Only landing failed: git branch --force agent/DEV-652 is refused because the stale T3-made worktree ~/.t3/worktrees/lotar/agent-DEV-652-dc465b1929db89d7 holds the branch. Check it is clean, remove it (git worktree remove) or move it aside, point agent/DEV-652 at 6c723f0cf, then hand off for review. Consider making lotar handle this case itself.'
+- date: 2026-11-18T04:11:42.191741+00:00
+  author: claude
+  text: |-
+    Landed: `agent/DEV-652` is at `f16031633`, the finished work rebased onto main `592abd9c4`. No code redone.
+
+    - Took `6c723f0cf` from `t3/t3-job-lotar-worktree-4`, rebased it onto main's two new commits (DEV-628, v0.15.4): no conflicts, still one signed commit.
+    - Lint, tests and smoke (405) ran again on `f16031633` and pass.
+    - The stale T3 worktree `~/.t3/worktrees/lotar/agent-DEV-652-dc465b1929db89d7` was clean and no thread works in it (all other DEV-652 threads are completed). I moved the branch inside it with `git reset --keep`, as lotar does for a finished job's worktree. Nothing removed.
+    - Why landing failed twice: the installed lotar is 0.15.3, built 2026-11-17 01:15, before the DEV-673 fix (`a11c67715`). It counts this job's own continued session `lotar-95e687-DEV-652-fix` as still at work in that worktree. Main already handles it, so no new ticket.
+    - Not checked: the "real ticket" points of Done when need the new build installed.
+  report:
+    commits:
+    - hash: f16031633
+      what: DEV-652 rebased onto main 592abd9c4 (v0.15.4), one signed commit
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: real ticket on the new build (Done when 1-3)
+      result: not_run
+      reason: the installed lotar is 0.15.3, the change runs only after merge and install
+    next: Review f16031633 on agent/DEV-652, then merge
+- date: 2026-11-18T04:32:10.722218+00:00
+  author: claude
+  text: |-
+    Review: passed. `f16031633` does what the ticket asks; lint, tests and smoke pass. Two follow-ups filed.
+
+    - **Read:** `git log main..HEAD` (one commit, on main `592abd9c4`; `t3/t3-job-lotar-worktree-5` has nothing HEAD lacks), the full diff, the ticket and its comments, AGENTS.md, and harnessmux 0.1.10's `src/backend/t3.rs`.
+    - **Worktree:** t3 jobs now go through `prepare_worktree` like every other runner. `plan_t3_worktree`, the move-aside, `follow_thread_branch`, `continued_thread_worktree` and `lotar agent worktree setup` are gone. harnessmux 0.1.10 starts a session whose cwd is a worktree with `t3_thread_launch` + `existing_worktree`, and the project comes from `project_of`, so T3 Code makes no worktree.
+    - **Old sessions:** a `session: continue` whose session ran in the main checkout (before DEV-652) starts a new thread in the ticket's worktree, with a handoff. Tested.
+    - **Settle:** runs only on success, after the end rules. It keeps the thread active when the ticket is HelpNeeded, or open and assigned to a non-`@` name. A refusal is only a job note. Tests cover settled, active and refused.
+    - **Claude settings (DEV-618):** now written straight into lotar's worktree (`t3_claude_settings.rs`, 3 unit tests). The file is kept out of commits through `info/exclude`.
+    - **Reran:** `npm ci`, `npm run lint`, `npm test` (2353 nextest + 1548 vitest + 7) and `npm run smoke` (405). All pass; the tree is still clean.
+    - **Not done in this repo:** the standards comment in `configs/lotar/agents.yml` (lines 4-6) still says T3 Code makes the worktree. Filed as STD-225.
+    - **Not checked:** the real-ticket points of "Done when". They need the new build installed. Filed as DEV-700.
+    - A DEV-699 I filed by mistake in the wrong project is soft-deleted.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
@@ -400,6 +443,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8ac0bc1-1324-4ea5-b00b-256bad9c76d8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1aff80e-5e07-47a3-ab00-67cd0ff214d2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A690b5e25-981f-4cec-87f8-ba282d5661da
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39d2f9ec-fd4b-4119-89ab-c9179c46c2fb
 description: |-
   Owner 2026-11-17 (DEV-579): "I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux." Owner 2026-11-16 (chief of staff options picker): "lotar makes them, T3 shows".
 
@@ -836,3 +880,58 @@ history:
   - field: tags
     old: fix-retried, retry-fix
     new: fix-retried, retry-fix, retry-fable
+- at: 2026-11-18T04:05:04.348044+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T04:05:05.132961+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39d2f9ec-fd4b-4119-89ab-c9179c46c2fb
+- at: 2026-11-18T04:11:42.191741+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:11:42.417589+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628"]}'
+- at: 2026-11-18T04:11:49.427637+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-fable'
+    new: '@review'
+- at: 2026-11-18T04:31:30.924102+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699"]}'
+- at: 2026-11-18T04:32:01.256477+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699","DEV-700"]}'
+- at: 2026-11-18T04:32:10.722218+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:32:20.040476+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

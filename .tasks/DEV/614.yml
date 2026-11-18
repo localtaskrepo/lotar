@@ -1,11 +1,11 @@
 title: 'Flaky smoke: relationships reciprocal repair test waits on an element under full-suite load'
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-17T02:13:34.053358+00:00
+modified: 2026-11-18T04:40:02.533551+00:00
 relationships:
   related:
   - DEV-606
@@ -120,6 +120,13 @@ comments:
     - Reran: `npm run build:smoke`; the relationships spec 3× (19/19 each); `npm run -s test:smoke:quick:agent` 2× (405/405 each, load avg 93–119); `npx prettier --check`, `npx oxlint` and `npx tsc -p smoke/tsconfig.json` on the spec all passed. `git status` was clean afterwards.
     - The branch is 15 commits behind `main` and none of them touch this spec, so the rebase is up to the merge agent.
     - Minor, filed: [DEV-638](https://lotar.pyxzl.net/task/DEV-638). The server announces files written before it started as `task_updated`. That is the product side of this flake: the test now works around it, the server still does it.
+- date: 2026-11-18T04:39:59.980858+00:00
+  author: triage
+  text: |-
+    Merge it: the review passed before the review job failed (owner 2026-11-15, STD-133: merge after a passed review, docs/decisions/2026-11-15-stall-recovery.md).
+
+    - "Review: passed" (2026-11-17 01:58 UTC) is newer than `2f6dd0eb` (2026-11-16 19:04 UTC), the branch's only commit beyond main.
+    - The job failed only at its end and handed the ticket to mallox with no question; nothing is left to decide. Restarting the merge step with the manual rule "Stalled: merge after a passed review".
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a918fc-ce4e-4947-96ea-4af19c6d46ae
@@ -244,3 +251,32 @@ history:
   - field: assignee
     old: '@review'
     new: mallox
+- at: 2026-11-18T04:39:59.980858+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:40:01.331978+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T04:40:01.922569+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T04:40:02.381458+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-18T04:40:02.533551+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Merging
+  - field: assignee
+    new: '@merge'

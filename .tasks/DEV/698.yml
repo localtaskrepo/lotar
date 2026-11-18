@@ -1,0 +1,35 @@
+title: 'config-reference: agent.job_history lines split the agent.memory_gate keys'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T04:18:56.381152+00:00
+modified: 2026-11-18T04:18:56.962525+00:00
+relationships:
+  related:
+  - DEV-693
+description: |-
+  `docs/help/config-reference.md` lists the two new `agent.job_history.*` keys (DEV-693) between `agent.memory_gate.max_swap_percent` and `agent.memory_gate.settle_seconds`, so the memory gate's keys are split. Found in the DEV-693 review, 2026-11-17.
+
+  ## Fix
+
+  Move the `agent.job_history.keep_days` and `agent.job_history.max_mb` lines after `agent.memory_gate.settle_seconds`.
+
+  ## Done when
+
+  - [ ] The three `agent.memory_gate.*` lines are together, followed by the two `agent.job_history.*` lines.
+tags:
+- light
+history:
+- at: 2026-11-18T04:18:56.657181+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-693"]}'
+- at: 2026-11-18T04:18:56.962525+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

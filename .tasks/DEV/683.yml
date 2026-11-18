@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-17T23:52:07.336095+00:00
-modified: 2026-11-18T03:19:07.784528+00:00
+modified: 2026-11-18T04:26:04.075702+00:00
 relationships:
   related:
   - DEV-584
@@ -180,9 +180,60 @@ comments:
       result: not_run
       reason: lotar code unchanged
     next: Review harnessmux agent/DEV-683 at 6377748, then merge; the release is 0.2.0
+- date: 2026-11-18T04:06:00.984217+00:00
+  author: claude
+  text: |-
+    Review: blocking. A Codex usage limit now ends as `kind: other` with the text "Internal error", so the reason for the limit is gone from `error`.
+
+    Reviewed harnessmux `agent/DEV-683` at HEAD `6377748` against `main` `0f7afe7`. lotar's own `agent/DEV-683` has no commits.
+
+    **Blocking**
+    - `src/failure.rs:61-67` (`Failure::from_acp_error`): when `data` is an object and not a string, the text is only `message`. codex-acp sends `{"code":-32603,"message":"Internal error","data":{"message":"You've hit your usage limit … try again at Nov 21st, 2026 9:36 PM.","codexErrorInfo":"usageLimitExceeded"}}`. The old code used the SDK's `Display`, which gives `Internal error: {…data…}`, so its text contained "usage limit". The new code gives `error: "Internal error"`, `kind: other`, `retryable: false`. This isn't rare: 52 of the `turn.failed` events in `~/.local/state/harnessmux/sessions/*.events.jsonl` have this shape, the most common failure there. DEV-584 would never pause these jobs.
+      - Fix: when `data` is an object, take the text from `data.message` (or keep `message: data`, as `describe` does). Map `data.codexErrorInfo` (`usageLimitExceeded` → `rate_limited`, and the other values codex-acp sends). Add a recorded Codex usage-limit error that replays to `kind: rate_limited` in `tests/cli.rs`.
+
+    **Checked, fine**
+    - The previous review's findings are fixed: the CHANGELOG entry is under `## 0.2.0 (unreleased)`, and DEV-584's "Done when" has the bump and `TurnFailed { error, .. }` item. `6377748` differs from `98b9bf7` only in `CHANGELOG.md`.
+    - Claude: `errorKind` and the `-32000` auth code come first, then the text. `resetsAt` becomes RFC 3339. `usage.rate_limit` comes from `_claude/rateLimit`. The replay test covers the rate limit and the auth failure.
+    - The README, the AGENTS.md scrub rule (it keeps `_claude/rateLimit`, which holds no account data) and the MCP output agree with the code.
+
+    **Reran in `~/.t3/worktrees/harnessmux/DEV-683`**
+    - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo nextest run` (56 passed) all passed. The worktree is still clean.
+    - No UI work, so no UI review. repos.json has no install step for harnessmux.
+
+    No minor tickets filed.
+- date: 2026-11-18T04:25:50.829180+00:00
+  author: claude
+  text: |-
+    Codex usage-limit finding fixed: it now fails as `kind: rate_limited`, `retryable: true`, with the real reason as `error`.
+
+    - The review read HEAD `6377748`, so I fixed it on top.
+    - `src/failure.rs` (`from_acp_error`): when `data` is an object with `message`, that is the text (codex-acp puts the reason there under "Internal error"). A string `data` still wins as before.
+    - New `kind_of_codex_error_info`: maps `data.codexErrorInfo`, string or `{"<code>": {"httpStatusCode": …}}`, after codex-acp 2.6.0's own table (`STRING_CODEX_ERROR_CATEGORIES` in its `dist/index.js`): `usageLimitExceeded`/`rateLimitExceeded` → rate_limited, `sessionBudgetExceeded` → quota, `unauthorized`/401 → auth_required, `serverOverloaded`/`internalServerError` → overloaded, `contextWindowExceeded` → context_exhausted, the four connection codes → transport, 429 → rate_limited; `other` falls back to the text; anything else → other.
+    - codex-acp calls `usageLimitExceeded` `quota_exhausted`, but its text says "try again at …", so it resets: typed rate_limited, as the review asked. `resets_at` stays empty: the text's time has no time zone.
+    - Tests: unit cases for the live shape and the mapping; recording `tests/recordings/codex-usage-limit.jsonl` replays to `kind: rate_limited` in `tests/cli.rs` (`a_recorded_codex_usage_limit_replays_as_rate_limited`).
+    - `CHANGELOG.md` 0.2.0 and `README.md` name codex-acp's error data.
+  report:
+    commits:
+    - hash: b6c5215
+      what: 'harnessmux agent/DEV-683, amended from 6377748: Codex errors typed from codexErrorInfo, text from data.message'
+    checks:
+    - command: cargo nextest run
+      result: passed
+      reason: 57 tests
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: no lotar code changed, the work is in harnessmux
+    next: Review harnessmux agent/DEV-683 at b6c5215
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A99135d3c-e4c5-4c4b-8d8b-1698f984e0be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af17f6c15-5bff-4902-9be0-e260d7ed3582
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67f8dd2b-9778-4fd7-ba93-fb6c50cbd563
 description: |-
   harnessmux reports a failed turn as `turn.failed {error: String}`, built from the error's text, and drops what the adapters already send: the kind of failure and when a usage limit resets. DEV-584 (pause a job until the usage-limit reset) has to guess both from text. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
 
@@ -203,6 +254,7 @@ description: |-
 tags:
 - proposal
 - review-returned
+- review-returned-twice
 history:
 - at: 2026-11-17T23:52:07.552972+00:00
   actor: claude
@@ -381,6 +433,49 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-18T03:19:07.784528+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T04:06:00.984217+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:06:01.189920+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal, review-returned
+    new: proposal, review-returned, review-blocked
+- at: 2026-11-18T04:06:10.956845+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: proposal, review-returned, review-blocked
+    new: proposal, review-returned, review-returned-twice
+- at: 2026-11-18T04:23:12.760472+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-18T04:23:13.655578+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67f8dd2b-9778-4fd7-ba93-fb6c50cbd563
+- at: 2026-11-18T04:25:50.829180+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:26:04.075702+00:00
   actor: claude
   changes:
   - field: status

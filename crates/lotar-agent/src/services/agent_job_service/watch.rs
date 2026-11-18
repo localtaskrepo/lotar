@@ -34,6 +34,8 @@ pub(super) struct JobWatch {
     next_look: Instant,
     /// Lowercase; empty for a merge job, which the ticket's moves don't stop.
     done_statuses: HashSet<String>,
+    /// Lowercase: a ticket Done already when the job started (a follow-up on a closed ticket) didn't move on.
+    status_at_start: Option<String>,
     reconcile: bool,
     grace: Duration,
     /// Since when the ticket has moved on, and how.
@@ -50,6 +52,7 @@ impl JobWatch {
         } else {
             crate::config::resolution::config_for_project(tasks_dir, prefix).map(|config| determine_done_statuses_from_config(&config)).unwrap_or_default()
         };
+        let status_at_start = ticket_state(tasks_dir, ticket_id).map(|(status, _)| status.to_ascii_lowercase());
         Self {
             job_id: job_id.to_string(),
             tasks_dir: tasks_dir.to_path_buf(),
@@ -59,6 +62,7 @@ impl JobWatch {
             last_sequence: 0,
             next_look: now,
             done_statuses,
+            status_at_start,
             reconcile: !is_merge_job,
             grace: MOVED_ON_GRACE,
             moved_on: None,
@@ -127,12 +131,13 @@ impl JobWatch {
     }
 
     /// "went Done" or "was assigned to mallox": the ticket's status and assignee, with what is recorded for the
-    /// job's end over them, against the assignee it started with.
+    /// job's end over them, against the status and assignee it started with.
     fn moved_on_now(&self) -> Option<String> {
         let (status, assignee) = ticket_state(&self.tasks_dir, &self.ticket_id)?;
         let outcome = crate::services::agent_active_jobs::peek_outcome(&self.tasks_dir, &self.job_id);
         let status = outcome.as_ref().and_then(|outcome| outcome.status.clone()).unwrap_or(status);
-        if self.done_statuses.contains(&status.to_ascii_lowercase()) {
+        let lowercase = status.to_ascii_lowercase();
+        if self.done_statuses.contains(&lowercase) && self.status_at_start.as_ref() != Some(&lowercase) {
             return Some(format!("went {status}"));
         }
         let assignee = match outcome.and_then(|outcome| outcome.assignee) {
@@ -205,6 +210,28 @@ mod tests {
             assert_eq!(notes(id).last().map(String::as_str), Some(format!("TEST-1 {how} while the job ran: LoTaR cancelled the job.").as_str()));
             assert_eq!(watch.check_at(seen + MOVED_ON_GRACE * 2), None, "once");
         }
+    }
+
+    /// A job started on a ticket that was Done already (a follow-up on a closed ticket) is not cancelled for it.
+    #[test]
+    fn a_job_on_a_ticket_done_before_it_started_runs_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = "dev682-done-at-start";
+        let tasks_dir = job_on_a_ticket(dir.path(), id, false);
+        crate::services::task_service::TaskService::update(
+            &mut crate::storage::manager::Storage::new(&tasks_dir),
+            "TEST-1",
+            crate::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() },
+        )
+        .unwrap();
+        // As the job reads it when it starts: the status change may have assigned the ticket.
+        let assignee = ticket_state(&tasks_dir, "TEST-1").and_then(|(_, assignee)| assignee);
+        JOB_REGISTRY.lock().unwrap().jobs.get_mut(id).unwrap().assignee_at_start = Some(assignee);
+        let mut watch = JobWatch::new(id, &tasks_dir, "TEST-1", None);
+        let start = Instant::now();
+        assert_eq!(watch.check_at(start), None);
+        assert_eq!(watch.check_at(start + MOVED_ON_GRACE * 2), None);
+        assert!(notes(id).is_empty());
     }
 
     #[test]
