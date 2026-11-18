@@ -2,6 +2,7 @@ use crate::api_types::AgentJobCreateRequest;
 use crate::config::manager::ConfigManager;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, JobStartMode};
+use crate::services::memory_gate::MemoryHold;
 use crate::utils::time;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
@@ -233,7 +234,9 @@ impl AgentQueueService {
     }
 
     /// The worker's state and, with entries queued, what they wait for.
-    pub fn worker_state(tasks_dir: &Path, pending: &[AgentQueueEntry]) -> (WorkerState, Option<String>) {
+    /// `memory_hold` is the caller's one reading of the memory gate, so
+    /// the reason and the hold it shows beside it agree (DEV-681).
+    pub fn worker_state(tasks_dir: &Path, pending: &[AgentQueueEntry], memory_hold: Option<&MemoryHold>) -> (WorkerState, Option<String>) {
         if !Self::is_worker_running(tasks_dir) {
             if pending.is_empty() {
                 return (WorkerState::Idle, None);
@@ -243,7 +246,7 @@ impl AgentQueueService {
         if pending.is_empty() {
             return (WorkerState::Active, None);
         }
-        if let Some(hold) = crate::services::memory_gate::status(tasks_dir).hold {
+        if let Some(hold) = memory_hold {
             return (WorkerState::Active, Some(format!("waiting for memory: {}", hold.describe())));
         }
         let reason = job_slots(tasks_dir, pending, AgentJobService::active_jobs())

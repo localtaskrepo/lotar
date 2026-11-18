@@ -1,0 +1,113 @@
+title: A review that finds no work at all still lets the merge set the ticket Done
+status: Merging
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T23:38:57.733684+00:00
+modified: 2026-11-18T00:10:13.738168+00:00
+relationships:
+  related:
+  - DEV-652
+  - DEV-657
+  - DEV-677
+  - DEV-685
+comments:
+- date: 2026-11-17T23:57:49.253640+00:00
+  author: claude
+  text: |-
+    Fixed: a merge job now fails, rather than setting the ticket Done, when nothing was built for the ticket.
+
+    - Guard in `ensure_branch_merged` (`crates/lotar-agent/src/services/agent_job_service.rs`): the job fails when the branch brought nothing since the merge job started and no commit whose subject starts with the ticket ID is on main, in lotar or in a repo the ticket names (`merge::built_anywhere`). The automation rule `Merge failed: retry with @fix` then sends the ticket back to the fix step. An agent that handed the ticket back still passes.
+    - `merge::work_elsewhere` now shares the repo lookup (`named_checkouts`) with the new check.
+    - Test: `a_ticket_nothing_was_built_for_is_not_done` in `dev605_merge_without_agent_test.rs` is the DEV-657 case. It replaces `a_branch_without_new_commits_has_nothing_to_merge`, which expected "completed" for exactly this case, so the new test fails without the fix. Also new: `a_branch_landed_already_has_nothing_to_merge`.
+    - Three older fixtures merged tickets that had no commit at all. They now commit work named after the ticket: two in `agent_automation_integration_test.rs`, one in `smoke/tests/ui.agent-jobs.smoke.spec.ts`.
+    - Docs: `docs/help/agent.md`, in the merge job section and the lotar merge steps.
+  report:
+    commits:
+    - hash: c30990af7
+      what: merge job fails when nothing was built for the ticket
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2358 Rust tests plus UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review, then merge
+- date: 2026-11-18T00:10:06.201500+00:00
+  author: claude
+  text: |-
+    Review: passed. `c30990af7` stops a merge from setting a ticket Done when nothing was built for it. One minor gap is filed as DEV-685.
+
+    - **Read:** the diff of `main..agent/DEV-680` (1 commit; HEAD and the branch are the same), DEV-657/677/679, the merge-failure rules in `.tasks/DEV/automation.yml:572-618`, and the last 5 main commits to the touched files.
+    - **Done when is met:** the DEV-657 case now fails the merge job (`ensure_branch_merged`, `agent_job_service.rs:4912`). Rule "Merge failed: retry with @fix" then sends the ticket back to @fix. A second failure goes to mallox as HelpNeeded (tag `merge-retried`), so it can't loop. DEV-657 has no commit on lotar main whose subject starts with its ID, so the check holds for the real case.
+    - **Test fails before the fix:** `a_ticket_nothing_was_built_for_is_not_done` uses the same setup as the removed test, which asserted `completed`.
+    - **Refactor:** the `work_elsewhere` → `named_checkouts` change keeps the old behavior (same dedup, same skips, first match wins).
+    - **Reran:** `npm ci` ok. `npm run lint` passed. `cargo nextest run -p lotar-lib -p lotar-agent -E 'test(/dev605|agent_automation_integration|dev318|dev677|dev679|merge/)'`: 96 passed. Full `npm test` and `npm run smoke` were not rerun by me; the fix agent reports both passing. Worktree left clean.
+    - **Minor, filed:** DEV-685. `merged_despite_failure` (`agent_job_service.rs:~4991`) doesn't call `built_anywhere`, so a merge runner that crashes on a nothing-built ticket still completes it as Done.
+    - **No UI change:** only a smoke fixture changed (`ui.agent-jobs.smoke.spec.ts`), so no screenshots were needed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5c4ec453-aaba-4d1a-86f6-a9b92b222f4e
+description: 'Found 2026-11-17 on DEV-657: its fix job only edited the ticket (no harnessmux or lotar commit). The review commented ''Review: nothing to review ... no code is written yet, so every Done when item is still open'' but left status/assignee, so the merge reported ''Nothing to merge: agent/DEV-657 is in main already'' and automation set DEV-657 Done. That restarted DEV-652 via ''Prerequisites done'' with the prerequisite unbuilt. DEV-677''s work_elsewhere guard doesn''t apply: no repo has commits on agent/DEV-657. Check: a ticket whose fix job made no commit anywhere and whose review says nothing was written ends Done. Done: such a ticket goes back to the fix step (or HelpNeeded) instead of Done, with a test.'
+tags:
+- health
+custom_fields:
+  finding: review:no-work-done
+history:
+- at: 2026-11-17T23:38:57.986779+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-652","DEV-657","DEV-677"]}'
+- at: 2026-11-17T23:38:58.235325+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T23:39:00.148678+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T23:39:00.925631+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5c4ec453-aaba-4d1a-86f6-a9b92b222f4e
+- at: 2026-11-17T23:57:49.253640+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:58:00.194795+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T00:09:53.472347+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-652","DEV-657","DEV-677"]}'
+    new: '{"related":["DEV-652","DEV-657","DEV-677","DEV-685"]}'
+- at: 2026-11-18T00:10:06.201500+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:10:13.738168+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

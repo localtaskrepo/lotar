@@ -1,0 +1,27 @@
+title: A merge job whose runner fails still sets a ticket Done when nothing was built for it
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T00:09:53.272240+00:00
+modified: 2026-11-18T00:09:54.093389+00:00
+relationships:
+  related:
+  - DEV-680
+  - DEV-657
+description: 'Found reviewing DEV-680 (c30990af7), 2026-11-17: the new nothing-was-built guard (merge::built_anywhere) runs only in ensure_branch_merged. merged_despite_failure (crates/lotar-agent/src/services/agent_job_service.rs, ~line 4965) completes a merge job whose runner failed when the branch is on main, checking work_elsewhere but not built_anywhere. So a merge agent that crashes on a ticket whose fix job committed nothing (the DEV-657 case) still runs job_completed rules and sets it Done. Check: a merge job for a ticket with no commit named after it anywhere, whose runner exits 1 with an empty branch, ends completed. Done: it fails like the ensure_branch_merged path, with a test next to a_merge_job_that_fails_after_its_branch_reached_main_completes in dev318_t3_runner_test.rs.'
+tags:
+- health
+history:
+- at: 2026-11-18T00:09:53.867415+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-680"]}'
+    new: '{"related":["DEV-680","DEV-657"]}'
+- at: 2026-11-18T00:09:54.093389+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

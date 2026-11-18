@@ -447,9 +447,9 @@ impl AgentHandler {
                 stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
                 // And the on-disk queue this command lists (DEV-522).
                 stats.queued = stats.queued.max(pending.len());
-                let (state, reason) = AgentQueueService::worker_state(tasks_dir, &pending);
-                let worker_running = state == WorkerState::Active;
                 let memory = crate::services::memory_gate::status(tasks_dir);
+                let (state, reason) = AgentQueueService::worker_state(tasks_dir, &pending, memory.hold.as_ref());
+                let worker_running = state == WorkerState::Active;
 
                 if matches!(renderer.format, OutputFormat::Json) {
                     let entries: Vec<_> = pending

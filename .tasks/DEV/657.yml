@@ -1,11 +1,11 @@
-title: harnessmux's t3 agent starts a thread in an existing worktree through T3's t3_thread_launch
-status: HelpNeeded
+title: harnessmux's t3 agent starts a thread in an existing worktree through T3's t3_thread_launch, signed in with a pairing code
+status: Done
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-17T09:09:23.082971+00:00
-modified: 2026-11-17T09:16:10.097097+00:00
+modified: 2026-11-18T00:09:53.866275+00:00
 relationships:
   blocks:
   - DEV-652
@@ -13,6 +13,11 @@ relationships:
   - DEV-652
   - DEV-318
   - DEV-353
+  - DEV-680
+  - DEV-682
+  - DEV-683
+  - DEV-684
+  - DEV-685
 comments:
 - date: 2026-11-17T09:15:01.176254+00:00
   author: claude
@@ -35,27 +40,178 @@ comments:
       result: not_run
       reason: no code change, blocked before coding
     next: Owner picks how harnessmux gets a full-access T3 thread in an existing worktree
+- date: 2026-11-17T22:41:05.883390+00:00
+  author: mallox
+  text: 'mallox via the chief of staff, 2026-11-17: picked option 1, "Upstream T3 flag": file a T3 Code issue (or PR) for `t3 thread start --worktree-path <path>` mapping to existing_worktree; harnessmux passes it, and DEV-652 waits for the T3 release. Filing the upstream issue/PR is approved.'
+- date: 2026-11-17T22:42:42.217580+00:00
+  author: claude
+  text: |-
+    Blocked on T3 Code: the flag is already proposed upstream, so I backed that proposal instead of filing a duplicate.
+
+    - Upstream Ideas discussion [#23945](https://github.com/pingdotgg/t3code/discussions/23945) asks for exactly `t3 thread start --worktree-path <path>` → `existing_worktree` (open since 2026-10-23, 7 upvotes, no maintainer reply yet).
+    - Its PR [#23943](https://github.com/pingdotgg/t3code/pull/23943) was closed by its author until a maintainer says yes; T3's `CONTRIBUTING.md` auto-closes outside feature PRs and sends feature requests to Ideas discussions. A new issue or PR from us would be closed the same way.
+    - Done: upvoted it and commented our use case plus the access-ceiling finding: [comment](https://github.com/pingdotgg/t3code/discussions/23945#discussioncomment-19692554).
+    - No harnessmux code changed, nothing committed. Blocked, no assignee: nothing for you to do until T3 ships the flag.
+  report:
+    checks:
+    - command: upstream duplicate search (gh issue/pr list, discussions)
+      result: passed
+      reason: '#23945 is the same proposal'
+    - command: harnessmux code, tests, release
+      result: not_run
+      reason: waits on the T3 flag
+    next: When T3 Code ships `t3 thread start --worktree-path` (watch discussions/23945 and the t3code releases), harnessmux passes it for a cwd worktree, then release harnessmux for DEV-652
+- date: 2026-11-17T22:45:46.489791+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533ec83-82d2-4787-a1eb-7c32fa5819f7 of the job job-20261117T224107.558Z-1 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T224546.481Z-3: DEV-657 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-17T22:45:57.607977+00:00
+  author: automation
+  text: 'The t3 session waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533ec83-82d2-4787-a1eb-7c32fa5819f7'
+- date: 2026-11-17T22:48:25.876485+00:00
+  author: claude
+  text: 'mallox in the thread, 2026-11-17: interim until T3''s `--worktree-path` lands: "Okay project per work tree, but make sure they are named it organized in such a way that they don''t clutter the UI to unusable amounts".'
+- date: 2026-11-17T22:50:47.573034+00:00
+  author: claude
+  text: |-
+    Plan changed to your interim: a T3 project per worktree, grouped so it doesn't clutter the sidebar.
+
+    - Live check: a lotar worktree added as a project gets the same repository key as `lotar` (`github.com/localtaskrepo/lotar`); your sidebar groups by repository, so it shows inside the `lotar` group. Test project removed again.
+    - Cleanup archives the project (threads kept), never `--force`.
+    - Description and Done when updated. Next: implement in harnessmux.
+- date: 2026-11-17T22:53:24.960749+00:00
+  author: claude
+  text: |-
+    Correction: a headless full-access sign-in to T3's `/mcp` exists. My 09:15 "only T3's own CLI gets full access" was wrong.
+
+    - Tencent/teamai-cli (MIT, `packages/runtime-t3/src/auth.ts`, guide `docs/guide/runtime-t3.md`) signs in through T3's MCP OAuth. It approves its own sign-in by POSTing a pairing code from `t3 auth pairing create --json --scope orchestration:read --scope orchestration:operate --scope settings:write --scope source-control:write --ttl 2m` to the authorization page's `decision` endpoint, with access `full-access`. The token lasts 30 days; then it signs in again the same way, with no human.
+    - `t3 auth pairing create` exists in our T3 0.1.10. Not tried live yet.
+    - With it, harnessmux can call `t3_thread_launch` with `existing_worktree` itself (the original plan). No per-worktree projects needed. It also gets `clientRequestId` (no duplicate thread on retry) and thread settling.
+    - Other T3 orchestrators: ski043/marshal-factory (Linear→PR, lets T3 make the worktree), Codecaine-AI/annotations (`t3 thread start`). Neither solves the existing-worktree case.
+    - Plan not changed yet: waits on the owner's pick.
+- date: 2026-11-17T23:33:00.852847+00:00
+  author: claude
+  text: |-
+    mallox in the thread, 2026-11-17: picked "Pairing sign-in (Recommended)". It replaces the project-per-worktree interim.
+
+    - Description and Done when rewritten: pairing sign-in, `t3_thread_launch` with `existing_worktree`, `clientRequestId`. The first step is the live check that the sign-in gets full access.
+    - Todo: the next job implements it in harnessmux.
+- date: 2026-11-17T23:36:25.411426+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533ec83-82d2-4787-a1eb-7c32fa5819f7 of the job job-20261117T224546.481Z-3 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T233625.403Z-4: DEV-657 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-17T23:36:46.884902+00:00
+  author: claude
+  text: |-
+    mallox in the thread, 2026-11-17: request IDs yes, and "moving threads into settled that I didn't need to look at".
+
+    - Added to What and Done when: `clientRequestId` on every launch and turn (no duplicate thread or run on a retry).
+    - Also added: settling a thread on request. lotar asks only at job end when the ticket doesn't wait for him and the job didn't fail; failed or waiting threads stay active.
+    - lotar's part of settling goes in DEV-652.
+- date: 2026-11-17T23:37:35.370441+00:00
+  author: claude
+  text: |-
+    Review: nothing to review
+
+    - `git log main..HEAD` on `agent/DEV-657` is empty (HEAD = main's `b7a9cb85e`); `t3/t3-launch-existing-worktree` sits on the same commit.
+    - harnessmux has no DEV-657 branch or commit either (`git log --all --grep=657` in `~/Development/@localtaskrepo/harnessmux`).
+    - The last job only added the request-ID and settling plan to the ticket; no code is written yet, so every "Done when" item is still open.
+- date: 2026-11-17T23:37:40.515591+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-657` is in `main` already.
+- date: 2026-11-17T23:39:08.564871+00:00
+  author: claude
+  text: |-
+    Reopened: this ticket went Done with no code written, so DEV-652 can't start.
+
+    - harnessmux has no DEV-657 commit (`git log --all --grep=657` empty), no `t3_thread_launch`/`existing_worktree` in `src/`, version still `0.1.9` (also on crates.io).
+    - The review said "nothing to review, every Done when item still open"; the merge then said "Nothing to merge" and automation set Done. Filed that gap as [DEV-680](https://lotar.pyxzl.net/task/DEV-680).
+    - The work belongs in `~/Development/@localtaskrepo/harnessmux`, not lotar's checkout.
+- date: 2026-11-17T23:39:29.576560+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533ec83-82d2-4787-a1eb-7c32fa5819f7 of the job job-20261117T233625.403Z-4 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261117T233929.566Z-2: DEV-657 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-17T23:39:30.572461+00:00
+  author: automation
+  text: 'The t3 session waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533ec83-82d2-4787-a1eb-7c32fa5819f7'
+- date: 2026-11-17T23:42:29.805209+00:00
+  author: mallox
+  text: 'mallox in the cos thread, 2026-11-17: "The crates release has my okay". Implement the pairing sign-in in ~/Development/@localtaskrepo/harnessmux (not lotar''s checkout), then tag and publish the harnessmux release to crates.io, so DEV-652 can bump it.'
+- date: 2026-11-17T23:53:01.670113+00:00
+  author: claude
+  text: |-
+    Survey of similar open-source projects for lotar, harnessmux, autospec, opgate and standards (mallox, 2026-11-17), building on the teamai-cli find used here: https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf
+
+    Proposal tickets filed from it: DEV-682 (stall timeout and reconcile for jobs), DEV-683 (typed turn failures in harnessmux), DEV-684 (Codex overloaded and deny quirks), ASP-5, LOCA-518, LOCA-519, STD-213, STD-214. Nothing in it changes DEV-657's plan; nothing was posted outside.
+- date: 2026-11-18T00:05:44.063045+00:00
+  author: claude
+  text: |-
+    harnessmux 0.1.10 is on crates.io: t3 sessions in a worktree launch their thread there through T3's MCP, signed in with a pairing code.
+
+    - A session in a git worktree calls `t3_thread_launch` (`existing_worktree`, full access). `--worktree` is refused there.
+    - Every later t3 turn goes through `t3_thread_send`. Each launch and send carries a `clientRequestId`, so a retry starts no second thread or run (checked live).
+    - Sign-in: a 2-minute pairing code from `t3 auth pairing create` is traded for an OAuth token. The token is kept 30 days in `<state>/t3-credential.json` (0600). T3 shows it as session `harnessmux`, and a revoked or expired token signs in again.
+    - New: `harnessmux settle <name>` and `backend::t3::settle` move a finished thread to Settled. A thread that waits for an answer, still runs or failed is refused.
+    - Live check against T3 Code 0.1.10 done; its session is revoked again. Tests use a fake T3 server, no real agent.
+    - Left for DEV-652: bump harnessmux to 0.1.10 in lotar, and drop lotar's `worktree_base`/`branch` use for t3 jobs.
+  report:
+    commits:
+    - hash: 0f7afe7
+      what: harnessmux DEV-657 MCP launch/send, pairing sign-in, settle (tag v0.1.10)
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+      reason: also for the Windows target
+    - command: cargo nextest run
+      result: passed
+      reason: 52 tests
+    - command: cargo deny check
+      result: passed
+    - command: release.yml v0.1.10 (CI, 6 builds, GitHub release, crates.io publish)
+      result: passed
+    next: DEV-652 bumps harnessmux to 0.1.10 in lotar
+- date: 2026-11-18T00:07:20.570457+00:00
+  author: claude
+  text: |-
+    Review: nothing to review
+
+    - `git log main..HEAD` on lotar's `agent/DEV-657` is empty (HEAD = main's `2f8b1cb78`); the branch `t3/t3-launch-existing-worktree` doesn't exist.
+    - The work is in harnessmux: `0f7afe7` is already on harnessmux `main` = `origin/main` and tagged `v0.1.10` (published), so this lotar review and merge have nothing to land.
+    - No files changed, no checks rerun, status and assignee left as they are.
+- date: 2026-11-18T00:09:29.458628+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-657` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1efc943f-fca5-4376-bd67-e786b4bdf9f9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533ec83-82d2-4787-a1eb-7c32fa5819f7
 description: |-
   Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+  Owner 2026-11-17: backed upstream `t3 thread start --worktree-path` (pingdotgg/t3code discussion #23945; no maintainer reply yet).
+  Owner 2026-11-17, after the pairing sign-in was found: picked "Pairing sign-in". This replaces his earlier interim pick "project per work tree".
+  Owner 2026-11-17: "I'm like the idea about the id let's implement it, and yes moving threads into settled that I didn't need to look at are also a good idea".
 
   ## Found
-  - `t3 thread start` (T3 Code 0.1.9, upstream main too) only has `--worktree <base>`: T3 Code makes a new worktree in `~/.t3/worktrees` on a new `t3/...` branch for every thread. `src/backend/t3.rs` only knows `worktree_base`/`branch`.
-  - T3's server already takes an existing checkout: MCP `t3_thread_launch` with `workspaceStrategy: {type: existing_worktree, worktreePath}`. `assertProjectWorktree` accepts only a path in `git worktree list` of the project's `workspaceRoot` (symlinks resolved), else "worktreePath must be one of the project's git worktrees". Worktrees lotar makes with `git worktree add` pass.
-  - Auth: the CLI signs itself in per call (`EnvironmentAuth.issueMcpClientSession`) and calls `<origin>/mcp` with a short-lived Bearer token. `t3 auth session issue --scope orchestration:read --scope orchestration:operate --ttl 5m --token-only` mints a bearer token from the CLI; whether `/mcp` accepts it is not checked yet.
+  - `t3 thread start` (T3 Code 0.1.10) only has `--worktree <base>`: T3 makes a new worktree. MCP `t3_thread_launch` takes `workspaceStrategy: {type: existing_worktree, worktreePath}`; the path must be in `git worktree list` of the project's `workspaceRoot` (lotar's `git worktree add` worktrees pass).
+  - A thread's mode can't exceed its caller's sign-in. A plain `t3 auth session issue --subject mcp-client` token only gets `approval-required`.
+  - Full access with no human: Tencent/teamai-cli (MIT; `packages/runtime-t3/src/auth.ts`, `docs/guide/runtime-t3.md`) uses T3's MCP OAuth (client registration + PKCE). It approves its own sign-in by POSTing `{authorization, decision: {_tag: "pairing-code", access: "full-access", code}}` to the authorization page's `decision` endpoint. The code comes from `t3 auth pairing create --json --base-dir ~/.t3 --scope orchestration:read --scope orchestration:operate --scope settings:write --scope source-control:write --ttl 2m --label harnessmux`. The token lasts 30 days, then it signs in again the same way. Its `t3.ts` also uses `clientRequestId` (a repeated launch returns the same thread) and settles finished threads (T3's Settled group).
 
   ## What
-  - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`) starts its thread with `t3_thread_launch`, `existing_worktree` at `cwd`, keeping title, provider/model and the prompt. Later turns, `show`, resume and the thread lookup by title stay as they are (`t3 thread send/show/list`).
-  - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+  - Sign-in: harnessmux keeps one T3 credential (0600 file in its state dir), reuses it while valid, and signs in again with a fresh pairing code when it has expired or `/mcp` refuses it. It never prints the pairing code or the token.
+  - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`) starts its thread with `t3_thread_launch`, `existing_worktree` at `cwd`, full-access mode, keeping title, provider/model and the prompt, with a `clientRequestId` derived from the session, so a retry or resume never makes a second thread. Later turns, `show`, resume and the thread lookup by title stay as they are (`t3 thread send/show/list`).
+  - Request IDs: every launch and every later turn goes through MCP with a `clientRequestId` derived from the session and the turn (`t3_thread_launch`, `t3_thread_send`), so a retry, a resume or a restarted harnessmux re-sending a turn never makes a second thread or a second run. A repeated launch that T3 refuses with `invalid_request` or `runtime_mode_escalation_denied` launched nothing (teamai's rule); any other answer to a repeat means the thread exists: look it up, never launch again.
+  - Settling: harnessmux offers settling a session's thread (`t3_thread_organize` with `action: settle`; it stays reachable by its link). It settles only when asked and only a thread whose last run finished and isn't waiting for an answer; a thread that failed, was interrupted, or waits for the owner stays active. lotar (DEV-652) asks at job end only when the ticket doesn't wait for the owner (not HelpNeeded and not assigned to him) and the job didn't fail: the threads the owner didn't need to look at. A settle T3 refuses is logged and doesn't fail the job.
   - Which wins: `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no thread started. `cwd` equal to `project` → `t3 thread start` as today.
-  - A failed launch (server unreachable, auth refused, path rejected) fails the turn with T3's error text and starts no thread; `agent_session_asked` handling stays, so a resume never makes a second thread.
+  - A failed sign-in or launch (server unreachable, pairing refused, path rejected, mode refused) fails the turn with T3's error text and starts no thread; `agent_session_asked` handling stays.
+  - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
 
   ## Done when
+  - [ ] Live check first: the pairing sign-in gets a token whose launch runs a `full-access` thread (`t3 thread show --json`), and `t3 auth session list` shows one harnessmux session, not one per run.
   - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), and `~/.t3/worktrees` gets nothing new.
-  - [ ] A second turn and a resume continue the same thread; the started event carries the thread link.
-  - [ ] Tests (replayed, no real agent) cover: launch in a worktree, `worktree_base` + worktree refused, launch failure fails the turn without a thread.
-  - [ ] README t3 row and CHANGELOG say it; fmt, clippy, nextest, deny pass.
+  - [ ] A second turn and a resume continue the same thread; a repeated launch or turn with the same `clientRequestId` returns the same thread and run (live check: send it twice, one run); the started event carries the thread link.
+  - [ ] Settling: a finished thread settled through harnessmux moves to T3's Settled group and its link still opens it; a thread waiting for an answer or failed is not settled (tests, plus one live check).
+  - [ ] Tests (replayed, no real agent) cover: launch in a worktree, kept token reused, expired or refused token signs in again, `worktree_base` + worktree refused, launch failure fails the turn without a thread, repeated `clientRequestId` makes no second thread, settle refused for a waiting or failed thread.
+  - [ ] README t3 row and CHANGELOG say it (including the T3 session it creates and how to revoke it: `t3 auth session revoke <id>`); fmt, clippy, nextest, deny pass.
   - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
 history:
 - at: 2026-11-17T09:09:23.535461+00:00
@@ -111,3 +267,434 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-17T22:41:05.883390+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:41:06.684647+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-17T22:41:08.118239+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T22:41:08.895134+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533ec83-82d2-4787-a1eb-7c32fa5819f7
+- at: 2026-11-17T22:42:42.217580+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:42:55.455957+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-17T22:45:46.455777+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T22:45:46.489791+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:45:46.699994+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T22:45:57.576563+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-17T22:45:57.607977+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:48:25.876485+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:50:47.530336+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: harnessmux's t3 agent starts a thread in an existing worktree through T3's t3_thread_launch
+    new: harnessmux's t3 agent starts a thread in an existing worktree, registered as its own T3 project until T3 ships --worktree-path
+  - field: description
+    old: |-
+      Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+
+      ## Found
+      - `t3 thread start` (T3 Code 0.1.9, upstream main too) only has `--worktree <base>`: T3 Code makes a new worktree in `~/.t3/worktrees` on a new `t3/...` branch for every thread. `src/backend/t3.rs` only knows `worktree_base`/`branch`.
+      - T3's server already takes an existing checkout: MCP `t3_thread_launch` with `workspaceStrategy: {type: existing_worktree, worktreePath}`. `assertProjectWorktree` accepts only a path in `git worktree list` of the project's `workspaceRoot` (symlinks resolved), else "worktreePath must be one of the project's git worktrees". Worktrees lotar makes with `git worktree add` pass.
+      - Auth: the CLI signs itself in per call (`EnvironmentAuth.issueMcpClientSession`) and calls `<origin>/mcp` with a short-lived Bearer token. `t3 auth session issue --scope orchestration:read --scope orchestration:operate --ttl 5m --token-only` mints a bearer token from the CLI; whether `/mcp` accepts it is not checked yet.
+
+      ## What
+      - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`) starts its thread with `t3_thread_launch`, `existing_worktree` at `cwd`, keeping title, provider/model and the prompt. Later turns, `show`, resume and the thread lookup by title stay as they are (`t3 thread send/show/list`).
+      - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+      - Which wins: `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no thread started. `cwd` equal to `project` → `t3 thread start` as today.
+      - A failed launch (server unreachable, auth refused, path rejected) fails the turn with T3's error text and starts no thread; `agent_session_asked` handling stays, so a resume never makes a second thread.
+
+      ## Done when
+      - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), and `~/.t3/worktrees` gets nothing new.
+      - [ ] A second turn and a resume continue the same thread; the started event carries the thread link.
+      - [ ] Tests (replayed, no real agent) cover: launch in a worktree, `worktree_base` + worktree refused, launch failure fails the turn without a thread.
+      - [ ] README t3 row and CHANGELOG say it; fmt, clippy, nextest, deny pass.
+      - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
+    new: |-
+      Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+      Owner 2026-11-17 (option 1): upstream flag `t3 thread start --worktree-path <path>`. Upstream: Ideas discussion pingdotgg/t3code#23945 (backed, no maintainer reply yet).
+      Owner 2026-11-17, interim until that lands: "Okay project per work tree, but make sure they are named it organized in such a way that they don't clutter the UI to unusable amounts".
+
+      ## Found
+      - `t3 thread start` (T3 Code 0.1.10) only has `--worktree <base>` (T3 makes a new worktree). Calling `/mcp` ourselves only gets `approval-required` threads (no full access), so it's out.
+      - `t3 project add <path> --title <title>` registers any folder as a project; `t3 thread start <path>` then runs in that folder with full access.
+      - Clutter: T3's sidebar groups projects by repository (`sidebarProjectGroupingMode: "repository"`, T3's default and the owner's setting). A project made from a lotar worktree gets the same `repositoryIdentity.canonicalKey` (`github.com/localtaskrepo/lotar`) as `lotar`, so it shows inside the `lotar` group, not as a new sidebar entry. Checked live 2026-11-17: added `agent-DEV-610-…` as a project, saw the key, removed it.
+      - Cleanup: `t3 project remove` refuses or, with `--force`, deletes the project's threads. MCP `t3_project_update archived: true` hides it and keeps threads and files.
+
+      ## What
+      - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`): register `cwd` with `t3 project add <cwd> --title "<project title> <session title's ticket ID, else the worktree folder name>"` (an already-registered folder counts as done), then `t3 thread start <cwd>` as today. Later turns, `show`, resume and the thread lookup by title use `cwd` as the project.
+      - `cwd` equal to `project` → `t3 thread start <project>` as today. `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no project added, no thread started.
+      - A failed `project add` or start fails the turn with T3's error text and starts no thread; resume never makes a second thread or a second project.
+      - Cleanup when the worktree goes (lotar, DEV-652): archive the project (`archived: true`), never `--force`-remove it, so threads stay readable. If archiving needs MCP access the CLI can't give, remove it without `--force` only when it has no threads, else leave it (grouped, harmless) and say so.
+      - Once T3 ships `--worktree-path`: switch to it and drop the per-worktree projects (follow-up ticket).
+      - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+
+      ## Done when
+      - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), `~/.t3/worktrees` gets nothing new, and the sidebar shows it inside the repository's group (screenshot).
+      - [ ] A second turn and a resume continue the same thread and add no second project; the started event carries the thread link.
+      - [ ] Tests (replayed, no real agent) cover: worktree registered then started, already-registered worktree, `worktree_base` + worktree refused, `project add` failure fails the turn without a thread.
+      - [ ] README t3 row and CHANGELOG say it, including that the grouping relies on T3's "group by repository" sidebar setting; fmt, clippy, nextest, deny pass.
+      - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
+- at: 2026-11-17T22:50:47.573034+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T22:50:47.614925+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-17T22:53:24.960749+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:33:00.809291+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: harnessmux's t3 agent starts a thread in an existing worktree, registered as its own T3 project until T3 ships --worktree-path
+    new: harnessmux's t3 agent starts a thread in an existing worktree through T3's t3_thread_launch, signed in with a pairing code
+  - field: description
+    old: |-
+      Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+      Owner 2026-11-17 (option 1): upstream flag `t3 thread start --worktree-path <path>`. Upstream: Ideas discussion pingdotgg/t3code#23945 (backed, no maintainer reply yet).
+      Owner 2026-11-17, interim until that lands: "Okay project per work tree, but make sure they are named it organized in such a way that they don't clutter the UI to unusable amounts".
+
+      ## Found
+      - `t3 thread start` (T3 Code 0.1.10) only has `--worktree <base>` (T3 makes a new worktree). Calling `/mcp` ourselves only gets `approval-required` threads (no full access), so it's out.
+      - `t3 project add <path> --title <title>` registers any folder as a project; `t3 thread start <path>` then runs in that folder with full access.
+      - Clutter: T3's sidebar groups projects by repository (`sidebarProjectGroupingMode: "repository"`, T3's default and the owner's setting). A project made from a lotar worktree gets the same `repositoryIdentity.canonicalKey` (`github.com/localtaskrepo/lotar`) as `lotar`, so it shows inside the `lotar` group, not as a new sidebar entry. Checked live 2026-11-17: added `agent-DEV-610-…` as a project, saw the key, removed it.
+      - Cleanup: `t3 project remove` refuses or, with `--force`, deletes the project's threads. MCP `t3_project_update archived: true` hides it and keeps threads and files.
+
+      ## What
+      - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`): register `cwd` with `t3 project add <cwd> --title "<project title> <session title's ticket ID, else the worktree folder name>"` (an already-registered folder counts as done), then `t3 thread start <cwd>` as today. Later turns, `show`, resume and the thread lookup by title use `cwd` as the project.
+      - `cwd` equal to `project` → `t3 thread start <project>` as today. `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no project added, no thread started.
+      - A failed `project add` or start fails the turn with T3's error text and starts no thread; resume never makes a second thread or a second project.
+      - Cleanup when the worktree goes (lotar, DEV-652): archive the project (`archived: true`), never `--force`-remove it, so threads stay readable. If archiving needs MCP access the CLI can't give, remove it without `--force` only when it has no threads, else leave it (grouped, harmless) and say so.
+      - Once T3 ships `--worktree-path`: switch to it and drop the per-worktree projects (follow-up ticket).
+      - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+
+      ## Done when
+      - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), `~/.t3/worktrees` gets nothing new, and the sidebar shows it inside the repository's group (screenshot).
+      - [ ] A second turn and a resume continue the same thread and add no second project; the started event carries the thread link.
+      - [ ] Tests (replayed, no real agent) cover: worktree registered then started, already-registered worktree, `worktree_base` + worktree refused, `project add` failure fails the turn without a thread.
+      - [ ] README t3 row and CHANGELOG say it, including that the grouping relies on T3's "group by repository" sidebar setting; fmt, clippy, nextest, deny pass.
+      - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
+    new: |-
+      Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+      Owner 2026-11-17: backed upstream `t3 thread start --worktree-path` (pingdotgg/t3code discussion #23945; no maintainer reply yet).
+      Owner 2026-11-17, after the pairing sign-in was found: picked "Pairing sign-in". This replaces his earlier interim pick "project per work tree".
+
+      ## Found
+      - `t3 thread start` (T3 Code 0.1.10) only has `--worktree <base>`: T3 makes a new worktree. MCP `t3_thread_launch` takes `workspaceStrategy: {type: existing_worktree, worktreePath}`; the path must be in `git worktree list` of the project's `workspaceRoot` (lotar's `git worktree add` worktrees pass).
+      - A thread's mode can't exceed its caller's sign-in. A plain `t3 auth session issue --subject mcp-client` token only gets `approval-required`.
+      - Full access with no human: Tencent/teamai-cli (MIT; `packages/runtime-t3/src/auth.ts`, `docs/guide/runtime-t3.md`) uses T3's MCP OAuth (client registration + PKCE). It approves its own sign-in by POSTing `{authorization, decision: {_tag: "pairing-code", access: "full-access", code}}` to the authorization page's `decision` endpoint. The code comes from `t3 auth pairing create --json --base-dir ~/.t3 --scope orchestration:read --scope orchestration:operate --scope settings:write --scope source-control:write --ttl 2m --label harnessmux`. The token lasts 30 days, then it signs in again the same way. Its `t3.ts` also uses `clientRequestId` (a repeated launch returns the same thread) and settles finished threads (T3's Settled group).
+
+      ## What
+      - Sign-in: harnessmux keeps one T3 credential (0600 file in its state dir), reuses it while valid, and signs in again with a fresh pairing code when it has expired or `/mcp` refuses it. It never prints the pairing code or the token.
+      - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`) starts its thread with `t3_thread_launch`, `existing_worktree` at `cwd`, full-access mode, keeping title, provider/model and the prompt, with a `clientRequestId` derived from the session, so a retry or resume never makes a second thread. Later turns, `show`, resume and the thread lookup by title stay as they are (`t3 thread send/show/list`).
+      - Which wins: `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no thread started. `cwd` equal to `project` → `t3 thread start` as today.
+      - A failed sign-in or launch (server unreachable, pairing refused, path rejected, mode refused) fails the turn with T3's error text and starts no thread; `agent_session_asked` handling stays.
+      - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+
+      ## Done when
+      - [ ] Live check first: the pairing sign-in gets a token whose launch runs a `full-access` thread (`t3 thread show --json`), and `t3 auth session list` shows one harnessmux session, not one per run.
+      - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), and `~/.t3/worktrees` gets nothing new.
+      - [ ] A second turn and a resume continue the same thread; a repeated launch with the same `clientRequestId` returns it; the started event carries the thread link.
+      - [ ] Tests (replayed, no real agent) cover: launch in a worktree, kept token reused, expired or refused token signs in again, `worktree_base` + worktree refused, launch failure fails the turn without a thread.
+      - [ ] README t3 row and CHANGELOG say it (including the T3 session it creates and how to revoke it: `t3 auth session revoke <id>`); fmt, clippy, nextest, deny pass.
+      - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
+- at: 2026-11-17T23:33:00.852847+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:36:25.377375+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-17T23:36:25.411426+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:36:25.606532+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T23:36:46.839288+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+      Owner 2026-11-17: backed upstream `t3 thread start --worktree-path` (pingdotgg/t3code discussion #23945; no maintainer reply yet).
+      Owner 2026-11-17, after the pairing sign-in was found: picked "Pairing sign-in". This replaces his earlier interim pick "project per work tree".
+
+      ## Found
+      - `t3 thread start` (T3 Code 0.1.10) only has `--worktree <base>`: T3 makes a new worktree. MCP `t3_thread_launch` takes `workspaceStrategy: {type: existing_worktree, worktreePath}`; the path must be in `git worktree list` of the project's `workspaceRoot` (lotar's `git worktree add` worktrees pass).
+      - A thread's mode can't exceed its caller's sign-in. A plain `t3 auth session issue --subject mcp-client` token only gets `approval-required`.
+      - Full access with no human: Tencent/teamai-cli (MIT; `packages/runtime-t3/src/auth.ts`, `docs/guide/runtime-t3.md`) uses T3's MCP OAuth (client registration + PKCE). It approves its own sign-in by POSTing `{authorization, decision: {_tag: "pairing-code", access: "full-access", code}}` to the authorization page's `decision` endpoint. The code comes from `t3 auth pairing create --json --base-dir ~/.t3 --scope orchestration:read --scope orchestration:operate --scope settings:write --scope source-control:write --ttl 2m --label harnessmux`. The token lasts 30 days, then it signs in again the same way. Its `t3.ts` also uses `clientRequestId` (a repeated launch returns the same thread) and settles finished threads (T3's Settled group).
+
+      ## What
+      - Sign-in: harnessmux keeps one T3 credential (0600 file in its state dir), reuses it while valid, and signs in again with a fresh pairing code when it has expired or `/mcp` refuses it. It never prints the pairing code or the token.
+      - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`) starts its thread with `t3_thread_launch`, `existing_worktree` at `cwd`, full-access mode, keeping title, provider/model and the prompt, with a `clientRequestId` derived from the session, so a retry or resume never makes a second thread. Later turns, `show`, resume and the thread lookup by title stay as they are (`t3 thread send/show/list`).
+      - Which wins: `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no thread started. `cwd` equal to `project` → `t3 thread start` as today.
+      - A failed sign-in or launch (server unreachable, pairing refused, path rejected, mode refused) fails the turn with T3's error text and starts no thread; `agent_session_asked` handling stays.
+      - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+
+      ## Done when
+      - [ ] Live check first: the pairing sign-in gets a token whose launch runs a `full-access` thread (`t3 thread show --json`), and `t3 auth session list` shows one harnessmux session, not one per run.
+      - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), and `~/.t3/worktrees` gets nothing new.
+      - [ ] A second turn and a resume continue the same thread; a repeated launch with the same `clientRequestId` returns it; the started event carries the thread link.
+      - [ ] Tests (replayed, no real agent) cover: launch in a worktree, kept token reused, expired or refused token signs in again, `worktree_base` + worktree refused, launch failure fails the turn without a thread.
+      - [ ] README t3 row and CHANGELOG say it (including the T3 session it creates and how to revoke it: `t3 auth session revoke <id>`); fmt, clippy, nextest, deny pass.
+      - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
+    new: |-
+      Owner 2026-11-17 (DEV-652, answered in INBOX-412): "harnessmux's t3 agent calls T3's t3_thread_launch itself, without the CLI (a harnessmux ticket)". DEV-652 (lotar side) waits for this.
+      Owner 2026-11-17: backed upstream `t3 thread start --worktree-path` (pingdotgg/t3code discussion #23945; no maintainer reply yet).
+      Owner 2026-11-17, after the pairing sign-in was found: picked "Pairing sign-in". This replaces his earlier interim pick "project per work tree".
+      Owner 2026-11-17: "I'm like the idea about the id let's implement it, and yes moving threads into settled that I didn't need to look at are also a good idea".
+
+      ## Found
+      - `t3 thread start` (T3 Code 0.1.10) only has `--worktree <base>`: T3 makes a new worktree. MCP `t3_thread_launch` takes `workspaceStrategy: {type: existing_worktree, worktreePath}`; the path must be in `git worktree list` of the project's `workspaceRoot` (lotar's `git worktree add` worktrees pass).
+      - A thread's mode can't exceed its caller's sign-in. A plain `t3 auth session issue --subject mcp-client` token only gets `approval-required`.
+      - Full access with no human: Tencent/teamai-cli (MIT; `packages/runtime-t3/src/auth.ts`, `docs/guide/runtime-t3.md`) uses T3's MCP OAuth (client registration + PKCE). It approves its own sign-in by POSTing `{authorization, decision: {_tag: "pairing-code", access: "full-access", code}}` to the authorization page's `decision` endpoint. The code comes from `t3 auth pairing create --json --base-dir ~/.t3 --scope orchestration:read --scope orchestration:operate --scope settings:write --scope source-control:write --ttl 2m --label harnessmux`. The token lasts 30 days, then it signs in again the same way. Its `t3.ts` also uses `clientRequestId` (a repeated launch returns the same thread) and settles finished threads (T3's Settled group).
+
+      ## What
+      - Sign-in: harnessmux keeps one T3 credential (0600 file in its state dir), reuses it while valid, and signs in again with a fresh pairing code when it has expired or `/mcp` refuses it. It never prints the pairing code or the token.
+      - A t3 session whose `cwd` is a git worktree of its `project` (and no `worktree_base`) starts its thread with `t3_thread_launch`, `existing_worktree` at `cwd`, full-access mode, keeping title, provider/model and the prompt, with a `clientRequestId` derived from the session, so a retry or resume never makes a second thread. Later turns, `show`, resume and the thread lookup by title stay as they are (`t3 thread send/show/list`).
+      - Request IDs: every launch and every later turn goes through MCP with a `clientRequestId` derived from the session and the turn (`t3_thread_launch`, `t3_thread_send`), so a retry, a resume or a restarted harnessmux re-sending a turn never makes a second thread or a second run. A repeated launch that T3 refuses with `invalid_request` or `runtime_mode_escalation_denied` launched nothing (teamai's rule); any other answer to a repeat means the thread exists: look it up, never launch again.
+      - Settling: harnessmux offers settling a session's thread (`t3_thread_organize` with `action: settle`; it stays reachable by its link). It settles only when asked and only a thread whose last run finished and isn't waiting for an answer; a thread that failed, was interrupted, or waits for the owner stays active. lotar (DEV-652) asks at job end only when the ticket doesn't wait for the owner (not HelpNeeded and not assigned to him) and the job didn't fail: the threads the owner didn't need to look at. A settle T3 refuses is logged and doesn't fail the job.
+      - Which wins: `worktree_base` set and `cwd` a worktree → refuse with an error naming both, no thread started. `cwd` equal to `project` → `t3 thread start` as today.
+      - A failed sign-in or launch (server unreachable, pairing refused, path rejected, mode refused) fails the turn with T3's error text and starts no thread; `agent_session_asked` handling stays.
+      - `worktree_base`/`branch` go once lotar no longer sets them (DEV-652): remove them in the same release if nothing else uses them (search lotar and standards configs).
+
+      ## Done when
+      - [ ] Live check first: the pairing sign-in gets a token whose launch runs a `full-access` thread (`t3 thread show --json`), and `t3 auth session list` shows one harnessmux session, not one per run.
+      - [ ] Live check: a t3 session with `cwd` = a `git worktree add` worktree of a T3 project runs its thread there (`t3 thread show --json` names that path), and `~/.t3/worktrees` gets nothing new.
+      - [ ] A second turn and a resume continue the same thread; a repeated launch or turn with the same `clientRequestId` returns the same thread and run (live check: send it twice, one run); the started event carries the thread link.
+      - [ ] Settling: a finished thread settled through harnessmux moves to T3's Settled group and its link still opens it; a thread waiting for an answer or failed is not settled (tests, plus one live check).
+      - [ ] Tests (replayed, no real agent) cover: launch in a worktree, kept token reused, expired or refused token signs in again, `worktree_base` + worktree refused, launch failure fails the turn without a thread, repeated `clientRequestId` makes no second thread, settle refused for a waiting or failed thread.
+      - [ ] README t3 row and CHANGELOG say it (including the T3 session it creates and how to revoke it: `t3 auth session revoke <id>`); fmt, clippy, nextest, deny pass.
+      - [ ] A release with it on crates.io (tagging and publishing: the owner's OK first unless he gave it), so lotar can bump `harnessmux` in DEV-652.
+- at: 2026-11-17T23:36:46.884902+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:37:08.433746+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-17T23:37:35.370441+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:37:39.645043+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-17T23:37:40.515591+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:37:40.691716+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-17T23:38:57.985494+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318","DEV-353"]}'
+    new: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318","DEV-353","DEV-680"]}'
+- at: 2026-11-17T23:39:08.564871+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:39:08.775688+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Todo
+- at: 2026-11-17T23:39:08.835125+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-17T23:39:29.537968+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T23:39:29.576560+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:39:29.777428+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T23:39:30.538408+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-17T23:39:30.572461+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:42:29.805209+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:42:30.587282+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-17T23:42:30.921358+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-17T23:42:32.981498+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T23:53:01.670113+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:53:01.910554+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318","DEV-353","DEV-680"]}'
+    new: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318","DEV-353","DEV-680","DEV-682","DEV-683","DEV-684"]}'
+- at: 2026-11-18T00:05:44.063045+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:05:57.006979+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T00:05:57.803734+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-18T00:06:42.273150+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-18T00:07:20.570457+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:07:25.183743+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-18T00:09:29.458628+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:09:29.644382+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-18T00:09:53.866275+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318","DEV-353","DEV-680","DEV-682","DEV-683","DEV-684"]}'
+    new: '{"blocks":["DEV-652"],"related":["DEV-652","DEV-318","DEV-353","DEV-680","DEV-682","DEV-683","DEV-684","DEV-685"]}'

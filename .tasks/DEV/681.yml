@@ -1,0 +1,126 @@
+title: 'CI red on main: dev623_memory_gate_test a_queued_job_waits_while_memory_is_short fails'
+status: Merging
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-17T23:42:58.849777+00:00
+modified: 2026-11-18T00:09:28.265623+00:00
+relationships:
+  blocks:
+  - DEV-658
+  related:
+  - DEV-658
+  - TEST-1
+  - DEV-623
+comments:
+- date: 2026-11-18T00:06:29.150971+00:00
+  author: claude
+  text: |-
+    Fixed a race in `lotar agent queue`: it read the memory gate twice.
+
+    - CI output had `memory_hold` set but `reason` "waiting for the running jobs of their tickets to end": two different readings in one command.
+    - `agent run` only queues; the worker does the first memory reading and writes `memory-gate-<hash>.json` (fsync'd, slow on CI). A debug run caught the worker's `.tmp` file mid-write.
+    - `worker_state` read the gate first and found no hold, then the worker's write landed, then the handler's second read found the hold.
+    - Fix: the handler reads `memory_gate::status` once and passes the hold to `AgentQueueService::worker_state` (`crates/lotar-agent/src/services/agent_queue_service.rs`, `crates/lotar-lib/src/cli/handlers/agent.rs`).
+    - No new test: the race depends on timing, so the evidence is the failing CI run `44192130722`. The existing test now passes 8 runs in a row.
+  report:
+    commits:
+    - hash: b437760c4
+      what: agent queue reads the memory gate once
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2357 Rust, 1548 UI, release and hooks tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: cargo nextest run --test integration dev623_memory_gate
+      result: passed
+      reason: 8 runs in a row
+    - command: gh run list -b main -w 'Quality Assurance'
+      result: not_run
+      reason: the merge agent reruns it after the merge
+    next: Review, then merge; QA on main should go green
+- date: 2026-11-18T00:09:22.233631+00:00
+  author: claude
+  text: |-
+    Review: passed. One reading of the memory gate per `agent queue` fixes the race; ready to merge.
+
+    - Read: `b437760c4` (2 files, +7/-4), the ticket and the fix comment, the test `crates/lotar-lib/tests/dev623_memory_gate_test.rs`, `memory_gate::status` and `check` in `crates/lotar-agent/src/services/memory_gate.rs`, and AGENTS.md. On main, `bcd8bbcd8` (DEV-623) is the last commit to touch these files.
+    - The cause holds: the test waits until `memory_hold` is set, then expects `reason` to say "waiting for memory". Before the fix, `worker_state` and the handler each read the gate, so the worker's write could land between the two reads. Now `crates/lotar-lib/src/cli/handlers/agent.rs:450` reads it once and passes the hold to `AgentQueueService::worker_state` (`agent_queue_service.rs:239`), so the reason and `memory_hold` come from the same reading.
+    - `worker_state` has one caller. `list-jobs` (`agent.rs:316`) already reads the gate once. `waiting_reason` in `agent_job_service.rs:551` reads it only for its own message, so it has no second reading to disagree with.
+    - No new test: the existing test is the one CI failed, and the race only shows when the worker's write lands at the wrong moment. The new parameter makes `worker_state` hold to one reading by its signature. I accept this.
+    - Reran: `npm ci` passed, `npm run lint` passed, the dev623 test passed 5 runs in a row, and the queue and memory-gate tests in `lotar-agent` and `lotar-lib` passed (36 tests). The worktree is unchanged.
+    - Not run: the full `npm test` and `npm run smoke`, since the fix agent ran them and this change touches nothing they cover beyond the above. QA green on main can only be checked after the merge.
+    - No minor findings, no tickets filed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf565c24-5200-4aa0-bd06-76d7ab47feaf
+description: 'Found: Quality Assurance on main 2f8b1cb (2026-11-17 22:39) failed in Rust Quality Checks: lotar-lib::integration dev623_memory_gate_test::a_queued_job_waits_while_memory_is_short panicked at crates/lotar-lib/tests/dev623_memory_gate_test.rs:64:5 (the queue shows TEST-1 pending, worker_running true). The run before (45fd197) was green. Check: gh run list -b main -w ''Quality Assurance''. Done: QA green on main; the v0.15.4 release (DEV-658) needs it.'
+tags:
+- health
+custom_fields:
+  finding: ci:dev623_memory_gate_test
+history:
+- at: 2026-11-17T23:42:59.084129+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-658","TEST-1"]}'
+- at: 2026-11-17T23:42:59.313946+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-17T23:58:00.980293+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T23:58:01.813485+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf565c24-5200-4aa0-bd06-76d7ab47feaf
+- at: 2026-11-18T00:02:42.793585+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-658","TEST-1"]}'
+    new: '{"blocks":["DEV-658"],"related":["DEV-658","TEST-1"]}'
+- at: 2026-11-18T00:06:29.150971+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:06:39.877567+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T00:09:22.233631+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:09:22.546021+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-658"],"related":["DEV-658","TEST-1"]}'
+    new: '{"blocks":["DEV-658"],"related":["DEV-658","TEST-1","DEV-623"]}'
+- at: 2026-11-18T00:09:28.265623+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

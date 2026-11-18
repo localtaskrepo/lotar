@@ -1,0 +1,91 @@
+title: 'Proposal: agent jobs end on a stall timeout and stop when their ticket goes Done or to a person'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-17T23:52:06.189581+00:00
+modified: 2026-11-18T00:12:09.431939+00:00
+relationships:
+  related:
+  - DEV-657
+comments:
+- date: 2026-11-17T23:52:34.645149+00:00
+  author: claude
+  text: |-
+    Build the stall timeout and the reconcile for running jobs?
+
+    Options:
+    - both: Both: stall timeout and stop jobs whose ticket went Done or to a person (recommended)
+    - stall: Only the stall timeout
+    - no: Not now
+  question:
+    options:
+    - key: both
+      label: 'Both: stall timeout and stop jobs whose ticket went Done or to a person'
+      set:
+        status: Todo
+        assignee: '@fix'
+    - key: stall
+      label: Only the stall timeout
+      set:
+        status: Todo
+        assignee: '@fix'
+    - key: no
+      label: Not now
+      set:
+        status: WontDo
+    recommended: both
+- date: 2026-11-18T00:12:09.425843+00:00
+  author: mallox
+  text: |-
+    Answer: both (Both: stall timeout and stop jobs whose ticket went Done or to a person)
+
+    (answered in INBOX-474)
+  answer:
+    to: 2026-11-17T23:52:34.645149+00:00
+    choice:
+    - both
+    note: (answered in INBOX-474)
+description: |-
+  A running agent job that hangs holds its parallel slot and its ticket indefinitely, and a job keeps running (and spending tokens) after its ticket goes Done or is reassigned. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section lotar).
+
+  ## Evidence
+  - OpenAI Symphony's spec, Apache-2.0: [SPEC.md](https://github.com/openai/symphony/blob/main/SPEC.md) §8.5 stall detection (no agent event for `stall_timeout_ms` kills and retries the run), §8.5 part B (each tick re-reads the tracker: a ticket gone terminal stops the worker and cleans the workspace, a rerouted one stops the worker and keeps it), §8.4 retry with backoff `min(10s·2^(n-1), max)`.
+  - lotar today: only `--timeout-seconds` on `agent run`; failed runner jobs are terminal (docs/help/agent.md:424); a ticket reassigned while its job runs only skips the job's end rules, the job runs on (agent.md:243).
+
+  ## Proposal
+  - A per-profile `stall_timeout`: no harnessmux event for N minutes ends the job as failed with reason `stalled`, so `job_failed` rules decide (retry with `@fix` or ask).
+  - Reconcile: when the ticket of a running job goes Done/WontDo or is assigned to a person, cancel the job (or send its agent one message, deduped) and say so in the job log.
+  - Optional: retry a stalled job once with backoff.
+
+  ## Done when
+  - [ ] owner decided the scope (question below)
+  - [ ] a test job with a recorded agent that goes silent ends as `stalled`
+  - [ ] a job whose ticket is set Done mid-run is cancelled and logged
+tags:
+- proposal
+history:
+- at: 2026-11-17T23:52:34.645149+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:53:01.911571+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-657"]}'
+- at: 2026-11-18T00:12:09.425843+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:12:09.431939+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+  - field: assignee
+    old: mallox
+    new: '@fix'

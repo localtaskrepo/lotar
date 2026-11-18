@@ -1,0 +1,68 @@
+title: 'Proposal: harnessmux: overloaded Codex turns count as finished, and a deny may pick Codex''s cancel'
+status: HelpNeeded
+priority: Medium
+type: Bug
+reporter: claude
+assignee: mallox
+created: 2026-11-17T23:52:08.704429+00:00
+modified: 2026-11-17T23:53:01.911984+00:00
+relationships:
+  related:
+  - DEV-657
+comments:
+- date: 2026-11-17T23:52:35.014058+00:00
+  author: claude
+  text: |-
+    Fix both Codex quirks; may the fix agent also add our repro to acpx issue 850 on GitHub?
+
+    Options:
+    - fix-post: Fix both and post the repro upstream
+    - fix: Fix both, post nothing (recommended)
+    - no: Not now
+  question:
+    options:
+    - key: fix-post
+      label: Fix both and post the repro upstream
+      set:
+        status: Todo
+        assignee: '@fix'
+    - key: fix
+      label: Fix both, post nothing
+      set:
+        status: Todo
+        assignee: '@fix'
+    - key: no
+      label: Not now
+      set:
+        status: WontDo
+    recommended: fix
+description: |-
+  Two Codex adapter quirks harnessmux doesn't handle yet. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
+
+  ## 1. Overloaded Codex turns count as successes
+  - codex-acp sends provider errors such as `server_overloaded` and `rateLimitExceeded` as an ordinary message chunk followed by `end_turn`; only `usageLimitExceeded` and auth failures become real errors. Upstream issue, open: [acpx #850](https://github.com/openclaw/acpx/issues/850).
+  - harnessmux's `FAILURE_TEXTS` (`src/acp_map.rs:67-79`) has no "at capacity" or "overloaded", so such a turn ends as a finished turn and a lotar job as completed.
+  - Fix: add those texts (with a recording as the failing test), or read `_meta.quota` when the adapter sends it.
+
+  ## 2. A policy deny may pick Codex's "cancel"
+  - codex-acp lists both `decline` and `cancel` with kind `reject_once`; `cancel` ("No, and tell Codex what to do differently") can end the turn ([codex-acp options.ts](https://github.com/agentclientprotocol/codex-acp/blob/main/src/permissions/options.ts)). acpx prefers `decline` on purpose ([codex-compat.ts](https://github.com/openclaw/acpx/blob/main/src/acp/codex-compat.ts)).
+  - harnessmux takes the first `RejectOnce` (`src/backend/acp.rs:440-445`), so it works only while codex-acp lists `decline` first.
+  - Fix: prefer an option id or name `decline`/`reject` over `cancel`, tested with a recording.
+
+  ## Done when
+  - [ ] a recorded overloaded Codex turn replays as `turn.failed`
+  - [ ] the deny choice is by name, with a test
+  - [ ] the owner decided whether we add our repro upstream (question below)
+tags:
+- proposal
+history:
+- at: 2026-11-17T23:52:35.014058+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:53:01.911984+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-657"]}'

@@ -1,0 +1,69 @@
+title: 'Proposal: harnessmux: typed turn failures (kind, reset time, retryable) from the adapters'' error data'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-17T23:52:07.336095+00:00
+modified: 2026-11-17T23:53:01.911784+00:00
+relationships:
+  related:
+  - DEV-584
+  - DEV-657
+comments:
+- date: 2026-11-17T23:52:34.697482+00:00
+  author: claude
+  text: |-
+    Add typed turn failures to harnessmux, and let DEV-584 use them?
+
+    Options:
+    - yes: Yes, build it (recommended)
+    - no: Not now
+  question:
+    options:
+    - key: yes
+      label: Yes, build it
+      set:
+        status: Todo
+        assignee: '@fix'
+    - key: no
+      label: Not now
+      set:
+        status: WontDo
+    recommended: yes
+description: |-
+  harnessmux reports a failed turn as `turn.failed {error: String}`, built from the error's text, and drops what the adapters already send: the kind of failure and when a usage limit resets. DEV-584 (pause a job until the usage-limit reset) has to guess both from text. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
+
+  ## Evidence
+  - claude-agent-acp (the pinned adapter): a failed turn's JSON-RPC error `data` is `{errorKind, rateLimit}` with `rateLimit.resetsAt` ([src/result-end.ts](https://github.com/agentclientprotocol/claude-agent-acp/blob/main/src/result-end.ts)); `usage_update` carries `_meta["_claude/rateLimit"]`, `quota`, `authStatus` (docs/air-extensions.md).
+  - acpx's two-layer error contract: stable code + raw error + `retryable` ([ACPX_ERROR_STRATEGY.md](https://github.com/openclaw/acpx/blob/main/docs/ACPX_ERROR_STRATEGY.md), [error-normalization.ts](https://github.com/openclaw/acpx/blob/main/src/acp/error-normalization.ts)).
+  - happy merges push and pull rate-limit data into one shape with `resetsAt` ([usageLimits.ts](https://github.com/slopus/happy/blob/main/packages/happy-cli/src/claude/utils/usageLimits.ts)); its fixture shows the native text "You've hit your limit · resets …", which `FAILURE_TEXTS` doesn't match.
+  - harnessmux: `src/error.rs:54`, `src/session.rs:347` (string only, `raw: None`), `src/acp_map.rs:33-41` (Usage reads used, size, cost).
+
+  ## Proposal
+  - `turn.failed` gets `kind` (rate_limited, quota, auth_required, overloaded, context_exhausted, transport, other), `resets_at`, `retryable` and `raw`, from the adapter's error data first; text matching stays as the fallback.
+  - `usage` events carry the rate-limit window when the adapter sends it.
+  - lotar's DEV-584 then reads `kind` and `resets_at` instead of the message.
+
+  ## Done when
+  - [ ] recorded sessions for a Claude rate limit and an auth failure replay to the typed fields
+  - [ ] lotar's usage-limit handling uses them (DEV-584)
+tags:
+- proposal
+history:
+- at: 2026-11-17T23:52:07.552972+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-584"]}'
+- at: 2026-11-17T23:52:34.697482+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T23:53:01.911784+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584"]}'
+    new: '{"related":["DEV-584","DEV-657"]}'

@@ -1,14 +1,24 @@
 title: Release v0.15.4
-status: Todo
+status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T16:01:03.148737+00:00
-modified: 2026-11-17T16:01:34.950204+00:00
+modified: 2026-11-18T00:06:40.318733+00:00
 relationships:
+  depends_on:
+  - DEV-681
   related:
   - DEV-651
+  - DEV-681
+comments:
+- date: 2026-11-18T00:02:41.977638+00:00
+  author: mallox
+  text: 'mallox in the cos thread, 2026-11-17, picked "Now, once QA is green (Recommended)": ship v0.15.4 (patch) once DEV-681 is fixed and Quality Assurance on main is green. This is the OK for step 4 of .github/skills/release/SKILL.md (signed tag, push, lotar release release). Follow the skill to the end, incl. brew upgrade and the next release ticket.'
+- date: 2026-11-18T00:06:40.318733+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-681.'
 releases:
 - 9
 description: |-
@@ -27,3 +37,35 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-651"]}'
+- at: 2026-11-17T23:42:59.083773+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-651"]}'
+    new: '{"related":["DEV-651","DEV-681"]}'
+- at: 2026-11-18T00:02:41.977638+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:02:42.391713+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T00:02:42.793203+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-651","DEV-681"]}'
+    new: '{"depends_on":["DEV-681"],"related":["DEV-651","DEV-681"]}'
+- at: 2026-11-18T00:02:43.177806+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Blocked
+- at: 2026-11-18T00:06:40.318733+00:00
+  actor: automation
+  changes:
+  - field: comment_added
