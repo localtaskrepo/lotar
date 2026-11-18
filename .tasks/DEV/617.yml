@@ -1,11 +1,11 @@
 title: A @fix-codex retry after a Claude rate limit ran on Claude and failed the same way
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-18T06:06:29.262015+00:00
+modified: 2026-11-18T06:21:43.210182+00:00
 relationships:
   depends_on:
   - DEV-644
@@ -18,6 +18,7 @@ relationships:
   - DEV-634
   - DEV-642
   - DEV-694
+  - DEV-701
 comments:
 - date: 2026-11-16T19:17:10.926669+00:00
   author: claude
@@ -334,6 +335,32 @@ comments:
     - **Not run:** `npm run smoke`. It passed on `b4d875195` in `job-20261118T030735.468Z-23`, and the merge runs it again.
     - No UI pages changed (only text helpers in `view/utils`), so no screenshots are needed. No stray files, no findings, no tickets filed.
     - To note: until a release includes this commit, the installed lotar `0.15.4` reads `job:` in the standards rules as an unknown custom field (the fix agent noted this before).
+- date: 2026-11-18T06:16:55.490187+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-617` is in `main`.
+
+    - Rebased `agent/DEV-617` onto `main` (`77b3b3ed474f`): `6d944c895cbd`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `6d944c895cbd`
+    - Amended the pending `.tasks` changes into the merged commit: `d306033e6f4a`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[agent-job:retry-same-provider]`
+  report:
+    commits:
+    - hash: d306033e6
+      what: DEV-617 A @fix-codex retry after a Claude rate limit ran on Claude and failed the same way
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5546fe0-7dc8-46db-bd03-10093f4d83f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6
@@ -345,9 +372,6 @@ references:
 description: 'Found 2026-11-16 on DEV-606: job job-20261116T062103.231Z-76 (profile fix-codex) ran in a T3 thread with model claude-opus-5-5 (~/.local/state/harnessmux/sessions/lotar-95e687-DEV-606-fix-codex.json, profile.model) and failed in 7 s with ''Claude API rate limit reached'', just like the @fix job before it, so the ticket went to the owner. Check: that session file shows profile.model claude-opus-5-5 for LOTAR_AGENT_PROFILE fix-codex. Done: a fix-codex job runs on a Codex model (or the profile is renamed to what it runs), with a test; related to DEV-584 (wait through usage limits).'
 tags:
 - health
-- retry-fix
-- fix-retried
-- review-returned
 custom_fields:
   finding: agent-job:retry-same-provider
 history:
@@ -707,3 +731,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T06:16:55.490187+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:16:55.689293+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, retry-fix, fix-retried, review-returned
+    new: health
+- at: 2026-11-18T06:21:43.210182+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-644","DEV-694"],"related":["DEV-584","DEV-606","DEV-644","DEV-633","DEV-634","DEV-642","DEV-694"]}'
+    new: '{"depends_on":["DEV-644","DEV-694"],"related":["DEV-584","DEV-606","DEV-644","DEV-633","DEV-634","DEV-642","DEV-694","DEV-701"]}'

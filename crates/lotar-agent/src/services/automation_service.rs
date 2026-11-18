@@ -821,7 +821,7 @@ impl AutomationService {
                     let by = prerequisites_of(storage, task);
                     preview.tmpl = std::mem::take(&mut preview.tmpl).with_unblocked(&by);
                 }
-                let actions = describe_action(action, task, config, &mut preview);
+                let actions = describe_action(action, task, event, config, &mut preview);
                 task_after = simulate_action(task, &task_after, action, config, storage, &mut preview);
                 notes.extend(preview.into_warnings());
                 warnings.extend(notes.iter().cloned());
@@ -944,7 +944,7 @@ impl AutomationService {
                     continue;
                 }
                 let mut preview = PreviewContext::new(&task);
-                let actions = describe_action(action, &task, &config, &mut preview);
+                let actions = describe_action(action, &task, AutomationEvent::Manual, &config, &mut preview);
                 let mut entry = ManualRunEntry {
                     rule: name.clone(),
                     task: task.id.clone(),
@@ -962,7 +962,8 @@ impl AutomationService {
                         rule: name.clone(),
                     };
                     match apply_action(storage, &task, &config, action, &context) {
-                        Ok(()) => {
+                        Ok(note) => {
+                            entry.warnings.extend(note);
                             changed = true;
                             cooldown_record(rule, &key, &task.id, &tasks_dir);
                         }
@@ -1037,7 +1038,7 @@ impl AutomationService {
             }
             let mut preview = PreviewContext::new(task);
             preview.tmpl = std::mem::take(&mut preview.tmpl).with_unblocked(&by);
-            let actions = describe_action(action, task, config, &mut preview);
+            let actions = describe_action(action, task, AutomationEvent::Unblocked, config, &mut preview);
             let mut entry = ManualRunEntry {
                 rule: name.clone(),
                 task: task.id.clone(),
@@ -1055,7 +1056,10 @@ impl AutomationService {
                     rule: name.clone(),
                 };
                 match apply_action(storage, task, config, action, &context) {
-                    Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
+                    Ok(note) => {
+                        entry.warnings.extend(note);
+                        cooldown_record(rule, &key, &task.id, &tasks_dir);
+                    }
                     Err(err) => entry.error = Some(err.to_string()),
                 }
             }
@@ -1107,7 +1111,13 @@ pub struct SimulatedAction {
 }
 
 /// Describe what an automation action would do
-fn describe_action(action: &AutomationAction, current: &TaskDTO, config: &ResolvedConfig, preview: &mut PreviewContext) -> Vec<SimulatedAction> {
+fn describe_action(
+    action: &AutomationAction,
+    current: &TaskDTO,
+    event: AutomationEvent,
+    config: &ResolvedConfig,
+    preview: &mut PreviewContext,
+) -> Vec<SimulatedAction> {
     let mut actions = Vec::new();
     fn push(actions: &mut Vec<SimulatedAction>, action: &str, description: String) {
         actions.push(SimulatedAction { action: action.to_string(), description });
@@ -1238,12 +1248,20 @@ fn describe_action(action: &AutomationAction, current: &TaskDTO, config: &Resolv
         });
     }
 
-    // Detect if assignee change would trigger agent job
+    // Detect if assignee change would trigger agent job. Only a manual run
+    // starts the job of the agent the ticket already has (DEV-701).
     if let Some(set) = action.set.as_ref()
         && let Some(assignee) = set.assignee.as_ref()
         && assignee.starts_with('@')
         && config.agent_profiles.contains_key(&assignee[1..])
     {
+        if event != AutomationEvent::Manual && current.assignee.as_deref() == Some(assignee.as_str()) {
+            actions.push(SimulatedAction {
+                action: "no_agent_job".to_string(),
+                description: format!("No agent job: the ticket is already assigned to {assignee} (tell_agent starts it)"),
+            });
+            return actions;
+        }
         let mut description = format!("Queue agent job for profile '{}'", &assignee[1..]);
         if let Some(agent) = action.agent.as_ref() {
             let mut settings: Vec<String> = Vec::new();
@@ -2249,13 +2267,16 @@ fn replay_end_actions(tasks_dir: &Path) {
 /// overwriting them with event-time snapshots. `current` stays the
 /// event-time snapshot: templates and assignee alias tokens keep resolving
 /// the pre-change values that conditions were matched against.
+///
+/// Returns why the agent job the action assigns doesn't run now, for a
+/// manual run to report (DEV-701).
 fn apply_action(
     storage: &mut Storage,
     current: &TaskDTO,
     config: &ResolvedConfig,
     action: &AutomationAction,
     action_context: &AutomationActionContext,
-) -> LoTaRResult<()> {
+) -> LoTaRResult<Option<String>> {
     // Compose against the latest persisted state, including side effects of
     // earlier actions in this dispatch (collection commits, sprint
     // assignment, comments).
@@ -2325,16 +2346,15 @@ fn apply_action(
     } else if patch_has_changes(&patch) {
         next_task = Some(TaskService::update_with_context(storage, &base.id, patch, TaskUpdateContext::automation_disabled())?);
     }
-    if let Some(updated) = next_task.as_ref() {
+    // A manual run that assigns the agent the ticket already has starts its
+    // job too, as `tell_agent` does: the run asks for that agent (DEV-701).
+    let reassigns_agent = matches!(action_context.event, AutomationEvent::Manual) && action.set.as_ref().is_some_and(|set| set.assignee.is_some());
+    let mut agent_note = None;
+    if let Some(updated) = next_task.as_ref().or(reassigns_agent.then_some(&base)) {
         let run = action.agent.as_ref().map(|agent| AgentRunSettings::from_action(agent, &tmpl));
-        maybe_queue_agent_on_assignment(
-            storage.root_path.as_path(),
-            base.assignee.as_deref(),
-            updated.assignee.as_deref(),
-            updated,
-            config,
-            run.unwrap_or_default(),
-        );
+        let previous = if reassigns_agent { None } else { base.assignee.as_deref() };
+        agent_note =
+            maybe_queue_agent_on_assignment(storage.root_path.as_path(), previous, updated.assignee.as_deref(), updated, config, run.unwrap_or_default());
     }
 
     let task_for_env = next_task.as_ref().unwrap_or(&base);
@@ -2386,7 +2406,7 @@ fn apply_action(
         TaskService::archive_with_receipt(storage, &current.id, None, archive)?;
     }
 
-    Ok(())
+    Ok(agent_note)
 }
 
 /// A job's hand-back to the ticket's reporter reaches no one when that

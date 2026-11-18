@@ -1,11 +1,11 @@
 title: 'Job-log pruning: no test that archived and malformed-ID tickets'' logs go'
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-18T05:30:51.047164+00:00
-modified: 2026-11-18T06:11:12.134002+00:00
+modified: 2026-11-18T06:23:30.669009+00:00
 relationships:
   related:
   - DEV-697
@@ -47,6 +47,40 @@ comments:
     - **Fix:** rebase onto main and merge the two versions: match on `resolve_task_location` first: `Ok(location) => !location.archived && ticket_done_state(..).is_none_or(|done| !done)`, `Err(Ambiguous { .. }) => true`, `Err(NotFound(_) | Invalid(_)) => false`. Keep both tests and DEV-697's doc comment wording plus "archived whatever its status". In a scratch copy of main this version passed all 4 `dev21_ticket_done_state_tests`.
     - **"Done when" gap:** item 4 should also say that jobs of an ID held by several roots still stay (DEV-697), so the rework can't lose it.
     - **Reran:** `cargo nextest run -p lotar-agent dev21_ticket_done_state_tests` on the branch passed (3/3). I didn't rerun full lint/test/smoke: the branch needs a rebase before they mean anything. No UI changes; no stray files.
+- date: 2026-11-18T06:22:24.781617+00:00
+  author: claude
+  text: |-
+    Rework done: rebased on main, merged with DEV-697's version; `bc017cd58` replaces `b5d8f1c9a`.
+
+    - **Stale base / conflict:** rebased onto main (`d306033e6`); the conflict in `ticket_keeps_its_jobs` and the test module is resolved
+    - **Ambiguous IDs:** `ticket_keeps_its_jobs` now matches on `resolve_task_location` first: `Ok` → kept unless archived or done; `Ambiguous` → kept; `NotFound`/`Invalid` → go (`crates/lotar-agent/src/services/agent_job_service.rs`)
+    - **Tests:** DEV-697's `old_job_log_of_an_ambiguous_ticket_stays` and the new `old_job_logs_of_archived_and_malformed_tickets_go` are both kept and pass
+    - **Mutation check again:** making `Invalid` keep its logs, or ignoring the archive, each fails the new test with its own message
+  report:
+    commits:
+    - hash: bc017cd58
+      what: rebased on main; archived tickets' logs go whatever their status, ambiguous IDs still kept (DEV-697)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: cargo nextest run -p lotar-agent dev21_ticket_done_state_tests
+      result: passed
+      reason: 4 tests
+    next: Review again, then merge
+- date: 2026-11-18T06:23:22.001606+00:00
+  author: claude
+  text: |-
+    Review: passed. `bc017cd58` (HEAD, rebased on main `d306033e6`) fixes the archived-ticket bug and keeps DEV-697's handling of ambiguous IDs.
+
+    - **Read:** the diff (`crates/lotar-agent/src/services/agent_job_service.rs` only), the ticket and its 3 comments, `docs/help/agent.md:485`, `ticket_done_state`, `git log -5 main` for the file (DEV-697 `c763f96e9` is the base now)
+    - **Logic:** `ticket_keeps_its_jobs` (`agent_job_service.rs:3136`) resolves the location first. `Ok` → kept unless archived or done, so unreadable files still stay. `Ambiguous` → kept. `NotFound`/`Invalid` → go. This matches the help doc and every "Done when" item. Results stay cached per ticket, so the extra lookup costs little
+    - **Tests:** the new `old_job_logs_of_archived_and_malformed_tickets_go` (archived Todo, `not-a-ticket`, open control) and DEV-697's ambiguous test are both present. The first review showed that main's function fails the new test
+    - **Reran:** `npm ci` passed; `cargo nextest run -p lotar-agent dev21_ticket_done_state_tests` passed (4/4); `rustfmt --edition 2024 --check` on the file passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` passed. I didn't rerun full `npm test`/`npm run smoke`: the fix agent reports them passed, and the change touches one private function plus a test
+    - **No findings:** no stray files, no second branch, nothing that needs the owner's decision. The worktree is clean
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3a7b67a-a3b1-4fc0-b101-30ecf4ca26de
 description: |-
@@ -146,3 +180,35 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-18T06:17:06.913590+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-18T06:22:24.781617+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:22:31.008210+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T06:23:22.001606+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:23:30.669009+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

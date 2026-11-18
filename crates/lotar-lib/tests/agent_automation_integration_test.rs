@@ -3425,3 +3425,105 @@ fn a_failed_dependency_check_queues_the_job_and_the_queue_checks_again() {
     AgentQueueService::run_worker(&fixtures.tasks_root).expect("run worker");
     assert_eq!(wait_for_completed_jobs(&repaired.id, 1, 10_000).len(), 1, "the job starts once the graph reads");
 }
+
+/// DEV-701: a manual rule that assigns the agent the ticket already has
+/// starts that agent's job; it printed "Queue agent job" and queued none.
+#[cfg(unix)]
+#[test]
+fn manual_rule_queues_a_job_for_the_agent_the_ticket_already_has() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "stub-triage.sh",
+        "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}'\n",
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!("issue:\n  states: [Todo, InProgress, Done]\nagents:\n  triage:\n    runner: command\n    command: \"{}\"\n", script.display()),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Triage again\n      on:\n        manual:\n          set:\n            assignee: \"@triage\"\n          agent:\n            prompt: \"Triage ${{ticket.id}}\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let task = TaskService::create(&mut storage, TaskCreate { title: "Inbox item".to_string(), project: Some("INB".to_string()), ..Default::default() })
+        .expect("create task");
+    TaskService::update_with_context(
+        &mut storage,
+        &task.id,
+        TaskUpdate { assignee: Some("@triage".to_string()), ..Default::default() },
+        TaskUpdateContext::automation_disabled(),
+    )
+    .expect("assign without a job");
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != task.id), "no job before the run");
+
+    let report = AutomationService::run_manual(&mut storage, &["Triage again".to_string()], None, false).expect("run manual");
+    assert_eq!(report.entries.len(), 1, "{report:?}");
+    assert!(report.entries[0].actions.iter().any(|action| action.action == "queue_agent"), "{report:?}");
+
+    let jobs = wait_for_completed_jobs(&task.id, 1, WAIT_FLOOR_MS);
+    assert_eq!(jobs.len(), 1, "the run queued a job: {jobs:?}");
+    assert_eq!(jobs[0].agent.as_deref(), Some("triage"));
+}
+
+/// DEV-701: an `unblocked` rule replayed by `lotar automation run` on a
+/// ticket already assigned to the rule's agent starts no job, and the run
+/// says so instead of "Queue agent job".
+#[cfg(unix)]
+#[test]
+fn unblocked_replay_says_no_job_for_the_agent_the_ticket_already_has() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "stub-fix.sh",
+        "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}'\n",
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!("issue:\n  states: [Todo, Blocked, InProgress, Done]\nagents:\n  fix:\n    runner: command\n    command: \"{}\"\n", script.display()),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Prerequisites done\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          set:\n            assignee: \"@fix\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let docs = TaskService::create(
+        &mut storage,
+        TaskCreate { title: "Docs".to_string(), project: Some("UB".to_string()), status: Some("Done".into()), ..Default::default() },
+    )
+    .expect("create prerequisite");
+    let waiting = TaskService::create(
+        &mut storage,
+        TaskCreate { title: "Waiting".to_string(), project: Some("UB".to_string()), status: Some("Blocked".into()), ..Default::default() },
+    )
+    .expect("create task");
+    TaskService::update_with_context(
+        &mut storage,
+        &waiting.id,
+        TaskUpdate {
+            assignee: Some("@fix".to_string()),
+            relationships: Some(lotar::types::TaskRelationships { depends_on: vec![docs.id.clone()], ..Default::default() }),
+            ..Default::default()
+        },
+        TaskUpdateContext::automation_disabled(),
+    )
+    .expect("assign without a job");
+
+    let report = AutomationService::run_manual(&mut storage, &["Prerequisites done".to_string()], None, false).expect("run manual");
+    assert_eq!(report.entries.len(), 1, "{report:?}");
+    let actions = &report.entries[0].actions;
+    assert!(actions.iter().all(|action| action.action != "queue_agent"), "{actions:?}");
+    assert!(actions.iter().any(|action| action.action == "no_agent_job"), "{actions:?}");
+    sleep(Duration::from_millis(300));
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != waiting.id), "no job started");
+}

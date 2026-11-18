@@ -1,14 +1,15 @@
 title: Agent action queues no job when the ticket's assignee is already that agent
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-18T04:40:49.336024+00:00
-modified: 2026-11-18T06:11:17.408738+00:00
+modified: 2026-11-18T06:22:41.549285+00:00
 relationships:
   related:
   - DEV-653
+  - DEV-617
 comments:
 - date: 2026-11-18T05:38:00.171921+00:00
   author: claude
@@ -42,6 +43,86 @@ comments:
     - **Blocking: the unblocked path still prints the false line.** `run_unblocked` (`crates/lotar-agent/src/services/automation_service.rs:1036`) builds its output with `describe_action`, which adds "Queue agent job for profile 'X'" whenever `set.assignee` names an agent profile (`:1240-1265`). `apply_action` queues only for `AutomationEvent::Manual` (`reassigns_agent`, `:2332`). An unblocked rule sets the assignee to the agent the ticket already has (blocking keeps the agent as assignee, `docs/help/automation.md:45`), so `maybe_queue_agent_on_assignment` returns at `previous == new` (`:2818`). The run then prints "Queue agent job" with no job and no `note:`, which breaks the ticket's Done ("the CLI never prints 'Queue agent job' without queueing one").
     - Fix: make `describe_action` print the `queue_agent` line only when a job will be queued: manual events, or `current.assignee` differs from the new one. Otherwise print e.g. "assignee unchanged, no job (use tell_agent)", as the docs at `automation.md:480` already describe. Add a test that replays an unblocked rule on a ticket already assigned to the agent and checks the output.
     - Note, not blocking: running the same manual rule twice now starts a second job once the first has ended (the fix agent says so). The docs say to use a cooldown or a condition for that, so it's fine.
+- date: 2026-11-18T06:18:20.275395+00:00
+  author: claude
+  text: |-
+    Rework: the unblocked replay no longer prints "Queue agent job" without queueing one.
+
+    - The review read HEAD `2e50a083d`, so I fixed its finding.
+    - `describe_action` now gets the event. For any event other than `manual`, when the rule sets the assignee the ticket already has, it prints `no_agent_job` "No agent job: the ticket is already assigned to @x (tell_agent starts it)" instead of `queue_agent`. This covers `run_unblocked` and `lotar automation simulate`.
+    - New test, failing first: `unblocked_replay_says_no_job_for_the_agent_the_ticket_already_has` in `crates/lotar-lib/tests/agent_automation_integration_test.rs`. Against the old source it printed `queue_agent`; with the fix it passes and no job starts.
+    - Docs: the manual-run line in `docs/help/automation.md` names the new line.
+    - Amended into `01c91d247`. Full lint, test (2374 Rust, 1561 UI) and smoke (405) passed.
+  report:
+    commits:
+    - hash: 01c91d247
+      what: manual runs queue the job of an agent the ticket already has; other paths print No agent job instead of Queue agent job
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review again, then merge
+- date: 2026-11-18T06:21:42.227967+00:00
+  author: claude
+  text: |-
+    Review: passed. `01c91d247` fixes both paths: a manual run queues the job (or prints why not as a note), and an unblocked replay prints "No agent job" instead of a false "Queue agent job".
+
+    - Read `01c91d247`, the only commit in `main..HEAD`, which is also the tip of `agent/DEV-701`. Main moved to `d306033e6` (DEV-617 touches `automation_service.rs`, in other functions). `git merge-tree` reports no conflict.
+    - Last review's blocker is fixed: `describe_action` now gets the event (`automation_service.rs:1253`). For any event other than manual, when the rule sets the assignee the ticket already has, it prints `no_agent_job`. This matches `apply_action`, where only manual runs skip the `previous == new` check (`:2346-2352`). `simulate` passes its real event (`:819`), so its preview matches what the run does.
+    - The job notes (an active job, or `max_iterations` reached) now reach both manual entries and unblocked entries (`:960`, `:1054`).
+    - `npm ci` ok. `cargo nextest run -p lotar-lib --test integration -E 'test(/agent_automation_integration_test::/)'`: 54 passed.
+    - Failing test first: with `automation_service.rs` from `2e50a083d` in a detached scratch worktree, `unblocked_replay_says_no_job_for_the_agent_the_ticket_already_has` fails at `agent_automation_integration_test.rs:3477`. The scratch worktree is removed.
+    - `cargo clippy -p lotar-agent -p lotar-lib --all-targets -- -D warnings`, `rustfmt --check` and `prettier --check` on the changed files: clean. The full `npm run lint/test/smoke` wasn't rerun: the fix agent reports them passing on this commit.
+    - No UI changes, no stray files. Tickets filed: none.
+- date: 2026-11-18T06:22:41.549285+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/useFilterBuilder-CY_LpVpd.js           24.60 kB │ gzip:   8.37 kB
+    target/web/assets/AgentJobs-BaO41tw5.js                  25.75 kB │ gzip:   8.74 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-Bxn7eU0Q.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-axk0H1R8.js                      47.85 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-CudTKcoO.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-CLAEKm1t.js      72.02 kB │ gzip:  20.04 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-C5emYl7Q.js                153.93 kB │ gzip:  38.50 kB
+    target/web/assets/SprintsList-m5kfIMuE.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-BVq19foQ.js                     419.56 kB │ gzip: 127.76 kB
+
+    ✓ built in 514ms
+    compressed 1926KiB -> 579KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-tasks v0.15.4 (/Users/mallox/.t3/worktrees/lotar/agent-DEV-701-9113159f15dd4048/crates/lotar-tasks)
+       Compiling lotar-web-assets v0.15.4 (/Users/mallox/.t3/worktrees/lotar/agent-DEV-701-9113159f15dd4048/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.4 (/Users/mallox/.t3/worktrees/lotar/agent-DEV-701-9113159f15dd4048/crates/lotar-lib)
+       Compiling lotar-agent v0.15.4 (/Users/mallox/.t3/worktrees/lotar/agent-DEV-701-9113159f15dd4048/crates/lotar-agent)
+    error: couldn't read `/private/tmp/claude-501/-Users-mallox--t3-worktrees-lotar-agent-DEV-701-9113159f15dd4048/e4687cc1-e5c9-4ac6-b093-a239c76aeee7/scratchpad/old/crates/lotar-agent/../../docs/help/agent-instructions.md`: No such file or directory (os error 2)
+      --> crates/lotar-agent/src/services/agent_job_service.rs:34:42
+       |
+    34 | const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!(concat!(env!("LOTAR_DOCS_DIR"), "/help/agent-instructions.md"));
+       |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    error: could not compile `lotar-agent` (lib) due to 1 previous error
+    warning: build failed, waiting for other jobs to finish...
+    error: could not compile `lotar-agent` (lib test) due to 1 previous error
+    error: command `/Users/mallox/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/cargo '--color=never' test --no-run --message-format json-render-diagnostics --profile dev` exited with code 101
+    ```.
+
+    - Rebased `agent/DEV-701` onto `main` (`d306033e6f4a`): `4812ba2d5a3b`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b20c500-78e5-4ed1-9442-566d04a6100c
 description: 'Found 2026-11-17 by the chief of staff: standards INBOX-397 had assignee @triage with no job. lotar automation run "Inbox: triage again" --select id:INBOX-397 (set assignee @triage, agent triage) printed "Set assignee to agent ''triage''" and "Queue agent job for profile ''triage''", yet lotar agent list-jobs showed no job. After lotar task edit INBOX-397 --assignee mallox the same command queued job-20261118T044015.808Z-1 at once. The same rule queued jobs for INBOX-402, 441 and 443, which had other assignees. Check: an automation run whose agent action targets a ticket already assigned to that agent queues a job (or says why not). Done: a failing test first, then the fix; the CLI never prints "Queue agent job" without queueing one.'
@@ -111,3 +192,39 @@ history:
   - field: status
     old: Reviewing
     new: InProgress
+- at: 2026-11-18T06:18:20.275395+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:18:27.630979+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T06:21:42.227967+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T06:21:43.211793+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653"]}'
+    new: '{"related":["DEV-653","DEV-617"]}'
+- at: 2026-11-18T06:21:49.723012+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-18T06:22:41.549285+00:00
+  actor: automation
+  changes:
+  - field: comment_added
