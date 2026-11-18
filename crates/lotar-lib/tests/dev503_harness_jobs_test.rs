@@ -880,6 +880,27 @@ fn the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_sessio
     assert!(earlier.join("fix.txt").is_file(), "the earlier worktree moved with it");
 }
 
+/// DEV-694: on DEV-617 a headless review ran in between, in the earlier fix thread's worktree that still had
+/// `agent/TEST-1` checked out, and the next fix job continued the fix session on a branch of its own. Its end failed
+/// (`cannot force update the branch used by worktree`) on a build without DEV-673. The ended review doesn't hold the
+/// worktree either: the ticket's branch moves with it to the thread's commit.
+#[test]
+fn the_tickets_branch_moves_after_a_headless_review_ran_in_the_earlier_worktree() {
+    let run = "if git rev-parse -q --verify refs/heads/agent/TEST-1 >/dev/null; then echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; else git checkout -q -b agent/TEST-1; fi";
+    let (fixtures, _env) =
+        t3_harness_and(&[("fix", run, "")], "  review:\n    runner: command\n    command: /bin/sh\n    args: [\"-c\", \"pwd >> ../../review.log\"]\n");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let earlier = std::fs::canonicalize(root.join("t3-trees/0")).unwrap();
+    run_t3(&fixtures, "review").success();
+    let reviewed = std::fs::read_to_string(root.join("review.log")).unwrap();
+    assert_eq!(reviewed.trim(), earlier.display().to_string(), "the review ran in the earlier worktree");
+    run_t3(&fixtures, "fix").success();
+    let fix = rev(root, "t3/topic-1");
+    assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch follows the thread");
+    assert_eq!(rev(&earlier, "HEAD"), fix, "the earlier worktree moved with it");
+}
+
 /// DEV-594: a fix job's thread hit the usage limit, so the job failed, and T3 Code resumed the thread on its own when
 /// the limit reset. The next fix job started beside it, in a thread of its own on a `t3/*` branch, and both committed.
 /// A job now waits while T3 Code still runs an earlier job's thread on the ticket.

@@ -1,11 +1,11 @@
 title: A t3 job can't move agent/<ticket> to its thread's branch while a worktree has agent/<ticket> checked out
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: triage
 assignee: '@fix'
 created: 2026-11-18T02:23:14.686039+00:00
-modified: 2026-11-18T04:23:27.862585+00:00
+modified: 2026-11-18T04:59:19.799234+00:00
 relationships:
   depends_on:
   - DEV-658
@@ -75,6 +75,7 @@ comments:
     - If QA on main is red, file that as the blocker instead of asking again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d4ab356-82dd-4657-9a3e-ec1121ba8b10
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a1ee22-1036-4262-971d-5e3ee9d79c77
 description: 'Found: STD-216 job-20261118T021821.921Z-1 failed with ''git branch --force agent/STD-216 41462b6 failed: fatal: cannot force update the branch agent/STD-216 used by worktree /Users/mallox/.t3/worktrees/standards/agent-STD-216-d14d5bbe7bff030e''. The fix is done and checked on the thread''s branch; only the move failed. Check: a test where agent/TEST-1 is checked out in a worktree and the thread''s branch is ahead: the job moves the branch anyway (e.g. git -C <worktree> reset --hard or update-ref there, when the worktree is clean) or detaches the worktree first. Done when STD-216''s branch lands without the owner. Related: DEV-687 (the earlier refusal).'
 tags:
 - health
@@ -177,3 +178,14 @@ history:
   - field: tags
     old: health
     new: health, retry-fix
+- at: 2026-11-18T04:59:15.538159+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T04:59:19.799234+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81a1ee22-1036-4262-971d-5e3ee9d79c77
