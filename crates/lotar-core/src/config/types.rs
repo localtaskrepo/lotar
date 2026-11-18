@@ -323,6 +323,11 @@ pub struct AgentProfileDetail {
     /// reports passes this (DEV-511).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub max_budget_usd: Option<f64>,
+    /// A job whose agent sends nothing (no event, no output line) for this
+    /// many seconds fails as stalled, so `job_failed` rules decide (DEV-682).
+    /// Unset or 0: no limit. A question waiting for an answer doesn't count.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stall_timeout_seconds: Option<u64>,
     /// The agent's own ACP config options, id to value (`harnessmux
     /// capabilities <agent>` lists them), set after `model` and `effort`: for
     /// values outside low..max such as Codex's `reasoning_effort: ultra`.

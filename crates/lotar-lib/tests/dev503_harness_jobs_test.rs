@@ -473,6 +473,21 @@ fn cancelling_a_job_cancels_its_sessions_turn() {
     let _ = std::fs::remove_file(&hold);
 }
 
+/// DEV-682: an agent that sends nothing for the profile's stall_timeout_seconds has its turn cancelled, and the job
+/// fails as stalled, so `job_failed` rules decide.
+#[test]
+fn a_silent_agent_fails_its_job_as_stalled() {
+    let root = tempfile::tempdir().unwrap();
+    let hold = root.path().join("hold");
+    let harness = harness("    stall_timeout_seconds: 1\n", &[("FAKE_HOLD", hold.to_string_lossy().to_string())]);
+    let job = harness.start();
+    wait_for("the job's failure", || status(&job) == "failed");
+    assert!(hold.exists(), "the agent held its prompt");
+    let summary = AgentJobService::get_job(&job).unwrap().summary.unwrap_or_default();
+    assert!(summary.starts_with("Stalled: the agent sent nothing for 1s"), "{summary}");
+    wait_for("the cancel", || harness.log().contains("\"method\":\"session/cancel\""));
+}
+
 /// DEV-511: a reply shows in the job log while the agent writes it, not only when its turn ends.
 #[test]
 fn a_reply_streams_into_the_job_log_as_the_agent_writes_it() {

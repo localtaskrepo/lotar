@@ -71,6 +71,7 @@ CLI > env > project > home > global > defaults (commands without a project skip 
   - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be one of the runners in [Agent Jobs](./agent.md#runners).
   - agents.<name>.mcp.lotar: boolean (default false) — give the job LoTaR's own MCP server, limited to ticket tools (not for `amp`, `t3` or `command`)
   - agents.<name>.max_budget_usd: number — the job's turn is cancelled and the job fails once the cost the agent reports passes it. See [Usage and cost](./agent.md#usage-and-cost)
+  - agents.<name>.stall_timeout_seconds: integer — a job whose agent sends nothing for this many seconds fails as stalled; unset or `0`: no limit. See [Stalls and tickets that move on](./agent.md#stalls-and-tickets-that-move-on)
   - agents.<name>.instructions: string | { file: string } — added after `agent.instructions` (or the built-in instructions) for this profile
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)

@@ -26,6 +26,7 @@ use std::time::{Duration, Instant};
 
 mod merge;
 mod resumed;
+mod watch;
 
 const EVENT_LOG_LIMIT: usize = 200;
 /// How long a runner's descendants may keep its output streams busy after it exits.
@@ -2350,7 +2351,6 @@ fn resume_session_to_end(
     config: &ResolvedConfig,
     why: &str,
 ) {
-    let budget = profile.max_budget_usd;
     let session = (|| {
         let table = crate::services::agent_runner::job_agent_table(agent, profile)?;
         // The turn it finishes keeps the environment the job gave it.
@@ -2381,7 +2381,7 @@ fn resume_session_to_end(
         record_and_emit(state, "agent_job_progress", Some(note.clone()));
     });
     let mut context_messages = Vec::new();
-    let end = drive_session(job_id, tasks_dir, &session, prompt, &[], budget, &mut context_messages);
+    let end = drive_session(job_id, tasks_dir, &session, prompt, &[], profile, &mut context_messages);
     end_job(job_id, ticket_id, end, &context_messages, tasks_dir, config);
 }
 
@@ -3911,10 +3911,26 @@ fn run_command(
             .flatten()
             .collect();
 
+    let mut watch = watch::JobWatch::new(job_id, tasks_dir, ticket_id, profile.stall_timeout_seconds);
+    let mut stalled = None;
     let status = loop {
         // A cancel asked for by another process (`lotar agent cancel`).
         if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
             let _ = AgentJobService::cancel_job(job_id);
+        }
+        match watch.check() {
+            Some(watch::WatchEnd::MovedOn) => {
+                let _ = AgentJobService::cancel_job(job_id);
+            }
+            Some(watch::WatchEnd::Stalled(why)) => {
+                if let Ok(mut c) = child.lock() {
+                    terminate_child(&mut c);
+                    let _ = c.wait();
+                }
+                stalled = Some(why);
+                break Err(std::io::Error::other("stalled"));
+            }
+            None => {}
         }
         if should_stop_job(job_id)
             && let Ok(mut c) = child.lock()
@@ -3945,6 +3961,9 @@ fn run_command(
     }
     if should_stop_job(job_id) {
         return RunEnd::Stopped;
+    }
+    if let Some(why) = stalled {
+        return RunEnd::Failed(why);
     }
     match (status, output_error) {
         (Ok(status), None) => RunEnd::Exited(status.code()),
@@ -4091,7 +4110,7 @@ fn run_session(
         let note = format!("{how} {} (`harnessmux attach {}` follows it).", launch.name, launch.name);
         record_and_emit(state, "agent_job_progress", Some(note));
     });
-    let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile.max_budget_usd, context_messages);
+    let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile, context_messages);
     if let Some(recorded) = t3_setup.take() {
         let note = recorded.finish();
         update_job(job_id, |state| {
@@ -4386,15 +4405,15 @@ impl CostMeter {
 
 /// Run `prompt` as the next turn of `session`, then the turns that messages
 /// queue meanwhile (the message box, `harnessmux send`, DEV-384), and record
-/// their events on the job. The job ends with the last of them, or when its
-/// cost passes `budget`.
+/// their events on the job. The job ends with the last of them, when its
+/// cost passes the profile's budget, or when [`watch::JobWatch`] ends it.
 fn drive_session(
     job_id: &str,
     tasks_dir: &std::path::Path,
     session: &harnessmux::Session,
     prompt: &str,
     prefixes: &[String],
-    budget: Option<f64>,
+    profile: &AgentProfileDetail,
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
     let status = block_on(session.status()).map_err(|err| err.to_string());
@@ -4409,7 +4428,7 @@ fn drive_session(
         Ok(turn) => turn,
         Err(err) => return RunEnd::Failed(format!("Could not send the prompt to the session {}: {err}", session.name())),
     };
-    let settings = TurnSettings { first, prefixes, budget, agent: &agent, link };
+    let settings = TurnSettings { first, prefixes, budget: profile.max_budget_usd, stall_timeout_seconds: profile.stall_timeout_seconds, agent: &agent, link };
     drive_turns(job_id, tasks_dir, session, &mut events, settings, meter, context_messages)
 }
 
@@ -4420,6 +4439,8 @@ struct TurnSettings<'a> {
     first: u64,
     prefixes: &'a [String],
     budget: Option<f64>,
+    /// The profile's `stall_timeout_seconds`.
+    stall_timeout_seconds: Option<u64>,
     /// The session's agent and link when the job started.
     agent: &'a str,
     link: Option<&'a str>,
@@ -4458,7 +4479,7 @@ fn drive_turns(
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
     use harnessmux::EventBody;
-    let TurnSettings { first, prefixes, budget, agent, link } = settings;
+    let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, link } = settings;
     let mut reply = ReplyStream::default();
     let progress = |message: String| {
         update_job(job_id, |state| {
@@ -4491,9 +4512,20 @@ fn drive_turns(
     let mut waiting = false;
     // A turn runs or was prompted: the job's first from the start.
     let mut in_turn = true;
+    let mut watch = watch::JobWatch::new(job_id, tasks_dir, ticket_id, stall_timeout_seconds);
     loop {
         if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
             let _ = AgentJobService::cancel_job(job_id);
+        }
+        match watch.check() {
+            Some(watch::WatchEnd::MovedOn) => {
+                let _ = AgentJobService::cancel_job(job_id);
+            }
+            Some(watch::WatchEnd::Stalled(why)) => {
+                session.cancel();
+                return RunEnd::Failed(why);
+            }
+            None => {}
         }
         if should_stop_job(job_id) {
             session.cancel();
@@ -4504,6 +4536,7 @@ fn drive_turns(
             Err(why) => return RunEnd::Failed(format!("The session {} {why}", session.name())),
             Ok(Some(event)) => event,
         };
+        watch.activity();
         if event.turn.is_some_and(|turn| turn < first) {
             continue;
         }
@@ -6288,7 +6321,7 @@ mod tests {
         }
     }
 
-    fn unit_job_state(id: &str) -> AgentJobState {
+    pub(super) fn unit_job_state(id: &str) -> AgentJobState {
         let tasks_dir = std::env::temp_dir().join("dev108-no-logs").join(".tasks");
         AgentJobState {
             record: AgentJobRecord {
@@ -7079,7 +7112,7 @@ mod dev520_session_events_tests {
     }
 
     fn drive(events: &mut SessionEvents, tasks_dir: &Path) -> RunEnd {
-        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, agent: "fake", link: None };
+        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None };
         drive_turns("dev520-test", tasks_dir, &Idle, events, settings, CostMeter::default(), &mut Vec::new())
     }
 
