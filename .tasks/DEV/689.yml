@@ -1,0 +1,33 @@
+title: follow_ticket_work's DEV-687 rule (another branch keeps the ticket tip) has no test
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T02:27:08.953170+00:00
+modified: 2026-11-18T02:27:09.799138+00:00
+relationships:
+  related:
+  - DEV-687
+  - DEV-602
+  - TEST-1
+description: |-
+  Found: in review of DEV-687, follow_ticket_work (crates/lotar-agent/src/services/agent_job_service.rs) now moves agent/<ID> to a newer holder that doesn't build on the ticket tip when branch_keeping finds another local branch containing that tip. No test covers this path, and branch_keeping takes any branch: an older t3/topic-N that the ticket branch was pointed at earlier usually contains the tip, so the DEV-602 guard (the ticket branch stays when the newer branch doesn't build on its work) rarely holds now. The moved-away work then stays out of the review and merge.
+
+  Check: a test in crates/lotar-lib/tests/dev503_harness_jobs_test.rs where agent/TEST-1 sits at t3/topic-0's fix and a newer logged branch holds TEST-1 work not built on it; assert what the job does and that its note names the branch that keeps the fix.
+
+  Done: that path is covered by a test, and the owner has decided whether an older t3 branch of the same ticket counts as keeping the work.
+tags:
+- health
+history:
+- at: 2026-11-18T02:27:09.554905+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-687"]}'
+    new: '{"related":["DEV-687","DEV-602","TEST-1"]}'
+- at: 2026-11-18T02:27:09.799138+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

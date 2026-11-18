@@ -1,11 +1,11 @@
 title: 't3 worktree setup: .result files of jobs that ended without finish() stay in .git/lotar/t3-worktree-setup/ for good'
-status: HelpNeeded
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-17T21:59:44.502058+00:00
-modified: 2026-11-18T01:08:28.465478+00:00
+modified: 2026-11-18T02:08:52.215583+00:00
 relationships:
   related:
   - DEV-674
@@ -85,6 +85,46 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-18T02:00:19.581067+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A36ca4890-0d05-4d4c-9e61-e772dbb56964 of the job job-20261118T010751.708Z-25 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261118T020019.572Z-12: DEV-678 goes back to @fix-retry, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-18T02:02:38.161618+00:00
+  author: claude
+  text: |-
+    Resumed job: the fix was already committed as `b90161f9c`; nothing new to change.
+
+    - The job that made it was marked failed after its turn ended (`job-20261118T010751.708Z-25`), not because of the work.
+    - Re-ran `cargo nextest run -p lotar-agent t3_worktree_setup`: 10 passed, including `results_older_than_two_days_are_deleted_and_fresh_ones_kept`.
+    - Branch is based on `cced51c43`; main has moved to `9d8613379`, so the merge agent rebases.
+  report:
+    commits:
+    - hash: b90161f9c
+      what: prune() deletes .result files older than 2 days, with test and docs
+    checks:
+    - command: cargo nextest run -p lotar-agent t3_worktree_setup
+      result: passed
+      reason: 10 tests, rerun now
+    - command: npm run lint
+      result: passed
+      reason: in the earlier turn on b90161f9c
+    - command: npm test
+      result: passed
+      reason: in the earlier turn (2359 Rust, 1548 UI)
+    - command: npm run smoke
+      result: passed
+      reason: in the earlier turn (405)
+    next: Review, then merge (branch is on cced51c43; main is now 9d8613379, rebase needed)
+- date: 2026-11-18T02:08:44.184490+00:00
+  author: claude
+  text: |-
+    Review: passed. Old `.result` files are now deleted after 2 days, and the new test covers it.
+
+    - Reviewed `b90161f9c` (same commit as `t3/5e428430`), which changes `crates/lotar-agent/src/services/t3_worktree_setup.rs` and `docs/help/agent.md`. It merges cleanly onto main `9d8613379`, and main has no newer commits to either file.
+    - Done when 1: `prune()` deletes `.result` files whose file age is over `RESULT_SECS` (2 days). Both `record()` and `setup()` call it. `finish()` still deletes a job's own result when its session ends.
+    - Done when 2: `results_older_than_two_days_are_deleted_and_fresh_ones_kept` checks an old result, a fresh one and one just under 2 days old, through both `setup()` and `record()`. I took the delete loop out and the test failed, then put it back. The worktree is clean.
+    - The doc line in `docs/help/agent.md` describes the new behavior correctly. Nothing outside the ticket changed.
+    - Reran: `npm ci` passed, `cargo nextest run -p lotar-agent t3_worktree_setup` (10 passed), `cargo clippy -p lotar-agent --all-targets` (no warnings), `rustfmt --check` passed. I did not rerun the full `npm run lint`, `npm test` or `npm run smoke`: the fix agent reported them passing on this same commit.
+    - No UI changes, so no screenshot review. No findings and no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab80873ca-9786-4f14-8955-40e4ffb4833e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5b8118c-5073-4af9-aa10-5c2824821be6
@@ -189,3 +229,45 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T02:00:19.547636+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-retry'
+- at: 2026-11-18T02:00:19.581067+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:00:19.798148+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:02:38.161618+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:03:41.802805+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-18T02:08:44.184490+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:08:52.215583+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

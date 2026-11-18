@@ -1,11 +1,11 @@
 title: 'Proposal: harnessmux: typed turn failures (kind, reset time, retryable) from the adapters'' error data'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-17T23:52:07.336095+00:00
-modified: 2026-11-18T01:07:48.131953+00:00
+modified: 2026-11-18T02:26:41.972123+00:00
 relationships:
   related:
   - DEV-584
@@ -93,8 +93,47 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-18T02:21:22.830294+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-494)
+  answer:
+    to: 2026-11-18T01:07:48.131953+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-494)
+- date: 2026-11-18T02:26:32.508723+00:00
+  author: claude
+  text: |-
+    Branch checked and ready for review again; the failed review was a usage limit, not the work.
+
+    - The review session hit "You've hit your 5-hour limit" (`lotar-95e687-DEV-683-review.events.jsonl`). Its error data held only `{"errorKind":"rate_limit"}`, no `rateLimit`: the branch types it `rate_limited`, `resets_at` empty.
+    - Found a gap: that live text matched none of the limit texts (`hit your limit` misses `hit your 5-hour limit`). Added `-hour limit` and `weekly limit` in `src/acp_map.rs` and `src/failure.rs`; the tests failed before the fix and pass after it.
+    - New unit test pins the live error shape. CHANGELOG line updated.
+    - Commit `98b9bf7` in harnessmux on `agent/DEV-683` (on top of `85a7484`, branch is on current `main`). lotar repo unchanged.
+  report:
+    commits:
+    - hash: 98b9bf7
+      what: limit texts '-hour limit' and 'weekly limit', live error shape test (harnessmux agent/DEV-683)
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo nextest run
+      result: passed
+      reason: 56 tests
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: lotar unchanged
+    next: Review harnessmux branch agent/DEV-683 (85a7484, 98b9bf7), then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A99135d3c-e4c5-4c4b-8d8b-1698f984e0be
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af17f6c15-5bff-4902-9be0-e260d7ed3582
 description: |-
   harnessmux reports a failed turn as `turn.failed {error: String}`, built from the error's text, and drops what the adapters already send: the kind of failure and when a usage limit resets. DEV-584 (pause a job until the usage-limit reset) has to guess both from text. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
 
@@ -190,3 +229,37 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T02:21:22.830294+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:21:22.834642+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T02:24:22.784624+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:24:24.018232+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af17f6c15-5bff-4902-9be0-e260d7ed3582
+- at: 2026-11-18T02:26:32.508723+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:26:41.972123+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

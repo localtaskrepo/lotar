@@ -5,7 +5,7 @@ type: Bug
 reporter: triage
 assignee: '@merge'
 created: 2026-11-17T20:51:41.239885+00:00
-modified: 2026-11-18T00:44:16.698771+00:00
+modified: 2026-11-18T02:34:23.853692+00:00
 relationships:
   blocks:
   - DEV-623
@@ -15,6 +15,7 @@ relationships:
   - DEV-577
   - DEV-676
   - DEV-645
+  - DEV-652
 comments:
 - date: 2026-11-17T20:53:20.312383+00:00
   author: claude
@@ -192,3 +193,9 @@ history:
   changes:
   - field: releases
     new: '#9'
+- at: 2026-11-18T02:34:23.853692+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-623"],"related":["DEV-623","DEV-573","DEV-577","DEV-676","DEV-645"]}'
+    new: '{"blocks":["DEV-623"],"related":["DEV-623","DEV-573","DEV-577","DEV-676","DEV-645","DEV-652"]}'

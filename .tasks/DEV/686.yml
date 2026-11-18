@@ -1,0 +1,209 @@
+title: DEV-604 is Done, but its work e4edce9b never reached main
+status: Merging
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-18T02:02:14.561899+00:00
+modified: 2026-11-18T02:32:57.124824+00:00
+relationships:
+  blocks:
+  - DEV-664
+  - DEV-690
+  related:
+  - DEV-604
+  - DEV-664
+  - DEV-685
+comments:
+- date: 2026-11-18T02:23:00.938271+00:00
+  author: claude
+  text: |-
+    DEV-604's queue pause is rebased onto main on `agent/DEV-686`, with the review finding fixed. Not merged yet.
+    - Took `48d4054e6` (`t3/acb65239`, a pure rebase of `e4edce9b`). Merged it with main's memory gate, slot limits and jiff.
+    - Fix: `AgentQueueService::take_held_try`. A job held in `lotar serve` takes a due retry only when no held queue entry waits for it, so a pause whose retry left the queue still ends.
+    - Regression test `a_job_held_in_serve_takes_the_due_try_when_no_queue_entry_waits` in `crates/lotar-lib/tests/dev604_queue_pauses_test.rs`: fails before the fix (`never started: queued`), passes after.
+    - UI: the view files match `48d4054e6` byte for byte. Attached DEV-604's 12 before/after screenshots (`DEV-604-agents-{before,after}-{dark,light}-{390,1440,1920}`), which the earlier review checked.
+    - `git merge-base --is-ancestor e4edce9b main` stays false after the merge, because the hash changes. Check for `79ce70782` on main instead.
+    - Branches `agent/DEV-604`, `t3/b9902be4`, `t3/09cc8d99`, `t3/ae62354d`, `t3/pause-queue-on-signing-disk-failure` and `t3/acb65239` are not deleted. Their work only lands with this merge, and two worktrees still hold `t3/b9902be4` (mid-rebase) and `t3/acb65239`.
+  report:
+    commits:
+    - hash: 79ce70782
+      what: DEV-604 queue pause on main plus take_held_try fix and regression test
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2364 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: cargo nextest run dev604 dev623 dev646
+      result: passed
+    next: merge agent lands agent/DEV-686, checks 79ce70782 is on main, then deletes the six branches and the t3-b9902be4 and t3-acb65239 worktrees once nothing uses them
+- date: 2026-11-18T02:32:47.184087+00:00
+  author: claude
+  text: |-
+    Review: passed. DEV-604's queue pause is rebased cleanly onto main in `79ce70782`, and the fix for the last review's finding works and is tested.
+
+    - **Read:** `git log main..HEAD` (`79ce70782` only, on top of `cced51c43`; main has since moved to `9d8613379`, DEV-685), its diff, both DEV-604 reviews and the fix comments, DEV-686's "Done when", `docs/help/agent.md` § Paused queue, and AGENTS.md.
+    - **The fix:** `AgentQueueService::take_held_try` (`agent_queue_service.rs:455`) gives the due try to a job held in `lotar serve` only when no queue entry the pause holds is waiting, and it takes the try under the queue lock. It is used in `process_pending_queue` (`agent_job_service.rs:5575`). This closes the case from the 2026-11-16 review where the pause stayed forever.
+    - **Regression test:** with the `take_held_try` call removed, `a_job_held_in_serve_takes_the_due_try_when_no_queue_entry_waits` fails (`never started: queued, runs ["TEST-1"]`). With the call in place it passes. I restored the file afterwards.
+    - **Reran:** `npm ci` passed. `npm run lint:agent` passed. `cargo nextest` filtered to the DEV-604 tests and the queue, memory-gate and held-entry tests: 9 of 9 passed. The two UI specs (`AgentActivityIndicator`, `agentJobsUtils`): 5 of 5 passed. I didn't rerun the full `npm test` or `npm run smoke`; the fix agent ran them.
+    - **UI:** the view files are byte-identical to `48d4054e6`. I read the attached before/after screenshots (light 1440, dark 390, before dark 1920). I also ran this branch's `lotar serve` with a runner that prints `No space left on device`, then took my own after screenshots: light and dark at 1920, 1440 and 390. The paused chip, the card edge and the log line show in the warning colour, the `PAUSED` text label is kept, and nothing overflows or breaks the layout.
+    - **Old branches:** `agent/DEV-604`, `t3/b9902be4`, `t3/09cc8d99` and `t3/ae62354d` hold only `e4edce9b`. `t3/pause-queue-on-signing-disk-failure` holds only `6fc5011a`, the version before the rework, and `t3/acb65239` holds only `48d4054e6`. Nothing on them is lost by landing this.
+    - **Not done here:** "Done when" also asks to delete those branches, which can only happen after the merge. I filed [DEV-690](https://lotar.pyxzl.net/task/DEV-690) (depends on DEV-686) for the branches and the two worktrees on them.
+    - **For the merge:** `git merge-base --is-ancestor e4edce9b main` stays false because the hash changes. Check for this commit on main instead.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57e721af-2a57-41c3-9276-69e61d0592fa
+- attachment: DEV-604-agents-after-dark-1440.952b0eddfc66399766af64ead144a82a.png
+- attachment: DEV-604-agents-after-dark-1920.c4f1d9b6eb07dde372b0da3ecf37c42d.png
+- attachment: DEV-604-agents-after-dark-390.bb73935cfb6f159dada55c10cceb2db5.png
+- attachment: DEV-604-agents-after-light-1440.14d0ebb00b36e70c9f9fa1c9756e21c1.png
+- attachment: DEV-604-agents-after-light-1920.be35cb2fc6284ed1349b4fe4e0ed4f7d.png
+- attachment: DEV-604-agents-after-light-390.52d2c0ce200945330276a15d5f67f8f4.png
+- attachment: DEV-604-agents-before-dark-1440.a518a7fd1c5f7d52cdb183b4433db184.png
+- attachment: DEV-604-agents-before-dark-1920.f1909d315c600190d826035dc8e3ffa4.png
+- attachment: DEV-604-agents-before-dark-390.9dd10202744f91d03f459b20906317f1.png
+- attachment: DEV-604-agents-before-light-1440.a06c83e19984233e7ab0874138cd9680.png
+- attachment: DEV-604-agents-before-light-1920.863aa1382f31d3b67e6fd0b2fba61dc6.png
+- attachment: DEV-604-agents-before-light-390.df4ff787375909961bbea34e7a338218.png
+description: 'Found by DEV-664 (2026-11-18): DEV-604 has status Done, but its only commit e4edce9b is on agent/DEV-604, t3/b9902be4, t3/09cc8d99, t3/ae62354d and t3/pause-queue-on-signing-disk-failure, not on main. The review on DEV-604 (2026-11-16 19:32) found it blocking and conflicting with main. The worktree t3-b9902be4-7c71184961c450d6 has been stuck mid-rebase since 2026-11-15 23:11. Check: git merge-base --is-ancestor e4edce9b main fails. Done: DEV-604''s fix with the review finding addressed is on main (or the owner drops it), and the five branches are deleted.'
+tags:
+- health
+- ui
+custom_fields:
+  finding: unlanded:DEV-604
+history:
+- at: 2026-11-18T02:02:15.595608+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-604","DEV-664"]}'
+- at: 2026-11-18T02:02:16.583548+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T02:02:34.080790+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-664"]}'
+    new: '{"blocks":["DEV-664"],"related":["DEV-604","DEV-664"]}'
+- at: 2026-11-18T02:05:06.747940+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T02:05:07.685869+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57e721af-2a57-41c3-9276-69e61d0592fa
+- at: 2026-11-18T02:22:43.713828+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, ui
+- at: 2026-11-18T02:22:43.786068+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-dark-1440.952b0eddfc66399766af64ead144a82a.png
+- at: 2026-11-18T02:22:43.834341+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-dark-1920.c4f1d9b6eb07dde372b0da3ecf37c42d.png
+- at: 2026-11-18T02:22:43.881159+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-dark-390.bb73935cfb6f159dada55c10cceb2db5.png
+- at: 2026-11-18T02:22:43.930330+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-light-1440.14d0ebb00b36e70c9f9fa1c9756e21c1.png
+- at: 2026-11-18T02:22:43.986634+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-light-1920.be35cb2fc6284ed1349b4fe4e0ed4f7d.png
+- at: 2026-11-18T02:22:44.058265+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-after-light-390.52d2c0ce200945330276a15d5f67f8f4.png
+- at: 2026-11-18T02:22:44.109013+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-dark-1440.a518a7fd1c5f7d52cdb183b4433db184.png
+- at: 2026-11-18T02:22:44.157484+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-dark-1920.f1909d315c600190d826035dc8e3ffa4.png
+- at: 2026-11-18T02:22:44.222588+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-dark-390.9dd10202744f91d03f459b20906317f1.png
+- at: 2026-11-18T02:22:44.283507+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-light-1440.a06c83e19984233e7ab0874138cd9680.png
+- at: 2026-11-18T02:22:44.350309+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-light-1920.863aa1382f31d3b67e6fd0b2fba61dc6.png
+- at: 2026-11-18T02:22:44.413357+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-604-agents-before-light-390.df4ff787375909961bbea34e7a338218.png
+- at: 2026-11-18T02:23:00.938271+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:23:15.283257+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T02:32:30.733633+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-664"],"related":["DEV-604","DEV-664"]}'
+    new: '{"blocks":["DEV-664","DEV-690"],"related":["DEV-604","DEV-664"]}'
+- at: 2026-11-18T02:32:47.184087+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:32:47.375921+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-664","DEV-690"],"related":["DEV-604","DEV-664"]}'
+    new: '{"blocks":["DEV-664","DEV-690"],"related":["DEV-604","DEV-664","DEV-685"]}'
+- at: 2026-11-18T02:32:57.124824+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

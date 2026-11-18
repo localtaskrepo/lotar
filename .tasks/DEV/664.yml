@@ -1,12 +1,15 @@
 title: 'Commits only on this Mac: branches'
-status: InProgress
+status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-retry'
 created: 2026-11-17T18:08:11.962632+00:00
-modified: 2026-11-18T01:12:28.751924+00:00
+modified: 2026-11-18T02:04:01.785060+00:00
 relationships:
+  depends_on:
+  - DEV-530
+  - DEV-628
+  - DEV-686
   related:
   - DEV-567
   - DEV-516
@@ -18,6 +21,8 @@ relationships:
   - DEV-523
   - DEV-530
   - DEV-604
+  - DEV-685
+  - DEV-686
 comments:
 - date: 2026-11-17T18:13:17.083588+00:00
   author: claude
@@ -57,9 +62,76 @@ comments:
 - date: 2026-11-18T01:12:28.751924+00:00
   author: automation
   text: The fix agent's job job-20261118T011218.044Z-30 failed (lotar agent logs job-20261118T011218.044Z-30); @fix-retry retries it on branch t3/resolve-unpushed-branch-commits.
+- date: 2026-11-18T01:12:41.790584+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261118T011234.620Z-32 failed again or on a rate limit (lotar agent logs job-20261118T011234.620Z-32). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-18T02:00:18.791814+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A947f85ae-287b-4f05-a37c-5169f75e92ce of the job job-20261118T011234.620Z-32 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261118T020018.782Z-11: DEV-664 goes back to @fix-retry, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-18T02:00:19.001813+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a of the job job-20261118T011218.044Z-30 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A947f85ae-287b-4f05-a37c-5169f75e92ce that the job job-20261118T020018.782Z-11 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-18T02:02:11.905032+00:00
+  author: claude
+  text: |-
+    Done as you answered: the 10 branches are deleted. What the check still lists is kept on purpose.
+
+    - Gone: `t3/sandbox-blocked-check-retries-1`, `agent/DEV-523`, `t3/merge-job-*` (4), `t3/fix-agent-handback-retry-*` (2), `agent/STD-140`, `agent/STD-165`
+    - Still listed and kept by your decision (INBOX-490): DEV-530's `t3/resume-held-*`, `t3/review-dev-530-*` and related branches; DEV-604's `agent/DEV-604`, `t3/b9902be4`, `t3/09cc8d99`, `t3/ae62354d`, `t3/pause-queue-on-signing-disk-failure`
+    - `agent/DEV-628`: live work, its commit `b06642d22` sits in worktree `t3/dev-628-job-prompt-empty-comments`
+    - `main 1`: `9d8613379` (DEV-685, Done, assigned to @merge) is not pushed yet. My `git push origin main` was blocked by the permission check, so DEV-685's merge step still has to push it
+    - No file changes here, so there's nothing to commit
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: failed
+      reason: lists only branches you chose to keep, plus main 1
+- date: 2026-11-18T02:02:34.953777+00:00
+  author: claude
+  text: |-
+    Deleted the 10 branches as you answered. Left: the branches you kept, so DEV-664 now waits Blocked on their tickets.
+
+    - Deleted: `t3/sandbox-blocked-check-retries-1` (`906720436`), `agent/DEV-523` and `t3/merge-job-stopped-no-ff` (`cc8958339`), `t3/merge-job-skip-ff-when-stopped` (`53f61bbd7`), `t3/merge-job-stop-keeps-main` (`eca8ccb22`), `t3/merge-job-stop-keeps-main-1` (`81c1488d5`), `t3/fix-agent-handback-retry-rule` (`537faefda`), `t3/fix-agent-handback-retry-override` (`a3a6f646d`), `agent/STD-140` (`b9de0f693`), `agent/STD-165` (`91e0bfc7b`)
+    - Check now: `unpushed:branches` with 15 commits on DEV-530's 16 branches, DEV-604's 5, `agent/DEV-628` (DEV-628 is InProgress) and `main` (`9d8613379`, DEV-685, merged at 17:12; its push follows)
+    - Filed DEV-686: DEV-604 is Done, but `e4edce9b` never reached main, so no ticket would land it or clear its branches
+    - Depends on DEV-530, DEV-628, DEV-686: once they finish, this ticket's agent deletes their leftover branches and reruns the check
+    - No files changed, so no commit
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: failed
+      reason: unpushed:branches still lists the DEV-530, DEV-604 and DEV-628 branches you said to keep
+    next: Clears when DEV-530, DEV-628 and DEV-686 land; then delete their leftover branches and rerun the check
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A947f85ae-287b-4f05-a37c-5169f75e92ce
 description: |-
   11 commits on no remote, only on this Mac: agent/DEV-516 1, agent/DEV-528 1, agent/DEV-585 1, agent/DEV-628 1, backup/DEV-466-896309c0 3, backup/DEV-585-d6dbec07 1, t3/b9902be4 1, t3/review-held-job-resume 2 (git log <branch> --not --remotes)
 
@@ -189,3 +261,87 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T01:12:36.175169+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A947f85ae-287b-4f05-a37c-5169f75e92ce
+- at: 2026-11-18T01:12:41.713713+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-18T01:12:41.790584+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:00:18.754586+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-retry'
+- at: 2026-11-18T02:00:18.791814+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:00:19.001813+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:00:19.274448+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:02:11.905032+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:02:12.870703+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604"]}'
+    new: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685"]}'
+- at: 2026-11-18T02:02:15.595095+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685"]}'
+    new: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+- at: 2026-11-18T02:02:30.994247+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+    new: '{"depends_on":["DEV-530"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+- at: 2026-11-18T02:02:32.555346+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-530"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+    new: '{"depends_on":["DEV-530","DEV-628"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+- at: 2026-11-18T02:02:34.080059+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-530","DEV-628"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+    new: '{"depends_on":["DEV-530","DEV-628","DEV-686"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686"]}'
+- at: 2026-11-18T02:02:34.953777+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:04:01.785060+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+  - field: assignee
+    old: '@fix-retry'

@@ -1,0 +1,107 @@
+title: A t3 job can't move agent/<ticket> to its thread's branch while a worktree has agent/<ticket> checked out
+status: Blocked
+priority: Medium
+type: Feature
+reporter: triage
+assignee: '@review'
+created: 2026-11-18T02:23:14.686039+00:00
+modified: 2026-11-18T02:36:16.992366+00:00
+relationships:
+  depends_on:
+  - DEV-658
+  related:
+  - DEV-687
+  - TEST-1
+  - DEV-673
+comments:
+- date: 2026-11-18T02:36:06.738036+00:00
+  author: claude
+  text: |-
+    Already fixed on main by DEV-673 (`a11c67715`), but the installed lotar 0.15.3 doesn't have it yet: waits for release v0.15.4 (DEV-658).
+
+    - STD-216's job `job-20261118T021821.921Z-1` continued the session `standards-04f015-STD-216-fix`, the same session as the fix job `job-20261118T004740.011Z-739`, whose clean worktree `agent-STD-216-d14d5bbe7bff030e` has `agent/STD-216` checked out
+    - 0.15.3 (tag `fcc715939`) counted the ending job's own record as a job still at work in that worktree, so it neither moved the worktree nor the branch: `git branch --force` refused
+    - DEV-673 leaves the ending job out (`finished_job_worktree`, `crates/lotar-agent/src/services/agent_job_service.rs`); the test `the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_session` covers this case and passes here
+    - `a11c67715` is on main, not in `v0.15.3`; release v0.15.4 (DEV-658) includes it
+    - STD-216 itself is unchanged: `agent/STD-216` is at `f2c4f93`, the fix is at `41462b6` on `t3/ls-credential-paths-xargs-guard`, the old worktree is clean. STD-216 waits for DEV-688.
+    - No commit: nothing to change
+  report:
+    checks:
+    - command: cargo nextest run --test integration dev503_harness_jobs_test::the_tickets_branch
+      result: passed
+      reason: 4 tests, incl. the DEV-673 same-session case
+    - command: npm run lint
+      result: not_run
+      reason: no file changed
+    - command: npm test
+      result: not_run
+      reason: no file changed
+    - command: npm run smoke
+      result: not_run
+      reason: no file changed
+    next: 'After v0.15.4 is installed (DEV-658), STD-216 continues on its own: check that agent/STD-216 moves to t3/ls-credential-paths-xargs-guard (41462b6) and lands, then set DEV-688 Done'
+- date: 2026-11-18T02:36:16.992366+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-658.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d4ab356-82dd-4657-9a3e-ec1121ba8b10
+description: 'Found: STD-216 job-20261118T021821.921Z-1 failed with ''git branch --force agent/STD-216 41462b6 failed: fatal: cannot force update the branch agent/STD-216 used by worktree /Users/mallox/.t3/worktrees/standards/agent-STD-216-d14d5bbe7bff030e''. The fix is done and checked on the thread''s branch; only the move failed. Check: a test where agent/TEST-1 is checked out in a worktree and the thread''s branch is ahead: the job moves the branch anyway (e.g. git -C <worktree> reset --hard or update-ref there, when the worktree is clean) or detaches the worktree first. Done when STD-216''s branch lands without the owner. Related: DEV-687 (the earlier refusal).'
+tags:
+- health
+custom_fields:
+  finding: infra:branch-in-worktree:move_ticket_branch
+history:
+- at: 2026-11-18T02:23:15.010044+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-687","TEST-1"]}'
+- at: 2026-11-18T02:23:15.582088+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T02:31:22.703193+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T02:31:23.692363+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d4ab356-82dd-4657-9a3e-ec1121ba8b10
+- at: 2026-11-18T02:36:06.244775+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-687","TEST-1"]}'
+    new: '{"depends_on":["DEV-658"],"related":["DEV-687","TEST-1"]}'
+- at: 2026-11-18T02:36:06.738036+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:36:06.938007+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-658"],"related":["DEV-687","TEST-1"]}'
+    new: '{"depends_on":["DEV-658"],"related":["DEV-687","TEST-1","DEV-673"]}'
+- at: 2026-11-18T02:36:16.686360+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T02:36:16.934089+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-18T02:36:16.992366+00:00
+  actor: automation
+  changes:
+  - field: comment_added

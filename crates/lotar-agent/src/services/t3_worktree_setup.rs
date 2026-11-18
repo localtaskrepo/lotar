@@ -23,6 +23,9 @@ const SETTINGS_FILE: &str = ".claude/settings.local.json";
 /// T3 Code runs the worktree script right after `t3 thread start`; an older
 /// record belongs to a job whose thread never got that far.
 const PENDING_SECS: u64 = 600;
+/// A result outlives any session: an older one belongs to a job that ended
+/// without [`finish`] (lotar killed, the Mac restarted) (DEV-678).
+const RESULT_SECS: u64 = 2 * 24 * 60 * 60;
 
 /// What a starting job's new worktree gets.
 #[derive(Debug, Serialize, Deserialize)]
@@ -127,21 +130,35 @@ pub fn record(
 const NOT_CLAIMED: &str = "The thread started without the profile's tools.disallowed and env: T3 Code's worktree script for this project \
 doesn't run `lotar agent worktree setup` (docs/help/agent.md#t3-code-threads).";
 
-/// Delete the records no worktree took in time; their jobs learn it from the
-/// result left in their place, unless `setup` already left one (T3 Code
-/// couldn't be asked). A record that can't be read goes by its file's age.
+/// When `path` was last written, in seconds since the epoch; now when unknown.
+fn modified_at(path: &Path) -> u64 {
+    fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map_or(now(), |since| since.as_secs())
+}
+
+/// Delete the results older than [`RESULT_SECS`] by their file's age, and the
+/// records no worktree took in time; their jobs learn it from the result left
+/// in their place, unless `setup` already left one (T3 Code couldn't be
+/// asked). A record that can't be read goes by its file's age.
 fn prune(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    for path in entries.flatten().map(|entry| entry.path()).filter(|path| path.extension().is_some_and(|ext| ext == "json")) {
+    let (results, records): (Vec<PathBuf>, Vec<PathBuf>) = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json" || ext == "result"))
+        .partition(|path| path.extension().is_some_and(|ext| ext == "result"));
+    for path in results.iter().filter(|path| now().saturating_sub(modified_at(path)) > RESULT_SECS) {
+        let _ = fs::remove_file(path);
+    }
+    for path in records {
         let created = match fs::read_to_string(&path).ok().and_then(|text| serde_json::from_str::<Pending>(&text).ok()) {
             Some(pending) => pending.created_at,
-            None => fs::metadata(&path)
-                .and_then(|meta| meta.modified())
-                .ok()
-                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
-                .map_or(now(), |since| since.as_secs()),
+            None => modified_at(&path),
         };
         if now().saturating_sub(created) > PENDING_SECS && fs::remove_file(&path).is_ok() {
             let result = fs::OpenOptions::new().write(true).create_new(true).open(path.with_extension("result"));
@@ -503,6 +520,31 @@ mod tests {
         let _fresh = record(&repo, "job-12", "DEV-12", &on_branch("agent/DEV-12"), &deny(), BTreeMap::new()).expect("recorded").expect("a record");
         assert!(!record_path(&repo, "job-11").exists(), "deleted by record");
         assert!(record_path(&repo, "job-12").exists());
+    }
+
+    #[test]
+    fn results_older_than_two_days_are_deleted_and_fresh_ones_kept() {
+        let (_temp, repo, worktree) = repo_with_worktree("agent/DEV-15");
+        let dir = repo.join(".git/lotar/t3-worktree-setup");
+        fs::create_dir_all(&dir).expect("setup dir");
+        let (old, fresh, almost) = (dir.join("job-15.result"), dir.join("job-16.result"), dir.join("job-17.result"));
+        for path in [&old, &fresh, &almost] {
+            fs::write(path, "Wrote the settings.").expect("result");
+        }
+        let age = |path: &Path, secs: u64| {
+            let when = SystemTime::now() - std::time::Duration::from_secs(secs);
+            fs::File::options().write(true).open(path).and_then(|file| file.set_modified(when)).expect("aged result");
+        };
+        age(&old, RESULT_SECS + 60);
+        age(&almost, RESULT_SECS - 60);
+        assert!(setup_with(&worktree, titled("")).expect("setup").is_none());
+        assert!(!old.exists(), "a result older than two days is deleted");
+        assert!(fresh.exists() && almost.exists(), "younger results are kept for their jobs");
+
+        age(&fresh, RESULT_SECS + 60);
+        let _recorded = record(&repo, "job-18", "DEV-18", &on_branch("agent/DEV-18"), &deny(), BTreeMap::new()).expect("recorded").expect("a record");
+        assert!(!fresh.exists(), "deleted by record");
+        assert!(almost.exists());
     }
 
     #[test]

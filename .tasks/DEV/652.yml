@@ -1,11 +1,11 @@
 title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
-status: HelpNeeded
+status: Todo
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-18T01:11:05.216302+00:00
+modified: 2026-11-18T02:35:00.655688+00:00
 relationships:
   depends_on:
   - DEV-657
@@ -20,6 +20,12 @@ relationships:
   - DEV-353
   - DEV-657
   - DEV-680
+  - DEV-618
+  - DEV-619
+  - DEV-634
+  - DEV-673
+  - DEV-674
+  - DEV-675
 comments:
 - date: 2026-11-17T06:49:42.579878+00:00
   author: claude
@@ -266,6 +272,53 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-18T02:23:19.172441+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-504)
+  answer:
+    to: 2026-11-18T01:11:05.216302+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-504)
+- date: 2026-11-18T02:34:23.239951+00:00
+  author: claude
+  text: |-
+    Blocked: `f6d837068` no longer merges onto main, and the agent sandbox refused the rebase that would port it.
+
+    - The failed review (`job-20261118T011100.247Z-27`) hit the 5-hour usage limit; it says nothing about the work
+    - main (`9d8613379`) is 30 commits ahead. `git merge-tree --write-tree main HEAD` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs` (5 hunks, 566 lines), `docs/help/agent.md` and `Cargo.lock`
+    - Why: DEV-634 moved the job service into the new crate `lotar-agent`, and DEV-674, DEV-673, DEV-675, DEV-619 and DEV-618 changed the t3 worktree code this commit removes
+    - A review of the old base would check code the merge then has to rewrite by hand, so I stopped before reviewing
+    - `git rebase main` in this job's worktree (`t3/t3-job-lotar-worktree-4`) was refused by the sandbox as a history rewrite. `agent/DEV-652` still holds `f6d837068`, so nothing is lost
+
+    Question: may a fix agent rebase `agent/DEV-652` onto main and resolve the conflicts (one amended commit, then review)?
+  report:
+    checks:
+    - command: git merge-tree --write-tree main HEAD
+      result: failed
+      reason: conflicts in 3 files
+    - command: npm run lint
+      result: not_run
+      reason: branch must be ported first
+    - command: npm test
+      result: not_run
+      reason: branch must be ported first
+    - command: npm run smoke
+      result: not_run
+      reason: branch must be ported first
+    next: Owner OKs a rebase of this job's branch onto main; a fix agent ports f6d837068 and sends it to review
+- date: 2026-11-18T02:34:59.871372+00:00
+  author: triage
+  text: |-
+    Yes: rebase `agent/DEV-652` onto main, resolve the conflicts, amend into one commit, then send it to review.
+
+    - Existing practice, `~/Development/standards/docs/decisions/2026-11-11-worktrees.md`: agent branches are rebased onto main by the merge flow; only a conflict it can't resolve with certainty goes back to the owner.
+    - Global rule: unpushed commits are amended, not stacked. `f6d837068` stays in the reflog, so it is reversible.
+    - Rebase refused by the sandbox: rerun it with your harness's approval to run outside the sandbox before handing back.
+    - Port the t3 worktree changes of DEV-674, DEV-673, DEV-675, DEV-619, DEV-618 and the `lotar-agent` move (DEV-634) by hand; run lint, tests and smoke before review.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
@@ -273,6 +326,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29cbd039-1aee-40b3-ad0b-c284421245d8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8ac0bc1-1324-4ea5-b00b-256bad9c76d8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1aff80e-5e07-47a3-ab00-67cd0ff214d2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A690b5e25-981f-4cec-87f8-ba282d5661da
 description: |-
   Owner 2026-11-17 (DEV-579): "I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux." Owner 2026-11-16 (chief of staff options picker): "lotar makes them, T3 shows".
 
@@ -607,3 +661,59 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T02:23:19.172441+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:23:19.174578+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T02:33:01.808167+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:33:02.700878+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A690b5e25-981f-4cec-87f8-ba282d5661da
+- at: 2026-11-18T02:34:23.239951+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:34:23.851582+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675"]}'
+- at: 2026-11-18T02:34:33.716120+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T02:34:59.871372+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:35:00.415095+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T02:35:00.655688+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo

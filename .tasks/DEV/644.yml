@@ -1,11 +1,11 @@
 title: A job whose turn ended normally fails when its session later ends idle
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-17T02:57:46.326002+00:00
-modified: 2026-11-18T01:12:12.756425+00:00
+modified: 2026-11-18T02:24:20.286893+00:00
 relationships:
   blocks:
   - DEV-617
@@ -19,6 +19,7 @@ relationships:
   - DEV-652
   - DEV-635
   - DEV-646
+  - DEV-634
 comments:
 - date: 2026-11-17T03:18:45.333426+00:00
   author: claude
@@ -231,6 +232,52 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-18T02:00:16.591593+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3f3fae67-311d-480d-aef7-cbe0955c569b of the job job-20261118T011135.952Z-29 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261118T020016.582Z-9: DEV-644 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-18T02:04:08.186812+00:00
+  author: claude
+  text: |-
+    Branch checked again: ready for review. No code change.
+
+    - Earlier retry `job-20261118T011135.952Z-29` failed on a Claude rate limit, not on the work
+    - Main moved `agent_job_service.rs` to `crates/lotar-agent` (`bafbec164`, DEV-634); `git merge-tree` applies `19c7f5472` onto main `9d8613379` cleanly via rename detection
+    - On that merged tree (built in a scratch copy): the 6 `dev520_session_events_tests` pass, clippy `-D warnings` and rustfmt clean
+    - Merge note: drop `bb7cc8371` (DEV-633) in the rebase; main has it as `9c10760fa`
+  report:
+    commits:
+    - hash: 19c7f5472
+      what: DEV-644 fix (unchanged)
+    checks:
+    - command: cargo nextest run -p lotar-agent dev520_session_events_tests (fix merged onto main 9d8613379)
+      result: passed
+      reason: 6 passed
+    - command: cargo clippy -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check agent_job_service.rs
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: only clippy/fmt on the changed crate; no code change in this job
+    - command: npm test
+      result: not_run
+      reason: passed in the fix job on this commit
+    - command: npm run smoke
+      result: not_run
+      reason: passed in the fix job on this commit
+    next: 'Review, then merge: rebase onto main dropping bb7cc8371 (DEV-633, on main as 9c10760fa)'
+- date: 2026-11-18T02:24:13.510476+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix does what "Done" asks, and its test fails without it.
+
+    - **Work:** `19c7f5472`, one file (`agent_job_service.rs`). An `in_turn` flag is set on `TurnStarted` and cleared when a turn ends. `SessionEnded { reason: "idle" }` after the turn ended now returns that turn's exit code. A session that ends during a turn still fails the job. The new test covers end_turn → 0, TurnFailed → 1, ending mid-turn → Failed, and ending before any turn → Failed.
+    - **Read:** the ticket and its comments, the related tickets (no other branch or copy of this fix), and `drive_turns` on main. Main's commits since the branch base don't touch `drive_turns`; DEV-634 moved the file to `crates/lotar-agent`.
+    - **Reran on main `9d8613379` plus the cherry-picked fix** (scratch worktree, now removed): `cargo nextest run -p lotar-agent` 172/172 passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` clean; `rustfmt --check` clean.
+    - **Failing before the fix:** with the new match arm removed and the test kept, `a_session_that_ends_idle_after_its_turn_ended_keeps_the_turns_outcome` FAILS.
+    - **Not rerun:** `npm run lint`, `npm test`, `npm run smoke`. The change is Rust-only. `npm ci` ran in the worktree and succeeded.
+    - **Merge note:** the branch still has `bb7cc8371` (DEV-633). Main has it as `9c10760fa` with a different patch-id, so a rebase won't skip it on its own, and `git merge-tree` shows it conflicts on main. Drop it and land only `19c7f5472`.
+    - No UI change; no minor findings; no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a9e27ee-393b-4db4-b306-f8d87cbaddf7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0b1f365-faca-4cdd-a969-a39d7d4494a0
@@ -470,3 +517,51 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T02:00:16.555387+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T02:00:16.591593+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:00:16.802038+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:04:08.186812+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:04:08.418295+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-617"],"related":["DEV-617","DEV-615","DEV-577","DEV-647","DEV-633","DEV-638","DEV-652","DEV-635","DEV-646"]}'
+    new: '{"blocks":["DEV-617"],"related":["DEV-617","DEV-615","DEV-577","DEV-647","DEV-633","DEV-638","DEV-652","DEV-635","DEV-646","DEV-634"]}'
+- at: 2026-11-18T02:04:22.119131+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T02:24:13.510476+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:24:20.286893+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

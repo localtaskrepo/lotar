@@ -1,11 +1,11 @@
 title: 'Proposal: harnessmux: overloaded Codex turns count as finished, and a deny may pick Codex''s cancel'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-17T23:52:08.704429+00:00
-modified: 2026-11-18T01:07:42.557888+00:00
+modified: 2026-11-18T02:27:54.379254+00:00
 relationships:
   related:
   - DEV-657
@@ -91,8 +91,44 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-18T02:23:12.213588+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-493)
+  answer:
+    to: 2026-11-18T01:07:42.557888+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-493)
+- date: 2026-11-18T02:27:44.868854+00:00
+  author: claude
+  text: |-
+    Branch rechecked, unchanged: ready for review again (the last review stopped on the reviewer's usage limit, not on the work).
+
+    - Work is in **harnessmux**, branch `agent/DEV-684`, commit `65a95a0`, based on current main `0f7afe7`: no rebase needed
+    - lotar's branch has no changes
+    - All harnessmux checks pass in `~/.t3/worktrees/harnessmux/DEV-684`
+    - Recording `tests/recordings/codex-overloaded-after-a-deny.jsonl` is scrubbed (no `_meta`, `auth/`, `available_commands_update` or home paths)
+  report:
+    commits:
+    - hash: 65a95a0
+      what: harnessmux fix (unchanged, from the earlier fix job)
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo nextest run
+      result: passed
+      reason: 53 of 53
+    - command: cargo deny check
+      result: passed
+    next: Review harnessmux branch agent/DEV-684 (65a95a0), then merge in harnessmux
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5fda11d-f695-48f3-a426-5c36abdaa110
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16994b3c-6fa4-43f4-9b0d-feebed32110e
 description: |-
   Two Codex adapter quirks harnessmux doesn't handle yet. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section harnessmux).
 
@@ -170,3 +206,37 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T02:23:12.213588+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:23:12.216007+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T02:26:43.332879+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:26:44.641156+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16994b3c-6fa4-43f4-9b0d-feebed32110e
+- at: 2026-11-18T02:27:44.868854+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:27:54.379254+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

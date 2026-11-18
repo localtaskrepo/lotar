@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-17T01:03:27.180760+00:00
-modified: 2026-11-18T00:44:14.517257+00:00
+modified: 2026-11-18T02:34:23.850608+00:00
 relationships:
   related:
   - DEV-498
@@ -19,6 +19,8 @@ relationships:
   - DEV-623
   - DEV-619
   - DEV-673
+  - DEV-644
+  - DEV-652
 comments:
 - date: 2026-11-17T01:29:07.217603+00:00
   author: claude
@@ -585,3 +587,15 @@ history:
   changes:
   - field: releases
     new: '#9'
+- at: 2026-11-18T02:04:08.417442+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628","DEV-638","DEV-623","DEV-619","DEV-673"]}'
+    new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628","DEV-638","DEV-623","DEV-619","DEV-673","DEV-644"]}'
+- at: 2026-11-18T02:34:23.850608+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628","DEV-638","DEV-623","DEV-619","DEV-673","DEV-644"]}'
+    new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628","DEV-638","DEV-623","DEV-619","DEV-673","DEV-644","DEV-652"]}'

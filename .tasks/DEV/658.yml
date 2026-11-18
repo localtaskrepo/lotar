@@ -1,14 +1,16 @@
 title: Release v0.15.4
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-17T16:01:03.148737+00:00
-modified: 2026-11-18T01:10:58.859388+00:00
+modified: 2026-11-18T02:36:19.134620+00:00
 relationships:
   depends_on:
   - DEV-681
+  blocks:
+  - DEV-688
   related:
   - DEV-651
   - DEV-681
@@ -75,8 +77,20 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-18T02:23:26.916263+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-502)
+  answer:
+    to: 2026-11-18T01:10:58.859388+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-502)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0fb4ee5-0af2-43c2-9ff2-844d5e38cc7d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae66d2417-c918-4f65-9cd1-a23b637ba16e
 releases:
 - 9
 description: |-
@@ -170,3 +184,30 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T02:23:26.916263+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:23:26.918331+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T02:36:06.244275+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-681"],"related":["DEV-651","DEV-681","DEV-353"]}'
+    new: '{"depends_on":["DEV-681"],"blocks":["DEV-688"],"related":["DEV-651","DEV-681","DEV-353"]}'
+- at: 2026-11-18T02:36:18.212179+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T02:36:19.134620+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae66d2417-c918-4f65-9cd1-a23b637ba16e
