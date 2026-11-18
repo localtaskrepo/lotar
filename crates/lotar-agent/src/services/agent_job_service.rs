@@ -144,10 +144,6 @@ struct AgentJobState {
     /// sees whether the agent handed the ticket back (DEV-516) or something
     /// moved it on while it ran (DEV-566).
     assignee_at_start: Option<Option<String>>,
-    /// The ticket branch's commit when a T3 Code job's thread started from
-    /// it: a thread that rewrote that commit (an amend) moves the ticket's
-    /// branch when nothing else moved it meanwhile (DEV-550).
-    ticket_commit_at_start: Option<String>,
     /// The request that started the job, for its retry after a pause.
     request: Option<AgentJobCreateRequest>,
     /// The job only retries a paused job's commit (DEV-604).
@@ -379,9 +375,8 @@ impl AgentJobService {
         // profile's permissions say.
         let read_only = runner_kind != AgentRunnerKind::T3 && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
         let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && crate::services::agent_runner::takes_mcp_servers(runner_kind);
-        let t3_thread = runner_kind == AgentRunnerKind::T3;
-        let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp, t3_thread);
-        if t3_thread {
+        let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp);
+        if runner_kind == AgentRunnerKind::T3 {
             notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id, is_merge_job));
         }
         let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, &ticket_id, req.agent.as_deref()));
@@ -475,7 +470,6 @@ impl AgentJobService {
                     worker_running: false,
                     main_head_at_start: None,
                     assignee_at_start: None,
-                    ticket_commit_at_start: None,
                     request: Some(req.clone()),
                     commit_retry,
                     carried_outcome,
@@ -1228,18 +1222,8 @@ fn instruction_template(
 
 /// What LoTaR knows about how this job runs and ends, so the agent neither
 /// leaves work uncommitted in a worktree nor fights automation over the
-/// ticket's status. A T3 Code thread may run on a branch T3 Code made from
-/// the ticket's branch (DEV-583), which LoTaR points the ticket's branch at
-/// when the job ends.
-fn job_notes(
-    tasks_dir: &std::path::Path,
-    config: &ResolvedConfig,
-    ticket_id: &str,
-    is_merge_job: bool,
-    read_only: bool,
-    lotar_mcp: bool,
-    t3_thread: bool,
-) -> String {
+/// ticket's status.
+fn job_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool, read_only: bool, lotar_mcp: bool) -> String {
     if read_only {
         return "- This job is read-only: you can read files and search, but not edit files or run commands \
 that change anything, including lotar. Don't try to update the ticket. Put your complete result in your \
@@ -1258,18 +1242,10 @@ final answer; LoTaR saves it as the job summary.\n"
     }
     if config.agent_worktree.enabled {
         let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
-        if t3_thread {
-            notes.push_str(&format!(
-                "- You work in a git worktree on branch `{branch}` or one T3 Code made from it (`git branch --show-current`). \
-Commit your work to the branch you are on before you finish: LoTaR points `{branch}` at it when the job ends. \
-If git refuses (a sandbox), leave the changes: LoTaR commits them. Don't switch branches.\n"
-            ));
-        } else {
-            notes.push_str(&format!(
-                "- You work in a git worktree on branch `{branch}`, separate from the main checkout. Commit your work to it \
+        notes.push_str(&format!(
+            "- You work in a git worktree on branch `{branch}`, separate from the main checkout. Commit your work to it \
 before you finish; if git refuses (a sandbox), leave the changes: LoTaR commits them when the job ends. Don't switch branches.\n"
-            ));
-        }
+        ));
         if is_merge_job {
             notes.push_str(&format!(
                 "- This is a merge job: it succeeds only if the branch ends up in the main checkout's current branch. \
@@ -1611,9 +1587,9 @@ fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
         return Ok(context);
     }
 
-    // The ticket's branch checked out in another worktree, a T3 Code
-    // thread's (DEV-581): git checks a branch out in one worktree only, so
-    // the job runs there. The thread can continue in it afterwards.
+    // The ticket's branch checked out in another worktree, one made by hand
+    // or a T3 Code thread's from before DEV-652 (DEV-581): git checks a
+    // branch out in one worktree only, so the job runs there.
     if let Some(path) =
         linked_worktrees(&repo_root)?.into_iter().find_map(|(path, on)| (on.as_deref() == Some(branch.as_str()) && path.is_dir()).then_some(path))
     {
@@ -1692,20 +1668,14 @@ fn clonefile(_from: &std::path::Path, _to: &std::path::Path) -> std::io::Result<
     Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "clonefile(2) isn't available on this system"))
 }
 
-/// Where a t3 job's thread starts: `t3 thread start --worktree <base> [--branch <branch>]`.
-struct T3Worktree {
-    base: String,
-    branch: Option<String>,
-}
-
 /// A T3 Code thread runs on the T3 server and doesn't get the job's
 /// environment (`LOTAR_TASKS_DIR`), so its lotar commands name the tasks
 /// folder; in a worktree they would otherwise change the worktree's copy.
-/// A retried or resumed job's thread starts in a new worktree (DEV-583), so
-/// the notes name the ticket's worktrees that hold uncommitted work. They
-/// stay there after a job carried them over or dropped them, so the note
-/// leaves them to a job that takes the work over; a merge job doesn't get
-/// it (DEV-608).
+/// Threads of jobs before DEV-652 ran in worktrees T3 Code made, on
+/// branches of their own (DEV-583), so the notes name those of the ticket
+/// that hold uncommitted work. They stay there after a job carried them
+/// over or dropped them, so the note leaves them to a job that takes the
+/// work over; a merge job doesn't get it (DEV-608).
 fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool) -> String {
     let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
     let mut notes = format!(
@@ -1728,8 +1698,10 @@ commits and comments first. A review job leaves them alone. Leave that worktree 
     notes
 }
 
-/// The worktrees of the ticket's branch and of the T3 Code thread branches
-/// made from it that have uncommitted changes, with their branches.
+/// The worktrees of the T3 Code thread branches made from the ticket's
+/// branch, or detached from it, that have uncommitted changes, with their
+/// branches. The worktree that has the ticket's branch checked out is the
+/// job's own.
 fn uncommitted_ticket_worktrees(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str) -> Vec<(std::path::PathBuf, String)> {
     if !config.agent_worktree.enabled {
         return Vec::new();
@@ -1741,203 +1713,13 @@ fn uncommitted_ticket_worktrees(tasks_dir: &std::path::Path, config: &ResolvedCo
     let worktrees = agent_worktrees(&repo_root, &config.agent_worktree.branch_prefix).unwrap_or_default();
     worktrees
         .into_iter()
-        .filter(|worktree| worktree.ticket_branch == ticket_branch)
+        .filter(|worktree| worktree.ticket_branch == ticket_branch && (worktree.detached || worktree.branch != ticket_branch))
         .filter(|worktree| {
             let status = git_command(&worktree.path).args(["status", "--porcelain"]).output();
             status.is_ok_and(|status| status.status.success() && !status.stdout.is_empty())
         })
         .map(|worktree| (fs::canonicalize(&worktree.path).unwrap_or(worktree.path), worktree.branch))
         .collect()
-}
-
-/// The worktree a t3 job asks T3 Code for, as T3 Code runs a thread only in
-/// its project (DEV-318): a new ticket branch from the main checkout's
-/// current branch, or the existing ticket branch of an earlier phase. The
-/// session runs in the main checkout (the T3 project).
-fn plan_t3_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> LoTaRResult<(WorktreeContext, T3Worktree)> {
-    let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
-    let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
-    let mut note = None;
-    let plan = if branch_exists(&repo_root, &branch) {
-        T3Worktree { base: branch.clone(), branch: None }
-    } else {
-        note = move_aside_detached_t3_worktree(&repo_root, &config.agent_worktree.branch_prefix, &branch)?;
-        let head =
-            git_command(&repo_root).args(["symbolic-ref", "--quiet", "--short", "HEAD"]).current_dir(&repo_root).output().map_err(LoTaRError::IoError)?;
-        let base = String::from_utf8_lossy(&head.stdout).trim().to_string();
-        T3Worktree { base: if head.status.success() && !base.is_empty() { base } else { "HEAD".to_string() }, branch: Some(branch.clone()) }
-    };
-    let context = WorktreeContext { working_dir: repo_root, worktree_path: None, worktree_branch: Some(branch), note };
-    Ok((context, plan))
-}
-
-/// T3 Code puts a new branch's worktree at the same path every time:
-/// `<repo>/<branch, / as ->-<hash of repository and branch>`. A worktree an
-/// earlier thread left there, detached from the ticket's branch when a
-/// later thread took the branch over (DEV-573), stays after the branch is
-/// deleted, and every later thread then fails with `path_already_exists`
-/// (DEV-596). It moves aside with its changes; Done cleanup finds it there.
-fn move_aside_detached_t3_worktree(repo_root: &std::path::Path, prefix: &str, branch: &str) -> LoTaRResult<Option<String>> {
-    let mut stem = String::new();
-    for character in branch.replace('/', "-").chars() {
-        if stem.len() + character.len_utf8() > 23 {
-            break;
-        }
-        stem.push(character);
-    }
-    let repo_name = repo_root.file_name();
-    let t3_path = |path: &std::path::Path| {
-        path.parent().and_then(std::path::Path::file_name) == repo_name
-            && path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .and_then(|name| name.strip_prefix(stem.as_str())?.strip_prefix('-'))
-                .is_some_and(|hash| hash.len() == 16 && hash.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
-    };
-    let Some(stale) =
-        agent_worktrees(repo_root, prefix)?.into_iter().find(|worktree| worktree.detached && worktree.ticket_branch == branch && t3_path(&worktree.path))
-    else {
-        return Ok(None);
-    };
-    let name = stale.path.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default();
-    let target = (1..).map(|n| stale.path.with_file_name(format!("{name}-detached-{n}"))).find(|path| !path.exists()).unwrap_or_default();
-    run_git_command(repo_root, &["worktree", "move", &stale.path.to_string_lossy(), &target.to_string_lossy()])?;
-    Ok(Some(format!(
-        "Moved the worktree {} that an earlier T3 Code thread left detached from {branch} to {}, so T3 Code can make the new thread's worktree there.",
-        stale.path.display(),
-        target.display()
-    )))
-}
-
-/// The worktree of the T3 Code thread a `session: continue` job sends its
-/// turn to, moved to the ticket branch's commit (DEV-550): T3 Code keeps a
-/// thread on a branch of its own, which a later job's work on the ticket's
-/// branch (an amended rework) leaves behind. The branch moves when it is
-/// behind the ticket's branch, or still at the commit the ticket's branch
-/// pointed at when the thread's last job ended. The worktree is the one
-/// the session's latest job logged, and only when that job ended in
-/// `thread`: a job that started a new thread replaced the session's
-/// earlier one under the same name. `Ok` gives the worktree, its branch
-/// and a note when the branch moved; `Err` says why the thread can't
-/// continue, and LoTaR changes nothing then.
-fn continued_thread_worktree(
-    tasks_dir: &std::path::Path,
-    ticket_id: &str,
-    config: &ResolvedConfig,
-    session: &str,
-    thread: Option<&str>,
-) -> Result<(std::path::PathBuf, String, Option<String>), String> {
-    let ticket_branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
-    let refuse = |why: String| format!("{why}; this job starts a new T3 Code thread on {ticket_branch}.");
-    let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| refuse("Git repository not found".to_string()))?;
-    let latest = saved_jobs(tasks_dir)
-        .into_iter()
-        .filter_map(|job| job.status)
-        .filter(|status| status.session_id.as_deref() == Some(session))
-        .max_by(|a, b| a.at.cmp(&b.at))
-        .filter(|status| thread.is_some() && status.agent_session.as_deref() == thread);
-    let (path, branch, ticket_commit) = latest
-        .and_then(|status| Some((std::path::PathBuf::from(status.worktree_path?), status.worktree_branch?, status.ticket_commit)))
-        .ok_or_else(|| refuse(format!("The latest job of the session {session} recorded no worktree of its T3 Code thread")))?;
-    let shown = path.display();
-    if !path.is_dir() {
-        return Err(refuse(format!("The T3 Code thread's worktree {shown} is gone")));
-    }
-    let git = |args: &[&str]| -> Result<std::process::Output, String> {
-        git_command(&path).args(args).output().map_err(|err| refuse(format!("git {} in {shown}: {err}", args.join(" "))))
-    };
-    let on = git(&["symbolic-ref", "--quiet", "--short", "HEAD"])?;
-    if !on.status.success() || String::from_utf8_lossy(&on.stdout).trim() != branch {
-        return Err(refuse(format!("The T3 Code thread's worktree {shown} is no longer on {branch}")));
-    }
-    let changes = git(&["status", "--porcelain"])?;
-    if !changes.status.success() || !changes.stdout.is_empty() {
-        return Err(refuse(format!("The T3 Code thread's worktree {shown} has uncommitted changes, which LoTaR leaves alone")));
-    }
-    let target = rev_parse(&repo_root, &format!("refs/heads/{ticket_branch}")).ok_or_else(|| refuse(format!("{ticket_branch} doesn't exist")))?;
-    let head = rev_parse(&path, "HEAD").ok_or_else(|| refuse(format!("{shown} has no commit")))?;
-    if head == target {
-        return Ok((path, branch, None));
-    }
-    let behind = git(&["merge-base", "--is-ancestor", &head, &target])?.status.success();
-    if !behind && ticket_commit.as_deref() != Some(head.as_str()) {
-        return Err(refuse(format!("{branch} in the T3 Code thread's worktree {shown} has commits {ticket_branch} lacks, which LoTaR leaves alone")));
-    }
-    let reset = git(&["reset", "--quiet", "--keep", &target])?;
-    if !reset.status.success() {
-        return Err(refuse(format!("git reset --keep {target} in {shown} failed: {}", String::from_utf8_lossy(&reset.stderr).trim())));
-    }
-    let short = |commit: &str| commit.get(..12).unwrap_or(commit).to_string();
-    let note = format!(
-        "Moved {branch} of the continued T3 Code thread from {} to {} ({ticket_branch}), so the thread works on the ticket's current commit.",
-        short(&head),
-        short(&target)
-    );
-    Ok((path, branch, Some(note)))
-}
-
-/// Record the worktree T3 Code made for a t3 job's thread: the one T3 Code
-/// names for the thread, else the one that appeared while it ran, else of
-/// those the one on the job's branch. Other jobs' threads make worktrees
-/// meanwhile, and an earlier job's may hold the job's branch (DEV-573).
-/// T3 Code may rename the branch it was given (`agent/DEV-1` becomes
-/// `t3/<topic>`), so the branch is read from the worktree.
-fn record_t3_worktree(job_id: &str, repo_root: &std::path::Path, before: &[std::path::PathBuf], named: Option<std::path::PathBuf>) {
-    let Ok(now) = linked_worktrees(repo_root) else {
-        return;
-    };
-    let branch = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.worktree_branch.clone()));
-    let new: Vec<_> = now.iter().filter(|(path, _)| !before.contains(path)).collect();
-    let named = named.and_then(|named| fs::canonicalize(named).ok());
-    let found = match (named.and_then(|named| new.iter().find(|(path, _)| fs::canonicalize(path).ok().as_ref() == Some(&named))), new.as_slice()) {
-        (Some(thread), _) | (None, [thread]) => Some((*thread).clone()),
-        _ => branch.as_deref().and_then(|branch| new.iter().find(|(_, on)| on.as_deref() == Some(branch)).map(|found| (*found).clone())),
-    };
-    if let Some((path, branch)) = found {
-        update_job(job_id, |state| {
-            state.record.worktree_path = Some(path.to_string_lossy().to_string());
-            state.record.worktree_branch = branch.clone().or(state.record.worktree_branch.take());
-        });
-    }
-}
-
-/// Point the ticket's agent branch at the commit its thread ended on
-/// (DEV-468): T3 Code runs a thread on a branch of its own (`t3/<topic>`),
-/// and a later job that starts from the ticket's branch must read that
-/// thread's work, not an earlier job's.
-fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Result<(), String> {
-    if !config.agent_worktree.enabled {
-        return Ok(());
-    }
-    let thread = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        let state = registry.jobs.get(job_id)?;
-        let record = &state.record;
-        let branch = record.worktree_branch.clone().filter(|_| record.runner == AgentRunnerKind::T3.as_str() && record.worktree_path.is_some())?;
-        Some((branch, state.ticket_commit_at_start.clone()))
-    });
-    let (Some((thread_branch, started_from)), Some(repo_root)) = (thread, resolve_repo_root(tasks_dir)) else {
-        return Ok(());
-    };
-    let ticket_branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
-    if thread_branch == ticket_branch {
-        return Ok(());
-    }
-    let moved = move_ticket_branch(tasks_dir, &repo_root, ticket_id, &ticket_branch, &thread_branch, started_from.as_deref(), Some(job_id))
-        .map_err(|err| format!("{ticket_branch} stays where it is, not at {thread_branch} of the T3 Code thread: {err}"))?;
-    let note = match moved {
-        BranchMove::Already => None,
-        BranchMove::Moved(kept) => Some(format!(
-            "Pointed {ticket_branch} at {thread_branch}, where the T3 Code thread worked, so the ticket's next job starts from its work.{}",
-            kept_note(kept.as_deref(), &thread_branch)
-        )),
-        BranchMove::Stayed(why) => Some(why),
-    };
-    if let Some(note) = note {
-        update_job(job_id, |state| {
-            record_and_emit(state, "agent_job_progress", Some(note.clone()));
-        });
-    }
-    Ok(())
 }
 
 /// The branch of a ticket, other than `except`, whose work missing from the
@@ -1996,7 +1778,7 @@ fn holds_logged_work(repo_root: &std::path::Path, branch: &str, ticket_id: &str,
 
 /// Point the ticket's branch at the ticket's branch with the newest work
 /// missing from the main checkout (DEV-602), before a job plans its
-/// worktree: a thread may commit on an earlier thread's branch (`t3/<topic>`)
+/// worktree: a thread before DEV-652 could commit on an earlier thread's branch (`t3/<topic>`)
 /// while the ticket's branch stays behind, and the review and merge then
 /// start from nothing. The ticket's branch stays when it has work of its
 /// own that the newer branch doesn't build on and no branch outside the
@@ -2296,7 +2078,6 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 worker_running: true,
                 main_head_at_start: None,
                 assignee_at_start: restored_assignee(job.assignee_at_start.clone()),
-                ticket_commit_at_start: None,
                 request: None,
                 commit_retry: None,
                 carried_outcome: None,
@@ -3480,17 +3261,19 @@ fn run_job(
                 Some(format!("Continuing the session {}, last used {minutes} minutes ago (within continue_within_minutes, {limit}).", record.name));
         }
     }
-    let t3_worktrees = runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled;
-    let mut thread_worktree = None;
-    if t3_worktrees && continued.is_some() {
-        let (session, thread) = continued.as_ref().map(|record| (record.name.clone(), record.agent_session.clone())).unwrap_or_default();
-        match continued_thread_worktree(&tasks_dir, &ticket_id, &config, &session, thread.as_deref()) {
-            Ok(found) => thread_worktree = Some(found),
-            Err(reason) => {
-                continued = None;
-                session_reason = Some(reason);
-            }
-        }
+    // A t3 session of a job before DEV-652 ran in the main checkout, its
+    // thread in a worktree T3 Code made; the job then starts a new thread in
+    // lotar's worktree, with a handoff from that one.
+    if runner_kind == AgentRunnerKind::T3
+        && config.agent_worktree.enabled
+        && let Some(record) = continued.as_ref()
+        && worktree_context_at(&tasks_dir, &record.cwd).worktree_path.is_none()
+    {
+        session_reason = Some(format!(
+            "The session {}'s T3 Code thread runs in a worktree T3 Code made; this job starts a new thread in the ticket's worktree, with a handoff.",
+            record.name
+        ));
+        handoff_from = continued.take();
     }
     // A resumed session runs on the model and effort it started with, also
     // a merge that continues the reviewer's (DEV-672): the job shows those.
@@ -3505,10 +3288,9 @@ fn run_job(
     // A job that starts a new session starts its profile's own, never
     // replacing another profile's.
     let name = continued.as_ref().map_or(own_name, |record| record.name.clone());
-    // A t3 job asks T3 Code for the worktree (DEV-318); a continued session
-    // stays where it ran, a continued T3 Code thread in its own worktree.
-    let mut t3_plan = None;
-    let mut moved_note = None;
+    // A commit retry runs where the paused job's work waits (DEV-604). A
+    // continued session stays where it ran. Every other job, a t3 job's too
+    // (DEV-652), runs in the ticket's worktree.
     let prepared = if let Some(retry) = commit_retry.as_ref() {
         let mut context = worktree_context_at(&tasks_dir, std::path::Path::new(&retry.worktree_path));
         context.worktree_branch = retry.worktree_branch.clone().or(context.worktree_branch);
@@ -3518,18 +3300,7 @@ fn run_job(
         ));
         Ok(context)
     } else if let Some(record) = continued.as_ref() {
-        let mut context = worktree_context_at(&tasks_dir, &record.cwd);
-        if let Some((path, branch, note)) = thread_worktree {
-            context.worktree_path = Some(path);
-            context.worktree_branch = Some(branch);
-            moved_note = note;
-        }
-        Ok(context)
-    } else if t3_worktrees {
-        plan_t3_worktree(&tasks_dir, &ticket_id, &config).map(|(context, plan)| {
-            t3_plan = Some(plan);
-            context
-        })
+        Ok(worktree_context_at(&tasks_dir, &record.cwd))
     } else {
         prepare_worktree(&tasks_dir, &ticket_id, &config)
     };
@@ -3579,15 +3350,12 @@ fn run_job(
         }
     };
     let is_merge_job = merge::is_merge_job(&job_id);
-    for note in followed_note.into_iter().chain(session_reason).chain(moved_note).chain(worktree_context.note.clone()) {
+    for note in followed_note.into_iter().chain(session_reason).chain(worktree_context.note.clone()) {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
     }
     let ticket_ref = format!("refs/heads/{}", build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(&ticket_id)));
-    if t3_worktrees && let Some(commit) = resolve_repo_root(&tasks_dir).and_then(|root| rev_parse(&root, &ticket_ref)) {
-        update_job(&job_id, |state| state.ticket_commit_at_start = Some(commit.clone()));
-    }
 
     // Other processes see the job, and can ask to cancel it or send it a
     // message (DEV-279). The record names the session before the runner
@@ -3635,7 +3403,6 @@ fn run_job(
                 resume: continued.is_some(),
                 cwd: &worktree_context.working_dir,
                 writable_dirs: extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job),
-                t3_plan,
             };
             run_session(&job_id, &launch, &profile, &prompt, env, &tasks_dir, &ticket_id, &mut context_messages)
         }
@@ -4072,7 +3839,6 @@ struct SessionLaunch<'a> {
     resume: bool,
     cwd: &'a std::path::Path,
     writable_dirs: Vec<std::path::PathBuf>,
-    t3_plan: Option<T3Worktree>,
 }
 
 /// Run the job as a turn of its harnessmux session (DEV-503).
@@ -4103,10 +3869,8 @@ fn run_session(
             notes.push(format!("The {} runner can't be given LoTaR's MCP server; the agent uses the lotar CLI instead.", launch.agent));
         }
     }
-    let repo_root = resolve_repo_root(tasks_dir);
-    let mut worktrees_before = None;
-    // Dropped on an early return, which removes the record (DEV-674).
-    let mut t3_setup = None;
+    // harnessmux starts the thread of a t3 session in a worktree there
+    // (`t3_thread_launch`, DEV-657); T3 Code makes no worktree of its own.
     let mut t3_rename_to = None;
     if launch.runner_kind == AgentRunnerKind::T3 {
         let task = Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, ticket_id, None).ok());
@@ -4115,22 +3879,9 @@ fn run_session(
             t3_rename_to = Some(title.clone());
         }
         session_profile.title = Some(title);
-        if let Some(plan) = launch.t3_plan.as_ref() {
-            session_profile.worktree_base = Some(plan.base.clone());
-            session_profile.branch = plan.branch.clone();
-            if !launch.resume
-                && let Some(root) = repo_root.as_deref()
-            {
-                let thread =
-                    crate::services::t3_worktree_setup::NewThread { base: &plan.base, branch: plan.branch.as_deref(), title: session_profile.title.as_deref() };
-                t3_setup = record_t3_worktree_setup(job_id, root, ticket_id, &thread, profile, session_profile.provider.as_deref());
-            }
-        }
-        // A continued thread makes no worktree: it keeps the one run_job
-        // checked for it, not one another job's thread made meanwhile.
-        if !launch.resume {
-            worktrees_before =
-                repo_root.as_deref().map(|root| linked_worktrees(root).unwrap_or_default().into_iter().map(|(path, _)| path).collect::<Vec<_>>());
+        // A new thread's Claude settings (DEV-618), in the worktree lotar made.
+        if !launch.resume && worktree_context_at(tasks_dir, launch.cwd).worktree_path.is_some() {
+            notes.extend(write_t3_claude_settings(launch.cwd, profile, session_profile.provider.as_deref()));
         }
     }
     for note in notes {
@@ -4142,8 +3893,7 @@ fn run_session(
         Ok(table) => table,
         Err(err) => return RunEnd::Failed(err.to_string()),
     };
-    let t3_env: Vec<(String, String)> =
-        table.get(launch.agent).map(|spec| spec.env.clone()).unwrap_or_default().into_iter().chain(session_profile.env.clone()).collect();
+    let t3_profile_env = session_profile.env.clone();
     let session = match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, &table, session_profile, launch.resume) {
         Ok(session) => session,
         Err(err) => return RunEnd::Failed(format!("Could not start the {} session {}: {err}", launch.agent, launch.name)),
@@ -4153,7 +3903,9 @@ fn run_session(
         return RunEnd::Stopped;
     }
     if let Some(title) = t3_rename_to {
-        let note = rename_continued_t3_thread(launch, &table, &t3_env, repo_root.as_deref(), &title);
+        let t3_env: Vec<(String, String)> =
+            table.get(launch.agent).map(|spec| spec.env.clone()).unwrap_or_default().into_iter().chain(t3_profile_env).collect();
+        let note = rename_continued_t3_thread(launch, &table, &t3_env, resolve_repo_root(tasks_dir).as_deref(), &title);
         update_job(job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
@@ -4163,50 +3915,22 @@ fn run_session(
         let note = format!("{how} {} (`harnessmux attach {}` follows it).", launch.name, launch.name);
         record_and_emit(state, "agent_job_progress", Some(note));
     });
-    let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile, context_messages);
-    if let Some(recorded) = t3_setup.take() {
-        let note = recorded.finish();
-        update_job(job_id, |state| {
-            record_and_emit(state, "agent_job_progress", Some(note.clone()));
-        });
-    }
-    if let (Some(root), Some(before)) = (repo_root.as_deref(), worktrees_before.as_deref()) {
-        let thread = crate::services::agent_runner::registry().load(launch.name).ok().and_then(|record| record.agent_session);
-        let program = table.get(launch.agent).ok().and_then(|spec| block_on(spec.launch_command()).ok()).map(|(program, _)| program);
-        let named = thread.zip(program).and_then(|(thread, program)| t3_thread_worktree(&program, &t3_env, root, &thread));
-        record_t3_worktree(job_id, root, before, named);
-    }
-    end
+    drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile, context_messages)
 }
 
-/// Leave the profile's `tools.disallowed` and `env` for the T3 project's
-/// worktree script, which writes them into the new thread's Claude settings
-/// (DEV-618). Only Claude threads read them: provider `claudeAgent`, or none
-/// (the project's default model). A failure is logged and the thread starts
-/// without them.
-fn record_t3_worktree_setup(
-    job_id: &str,
-    repo_root: &std::path::Path,
-    ticket_id: &str,
-    thread: &crate::services::t3_worktree_setup::NewThread<'_>,
-    profile: &AgentProfileDetail,
-    provider: Option<&str>,
-) -> Option<crate::services::t3_worktree_setup::Recorded> {
+/// Write the profile's `tools.disallowed` and `env` into the Claude settings
+/// of a new thread's worktree (DEV-618) before the thread starts: T3's CLI
+/// takes no Claude settings, and T3's Claude sessions read the worktree's
+/// `.claude/settings.local.json`. Only Claude threads read them: provider
+/// `claudeAgent`, or none (the project's default model). The note for the
+/// job log; a failure leaves the thread without them.
+fn write_t3_claude_settings(worktree: &std::path::Path, profile: &AgentProfileDetail, provider: Option<&str>) -> Option<String> {
     if provider.is_some_and(|provider| !provider.to_ascii_lowercase().contains("claude")) {
         return None;
     }
     let deny = profile.tools.as_ref().map(|tools| tools.disallowed.clone()).unwrap_or_default();
     let env = crate::services::agent_runner::expand_env_map(&profile.env).into_iter().collect();
-    match crate::services::t3_worktree_setup::record(repo_root, job_id, ticket_id, thread, &deny, env) {
-        Ok(recorded) => recorded,
-        Err(err) => {
-            let note = format!("The thread starts without the profile's tools.disallowed and env: {err}");
-            update_job(job_id, |state| {
-                record_and_emit(state, "agent_job_progress", Some(note.clone()));
-            });
-            None
-        }
-    }
+    crate::services::t3_claude_settings::write(worktree, &deny, &env)
 }
 
 /// Rename the thread a continued T3 job runs in to `title` before its turn
@@ -4243,12 +3967,6 @@ fn t3_thread_title(ticket_id: &str, task: Option<&crate::api_types::TaskDTO>, th
         Some(name) => name,
         None => format!("{ticket_id} {}", task.map(|task| task.title.as_str()).unwrap_or_default()).trim().to_string(),
     }
-}
-
-/// The worktree T3 Code runs `thread` in, from `t3 thread show <thread> --json`.
-fn t3_thread_worktree(program: &std::path::Path, env: &[(String, String)], cwd: &std::path::Path, thread: &str) -> Option<std::path::PathBuf> {
-    let shown = t3_thread_show(program, env, cwd, thread)?;
-    shown.get("worktreePath")?.as_str().filter(|path| !path.is_empty()).map(std::path::PathBuf::from)
 }
 
 /// The `thread` object of `t3 thread show <thread> --json`.
@@ -5216,7 +4934,7 @@ fn merged_despite_failure(job_id: &str, tasks_dir: &std::path::Path, exit_code: 
 }
 
 /// The commit a job's worktree `branch` ended on, when the ticket's branch
-/// points at it too (for [`continued_thread_worktree`]).
+/// points at it too (for [`holds_logged_work`]).
 fn ended_on_ticket_branch(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig, branch: Option<&str>) -> Option<String> {
     let repo_root = resolve_repo_root(tasks_dir)?;
     let tip = rev_parse(&repo_root, &format!("refs/heads/{}", branch?))?;
@@ -5261,19 +4979,6 @@ fn finalize_job(
     let commit_failed = commit_failure.is_some();
     if commit_failed {
         success = false;
-    }
-    // After that commit, so the ticket's branch gets LoTaR's commit too. A
-    // branch that can't follow fails the job: automation must not hand the
-    // ticket on to a job that would read the stale branch.
-    if let Err(note) = follow_thread_branch(job_id, tasks_dir, ticket_id, config) {
-        if success {
-            commit_failure = Some(note);
-            success = false;
-        } else {
-            update_job(job_id, |state| {
-                record_and_emit(state, "agent_job_progress", Some(note.clone()));
-            });
-        }
     }
     // A merge job must end with its branch in the main checkout; LoTaR
     // fast-forwards when the agent couldn't, and fails the job otherwise so
@@ -5413,6 +5118,9 @@ fn finalize_job(
     if !should_stop_job(job_id) && paused.is_none() {
         let event = if success { AutomationEvent::JobCompleted } else { AutomationEvent::JobFailed };
         apply_job_end_rules(job_id, ticket_id, tasks_dir, event, job_context);
+        if success {
+            settle_t3_thread(job_id, ticket_id, tasks_dir, config);
+        }
     }
 
     // A paused job's worktree stays as it is for its retry; a full disk
@@ -5529,6 +5237,54 @@ fn carry_outcome(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, car
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
     }
+}
+
+/// A completed t3 job settles its thread in T3 Code once the end rules moved
+/// the ticket on (owner 2026-11-17), so the sidebar keeps only the threads
+/// that still need someone. A ticket that waits for a person keeps its thread
+/// active, and a refused settle is a job note only.
+fn settle_t3_thread(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) {
+    let job = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry.jobs.get(job_id).map(|state| (state.record.runner.clone(), state.record.agent_profile.clone(), state.record.session_id.clone()))
+    });
+    let Some((runner, agent, Some(session))) = job else { return };
+    if runner != AgentRunnerKind::T3.as_str() {
+        return;
+    }
+    let note = |message: String| {
+        update_job(job_id, |state| {
+            push_event(state, "agent_job_progress", Some(message.clone()));
+        });
+    };
+    if let Some(waits) = ticket_waits_for_a_person(tasks_dir, ticket_id) {
+        note(format!("The T3 Code thread stays active: {ticket_id} {waits}."));
+        return;
+    }
+    let Ok(record) = crate::services::agent_runner::registry().load(&session) else { return };
+    let table = match agent.as_deref().and_then(|name| config.agent_profiles.get(name)) {
+        Some(profile) => crate::services::agent_runner::job_agent_table(&record.agent, profile),
+        None => crate::services::agent_runner::agent_table(),
+    };
+    let settled = table.map_err(|err| err.to_string()).and_then(|table| {
+        let spec = table.get(&record.agent).map_err(|err| err.to_string())?;
+        block_on(harnessmux::backend::t3::settle(spec, &record)).map_err(|err| err.to_string())
+    });
+    note(match settled {
+        Ok(link) => format!("Settled the T3 Code thread {link}"),
+        Err(err) => format!("The T3 Code thread was not settled: {err}"),
+    });
+}
+
+/// Why the ticket waits for a person, if it does: it is HelpNeeded, or open
+/// and assigned to someone other than an agent profile. A done ticket that
+/// keeps its owner as assignee waits for nobody.
+fn ticket_waits_for_a_person(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<String> {
+    let (status, assignee) = ticket_state(tasks_dir, ticket_id)?;
+    if status.eq_ignore_ascii_case("HelpNeeded") {
+        return Some("is HelpNeeded".to_string());
+    }
+    let person = assignee.filter(|assignee| !assignee.trim().is_empty() && !assignee.starts_with('@'))?;
+    (ticket_done_state(tasks_dir, ticket_id) != Some(true)).then(|| format!("is {status}, assigned to {person}"))
 }
 
 /// How a runner process ended, for a failure's reason.
@@ -6235,7 +5991,7 @@ mod tests {
         .unwrap();
         let mut config = crate::config::resolution::config_for_project(&tasks_dir, Some("NOTE")).unwrap();
 
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
         assert!(notes.contains("main checkout"), "{notes}");
         assert!(notes.contains("No automation rule"), "{notes}");
 
@@ -6245,14 +6001,14 @@ mod tests {
             "automation:\n  rules:\n    - when:\n        assignee: \"@implement\"\n      on:\n        complete:\n          set:\n            status: Done\n",
         )
         .unwrap();
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
         assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
         assert!(notes.contains("Commit your work"), "{notes}");
         assert!(notes.contains("move this ticket to the next step"), "{notes}");
         assert!(!notes.contains("final summary"), "LoTaR logs the next step itself: {notes}");
         assert!(notes.contains("hand the ticket back"), "{notes}");
 
-        let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false, false);
+        let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false);
         assert!(notes.contains("This job is read-only"), "{notes}");
         assert!(notes.contains("final answer"), "{notes}");
         assert!(!notes.contains("Commit your work"), "{notes}");
@@ -6410,7 +6166,6 @@ mod tests {
             worker_running: false,
             main_head_at_start: None,
             assignee_at_start: None,
-            ticket_commit_at_start: None,
             request: None,
             commit_retry: None,
             carried_outcome: None,
@@ -7361,43 +7116,5 @@ mod dev520_session_events_tests {
         };
         assert!(why.contains("ended: idle"), "{why}");
         let RunEnd::Failed(_) = ends_idle_after(vec![], dir.path()) else { panic!("a session that ends before the first turn ends fails the job") };
-    }
-}
-
-#[cfg(test)]
-mod dev596_t3_worktree_tests {
-    use super::move_aside_detached_t3_worktree;
-    use std::fs;
-
-    /// DEV-596: T3 Code makes a new ticket branch's worktree at a fixed path, where an earlier thread's worktree
-    /// stayed detached after the branch was deleted. It moves aside with its staged change; another ticket's stays.
-    #[test]
-    fn a_detached_worktree_at_the_t3_path_of_a_new_ticket_branch_moves_aside() {
-        let tmp = tempfile::tempdir().unwrap();
-        let repo = tmp.path().join("repo");
-        let git = |dir: &std::path::Path, args: &[&str]| {
-            let output = crate::utils::git::git_command(dir).args(args).current_dir(dir).output().unwrap();
-            assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
-        };
-        fs::create_dir_all(&repo).unwrap();
-        git(&repo, &["init", "-q", "-b", "main"]);
-        git(&repo, &["-c", "user.name=T", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "init"]);
-        let trees = tmp.path().join("t3").join("repo");
-        let stale = trees.join("agent-TEST-1-0123456789abcdef");
-        let other = trees.join("agent-TEST-2-0123456789abcdef");
-        git(&repo, &["worktree", "add", "-q", "-b", "agent/TEST-1", &stale.to_string_lossy()]);
-        git(&repo, &["worktree", "add", "-q", "-b", "agent/TEST-2", &other.to_string_lossy()]);
-        git(&other, &["checkout", "-q", "--detach"]);
-        fs::write(stale.join("draft.txt"), "draft").unwrap();
-        git(&stale, &["add", "draft.txt"]);
-        git(&stale, &["checkout", "-q", "--detach"]);
-        git(&repo, &["branch", "-D", "agent/TEST-1"]);
-
-        let note = move_aside_detached_t3_worktree(&repo, "agent", "agent/TEST-1").unwrap();
-        let moved = trees.join("agent-TEST-1-0123456789abcdef-detached-1");
-        assert!(note.is_some_and(|note| note.contains(&moved.display().to_string())));
-        assert!(!stale.exists() && fs::read_to_string(moved.join("draft.txt")).unwrap() == "draft", "the draft moved along");
-        assert!(other.is_dir(), "another ticket's worktree stays");
-        assert!(move_aside_detached_t3_worktree(&repo, "agent", "agent/TEST-1").unwrap().is_none(), "nothing left at the path");
     }
 }

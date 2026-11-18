@@ -987,14 +987,16 @@ dependencies = [
 
 [[package]]
 name = "harnessmux"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d03cc667502c0def2983732602a4979a8042894b59165e36601128e83915f605"
+checksum = "25d89225e7200767f77c3fd9fb4dd4512b6087e768667fac4b1b9fb5fe8ad09e"
 dependencies = [
  "agent-client-protocol",
  "clap",
+ "getrandom 0.4.3",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "toml",
  "windows-sys 0.61.2",
@@ -2296,6 +2298,17 @@ name = "sha1"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
+]
+
+[[package]]
+name = "sha2"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
 dependencies = [
  "cfg-if",
  "cpufeatures",

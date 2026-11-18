@@ -45,8 +45,6 @@ pub enum WorktreeAction {
     List,
     /// Remove stale agent worktrees and optionally their branches
     Cleanup(WorktreeCleanupArgs),
-    /// T3 Code's worktree script: write a starting job's Claude settings into this new worktree
-    Setup,
 }
 
 #[derive(Args)]

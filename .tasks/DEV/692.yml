@@ -1,11 +1,11 @@
 title: 'Ticket list API and web view: leave comments and history out of list rows, gzip responses, refresh only the changed ticket'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T03:06:46.818129+00:00
-modified: 2026-11-18T04:29:20.883325+00:00
+modified: 2026-11-18T05:09:13.273647+00:00
 comments:
 - date: 2026-11-18T04:03:32.949630+00:00
   author: claude
@@ -60,6 +60,29 @@ comments:
     - **App:** I ran `lotar serve` on the `--demo` seed. The list answer is gzipped with `Vary: Accept-Encoding`. After a ticket update, the open list sent only `list?...&ids=ATLS-31` and the row updated in place.
     - **Screenshots:** I read the fix agent's (list, board, panel, list at 390 dark). I took my own of list, board and insights in light and dark at 1920, 1440 and 390, plus calendar and the panel. No visual problems and no console errors. The panel shows the full description.
     - **Note, not a defect:** HEAD on a JSON endpoint now gets the same gzip headers as GET. The ticket says HEAD "goes out as before", but matching GET is correct HTTP.
+- date: 2026-11-18T05:09:13.117859+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-692` is in `main`.
+
+    - Rebased `agent/DEV-692` onto `main` (`afb9e823d5eb`): `2ee80c929714`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `2ee80c929714`
+    - Amended the pending `.tasks` changes into the merged commit: `8ce578e70506`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 8ce578e70
+      what: 'DEV-692 Ticket list API and web view: leave comments and history out of list rows, gzip responses, refresh only the changed ticket'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A740a70fc-3c79-42cd-9f65-62e36bbc5792
 - attachment: after-board-dark-1440.f7d2cf3670c356bcf8335d44f69250f2.png
@@ -323,3 +346,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T05:09:13.117859+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:09:13.273647+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

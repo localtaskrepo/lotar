@@ -1,18 +1,114 @@
 title: Check DEV-652 on a real t3 ticket once a build with it is installed
-status: Todo
+status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T04:32:01.039948+00:00
-modified: 2026-11-18T04:32:01.683877+00:00
+modified: 2026-11-18T05:10:48.739117+00:00
 relationships:
+  depends_on:
+  - DEV-702
+  - DEV-652
   related:
   - DEV-652
-description: 'Found (review of DEV-652): ''Done when'' asks for checks on a real ticket, not assumed, and none ran: the installed lotar is 0.15.3 without `f16031633`. Tests cover them with a fake t3 (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`). Check on a ticket with fix, review and merge jobs on the t3 runner: one worktree under lotar''s worktree folder, nothing new in `~/.t3/worktrees` (`ls -t ~/.t3/worktrees/lotar | head`); the thread shows in T3 Code with its title and is linked on the ticket; `session: continue` continues it; a job that ends with the ticket moving on logs `Settled the T3 Code thread`, one that ends HelpNeeded or failed logs `stays active`. Done: each point seen on that ticket, with the job IDs in a comment.'
+comments:
+- date: 2026-11-18T05:10:37.853417+00:00
+  author: claude
+  text: |-
+    Waiting: no installed lotar has DEV-652 yet, so the real-ticket check can't run. Set Blocked on the next release.
+
+    - Installed: `lotar 0.15.3` (`/opt/homebrew/opt/lotar/bin/lotar`). `f16031633` is only on `agent/DEV-652` (Merging), not on `main`, so `v0.15.4` lacks it too.
+    - This very job shows the old behaviour: it runs in `~/.t3/worktrees/lotar/agent-DEV-700-1ca2b67d53d6f872`, a T3-made worktree.
+    - No `Release v0.15.5` ticket existed (release step 8 missed after v0.15.4): filed [DEV-702](https://lotar.pyxzl.net/task/DEV-702), assigned mallox, and `lotar release create 0.15.5` (#10).
+    - DEV-700 now depends on [DEV-652](https://lotar.pyxzl.net/task/DEV-652) and [DEV-702](https://lotar.pyxzl.net/task/DEV-702); closing the release hands it to @fix ("Prerequisites done" rule).
+    - Added a "Done when" checklist to the description.
+- date: 2026-11-18T05:10:48.739117+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-652, DEV-702.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6dcc807a-74b4-403e-8751-be20c9c3464d
+description: |-
+  Found (review of DEV-652): DEV-652's "Done when" asks for checks on a real ticket, not assumed, and none ran: the installed lotar is 0.15.3 without `f16031633`. Tests cover them with a fake t3 (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`).
+
+  Waits (Blocked) for DEV-652 to merge and for the release that ships it (DEV-702, Release v0.15.5) to be installed: `lotar --version` prints 0.15.5 or later. Closing DEV-702 hands this ticket to @fix.
+
+  ## Done when
+  Checked on one real ticket that gets fix, review and merge jobs on the t3 runner, run by the installed build, not assumed:
+  - [ ] All its jobs ran in one worktree under lotar's worktree folder on `agent/<ID>`; `ls -t ~/.t3/worktrees/lotar | head` shows nothing new for it.
+  - [ ] Its thread shows in T3 Code with its title and is linked on the ticket.
+  - [ ] A job with `session: continue` continued that same thread (same thread link).
+  - [ ] A job that ended with the ticket moving on logged `Settled the T3 Code thread` (`lotar agent logs <job>`).
+  - [ ] A job that ended HelpNeeded or failed logged `stays active`. If no job on that ticket ends this way, run one that hands back (HelpNeeded) on a scratch ticket made with `npm run seed:test-tasks`, never a fake DEV ticket.
+  - [ ] A comment lists the ticket and the job IDs for each point.
+
+  A point that fails: comment what ran and what failed, set HelpNeeded, assign mallox; don't fix it in this job.
 history:
 - at: 2026-11-18T04:32:01.683877+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T05:09:16.746281+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T05:09:17.501706+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6dcc807a-74b4-403e-8751-be20c9c3464d
+- at: 2026-11-18T05:10:25.253013+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-652"]}'
+    new: '{"depends_on":["DEV-702"],"related":["DEV-652"]}'
+- at: 2026-11-18T05:10:25.813479+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-702"],"related":["DEV-652"]}'
+    new: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652"]}'
+- at: 2026-11-18T05:10:37.588390+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found (review of DEV-652): ''Done when'' asks for checks on a real ticket, not assumed, and none ran: the installed lotar is 0.15.3 without `f16031633`. Tests cover them with a fake t3 (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`). Check on a ticket with fix, review and merge jobs on the t3 runner: one worktree under lotar''s worktree folder, nothing new in `~/.t3/worktrees` (`ls -t ~/.t3/worktrees/lotar | head`); the thread shows in T3 Code with its title and is linked on the ticket; `session: continue` continues it; a job that ends with the ticket moving on logs `Settled the T3 Code thread`, one that ends HelpNeeded or failed logs `stays active`. Done: each point seen on that ticket, with the job IDs in a comment.'
+    new: |-
+      Found (review of DEV-652): DEV-652's "Done when" asks for checks on a real ticket, not assumed, and none ran: the installed lotar is 0.15.3 without `f16031633`. Tests cover them with a fake t3 (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`).
+
+      Waits (Blocked) for DEV-652 to merge and for the release that ships it (DEV-702, Release v0.15.5) to be installed: `lotar --version` prints 0.15.5 or later. Closing DEV-702 hands this ticket to @fix.
+
+      ## Done when
+      Checked on one real ticket that gets fix, review and merge jobs on the t3 runner, run by the installed build, not assumed:
+      - [ ] All its jobs ran in one worktree under lotar's worktree folder on `agent/<ID>`; `ls -t ~/.t3/worktrees/lotar | head` shows nothing new for it.
+      - [ ] Its thread shows in T3 Code with its title and is linked on the ticket.
+      - [ ] A job with `session: continue` continued that same thread (same thread link).
+      - [ ] A job that ended with the ticket moving on logged `Settled the T3 Code thread` (`lotar agent logs <job>`).
+      - [ ] A job that ended HelpNeeded or failed logged `stays active`. If no job on that ticket ends this way, run one that hands back (HelpNeeded) on a scratch ticket made with `npm run seed:test-tasks`, never a fake DEV ticket.
+      - [ ] A comment lists the ticket and the job IDs for each point.
+
+      A point that fails: comment what ran and what failed, set HelpNeeded, assign mallox; don't fix it in this job.
+- at: 2026-11-18T05:10:37.853417+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:10:48.492610+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T05:10:48.707273+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-18T05:10:48.739117+00:00
+  actor: automation
+  changes:
+  - field: comment_added

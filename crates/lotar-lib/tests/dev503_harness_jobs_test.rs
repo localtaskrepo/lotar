@@ -663,60 +663,222 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
     wait_for_jobs_to_end(&fixtures.tasks_root);
 }
 
-/// `t3` as T3 Code's CLI: `thread start` runs each thread in a new worktree on a branch of its own (`t3/topic-<n>`),
-/// made from the `--worktree` base, runs `$FAKE_RUN` there and logs `<base> <branch> <commit it started from>` to
-/// `$FAKE_LOG`. `thread send thread-<n>` runs `$FAKE_RUN` in that thread's worktree and logs
-/// `send thread-<n> <branch> <commit it started from>`. `thread show thread-<n>` answers with that thread's worktree,
-/// and with status `running` while a file `running-thread-<n>` is next to the script, an `activeRunId` while
-/// `active-thread-<n>` is, and as waiting for an answer (`running`, `pendingRequestCount` 1) while `waiting-thread-<n>`
-/// is; it logs `show thread-<n>` to `t3-show.log` there.
+/// `t3` as T3 Code's CLI, next to a [`fake_t3_server`] that keeps its threads in `t3-threads/<id>/` beside the
+/// script. `thread show <id>` does a run the server took (a `t3_thread_launch` or `t3_thread_send`) when the call
+/// carries a job's env (`$FAKE_LOG`): it logs `<id> <branch> <commit it started from>` for a launch, `send <id> ...`
+/// for a send, to `$FAKE_LOG` (a launch's prompt to `$FAKE_LOG.prompt-<n>`), and runs `$FAKE_RUN` in the thread's
+/// worktree. Without the env the run still runs. It answers with status `running` while a file `running-<id>` is next
+/// to the script, an `activeRunId` while `active-<id>` is, as waiting for an answer while `waiting-<id>` is, and with
+/// status `failed` while `failed-<id>` is; it logs `show <id>` to `t3-show.log` there. `thread start` (a session in the
+/// main checkout, before DEV-652) makes a thread in the project and runs it the same way. `auth pairing create` prints
+/// the pairing code `pair-1`.
 const FAKE_T3: &str = r#"#!/bin/sh
-if [ "$1 $2" = "thread show" ]; then
-  echo "show $3" >> "$(dirname "$0")/t3-show.log"
-  status=completed active=null pending=0
-  [ -f "$(dirname "$0")/running-$3" ] && status=running
-  [ -f "$(dirname "$0")/active-$3" ] && active='"r1"'
-  [ -f "$(dirname "$0")/waiting-$3" ] && status=running pending=1
-  printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","activeRunId":%s,"pendingRequestCount":%s,"worktreePath":"%s"}}\n' "$3" "$3" "$status" "$active" "$pending" "$FAKE_TREES/${3#thread-}"
-  exit 0
-fi
-if [ "$1 $2" = "thread send" ]; then
-  cat > /dev/null
-  tree="$FAKE_TREES/${3#thread-}"
-  printf 'send %s %s %s\n' "$3" "$(git -C "$tree" symbolic-ref --short HEAD)" "$(git -C "$tree" rev-parse HEAD)" >> "$FAKE_LOG"
+dir=$(dirname "$0")
+threads="$dir/t3-threads"
+run_pending() {
+  t="$threads/$1"
+  [ -f "$t/pending" ] && [ -n "$FAKE_LOG" ] || return 0
+  tree=$(cat "$t/tree")
+  line="$1 $(git -C "$tree" symbolic-ref --short HEAD) $(git -C "$tree" rev-parse HEAD)"
+  if [ "$(cat "$t/kind")" = launch ]; then
+    echo "$line" >> "$FAKE_LOG"
+    cp "$t/message" "$FAKE_LOG.prompt-${1#thread-}"
+  else
+    echo "send $line" >> "$FAKE_LOG"
+  fi
   (cd "$tree" && sh -c "$FAKE_RUN") >/dev/null 2>&1
-  echo "Done in $3"
-  exit 0
-fi
-[ "$1 $2" = "thread start" ] || { echo '{}'; exit 0; }
-base=""
-while [ $# -gt 0 ]; do
-  if [ "$1" = "--worktree" ]; then base=$2; shift; fi
-  shift
-done
-mkdir -p "$FAKE_TREES"
-n=$(ls "$FAKE_TREES" | wc -l | tr -d ' ')
-cat > "$FAKE_LOG.prompt-$n"
-tree="$FAKE_TREES/$n"
-git worktree add -q -b "t3/topic-$n" "$tree" "$base" || exit 1
-printf '%s t3/topic-%s %s\n' "$base" "$n" "$(git -C "$tree" rev-parse HEAD)" >> "$FAKE_LOG"
-(cd "$tree" && sh -c "$FAKE_RUN") >/dev/null 2>&1
-echo "Thread thread-$n" >&2
-echo "Done in thread $n"
+  mv "$t/pending" "$t/latest"
+}
+case "$1 $2" in
+  "auth pairing") echo '{"credential":"pair-1","expiresAt":"2099-01-01T00:02:00.000Z","id":"p","label":"harnessmux","scopes":[]}'; exit 0 ;;
+  "thread start")
+    mkdir -p "$threads"
+    id="thread-$(ls "$threads" | wc -l | tr -d ' ')"
+    mkdir "$threads/$id"
+    echo "$3" > "$threads/$id/tree"
+    echo launch > "$threads/$id/kind"
+    cat > "$threads/$id/message"
+    echo r0 > "$threads/$id/pending"
+    echo "Thread $id" >&2
+    run_pending "$id"
+    echo "Done in $id"
+    exit 0 ;;
+  "thread show") ;;
+  "auth session") if [ "$3" = issue ]; then echo '{"sessionId":"s1","token":"secret"}'; else echo "$*" >> "$dir/t3-auth.log"; fi; exit 0 ;;
+  *) echo '{}'; exit 0 ;;
+esac
+id=$3
+echo "show $id" >> "$dir/t3-show.log"
+[ -d "$threads/$id" ] || { echo "No thread $id" >&2; exit 1; }
+run_pending "$id"
+status=completed active=null pending=0
+run=$(cat "$threads/$id/latest" 2>/dev/null)
+if [ -f "$threads/$id/pending" ]; then status=running; run=$(cat "$threads/$id/pending"); active="\"$run\""; fi
+[ -f "$dir/running-$id" ] && status=running
+[ -f "$dir/active-$id" ] && active='"r1"'
+[ -f "$dir/waiting-$id" ] && status=running pending=1
+[ -f "$dir/failed-$id" ] && status=failed
+printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","activeRunId":%s,"latestRunId":"%s","pendingRequestCount":%s,"worktreePath":"%s"},"messages":[{"role":"assistant","runId":"%s","text":"Done in %s"}]}\n' \
+  "$id" "$id" "$status" "$active" "$run" "$pending" "$(cat "$threads/$id/tree")" "$run" "$id"
 "#;
 
-/// A repository whose TEST project runs the profiles `fix`, `rework` and `review` as fake T3 Code threads in worktrees.
+/// A fake T3 Code server for the fake `t3` in `dir`, with one project, the repository at `project`: the MCP OAuth
+/// sign-in with the pairing code `pair-1`, and `/mcp`. `t3_thread_launch` makes thread `thread-<n>` in its
+/// `existing_worktree` (the same thread for a repeated `clientRequestId`) and `t3_thread_send` gives a thread a run;
+/// the fake `t3 thread show` does it. `t3_thread_organize` fails with the text in `organize-error` while that file is
+/// there. Each tool call is logged to `t3-mcp.log` (`<tool> <arguments>`). A WebSocket on `/ws` takes T3 Code's
+/// internal rename command (DEV-619), logs it there as `ws_rename <payload>` and answers success; while `ws-refuse` is
+/// there, `/ws` answers 404. Returns the origin.
+fn fake_t3_server(dir: &Path, project: &Path) -> String {
+    use std::collections::{HashMap, HashSet};
+    use std::io::{BufRead as _, Read as _, Write as _};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let (dir, project) = (dir.to_path_buf(), std::fs::canonicalize(project).unwrap());
+    std::thread::spawn(move || {
+        let threads = dir.join("t3-threads");
+        let (mut tokens, mut codes, mut launched) = (HashSet::new(), HashSet::new(), HashMap::new());
+        let mut runs = 0;
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            let mut head = [0; 7];
+            if stream.peek(&mut head).is_ok_and(|read| read == head.len()) && &head == b"GET /ws" && !dir.join("ws-refuse").exists() {
+                let Ok(mut socket) = tungstenite::accept(stream) else { continue };
+                if let Ok(tungstenite::Message::Text(text)) = socket.read() {
+                    let request: serde_json::Value = serde_json::from_str(text.as_str()).unwrap();
+                    let mut log = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("t3-mcp.log")).unwrap();
+                    writeln!(log, "ws_rename {}", request["payload"]).unwrap();
+                    let answer = serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Success", "value": {"sequence": 1}}});
+                    let _ = socket.send(tungstenite::Message::text(answer.to_string()));
+                    let _ = socket.read();
+                }
+                continue;
+            }
+            let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+            let mut request_line = String::new();
+            reader.read_line(&mut request_line).unwrap();
+            let path = request_line.split_whitespace().nth(1).unwrap_or_default().to_string();
+            let (mut length, mut bearer) = (0, String::new());
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                let line = line.trim_end();
+                if line.is_empty() {
+                    break;
+                }
+                let (key, value) = line.split_once(':').unwrap();
+                match key.to_ascii_lowercase().as_str() {
+                    "content-length" => length = value.trim().parse().unwrap(),
+                    "authorization" => bearer = value.trim().trim_start_matches("Bearer ").to_string(),
+                    _ => {}
+                }
+            }
+            let mut body = vec![0; length];
+            reader.read_exact(&mut body).unwrap();
+            let body = String::from_utf8(body).unwrap();
+            let json = |status: u16, value: serde_json::Value| (status, value.to_string());
+            let (status, answer) = match path.as_str() {
+                "/oauth/mcp/register" => json(201, serde_json::json!({"client_id": "c1"})),
+                "/oauth/mcp/decision" => {
+                    let request: serde_json::Value = serde_json::from_str(&body).unwrap();
+                    if request["decision"]["code"] != "pair-1" {
+                        json(400, serde_json::json!({"error": "invalid_grant", "error_description": "Invalid pairing code"}))
+                    } else {
+                        let code = format!("ac{}", codes.len() + 1);
+                        codes.insert(code.clone());
+                        json(200, serde_json::json!({"redirectTo": format!("http://127.0.0.1/callback?code={code}&state=s")}))
+                    }
+                }
+                "/oauth/mcp/token" => {
+                    let token = format!("tok-{}", tokens.len() + 1);
+                    tokens.insert(token.clone());
+                    json(200, serde_json::json!({"access_token": token, "token_type": "Bearer", "expires_in": 2_592_000}))
+                }
+                "/mcp" => {
+                    let request: serde_json::Value = serde_json::from_str(&body).unwrap();
+                    if !tokens.contains(&bearer) {
+                        json(401, serde_json::json!({"error": "invalid_mcp_credential"}))
+                    } else if request.get("id").is_none() {
+                        (202, String::new())
+                    } else if request["method"] == "initialize" {
+                        json(200, serde_json::json!({"jsonrpc": "2.0", "id": request["id"], "result": {"protocolVersion": "2025-06-18", "capabilities": {}}}))
+                    } else {
+                        let (tool, arguments) = (request["params"]["name"].as_str().unwrap(), &request["params"]["arguments"]);
+                        let mut log = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("t3-mcp.log")).unwrap();
+                        writeln!(log, "{tool} {arguments}").unwrap();
+                        let mut run = |id: &str, kind: &str, tree: Option<&str>| {
+                            runs += 1;
+                            let thread = threads.join(id);
+                            std::fs::create_dir_all(&thread).unwrap();
+                            if let Some(tree) = tree {
+                                std::fs::write(thread.join("tree"), tree).unwrap();
+                            }
+                            std::fs::write(thread.join("kind"), kind).unwrap();
+                            std::fs::write(thread.join("message"), arguments["message"].as_str().unwrap_or_default()).unwrap();
+                            std::fs::write(thread.join("pending"), format!("r{runs}")).unwrap();
+                            serde_json::json!({"threadId": id, "link": format!("https://t3.test/{id}"), "runId": format!("r{runs}"), "status": "starting"})
+                        };
+                        let result = match tool {
+                            "t3_project_list" => Ok(serde_json::json!({"projects": [{"id": "p1", "workspaceRoot": project}], "nextCursor": null})),
+                            "t3_thread_launch" => {
+                                let request = arguments["clientRequestId"].as_str().unwrap().to_string();
+                                match launched.get(&request) {
+                                    Some(id) => Ok(serde_json::json!({"threadId": id, "link": format!("https://t3.test/{id}")})),
+                                    None => {
+                                        let id = format!("thread-{}", std::fs::read_dir(&threads).map_or(0, Iterator::count));
+                                        launched.insert(request, id.clone());
+                                        Ok(run(&id, "launch", arguments["workspaceStrategy"]["worktreePath"].as_str()))
+                                    }
+                                }
+                            }
+                            "t3_thread_send" => Ok(run(arguments["threadId"].as_str().unwrap(), "send", None)),
+                            "t3_thread_organize" => {
+                                std::fs::read_to_string(dir.join("organize-error")).map_or_else(|_| Ok(serde_json::json!({"sequence": 1})), Err)
+                            }
+                            _ => Ok(serde_json::json!({"sequence": 1})),
+                        };
+                        let result = match result {
+                            Ok(content) => {
+                                serde_json::json!({"content": [{"type": "text", "text": content.to_string()}], "structuredContent": content, "isError": false})
+                            }
+                            Err(error) => serde_json::json!({"content": [{"type": "text", "text": error}], "isError": true}),
+                        };
+                        json(200, serde_json::json!({"jsonrpc": "2.0", "id": request["id"], "result": result}))
+                    }
+                }
+                _ => (404, String::new()),
+            };
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\nmcp-session-id: s1\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{answer}",
+                answer.len()
+            );
+        }
+    });
+    origin
+}
+
+/// The fake T3 Code server's calls of `tool`, with their arguments.
+fn mcp_calls(root: &Path, tool: &str) -> Vec<serde_json::Value> {
+    let calls = std::fs::read_to_string(root.join("t3-mcp.log")).unwrap_or_default();
+    let prefix = format!("{tool} ");
+    calls.lines().filter_map(|line| line.strip_prefix(&prefix)).map(|args| serde_json::from_str(args).unwrap()).collect()
+}
+
+/// A repository whose TEST project runs the profiles `fix`, `rework` and `review` as fake T3 Code threads in the
+/// ticket's worktree.
 fn t3_harness(rework_run: &str) -> (TestFixtures, Vec<EnvVarGuard>) {
     t3_harness_with(&[("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""), ("rework", rework_run, ""), ("review", "", "")])
 }
 
 /// A repository whose TEST project runs `profiles` (name, `$FAKE_RUN`, more profile keys four spaces deep) as fake
-/// T3 Code threads in worktrees.
+/// T3 Code threads in the ticket's worktree.
 fn t3_harness_with(profiles: &[(&str, &str, &str)]) -> (TestFixtures, Vec<EnvVarGuard>) {
     t3_harness_and(profiles, "")
 }
 
-/// `t3_harness_with` plus `more_agents`, profiles on other runners (two spaces deep).
+/// `t3_harness_with` plus `more_agents`, profiles on other runners (two spaces deep). The ticket's worktree is
+/// `worktrees/TEST-1` in the repository ([`ticket_worktree`]).
 fn t3_harness_and(profiles: &[(&str, &str, &str)], more_agents: &str) -> (TestFixtures, Vec<EnvVarGuard>) {
     crate::common::require_git();
     let fixtures = TestFixtures::new();
@@ -724,23 +886,34 @@ fn t3_harness_and(profiles: &[(&str, &str, &str)], more_agents: &str) -> (TestFi
     let t3 = root.join("fake-t3.sh");
     std::fs::write(&t3, FAKE_T3).unwrap();
     std::fs::set_permissions(&t3, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let t3_home = root.join("t3home");
+    std::fs::create_dir_all(t3_home.join("userdata")).unwrap();
+    let origin = fake_t3_server(&root, &root);
+    std::fs::write(t3_home.join("userdata/server-runtime.json"), format!(r#"{{"version":1,"origin":"{origin}"}}"#)).unwrap();
     let home = root.join("harnessmux");
     std::fs::create_dir_all(home.join("config")).unwrap();
-    std::fs::write(home.join("config/agents.toml"), format!("[agents.t3]\ncommand = [\"{}\"]\n", t3.display())).unwrap();
+    std::fs::write(
+        home.join("config/agents.toml"),
+        format!("[agents.t3]\ncommand = [{:?}]\nenv = {{ T3CODE_HOME = {:?} }}\n", t3.display().to_string(), t3_home.display().to_string()),
+    )
+    .unwrap();
     let profile = |(name, run, extra): &(&str, &str, &str)| {
-        format!(
-            "  {name}:\n    runner: t3\n{extra}    env:\n      FAKE_LOG: \"{}\"\n      FAKE_TREES: \"{}\"\n      FAKE_RUN: \"{run}\"\n",
-            root.join("t3.log").display(),
-            root.join("t3-trees").display()
-        )
+        format!("  {name}:\n    runner: t3\n{extra}    env:\n      FAKE_LOG: \"{}\"\n      FAKE_RUN: \"{run}\"\n", root.join("t3.log").display())
     };
     let agents: String = profiles.iter().map(profile).collect::<String>() + more_agents;
-    fixtures.create_config_in_dir(&fixtures.tasks_root, &format!("default:\n  project: TEST\nagent:\n  worktree:\n    enabled: true\nagents:\n{agents}"));
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagent:\n  worktree:\n    enabled: true\n    dir: '{}'\nagents:\n{agents}",
+            root.join("worktrees").display()
+        ),
+    );
     TaskService::create(&mut fixtures.create_storage(), TaskCreate { title: "Rework".into(), project: Some("TEST".into()), ..Default::default() }).unwrap();
     git(&root, &["init", "-q", "-b", "main"]);
     git(&root, &["config", "user.name", "Rework"]);
     git(&root, &["config", "user.email", "rework@example.invalid"]);
     git(&root, &["config", "commit.gpgsign", "false"]);
+    std::fs::write(root.join(".gitignore"), "worktrees/\nt3-threads/\nt3home/\nharnessmux/\n*.log\n*.log.*\n").unwrap();
     git(&root, &["add", "."]);
     git(&root, &["commit", "-qm", "init"]);
     let guards = vec![
@@ -749,6 +922,11 @@ fn t3_harness_and(profiles: &[(&str, &str, &str)], more_agents: &str) -> (TestFi
         EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
     ];
     (fixtures, guards)
+}
+
+/// The ticket TEST-1's worktree, where LoTaR runs its jobs.
+fn ticket_worktree(fixtures: &TestFixtures) -> PathBuf {
+    fixtures.get_temp_path().join("worktrees/TEST-1")
 }
 
 fn run_t3(fixtures: &TestFixtures, profile: &str) -> assert_cmd::assert::Assert {
@@ -766,144 +944,195 @@ fn rev(dir: &Path, rev: &str) -> String {
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
-/// DEV-468: T3 Code runs each thread on a branch of its own, so a rework thread's commits (here LoTaR's commit of
-/// what the rework left uncommitted) missed `agent/TEST-1`, and the next `session: fresh` review read the first fix.
-/// Each thread's branch now becomes the ticket's branch when its job ends.
+/// The job logs of the fixture, in one string.
+fn job_logs(fixtures: &TestFixtures) -> String {
+    std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
+        .collect()
+}
+
+/// DEV-652: T3 Code made each thread a worktree of its own, on a `t3/*` branch, and LoTaR pointed the ticket's branch
+/// at it when the job ended. A t3 job now runs in the ticket's worktree on its branch, as every runner does: the
+/// thread starts there (`t3_thread_launch`, `existing_worktree`), each thread of the ticket finds the work of the one
+/// before, and T3 Code makes no worktree.
 #[test]
-fn every_t3_thread_of_a_ticket_ends_on_and_starts_from_the_tickets_branch() {
+fn every_t3_thread_of_a_ticket_runs_in_its_worktree_on_its_branch() {
     let (fixtures, _env) = t3_harness("echo rework > rework.txt");
     let root = fixtures.get_temp_path();
+    let start = rev(root, "main");
     run_t3(&fixtures, "fix").success();
-    assert_eq!(rev(root, "agent/TEST-1"), rev(root, "t3/topic-0"), "the fix thread's commit is on the ticket's branch");
+    let tree = std::fs::canonicalize(ticket_worktree(&fixtures)).unwrap();
+    let fix = rev(root, "agent/TEST-1");
+    assert_ne!(fix, start, "the fix thread committed on the ticket's branch");
     run_t3(&fixtures, "rework").success();
-    let rework = rev(root, "t3/topic-1");
-    assert_eq!(rev(root, "agent/TEST-1"), rework, "so is LoTaR's commit of the rework");
-    let tree = root.join("t3-trees/1");
-    assert!(tree.join("rework.txt").is_file() && rev(&tree, "HEAD~1") == rev(root, "t3/topic-0"), "the rework was committed on the fix");
+    let rework = rev(root, "agent/TEST-1");
+    assert!(tree.join("rework.txt").is_file() && rev(&tree, "HEAD~1") == fix, "LoTaR committed the rework on the fix");
     run_t3(&fixtures, "review").success();
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    let review = log.lines().nth(2).unwrap_or_default();
-    assert_eq!(review, format!("agent/TEST-1 t3/topic-2 {rework}"), "the fresh review starts from the rework: {log}");
-}
-
-/// DEV-573: a fix thread whose job ran while another worktree appeared (a parallel job's), after a failed job's
-/// worktree kept `agent/TEST-1` checked out. LoTaR took that old worktree for the thread's, so the ticket's branch
-/// stayed behind and the review and merge missed the fix. T3 Code now names the thread's worktree, and the old one, a
-/// finished job's with changes of its own, is detached so the ticket's branch can follow.
-#[test]
-fn the_tickets_branch_follows_its_thread_past_a_parallel_and_a_stale_worktree() {
-    // Outside the fixture: lotar doesn't find TEST-1 with a worktree nested in the repository.
-    let elsewhere = tempfile::tempdir().unwrap();
-    let parallel = format!("git worktree add -q -b t3/other {}", elsewhere.path().join("parallel").display());
-    let fix = format!("{parallel} && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix");
-    let (fixtures, _env) = t3_harness_with(&[(STALE.0, STALE.1, ""), ("fix", &fix, ""), ("review", "", "")]);
-    let root = fixtures.get_temp_path();
-    let start = rev(root, "HEAD");
-    run_t3(&fixtures, STALE.0).success();
-    let stale = root.join("t3-trees/0");
-    std::fs::write(stale.join("draft.txt"), "unsaved").unwrap();
-    run_t3(&fixtures, "fix").success();
-    let fix = rev(root, "t3/topic-1");
-    assert_ne!(fix, start, "the fix thread committed");
-    assert_eq!(rev(root, "agent/TEST-1"), fix, "the fix thread's commit is on the ticket's branch");
-    assert_eq!(rev(&stale, "HEAD"), start, "the failed job's worktree with changes stays, detached at its commit");
-    run_t3(&fixtures, "review").success();
-    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    assert_eq!(log.lines().nth(2).unwrap_or_default(), format!("agent/TEST-1 t3/topic-2 {fix}"), "the review starts from the fix: {log}");
-}
-
-/// A profile whose thread, the job's, takes `agent/TEST-1` in its worktree and ends there.
-const STALE: (&str, &str) = ("stale", "git checkout -q -b agent/TEST-1");
-
-/// DEV-595: a T3 Code thread started on `agent/TEST-1` keeps it checked out in its worktree, and a later thread of
-/// the ticket ends on a branch of its own. Moving the ticket's branch failed the job (`cannot force update the branch
-/// used by worktree`). A clean worktree of a finished job now moves with the branch and stays on it, so a later thread
-/// on the branch still finds it there.
-#[test]
-fn the_tickets_branch_moves_in_a_clean_worktree_that_has_it_checked_out() {
-    let (fixtures, _env) =
-        t3_harness_with(&[(STALE.0, STALE.1, ""), ("rework", "echo rework > rework.txt && git add rework.txt && git commit -qm TEST-1-rework", "")]);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, STALE.0).success();
-    let agent = root.join("t3-trees/0");
-    run_t3(&fixtures, "rework").success();
-    let rework = rev(root, "t3/topic-1");
-    assert_eq!(rev(root, "agent/TEST-1"), rework, "the ticket's branch follows the thread");
-    let head = std::process::Command::new("git").args(["symbolic-ref", "--short", "HEAD"]).current_dir(&agent).output().unwrap();
-    assert_eq!(String::from_utf8_lossy(&head.stdout).trim(), "agent/TEST-1", "the worktree stays on the ticket's branch");
-    assert!(agent.join("rework.txt").is_file(), "and has the thread's work checked out");
-}
-
-/// DEV-675: a fix job ran out of disk space in its end rules, so its log has its `agent_job_completed` event but no
-/// final status, and its clean worktree kept `agent/TEST-1` checked out. That job counted as still at work there, and
-/// every later job failed (`cannot force update the branch used by worktree`). A log with an end event whose job no
-/// longer runs now counts as ended.
-#[test]
-fn the_tickets_branch_moves_in_the_worktree_of_a_job_whose_log_lost_its_status() {
-    let (fixtures, _env) =
-        t3_harness_with(&[(STALE.0, STALE.1, ""), ("rework", "echo rework > rework.txt && git add rework.txt && git commit -qm TEST-1-rework", "")]);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, STALE.0).success();
-    // Like the log of a job that continued in the worktree: its header names it, and the status line is gone.
-    for entry in std::fs::read_dir(fixtures.tasks_root.join("@agent-logs")).unwrap() {
-        let path = entry.unwrap().path();
-        let log = std::fs::read_to_string(&path).unwrap_or_default();
-        if !log.contains("agent_job_completed") {
-            continue;
-        }
-        let mut lines: Vec<serde_json::Value> = log.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
-        let status = lines.iter().position(|line| line["type"] == "status").expect("the log has a status line");
-        let worktree = lines.remove(status)["worktree_path"].clone();
-        assert!(worktree.is_string(), "the status names the worktree");
-        lines[0]["worktree_path"] = worktree;
-        std::fs::write(&path, lines.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
+    assert_eq!(
+        log.lines().collect::<Vec<_>>(),
+        vec![format!("thread-0 agent/TEST-1 {start}"), format!("thread-1 agent/TEST-1 {fix}"), format!("thread-2 agent/TEST-1 {rework}")],
+        "each thread starts from the work of the one before: {log}"
+    );
+    let launches = mcp_calls(root, "t3_thread_launch");
+    assert_eq!(launches.len(), 3, "{launches:?}");
+    for launch in &launches {
+        assert_eq!(launch["workspaceStrategy"], serde_json::json!({"type": "existing_worktree", "worktreePath": tree.display().to_string()}), "{launch}");
+        assert_eq!(launch["title"], "TEST-1 Rework", "{launch}");
+        assert_eq!(launch["runtimeMode"], "full-access", "{launch}");
     }
-    run_t3(&fixtures, "rework").success();
-    assert_eq!(rev(root, "agent/TEST-1"), rev(root, "t3/topic-1"), "the ticket's branch follows the thread");
-    assert!(root.join("t3-trees/0/rework.txt").is_file(), "the earlier worktree moved with it");
+    let worktrees = std::process::Command::new("git").args(["worktree", "list", "--porcelain"]).current_dir(root).output().unwrap();
+    let worktrees = String::from_utf8_lossy(&worktrees.stdout).lines().filter(|line| line.starts_with("worktree ")).count();
+    assert_eq!(worktrees, 2, "the main checkout and the ticket's worktree, nothing T3 Code made");
+    let task = TaskService::get(&fixtures.create_storage(), "TEST-1", None).unwrap();
+    for thread in ["thread-0", "thread-1", "thread-2"] {
+        let link = format!("https://t3.test/{thread}");
+        assert!(task.references.iter().any(|reference| reference.link.as_deref() == Some(link.as_str())), "{thread} is linked: {:?}", task.references);
+    }
 }
 
-/// DEV-673: an earlier fix job's thread left `agent/TEST-1` checked out in its clean worktree, and the next fix job
-/// ran in the same session on a branch of its own. The ending job's own record names that session, so the worktree
-/// counted as in use and the job failed (`cannot force update the branch used by worktree`). The ending job no longer
-/// counts.
+/// DEV-652: a `session: continue` job before DEV-652 ran in the main checkout, its thread in a worktree T3 Code
+/// made. The next job doesn't continue it there: it starts a new thread in the ticket's worktree with a handoff.
 #[test]
-fn the_tickets_branch_moves_in_the_worktree_of_an_earlier_job_in_the_same_session() {
-    let run = "if git rev-parse -q --verify refs/heads/agent/TEST-1 >/dev/null; then echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; else git checkout -q -b agent/TEST-1; fi";
-    let (fixtures, _env) = t3_harness_with(&[("fix", run, "")]);
+fn a_thread_from_before_ticket_worktrees_hands_off_to_a_new_one_in_the_worktree() {
+    let (fixtures, _env) = t3_harness_with(&[("fix", "echo $$ >> work.txt", "    session: continue\n")]);
     let root = fixtures.get_temp_path();
+    let config_path = fixtures.tasks_root.join("config.yml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    std::fs::write(&config_path, config.replace("    enabled: true\n", "    enabled: false\n")).unwrap();
     run_t3(&fixtures, "fix").success();
-    let earlier = root.join("t3-trees/0");
+    assert!(mcp_calls(root, "t3_thread_launch").is_empty(), "the old job's thread started from the main checkout");
+    std::fs::write(&config_path, &config).unwrap();
     run_t3(&fixtures, "fix").success();
-    let fix = rev(root, "t3/topic-1");
-    assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch follows the thread");
-    assert!(earlier.join("fix.txt").is_file(), "the earlier worktree moved with it");
+    let launches = mcp_calls(root, "t3_thread_launch");
+    let tree = std::fs::canonicalize(ticket_worktree(&fixtures)).unwrap();
+    assert_eq!(launches.len(), 1, "{launches:?}");
+    assert_eq!(launches[0]["workspaceStrategy"]["worktreePath"], tree.display().to_string());
+    assert!(
+        job_logs(&fixtures).contains("T3 Code thread runs in a worktree T3 Code made; this job starts a new thread in the ticket's worktree, with a handoff."),
+        "the job says why"
+    );
+    let prompt = std::fs::read_to_string(root.join("t3.log.prompt-1")).unwrap();
+    assert!(prompt.contains("thread-0"), "the new thread hears of the old one: {prompt}");
+    run_t3(&fixtures, "fix").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert!(log.lines().last().unwrap_or_default().starts_with("send thread-1 agent/TEST-1 "), "the next job continues the new thread: {log}");
 }
 
-/// DEV-694: on DEV-617 a headless review ran in between, in the earlier fix thread's worktree that still had
-/// `agent/TEST-1` checked out, and the next fix job continued the fix session on a branch of its own. Its end failed
-/// (`cannot force update the branch used by worktree`) on a build without DEV-673. The ended review doesn't hold the
-/// worktree either: the ticket's branch moves with it to the thread's commit.
+/// The owner decided 2026-11-17 (DEV-652): a t3 job that completed settles its thread in T3 Code once the end rules
+/// moved the ticket on, so the sidebar keeps only the threads that still need someone.
 #[test]
-fn the_tickets_branch_moves_after_a_headless_review_ran_in_the_earlier_worktree() {
-    let run = "if git rev-parse -q --verify refs/heads/agent/TEST-1 >/dev/null; then echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; else git checkout -q -b agent/TEST-1; fi";
-    let (fixtures, _env) =
-        t3_harness_and(&[("fix", run, "")], "  review:\n    runner: command\n    command: /bin/sh\n    args: [\"-c\", \"pwd >> ../../review.log\"]\n");
+fn a_completed_t3_job_settles_its_thread_once_the_ticket_moves_on() {
+    let (fixtures, _env) = t3_harness("");
     let root = fixtures.get_temp_path();
+    lotar::services::automation_service::AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Fixed\n      on:\n        job_completed:\n          set: { status: Done, assignee: mallox }\n",
+    )
+    .expect("automation rules");
     run_t3(&fixtures, "fix").success();
-    let earlier = std::fs::canonicalize(root.join("t3-trees/0")).unwrap();
+    let settles = mcp_calls(root, "t3_thread_organize");
+    assert_eq!(settles, vec![serde_json::json!({"threadId": "thread-0", "action": "settle"})], "a done ticket waits for nobody, whoever it is assigned to");
+    assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"), "the job says so");
+}
+
+/// DEV-652: a thread whose ticket waits for a person, or whose job failed, stays active in T3 Code, and a settle T3
+/// Code refuses is a note: the job still completes.
+#[test]
+fn a_t3_thread_stays_active_while_its_ticket_waits_or_its_job_failed() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    let rules = |set: &str| {
+        lotar::services::automation_service::AutomationService::set(
+            &fixtures.tasks_root,
+            None,
+            &format!("automation:\n  rules:\n    - name: End\n      on:\n        job_completed:\n          set: {set}\n"),
+        )
+        .expect("automation rules");
+    };
+    rules("{ status: InProgress, assignee: mallox }");
     run_t3(&fixtures, "review").success();
-    let reviewed = std::fs::read_to_string(root.join("review.log")).unwrap();
-    assert_eq!(reviewed.trim(), earlier.display().to_string(), "the review ran in the earlier worktree");
+    rules("{ status: HelpNeeded }");
+    run_t3(&fixtures, "review").success();
+    rules("{ status: Done }");
+    std::fs::write(root.join("failed-thread-2"), "").unwrap();
+    run_t3(&fixtures, "review").failure();
+    assert_eq!(mcp_calls(root, "t3_thread_organize"), Vec::<serde_json::Value>::new(), "no thread was settled");
+    let logs = job_logs(&fixtures);
+    assert!(logs.contains("The T3 Code thread stays active: TEST-1 is InProgress, assigned to mallox."), "{logs}");
+    assert!(logs.contains("The T3 Code thread stays active: TEST-1 is HelpNeeded."), "{logs}");
+    std::fs::write(root.join("organize-error"), "T3 Code refuses").unwrap();
+    run_t3(&fixtures, "review").success();
+    assert!(job_logs(&fixtures).contains("The T3 Code thread was not settled: "), "the refusal is a note");
+}
+
+/// DEV-618, DEV-652: a job whose profile sets `tools.disallowed` and `env` writes them into the ticket's worktree
+/// before its thread starts there; its log says so, and no commit takes the file. A profile on another provider than
+/// Claude writes nothing.
+#[test]
+fn a_t3_job_gives_the_tickets_worktree_the_profiles_tools_and_env() {
+    let (fixtures, _env) = t3_harness_with(&[
+        ("fix", "echo fix > fix.txt", "    tools:\n      disallowed: [Artifact]\n"),
+        ("other", "", "    provider: codex\n    model: m\n    tools:\n      disallowed: [Artifact]\n"),
+    ]);
+    let root = fixtures.get_temp_path();
     run_t3(&fixtures, "fix").success();
-    let fix = rev(root, "t3/topic-1");
-    assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch follows the thread");
-    assert_eq!(rev(&earlier, "HEAD"), fix, "the earlier worktree moved with it");
+    let file = ticket_worktree(&fixtures).join(".claude/settings.local.json");
+    let settings: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(settings["permissions"], serde_json::json!({"deny": ["Artifact"]}));
+    assert_eq!(settings["env"]["FAKE_RUN"], "echo fix > fix.txt", "{settings}");
+    assert!(job_logs(&fixtures).contains("Wrote .claude/settings.local.json"), "{}", job_logs(&fixtures));
+    let committed = std::process::Command::new("git").args(["log", "--name-only", "--format=", "main..agent/TEST-1"]).current_dir(root).output().unwrap();
+    let committed = String::from_utf8_lossy(&committed.stdout).to_string();
+    assert!(committed.contains("fix.txt") && !committed.contains(".claude"), "{committed}");
+
+    std::fs::remove_file(&file).unwrap();
+    run_t3_with(&fixtures, "other", &["--session", "new"]).success();
+    assert!(!file.exists(), "a codex thread gets no Claude settings");
+}
+
+/// DEV-619: a continued thread is renamed to the profile's thread_name before its turn is sent, with a session token
+/// that lotar revokes afterwards.
+#[test]
+fn a_continued_thread_is_renamed_before_its_turn() {
+    let named = "    session: continue\n    thread_name: \"${{ticket.id}} fix: ${{ticket.title}}\"\n";
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", named)]);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    assert_eq!(mcp_calls(root, "t3_thread_launch")[0]["title"], "TEST-1 fix: Rework", "a new thread gets the name");
+    assert!(mcp_calls(root, "ws_rename").is_empty(), "a new thread isn't renamed");
+    run_t3(&fixtures, "fix").success();
+    let rename = mcp_calls(root, "ws_rename");
+    assert_eq!(rename.len(), 1, "{rename:?}");
+    assert_eq!(rename[0]["type"], "thread.metadata.update");
+    assert_eq!(rename[0]["threadId"], "thread-0");
+    assert_eq!(rename[0]["title"], "TEST-1 fix: Rework");
+    let log = std::fs::read_to_string(root.join("t3-mcp.log")).unwrap();
+    let (renamed, sent) = (log.find("ws_rename").unwrap(), log.find("t3_thread_send").unwrap());
+    assert!(renamed < sent, "the rename comes before the continued turn: {log}");
+    assert!(job_logs(&fixtures).contains("Renamed the T3 Code thread thread-0 to \\\"TEST-1 fix: Rework\\\"."), "{}", job_logs(&fixtures));
+    assert!(std::fs::read_to_string(root.join("t3-auth.log")).unwrap_or_default().contains("auth session revoke s1"));
+}
+
+/// DEV-619: a rename that T3 Code's server refuses is logged and the job runs on.
+#[test]
+fn a_continued_thread_that_cant_be_renamed_runs_on() {
+    let named = "    session: continue\n    thread_name: \"${{ticket.id}} fix: ${{ticket.title}}\"\n";
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", named)]);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    std::fs::write(root.join("ws-refuse"), "").unwrap();
+    run_t3(&fixtures, "fix").success();
+    let logs = job_logs(&fixtures);
+    assert!(logs.contains("Could not rename the continued T3 Code thread to \\\"TEST-1 fix: Rework\\\", so it keeps its name: "), "{logs}");
+    assert_eq!(mcp_calls(root, "t3_thread_send").len(), 1, "the continued turn was sent");
 }
 
 /// DEV-594: a fix job's thread hit the usage limit, so the job failed, and T3 Code resumed the thread on its own when
-/// the limit reset. The next fix job started beside it, in a thread of its own on a `t3/*` branch, and both committed.
-/// A job now waits while T3 Code still runs an earlier job's thread on the ticket.
+/// the limit reset. The next fix job started beside it, and both committed. A job now waits while T3 Code still runs
+/// an earlier job's thread on the ticket.
 #[test]
 fn no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread() {
     let (fixtures, _env) = t3_harness("");
@@ -920,27 +1149,26 @@ fn no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread() {
     std::fs::remove_file(&running).unwrap();
     run_t3(&fixtures, "review").success();
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("agent/TEST-1 t3/topic-1 {fix}"), "the review starts from the fix: {log}");
+    assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("thread-1 agent/TEST-1 {fix}"), "the review starts from the fix: {log}");
 }
 
-/// DEV-583: a retried fix job's thread runs in a new worktree on a branch T3 Code makes from `agent/TEST-1`, while
-/// the failed job's uncommitted work stays in the worktree that has `agent/TEST-1` checked out. The prompt said
-/// "on branch `agent/TEST-1` ... Don't switch branches"; it now says the thread's branch may be one T3 Code made, and
-/// where the earlier work is.
+/// DEV-583: a thread from before DEV-652 left uncommitted work in a worktree T3 Code made, on a branch of its own
+/// from `agent/TEST-1`. The next job's prompt names it.
 #[test]
-fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
+fn a_t3_job_learns_where_an_earlier_threads_uncommitted_work_is() {
     let elsewhere = tempfile::tempdir().unwrap();
     let (fixtures, _env) = t3_harness_with(&[("fix", "", ""), ("review", "", ""), ("merge", "", "")]);
     let root = fixtures.get_temp_path();
-    let failed = elsewhere.path().join("failed");
-    git(root, &["worktree", "add", "-q", "-b", "agent/TEST-1", failed.to_str().unwrap()]);
-    std::fs::write(failed.join("half-done.txt"), "work").unwrap();
+    let earlier = elsewhere.path().join("earlier");
+    git(root, &["branch", "agent/TEST-1"]);
+    git(root, &["worktree", "add", "-q", "-b", "t3/topic-9", earlier.to_str().unwrap(), "agent/TEST-1"]);
+    std::fs::write(earlier.join("half-done.txt"), "work").unwrap();
     run_t3(&fixtures, "fix").success();
     let prompt = std::fs::read_to_string(root.join("t3.log.prompt-0")).unwrap();
-    assert!(prompt.contains("or one T3 Code made from it"), "{prompt}");
-    let failed = std::fs::canonicalize(&failed).unwrap();
-    assert!(prompt.contains(&format!("uncommitted changes in `{}` (branch `agent/TEST-1`)", failed.display())), "{prompt}");
-    assert!(failed.join("half-done.txt").is_file(), "the earlier work stays where it is");
+    assert!(prompt.contains("You work in a git worktree on branch `agent/TEST-1`, separate from the main checkout."), "{prompt}");
+    let earlier = std::fs::canonicalize(&earlier).unwrap();
+    assert!(prompt.contains(&format!("uncommitted changes in `{}` (branch `t3/topic-9`)", earlier.display())), "{prompt}");
+    assert!(earlier.join("half-done.txt").is_file(), "the earlier work stays where it is");
     // DEV-608: the changes stay there after the retry, so later jobs learn they may be carried over or dropped already,
     // and a merge job doesn't hear of them.
     assert!(prompt.contains("A job that takes the work over (a fix or rework)"), "{prompt}");
@@ -949,7 +1177,7 @@ fn a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is() {
     assert!(prompt.contains("carried them over or dropped them already") && prompt.contains("A review job leaves them alone"), "{prompt}");
     run_t3(&fixtures, "merge");
     let prompt = std::fs::read_to_string(root.join("t3.log.prompt-2")).unwrap();
-    assert!(prompt.contains("This is a merge job") && !prompt.contains("half-done") && !prompt.contains(&failed.display().to_string()), "{prompt}");
+    assert!(prompt.contains("This is a merge job") && !prompt.contains("half-done") && !prompt.contains(&earlier.display().to_string()), "{prompt}");
 }
 
 /// DEV-600: harnessmux counts a thread with an `activeRunId` as running whatever its status says, and T3 Code shows a
@@ -1072,176 +1300,29 @@ fn a_t3_job_ending_on_the_ticket_drops_its_cached_idle_answer() {
     assert_eq!(shows(), before + 2, "and caches that answer");
 }
 
-/// DEV-577: a merge thread fast-forwarded main to a commit of its own, then its job failed because the ticket's branch,
-/// checked out in another worktree, couldn't follow the thread. That worktree is no finished job's, maybe an agent's at
-/// work, so it stays on the branch (owner 2026-11-15). The work is on main: the branch stays too and the job completes.
+/// DEV-581, DEV-652: headless jobs and T3 Code threads of a ticket share its worktree. The headless review and merge
+/// run there, the rework continues the fix's thread there, and Done cleanup removes it.
 #[test]
-fn a_merged_thread_leaves_a_ticket_branch_checked_out_elsewhere_and_completes() {
-    let (fixtures, _env) = t3_harness_with(&[
-        ("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""),
-        (
-            "merge",
-            "git commit -q --allow-empty -m TEST-1-rebased && git -C \\\"$(git rev-parse --path-format=absolute --git-common-dir)/..\\\" merge -q --ff-only $(git rev-parse HEAD)",
-            "",
-        ),
-    ]);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix").success();
-    let fix = rev(root, "agent/TEST-1");
-    let other = tempfile::tempdir().unwrap();
-    git(root, &["worktree", "add", "-q", other.path().join("tree").to_str().unwrap(), "agent/TEST-1"]);
-    run_t3(&fixtures, "merge").success();
-    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
-        .unwrap()
-        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
-        .collect();
-    assert!(logs.contains("agent/TEST-1 stays where it is, not at t3/topic-1: the T3 Code thread's work is in the main checkout"), "the job says why: {logs}");
-    assert_eq!(rev(root, "main"), rev(root, "t3/topic-1"), "the merge reached main");
-    assert_eq!(rev(root, "agent/TEST-1"), fix, "the checked-out ticket branch is unchanged");
-    let on = std::process::Command::new("git").args(["symbolic-ref", "--short", "HEAD"]).current_dir(other.path().join("tree")).output().unwrap();
-    assert_eq!(String::from_utf8_lossy(&on.stdout).trim(), "agent/TEST-1", "the other worktree stays on it");
-}
-
-/// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays
-/// where it was, so automation doesn't hand the ticket to a job that would read it.
-#[test]
-fn a_ticket_branch_that_cannot_follow_its_thread_fails_the_job() {
-    let (fixtures, _env) = t3_harness("echo rework > rework.txt && git add rework.txt && git commit -qm TEST-1-rework");
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix").success();
-    let fix = rev(root, "agent/TEST-1");
-    git(root, &["checkout", "-q", "agent/TEST-1"]);
-    run_t3(&fixtures, "rework")
-        .failure()
-        .stdout(predicate::str::contains("agent/TEST-1 stays where it is, not at t3/topic-1 of the T3 Code thread: git branch --force"));
-    assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch is unchanged");
-    assert_ne!(rev(root, "t3/topic-1"), fix, "the rework stays on its thread's branch");
-}
-
-/// A fix thread whose `agent/TEST-1` got commit A, on the main before the thread's (and, with `backup`, a backup
-/// branch at A), while the thread rewrote A as A' on its own branch.
-fn rebased_fix(backup: bool) -> (TestFixtures, Vec<EnvVarGuard>) {
-    let keep = if backup { " && git branch backup/TEST-1-A" } else { "" };
-    let fix = format!(
-        "git checkout -q --detach main~1 && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix && git branch -f agent/TEST-1{keep} && git checkout -q t3/topic-0 && echo rebased > fix.txt && git add fix.txt && git commit -qm TEST-1-fix"
-    );
-    let (fixtures, env) = t3_harness_with(&[("fix", &fix, "")]);
-    let root = fixtures.get_temp_path();
-    std::fs::write(root.join("newer.txt"), "newer").unwrap();
-    git(root, &["add", "newer.txt"]);
-    git(root, &["commit", "-qm", "newer"]);
-    (fixtures, env)
-}
-
-/// DEV-687: a thread rebased `agent/LOCA-518`'s commit onto main with a different patch and kept the old commit as
-/// `backup/LOCA-518-<commit>`. `git cherry` reported that commit as missing from the thread's branch, so the job
-/// refused to move the ticket's branch although the backup kept it. Another branch keeping the ticket's tip now lets
-/// the branch move, and the job names that branch.
-#[test]
-fn the_tickets_branch_follows_a_thread_that_rebased_its_commit_and_kept_a_backup() {
-    let (fixtures, _env) = rebased_fix(true);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix").success();
-    let rebased = rev(root, "t3/topic-0");
-    assert_eq!(rev(root, "agent/TEST-1"), rebased, "the ticket's branch follows the thread");
-    assert_eq!(rev(root, "backup/TEST-1-A~1"), rev(root, "main~1"), "the backup keeps commit A");
-    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
-        .unwrap()
-        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
-        .collect();
-    assert!(logs.contains("Its commits that t3/topic-0 lacks stay on backup/TEST-1-A."), "the job names the backup: {logs}");
-}
-
-/// DEV-687: without a branch that keeps commit A, moving the ticket's branch would drop it, so the job still refuses.
-#[test]
-fn the_tickets_branch_stays_when_only_it_has_the_commit_its_thread_rebased() {
-    let (fixtures, _env) = rebased_fix(false);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix")
-        .failure()
-        .stdout(predicate::str::contains("agent/TEST-1 stays where it is, not at t3/topic-0 of the T3 Code thread: it has commits that t3/topic-0 lacks"));
-    assert_ne!(rev(root, "agent/TEST-1"), rev(root, "t3/topic-0"), "the ticket's branch keeps commit A");
-}
-
-/// `agent/TEST-1` at `t3/topic-0`'s fix (and, with `backup`, `backup/TEST-1-fix` there too), and a newer logged
-/// thread branch `t3/topic-1` with TEST-1 work that doesn't build on it; then a review job runs. The fix, `t3/topic-1`'s
-/// tip, and the T3 log.
-fn newer_work_beside_the_fix(backup: bool) -> (TestFixtures, Vec<EnvVarGuard>, String, String, String) {
-    let other =
-        "git reset -q --hard main && echo other > other.txt && git add other.txt && GIT_COMMITTER_DATE=2099-01-01T00:00:00Z git commit -qm TEST-1-other";
-    let (fixtures, env) =
-        t3_harness_with(&[("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""), ("other", other, ""), ("review", "", "")]);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix").success();
-    run_t3(&fixtures, "other").success();
-    let fix = rev(root, "t3/topic-0");
-    let newer = rev(root, "t3/topic-1");
-    git(root, &["branch", "-f", "agent/TEST-1", &fix]);
-    if backup {
-        git(root, &["branch", "backup/TEST-1-fix", &fix]);
-    }
-    run_t3(&fixtures, "review").success();
-    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    (fixtures, env, fix, newer, log)
-}
-
-/// DEV-689: only the ticket's own earlier thread branch `t3/topic-0` has the fix. It doesn't count as keeping it
-/// (owner 2026-11-18: only branches outside the ticket's own thread branches count), so the DEV-602 guard holds:
-/// the review starts from the fix, not from the newer work that drops it.
-#[test]
-fn the_tickets_branch_stays_at_its_fix_that_only_its_own_thread_branch_also_has() {
-    let (fixtures, _env, fix, _newer, log) = newer_work_beside_the_fix(false);
-    assert_eq!(log.lines().nth(2).unwrap_or_default(), format!("agent/TEST-1 t3/topic-2 {fix}"), "the review starts from the fix: {log}");
-    assert_eq!(rev(fixtures.get_temp_path(), "agent/TEST-1"), fix, "the ticket's branch stays at the fix");
-}
-
-/// DEV-689: a branch outside the ticket's thread branches (`backup/TEST-1-fix`) keeps the fix, so the job moves the
-/// ticket's branch to the newer work, starts from it and names the backup (DEV-687).
-#[test]
-fn the_tickets_branch_follows_newer_work_when_a_backup_keeps_its_fix() {
-    let (fixtures, _env, _fix, newer, log) = newer_work_beside_the_fix(true);
-    assert_eq!(log.lines().nth(2).unwrap_or_default(), format!("agent/TEST-1 t3/topic-2 {newer}"), "the review starts from the newer work: {log}");
-    assert_eq!(rev(fixtures.get_temp_path(), "agent/TEST-1"), newer, "the ticket's branch moves to the newer work");
-    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
-        .unwrap()
-        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
-        .collect();
-    assert!(logs.contains("Its commits that t3/topic-1 lacks stay on backup/TEST-1-fix."), "the job names the backup: {logs}");
-}
-
-/// DEV-581: a T3 Code thread keeps the ticket's branch checked out in its worktree, so a headless job after it failed
-/// on `git worktree add`. The headless review and merge now run in the thread's worktree, the rework continues the
-/// thread there, and Done cleanup removes it.
-#[test]
-fn headless_jobs_run_in_the_t3_threads_worktree_that_has_the_tickets_branch() {
-    let fix = "if [ -f fix.txt ]; then echo again >> fix.txt && git commit -qam TEST-1-rework; else git checkout -q -b agent/TEST-1 && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; fi";
+fn headless_jobs_and_t3_threads_of_a_ticket_share_its_worktree() {
+    let fix = "if [ -f fix.txt ]; then echo again >> fix.txt && git commit -qam TEST-1-rework; else echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; fi";
     let (fixtures, _env) = t3_harness_and(
         &[("fix", fix, "    session: continue\n")],
         "  review:\n    runner: command\n    command: /bin/sh\n    args: [\"-c\", \"pwd >> ../../review.log\"]\n  merge:\n    runner: command\n    command: /bin/sh\n    args: [\"-c\", \"pwd >> ../../review.log && git -C ../.. merge -q --ff-only agent/TEST-1\"]\n",
     );
     let root = fixtures.get_temp_path();
-    let tree = std::fs::canonicalize(root.join("t3-trees/0")).unwrap_or_else(|_| root.join("t3-trees/0"));
     let run = |profile: &str| {
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(root).args(["agent", "run", "TEST-1", "Work on it", "--agent", profile, "--wait"]);
         cmd.assert()
     };
     run("fix").success();
-    let tree = std::fs::canonicalize(&tree).unwrap();
+    let tree = std::fs::canonicalize(ticket_worktree(&fixtures)).unwrap();
     assert_eq!(rev(&tree, "HEAD"), rev(root, "agent/TEST-1"), "the fix thread works on the ticket's branch");
     run("review").success();
-    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
-        .unwrap()
-        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
-        .collect();
-    assert!(
-        logs.contains("agent/TEST-1 is checked out in the worktree ") && logs.contains("t3-trees/0, so this job runs there."),
-        "the job log names it: {logs}"
-    );
     run("fix").success();
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 agent/TEST-1 "), "the rework continues the fix thread in its worktree: {log}");
-    assert!(tree.join("fix.txt").is_file() && std::fs::read_to_string(tree.join("fix.txt")).unwrap().contains("again"));
+    assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 agent/TEST-1 "), "the rework continues the fix thread in the worktree: {log}");
+    assert!(std::fs::read_to_string(tree.join("fix.txt")).unwrap().contains("again"));
     run("merge").success();
     let pwds = std::fs::read_to_string(root.join("review.log")).unwrap();
     assert_eq!(pwds.lines().map(|line| std::fs::canonicalize(line).unwrap()).collect::<Vec<_>>(), vec![tree.clone(), tree.clone()], "{pwds}");
@@ -1249,7 +1330,7 @@ fn headless_jobs_run_in_the_t3_threads_worktree_that_has_the_tickets_branch() {
     for args in [&["config", "set", "agent_worktree_cleanup_on_done", "true", "--global"][..], &["status", "TEST-1", "Done"]] {
         crate::common::lotar_cmd().unwrap().current_dir(root).args(args).assert().success();
     }
-    assert!(!tree.exists(), "Done cleanup removed the thread's worktree");
+    assert!(!tree.exists(), "Done cleanup removed the ticket's worktree");
 }
 
 /// A `fix` thread that commits, then amends, and a `merge` thread that hands the ticket back; both continue their
@@ -1265,10 +1346,8 @@ fn amending_fix_and_merge() -> (TestFixtures, Vec<EnvVarGuard>) {
     ])
 }
 
-/// DEV-550: a merge that continues an earlier merge thread ran on that thread's worktree branch, still at the fix the
-/// rework had amended since. The continued rework recorded no worktree either, so the ticket's branch stayed at the
-/// first fix. A continued thread's branch now starts at the ticket branch's commit, and its end moves the ticket
-/// branch, amend included.
+/// DEV-550: a merge that continues an earlier merge thread ran at the fix the rework had amended since. A continued
+/// thread now runs in the ticket's worktree, at the amended rework.
 #[test]
 fn a_continued_merge_thread_starts_from_the_rework_that_amended_the_ticket_branch() {
     let (fixtures, _env) = amending_fix_and_merge();
@@ -1278,13 +1357,12 @@ fn a_continued_merge_thread_starts_from_the_rework_that_amended_the_ticket_branc
     run_t3_with(&fixtures, "merge", &["--session", "new"]).success();
     assert_ne!(rev(root, "main"), fix, "the merge handed the ticket back and left main alone");
     run_t3(&fixtures, "fix").success();
-    let rework = rev(root, "t3/topic-0");
+    let rework = rev(root, "agent/TEST-1");
     assert_ne!(rework, fix, "the rework amended the fix");
-    assert_eq!(rev(root, "agent/TEST-1"), rework, "the ticket's branch follows the amended rework");
     run_t3(&fixtures, "merge").success();
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     let merge = log.lines().last().unwrap_or_default();
-    assert_eq!(merge, format!("send thread-1 t3/topic-1 {rework}"), "the continued merge thread starts from the rework: {log}");
+    assert_eq!(merge, format!("send thread-1 agent/TEST-1 {rework}"), "the continued merge thread starts from the rework: {log}");
 }
 
 /// DEV-565: the owner decided 2026-11-11 that the merge runs in the reviewer's thread (DEV-368). A `session: continue`
@@ -1305,7 +1383,7 @@ fn a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread() {
     wait_for("the merge", || root.join("t3.log").is_file() && std::fs::read_to_string(root.join("t3.log")).unwrap().lines().count() == 2);
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 "), "the merge continues the review's thread: {log}");
-    wait_for("the merge's turn", || root.join("t3-trees/0/merged").is_file());
+    wait_for("the merge's turn", || ticket_worktree(&fixtures).join("merged").is_file());
     wait_for_jobs_to_end(&fixtures.tasks_root);
 }
 
@@ -1350,104 +1428,16 @@ fn a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env() {
     AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
     let mut storage = fixtures.create_storage();
     TaskService::update(&mut storage, "TEST-1", lotar::api_types::TaskUpdate { assignee: Some("@review".into()), ..Default::default() }).unwrap();
-    wait_for("the merge's turn", || root.join("t3-trees/0/merged").is_file());
+    wait_for("the merge's turn", || ticket_worktree(&fixtures).join("merged").is_file());
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 "), "the merge continues the review's thread: {log}");
     wait_for_jobs_to_end(&fixtures.tasks_root);
 }
 
-/// A continued thread whose branch holds a commit the ticket's branch lacks keeps it: the job starts a new thread on
-/// the ticket's branch instead and says why.
-#[test]
-fn a_continued_thread_with_work_of_its_own_leaves_it_and_starts_a_new_thread() {
-    let (fixtures, _env) = amending_fix_and_merge();
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix").success();
-    run_t3_with(&fixtures, "merge", &["--session", "new"]).success();
-    let tree = root.join("t3-trees/1");
-    std::fs::write(tree.join("own.txt"), "own").unwrap();
-    git(&tree, &["add", "own.txt"]);
-    git(&tree, &["commit", "-qm", "own work"]);
-    let own = rev(&tree, "HEAD");
-    run_t3(&fixtures, "fix").success();
-    let rework = rev(root, "agent/TEST-1");
-    run_t3(&fixtures, "merge").success();
-    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
-        .unwrap()
-        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
-        .collect();
-    assert!(
-        logs.contains("t3/topic-1 in the T3 Code thread's worktree") && logs.contains("this job starts a new T3 Code thread on agent/TEST-1"),
-        "the job log says why: {logs}"
-    );
-    assert_eq!(rev(root, "t3/topic-1"), own, "the thread's own commit stays");
-    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    assert_eq!(log.lines().last().unwrap_or_default(), format!("agent/TEST-1 t3/topic-2 {rework}"), "a new thread starts from the rework: {log}");
-}
-
-/// A continued thread keeps the worktree LoTaR checked for it: one that appears elsewhere during its turn (another
-/// job's thread) is not the job's, so LoTaR neither commits there nor points the ticket's branch at it.
-#[test]
-fn a_continued_thread_keeps_its_worktree_when_another_appears_during_its_turn() {
-    let (fixtures, _env) = t3_harness_with(&[(
-        "fix",
-        "if [ -f fix.txt ]; then git worktree add -q -b other ../../other-tree && echo stray > ../../other-tree/stray.txt; else echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix; fi",
-        "    session: continue\n",
-    )]);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix").success();
-    let fix = rev(root, "agent/TEST-1");
-    run_t3(&fixtures, "fix").success();
-    assert!(root.join("other-tree/stray.txt").is_file(), "the other worktree appeared during the turn");
-    assert_eq!(rev(root, "other"), fix, "LoTaR committed nothing in the other worktree");
-    assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch stays at the thread's work");
-}
-
-/// A session name outlives its thread: a job that starts a new one (`--session new`) replaces it under the same name.
-/// When the latest job of the session (here as an older lotar logged it, without worktree) doesn't name the thread's
-/// worktree, an earlier thread's worktree is not the continued thread's: the job starts a new thread on the ticket's
-/// branch and leaves the earlier thread's branch alone.
-#[test]
-fn a_continued_thread_never_takes_the_worktree_of_the_thread_it_replaced() {
-    let (fixtures, _env) = t3_harness_with(&[("fix", "echo work >> work.txt && git add work.txt && git commit -qm TEST-1-work", "    session: continue\n")]);
-    let root = fixtures.get_temp_path();
-    run_t3(&fixtures, "fix").success();
-    let first = rev(root, "t3/topic-0");
-    let mut replace = crate::common::lotar_cmd().unwrap();
-    replace.current_dir(root).args(["agent", "run", "TEST-1", "Work on it", "--agent", "fix", "--session", "new", "--wait"]).assert().success();
-    let logs = fixtures.tasks_root.join("@agent-logs");
-    let mut files: Vec<_> =
-        std::fs::read_dir(&logs).unwrap().map(|entry| entry.unwrap().path()).filter(|path| path.extension().is_some_and(|ext| ext == "jsonl")).collect();
-    files.sort();
-    let latest = files.last().unwrap();
-    let older: String = std::fs::read_to_string(latest)
-        .unwrap()
-        .lines()
-        .map(|line| {
-            let mut value: serde_json::Value = serde_json::from_str(line).unwrap();
-            if value["type"] == "status"
-                && let Some(status) = value.as_object_mut()
-            {
-                for key in ["worktree_path", "worktree_branch", "ticket_commit", "agent_session"] {
-                    status.remove(key);
-                }
-            }
-            format!("{value}\n")
-        })
-        .collect();
-    std::fs::write(latest, older).unwrap();
-    run_t3(&fixtures, "fix").success();
-    assert_eq!(rev(root, "t3/topic-0"), first, "the replaced thread's branch is unchanged");
-    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    let ticket = rev(root, "agent/TEST-1");
-    assert_eq!(ticket, rev(root, "t3/topic-2"), "a new thread did the work, and the ticket's branch follows it: {log}");
-    assert_eq!(rev(root, "t3/topic-2~1"), rev(root, "t3/topic-1"), "it started from the replacement thread's work: {log}");
-}
-
 /// DEV-602 (standards STD-133): the fix thread committed on an earlier thread's branch `t3/x`, created from
-/// `agent/TEST-1`, so the ticket's branch stayed at main. The review and the merge threads started from it on new
-/// `t3/*` branches, found nothing, and the merge counted as landed with the fix not on main. A job now starts from
-/// the ticket's branch with the newest work missing from main.
+/// `agent/TEST-1`, so the ticket's branch stayed at main. The review and the merge threads found nothing, and the
+/// merge counted as landed with the fix not on main. A job now starts from the ticket's branch with the newest work
+/// missing from main.
 #[test]
 fn review_and_merge_start_from_the_branch_that_holds_the_fix() {
     let elsewhere = tempfile::tempdir().unwrap();
@@ -1463,22 +1453,26 @@ fn review_and_merge_start_from_the_branch_that_holds_the_fix() {
     assert_ne!(fix, start, "the fix committed on t3/x");
     run_t3(&fixtures, "review").success();
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
-    assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("agent/TEST-1 t3/topic-1 {fix}"), "the review starts from the fix: {log}");
+    assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("thread-1 agent/TEST-1 {fix}"), "the review starts from the fix: {log}");
     run_t3(&fixtures, "merge").success();
     assert_eq!(rev(root, "main"), fix, "the merge landed the fix on main");
 }
 
-/// DEV-602: a merge whose branch has nothing beyond main fails, naming the ticket's branch with the fix, so the
+/// DEV-602: a merge whose branch has nothing beyond main fails, naming the branch with the ticket's fix, so the
 /// ticket can't go Done through the merge step without its fix on main.
 #[test]
 fn a_merge_that_brings_nothing_while_the_ticket_has_unlanded_work_fails() {
-    let (fixtures, _env) =
-        t3_harness_with(&[("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""), ("merge", "git reset -q --hard main", "")]);
+    let elsewhere = tempfile::tempdir().unwrap();
+    let earlier = elsewhere.path().join("earlier");
+    let fix = format!("cd {} && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", earlier.display());
+    let (fixtures, _env) = t3_harness_with(&[("fix", &fix, ""), ("merge", "git reset -q --hard main", "")]);
     let root = fixtures.get_temp_path();
+    git(root, &["branch", "agent/TEST-1"]);
+    git(root, &["worktree", "add", "-q", "-b", "t3/x", earlier.to_str().unwrap(), "agent/TEST-1"]);
     let start = rev(root, "main");
     run_t3(&fixtures, "fix").success();
     run_t3(&fixtures, "merge").failure().stdout(predicate::str::contains(
-        "Merge job finished, but t3/topic-1 has nothing beyond the main checkout's branch, while t3/topic-0 holds TEST-1's work that isn't in it",
+        "Merge job finished, but agent/TEST-1 has nothing beyond the main checkout's branch, while t3/x holds TEST-1's work that isn't in it",
     ));
     assert_eq!(rev(root, "main"), start, "main stays where it was");
 }
@@ -1510,19 +1504,25 @@ fn a_leftover_copy_of_a_fix_that_main_supersedes_is_not_unlanded_work() {
     assert_eq!(rev(root, "main"), main);
 }
 
-/// DEV-612: the fix job's `t3/topic-0` landed, cleanup at Done removed it, and T3 Code gave the name to another
-/// ticket's thread. The reopened ticket's job log still names it, but it holds none of the ticket's work: a merge
-/// leaves the ticket's branch where it is and passes.
+/// DEV-612: a fix job before DEV-652 logged its thread's `t3/topic-0`, which landed, and cleanup at Done removed it;
+/// T3 Code gave the name to another ticket's thread. The reopened ticket's job log still names it, but it holds none
+/// of the ticket's work: a merge leaves the ticket's branch where it is and passes.
 #[test]
 fn a_logged_branch_name_another_ticket_reuses_is_not_the_tickets_work() {
     let (fixtures, _env) = t3_harness_with(&[("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""), ("merge", "", "")]);
     let root = fixtures.get_temp_path();
     run_t3(&fixtures, "fix").success();
-    git(root, &["merge", "--ff-only", "-q", "t3/topic-0"]);
-    let tree = root.join("t3-trees/0");
-    git(root, &["worktree", "remove", "--force", tree.to_str().unwrap()]);
-    git(root, &["branch", "-D", "-q", "t3/topic-0"]);
-    git(root, &["branch", "-f", "agent/TEST-1", "main"]);
+    // As a job before DEV-652 logged it: the thread's branch.
+    for entry in std::fs::read_dir(fixtures.tasks_root.join("@agent-logs")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|ext| ext == "jsonl") {
+            let log = std::fs::read_to_string(&path).unwrap();
+            std::fs::write(&path, log.replace("\"worktree_branch\":\"agent/TEST-1\"", "\"worktree_branch\":\"t3/topic-0\"")).unwrap();
+        }
+    }
+    git(root, &["merge", "--ff-only", "-q", "agent/TEST-1"]);
+    let elsewhere = tempfile::tempdir().unwrap();
+    let tree = elsewhere.path().join("other");
     git(root, &["worktree", "add", "-q", "-b", "t3/topic-0", tree.to_str().unwrap(), "main"]);
     std::fs::write(tree.join("other.txt"), "other\n").unwrap();
     git(&tree, &["add", "other.txt"]);

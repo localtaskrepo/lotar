@@ -5,12 +5,13 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-18T04:32:20.040476+00:00
+modified: 2026-11-18T05:10:53.938861+00:00
 relationships:
   depends_on:
   - DEV-657
   blocks:
   - DEV-653
+  - DEV-700
   related:
   - DEV-318
   - DEV-579
@@ -435,6 +436,12 @@ comments:
     - **Not done in this repo:** the standards comment in `configs/lotar/agents.yml` (lines 4-6) still says T3 Code makes the worktree. Filed as STD-225.
     - **Not checked:** the real-ticket points of "Done when". They need the new build installed. Filed as DEV-700.
     - A DEV-699 I filed by mistake in the wrong project is soft-deleted.
+- date: 2026-11-18T05:10:53.938861+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-652` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`; lotar aborted the rebase, `agent/DEV-652` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
@@ -935,3 +942,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T05:10:25.812079+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-657"],"blocks":["DEV-653"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699","DEV-700"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653","DEV-700"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699","DEV-700"]}'
+- at: 2026-11-18T05:10:53.938861+00:00
+  actor: automation
+  changes:
+  - field: comment_added
