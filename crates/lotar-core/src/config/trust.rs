@@ -1,8 +1,9 @@
 //! Workspace trust for commands that come from repository files (DEV-259).
 //!
 //! Automation rules (`.tasks/automation.yml`, `.tasks/<PROJECT>/automation.yml`),
-//! agent profiles (`agents:` in `.tasks/config.yml` and project configs) and
-//! the merge's checks (`agent.merge`, DEV-605) travel with the repository,
+//! agent profiles (`agents:` in `.tasks/config.yml` and project configs),
+//! the merge's checks (`agent.merge`, DEV-605) and the command for waiting
+//! tickets (`agent.worktree.waiting_run`, DEV-712) travel with the repository,
 //! and all can run programs. Like `direnv allow`,
 //! LoTaR only runs them after the user trusted the current contents: a
 //! fingerprint of those sources is recorded per tasks directory in a trust
@@ -40,14 +41,14 @@ struct TrustRecord {
 pub struct CommandSource {
     /// Path relative to the tasks directory, e.g. `automation.yml`.
     pub path: String,
-    /// What it contributes: `automation`, `agents` or `merge`.
+    /// What it contributes: `automation`, `agents`, `merge` or `waiting_run`.
     pub kind: &'static str,
     content: String,
 }
 
 impl CommandSource {
     /// The file's command part: the whole automation file, the `agents`
-    /// block or the `agent.merge` block.
+    /// block, the `agent.merge` block or `agent.worktree.waiting_run`.
     pub fn content(&self) -> &str {
         &self.content
     }
@@ -99,6 +100,9 @@ impl TrustService {
             }
             if let Some(merge) = config.as_ref().and_then(merge_block) {
                 out.push(CommandSource { path: format!("{rel_prefix}config.yml"), kind: "merge", content: merge });
+            }
+            if let Some(waiting_run) = config.as_ref().and_then(waiting_run_block) {
+                out.push(CommandSource { path: format!("{rel_prefix}config.yml"), kind: "waiting_run", content: waiting_run });
             }
         };
         push_dir(tasks_dir, "");
@@ -222,8 +226,19 @@ fn merge_block(config: &serde_yaml_ng::Value) -> Option<String> {
     non_empty_block(config.get("agent").and_then(|agent| agent.get("merge")).or_else(|| config.get("agent.merge"))?)
 }
 
+/// `agent.worktree.waiting_run` of a config file, in any of its dotted
+/// spellings, like [`agents_block`].
+fn waiting_run_block(config: &serde_yaml_ng::Value) -> Option<String> {
+    let block = config
+        .get("agent")
+        .and_then(|agent| agent.get("worktree").and_then(|worktree| worktree.get("waiting_run")).or_else(|| agent.get("worktree.waiting_run")))
+        .or_else(|| config.get("agent.worktree").and_then(|worktree| worktree.get("waiting_run")))
+        .or_else(|| config.get("agent.worktree.waiting_run"))?;
+    non_empty_block(block)
+}
+
 fn non_empty_block(block: &serde_yaml_ng::Value) -> Option<String> {
-    if block.is_null() || block.as_mapping().is_some_and(|m| m.is_empty()) {
+    if block.is_null() || block.as_mapping().is_some_and(|m| m.is_empty()) || block.as_sequence().is_some_and(|s| s.is_empty()) {
         return None;
     }
     serde_yaml_ng::to_string(block).ok()
@@ -315,5 +330,29 @@ mod tests {
         assert_ne!(TrustService::fingerprint(&TrustService::sources(tasks)), before, "a changed check needs trust again");
         std::fs::write(tasks.join("config.yml"), "agent.merge:\n  checks: [npm test]\n").unwrap();
         assert_eq!(TrustService::sources(tasks).len(), 1, "the dotted spelling counts too");
+    }
+
+    #[test]
+    fn fingerprint_covers_the_waiting_run_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let tasks = dir.path();
+        std::fs::write(tasks.join("config.yml"), "agent:\n  worktree:\n    waiting_run: []\n").unwrap();
+        assert!(TrustService::sources(tasks).is_empty(), "an empty command runs nothing");
+
+        std::fs::write(tasks.join("config.yml"), "agent:\n  worktree:\n    waiting_run: [cargo, clean]\n").unwrap();
+        let sources = TrustService::sources(tasks);
+        assert_eq!(sources.iter().map(|s| (s.path.as_str(), s.kind)).collect::<Vec<_>>(), vec![("config.yml", "waiting_run")]);
+        let before = TrustService::fingerprint(&sources);
+
+        std::fs::write(tasks.join("config.yml"), "agent:\n  worktree:\n    waiting_run: [rm, -rf, src]\n").unwrap();
+        assert_ne!(TrustService::fingerprint(&TrustService::sources(tasks)), before, "a changed command needs trust again");
+        for dotted in [
+            "agent.worktree:\n  waiting_run: [cargo, clean]\n",
+            "agent.worktree.waiting_run: [cargo, clean]\n",
+            "agent:\n  worktree.waiting_run: [cargo, clean]\n",
+        ] {
+            std::fs::write(tasks.join("config.yml"), dotted).unwrap();
+            assert_eq!(TrustService::fingerprint(&TrustService::sources(tasks)), before, "{dotted}");
+        }
     }
 }

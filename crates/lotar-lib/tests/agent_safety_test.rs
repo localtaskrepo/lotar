@@ -513,7 +513,7 @@ mod git_required {
     /// person sets the status. A rule's own HelpNeeded fires no rule, so the
     /// build output stays then.
     #[test]
-    fn waiting_rule_drops_build_output_on_hand_back_and_person_change_only() {
+    fn waiting_build_output_goes_on_hand_back_person_change_and_waits_lotar_sets() {
         common::require_git();
         let bin = crate::common::lotar_bin();
         let (fixture, ticket) = setup(
@@ -526,8 +526,8 @@ mod git_required {
         let root = fixture.get_temp_path();
         let path = fixture.tasks_root.join("config.yml");
         let mut config: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-        config["issue"]["states"] = serde_yaml_ng::from_str("[Todo, HelpNeeded, Done]").unwrap();
-        fs::write(path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
+        config["issue"]["states"] = serde_yaml_ng::from_str("[Todo, HelpNeeded, Blocked, Done]").unwrap();
+        fs::write(&path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
         fs::write(root.join(".gitignore"), "target/\n").unwrap();
         git(root, &["add", "."]);
         git(root, &["commit", "-q", "-m", "Ignore build output"]);
@@ -538,15 +538,22 @@ mod git_required {
             )
         };
         fs::write(fixture.tasks_root.join("automation.yml"), rule("")).unwrap();
-        let status = |status: &str| {
-            let output = Command::new(&bin)
-                .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "status", &ticket, status])
+        let lotar = |args: &[&str], trusted: bool| {
+            let mut command = Command::new(&bin);
+            command
+                .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap()])
+                .args(args)
                 .env("LOTAR_IGNORE_HOME_CONFIG", "1")
-                .env_remove("LOTAR_AGENT_JOB_ID")
-                .current_dir(root)
-                .output()
-                .unwrap();
+                .env_remove("LOTAR_AGENT_JOB_ID");
+            if !trusted {
+                command.env_remove("LOTAR_TRUST_ALL").env("LOTAR_TRUST_FILE", root.join("trust.yml"));
+            }
+            let output = command.current_dir(root).output().unwrap();
             assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            String::from_utf8_lossy(&output.stderr).into_owned()
+        };
+        let status = |status: &str| {
+            lotar(&["status", &ticket, status], true);
         };
 
         let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
@@ -573,7 +580,41 @@ mod git_required {
         AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
         wait_idle();
         assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "HelpNeeded");
-        assert!(worktree.join("target/debug/built").exists(), "a rule's own HelpNeeded fires no rule (DEV-712)");
+        assert!(worktree.join("target/debug/built").exists(), "a rule's own HelpNeeded fires no rule");
+
+        // DEV-712: lotar runs agent.worktree.waiting_run when a job ends with
+        // the ticket waiting, also when a rule set the wait.
+        status("Todo");
+        config["agent"]["worktree"]["waiting_run"] = serde_yaml_ng::from_str("[sh, -c, 'rm -rf target/debug']").unwrap();
+        fs::write(&path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_idle();
+        assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "HelpNeeded");
+        assert!(!worktree.join("target/debug").exists(), "a rule's own HelpNeeded drops it at the job's end");
+        let log = AgentJobService::events_for(&job.id).into_iter().filter_map(|event| event.message).collect::<Vec<_>>().join("\n");
+        assert!(log.contains("waits (HelpNeeded): ran `sh -c rm -rf target/debug`"), "{log}");
+
+        // Blocked on open prerequisites when its job would start: no job ends.
+        fs::write(fixture.tasks_root.join("automation.yml"), rule("")).unwrap();
+        status("Todo");
+        lotar(&["assignee", &ticket, "--clear"], true);
+        let prerequisite =
+            TaskService::create(&mut fixture.create_storage(), TaskCreate { title: "Prerequisite".into(), project: Some("SAFE".into()), ..Default::default() })
+                .unwrap();
+        let task_path = fixture.tasks_root.join(format!("SAFE/{}.yml", ticket.trim_start_matches("SAFE-")));
+        let mut task: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&task_path).unwrap()).unwrap();
+        task["relationships"] = serde_yaml_ng::from_str(&format!("depends_on: [{}]", prerequisite.id)).unwrap();
+        fs::write(&task_path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+        fs::create_dir_all(worktree.join("target/debug")).unwrap();
+        let untrusted = lotar(&["assignee", &ticket, "@safety"], false);
+        assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "Blocked");
+        assert!(worktree.join("target/debug").exists(), "an untrusted repository's command doesn't run");
+        assert!(untrusted.contains("Skipped agent.worktree.waiting_run"), "{untrusted}");
+        status("Todo");
+        lotar(&["assignee", &ticket, "--clear"], true);
+        lotar(&["assignee", &ticket, "@safety"], true);
+        assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "Blocked");
+        assert!(!worktree.join("target/debug").exists(), "Blocked on prerequisites drops it");
     }
 
     #[test]

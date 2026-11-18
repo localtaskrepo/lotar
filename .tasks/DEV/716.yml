@@ -1,0 +1,82 @@
+title: A lotar build that adds a trust source kind makes every trusted repository untrusted
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T23:16:57.132482+00:00
+modified: 2026-11-18T23:18:31.092437+00:00
+relationships:
+  related:
+  - DEV-712
+  - DEV-605
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93e04b7f-1eca-4124-bc9a-accd8796276f
+description: |-
+  Found in DEV-712's review (2026-11-18).
+
+  - DEV-712 adds `agent.worktree.waiting_run` to `TrustService::sources` (`crates/lotar-core/src/config/trust.rs`), and `.tasks/DEV/config.yml` sets it.
+  - The merge job lands it with the installed lotar, which doesn't know that source yet: the fingerprint doesn't change, so the merge's re-trust (`merge.rs` `trust`) does nothing.
+  - Once the new build is installed, the fingerprint includes `waiting_run`: lotar's repository shows `changed`, rules' `run` actions are skipped and repository profiles refused until someone runs `lotar trust`. DEV-605 (`agent.merge`) had the same step.
+
+  ## Plan
+  The trust record lists the source kinds the lotar that wrote it fingerprinted (`kinds:`); its fingerprint covers only those. A record without `kinds:` (written before this change) counts as `automation`, `agents`, `merge`. A later build checks the record against the current sources of those kinds only; sources of a kind the record doesn't list don't make it `changed`. The next `lotar trust` (or a LoTaR edit through `rewrite`) records all kinds. Accepted trade-off: content of a new kind that changed between the last `lotar trust` and the upgrade is accepted unreviewed; the older lotar never ran it.
+
+  ## Done when
+  - [ ] A repository trusted by an older lotar (record without `kinds:`) stays `trusted` with this build, and with a later build that adds a kind (unit test simulating the added kind).
+  - [ ] A change to a source of a kind the record lists still makes it `changed` (rules, profiles, `agent.merge`), also for a legacy record.
+  - [ ] `lotar trust` writes `kinds:` with every kind this build fingerprints; the trust file stays readable by older builds (extra field ignored).
+  - [ ] A build that drops a kind the record lists shows `changed` (safe side: needs `lotar trust`).
+  - [ ] `docs/help/trust.md` says a new lotar version doesn't untrust a repository on its own.
+history:
+- at: 2026-11-18T23:16:57.776008+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-712"]}'
+    new: '{"related":["DEV-712","DEV-605"]}'
+- at: 2026-11-18T23:16:58.014366+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T23:17:25.165609+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T23:17:26.107154+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93e04b7f-1eca-4124-bc9a-accd8796276f
+- at: 2026-11-18T23:18:31.092437+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-712's review (2026-11-18).
+
+      - DEV-712 adds `agent.worktree.waiting_run` to `TrustService::sources` (`crates/lotar-core/src/config/trust.rs`), and `.tasks/DEV/config.yml` sets it.
+      - The merge job lands it with the installed lotar, which doesn't know that source yet: the fingerprint doesn't change, so the merge's re-trust (`merge.rs` `trust`) does nothing.
+      - Once the new build is installed, the fingerprint includes `waiting_run`: lotar's repository shows `changed`, rules' `run` actions are skipped and repository profiles refused until someone runs `lotar trust`. DEV-605 (`agent.merge`) had the same step.
+
+      ## Done when
+      - [ ] A repository that was trusted stays trusted when only a new lotar version adds a source kind to the fingerprint (for example, the record keeps the fingerprint per kind, or the release says to run `lotar trust`). A test or the release checklist shows it.
+    new: |-
+      Found in DEV-712's review (2026-11-18).
+
+      - DEV-712 adds `agent.worktree.waiting_run` to `TrustService::sources` (`crates/lotar-core/src/config/trust.rs`), and `.tasks/DEV/config.yml` sets it.
+      - The merge job lands it with the installed lotar, which doesn't know that source yet: the fingerprint doesn't change, so the merge's re-trust (`merge.rs` `trust`) does nothing.
+      - Once the new build is installed, the fingerprint includes `waiting_run`: lotar's repository shows `changed`, rules' `run` actions are skipped and repository profiles refused until someone runs `lotar trust`. DEV-605 (`agent.merge`) had the same step.
+
+      ## Plan
+      The trust record lists the source kinds the lotar that wrote it fingerprinted (`kinds:`); its fingerprint covers only those. A record without `kinds:` (written before this change) counts as `automation`, `agents`, `merge`. A later build checks the record against the current sources of those kinds only; sources of a kind the record doesn't list don't make it `changed`. The next `lotar trust` (or a LoTaR edit through `rewrite`) records all kinds. Accepted trade-off: content of a new kind that changed between the last `lotar trust` and the upgrade is accepted unreviewed; the older lotar never ran it.
+
+      ## Done when
+      - [ ] A repository trusted by an older lotar (record without `kinds:`) stays `trusted` with this build, and with a later build that adds a kind (unit test simulating the added kind).
+      - [ ] A change to a source of a kind the record lists still makes it `changed` (rules, profiles, `agent.merge`), also for a legacy record.
+      - [ ] `lotar trust` writes `kinds:` with every kind this build fingerprints; the trust file stays readable by older builds (extra field ignored).
+      - [ ] A build that drops a kind the record lists shows `changed` (safe side: needs `lotar trust`).
+      - [ ] `docs/help/trust.md` says a new lotar version doesn't untrust a repository on its own.

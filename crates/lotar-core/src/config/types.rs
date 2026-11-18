@@ -438,6 +438,13 @@ pub struct AgentWorktreeConfig {
     /// Only paths git ignores are deleted; the worktree stays.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub cleanup_paths: Vec<String>,
+    /// A command, program first, that LoTaR runs in a ticket's worktrees
+    /// when a job ends with the ticket HelpNeeded or Blocked, or a job is
+    /// held back for open prerequisites (DEV-712), such as
+    /// `[cargo, clean, --workspace]`. From a repository's config it needs
+    /// `lotar trust`.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub waiting_run: Vec<String>,
 }
 
 /// lotar's own merge in a merge job (DEV-605): it rebases the ticket's
@@ -486,6 +493,8 @@ pub struct AgentWorktreeConfigOverride {
     pub cleanup_ignored_files: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cleanup_paths: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub waiting_run: Option<Vec<String>>,
 }
 
 impl Default for AgentWorktreeConfig {
@@ -501,6 +510,7 @@ impl Default for AgentWorktreeConfig {
             cleanup_delete_branches: false,
             cleanup_ignored_files: true,
             cleanup_paths: Vec::new(),
+            waiting_run: Vec::new(),
         }
     }
 }

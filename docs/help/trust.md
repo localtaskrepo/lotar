@@ -12,25 +12,27 @@ lotar trust --revoke   # stop trusting it
 
 ## Why
 
-Three kinds of repository settings can make LoTaR run programs:
+Four kinds of repository settings can make LoTaR run programs:
 
 - automation rules with a `run` action: `.tasks/automation.yml` and `.tasks/<PROJECT>/automation.yml`
 - agent profiles under `agents:` in `.tasks/config.yml` and `.tasks/<PROJECT>/config.yml`, which pick the program an agent job starts
 - the merge's checks under `agent.merge` in those config files, which lotar's own merge runs (see [agent](agent.md#lotars-own-merge))
+- the command under `agent.worktree.waiting_run` in those config files, which LoTaR runs in a waiting ticket's worktrees (see [agent](agent.md#build-output-while-a-ticket-waits))
 
 These files are committed with the repository, so they can come from a clone, a pull request or a fork. Until you trust them, LoTaR:
 
 - skips automation `run` actions from those files and reports each one on stderr, as an `automation_skipped` SSE event and as a comment on the ticket (the rule's other actions still apply; see [automation](automation.md))
 - refuses to start agent jobs that use a profile defined in those files
 - leaves a merge job to its merge agent instead of running `agent.merge`
+- doesn't run `agent.worktree.waiting_run`, and says so in the job's log (on stderr when no job ends)
 
 Rules from your home automation file (`~/.lotar.automation.yml`) and agent jobs started with `--runner` and no profile are your own, so they always run.
 
 ## What is recorded
 
-`lotar trust` records a fingerprint of the automation files and the `agents:` and `agent.merge` sections of the config files, keyed by the tasks directory. The record lives in your home directory: `~/.lotar.trust.yml`, or `~/.lotar/trust.yml` when `~/.lotar` is a directory. Set `LOTAR_TRUST_FILE` to use another file.
+`lotar trust` records a fingerprint of the automation files and the `agents:`, `agent.merge` and `agent.worktree.waiting_run` sections of the config files, keyed by the tasks directory. The record lives in your home directory: `~/.lotar.trust.yml`, or `~/.lotar/trust.yml` when `~/.lotar` is a directory. Set `LOTAR_TRUST_FILE` to use another file.
 
-Any change to those files made outside LoTaR (an edit, a pull, a merge) makes the repository untrusted again until you review it and run `lotar trust`. `lotar trust --status` lists every `run` command and agent profile so you can review them. Changes to other settings in `config.yml` do not affect trust.
+Any change to those files made outside LoTaR (an edit, a pull, a merge) makes the repository untrusted again until you review it and run `lotar trust`. `lotar trust --status` lists every `run` command, agent profile, merge and waiting command so you can review them. Changes to other settings in `config.yml` do not affect trust.
 
 Edits made through LoTaR itself (the web UI, REST, MCP, `lotar config set`) keep a trusted repository trusted. They cannot make an untrusted repository trusted.
 

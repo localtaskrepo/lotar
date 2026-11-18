@@ -3056,6 +3056,110 @@ fn remove_build_output(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
     }
 }
 
+/// What [`run_waiting_command`] did in one worktree, or why it ran nothing.
+pub(crate) struct WaitingRunNote {
+    pub failed: bool,
+    pub message: String,
+}
+
+/// A ticket left waiting (HelpNeeded or Blocked) by a job's end or by its
+/// held-back start loses its build output: LoTaR runs
+/// `agent.worktree.waiting_run` in each of the ticket's worktrees (DEV-712).
+/// Waits that a rule or LoTaR sets fire no `updated` rule, and a rule's own
+/// `worktree run` skips while the job is still registered. `job_id` is the
+/// job that ends, which doesn't count as running. Runs nothing while another
+/// job works for the ticket or a T3 Code thread on it runs a turn; a thread
+/// that waits for an answer is idle. A repository's command runs only in a
+/// trusted workspace. Nothing else changes when the command fails.
+pub(crate) fn run_waiting_command(ticket_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig, job_id: Option<&str>) -> Vec<WaitingRunNote> {
+    let Some((program, args)) = config.agent_worktree.waiting_run.split_first() else {
+        return Vec::new();
+    };
+    let Ok(task) = TaskService::get(&Storage::new(tasks_dir), ticket_id, None) else {
+        return Vec::new();
+    };
+    let waiting =
+        ["HelpNeeded", "Blocked"].iter().find(|name| crate::types::TaskStatus::parse_with_config(name, config).is_ok_and(|status| status == task.status));
+    let Some(waiting) = waiting else {
+        return Vec::new();
+    };
+    let command_line = config.agent_worktree.waiting_run.join(" ");
+    let note = |failed: bool, message: String| vec![WaitingRunNote { failed, message }];
+    if !crate::config::trust::TrustService::allows_commands(tasks_dir) {
+        return note(true, crate::config::trust::TrustService::untrusted_message(tasks_dir, &format!("agent.worktree.waiting_run (`{command_line}`)")));
+    }
+    let prefix = &config.agent_worktree.branch_prefix;
+    let worktrees: Vec<_> = resolve_repo_root(tasks_dir)
+        .and_then(|root| agent_worktrees(&root, prefix).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|wt| {
+            let ticket = wt.ticket_branch.strip_prefix(prefix.as_str()).unwrap_or(&wt.ticket_branch).trim_start_matches('/');
+            crate::storage::identity::aliases_match(ticket, ticket_id)
+        })
+        .collect();
+    if worktrees.is_empty() {
+        return Vec::new();
+    }
+    // The claim keeps a job for the ticket from starting while the command runs.
+    let Ok(registry) = JOB_REGISTRY.lock() else {
+        return Vec::new();
+    };
+    let (registry, claim) = CleanupClaim::take(registry, ticket_id);
+    let busy = registry.active_by_ticket.get(ticket_id).is_some_and(|id| Some(id.as_str()) != job_id)
+        || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some();
+    drop(registry);
+    let skipped = if busy {
+        Some(format!("a job runs for {ticket_id}"))
+    } else {
+        running_t3_thread(tasks_dir, ticket_id).filter(|hold| !hold.waiting).map(|hold| hold.describe())
+    };
+    if let Some(reason) = skipped {
+        return note(false, format!("{ticket_id} waits ({waiting}), but agent.worktree.waiting_run (`{command_line}`) ran nothing: {reason}."));
+    }
+    let notes = worktrees
+        .iter()
+        .map(|wt| {
+            let mut command = Command::new(program);
+            command.args(args).current_dir(&wt.path).stdin(Stdio::null());
+            clear_repository_env(&mut command);
+            let place = wt.path.display();
+            match command.output() {
+                Ok(output) if output.status.success() => {
+                    WaitingRunNote { failed: false, message: format!("{ticket_id} waits ({waiting}): ran `{command_line}` in {place}.") }
+                }
+                Ok(output) => {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    let last = stderr.lines().rev().find(|line| !line.trim().is_empty()).map(|line| format!(": {}", line.trim())).unwrap_or_default();
+                    WaitingRunNote {
+                        failed: true,
+                        message: format!("agent.worktree.waiting_run (`{command_line}`) failed in {place} ({}){last}", output.status),
+                    }
+                }
+                Err(err) => {
+                    WaitingRunNote { failed: true, message: format!("agent.worktree.waiting_run (`{command_line}`) could not start in {place}: {err}") }
+                }
+            }
+        })
+        .collect();
+    drop(claim);
+    notes
+}
+
+/// The job's [`run_waiting_command`] notes go to its log.
+fn run_waiting_command_for_job(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) {
+    let notes = run_waiting_command(ticket_id, tasks_dir, config, Some(job_id));
+    if notes.is_empty() {
+        return;
+    }
+    update_job(job_id, |state| {
+        for note in &notes {
+            record_and_emit(state, "agent_job_progress", Some(note.message.clone()));
+        }
+    });
+    flush_event_log();
+}
+
 /// Whether `path` in the worktree exists, is not a symlink, is ignored by
 /// git and holds no tracked files.
 fn build_output_removable(worktree: &std::path::Path, path: &str) -> bool {
@@ -4756,6 +4860,7 @@ fn finalize_cancelled_job(job_id: &str) {
     if let Ok(config) = crate::config::resolution::config_for_project(&record.tasks_dir, prefix.as_deref()) {
         maybe_cleanup_worktree(job_id, &record.ticket_id, &record.tasks_dir, &config, JobOutcome::Cancelled);
         remove_build_output(job_id, &record.ticket_id, &record.tasks_dir, &config);
+        run_waiting_command_for_job(job_id, &record.ticket_id, &record.tasks_dir, &config);
         cleanup_done_worktrees(&record.tasks_dir, &config);
     }
 }
@@ -5166,8 +5271,13 @@ fn finalize_job(
     if paused.is_none() {
         maybe_cleanup_worktree(job_id, ticket_id, tasks_dir, config, if success { JobOutcome::Success } else { JobOutcome::Failure });
     }
+    // A paused job's ticket waits for the reset, not for a person.
+    let waits_for_reset = paused.is_some();
     if paused.is_none_or(|(reason, _)| reason == Some(PauseReason::Disk)) {
         remove_build_output(job_id, ticket_id, tasks_dir, config);
+    }
+    if !waits_for_reset {
+        run_waiting_command_for_job(job_id, ticket_id, tasks_dir, config);
     }
     cleanup_done_worktrees(tasks_dir, config);
 }

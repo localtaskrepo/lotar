@@ -1322,6 +1322,8 @@ export interface AgentWorktreeConfig {
     cleanup_ignored_files?: boolean
     /** Paths in the worktree deleted when a job ends, if git ignores them (build output). */
     cleanup_paths?: string[]
+    /** Command, program first, run in a ticket's worktrees when a job leaves it waiting (DEV-712). */
+    waiting_run?: string[]
 }
 
 /** `agent.memory_gate` (DEV-623, global only): new jobs wait while the machine is short of memory. */

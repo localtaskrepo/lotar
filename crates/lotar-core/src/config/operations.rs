@@ -169,6 +169,12 @@ fn parse_cleanup_paths(value: &str) -> Result<Vec<String>, ConfigError> {
     Ok(paths)
 }
 
+/// `agent_worktree_waiting_run`: the program, then its arguments, as a YAML
+/// list or comma-separated; empty turns it off.
+fn parse_waiting_run(value: &str) -> Result<Vec<String>, ConfigError> {
+    Ok(parse_simple_csv(value))
+}
+
 fn parse_simple_csv(value: &str) -> Vec<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -701,6 +707,9 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
         "agent_worktree_cleanup_paths" => {
             config.agent_worktree.cleanup_paths = parse_cleanup_paths(value)?;
         }
+        "agent_worktree_waiting_run" => {
+            config.agent_worktree.waiting_run = parse_waiting_run(value)?;
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -1048,6 +1057,14 @@ pub fn apply_field_to_project_config(config: &mut ProjectConfig, field: &str, va
                 config.agent_worktree.get_or_insert_with(Default::default).cleanup_paths = Some(paths);
             }
         }
+        "agent_worktree_waiting_run" => {
+            let command = parse_waiting_run(value)?;
+            if command.is_empty() {
+                clear_agent_worktree_field(config, WorktreeSubfield::WaitingRun);
+            } else {
+                config.agent_worktree.get_or_insert_with(Default::default).waiting_run = Some(command);
+            }
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -1346,6 +1363,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "agent_worktree_cleanup_paths" => {
             let _ = parse_cleanup_paths(value)?;
         }
+        "agent_worktree_waiting_run" => {
+            let _ = parse_waiting_run(value)?;
+        }
         "remotes" => {
             let _ = parse_sync_remotes(value)?;
         }
@@ -1539,6 +1559,9 @@ pub fn clear_project_override_field(config: &mut ProjectConfig, field: &str) -> 
         "agent_worktree_cleanup_paths" => {
             clear_agent_worktree_field(config, WorktreeSubfield::CleanupPaths);
         }
+        "agent_worktree_waiting_run" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::WaitingRun);
+        }
         "attachments_dir" => config.attachments_dir = None,
         "attachments_max_upload_mb" => config.attachments_max_upload_mb = None,
         "sync_reports_dir" => config.sync_reports_dir = None,
@@ -1564,6 +1587,7 @@ enum WorktreeSubfield {
     CleanupDeleteBranches,
     CleanupIgnoredFiles,
     CleanupPaths,
+    WaitingRun,
 }
 
 fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubfield) {
@@ -1581,6 +1605,7 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
         WorktreeSubfield::CleanupDeleteBranches => worktree.cleanup_delete_branches = None,
         WorktreeSubfield::CleanupIgnoredFiles => worktree.cleanup_ignored_files = None,
         WorktreeSubfield::CleanupPaths => worktree.cleanup_paths = None,
+        WorktreeSubfield::WaitingRun => worktree.waiting_run = None,
     }
     let empty = worktree.enabled.is_none()
         && worktree.dir.is_none()
@@ -1591,7 +1616,8 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
         && worktree.cleanup_on_cancel.is_none()
         && worktree.cleanup_delete_branches.is_none()
         && worktree.cleanup_ignored_files.is_none()
-        && worktree.cleanup_paths.is_none();
+        && worktree.cleanup_paths.is_none()
+        && worktree.waiting_run.is_none();
     if empty {
         config.agent_worktree = None;
     }

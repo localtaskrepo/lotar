@@ -90,6 +90,11 @@ fn describe(tasks_dir: &Path) -> Vec<String> {
                 let detail = source.content().trim().replace('\n', ", ");
                 lines.push(format!("{}: lotar's merge runs ({detail})", source.path));
             }
+            "waiting_run" => {
+                let command =
+                    serde_yaml_ng::from_str::<Vec<String>>(source.content()).map_or_else(|_| source.content().trim().to_string(), |command| command.join(" "));
+                lines.push(format!("{}: runs `{command}` in a waiting ticket's worktrees (agent.worktree.waiting_run)", source.path));
+            }
             _ => {
                 let Ok(serde_yaml_ng::Value::Mapping(map)) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(source.content()) else {
                     continue;

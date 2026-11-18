@@ -1,14 +1,19 @@
 title: 'Waiting cleanup for waits lotar or a rule sets: a job''s end drops the build output of a ticket it leaves HelpNeeded or Blocked'
-status: InProgress
+status: Merging
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-18T20:06:24.875941+00:00
-modified: 2026-11-18T23:04:34.675566+00:00
+modified: 2026-11-18T23:17:40.339580+00:00
 relationships:
+  blocks:
+  - DEV-715
   related:
   - DEV-653
+  - DEV-715
+  - DEV-716
+  - DEV-637
 comments:
 - date: 2026-11-18T20:35:21.301053+00:00
   author: claude
@@ -26,6 +31,59 @@ comments:
 - date: 2026-11-18T22:53:48.366712+00:00
   author: mallox
   text: 'Answer: command (A command lotar runs: setting agent.worktree.waiting_run (cargo clean --workspace), needs lotar trust) (answered in INBOX-550)'
+- date: 2026-11-18T23:08:32.348127+00:00
+  author: claude
+  text: |-
+    Done: lotar runs `agent.worktree.waiting_run` (DEV sets `cargo clean --workspace`) when a ticket waits.
+
+    - Runs at a job's end (completed, failed, cancelled; not paused for a usage limit) if the ticket is HelpNeeded or Blocked, after the end rules. It runs in every worktree of the ticket.
+    - Also runs when a job is held back for open prerequisites and lotar sets Blocked.
+    - Runs nothing while another job runs for the ticket or its T3 thread runs a turn. A thread waiting for an answer doesn't stop it.
+    - Runs from a repository config only after `lotar trust`; `trust --status` lists it. Untrusted, the job log (or stderr) says "Skipped agent.worktree.waiting_run".
+    - Each run and each failure goes to the job log; a failure changes nothing else.
+    - When the DEV waiting rule fires on an agent's hand-back, the clean runs twice. This is harmless and documented in `docs/help/agent.md`.
+    - Test: `waiting_build_output_goes_on_hand_back_person_change_and_waits_lotar_sets` in `crates/lotar-lib/tests/agent_safety_test.rs`
+  report:
+    commits:
+    - hash: fbf4982dc
+      what: agent.worktree.waiting_run runs at a job's end and on a held-back Blocked
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2406 Rust tests, frontend tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Integrate t3/waiting-build-output-cleanup onto main
+- date: 2026-11-18T23:17:17.112466+00:00
+  author: claude
+  text: |-
+    Review: passed: `fbf4982dc` does what "Done when" asks; two minor findings filed.
+
+    - Read: the diff, the ticket and the owner's answer (INBOX-550), DEV-653, `AGENTS.md`, main's newer DEV-637 (`3cb2acfa8`) in `automation_service.rs`. `git merge-tree` with main: no conflict.
+    - Code: the setting is a list, program first, no shell. A project's value replaces the global one, and an empty `config set` clears it. It runs after the end rules and the T3 settle in `finalize_job`, and in `finalize_cancelled_job`. A paused job runs nothing. `mark_task_blocked` runs it once the ticket is Blocked. A running job (any process) or a T3 turn holds it back. The cleanup claim makes a job start wait until it ends. The trust source and `trust --status` line are there. Notes go to the job log.
+    - The test flips the waiting-rule assertion. It covers the rule's own HelpNeeded, Blocked on prerequisites, and untrusted ("Skipped agent.worktree.waiting_run").
+    - Tried by hand in a scratch repo: `config set agent_worktree_waiting_run cargo,clean,--workspace -p APP` writes it, `trust --status` lists it, an empty value removes it.
+    - Minor, filed: [DEV-716](https://lotar.pyxzl.net/task/DEV-716): a `waiting_run` from your home config is skipped in an untrusted repository (whole-workspace trust check in `run_waiting_command`).
+    - Minor, filed: [DEV-715](https://lotar.pyxzl.net/task/DEV-715): once the new build is installed, the extra trust source changes lotar's fingerprint. Rules' `run` and repository profiles are then skipped until you run `lotar trust`. The merge's re-trust can't catch it, because the merge runs the old build.
+    - Worktree left clean, no files changed.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2406 Rust, 1562 UI tests
+    - command: npm run -s smoke
+      result: passed
+      reason: 405 tests
+    - command: ui-review
+      result: not_run
+      reason: no UI change
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b0cdad9-7699-4555-8e71-ac718d9fa284
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b8d09ba-3650-447c-80e2-286e292666cb
@@ -144,3 +202,53 @@ history:
       - [ ] Each run and each failure (exit status, last stderr line) goes to the job log; a failure changes nothing else.
       - [ ] `.tasks/DEV/config.yml` sets `[cargo, clean, --workspace]`; the DEV rule stays for a person's status change.
       - [ ] docs/help/agent.md "Build output while a ticket waits", config-reference.md, trust.md and the rule comment in `.tasks/DEV/automation.yml` say so; `view/api/types.ts` lists the field.
+- at: 2026-11-18T23:08:32.348127+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:08:39.948538+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T23:16:52.736786+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653"]}'
+    new: '{"related":["DEV-653","DEV-715"]}'
+- at: 2026-11-18T23:16:57.371390+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653","DEV-715"]}'
+    new: '{"related":["DEV-653","DEV-715","DEV-716"]}'
+- at: 2026-11-18T23:17:17.112466+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:17:17.300048+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653","DEV-715","DEV-716"]}'
+    new: '{"related":["DEV-653","DEV-715","DEV-716","DEV-637"]}'
+- at: 2026-11-18T23:17:24.330257+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-18T23:17:40.339580+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653","DEV-715","DEV-716","DEV-637"]}'
+    new: '{"blocks":["DEV-715"],"related":["DEV-653","DEV-715","DEV-716","DEV-637"]}'

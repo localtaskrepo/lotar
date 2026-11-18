@@ -1178,6 +1178,9 @@ fn apply_agent_worktree_override(target: &mut crate::config::types::AgentWorktre
     if let Some(cleanup_paths) = override_config.cleanup_paths {
         target.cleanup_paths = cleanup_paths;
     }
+    if let Some(waiting_run) = override_config.waiting_run {
+        target.waiting_run = waiting_run;
+    }
 }
 
 /// Invalidate the cached resolved configuration for a specific tasks_dir.

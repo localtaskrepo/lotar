@@ -3132,6 +3132,12 @@ fn mark_task_blocked(storage: &mut Storage, task: &TaskDTO, config: &ResolvedCon
     if let Err(err) = append_automation_comment(storage, &task.id, &message) {
         report_automation_failure(&task.id, "dependency check", &format!("{message} The comment could not be written: {err}"));
     }
+    // No job ends here, so the waiting ticket's build output goes now (DEV-712).
+    for note in crate::services::agent_job_service::run_waiting_command(&task.id, &storage.root_path, config, None) {
+        if note.failed {
+            report_automation_failure(&task.id, "agent.worktree.waiting_run", &note.message);
+        }
+    }
     Ok(())
 }
 
