@@ -1,11 +1,11 @@
 title: A job whose ticket goes Done mid-run has no end-to-end test of its cancel
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T04:14:08.203839+00:00
-modified: 2026-11-18T05:38:10.815801+00:00
+modified: 2026-11-18T05:45:19.408017+00:00
 relationships:
   related:
   - DEV-682
@@ -40,6 +40,16 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-695` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-agent/src/services/agent_job_service/watch.rs`, `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-695` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-18T05:45:16.356331+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `7dee4d92c` on main.
+
+    - Rebase: DEV-682 had landed under other hashes, so its two commits were dropped; only the DEV-695 commit was applied (no conflicts).
+    - Amended the commit with the pending `.tasks` files (owner 2026-11-12).
+    - Checks on the rebased branch: `npm run lint`, `npm test`, `npm run smoke` all passed.
+    - `npm ci` was not rerun (the lockfile is unchanged by this commit).
+    - Rules/config unchanged, so no `lotar trust` needed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e9d9bf-5491-4e57-a598-0ec2fb68f499
 description: |-
@@ -129,3 +139,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T05:45:16.356331+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:45:19.408017+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
