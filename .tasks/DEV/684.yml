@@ -1,11 +1,11 @@
 title: 'Proposal: harnessmux: overloaded Codex turns count as finished, and a deny may pick Codex''s cancel'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T23:52:08.704429+00:00
-modified: 2026-11-18T02:59:14.297169+00:00
+modified: 2026-11-18T03:26:18.336713+00:00
 relationships:
   related:
   - DEV-657
@@ -140,6 +140,10 @@ comments:
     - Rerun in `~/.t3/worktrees/harnessmux/DEV-684`: `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo nextest run` (53 of 53), `cargo deny check`: all passed, tree clean
     - No install entry for harnessmux in `repos.json`; no UI
     - Minor, filed as DEV-691: two more Codex capacity texts aren't covered, and an error chunk glued onto an earlier message without a blank line would be missed
+- date: 2026-11-18T03:26:18.170834+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-684` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5fda11d-f695-48f3-a426-5c36abdaa110
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16994b3c-6fa4-43f4-9b0d-feebed32110e
@@ -273,3 +277,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T03:26:18.170834+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:26:18.336713+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

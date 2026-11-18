@@ -1,11 +1,77 @@
 title: 'Ticket list API and web view: leave comments and history out of list rows, gzip responses, refresh only the changed ticket'
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T03:06:46.818129+00:00
-modified: 2026-11-18T03:06:47.119176+00:00
+modified: 2026-11-18T04:03:57.421517+00:00
+comments:
+- date: 2026-11-18T04:03:32.949630+00:00
+  author: claude
+  text: |-
+    **Done.** List rows leave out description, comments and history; JSON is gzipped; a ticket change refreshes only that ticket.
+
+    Copy of this repo's tasks (694 DEV tasks, 859 total), release builds, median of 5 local calls:
+
+    | request | before | after |
+    |---|---|---|
+    | full list (`limit=1000`) | 6.84 MB, 78 ms | 751 KB plain / **155 KB gzip**, 38 ms |
+    | page of 50 | 844 KB, 36 ms | 15.5 KB gzip, 34 ms |
+    | one ticket changed | full list reload (6.7 MB) | `ids=DEV-691`: 784 B |
+    | Insights (`include=history`) | 6.84 MB | 556 KB gzip, 64 ms |
+
+    - Open questions, comment and history counts and the board age come from new row fields (`open_question`, `comment_count`, `history_count`, `status_since`).
+    - The task panel loads the full ticket with `/api/tasks/get`, so comments still show.
+    - Pages look the same before and after: 13 of 18 screenshot pairs are byte-identical and were stored once.
+
+    Screenshots (light/dark at 1920, 1440 and 390 are attached):
+    - [list before](attachment:before-list-light-1920.e1e04cc20ed4d4fa065f9563bf92cb7e.png) / [after](attachment:after-list-light-1920.717dbb6b58cf3462447195c27803a211.png)
+    - [list phone dark before](attachment:before-list-dark-390.dcc42c52f7fa48bd6b5d195dc70311c5.png) / [after](attachment:after-list-dark-390.b00c86896447c6f1fec1556bf56fdc19.png)
+    - [board dark](attachment:after-board-dark-1920.3501b36302298a74b9ea99c5224f8979.png), [insights phone](attachment:after-insights-dark-390.4ce6d3778ececabdd6161ce4bc71c291.png) (same before and after)
+    - [panel with comments](attachment:after-panel-light-1440.a8cca1fa5067a859b8fb8435edf17b44.png)
+  report:
+    commits:
+    - hash: deac780bd
+      what: list rows, gzip, per-ticket refresh, docs and tests
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2379 Rust, 1561 UI, release and hook tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405 tests
+    - command: browser check
+      result: passed
+      reason: list, board, insights, panel, live ids refresh
+    next: review the commit on agent/DEV-692, then merge to main
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A740a70fc-3c79-42cd-9f65-62e36bbc5792
+- attachment: after-board-dark-1440.f7d2cf3670c356bcf8335d44f69250f2.png
+- attachment: after-board-dark-1920.3501b36302298a74b9ea99c5224f8979.png
+- attachment: after-board-dark-390.cf7466dde0ce0fa805d705f8ec950b1a.png
+- attachment: after-board-light-1440.8ba3dd4138bdc4aa979f89e76df69604.png
+- attachment: after-board-light-1920.c4fbd078e36b9a0397b75b56d9e666d3.png
+- attachment: after-board-light-390.3dcb9f5dffafc3100d0b8eb657d4cdc1.png
+- attachment: after-insights-dark-1440.1c76ec00042dba44feb91eca0ec7bad6.png
+- attachment: after-insights-dark-1920.ed65cdfe01abca5904b85aa403782cba.png
+- attachment: after-insights-dark-390.4ce6d3778ececabdd6161ce4bc71c291.png
+- attachment: after-insights-light-1440.a4df46f79b172c9d7cd6fde52c8a03ce.png
+- attachment: after-insights-light-1920.0af68013ab65753770bd4abfa2548211.png
+- attachment: after-insights-light-390.135c73fe60cdf6ef31f36718d2953789.png
+- attachment: after-list-dark-1440.31cdf7ca50f5ba6045e61dcc93cc848d.png
+- attachment: after-list-dark-1920.c32abb409ec0c6e2a85baa3694a3e166.png
+- attachment: after-list-dark-390.b00c86896447c6f1fec1556bf56fdc19.png
+- attachment: after-list-light-1440.e32b5443dac520836720dbc963cef7d0.png
+- attachment: after-list-light-1920.717dbb6b58cf3462447195c27803a211.png
+- attachment: after-list-light-390.93057389b7d195f26499e2fd6da50b37.png
+- attachment: after-panel-light-1440.a8cca1fa5067a859b8fb8435edf17b44.png
+- attachment: before-list-dark-1920.227f109179567bfef1ac6ec10d608cb8.png
+- attachment: before-list-dark-390.dcc42c52f7fa48bd6b5d195dc70311c5.png
+- attachment: before-list-light-1920.e1e04cc20ed4d4fa065f9563bf92cb7e.png
+- attachment: before-list-light-390.c2d5544f110bca6b25c2a8d11132609f.png
 description: |-
   Owner 2026-11-17 in the cos thread, on lotar and T3 performance ("We now have over a thousand items on each of them and we're quickly creating more. I want to make sure we don't run into issues and slow downs"), picked "Slim ticket list API".
 
@@ -16,10 +82,212 @@ description: |-
   - Compress API responses (gzip or br when the client accepts it).
   - After a ticket change event, the web view updates that ticket instead of fetching the whole list.
 
-  Done when: the lotar list response is under 1 MB for all tickets, compressed on the wire, no view loses data it shows today (check list, board, search, timeline), the ticket-changed path refetches one ticket (test), and before/after sizes and times are in a comment.
+  Measured again 2026-11-17 (claude, 859 tasks): without comments and history the rows are still 1.45 MB, 0.8 MB of it descriptions, which no list view shows (only the task panel, which loads the ticket itself). So list rows leave out the description too.
+
+  ## Done when
+
+  - [x] `GET /api/tasks/list` (list and search, `q=`) rows leave out `comments`, `history` and `description`, and carry `comment_count`, `history_count`, `open_question` (the newest unanswered question, when there is one) and `status_since` (when the task entered its current status: the latest change into it, else created when it never changed status, else the latest status change). `GET /api/tasks/get`, SSE payloads, mutation responses, MCP and CLI keep the full ticket.
+  - [x] `include=history` on the list puts `history` back in each row (the Insights page uses it: activity, cycle times and trends need every entry). An unknown `include` value is a 400.
+  - [x] `ids=A,B` on the list answers only those tickets: the ones that match the filter, with `positions` (their index in the full filtered order) and `total` of the full query. More than 100 IDs is a 400.
+  - [x] The lotar list for all tickets is under 1 MB uncompressed.
+  - [x] API JSON responses are gzip-compressed when the request's `Accept-Encoding` allows gzip (not `gzip;q=0`), with `Vary: Accept-Encoding`; small bodies (< 1 KB), 304s, HEAD and responses that set their own encoding (attachments) go out as before. br is not added (no new dependency; gzip comes from flate2, already used).
+  - [x] Web view, after a task created/updated/deleted event (SSE or its own change): the ticket itself comes from the event's DTO or one `GET /api/tasks/get`, and each mounted list asks `list?ids=<that id>` instead of reloading the whole list; a burst of events shares one request per list. Falls back to the full reload when a full reload is running or due, the list was never loaded completely, more than 50 IDs are pending, or the `ids` request fails. Reconnects and the day roll still reload in full (test).
+  - [x] A list row never wipes data a full ticket in the store holds: a row with the same `modified` keeps the ticket's comments, history and description; the open task panel ignores a row and fetches the full ticket instead of merging a row's missing description (test).
+  - [x] No view loses data it shows today: task list (open question badge), board (open question, column age rules), search, insights (via `include=history`), calendar, the task panel and its timeline; checked in the browser and by the smoke suite.
+  - [x] `crates/lotar-core/src/api_types.rs`, `view/api/types.ts`, `docs/openapi.json` and `docs/help` agree on the new list row.
+  - [x] Before/after sizes and times for lotar are in a comment; `npm run lint`, `npm test`, `npm run smoke` pass.
+tags:
+- ui
 history:
 - at: 2026-11-18T03:06:47.119176+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T03:28:03.423270+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T03:28:04.204845+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A740a70fc-3c79-42cd-9f65-62e36bbc5792
+- at: 2026-11-18T03:35:19.383926+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner 2026-11-17 in the cos thread, on lotar and T3 performance ("We now have over a thousand items on each of them and we're quickly creating more. I want to make sure we don't run into issues and slow downs"), picked "Slim ticket list API".
+
+      Measured 2026-11-17 against lotar serve 0.15.3 (load ~25): a full ticket list for lotar is 6.75 MB uncompressed (855 tasks, 3284 comments, 11403 history entries), standards 4.3 MB, local 2.3 MB; 0.26-0.32 s server time. In a 50-row page, comments are 472 KB and history 418 KB of ~1 MB: about 90 %. The web view fetches the whole list again after every ticket change. lotar passes 1000 tickets in about 3 days (a second page request); at current growth list time doubles in 1-2 weeks. Raw numbers: the chief of staff's measurement notes (perf/raw.md in its session scratchpad).
+
+      Change:
+      - List and search endpoints return list rows without comments and history (counts instead, where a view shows them); the single-ticket endpoint keeps everything.
+      - Compress API responses (gzip or br when the client accepts it).
+      - After a ticket change event, the web view updates that ticket instead of fetching the whole list.
+
+      Done when: the lotar list response is under 1 MB for all tickets, compressed on the wire, no view loses data it shows today (check list, board, search, timeline), the ticket-changed path refetches one ticket (test), and before/after sizes and times are in a comment.
+    new: |-
+      Owner 2026-11-17 in the cos thread, on lotar and T3 performance ("We now have over a thousand items on each of them and we're quickly creating more. I want to make sure we don't run into issues and slow downs"), picked "Slim ticket list API".
+
+      Measured 2026-11-17 against lotar serve 0.15.3 (load ~25): a full ticket list for lotar is 6.75 MB uncompressed (855 tasks, 3284 comments, 11403 history entries), standards 4.3 MB, local 2.3 MB; 0.26-0.32 s server time. In a 50-row page, comments are 472 KB and history 418 KB of ~1 MB: about 90 %. The web view fetches the whole list again after every ticket change. lotar passes 1000 tickets in about 3 days (a second page request); at current growth list time doubles in 1-2 weeks. Raw numbers: the chief of staff's measurement notes (perf/raw.md in its session scratchpad).
+
+      Change:
+      - List and search endpoints return list rows without comments and history (counts instead, where a view shows them); the single-ticket endpoint keeps everything.
+      - Compress API responses (gzip or br when the client accepts it).
+      - After a ticket change event, the web view updates that ticket instead of fetching the whole list.
+
+      Measured again 2026-11-17 (claude, 859 tasks): without comments and history the rows are still 1.45 MB, 0.8 MB of it descriptions, which no list view shows (only the task panel, which loads the ticket itself). So list rows leave out the description too.
+
+      ## Done when
+
+      - [ ] `GET /api/tasks/list` (list and search, `q=`) rows leave out `comments`, `history` and `description`, and carry `comment_count`, `history_count`, `open_question` (the newest unanswered question, when there is one) and `status_since` (when the task entered its current status: the latest change into it, else created when it never changed status, else the latest status change). `GET /api/tasks/get`, SSE payloads, mutation responses, MCP and CLI keep the full ticket.
+      - [ ] `include=history` on the list puts `history` back in each row (the Insights page uses it: activity, cycle times and trends need every entry). An unknown `include` value is a 400.
+      - [ ] `ids=A,B` on the list answers only those tickets: the ones that match the filter, with `positions` (their index in the full filtered order) and `total` of the full query. More than 100 IDs is a 400.
+      - [ ] The lotar list for all tickets is under 1 MB uncompressed.
+      - [ ] API JSON responses are gzip-compressed when the request's `Accept-Encoding` allows gzip (not `gzip;q=0`), with `Vary: Accept-Encoding`; small bodies (< 1 KB), 304s, HEAD and responses that set their own encoding (attachments) go out as before. br is not added (no new dependency; gzip comes from flate2, already used).
+      - [ ] Web view, after a task created/updated/deleted event (SSE or its own change): the ticket itself comes from the event's DTO or one `GET /api/tasks/get`, and each mounted list asks `list?ids=<that id>` instead of reloading the whole list; a burst of events shares one request per list. Falls back to the full reload when a full reload is running or due, the list was never loaded completely, more than 50 IDs are pending, or the `ids` request fails. Reconnects and the day roll still reload in full (test).
+      - [ ] A list row never wipes data a full ticket in the store holds: a row with the same `modified` keeps the ticket's comments, history and description; the open task panel ignores a row and fetches the full ticket instead of merging a row's missing description (test).
+      - [ ] No view loses data it shows today: task list (open question badge), board (open question, column age rules), search, insights (via `include=history`), calendar, the task panel and its timeline; checked in the browser and by the smoke suite.
+      - [ ] `crates/lotar-core/src/api_types.rs`, `view/api/types.ts`, `docs/openapi.json` and `docs/help` agree on the new list row.
+      - [ ] Before/after sizes and times for lotar are in a comment; `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-18T04:03:08.972412+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: ui
+- at: 2026-11-18T04:03:09.024954+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-dark-1440.f7d2cf3670c356bcf8335d44f69250f2.png
+- at: 2026-11-18T04:03:09.062189+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-dark-1920.3501b36302298a74b9ea99c5224f8979.png
+- at: 2026-11-18T04:03:09.098726+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-dark-390.cf7466dde0ce0fa805d705f8ec950b1a.png
+- at: 2026-11-18T04:03:09.134453+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-light-1440.8ba3dd4138bdc4aa979f89e76df69604.png
+- at: 2026-11-18T04:03:09.170230+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-light-1920.c4fbd078e36b9a0397b75b56d9e666d3.png
+- at: 2026-11-18T04:03:09.206292+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-light-390.3dcb9f5dffafc3100d0b8eb657d4cdc1.png
+- at: 2026-11-18T04:03:09.241891+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-insights-dark-1440.1c76ec00042dba44feb91eca0ec7bad6.png
+- at: 2026-11-18T04:03:09.277940+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-insights-dark-1920.ed65cdfe01abca5904b85aa403782cba.png
+- at: 2026-11-18T04:03:09.313194+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-insights-dark-390.4ce6d3778ececabdd6161ce4bc71c291.png
+- at: 2026-11-18T04:03:09.348080+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-insights-light-1440.a4df46f79b172c9d7cd6fde52c8a03ce.png
+- at: 2026-11-18T04:03:09.385949+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-insights-light-1920.0af68013ab65753770bd4abfa2548211.png
+- at: 2026-11-18T04:03:09.424725+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-insights-light-390.135c73fe60cdf6ef31f36718d2953789.png
+- at: 2026-11-18T04:03:09.464459+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-list-dark-1440.31cdf7ca50f5ba6045e61dcc93cc848d.png
+- at: 2026-11-18T04:03:09.502537+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-list-dark-1920.c32abb409ec0c6e2a85baa3694a3e166.png
+- at: 2026-11-18T04:03:09.540350+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-list-dark-390.b00c86896447c6f1fec1556bf56fdc19.png
+- at: 2026-11-18T04:03:09.577498+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-list-light-1440.e32b5443dac520836720dbc963cef7d0.png
+- at: 2026-11-18T04:03:09.618713+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-list-light-1920.717dbb6b58cf3462447195c27803a211.png
+- at: 2026-11-18T04:03:09.656093+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-list-light-390.93057389b7d195f26499e2fd6da50b37.png
+- at: 2026-11-18T04:03:09.695952+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-light-1440.a8cca1fa5067a859b8fb8435edf17b44.png
+- at: 2026-11-18T04:03:10.065275+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-list-dark-1920.227f109179567bfef1ac6ec10d608cb8.png
+- at: 2026-11-18T04:03:10.103786+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-list-dark-390.dcc42c52f7fa48bd6b5d195dc70311c5.png
+- at: 2026-11-18T04:03:10.168281+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-list-light-1920.e1e04cc20ed4d4fa065f9563bf92cb7e.png
+- at: 2026-11-18T04:03:10.205228+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-list-light-390.c2d5544f110bca6b25c2a8d11132609f.png
+- at: 2026-11-18T04:03:32.949630+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:03:57.186549+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T04:03:57.421517+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

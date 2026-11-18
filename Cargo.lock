@@ -1496,7 +1496,7 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "lotar"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "clap",
  "lotar-lib",
@@ -1507,7 +1507,7 @@ dependencies = [
 
 [[package]]
 name = "lotar-agent"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "blake3",
  "ctor",
@@ -1531,7 +1531,7 @@ dependencies = [
 
 [[package]]
 name = "lotar-core"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "base64",
  "blake3",
@@ -1554,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "lotar-lib"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "assert_cmd",
  "base64",
@@ -1590,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "lotar-tasks"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "blake3",
  "clap",
@@ -1611,7 +1611,7 @@ dependencies = [
 
 [[package]]
 name = "lotar-web-assets"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "include_dir",
 ]

@@ -1,15 +1,43 @@
 title: 'Agent job history: keep job records and logs by age (14 days) instead of the last 500 per repo'
-status: Todo
+status: Reviewing
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T03:06:47.346896+00:00
-modified: 2026-11-18T03:06:47.837245+00:00
+modified: 2026-11-18T03:40:08.045201+00:00
 relationships:
   related:
   - DEV-211
   - DEV-560
+comments:
+- date: 2026-11-18T03:39:59.528116+00:00
+  author: claude
+  text: |-
+    Job logs are now kept by age (14 days) with a 100 MiB size guard instead of the newest 500.
+
+    - New global setting `agent.job_history` (`keep_days: 14`, `max_mb: 100`, `0` = no size limit), documented in `docs/help/agent.md` and `docs/help/config-reference.md`.
+    - Pruning moved from `init_log` to job start (`prune_job_logs` in `agent_job_service.rs`): it never removes a job of an open ticket, of a ticket whose file can't be read, or a running job (this process or another one's active-job record). Those win over both limits. Done, archived and deleted tickets' jobs go, and so do logs without a header.
+    - Over `max_mb`, the oldest removable logs go first, also younger ones. A file that can't be read or removed is skipped; the job still starts.
+    - Tests: `old_job_logs_go_unless_their_ticket_is_open` (15-day-old Done-ticket job removed, open-ticket job kept), `logs_past_keep_days_go_unless_kept`, `size_guard_removes_the_oldest_removable_logs_first`, `agent_job_history_round_trips`.
+    - Size estimate: today's `@agent-logs` holds 501 logs in 2.5 MB over 2.2 days, about 5 KB per job and 230 jobs a day. 14 days is about 3,200 jobs, about 16 MB per repo (about 20 MB at 284 jobs a day), well under the 100 MiB guard.
+    - Unchanged: a server keeps finished jobs in memory for a day; `list-jobs`, `logs` and the timeline read older ones from the logs.
+  report:
+    commits:
+    - hash: 76504c10b
+      what: prune job logs by age and size, keep open tickets' and running jobs
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2374 Rust, 1548 UI
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: '405'
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A563a35e9-0b82-40bc-9af6-83c1dfab9f26
 description: |-
   Owner 2026-11-17 in the cos thread, on lotar and T3 performance, picked "Job history by age" (keep job logs by days, for example 14, instead of the last 500 per repo).
 
@@ -17,7 +45,17 @@ description: |-
 
   Change: keep job records and logs for a configurable age (default 14 days) with a size guard instead of a count; never drop a job of an open ticket or a running one.
 
-  Done when: the setting is documented in docs/help/agent.md, a test shows a 15-day-old job of a Done ticket removed and a 15-day-old job of an open ticket kept, and lotar's current size per repo at 14 days is estimated in a comment.
+  ## Done when
+
+  - [ ] The 500-log count cap (`MAX_JOB_LOGS`) is gone. When a job starts, LoTaR prunes its log folder by age: a job log last written more than `agent.job_history.keep_days` days ago (global config, default 14) is removed.
+  - [ ] Size guard: while the folder's job logs are over `agent.job_history.max_mb` MiB (default 100; 0 = no size guard), the oldest removable logs go first, also ones younger than `keep_days`.
+  - [ ] Never removed, by age or by size: a job of an open ticket (status not a done state), a job whose ticket file exists but can't be read, and a running job (in this process or in another one's active-job record). These win over both limits: the folder may stay over `max_mb`.
+  - [ ] Removable: jobs of Done/WontDo tickets, of tickets that no longer exist, and logs without a header.
+  - [ ] Jobs that drop from memory after a day keep showing in `lotar agent list-jobs`, `lotar agent logs` and the timeline as long as their log is kept (they read the logs; unchanged).
+  - [ ] A failed prune (unreadable folder or file, failed delete) skips that file and never stops the job from starting.
+  - [ ] The setting is documented in `docs/help/agent.md` and `docs/help/config-reference.md`.
+  - [ ] A test shows a 15-day-old job of a Done ticket removed and a 15-day-old job of an open ticket kept; another shows the size guard removing the oldest removable log first.
+  - [ ] lotar's size per repo at 14 days is estimated in a comment.
 history:
 - at: 2026-11-18T03:06:47.596115+00:00
   actor: claude
@@ -30,3 +68,57 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T03:29:37.607571+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T03:29:38.402005+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A563a35e9-0b82-40bc-9af6-83c1dfab9f26
+- at: 2026-11-18T03:31:19.670266+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner 2026-11-17 in the cos thread, on lotar and T3 performance, picked "Job history by age" (keep job logs by days, for example 14, instead of the last 500 per repo).
+
+      Measured 2026-11-17: @agent-logs is capped at 500 (MAX_JOB_LOGS), 3.0-3.4 MB per repo; lotar ran 284 jobs on 2026-11-17 (UTC), so the cap keeps about 2 days. Older jobs drop out of `lotar agent list-jobs`, `lotar agent logs` and the timeline while their tickets still link them (comments name job IDs). Related: DEV-211 (keep job logs by default, Done), DEV-560 (timeline showed only the last 200 events).
+
+      Change: keep job records and logs for a configurable age (default 14 days) with a size guard instead of a count; never drop a job of an open ticket or a running one.
+
+      Done when: the setting is documented in docs/help/agent.md, a test shows a 15-day-old job of a Done ticket removed and a 15-day-old job of an open ticket kept, and lotar's current size per repo at 14 days is estimated in a comment.
+    new: |-
+      Owner 2026-11-17 in the cos thread, on lotar and T3 performance, picked "Job history by age" (keep job logs by days, for example 14, instead of the last 500 per repo).
+
+      Measured 2026-11-17: @agent-logs is capped at 500 (MAX_JOB_LOGS), 3.0-3.4 MB per repo; lotar ran 284 jobs on 2026-11-17 (UTC), so the cap keeps about 2 days. Older jobs drop out of `lotar agent list-jobs`, `lotar agent logs` and the timeline while their tickets still link them (comments name job IDs). Related: DEV-211 (keep job logs by default, Done), DEV-560 (timeline showed only the last 200 events).
+
+      Change: keep job records and logs for a configurable age (default 14 days) with a size guard instead of a count; never drop a job of an open ticket or a running one.
+
+      ## Done when
+
+      - [ ] The 500-log count cap (`MAX_JOB_LOGS`) is gone. When a job starts, LoTaR prunes its log folder by age: a job log last written more than `agent.job_history.keep_days` days ago (global config, default 14) is removed.
+      - [ ] Size guard: while the folder's job logs are over `agent.job_history.max_mb` MiB (default 100; 0 = no size guard), the oldest removable logs go first, also ones younger than `keep_days`.
+      - [ ] Never removed, by age or by size: a job of an open ticket (status not a done state), a job whose ticket file exists but can't be read, and a running job (in this process or in another one's active-job record). These win over both limits: the folder may stay over `max_mb`.
+      - [ ] Removable: jobs of Done/WontDo tickets, of tickets that no longer exist, and logs without a header.
+      - [ ] Jobs that drop from memory after a day keep showing in `lotar agent list-jobs`, `lotar agent logs` and the timeline as long as their log is kept (they read the logs; unchanged).
+      - [ ] A failed prune (unreadable folder or file, failed delete) skips that file and never stops the job from starting.
+      - [ ] The setting is documented in `docs/help/agent.md` and `docs/help/config-reference.md`.
+      - [ ] A test shows a 15-day-old job of a Done ticket removed and a 15-day-old job of an open ticket kept; another shows the size guard removing the oldest removable log first.
+      - [ ] lotar's size per repo at 14 days is estimated in a comment.
+- at: 2026-11-18T03:39:59.528116+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:40:08.045201+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

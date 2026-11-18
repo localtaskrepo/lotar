@@ -5,7 +5,7 @@ type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-17T19:57:31.784714+00:00
-modified: 2026-11-18T02:36:06.937512+00:00
+modified: 2026-11-18T04:00:53.749753+00:00
 relationships:
   blocks:
   - DEV-530
@@ -20,6 +20,7 @@ relationships:
   - DEV-671
   - DEV-652
   - DEV-688
+  - DEV-694
 comments:
 - date: 2026-11-17T20:07:27.811407+00:00
   author: claude
@@ -215,3 +216,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619","DEV-603","DEV-634","DEV-669","DEV-671","DEV-652"]}'
     new: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619","DEV-603","DEV-634","DEV-669","DEV-671","DEV-652","DEV-688"]}'
+- at: 2026-11-18T04:00:53.749753+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619","DEV-603","DEV-634","DEV-669","DEV-671","DEV-652","DEV-688"]}'
+    new: '{"blocks":["DEV-530"],"related":["DEV-530","DEV-577","DEV-595","DEV-619","DEV-603","DEV-634","DEV-669","DEV-671","DEV-652","DEV-688","DEV-694"]}'

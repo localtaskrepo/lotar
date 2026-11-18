@@ -1,14 +1,47 @@
 title: 'harnessmux: some Codex error texts still end a turn as finished'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T02:58:51.888766+00:00
-modified: 2026-11-18T03:25:35.173664+00:00
+modified: 2026-11-18T03:29:36.840230+00:00
 relationships:
   related:
   - DEV-684
+comments:
+- date: 2026-11-18T03:29:27.124946+00:00
+  author: claude
+  text: |-
+    Both Codex texts and a glued error chunk now fail the turn; work is in **harnessmux** `agent/DEV-691`, commit `c00cd57`.
+
+    - Branch sits on DEV-684's `65a95a0` (not on main yet): merge DEV-684 first; lotar's branch has no changes
+    - Texts checked in codex 0.169.0's binary: `Policy-restricted capacity is unavailable. Please try again later.`, `Flex capacity unavailable.`; added to `LAST_PARAGRAPH_FAILURES` in `src/acp_map.rs`
+    - codex-acp 2.6.0 (`createErrorEvent`) sends the error as one chunk of its own, no `messageId`, plus a blank line. `src/backend/acp.rs` now keeps the turn's last chunk; `failure_in_reply(reply, last_chunk, ran_tools)` checks the last paragraph of both
+    - Tests: unit cases in `src/acp_map.rs`; recording `tests/recordings/codex-error-glued-onto-a-message.jsonl` + `a_codex_error_glued_onto_an_earlier_message_fails_the_turn` in `tests/cli.rs` (failed before the fix)
+    - Only caller is `src/backend/acp.rs`; lotar doesn't call `failure_in_reply`
+    - CHANGELOG Unreleased updated
+  report:
+    commits:
+    - hash: c00cd57
+      what: 'harnessmux branch agent/DEV-691 (on top of DEV-684''s 65a95a0): two more Codex error texts; last chunk checked too'
+    checks:
+    - command: cargo nextest run
+      result: passed
+      reason: 54 tests; new recorded test failed first (exit 0, turn finished)
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: no lotar file changed
+    - command: live codex run
+      result: not_run
+      reason: these errors can't be forced; recording follows codex-acp 2.6.0 createErrorEvent
+    next: Merge harnessmux agent/DEV-684 first, then agent/DEV-691 (worktree ~/.t3/worktrees/harnessmux/DEV-691)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad01813e-ca32-4de5-939e-c516b2e63466
 description: |-
@@ -16,8 +49,16 @@ description: |-
 
   - `LAST_PARAGRAPH_FAILURES` (`src/acp_map.rs:84-89`) has four of Codex's error texts. codex 0.169.0's binary has more that codex-acp sends the same way (text chunk, then `end_turn`): "Policy-restricted capacity is unavailable. Please try again later." and "Flex capacity unavailable…".
   - The check reads the last paragraph of the whole turn's text (`turn.reply`, all message chunks joined without separators, `src/backend/acp.rs:240`). If an earlier Codex message doesn't end in a blank line, the error chunk is glued onto it and the check misses it. Not seen in a real run yet: in acpx #850 the turn had no earlier message.
+  - codex-acp 2.6.0 (`createErrorEvent`) sends the error as one `agent_message_chunk` of its own, without `messageId`, text plus a blank line. So the last chunk of the turn holds the error alone, whatever came before it.
+  - Work goes in harnessmux on top of DEV-684's `agent/DEV-684` (not on main yet); the only caller of `failure_in_reply` is harnessmux `src/backend/acp.rs`, lotar doesn't call it.
 
-  Done when: both texts fail the turn, and an error chunk after an earlier message without a trailing blank line fails it too, each with a test.
+  ## Done when
+  - [ ] A turn whose last paragraph starts with "Policy-restricted capacity is unavailable" ends as `turn.failed`, also after tools ran (unit test in `src/acp_map.rs`)
+  - [ ] The same for "Flex capacity unavailable" (unit test)
+  - [ ] A turn whose last message chunk starts with one of the Codex error texts fails, also when that chunk is glued onto an earlier message without a blank line; a recorded replay test (`tests/cli.rs` + recording) shows `turn.failed` with the error text alone as `error`
+  - [ ] Either check failing the turn wins: the last paragraph of the whole reply or the last chunk. A cancelled turn still ends as cancelled (unchanged)
+  - [ ] A reply that only mentions such a text mid-paragraph or in an earlier paragraph still finishes (unchanged test stays green)
+  - [ ] `cargo fmt --all --check`, clippy `-D warnings`, `cargo nextest run`, `cargo deny check` pass in harnessmux
 history:
 - at: 2026-11-18T02:58:52.577298+00:00
   actor: claude
@@ -35,3 +76,42 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad01813e-ca32-4de5-939e-c516b2e63466
+- at: 2026-11-18T03:27:44.436847+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-684 (harnessmux `65a95a0`).
+
+      - `LAST_PARAGRAPH_FAILURES` (`src/acp_map.rs:84-89`) has four of Codex's error texts. codex 0.169.0's binary has more that codex-acp sends the same way (text chunk, then `end_turn`): "Policy-restricted capacity is unavailable. Please try again later." and "Flex capacity unavailable…".
+      - The check reads the last paragraph of the whole turn's text (`turn.reply`, all message chunks joined without separators, `src/backend/acp.rs:240`). If an earlier Codex message doesn't end in a blank line, the error chunk is glued onto it and the check misses it. Not seen in a real run yet: in acpx #850 the turn had no earlier message.
+
+      Done when: both texts fail the turn, and an error chunk after an earlier message without a trailing blank line fails it too, each with a test.
+    new: |-
+      Found in the review of DEV-684 (harnessmux `65a95a0`).
+
+      - `LAST_PARAGRAPH_FAILURES` (`src/acp_map.rs:84-89`) has four of Codex's error texts. codex 0.169.0's binary has more that codex-acp sends the same way (text chunk, then `end_turn`): "Policy-restricted capacity is unavailable. Please try again later." and "Flex capacity unavailable…".
+      - The check reads the last paragraph of the whole turn's text (`turn.reply`, all message chunks joined without separators, `src/backend/acp.rs:240`). If an earlier Codex message doesn't end in a blank line, the error chunk is glued onto it and the check misses it. Not seen in a real run yet: in acpx #850 the turn had no earlier message.
+      - codex-acp 2.6.0 (`createErrorEvent`) sends the error as one `agent_message_chunk` of its own, without `messageId`, text plus a blank line. So the last chunk of the turn holds the error alone, whatever came before it.
+      - Work goes in harnessmux on top of DEV-684's `agent/DEV-684` (not on main yet); the only caller of `failure_in_reply` is harnessmux `src/backend/acp.rs`, lotar doesn't call it.
+
+      ## Done when
+      - [ ] A turn whose last paragraph starts with "Policy-restricted capacity is unavailable" ends as `turn.failed`, also after tools ran (unit test in `src/acp_map.rs`)
+      - [ ] The same for "Flex capacity unavailable" (unit test)
+      - [ ] A turn whose last message chunk starts with one of the Codex error texts fails, also when that chunk is glued onto an earlier message without a blank line; a recorded replay test (`tests/cli.rs` + recording) shows `turn.failed` with the error text alone as `error`
+      - [ ] Either check failing the turn wins: the last paragraph of the whole reply or the last chunk. A cancelled turn still ends as cancelled (unchanged)
+      - [ ] A reply that only mentions such a text mid-paragraph or in an earlier paragraph still finishes (unchanged test stays green)
+      - [ ] `cargo fmt --all --check`, clippy `-D warnings`, `cargo nextest run`, `cargo deny check` pass in harnessmux
+- at: 2026-11-18T03:29:27.124946+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:29:36.840230+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

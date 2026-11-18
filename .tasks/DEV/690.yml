@@ -1,11 +1,11 @@
 title: Delete DEV-604's six leftover branches and their two worktrees once DEV-686 is on main
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T02:32:30.521433+00:00
-modified: 2026-11-18T02:32:31.608803+00:00
+modified: 2026-11-18T03:27:42.091124+00:00
 relationships:
   depends_on:
   - DEV-686
@@ -15,6 +15,24 @@ comments:
 - date: 2026-11-18T02:32:31.608803+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-686.'
+- date: 2026-11-18T03:27:35.481635+00:00
+  author: claude
+  text: |-
+    Deleted DEV-604's six branches and the stuck worktree; the check passes.
+
+    - DEV-604's work is on main as `978bedf02` (DEV-686): pause handling in `crates/lotar-lib/src/cli/handlers/agent.rs` and `crates/lotar-agent/src/services/agent_queue_service.rs`
+    - `git log main..<branch>` showed only DEV-604 commits: `e4edce9b2` (agent/DEV-604, t3/b9902be4, t3/09cc8d99, t3/ae62354d), `6fc5011a0` (t3/pause-queue-on-signing-disk-failure), `48d4054e6` (t3/acb65239)
+    - Worktree `t3-b9902be4-7c71184961c450d6` (rebase still running, conflicts resolved but not staged): all 14 files matched `48d4054e6` exactly, so nothing in it was unsaved. Ran `git rebase --abort`, then `git worktree remove`
+    - There was no worktree on t3/acb65239 any more
+    - `git branch -D` on the six branches; `git worktree prune`
+    - No files changed, so no commit
+  report:
+    checks:
+    - command: git branch --list <the six branches> lists none; git worktree list shows no b9902be4/acb65239 worktree
+      result: passed
+    next: 'None: no files changed, nothing to commit or merge'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad835d5e7-be36-49fb-92f9-43fff392e839
 description: |-
   Found by the DEV-686 review (2026-11-17). DEV-686 lands DEV-604's work as 79ce70782; its Done when also asks to delete the branches, which can only happen after the merge.
 
@@ -45,3 +63,27 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T03:26:21.237884+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T03:26:22.001675+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad835d5e7-be36-49fb-92f9-43fff392e839
+- at: 2026-11-18T03:27:35.481635+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:27:42.091124+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

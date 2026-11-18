@@ -1,11 +1,11 @@
 title: follow_ticket_work's DEV-687 rule (another branch keeps the ticket tip) has no test
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T02:27:08.953170+00:00
-modified: 2026-11-18T03:07:15.128399+00:00
+modified: 2026-11-18T03:45:41.395377+00:00
 relationships:
   related:
   - DEV-687
@@ -43,6 +43,31 @@ comments:
 - date: 2026-11-18T03:07:14.274485+00:00
   author: mallox
   text: 'Answer: outside-only (Only branches outside the ticket''s own thread branches count) (answered in INBOX-519)'
+- date: 2026-11-18T03:45:31.365651+00:00
+  author: claude
+  text: |-
+    Done as decided: only branches outside the ticket's own thread branches count as keeping its work.
+
+    - `branch_keeping` (`crates/lotar-agent/src/services/agent_job_service.rs`) now skips the ticket branch and every branch a job of the ticket logged as its worktree branch; applies in `follow_ticket_work` and `move_ticket_branch`. New helper `logged_branches`, also used by `unlanded_ticket_branch`.
+    - Tests in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: with only `t3/topic-0` holding the fix, `agent/TEST-1` stays at it and the review starts from it (fails on the previous code); with `backup/TEST-1-fix` it moves to the newer work and the note names the backup.
+    - Amended my earlier commit into `d9d678448` (unpushed). Still built on DEV-687's `7303f1e1b`: merge DEV-687 first.
+  report:
+    commits:
+    - hash: d9d678448
+      what: only branches outside the ticket's own thread branches keep its work; two tests
+    checks:
+    - command: cargo nextest run --test integration dev503
+      result: passed
+      reason: 47 tests; the stays test fails on the previous code
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2362 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review on another model, then merge after DEV-687 (this commit builds on 7303f1e1b)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa6b0b5b-e3f3-4a1b-854e-3d73db613432
 description: |-
@@ -99,3 +124,22 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-18T03:40:09.479044+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T03:45:31.365651+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:45:41.395377+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

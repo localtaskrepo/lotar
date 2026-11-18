@@ -1,11 +1,11 @@
 title: Job prompt shows an empty Comments section when no comment is picked
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-18T03:04:50.676694+00:00
+modified: 2026-11-18T03:28:02.416853+00:00
 relationships:
   blocks:
   - DEV-664
@@ -313,6 +313,43 @@ comments:
 - date: 2026-11-18T03:04:50.676694+00:00
   author: claude
   text: 'Stalled since 2026-11-18T02:31Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-18T03:25:52.865818+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-628` is in `main`.
+
+    - Rebased `agent/DEV-628` onto `main` (`de2a61629c78`): `a9f0f270766e`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `a9f0f270766e`
+    - Amended the pending `.tasks` changes into the merged commit: `41d1d43a5cb8`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 41d1d43a5
+      what: DEV-628 Job prompt shows an empty Comments section when no comment is picked
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+- date: 2026-11-18T03:27:44.394088+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: `agent/DEV-628` doesn't exist.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-18T03:27:59.595328+00:00
+  author: claude
+  text: |-
+    Nothing to merge: the work is already on main.
+
+    - `git log main..HEAD` is empty; `HEAD` and `main` are both `41d1d43a5` (DEV-628 commit).
+    - No rebase, push, trust or checks needed; no files changed by this job.
+    - Uncommitted `.tasks` edits in the main checkout left untouched (no merge to amend them into).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
@@ -333,10 +370,6 @@ description: |-
   ## Done when
   - [ ] No comment picked: the prompt's Comments section is a single line with the count and the `lotar show` / `lotar task timeline` commands, without "below the …"; a unit test covers it.
   - [ ] `docs/help/agent.md` gives the open-question and answer rules as the code applies them.
-tags:
-- fix-retried
-- review-returned
-- review-returned-twice
 history:
 - at: 2026-11-16T23:31:43.665837+00:00
   actor: claude
@@ -681,3 +714,36 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-18T03:25:52.865818+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:25:53.021782+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried, review-returned, review-returned-twice
+    new: ''
+- at: 2026-11-18T03:27:44.328151+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Merging
+- at: 2026-11-18T03:27:44.394088+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:27:59.595328+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T03:28:02.416853+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
