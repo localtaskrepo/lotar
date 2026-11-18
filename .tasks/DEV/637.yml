@@ -1,11 +1,11 @@
 title: A job held back for prerequisites stays parked when its ticket is closed by hand
-status: InProgress
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T01:56:54.001918+00:00
-modified: 2026-11-18T21:09:32.707531+00:00
+modified: 2026-11-18T21:18:01.490820+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -47,6 +47,30 @@ comments:
 - date: 2026-11-18T20:59:22.141568+00:00
   author: claude
   text: 'Stalled since 2026-11-17T19:39Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-18T21:17:51.257300+00:00
+  author: claude
+  text: |-
+    Fixed: closing a ticket drops the job it held back for its prerequisites.
+
+    - `fire_unblocked_dependents` (`crates/lotar-agent/src/services/automation_service.rs`) runs after every committed update (CLI, REST, MCP, rules). On open→done it now calls `take_parked` for the ticket itself.
+    - If the drop fails, the status change still stands. lotar prints the reason and sends an `automation_failed` event that names `lotar agent queue remove <id>`, and the entry stays in the queue.
+    - Test `a_held_back_job_is_dropped_when_its_ticket_is_closed` (`agent_automation_integration_test.rs`): open→open and Done→WontDo keep the job; →Done drops it, no job starts and `move_task` works; an unreadable queue file keeps the entry and sends the event. Without the fix it failed at "closing the ticket drops the job".
+    - `docs/help/automation.md` and the `dependents_unblocked` doc in `hooks.rs` describe the new behavior.
+    - Rebased onto main (DEV-530 `77ff5dce`). Skipped the branch's old DEV-612 copy `5e4b406b`: its code matches main `105f027a`.
+  report:
+    commits:
+    - hash: 55fd0880
+      what: drop a closed ticket's parked job, with test and help doc
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2392 Rust tests and the node tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review and merge agent/DEV-637
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ede6a56-9b89-4ce2-8b1c-a74fa80eb83a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad5bbc3be-75a9-412d-a943-c1f706afa6b0
@@ -190,3 +214,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad5bbc3be-75a9-412d-a943-c1f706afa6b0
+- at: 2026-11-18T21:17:51.257300+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:18:01.490820+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

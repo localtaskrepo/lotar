@@ -828,7 +828,8 @@ impl AgentHandler {
         } else if AgentJobService::has_active_job(ticket) || running_job_for_ticket(&resolver.path, ticket).is_some() {
             Some(format!("a job runs for {ticket}"))
         } else {
-            None
+            // A thread runs on after its job ended (DEV-713).
+            AgentJobService::t3_thread_holding(&resolver.path, ticket)
         };
         if let Some(reason) = skipped {
             if matches!(renderer.format, OutputFormat::Json) {

@@ -1,11 +1,11 @@
 title: A job that fails on a provider's usage limit pauses until the reset instead of failing into retries and owner questions
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-18T21:09:27.700852+00:00
+modified: 2026-11-18T21:18:52.121358+00:00
 relationships:
   depends_on:
   - standards:STD-133
@@ -21,6 +21,9 @@ relationships:
   - DEV-653
   - DEV-711
   - DEV-626
+  - standards:STD-246
+  - DEV-530
+  - DEV-704
 comments:
 - date: 2026-11-16T00:14:23.282323+00:00
   author: claude
@@ -179,6 +182,35 @@ comments:
       result: passed
       reason: run before the answer; no code change since
     next: Review on Codex, then merge
+- date: 2026-11-18T21:17:40.972467+00:00
+  author: claude
+  text: |-
+    Review: passed. A job that hits a usage limit now pauses until the reset and asks nobody. An agent that only mentions a rate limit no longer pauses its job.
+
+    - **Reviewed** `fa2b3f679`, the only commit on `main..HEAD`. `t3/usage-limit-pause` has nothing newer.
+    - **Last review's blocker is fixed:** `usage_limit_pause` (`agent_job_service.rs:5178`) reads only `runner_errors`, which `EventBody::TurnFailed` fills (`:4449`). New test `an_agent_that_only_talks_about_a_rate_limit_fails` covers it.
+    - **Real case:** real logs show the limit inside the runner's `turn.failed` error. Examples: `lotar-95e687-DEV-520-merge.events.jsonl` and `DEV-563-fix-codex` (`t3 exited with exit status: 1: Thread mcp:… stopped with status failed: You’ve hit your usage limit … try again at Nov 21st, 2026 9:36 PM.`). The pattern and the `try again at` reader match that line. Claude's `You've hit your 5-hour limit · resets 6pm (America/Los_Angeles)` (DEV-704) matches through `-hour limit` and `resets`.
+    - **Done when, all met:**
+      - The job ends `paused` and runs `job_paused` rules, not `job_failed`.
+      - The retry goes first in the queue on the same profile, with `not_before`. Without a named time it waits 1 h, or `LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS`.
+      - `list-jobs` shows `paused (until …)`.
+      - A limit wins over other failures. A retry that hits it again pauses again.
+      - Tests use a fake t3.
+      - Typed failures moved to DEV-711, as the owner decided (INBOX-549).
+    - **Contract:** `api_types.rs`, `openapi.json`, `view/utils` and `docs/help` all list `job_paused`.
+    - **Reran:**
+      - `npm ci`: passed.
+      - `cargo nextest run --cargo-profile dev -E 'test(usage_limit) | test(dev584) | test(dev626) | test(dev617) | test(job_error_condition) | test(pause) | test(automation)'`: 197 passed.
+      - Not rerun: full `npm test`, `npm run lint` and `npm run smoke`. The fix agent ran them on this same code.
+    - **UI:** no screenshots needed. The diff changes only `view/utils` text, no pages, components or styles.
+    - **For the merge:** rebasing onto `main` conflicts in `agent_queue_service.rs`. DEV-530 (`77ff5dce8`) moved the entry literal into `queue_entry()`, so `not_before: None` belongs there. It's a mechanical fix.
+    - **Filed:** standards STD-246 (Blocked on this ticket). Once this ticket ships, the shared rules should comment once on `job_paused`, and their stale rate-limit comments and conditions go (`configs/lotar/automation.yml:338`, `:516`).
+- date: 2026-11-18T21:18:52.121358+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-584` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-584` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae237cd7b-56b1-4808-8d93-a5027ca90283
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e0c894c-8d31-47dc-b9c6-2d4724c64a55
@@ -470,3 +502,32 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T21:17:25.715997+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626","standards:STD-246"]}'
+- at: 2026-11-18T21:17:40.972467+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:17:41.164640+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626","standards:STD-246"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626","standards:STD-246","DEV-530","DEV-704"]}'
+- at: 2026-11-18T21:17:49.751339+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-18T21:18:52.121358+00:00
+  actor: automation
+  changes:
+  - field: comment_added

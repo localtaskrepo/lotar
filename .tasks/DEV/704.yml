@@ -5,7 +5,10 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T17:10:47.476966+00:00
-modified: 2026-11-18T20:25:16.264129+00:00
+modified: 2026-11-18T21:17:41.165377+00:00
+relationships:
+  related:
+  - DEV-584
 comments:
 - date: 2026-11-18T18:50:53.353327+00:00
   author: claude
@@ -172,3 +175,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T21:17:41.165377+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-584"]}'

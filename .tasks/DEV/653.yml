@@ -1,11 +1,11 @@
 title: 'Partial cleanup per step: each job step removes the build output the next step doesn''t use, measured'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T06:51:34.275016+00:00
-modified: 2026-11-18T21:01:17.903867+00:00
+modified: 2026-11-18T21:10:55.148512+00:00
 relationships:
   depends_on:
   - DEV-652
@@ -163,6 +163,30 @@ comments:
     **Minor, filed**
     - [DEV-713](https://lotar.pyxzl.net/task/DEV-713): `worktree run` doesn't check a T3 Code thread that runs on after its job ended. lotar's own cleanup does (`finished_job_worktree`). A person's HelpNeeded could then clean the worktree under a running build.
     - [DEV-714](https://lotar.pyxzl.net/task/DEV-714): "Done when" 2 (rule run on a real ticket) only runs after a release that has `agent worktree run`. That check now lives in DEV-714, Blocked on this ticket, so it isn't lost when this ticket goes Done at merge.
+- date: 2026-11-18T21:10:54.972143+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-653` is in `main`.
+
+    - Rebased `agent/DEV-653` onto `main` (`fa45d884bf06`): `b466ba197bbf`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `b466ba197bbf`
+    - Amended the pending `.tasks` changes into the merged commit: `d37a26bb556a`
+    - The merge changed rules, agent profiles or `agent.merge`: ran `lotar trust`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: d37a26bb5
+      what: 'DEV-653 Partial cleanup per step: each job step removes the build output the next step doesn''t use, measured'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A509492fe-d1ac-4c44-887b-244e75950add
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac8df013-267a-4c25-a134-08054d18ee06
@@ -185,8 +209,6 @@ description: |-
   - [ ] Measurements in a comment (sizes per part, rebuild time per step, before and after).
   - [ ] The kept rules run on a real ticket through fix, review and merge (checked, not assumed); docs/help/automation.md and agent.md say so.
   - [ ] lint, tests and smoke pass.
-tags:
-- review-returned
 history:
 - at: 2026-11-17T07:05:48.712571+00:00
   actor: claude
@@ -359,3 +381,16 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-652"],"blocks":["DEV-714"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584","DEV-712","DEV-713"]}'
     new: '{"depends_on":["DEV-652"],"blocks":["DEV-714","DEV-713"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584","DEV-712","DEV-713"]}'
+- at: 2026-11-18T21:10:54.972143+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:10:55.148512+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned
+    new: ''

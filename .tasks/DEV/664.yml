@@ -1,11 +1,11 @@
 title: 'Commits only on this Mac: branches'
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T18:08:11.962632+00:00
-modified: 2026-11-18T20:59:39.824671+00:00
+modified: 2026-11-18T21:12:27.578100+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -25,6 +25,7 @@ relationships:
   - DEV-685
   - DEV-686
   - DEV-636
+  - DEV-524
 comments:
 - date: 2026-11-17T18:13:17.083588+00:00
   author: claude
@@ -146,10 +147,27 @@ comments:
     ## Done when
 
     git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
+- date: 2026-11-18T21:12:14.311670+00:00
+  author: claude
+  text: |-
+    Question: DEV-530 is merged, so may I delete its 7 leftover draft branches? You said to keep them (INBOX-490) while DEV-530 was still open.
+
+    - Prerequisites are done: DEV-530 (`77ff5dce8` on `origin/main`), DEV-628 and DEV-686. The DEV-604, DEV-628 and DEV-636 branches are gone.
+    - The check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` still reports `[unpushed:branches]`, 8 commits: `t3/dev-530-review-held-job-resume` (`f5a440856`), `t3/resume-held-job-after-prerequisites` (`6564ad129`), `t3/resume-held-jobs-after-prerequisites` (`b76f5dda3`), `t3/resume-held-jobs-when-unblocked` (`4e2f775ad`), `t3/review-dev-530-held-job-resume` (`7c998bc75`, plus `500370cdd` DEV-524, which is on main as `c01dfce3c`), `t3/review-dev-530-held-job-resume-1` (`fb7de8791`), `t3/review-dev-530-held-job-resume-2` (`c5fd40f2b`)
+    - Each one is an earlier DEV-530 attempt from 2026-11-13. Main has the reworked version. No worktree uses any of them.
+    - Recommended: delete all 7. Main has the finished fix, so nothing still needed is lost.
+    - No files changed, so there is no commit.
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: failed
+      reason: '[unpushed:branches] still lists 7 DEV-530 draft branches (8 commits)'
+    next: 'Owner: delete the 7 DEV-530 draft branches, or keep them'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A947f85ae-287b-4f05-a37c-5169f75e92ce
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab20a1a2b-4a46-4d17-972e-679a85c035e9
 description: |-
   11 commits on no remote, only on this Mac: agent/DEV-516 1, agent/DEV-528 1, agent/DEV-585 1, agent/DEV-628 1, backup/DEV-466-896309c0 3, backup/DEV-585-d6dbec07 1, t3/b9902be4 1, t3/review-held-job-resume 2 (git log <branch> --not --remotes)
 
@@ -378,3 +396,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T21:11:02.924943+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T21:11:03.716851+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab20a1a2b-4a46-4d17-972e-679a85c035e9
+- at: 2026-11-18T21:12:14.311670+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:12:14.643308+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-530","DEV-628","DEV-686"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686","DEV-636"]}'
+    new: '{"depends_on":["DEV-530","DEV-628","DEV-686"],"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604","DEV-685","DEV-686","DEV-636","DEV-524"]}'
+- at: 2026-11-18T21:12:27.578100+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

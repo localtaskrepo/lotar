@@ -3,10 +3,35 @@ status: Blocked
 priority: Low
 type: Chore
 reporter: claude
+assignee: '@review'
 created: 2026-11-18T20:46:33.122471+00:00
+modified: 2026-11-18T21:18:50.175103+00:00
 relationships:
   depends_on:
   - DEV-653
+  - DEV-702
+comments:
+- date: 2026-11-18T21:18:43.467083+00:00
+  author: claude
+  text: |-
+    Still blocked: the release with `lotar agent worktree run` isn't out yet, so the live check can't run.
+
+    - `lotar --version` prints `lotar 0.15.4`, the version the ticket says lacks the command
+    - `lotar agent worktree --help` lists only `list`, `cleanup`, `setup`
+    - main has the command (`docs/help/agent.md:22`), 23 commits past `v0.15.4`
+    - Release ticket [DEV-702](https://lotar.pyxzl.net/task/DEV-702) "Release v0.15.5" is Todo, assigned to mallox; added it as a dependency here
+    - No files changed, no commit
+  report:
+    checks:
+    - command: lotar agent worktree run --help
+      result: not_run
+      reason: lotar 0.15.4 installed, no such subcommand
+    next: Release v0.15.5 (DEV-702), install it, then rerun this check
+- date: 2026-11-18T21:18:50.175103+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-702.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2b2e16ab-beeb-4c69-93f7-9ee169feb976
 description: |-
   Found in DEV-653's review (2026-11-18, commit `05ea0d37e`). DEV-653's "Done when" asks that the kept rule run on a real ticket, checked, not assumed. Only an integration test checked it (`waiting_rule_drops_build_output_on_hand_back_and_person_change_only`): the installed lotar (0.15.4) lacks `agent worktree run`, so the rule fails and `ignore_failure` hides it until a release has the command. DEV-653 goes Done at merge, so this ticket keeps the check.
 
@@ -15,3 +40,49 @@ description: |-
   ## Done when
   - [ ] On a real DEV ticket with a lotar worktree, a status change to HelpNeeded or Blocked by a person, or an agent's hand-back during its job, ran `cargo clean --workspace` there: `target/` size before and after, and the automation log line, in a comment.
   - [ ] Then STD-236 copies the rule into standards.
+history:
+- at: 2026-11-18T21:11:00.769105+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T21:17:50.924039+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T21:17:51.836334+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2b2e16ab-beeb-4c69-93f7-9ee169feb976
+- at: 2026-11-18T21:18:43.071971+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-653"]}'
+    new: '{"depends_on":["DEV-653","DEV-702"]}'
+- at: 2026-11-18T21:18:43.467083+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:18:49.932195+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T21:18:50.142835+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Blocked
+- at: 2026-11-18T21:18:50.175103+00:00
+  actor: automation
+  changes:
+  - field: comment_added

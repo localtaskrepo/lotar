@@ -401,11 +401,7 @@ impl AgentJobService {
             return Err(active_job_error());
         }
         if let Some(hold) = running_t3_thread(tasks_dir, &ticket_id) {
-            let T3ThreadHold { thread, job, waiting, .. } = hold;
-            let what = if waiting { "waits for an answer" } else { "still runs" };
-            return Err(LoTaRError::ValidationError(format!(
-                "Ticket '{ticket_id}' already has an active job: the T3 Code thread {thread} of the job {job} {what}"
-            )));
+            return Err(LoTaRError::ValidationError(format!("Ticket '{ticket_id}' already has an active job: {}", hold.describe())));
         }
 
         // Short of memory: the job waits as queued (DEV-623).
@@ -654,6 +650,13 @@ impl AgentJobService {
     /// tasks directory (DEV-279).
     pub fn has_active_job_in(tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
         Self::has_active_job(ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some()
+    }
+
+    /// The T3 Code thread of an earlier job on the ticket that still runs or
+    /// waits for an answer, described, as a new job's start sees it: such a
+    /// thread still works in the ticket's worktree (DEV-713).
+    pub fn t3_thread_holding(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<String> {
+        running_t3_thread(tasks_dir, ticket_id).map(|hold| hold.describe())
     }
 
     pub fn get_job(id: &str) -> Option<AgentJob> {
@@ -4014,6 +4017,13 @@ pub(crate) struct T3ThreadHold {
     pub link: Option<String>,
     /// The thread waits for an answer rather than runs a turn (DEV-600).
     pub waiting: bool,
+}
+
+impl T3ThreadHold {
+    fn describe(&self) -> String {
+        let what = if self.waiting { "waits for an answer" } else { "still runs" };
+        format!("the T3 Code thread {} of the job {} {what}", self.thread, self.job)
+    }
 }
 
 /// Per ticket: when T3 Code was asked, about which earlier threads, and the

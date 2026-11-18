@@ -272,3 +272,42 @@ fn a_thread_t3_code_lists_as_waiting_holds_the_ticket_too() {
     let beside = harness.task().comments.into_iter().find(|comment| comment.text.contains("stop it in T3 Code")).expect("a comment on the running thread");
     assert!(beside.text.contains(&link("t2")) && beside.text.contains(&link("t1")), "{}", beside.text);
 }
+
+/// DEV-713: `agent worktree run` runs nothing in the ticket's worktree while T3 Code runs the thread of its ended job
+/// or the thread waits for an answer; the thread still works there.
+#[test]
+fn worktree_run_runs_nothing_while_the_ticket_thread_runs_or_waits_for_an_answer() {
+    crate::common::require_git();
+    let harness = harness();
+    harness.run_job("fixer", "t1");
+    let root = harness.fixtures.get_temp_path().to_path_buf();
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git").args(args).current_dir(&root).output().unwrap();
+        assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    };
+    git(&["init", "-q", "-b", "main"]);
+    git(&["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "init"]);
+    let wt = root.join("worktrees").join("TEST-1");
+    git(&["worktree", "add", "-q", "-b", "agent/TEST-1", wt.to_str().unwrap()]);
+    let run = || {
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        cmd.current_dir(&root).args(["agent", "worktree", "run", "TEST-1", "--", "sh", "-c", "touch ran-here"]);
+        let output = cmd.output().unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stdout).into_owned()
+    };
+
+    harness.show("t1", "running", Some("r2"), 0, "Working.");
+    let out = run();
+    assert!(out.contains("Ran nothing: the T3 Code thread t1 of the job") && out.contains("still runs"), "{out}");
+    assert!(!wt.join("ran-here").exists(), "a running thread's worktree is left alone");
+
+    harness.show("t1", "completed", None, 1, "Which one?");
+    let out = run();
+    assert!(out.contains("waits for an answer"), "{out}");
+    assert!(!wt.join("ran-here").exists(), "a waiting thread's worktree is left alone");
+
+    harness.show("t1", "completed", None, 0, "Finished.");
+    run();
+    assert!(wt.join("ran-here").exists(), "a finished thread doesn't hold the worktree");
+}
