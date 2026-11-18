@@ -26,6 +26,7 @@ export type AutomationEventKey =
     | 'complete'
     | 'error'
     | 'cancel'
+    | 'pause'
     | 'manual'
     | 'unblocked'
 
@@ -185,6 +186,7 @@ const EVENT_LABELS: Record<AutomationEventKey, string> = {
     complete: 'Job completed',
     error: 'Job failed',
     cancel: 'Job cancelled',
+    pause: 'Job paused',
     manual: 'Run manually or from cron',
     unblocked: 'Prerequisites done',
 }
@@ -211,6 +213,9 @@ const EVENT_ALIAS_TO_KEY: Record<string, AutomationEventKey> = {
     cancel: 'cancel',
     job_cancel: 'cancel',
     job_cancelled: 'cancel',
+    pause: 'pause',
+    job_pause: 'pause',
+    job_paused: 'pause',
     manual: 'manual',
     unblocked: 'unblocked',
 }
@@ -228,6 +233,7 @@ const YAML_EVENT_KEYS: Record<AutomationEventKey, string> = {
     complete: 'job_completed',
     error: 'job_failed',
     cancel: 'job_cancelled',
+    pause: 'job_paused',
     manual: 'manual',
     unblocked: 'unblocked',
 }
@@ -1383,6 +1389,8 @@ function denormalizeEventKey(event: AutomationEventKey): string {
             return 'job_failed'
         case 'cancel':
             return 'job_cancelled'
+        case 'pause':
+            return 'job_paused'
         case 'created':
         case 'updated':
         case 'assigned':

@@ -165,6 +165,7 @@ mod dev55_transactional_mutations_test;
 mod dev562_similar_open_ticket_test;
 mod dev56_task_identity_test;
 mod dev57_task_query_test;
+mod dev584_usage_limit_pause_test;
 mod dev58_typed_error_mapping_test;
 mod dev592_queue_resumes_after_restart_test;
 mod dev604_queue_pauses_test;

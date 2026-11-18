@@ -178,8 +178,12 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
     }
     let busy = AgentJobService::has_active_job_in(tasks_dir, ticket_id)
         || crate::services::agent_active_jobs::orphaned(tasks_dir).iter().any(|job| crate::storage::identity::aliases_match(&job.ticket_id, ticket_id));
-    // A queued job waits for the thread (DEV-600); the owner or a rule chose it.
-    if !busy && queued(tasks_dir, ticket_id) {
+    // A queued job waits for the thread (DEV-600); the owner or a rule chose
+    // it. A job's retry after a usage limit doesn't: T3 Code resumed the
+    // paused job's own turn after the reset, so the thread is taken over
+    // and the retry goes (DEV-584).
+    let limit_retries = if busy { None } else { limit_retries(tasks_dir, ticket_id) };
+    if !busy && limit_retries.is_none() && queued(tasks_dir, ticket_id) {
         return;
     }
     let mut threads = threads.into_iter();
@@ -191,8 +195,14 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
         if !crate::services::agent_active_jobs::first_look_at_run(tasks_dir, &first.thread, &first.run) {
             return;
         }
-        match adopt(tasks_dir, ticket_id, &first) {
-            Ok(job_id) => beside = Some(format!("the thread {} that the job {job_id} took over", first.shown())),
+        let carried = limit_retries.as_ref().and_then(|entries| entries.iter().find_map(|entry| entry.carried_outcome.clone()));
+        match adopt(tasks_dir, ticket_id, &first, carried) {
+            Ok(job_id) => {
+                for entry in limit_retries.iter().flatten() {
+                    let _ = crate::services::agent_queue_service::AgentQueueService::remove(tasks_dir, &entry.ticket_id);
+                }
+                beside = Some(format!("the thread {} that the job {job_id} took over", first.shown()));
+            }
             Err(why) => comment(
                 tasks_dir,
                 ticket_id,
@@ -241,6 +251,15 @@ fn waits_for_answer(program: &Path, env: &[(String, String)], cwd: &Path, thread
         .is_some_and(|count| count > 0)
 }
 
+/// The ticket's queued entries when every one is a job's retry after a
+/// usage limit (`not_before`) and no job of it waits in this process.
+fn limit_retries(tasks_dir: &Path, ticket_id: &str) -> Option<Vec<crate::services::agent_queue_service::AgentQueueEntry>> {
+    let pending = crate::services::agent_queue_service::AgentQueueService::list_pending(tasks_dir).ok()?;
+    let entries: Vec<_> = pending.into_iter().filter(|entry| crate::storage::identity::aliases_match(&entry.ticket_id, ticket_id)).collect();
+    let in_memory = JOB_REGISTRY.lock().map_or(true, |registry| registry.pending_queue.iter().any(|job| job.ticket_id == ticket_id));
+    (!entries.is_empty() && !in_memory && entries.iter().all(|entry| entry.not_before.is_some())).then_some(entries)
+}
+
 fn queued(tasks_dir: &Path, ticket_id: &str) -> bool {
     let pending = crate::services::agent_queue_service::AgentQueueService::list_pending(tasks_dir).unwrap_or_default();
     pending.iter().any(|entry| crate::storage::identity::aliases_match(&entry.ticket_id, ticket_id))
@@ -254,7 +273,12 @@ fn comment(tasks_dir: &Path, ticket_id: &str, text: &str) {
 /// Take the thread over as a new job of its job's profile: the ticket goes
 /// back to that profile, the `job_started` rules run, and the job follows the
 /// thread's run and ends like any job. The new job's id, or why not.
-fn adopt(tasks_dir: &Path, ticket_id: &str, resumed: &Resumed) -> Result<String, String> {
+fn adopt(
+    tasks_dir: &Path,
+    ticket_id: &str,
+    resumed: &Resumed,
+    carried_outcome: Option<crate::services::agent_queue_service::CarriedOutcome>,
+) -> Result<String, String> {
     let parsed = crate::storage::TaskId::parse(ticket_id).map_err(|err| err.to_string())?;
     let config = crate::config::resolution::config_for_project(tasks_dir, Some(&parsed.project)).map_err(|err| err.to_string())?;
     let profile = match resumed.agent.as_deref() {
@@ -321,6 +345,7 @@ fn adopt(tasks_dir: &Path, ticket_id: &str, resumed: &Resumed) -> Result<String,
                 runtime: None,
                 cancellation_finalized: false,
                 runner_failed: false,
+                runner_errors: Vec::new(),
                 worker_running: true,
                 main_head_at_start: None,
                 assignee_at_start: None,
@@ -343,7 +368,7 @@ fn adopt(tasks_dir: &Path, ticket_id: &str, resumed: &Resumed) -> Result<String,
         None => "the job's end rules run when the thread's run ends".to_string(),
     };
     let text = format!(
-        "T3 Code runs the thread {} of the job {} again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job {job_id}: {what}.",
+        "T3 Code runs the thread {} of the job {} again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job {job_id}: {what}.",
         resumed.shown(),
         resumed.job_id
     );
@@ -356,6 +381,10 @@ fn adopt(tasks_dir: &Path, ticket_id: &str, resumed: &Resumed) -> Result<String,
         let _slot = RunningJobSlot { job_id, ticket_id: &ticket_id, tasks_dir: &tasks_dir };
         if !start_job(job_id, AgentRunnerKind::T3, &profile, &tasks_dir, &ticket_id, &config, &started_at, Some(worktree)) {
             return;
+        }
+        // What the job paused on a usage limit recorded, as its retry would have.
+        if let Some(carried) = carried_outcome {
+            super::carry_outcome(job_id, &tasks_dir, &ticket_id, carried);
         }
         // Other processes see that this job follows the session.
         let active = JOB_REGISTRY

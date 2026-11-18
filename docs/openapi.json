@@ -10119,7 +10119,7 @@
           },
           "event": {
             "type": "string",
-            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, release_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
+            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, release_changed, job_started, job_completed, job_failed, job_cancelled, job_paused, manual, unblocked. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel, pause).",
             "examples": [
               "created",
               "updated",

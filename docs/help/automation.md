@@ -192,14 +192,14 @@ when:
 
 ### Job conditions
 
-`job: { error: ... }` checks why an agent job failed: the job's last message, such as the runner's error (`t3 exited with exit status: 1: ... Claude API rate limit reached. Try again later.`). It takes any field condition; `matches` is case-sensitive, so add `(?i)` to ignore case. A job that didn't fail has no error and matches only `exists: false`. `job` conditions never match on other events, so put them only on rules with job hooks. This rule retries a failed job on another agent unless it failed on a usage limit, which the same provider would hit again:
+`job: { error: ... }` checks why an agent job failed or paused: the job's last message, such as the runner's error (`t3 exited with exit status: 1: error: tests failed`) or a paused job's note (`Paused, not failed: codex hit its usage limit (...)`). It takes any field condition; `matches` is case-sensitive, so add `(?i)` to ignore case. A job that completed or was cancelled has no error and matches only `exists: false`. `job` conditions never match on other events, so put them only on rules with job hooks. A job that stops on a usage limit pauses and runs again after the reset (see [Usage limits](agent.md#usage-limits)), so `job_failed` rules don't see it. This rule retries a failed job on another agent unless it failed in setup:
 
 ```yaml
 - name: Retry on another agent
   when:
     all:
       - assignee: "@fix"
-      - not: { job: { error: { matches: '(?i)rate limit|usage limit' } } }
+      - not: { job: { error: { matches: '(?i)worktree setup' } } }
   on:
     job_failed:
       set: { assignee: "@fix-retry" }
@@ -227,6 +227,7 @@ Actions define what happens at different points in the automation lifecycle:
 - `job_completed`: when an agent job succeeds
 - `job_failed`: when an agent job fails
 - `job_cancelled`: when an agent job is cancelled
+- `job_paused`: when an agent job pauses instead of failing: on its provider's [usage limit](agent.md#usage-limits) until the reset, or with a [paused queue](agent.md#paused-queue). No `job_failed` rule runs then; the job's retry runs the end rules. `job: { error: ... }` matches the pause note, which names the provider and when the job runs again
 - `manual`: only when started on purpose: **Run now** in the web UI, `lotar automation run`, `POST /api/automation/run`, or cron calling one of them (see below)
 - `unblocked`: on a ticket whose last open prerequisite (`depends_on`) reaches a done state (see [When prerequisites are done](#when-prerequisites-are-done))
 - `start`: legacy catch-all that fires on every matching task change, after the specific hook

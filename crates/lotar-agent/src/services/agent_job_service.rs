@@ -10,7 +10,7 @@ use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
 use crate::utils::git::{clear_repository_env, git_command, verified_common_dir};
-use crate::utils::time;
+use crate::utils::time::{self, Rfc3339};
 use crate::workspace::TasksDirectoryResolver;
 use jiff::SignedDuration;
 use jiff::Timestamp;
@@ -134,6 +134,10 @@ struct AgentJobState {
     /// The runner reported a failure in its output (an error result, a
     /// failed turn), so the job fails even if the process exits 0.
     runner_failed: bool,
+    /// The runner's own reports of a failed turn (harnessmux `TurnFailed`),
+    /// apart from the agent's words: a usage limit is read only from these,
+    /// so an agent that talked about a rate limit doesn't pause (DEV-584).
+    runner_errors: Vec<String>,
     /// A worker thread runs the job; it clears this only after the job's
     /// end automation, context and worktree cleanup (DEV-322).
     worker_running: bool,
@@ -463,6 +467,7 @@ impl AgentJobService {
                     runtime: None,
                     cancellation_finalized: false,
                     runner_failed: false,
+                    runner_errors: Vec::new(),
                     worker_running: false,
                     main_head_at_start: None,
                     assignee_at_start: None,
@@ -952,7 +957,7 @@ fn job_context_for(id: &str) -> Option<AutomationJobContext> {
         worktree_branch: state.record.worktree_branch.clone(),
         usage: state.record.usage.clone(),
         assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
-        error: state.record.summary.clone().filter(|_| state.record.status == AgentJobStatus::Failed),
+        error: state.record.summary.clone().filter(|_| matches!(state.record.status, AgentJobStatus::Failed | AgentJobStatus::Paused)),
     })
 }
 
@@ -2080,6 +2085,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 runtime: None,
                 cancellation_finalized: false,
                 runner_failed: false,
+                runner_errors: Vec::new(),
                 worker_running: true,
                 main_head_at_start: None,
                 assignee_at_start: restored_assignee(job.assignee_at_start.clone()),
@@ -4453,6 +4459,7 @@ fn drive_turns(
                 };
             }
             EventBody::TurnFailed { error } => {
+                update_job(job_id, |state| state.runner_errors.push(error.clone()));
                 progress(error);
                 exit_code = 1;
             }
@@ -5027,10 +5034,18 @@ fn finalize_job(
             if runner_failed { format!("The {runner} runner reported a failure.") } else { format!("The {runner} runner {}.", exit_description(exit_code)) }
         })
     });
+    // A provider's usage limit pauses the job until the reset; it wins over
+    // any other failure in the same output (DEV-584).
+    let limit_pause = if success { None } else { usage_limit_pause(job_id, tasks_dir, config) };
+    let resumes_at = limit_pause.as_ref().map(|(_, at)| at.clone());
     // A failure every job like this one would hit pauses the queue instead
     // of failing (DEV-604); a job that completes ends a pause it would have hit.
-    let paused = if success { None } else { pause_cause(job_id, failure_reason.as_deref()) }
-        .and_then(|(reason, line)| pause_queue(job_id, tasks_dir, reason, &line, commit_failed).map(|note| (reason, note)));
+    let paused: Option<(Option<PauseReason>, String)> = match limit_pause {
+        Some((note, _)) => Some((None, note)),
+        None if success => None,
+        None => pause_cause(job_id, failure_reason.as_deref())
+            .and_then(|(reason, line)| pause_queue(job_id, tasks_dir, reason, &line, commit_failed).map(|note| (Some(reason), note))),
+    };
     let commits = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.commits)).unwrap_or(true);
     if success && let Some(pause) = AgentQueueService::end_pause(tasks_dir, commits) {
         let note = format!("This job completed, so the queue's pause ({}, since {}) ended: the jobs it held start.", pause.reason.describe(), pause.since);
@@ -5115,6 +5130,7 @@ fn finalize_job(
             worktree_branch,
             ticket_commit,
             agent_session,
+            resumes_at,
         },
     );
 
@@ -5133,8 +5149,11 @@ fn finalize_job(
     // The context goes first: the end rules may start the next phase's agent, whose prompt carries it.
     let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
 
-    // A paused job ran no rule: its retry ends it (DEV-604).
-    if !should_stop_job(job_id) && paused.is_none() {
+    // A paused job runs only its `job_paused` rules: its retry ends it
+    // (DEV-604, DEV-584).
+    if !should_stop_job(job_id) && paused.is_some() {
+        apply_job_end_rules(job_id, ticket_id, tasks_dir, AutomationEvent::JobPaused, job_context);
+    } else if !should_stop_job(job_id) {
         let event = if success { AutomationEvent::JobCompleted } else { AutomationEvent::JobFailed };
         apply_job_end_rules(job_id, ticket_id, tasks_dir, event, job_context);
         if success {
@@ -5147,7 +5166,7 @@ fn finalize_job(
     if paused.is_none() {
         maybe_cleanup_worktree(job_id, ticket_id, tasks_dir, config, if success { JobOutcome::Success } else { JobOutcome::Failure });
     }
-    if paused.is_none_or(|(reason, _)| reason == PauseReason::Disk) {
+    if paused.is_none_or(|(reason, _)| reason == Some(PauseReason::Disk)) {
         remove_build_output(job_id, ticket_id, tasks_dir, config);
     }
     cleanup_done_worktrees(tasks_dir, config);
@@ -5171,16 +5190,61 @@ fn pause_cause_in<'a>(texts: impl IntoIterator<Item = &'a str>) -> Option<(Pause
     })
 }
 
-/// The pause a failed job's output calls for: LoTaR's note on the failure,
-/// the agent's last message and its last 10 events. Not the whole log: an
-/// agent that only talked about a full disk doesn't pause the queue.
+/// The output a failed job's pause is read from: LoTaR's note on the
+/// failure, the agent's last message and its last 10 events. Not the whole
+/// log: an agent that only talked about a full disk doesn't pause the queue.
+fn failure_texts(job_id: &str, note: Option<&str>) -> Vec<String> {
+    JOB_REGISTRY
+        .lock()
+        .ok()
+        .and_then(|registry| {
+            let state = registry.jobs.get(job_id)?;
+            let events = state.events.iter().rev().take(10).filter_map(|event| event.message.clone());
+            Some(note.map(str::to_string).into_iter().chain(state.record.last_message.clone()).chain(events).collect())
+        })
+        .unwrap_or_default()
+}
+
+/// The pause a failed job's output calls for ([`failure_texts`]).
 fn pause_cause(job_id: &str, note: Option<&str>) -> Option<(PauseReason, String)> {
-    let texts: Vec<String> = JOB_REGISTRY.lock().ok().and_then(|registry| {
+    pause_cause_in(failure_texts(job_id, note).iter().map(String::as_str))
+}
+
+/// Pause a job that stopped on a provider's usage limit (DEV-584): its retry
+/// is queued first, on the same profile, to start after the reset (or the
+/// default wait when the provider names no time). The ticket keeps its
+/// status and assignee; the status and assignee change the job recorded goes
+/// with the retry. The job's note and when it runs again; `None` when the
+/// runner reported no limit or the job can't be retried (taken over from
+/// another process). Only the runner's failure reports count
+/// (`runner_errors`): the agent's messages and tool calls are its words,
+/// and a failed job that only talked about a rate limit fails.
+fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) -> Option<(String, String)> {
+    let (mut request, ticket_id, runner, errors) = JOB_REGISTRY.lock().ok().and_then(|registry| {
         let state = registry.jobs.get(job_id)?;
-        let events = state.events.iter().rev().take(10).filter_map(|event| event.message.clone());
-        Some(note.map(str::to_string).into_iter().chain(state.record.last_message.clone()).chain(events).collect())
+        Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.runner.clone(), state.runner_errors.clone()))
     })?;
-    pause_cause_in(texts.iter().map(String::as_str))
+    let limit = crate::services::usage_limit::find(errors.iter().map(String::as_str), Timestamp::now())?;
+    let carried = carried_outcome_of(tasks_dir, job_id, &ticket_id);
+    request.ticket_id = ticket_id;
+    let resumes_at = limit.resume_at(Timestamp::now()).to_rfc3339();
+    let mut retry = AgentQueueEntry::retry_of(&request, None, carried);
+    retry.not_before = Some(resumes_at.clone());
+    AgentQueueService::requeue_after_limit(tasks_dir, &retry).ok()?;
+    let provider = request.provider.clone().or_else(|| resolve_profile(config, &request).ok()?.provider).unwrap_or_else(|| runner.clone());
+    let profile = request.agent.as_deref().map_or_else(|| format!("the {runner} runner"), |agent| format!("@{agent}"));
+    let when = if limit.resets_at.is_some() { "after the reset" } else { "after the default wait (the provider named no reset time)" };
+    let note = format!("Paused, not failed: {provider} hit its usage limit ({}). The job runs again on {profile} at {resumes_at}, {when}.", limit.line);
+    Some((note, resumes_at))
+}
+
+/// The status and assignee change the agent recorded during the job (a
+/// hand-back), with the ticket's state now, for the job's retry.
+fn carried_outcome_of(tasks_dir: &std::path::Path, job_id: &str, ticket_id: &str) -> Option<CarriedOutcome> {
+    crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id).filter(|outcome| !outcome.is_empty()).and_then(|outcome| {
+        let (status_at_pause, assignee_at_pause) = ticket_state(tasks_dir, ticket_id)?;
+        Some(CarriedOutcome { outcome, status_at_pause, assignee_at_pause })
+    })
 }
 
 /// Pause the queue for a job that failed on `reason` and queue its retry
@@ -5195,10 +5259,7 @@ fn pause_queue(job_id: &str, tasks_dir: &std::path::Path, reason: PauseReason, l
     })?;
     // A status or assignee the agent set during the job (a hand-back) goes
     // with the retry, which applies it when it ends.
-    let carried = crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id).filter(|outcome| !outcome.is_empty()).and_then(|outcome| {
-        let (status_at_pause, assignee_at_pause) = ticket_state(tasks_dir, &ticket_id)?;
-        Some(CarriedOutcome { outcome, status_at_pause, assignee_at_pause })
-    });
+    let carried = carried_outcome_of(tasks_dir, job_id, &ticket_id);
     request.ticket_id = ticket_id;
     let commit_retry =
         worktree.filter(|_| retry_commit).map(|worktree_path| CommitRetry { job_id: job_id.to_string(), worktree_path, worktree_branch: branch });
@@ -5369,9 +5430,8 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
         registry.active_by_ticket.remove(ticket_id);
     }
     drop(registry);
-    if !paused {
-        apply_job_end_rules(job_id, ticket_id, tasks_dir, AutomationEvent::JobFailed, job_context_for(job_id));
-    }
+    let event = if paused { AutomationEvent::JobPaused } else { AutomationEvent::JobFailed };
+    apply_job_end_rules(job_id, ticket_id, tasks_dir, event, job_context_for(job_id));
 }
 
 /// Runs the rules for the job's end and logs where they moved the ticket,
@@ -6229,6 +6289,7 @@ mod tests {
             runtime: None,
             cancellation_finalized: false,
             runner_failed: false,
+            runner_errors: Vec::new(),
             worker_running: false,
             main_head_at_start: None,
             assignee_at_start: None,
@@ -6501,6 +6562,7 @@ mod tests {
             worktree_branch: None,
             ticket_commit: None,
             agent_session: None,
+            resumes_at: None,
         };
         AgentLogService::write_status_with_usage(workspace.path(), Some(&logs_dir), job_id, status).expect("status line");
         crate::services::agent_active_jobs::register(&tasks_dir, &orphan_record(job_id, Some("review"), false));

@@ -86,6 +86,9 @@ pub struct JobStatusLine {
     /// session name outlives it when a job starts a new one (DEV-550).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_session: Option<String>,
+    /// When a job paused on a provider's usage limit runs again (DEV-584).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub resumes_at: Option<String>,
 }
 
 pub struct AgentLogService;
@@ -250,6 +253,7 @@ impl AgentLogService {
                 worktree_branch: None,
                 ticket_commit: None,
                 agent_session: None,
+                resumes_at: None,
             },
         )
     }

@@ -1,11 +1,11 @@
 title: lotar agent worktree run runs while the ticket's T3 Code thread still runs or waits for an answer
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T20:46:28.278416+00:00
-modified: 2026-11-18T21:19:17.703064+00:00
+modified: 2026-11-18T21:24:55.473971+00:00
 relationships:
   depends_on:
   - DEV-653
@@ -71,6 +71,29 @@ comments:
       result: not_run
       reason: code tree unchanged since the earlier job's passing run (405 passed)
     next: 'Merge: git rebase --onto main 1614afdde agent/DEV-713, then fast-forward main'
+- date: 2026-11-18T21:24:55.314498+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-713` is in `main`.
+
+    - Rebased `agent/DEV-713` onto `main` (`d37a26bb556a`): `b50dff4e2945`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `b50dff4e2945`
+    - Amended the pending `.tasks` changes into the merged commit: `9bef87ac1287`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 9bef87ac1
+      what: DEV-713 lotar agent worktree run skips a ticket whose T3 Code thread still runs or waits for an answer
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A111244fc-866c-4402-97df-07ad00791c5d
 description: |-
@@ -196,3 +219,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T21:24:55.314498+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T21:24:55.473971+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

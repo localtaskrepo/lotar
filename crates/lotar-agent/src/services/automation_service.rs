@@ -209,6 +209,9 @@ pub enum AutomationEvent {
     JobCompleted,
     JobFailed,
     JobCancelled,
+    /// A job stopped on a provider's usage limit or a pause of the queue and
+    /// runs again later (DEV-584): no end rule ran, its retry runs them.
+    JobPaused,
 
     // Started on purpose: `lotar automation run`, cron, "Run now" (DEV-241)
     Manual,
@@ -230,6 +233,7 @@ impl std::fmt::Display for AutomationEvent {
             Self::JobCompleted => "job_completed",
             Self::JobFailed => "job_failed",
             Self::JobCancelled => "job_cancelled",
+            Self::JobPaused => "job_paused",
             Self::Manual => "manual",
             Self::Unblocked => "unblocked",
         })
@@ -250,10 +254,11 @@ impl std::str::FromStr for AutomationEvent {
             "job_completed" | "complete" | "success" => Ok(Self::JobCompleted),
             "job_failed" | "error" | "failure" => Ok(Self::JobFailed),
             "job_cancelled" | "cancel" => Ok(Self::JobCancelled),
+            "job_paused" | "pause" => Ok(Self::JobPaused),
             "manual" => Ok(Self::Manual),
             "unblocked" => Ok(Self::Unblocked),
             _ => Err(format!(
-                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, release_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked",
+                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, release_changed, job_started, job_completed, job_failed, job_cancelled, job_paused, manual, unblocked",
                 s
             )),
         }
@@ -1459,6 +1464,7 @@ fn resolve_action_for_event(on: &crate::automation::types::AutomationRuleActions
         AutomationEvent::JobCompleted => on.job_completed.as_ref(),
         AutomationEvent::JobFailed => on.job_failed.as_ref(),
         AutomationEvent::JobCancelled => on.job_cancelled.as_ref(),
+        AutomationEvent::JobPaused => on.job_paused.as_ref(),
         AutomationEvent::Manual => on.manual.as_ref(),
         AutomationEvent::Unblocked => on.unblocked.as_ref(),
     }

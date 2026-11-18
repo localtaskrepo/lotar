@@ -311,3 +311,52 @@ fn worktree_run_runs_nothing_while_the_ticket_thread_runs_or_waits_for_an_answer
     run();
     assert!(wt.join("ran-here").exists(), "a finished thread doesn't hold the worktree");
 }
+
+/// DEV-584: a job paused on a usage limit queues its retry for after the reset. When T3 Code resumes the paused
+/// job's own turn after that reset, the thread is taken over and the retry goes, so the work doesn't run twice.
+#[test]
+fn a_thread_t3_code_resumes_after_a_usage_limit_is_taken_over_instead_of_its_queued_retry() {
+    use lotar::services::agent_queue_service::AgentQueueService;
+    let harness = harness();
+    harness.run_job("fixer", "t1");
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    let _worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let request =
+        lotar::api_types::AgentJobCreateRequest { ticket_id: "TEST-1".into(), prompt: "Fix it".into(), agent: Some("fixer".into()), ..Default::default() };
+    AgentQueueService::enqueue(&tasks_dir, request).unwrap();
+    let mut retry = AgentQueueService::list_pending(&tasks_dir).unwrap().remove(0);
+    retry.not_before = Some("2099-01-01T00:00:00Z".into());
+    AgentQueueService::requeue_after_limit(&tasks_dir, &retry).unwrap();
+
+    harness.list(&[("t1", "running")]);
+    harness.show("t1", "running", Some("r2"), 0, "Working again after the reset.");
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+
+    assert_eq!(harness.comments_with("lotar takes it over as the job"), 1, "{:?}", harness.task().comments);
+    assert!(AgentQueueService::list_pending(&tasks_dir).unwrap().is_empty(), "the retry is dropped");
+    let job = lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").expect("the thread is taken over");
+    harness.show("t1", "completed", None, 0, "Finished.");
+    harness.list(&[("t1", "completed")]);
+    wait_for_end(&job.job_id);
+    assert_eq!(harness.calls().matches("thread start").count(), 1, "the work ran once: {}", harness.calls());
+}
+
+/// A retry the owner or a rule queued (no `not_before`) still waits for the thread (DEV-600).
+#[test]
+fn a_thread_t3_code_resumes_is_left_to_a_queued_job_that_is_no_usage_limit_retry() {
+    use lotar::services::agent_queue_service::AgentQueueService;
+    let harness = harness();
+    harness.run_job("fixer", "t1");
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    let _worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let request =
+        lotar::api_types::AgentJobCreateRequest { ticket_id: "TEST-1".into(), prompt: "Fix it".into(), agent: Some("fixer".into()), ..Default::default() };
+    AgentQueueService::enqueue(&tasks_dir, request).unwrap();
+
+    harness.list(&[("t1", "running")]);
+    harness.show("t1", "running", Some("r2"), 0, "Working.");
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+
+    assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none(), "no job takes it over");
+    assert_eq!(AgentQueueService::list_pending(&tasks_dir).unwrap().len(), 1, "the queued job stays");
+}

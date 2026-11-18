@@ -47,6 +47,7 @@ pub(crate) fn validate_rules(file: &AutomationFile, config: &ResolvedConfig) -> 
         validate_action(rule.on.job_completed.as_ref(), config, &mut result);
         validate_action(rule.on.job_failed.as_ref(), config, &mut result);
         validate_action(rule.on.job_cancelled.as_ref(), config, &mut result);
+        validate_action(rule.on.job_paused.as_ref(), config, &mut result);
         // Started on purpose (DEV-241)
         validate_action(rule.on.manual.as_ref(), config, &mut result);
         validate_action(rule.on.unblocked.as_ref(), config, &mut result);

@@ -789,31 +789,31 @@ fn command_runner_failure_fires_job_failed() {
     assert!(refreshed.tags.iter().any(|t| t == "cmd-error"));
 }
 
-/// DEV-617: a `job: { error: ... }` condition sees why a job failed, so a
-/// job that failed on a rate limit isn't retried on the same provider.
+/// DEV-617: a `job: { error: ... }` condition sees why a job failed, so
+/// rules can treat one kind of failure apart from the others. (A usage limit
+/// no longer fails the job: it pauses, DEV-584.)
 #[cfg(unix)]
 #[test]
-fn job_error_condition_tells_a_rate_limit_from_other_failures() {
+fn job_error_condition_tells_one_failure_from_another() {
     let _guard = lock_agent_tests();
     enable_server_mode();
     let fixtures = TestFixtures::new();
 
-    let limited =
-        write_stub_agent_script(fixtures.get_temp_path(), "limited.sh", "#!/bin/sh\necho 'Claude API rate limit reached. Try again later.'\nexit 1\n");
+    let setup = write_stub_agent_script(fixtures.get_temp_path(), "setup.sh", "#!/bin/sh\necho 'Worktree setup failed: branch already exists'\nexit 1\n");
     let broken = write_stub_agent_script(fixtures.get_temp_path(), "broken.sh", "#!/bin/sh\necho 'build failed'\nexit 1\n");
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
-            "agents:\n  limited:\n    runner: command\n    command: \"{}\"\n  broken:\n    runner: command\n    command: \"{}\"\n",
-            limited.to_string_lossy(),
+            "agents:\n  setup:\n    runner: command\n    command: \"{}\"\n  broken:\n    runner: command\n    command: \"{}\"\n",
+            setup.to_string_lossy(),
             broken.to_string_lossy()
         ),
     );
-    let automation_yaml = "automation:\n  rules:\n    - name: Retry\n      when:\n        not: { job: { error: { matches: '(?i)rate limit|usage limit' } } }\n      on:\n        job_failed:\n          set: { assignee: \"@reporter\" }\n          add: { tags: [retried] }\n    - name: Limit\n      when:\n        job: { error: { matches: '(?i)rate limit|usage limit' } }\n      on:\n        job_failed:\n          set: { assignee: \"@reporter\" }\n          add: { tags: [limited] }\n";
+    let automation_yaml = "automation:\n  rules:\n    - name: Retry\n      when:\n        not: { job: { error: { matches: '(?i)worktree setup' } } }\n      on:\n        job_failed:\n          set: { assignee: \"@reporter\" }\n          add: { tags: [retried] }\n    - name: Setup\n      when:\n        job: { error: { matches: '(?i)worktree setup' } }\n      on:\n        job_failed:\n          set: { assignee: \"@reporter\" }\n          add: { tags: [setup] }\n";
     AutomationService::set(&fixtures.tasks_root, None, automation_yaml).expect("set automation");
 
     let mut storage = fixtures.create_storage();
-    for (agent, tag) in [("limited", "limited"), ("broken", "retried")] {
+    for (agent, tag) in [("setup", "setup"), ("broken", "retried")] {
         let created = TaskService::create(
             &mut storage,
             TaskCreate { title: format!("{agent} job"), project: Some("LIM".to_string()), reporter: Some("bob".to_string()), ..Default::default() },

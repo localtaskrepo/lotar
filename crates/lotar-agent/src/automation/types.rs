@@ -102,6 +102,10 @@ pub struct AutomationRuleActions {
     pub job_failed: Option<AutomationAction>,
     #[serde(default, alias = "cancel", alias = "job_cancel")]
     pub job_cancelled: Option<AutomationAction>,
+    /// A job paused instead of failing: on a provider's usage limit until
+    /// the reset, or with the queue (DEV-584). Its retry runs the end rules.
+    #[serde(default, alias = "pause", alias = "job_pause", skip_serializing_if = "Option::is_none")]
+    pub job_paused: Option<AutomationAction>,
 
     /// Runs only when started on purpose: `lotar automation run` (for
     /// example from cron), the REST endpoint, or "Run now" in the web UI
@@ -131,6 +135,7 @@ impl AutomationRuleActions {
             &self.job_completed,
             &self.job_failed,
             &self.job_cancelled,
+            &self.job_paused,
             &self.manual,
             &self.unblocked,
         ]

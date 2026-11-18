@@ -170,9 +170,18 @@ pub struct AgentQueueEntry {
     /// What the paused job recorded for its ticket, applied when its retry ends.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub carried_outcome: Option<CarriedOutcome>,
+    /// The entry starts no earlier than this (RFC 3339): a job paused on a
+    /// provider's usage limit runs again after the reset (DEV-584).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub not_before: Option<String>,
 }
 
 impl AgentQueueEntry {
+    /// When the entry still waits for its `not_before` time, that time.
+    pub fn waiting_until(&self) -> Option<&str> {
+        self.not_before.as_deref().filter(|at| time::parse_rfc3339(at).is_ok_and(|at| at > jiff::Timestamp::now()))
+    }
+
     /// The entry that runs `req` again; `commit_retry` makes it retry only the commit.
     pub fn retry_of(req: &AgentJobCreateRequest, commit_retry: Option<CommitRetry>, carried_outcome: Option<CarriedOutcome>) -> Self {
         Self {
@@ -190,6 +199,7 @@ impl AgentQueueEntry {
             held_by: None,
             commit_retry,
             carried_outcome,
+            not_before: None,
         }
     }
 
@@ -439,6 +449,9 @@ impl AgentQueueService {
         if let Some(hold) = memory_hold {
             return (WorkerState::Active, Some(format!("waiting for memory: {}", hold.describe())));
         }
+        if let Some(at) = pending.iter().map(AgentQueueEntry::waiting_until).collect::<Option<Vec<_>>>().and_then(|times| times.into_iter().min()) {
+            return (WorkerState::Active, Some(format!("waiting for a provider's usage limit to reset; the next job runs at {at}")));
+        }
         let reason = job_slots(tasks_dir, pending, AgentJobService::active_jobs())
             .ok()
             .and_then(|slots| pending.iter().find_map(|entry| slots.wait_reason(entry_project(entry).as_deref())))
@@ -487,6 +500,17 @@ impl AgentQueueService {
         })?;
         Self::ensure_worker(tasks_dir)?;
         paused.ok_or_else(|| LoTaRError::ValidationError("The queue could not be paused".to_string()))
+    }
+
+    /// Queue the retry of a job that stopped on a provider's usage limit,
+    /// first, to start at its `not_before` time (DEV-584). Other jobs run
+    /// meanwhile; the queue itself stays open.
+    pub fn requeue_after_limit(tasks_dir: &Path, retry: &AgentQueueEntry) -> LoTaRResult<()> {
+        with_locked_queue(tasks_dir, |state| {
+            state.pending.retain(|item| !same_entry(item, retry));
+            state.pending.insert(0, retry.clone());
+        })?;
+        Self::ensure_worker(tasks_dir)
     }
 
     /// The queue's open pause, if any.
@@ -805,6 +829,11 @@ fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
         let mut take = Vec::new();
         let mut keep = Vec::new();
         for entry in std::mem::take(&mut state.pending) {
+            // A job paused on a usage limit waits for the reset (DEV-584).
+            if entry.waiting_until().is_some() {
+                keep.push(entry);
+                continue;
+            }
             // A disk pause holds every entry: no need to read their profiles.
             let held = state.pause.as_ref().is_some_and(|pause| pause.reason == PauseReason::Disk || pause.reason.holds(entry_commits(tasks_dir, &entry)));
             if held && !retry_due {

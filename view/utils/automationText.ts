@@ -19,6 +19,7 @@ const TRIGGER_TEXT: Record<AutomationEventKey, string> = {
     complete: 'an agent job finishes',
     error: 'an agent job fails',
     cancel: 'an agent job is cancelled',
+    pause: 'an agent job pauses on a usage limit or with the queue',
     manual: 'it is run manually or from cron',
     unblocked: "a task's last open prerequisite is done",
 }
@@ -45,6 +46,9 @@ const HOOK_TO_EVENT: Record<string, AutomationEventKey> = {
     cancel: 'cancel',
     job_cancel: 'cancel',
     job_cancelled: 'cancel',
+    pause: 'pause',
+    job_pause: 'pause',
+    job_paused: 'pause',
     manual: 'manual',
     unblocked: 'unblocked',
 }
@@ -306,7 +310,7 @@ const TASK_VARIABLES: Array<[string, string]> = [
 ]
 
 const CHANGE_EVENTS = new Set<AutomationEventKey>(['updated', 'assigned', 'sprint_changed', 'release_changed', 'start'])
-const JOB_EVENTS = new Set<AutomationEventKey>(['job_start', 'complete', 'error', 'cancel'])
+const JOB_EVENTS = new Set<AutomationEventKey>(['job_start', 'complete', 'error', 'cancel', 'pause'])
 
 /** The placeholders a rule can use, given the events it runs on. Values
  * only some events provide are offered when one of them is selected. */

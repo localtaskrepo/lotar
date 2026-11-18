@@ -362,6 +362,8 @@ impl AgentHandler {
                 "status": status.as_ref().map(|s| s.status.as_str()).unwrap_or("unknown"),
                 "exit_code": status.as_ref().and_then(|s| s.exit_code),
                 "summary": status.as_ref().and_then(|s| s.summary.clone()),
+                // A job paused on a usage limit runs again then (DEV-584).
+                "resumes_at": status.as_ref().and_then(|s| s.resumes_at.clone()),
             }));
         }
 
@@ -376,7 +378,10 @@ impl AgentHandler {
                 "{}\t{}\t{}\t{}",
                 job["id"].as_str().unwrap_or("-"),
                 job["ticket_id"].as_str().unwrap_or("-"),
-                job["status"].as_str().unwrap_or("-"),
+                match job["resumes_at"].as_str() {
+                    Some(at) => format!("{} (until {at})", job["status"].as_str().unwrap_or("-")),
+                    None => job["status"].as_str().unwrap_or("-").to_string(),
+                },
                 job["runner"].as_str().unwrap_or("-")
             ));
         }
@@ -464,6 +469,7 @@ impl AgentHandler {
                                 "agent": e.agent,
                                 "queued_at": e.queued_at,
                                 "attempts": e.attempts,
+                                "not_before": e.not_before,
                             })
                         })
                         .collect();
@@ -499,9 +505,16 @@ impl AgentHandler {
                 if pending.is_empty() {
                     renderer.emit_notice("No pending entries in queue.");
                 } else {
-                    renderer.emit_raw_stdout(format_args!("ticket\tagent\tqueued_at\tattempts"));
+                    renderer.emit_raw_stdout(format_args!("ticket\tagent\tqueued_at\tattempts\tnot_before"));
                     for entry in &pending {
-                        renderer.emit_raw_stdout(format_args!("{}\t{}\t{}\t{}", entry.ticket_id, entry.agent, entry.queued_at, entry.attempts));
+                        renderer.emit_raw_stdout(format_args!(
+                            "{}\t{}\t{}\t{}\t{}",
+                            entry.ticket_id,
+                            entry.agent,
+                            entry.queued_at,
+                            entry.attempts,
+                            entry.not_before.as_deref().unwrap_or("-")
+                        ));
                     }
                 }
                 if !parked.is_empty() {
