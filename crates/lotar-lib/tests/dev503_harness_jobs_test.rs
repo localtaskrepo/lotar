@@ -1082,6 +1082,51 @@ fn a_ticket_branch_that_cannot_follow_its_thread_fails_the_job() {
     assert_ne!(rev(root, "t3/topic-1"), fix, "the rework stays on its thread's branch");
 }
 
+/// A fix thread whose `agent/TEST-1` got commit A, on the main before the thread's (and, with `backup`, a backup
+/// branch at A), while the thread rewrote A as A' on its own branch.
+fn rebased_fix(backup: bool) -> (TestFixtures, Vec<EnvVarGuard>) {
+    let keep = if backup { " && git branch backup/TEST-1-A" } else { "" };
+    let fix = format!(
+        "git checkout -q --detach main~1 && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix && git branch -f agent/TEST-1{keep} && git checkout -q t3/topic-0 && echo rebased > fix.txt && git add fix.txt && git commit -qm TEST-1-fix"
+    );
+    let (fixtures, env) = t3_harness_with(&[("fix", &fix, "")]);
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("newer.txt"), "newer").unwrap();
+    git(root, &["add", "newer.txt"]);
+    git(root, &["commit", "-qm", "newer"]);
+    (fixtures, env)
+}
+
+/// DEV-687: a thread rebased `agent/LOCA-518`'s commit onto main with a different patch and kept the old commit as
+/// `backup/LOCA-518-<commit>`. `git cherry` reported that commit as missing from the thread's branch, so the job
+/// refused to move the ticket's branch although the backup kept it. Another branch keeping the ticket's tip now lets
+/// the branch move, and the job names that branch.
+#[test]
+fn the_tickets_branch_follows_a_thread_that_rebased_its_commit_and_kept_a_backup() {
+    let (fixtures, _env) = rebased_fix(true);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let rebased = rev(root, "t3/topic-0");
+    assert_eq!(rev(root, "agent/TEST-1"), rebased, "the ticket's branch follows the thread");
+    assert_eq!(rev(root, "backup/TEST-1-A~1"), rev(root, "main~1"), "the backup keeps commit A");
+    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
+        .collect();
+    assert!(logs.contains("Its commits that t3/topic-0 lacks stay on backup/TEST-1-A."), "the job names the backup: {logs}");
+}
+
+/// DEV-687: without a branch that keeps commit A, moving the ticket's branch would drop it, so the job still refuses.
+#[test]
+fn the_tickets_branch_stays_when_only_it_has_the_commit_its_thread_rebased() {
+    let (fixtures, _env) = rebased_fix(false);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix")
+        .failure()
+        .stdout(predicate::str::contains("agent/TEST-1 stays where it is, not at t3/topic-0 of the T3 Code thread: it has commits that t3/topic-0 lacks"));
+    assert_ne!(rev(root, "agent/TEST-1"), rev(root, "t3/topic-0"), "the ticket's branch keeps commit A");
+}
+
 /// DEV-581: a T3 Code thread keeps the ticket's branch checked out in its worktree, so a headless job after it failed
 /// on `git worktree add`. The headless review and merge now run in the thread's worktree, the rework continues the
 /// thread there, and Done cleanup removes it.

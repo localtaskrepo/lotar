@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-17T03:18:57.399188+00:00
+modified: 2026-11-18T02:48:37.174197+00:00
 relationships:
   depends_on:
   - DEV-644
@@ -190,6 +190,9 @@ comments:
 - date: 2026-11-17T03:18:57.399188+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-617 yet. DEV-617 waits for DEV-644.'
+- date: 2026-11-18T02:48:37.174197+00:00
+  author: automation
+  text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-617 yet. Agent job job-20261118T024836.128Z-21 is queued: it is waiting for a free slot (3 of DEV''s agent.worktree.max_parallel_jobs 2 running).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5546fe0-7dc8-46db-bd03-10093f4d83f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b7d59ec-480a-438b-af22-758e236e01f6
@@ -398,6 +401,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-17T03:18:57.399188+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:48:37.174197+00:00
   actor: automation
   changes:
   - field: comment_added

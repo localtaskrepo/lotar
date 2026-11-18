@@ -1,16 +1,45 @@
 title: follow_ticket_work's DEV-687 rule (another branch keeps the ticket tip) has no test
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-18T02:27:08.953170+00:00
-modified: 2026-11-18T02:44:35.027812+00:00
+modified: 2026-11-18T02:54:14.515461+00:00
 relationships:
   related:
   - DEV-687
   - DEV-602
   - TEST-1
+comments:
+- date: 2026-11-18T02:54:04.888798+00:00
+  author: claude
+  text: |-
+    Test added; one decision is yours before this is Done.
+
+    - New test `the_tickets_branch_follows_newer_work_when_an_older_thread_branch_keeps_its_fix` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: `agent/TEST-1` sits at `t3/topic-0`'s fix, newer `t3/topic-1` has TEST-1 work not built on it. Today the next job moves `agent/TEST-1` to `t3/topic-1` and notes "Its commits that t3/topic-1 lacks stay on t3/topic-0."
+    - It fails with DEV-687's `branch_keeping` check in `follow_ticket_work` removed (the DEV-602 guard then keeps the branch at the fix).
+    - Built on DEV-687's `7303f1e1b` (not on main yet, Merging): merge DEV-687 first.
+    - So the fix on `t3/topic-0` drops out of the review and merge; it isn't lost, only left on the old branch.
+
+    **Question:** should an older `t3/` branch of the same ticket count as keeping the ticket's work (keep today's behaviour, the test stays), or should only branches outside the ticket's own thread branches (like `backup/...`) count, so `agent/TEST-1` stays at the fix as DEV-602 had it?
+  report:
+    commits:
+    - hash: f8c79817d
+      what: test for follow_ticket_work moving agent/TEST-1 when an older t3 branch keeps the fix
+    checks:
+    - command: cargo nextest run --test integration the_tickets_branch_follows_newer
+      result: passed
+      reason: fails with DEV-687's branch_keeping condition removed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2361 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: 'Owner decides: does an older t3 branch of the same ticket count as keeping the work? Then review and merge (after DEV-687)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa6b0b5b-e3f3-4a1b-854e-3d73db613432
 description: |-
@@ -44,3 +73,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa6b0b5b-e3f3-4a1b-854e-3d73db613432
+- at: 2026-11-18T02:54:04.888798+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T02:54:14.515461+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

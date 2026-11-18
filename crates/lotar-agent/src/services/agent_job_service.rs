@@ -1852,9 +1852,10 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
         .map_err(|err| format!("{ticket_branch} stays where it is, not at {thread_branch} of the T3 Code thread: {err}"))?;
     let note = match moved {
         BranchMove::Already => None,
-        BranchMove::Moved => {
-            Some(format!("Pointed {ticket_branch} at {thread_branch}, where the T3 Code thread worked, so the ticket's next job starts from its work."))
-        }
+        BranchMove::Moved(kept) => Some(format!(
+            "Pointed {ticket_branch} at {thread_branch}, where the T3 Code thread worked, so the ticket's next job starts from its work.{}",
+            kept_note(kept.as_deref(), &thread_branch)
+        )),
         BranchMove::Stayed(why) => Some(why),
     };
     if let Some(note) = note {
@@ -1928,7 +1929,9 @@ fn holds_logged_work(repo_root: &std::path::Path, branch: &str, ticket_id: &str,
 /// worktree: a thread may commit on an earlier thread's branch (`t3/<topic>`)
 /// while the ticket's branch stays behind, and the review and merge then
 /// start from nothing. The ticket's branch stays when it has work of its
-/// own that the newer branch doesn't build on. `Ok(Some(note))` when it
+/// own that the newer branch doesn't build on and no other branch keeps
+/// (DEV-687: a thread rebased it and kept the old commit on a backup
+/// branch). `Ok(Some(note))` when it
 /// moved; `Err` when git refused to move it.
 fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Result<Option<String>, String> {
     if !config.agent_worktree.enabled {
@@ -1944,7 +1947,10 @@ fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &Res
     };
     if let Some(ticket_tip) = rev_parse(&repo_root, &format!("refs/heads/{ticket_branch}")) {
         let builds_on = git_command(&repo_root).args(["merge-base", "--is-ancestor", &ticket_tip, &format!("refs/heads/{holder}")]).status();
-        if !builds_on.is_ok_and(|status| status.success()) && !branch_landed(&repo_root, &ticket_branch).unwrap_or(false) {
+        if !builds_on.is_ok_and(|status| status.success())
+            && !branch_landed(&repo_root, &ticket_branch).unwrap_or(false)
+            && branch_keeping(&repo_root, &ticket_tip, &ticket_branch).is_none()
+        {
             return Ok(None);
         }
     }
@@ -1953,9 +1959,10 @@ fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &Res
     let tip = rev_parse(&repo_root, &format!("refs/heads/{holder}")).unwrap_or_default();
     Ok(match moved {
         BranchMove::Already => None,
-        BranchMove::Moved => Some(format!(
-            "Pointed {ticket_branch} at {holder} ({}), which holds {ticket_id}'s newest work that isn't in the main checkout's branch, so this job starts from it.",
-            tip.get(..12).unwrap_or(&tip)
+        BranchMove::Moved(kept) => Some(format!(
+            "Pointed {ticket_branch} at {holder} ({}), which holds {ticket_id}'s newest work that isn't in the main checkout's branch, so this job starts from it.{}",
+            tip.get(..12).unwrap_or(&tip),
+            kept_note(kept.as_deref(), &holder)
         )),
         BranchMove::Stayed(why) => Some(why),
     })
@@ -1965,7 +1972,9 @@ fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &Res
 enum BranchMove {
     /// It was at the commit already.
     Already,
-    Moved,
+    /// It moved; the branch named keeps the commits it held that the new
+    /// tip lacks.
+    Moved(Option<String>),
     /// It stays where it is, for the reason given: the job's work is in the
     /// main checkout.
     Stayed(String),
@@ -1975,7 +1984,9 @@ enum BranchMove {
 /// `Already` when it is there already; an error when it holds a commit
 /// the thread's branch lacks and the main checkout doesn't have, which
 /// moving it would drop. Unless it is still at `started_from`, the commit
-/// the thread started from: then the thread rewrote that commit (an amend).
+/// the thread started from: then the thread rewrote that commit (an amend),
+/// or another local branch keeps its tip (a backup the thread kept when it
+/// rebased the commit, DEV-687): moving drops nothing then.
 /// A worktree of a finished job that still has `ticket_branch` checked out
 /// (an earlier thread's, which T3 Code leaves when a later thread takes
 /// over the branch, DEV-573) moves with it when clean, else is detached at
@@ -2000,6 +2011,7 @@ fn move_ticket_branch(
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     };
     let tip = git_output(&["rev-parse", "--verify", &format!("refs/heads/{thread_branch}^{{commit}}")])?;
+    let mut kept = None;
     if branch_exists(repo_root, ticket_branch) {
         let ticket_ref = format!("refs/heads/{ticket_branch}");
         let ticket_tip = git_output(&["rev-parse", &ticket_ref])?;
@@ -2008,7 +2020,10 @@ fn move_ticket_branch(
         }
         let lacks = started_from != Some(ticket_tip.as_str()) && git_output(&["cherry", &tip, &ticket_ref])?.lines().any(|line| line.starts_with('+'));
         if lacks && !branch_landed(repo_root, ticket_branch).unwrap_or(false) {
-            return Err(format!("it has commits that {thread_branch} lacks"));
+            kept = branch_keeping(repo_root, &ticket_tip, ticket_branch);
+            if kept.is_none() {
+                return Err(format!("it has commits that {thread_branch} lacks"));
+            }
         }
         let worktrees = linked_worktrees(repo_root).map_err(|err| err.to_string())?;
         if let Some((path, _)) = worktrees.iter().find(|(path, on)| on.as_deref() == Some(ticket_branch) && finished_job_worktree(tasks_dir, path, ending)) {
@@ -2023,7 +2038,7 @@ fn move_ticket_branch(
             // out, so a later thread on the branch finds it there (DEV-595).
             if in_worktree(&["status", "--porcelain"])?.is_empty() {
                 in_worktree(&["reset", "--quiet", "--keep", &tip])?;
-                return Ok(BranchMove::Moved);
+                return Ok(BranchMove::Moved(kept));
             }
             in_worktree(&["checkout", "--quiet", "--detach"])?;
         }
@@ -2036,7 +2051,20 @@ fn move_ticket_branch(
             "{ticket_branch} stays where it is, not at {thread_branch}: the T3 Code thread's work is in the main checkout, and {err}"
         )));
     }
-    Ok(BranchMove::Moved)
+    Ok(BranchMove::Moved(kept))
+}
+
+/// A local branch other than `ticket_branch` whose history has `commit`,
+/// so moving `ticket_branch` away from it loses nothing (DEV-687).
+fn branch_keeping(repo_root: &std::path::Path, commit: &str, ticket_branch: &str) -> Option<String> {
+    let branches = git_stdout(repo_root, &["for-each-ref", "--contains", commit, "--format=%(refname:short)", "refs/heads/"]).ok()?;
+    branches.lines().map(str::trim).find(|branch| !branch.is_empty() && *branch != ticket_branch).map(str::to_string)
+}
+
+/// The note's ending that names `kept`, the branch keeping the commits the
+/// ticket's branch held that `tip_branch` lacks.
+fn kept_note(kept: Option<&str>, tip_branch: &str) -> String {
+    kept.map(|kept| format!(" Its commits that {tip_branch} lacks stay on {kept}.")).unwrap_or_default()
 }
 
 /// Whether `path` is the worktree of a finished job: an ended job's log
