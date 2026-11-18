@@ -393,6 +393,22 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
     resolved
 }
 
+/// The user's own layers without the repository's: defaults -> home -> env
+/// -> CLI. A command set here is the user's, so it needs no `lotar trust`
+/// (DEV-715).
+pub fn own_layers_config() -> ResolvedConfig {
+    let mut config = GlobalConfig::default();
+    if let Ok(home_config) = crate::config::persistence::load_home_config() {
+        merge_global_config_with(&mut config, home_config, &home_layer_keys());
+    }
+    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    let env_keys = env_layer_keys(&env_snapshot);
+    merge_global_config_with(&mut config, env_snapshot.global, &env_keys);
+    let mut resolved = ResolvedConfig::from_global(config);
+    apply_cli_overrides(&mut resolved);
+    resolved
+}
+
 /// Resolve the effective configuration for an optional project scope.
 ///
 /// Precedence: CLI > env > project > home > global > defaults.

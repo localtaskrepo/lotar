@@ -26,7 +26,7 @@ These files are committed with the repository, so they can come from a clone, a 
 - leaves a merge job to its merge agent instead of running `agent.merge`
 - doesn't run `agent.worktree.waiting_run`, and says so in the job's log (on stderr when no job ends)
 
-Rules from your home automation file (`~/.lotar.automation.yml`) and agent jobs started with `--runner` and no profile are your own, so they always run.
+Rules from your home automation file (`~/.lotar.automation.yml`), agent jobs started with `--runner` and no profile, and an `agent.worktree.waiting_run` from your home config (`~/.lotar`) are your own, so they always run. A project config's `waiting_run` wins over your home one, so it needs trust again.
 
 ## What is recorded
 

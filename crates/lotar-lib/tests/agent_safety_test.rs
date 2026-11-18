@@ -610,6 +610,29 @@ mod git_required {
         assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "Blocked");
         assert!(worktree.join("target/debug").exists(), "an untrusted repository's command doesn't run");
         assert!(untrusted.contains("Skipped agent.worktree.waiting_run"), "{untrusted}");
+        // DEV-715: the user's own command (home config, which wins over the
+        // repository's global one) runs in the same untrusted repository.
+        status("Todo");
+        lotar(&["assignee", &ticket, "--clear"], true);
+        let home = root.join("home");
+        fs::create_dir_all(&home).unwrap();
+        fs::write(home.join(".lotar"), "agent:\n  worktree:\n    waiting_run: [sh, -c, 'rm -rf target/debug && touch target/home-ran']\n").unwrap();
+        let output = Command::new(&bin)
+            .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "assignee", &ticket, "@safety"])
+            .env("HOME", &home)
+            .env_remove("RUST_TEST_THREADS")
+            .env_remove("LOTAR_TEST_MODE")
+            .env_remove("LOTAR_IGNORE_HOME_CONFIG")
+            .env_remove("LOTAR_AGENT_JOB_ID")
+            .env_remove("LOTAR_TRUST_ALL")
+            .env("LOTAR_TRUST_FILE", root.join("trust.yml"))
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "Blocked");
+        assert!(!worktree.join("target/debug").exists() && worktree.join("target/home-ran").exists(), "{}", String::from_utf8_lossy(&output.stderr));
+        fs::create_dir_all(worktree.join("target/debug")).unwrap();
         status("Todo");
         lotar(&["assignee", &ticket, "--clear"], true);
         lotar(&["assignee", &ticket, "@safety"], true);

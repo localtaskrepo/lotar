@@ -3085,7 +3085,11 @@ pub(crate) fn run_waiting_command(ticket_id: &str, tasks_dir: &std::path::Path, 
     };
     let command_line = config.agent_worktree.waiting_run.join(" ");
     let note = |failed: bool, message: String| vec![WaitingRunNote { failed, message }];
-    if !crate::config::trust::TrustService::allows_commands(tasks_dir) {
+    // Only a command from the repository needs trust: one the user's own
+    // layers (home, env, CLI) set always runs (DEV-715). A project's command
+    // wins over the home one, so it needs trust again.
+    let own = crate::config::resolution::own_layers_config().agent_worktree.waiting_run == config.agent_worktree.waiting_run;
+    if !own && !crate::config::trust::TrustService::allows_commands(tasks_dir) {
         return note(true, crate::config::trust::TrustService::untrusted_message(tasks_dir, &format!("agent.worktree.waiting_run (`{command_line}`)")));
     }
     let prefix = &config.agent_worktree.branch_prefix;
