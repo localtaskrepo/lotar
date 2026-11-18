@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T03:02:08.605225+00:00
-modified: 2026-11-17T22:21:09.875557+00:00
+modified: 2026-11-18T00:44:14.803638+00:00
 relationships:
   depends_on:
   - DEV-623
@@ -189,6 +189,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A577c8b27-c103-4ecf-b1eb-5dad6f458e1d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8e1372af-9575-4980-80b0-80ab55fdb0d2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A49bbe071-5597-4f60-a3f2-bda5b06f1239
+releases:
+- 9
 description: |-
   Found in the DEV-623 review (2026-11-16).
 
@@ -437,3 +439,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-623"],"related":["DEV-633","DEV-675","DEV-674"]}'
     new: '{"depends_on":["DEV-623"],"related":["DEV-633","DEV-675","DEV-674","DEV-677"]}'
+- at: 2026-11-18T00:44:14.803638+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

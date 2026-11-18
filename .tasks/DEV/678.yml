@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T21:59:44.502058+00:00
-modified: 2026-11-18T00:14:56.666594+00:00
+modified: 2026-11-18T01:08:28.465478+00:00
 relationships:
   related:
   - DEV-674
@@ -22,8 +22,73 @@ comments:
 - date: 2026-11-18T00:14:53.337519+00:00
   author: mallox
   text: 'Answer: inside (DEV-674''s fix job also deletes .result files older than 2 days, with a test; DEV-678 closes with DEV-674) (answered in INBOX-470)'
+- date: 2026-11-18T00:48:42.119082+00:00
+  author: claude
+  text: |-
+    Restarting the fix: the owner's answer arrived but no job continued it (LOCA-522).
+
+    - Owner (2026-11-18 00:14): the `.result` cleanup goes into DEV-674's fix job. DEV-674 merged to main at 22:19 without it: `prune()` in `crates/lotar-agent/src/services/t3_worktree_setup.rs` only handles `.json` and never deletes a `.result`.
+    - So build DEV-678 on main now: `prune()` also deletes `.result` files older than 2 days (by file age), with a unit test for an old one deleted and a fresh one kept.
+- date: 2026-11-18T01:02:43.463633+00:00
+  author: claude
+  text: |-
+    Done on main, following the owner's answer (2026-11-18): `prune()` now deletes `.result` files older than 2 days.
+
+    - DEV-674 was already on main without the cleanup, so I fast-forwarded the branch (it had no commits of its own) to main `cced51c43` and built the fix there.
+    - `crates/lotar-agent/src/services/t3_worktree_setup.rs`: `RESULT_SECS` is 2 days. `prune()` deletes older `.result` files first, judged by file age (unreadable age counts as now, so the file is kept). It then handles `.json` records as before. `record()` and `setup()` both run it.
+    - New test `results_older_than_two_days_are_deleted_and_fresh_ones_kept`: an old result is deleted, a fresh one and one just under 2 days are kept, both through `setup` and through `record`.
+    - `docs/help/agent.md` (T3 Code threads) says how long a result is kept.
+  report:
+    commits:
+    - hash: b90161f9c
+      what: prune() deletes .result files older than 2 days, with a test and help doc
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2359 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Merge agent lands agent/DEV-678 on main
+- date: 2026-11-18T01:02:53.698360+00:00
+  author: automation
+  text: The fix agent's job job-20261118T005337.785Z-17 failed (lotar agent logs job-20261118T005337.785Z-17); @fix-retry retries it on branch t3/prune-stale-worktree-results.
+- date: 2026-11-18T01:08:28.465478+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261118T010751.708Z-25 failed again or on a rate limit (lotar agent logs job-20261118T010751.708Z-25). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab80873ca-9786-4f14-8955-40e4ffb4833e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5b8118c-5073-4af9-aa10-5c2824821be6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A36ca4890-0d05-4d4c-9e61-e772dbb56964
 description: |-
   Found reviewing DEV-674 (`crates/lotar-agent/src/services/t3_worktree_setup.rs`).
 
@@ -32,6 +97,8 @@ description: |-
   ## Done when
   - [ ] `prune()` also deletes `.result` files older than a limit long enough for any session to end (for example 2 days, by file age).
   - [ ] A unit test covers an old `.result` being deleted and a fresh one being kept.
+tags:
+- fix-retried
 history:
 - at: 2026-11-17T21:59:45.086258+00:00
   actor: claude
@@ -72,3 +139,53 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-18T00:48:42.119082+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:48:42.346993+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T00:53:39.285216+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab5b8118c-5073-4af9-aa10-5c2824821be6
+- at: 2026-11-18T01:02:43.463633+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T01:02:53.483930+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-18T01:02:53.698360+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T01:07:55.883212+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A36ca4890-0d05-4d4c-9e61-e772dbb56964
+- at: 2026-11-18T01:08:28.284647+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-18T01:08:28.465478+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,17 +1,18 @@
 title: Release v0.15.4
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T16:01:03.148737+00:00
-modified: 2026-11-18T00:06:40.318733+00:00
+modified: 2026-11-18T01:10:58.859388+00:00
 relationships:
   depends_on:
   - DEV-681
   related:
   - DEV-651
   - DEV-681
+  - DEV-353
 comments:
 - date: 2026-11-18T00:02:41.977638+00:00
   author: mallox
@@ -19,6 +20,63 @@ comments:
 - date: 2026-11-18T00:06:40.318733+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-681.'
+- date: 2026-11-18T00:50:31.295227+00:00
+  author: claude
+  text: |-
+    Version bump to 0.15.4 committed on `agent/DEV-658`; release record 0.15.4 filled.
+
+    - DEV-681 is on main (`748263aa7`); no Blocked ticket depends on this one (`relationships --kind blocks` lists none)
+    - Record `#9` 0.15.4 now holds this ticket and the 27 tickets from `git log v0.15.3..main` that were in no release (DEV-353 … DEV-681)
+    - Bump commit `866cfc8a7`: `[workspace.package]` and the five `=0.15.4` pins, `Cargo.lock` (6 crates); no doc names 0.15.3 as current
+    - Still to do after the merge: green QA for the bump on main, then the signed tag (mallox OK'd it 2026-11-17), Release run, `brew upgrade`, close, `Release v0.15.5`
+    - The `.tasks` edits (record `#9`, `releases: [9]`) sit in the main checkout for the next commit there
+  report:
+    commits:
+    - hash: 866cfc8a7
+      what: version 0.15.3 -> 0.15.4 in Cargo.toml and Cargo.lock
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2358 Rust, 1548 UI, 7 hook tests
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    - command: Quality Assurance on main
+      result: not_run
+      reason: bump not on main yet
+    - command: Release workflow
+      result: not_run
+      reason: tag waits for merge and green QA
+    next: 'After merge and green QA on main (owner OK already given 2026-11-17): git tag -s v0.15.4 -m v0.15.4, push the tag, lotar release release 0.15.4, Release run green, brew upgrade, close; open Release v0.15.5'
+- date: 2026-11-18T01:10:58.859388+00:00
+  author: automation
+  text: |-
+    The review job job-20261118T010509.678Z-22 failed (lotar agent logs job-20261118T010509.678Z-22), so the work on branch agent/DEV-658 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0fb4ee5-0af2-43c2-9ff2-844d5e38cc7d
 releases:
 - 9
 description: |-
@@ -66,6 +124,49 @@ history:
     old: Todo
     new: Blocked
 - at: 2026-11-18T00:06:40.318733+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:43:32.708430+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T00:43:33.521412+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0fb4ee5-0af2-43c2-9ff2-844d5e38cc7d
+- at: 2026-11-18T00:50:31.295227+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:50:31.526810+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-681"],"related":["DEV-651","DEV-681"]}'
+    new: '{"depends_on":["DEV-681"],"related":["DEV-651","DEV-681","DEV-353"]}'
+- at: 2026-11-18T00:50:40.326455+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T01:10:58.796573+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-18T01:10:58.859388+00:00
   actor: automation
   changes:
   - field: comment_added

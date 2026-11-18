@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T18:13:11.087662+00:00
-modified: 2026-11-17T20:17:05.719970+00:00
+modified: 2026-11-18T00:44:15.978134+00:00
 relationships:
   related:
   - DEV-122
@@ -123,6 +123,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac6b1fa-471d-4f08-ab90-a091782b3058
+releases:
+- 9
 description: |-
   RUSTSEC-2026-0543 marks chrono unmaintained (no vulnerability, no safe upgrade). DEV-665 added a deny.toml ignore to unblock CI. chrono is a workspace dependency in lotar-core, lotar-lib, lotar-agent and lotar-tasks (~185 uses). Evaluate jiff/time like DEV-122 did for YAML: prove task YAML date/time round-trips stay byte-compatible, serde formats and timezone handling; then migrate and drop the ignore entry from deny.toml.
 
@@ -356,3 +358,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530","DEV-623","DEV-619"]}'
     new: '{"related":["DEV-122","DEV-665","DEV-654","DEV-668","DEV-585","DEV-530","DEV-623","DEV-619","DEV-673"]}'
+- at: 2026-11-18T00:44:15.978134+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

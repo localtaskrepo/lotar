@@ -4965,7 +4965,8 @@ fn merged_landed(repo_root: &std::path::Path, tasks_dir: &std::path::Path, branc
 /// completes anyway, when its branch is on main already (`merged_landed`)
 /// and its worktree holds nothing uncommitted. `None` for other jobs, for
 /// a ticket whose work is in another repository, and for states git can't
-/// judge.
+/// judge. The job then still passes `ensure_branch_merged`, which fails it
+/// when nothing was built for the ticket (DEV-680, DEV-685).
 fn merged_despite_failure(job_id: &str, tasks_dir: &std::path::Path, exit_code: Option<i32>, runner_failed: bool) -> Option<String> {
     let (runner, ticket_id, branch, worktree) = JOB_REGISTRY.lock().ok().and_then(|registry| {
         registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| {

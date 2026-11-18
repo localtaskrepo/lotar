@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:42:03.779287+00:00
-modified: 2026-11-17T20:43:50.531990+00:00
+modified: 2026-11-18T00:44:14.226453+00:00
 relationships:
   related:
   - DEV-613
@@ -154,6 +154,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6c33da7-f719-4203-a88d-6fac03dbc057
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa795617b-c98d-4358-a074-874d80cf95a3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2dfb3e33-0997-4a2c-8ebf-bca335fe7262
+releases:
+- 9
 description: |-
   Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposal 2: lotar names the thread itself.
 
@@ -388,3 +390,8 @@ history:
   - field: tags
     old: fix-retried
     new: ''
+- at: 2026-11-18T00:44:14.226453+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

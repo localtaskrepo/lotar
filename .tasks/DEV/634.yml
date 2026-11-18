@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-17T01:03:27.180760+00:00
-modified: 2026-11-17T20:17:05.719117+00:00
+modified: 2026-11-18T00:44:14.517257+00:00
 relationships:
   related:
   - DEV-498
@@ -268,6 +268,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A52e16d4b-4fb9-4039-aef7-67dd650ad494
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54281bbe-1d96-4b70-b27e-24a8badc65b2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57452cde-ae86-46b7-83a6-02160cea5c5d
+releases:
+- 9
 description: |-
   Owner, 2026-11-17, on DEV-579 choosing option A: "Okay, A sounds good." Continues DEV-499's workspace split; STD-131: keep projects small and focused.
 
@@ -578,3 +580,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628","DEV-638","DEV-623","DEV-619"]}'
     new: '{"related":["DEV-498","DEV-499","DEV-579","DEV-635","DEV-655","DEV-654","DEV-656","DEV-628","DEV-638","DEV-623","DEV-619","DEV-673"]}'
+- at: 2026-11-18T00:44:14.517257+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

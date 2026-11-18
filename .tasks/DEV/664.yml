@@ -1,11 +1,11 @@
 title: 'Commits only on this Mac: branches'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-17T18:08:11.962632+00:00
-modified: 2026-11-18T00:17:32.765816+00:00
+modified: 2026-11-18T01:12:28.751924+00:00
 relationships:
   related:
   - DEV-567
@@ -15,6 +15,9 @@ relationships:
   - DEV-628
   - DEV-466
   - DEV-620
+  - DEV-523
+  - DEV-530
+  - DEV-604
 comments:
 - date: 2026-11-17T18:13:17.083588+00:00
   author: claude
@@ -30,8 +33,33 @@ comments:
 - date: 2026-11-18T00:17:30.657834+00:00
   author: mallox
   text: 'Answer: delete (Delete both backup branches) (answered in INBOX-442)'
+- date: 2026-11-18T01:01:48.423885+00:00
+  author: claude
+  text: |-
+    Deleted both `backup/*` branches as you answered. The check still fails: 31 other branches lost their worktrees since yesterday.
+
+    - Deleted: `backup/DEV-466-896309c0` (`896309c04`), `backup/DEV-585-d6dbec07` (`d6dbec079`)
+    - New: T3 worktrees were removed and their branches stayed, so `repos.ts` now lists 31 branches with 21 commits. Each was a draft for one ticket:
+      - **Done, fix on main or dropped by you (10 branches):** DEV-516 `t3/sandbox-blocked-check-retries-1`. DEV-523 `agent/DEV-523`, `t3/merge-job-stopped-no-ff` (`cc895833`, you said drop it in INBOX-202), plus `t3/merge-job-skip-ff-when-stopped`, `t3/merge-job-stop-keeps-main`, `t3/merge-job-stop-keeps-main-1`. DEV-528 `t3/fix-agent-handback-retry-rule`, `t3/fix-agent-handback-retry-override`. STD-140 `agent/STD-140` and STD-165 `agent/STD-165` (same changes as `9ec529011` and `a5e771731` on main)
+      - **Keep, live work (14 branches):** DEV-530 is HelpNeeded: `t3/resume-held-jobs*`, `t3/review-dev-530-*`, `t3/dependency-check-resume-held-jobs`, `t3/f58e409d`, and others
+      - **Keep, work only here (5 branches):** DEV-604 says Done, but `e4edce9b` is not on main (see the review on DEV-604, 2026-11-16 19:32): `agent/DEV-604`, `t3/b9902be4` (its worktree has been stuck mid-rebase since 2026-11-15 23:11), `t3/09cc8d99`, `t3/ae62354d`, `t3/pause-queue-on-signing-disk-failure`
+    - I didn't delete the 10 because your answer covered only the backups. The permission check also stopped me.
+
+    Question: delete the 10 branches of the Done tickets DEV-516, DEV-523, DEV-528, STD-140 and STD-165 (earlier drafts of fixes that are on main), and keep the DEV-530 and DEV-604 branches?
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: failed
+      reason: still lists unpushed:branches, now 31 branches
+- date: 2026-11-18T01:06:43.575758+00:00
+  author: mallox
+  text: 'Answer: delete (Delete the 10 branches, keep the DEV-530 and DEV-604 ones) (answered in INBOX-490)'
+- date: 2026-11-18T01:12:28.751924+00:00
+  author: automation
+  text: The fix agent's job job-20261118T011218.044Z-30 failed (lotar agent logs job-20261118T011218.044Z-30); @fix-retry retries it on branch t3/resolve-unpushed-branch-commits.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a
 description: |-
   11 commits on no remote, only on this Mac: agent/DEV-516 1, agent/DEV-528 1, agent/DEV-585 1, agent/DEV-628 1, backup/DEV-466-896309c0 3, backup/DEV-585-d6dbec07 1, t3/b9902be4 1, t3/review-held-job-resume 2 (git log <branch> --not --remotes)
 
@@ -47,6 +75,7 @@ description: |-
 tags:
 - health
 - light
+- fix-retried
 custom_fields:
   finding: unpushed:branches
 history:
@@ -101,3 +130,62 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-18T00:58:43.147028+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T00:58:44.710293+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a
+- at: 2026-11-18T01:01:48.423885+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T01:01:49.820067+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620"]}'
+    new: '{"related":["DEV-567","DEV-516","DEV-528","DEV-585","DEV-628","DEV-466","DEV-620","DEV-523","DEV-530","DEV-604"]}'
+- at: 2026-11-18T01:02:09.697718+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T01:06:43.575758+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T01:06:45.369612+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T01:12:20.746824+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T01:12:28.296269+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, light
+    new: health, light, fix-retried
+- at: 2026-11-18T01:12:28.751924+00:00
+  actor: automation
+  changes:
+  - field: comment_added

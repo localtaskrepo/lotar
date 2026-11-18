@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T20:09:56.418127+00:00
-modified: 2026-11-17T22:19:44.592342+00:00
+modified: 2026-11-18T00:44:16.562183+00:00
 relationships:
   related:
   - DEV-618
@@ -143,6 +143,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80e8eabe-0406-4963-818d-fa9a366fb82c
+releases:
+- 9
 description: |-
   Found reviewing DEV-618 (`crates/lotar-lib/src/services/t3_worktree_setup.rs`, `agent_job_service.rs` `run_session`).
 
@@ -346,3 +348,8 @@ history:
   - field: tags
     old: review-returned
     new: ''
+- at: 2026-11-18T00:44:16.562183+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

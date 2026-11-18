@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:41:59.400479+00:00
-modified: 2026-11-17T20:32:54.259991+00:00
+modified: 2026-11-18T00:44:14.104246+00:00
 relationships:
   related:
   - DEV-596
@@ -115,6 +115,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef1ab-19d5-4a1d-9e83-87eed3e27274
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67416213-09db-42c9-9957-6856b853ac51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A582a6ec4-2269-4595-9529-0b3a0947e77d
+releases:
+- 9
 description: |-
   Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six; 1 and 4 only in job sessions" (answered in INBOX-351): unused tools and the claude.ai connectors go off in job sessions only, his own sessions keep them.
 
@@ -301,3 +303,8 @@ history:
   - field: tags
     old: fix-retried
     new: ''
+- at: 2026-11-18T00:44:14.104246+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

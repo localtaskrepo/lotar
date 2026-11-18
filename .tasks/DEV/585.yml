@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-17T19:04:52.981959+00:00
+modified: 2026-11-18T00:44:13.990959+00:00
 relationships:
   related:
   - DEV-510
@@ -242,6 +242,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab03303e3-95f6-4964-b850-05c9841e7ba5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6d0ae523-068a-40cd-9cbb-a988f1097835
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f7da85f-ebd4-464c-8b91-6b661f0f75a0
+releases:
+- 9
 description: |-
   Found during the DEV-510 merge (2026-11-15): the first `npm run -s test:agent` in the DEV-510 worktree failed 3 tests; the second full run passed 2218/2218 on the same commit.
 
@@ -550,3 +552,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T00:44:13.990959+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

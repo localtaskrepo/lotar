@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T06:57:37.267960+00:00
-modified: 2026-11-17T18:17:04.938221+00:00
+modified: 2026-11-18T00:44:14.917770+00:00
 relationships:
   related:
   - DEV-635
@@ -137,6 +137,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4a141ed-0d1d-4696-b833-5d123ae895a9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d2a4eb5-f5fc-431b-aa61-611790f229dd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec64b5e4-64fd-4df4-a998-043799c3d0dc
+releases:
+- 9
 description: 'Found: Quality Assurance run 44032088895 (main 5181b1410, DEV-635) failed in `crates/lotar-core/src/utils/git.rs:372`: ''the hanging child 6080 is still running''. Locally the test passes (2302 Rust tests on 93bf6ed47). Likely cause: `kill -0` right after the kill also succeeds for a killed process that its new parent hasn''t reaped yet (a zombie). Check: `cargo nextest run -p lotar-core hanging_command_is_killed_at_the_timeout` repeated under load, and the next QA runs. Done: the test waits briefly for the child to disappear or checks that it is a zombie, and QA no longer fails on it.'
 tags:
 - health
@@ -292,3 +294,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634","DEV-655","DEV-668"]}'
     new: '{"related":["DEV-635","DEV-651","DEV-466","DEV-634","DEV-655","DEV-668","DEV-665","DEV-669"]}'
+- at: 2026-11-18T00:44:14.917770+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:15:20.189944+00:00
-modified: 2026-11-17T17:28:46.966397+00:00
+modified: 2026-11-18T00:44:15.336169+00:00
 relationships:
   related:
   - DEV-643
@@ -88,6 +88,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af14f2e6c-276d-42d1-8c0a-5d03c1661ffa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4fe5fb4e-b8ca-4da6-9b91-78ba9196fe3d
+releases:
+- 9
 description: |-
   Found by LOCA-500 (local, 2026-11-17).
 
@@ -239,3 +241,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661","DEV-659","DEV-629"]}'
     new: '{"related":["DEV-643","DEV-646","DEV-647","DEV-661","DEV-659","DEV-629","DEV-663"]}'
+- at: 2026-11-18T00:44:15.336169+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

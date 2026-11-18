@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-17T21:28:37.216798+00:00
+modified: 2026-11-18T00:44:15.473307+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -220,6 +220,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab4030175-27a1-400b-be90-323bd777aa74
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad512610d-e2c3-4b6c-b7fa-c9cbe1d49747
+releases:
+- 9
 description: |-
   Found while fixing DEV-660 (2026-11-17).
 
@@ -459,3 +461,8 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623"]}'
     new: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676"]}'
+- at: 2026-11-18T00:44:15.473307+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-17T18:08:30.427039+00:00
+modified: 2026-11-18T01:11:34.184506+00:00
 relationships:
   related:
   - DEV-620
@@ -217,6 +217,46 @@ comments:
     - Not rerun: `npm test`, `npm run smoke` (code unchanged since they passed in the rework)
     - The merge agent should rebase onto main: the file's path changed
     - UI review not needed; no tickets filed
+- date: 2026-11-18T01:05:21.966108+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-418)
+  answer:
+    to: 2026-11-17T09:16:52.366299+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-418)
+- date: 2026-11-18T01:11:34.184506+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261118T011108.127Z-28 failed again or on a rate limit (lotar agent logs job-20261118T011108.127Z-28). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
@@ -225,6 +265,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7211882e-8293-4060-8a4a-109b8652b8e3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa042b8b2-4b2d-4368-82f8-5d53ac03b51d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9ab05ee0-582f-4b01-b144-9c88c79f61c3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A320b82d8-cc72-4d24-a230-8d9549a7fa87
 description: |-
   Found in the DEV-620 review.
 
@@ -488,3 +529,37 @@ history:
   - field: relationships
     old: '{"related":["DEV-620","DEV-631","DEV-635","DEV-639","DEV-646","DEV-634"]}'
     new: '{"related":["DEV-620","DEV-631","DEV-635","DEV-639","DEV-646","DEV-634","DEV-664"]}'
+- at: 2026-11-18T01:05:21.966108+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-18T01:05:21.972638+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T01:11:23.364246+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T01:11:24.519138+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A320b82d8-cc72-4d24-a230-8d9549a7fa87
+- at: 2026-11-18T01:11:34.100389+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T01:11:34.184506+00:00
+  actor: automation
+  changes:
+  - field: comment_added

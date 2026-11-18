@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:05:45.260312+00:00
-modified: 2026-11-17T18:04:05.293322+00:00
+modified: 2026-11-18T00:50:31.526148+00:00
 relationships:
   related:
   - DEV-335
@@ -16,6 +16,7 @@ relationships:
   - DEV-503
   - DEV-318
   - DEV-663
+  - DEV-658
 comments:
 - date: 2026-11-17T16:12:37.224139+00:00
   author: claude
@@ -121,6 +122,8 @@ references:
 - file: docs/help/agent.md
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0945bb5d-10c1-4125-90c0-71b793b9cca9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16380bec-54a4-4c33-b7c2-c3a7129e4723
+releases:
+- 9
 description: |-
   T3 Code fixed [#34688](https://github.com/pingdotgg/t3code/issues/34688) in [PR #34696](https://github.com/pingdotgg/t3code/pull/34696), merged 2026-11-12 03:56 UTC: `t3 thread start --wait` and `t3 thread send --wait` now wait for background work the agent waits on and print the run it wakes. Until a release has it, lotar keeps the DEV-335 workaround. Once one does, the workaround goes. Filed by claude on mallox's go-ahead (2026-11-12).
 
@@ -348,3 +351,14 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T00:44:13.910093+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'
+- at: 2026-11-18T00:50:31.526148+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652","DEV-657","DEV-503","DEV-318","DEV-663"]}'
+    new: '{"related":["DEV-335","DEV-401","DEV-400","DEV-652","DEV-657","DEV-503","DEV-318","DEV-663","DEV-658"]}'

@@ -5,7 +5,7 @@ type: Bug
 reporter: triage
 assignee: '@merge'
 created: 2026-11-17T20:51:41.239885+00:00
-modified: 2026-11-17T21:51:39.723398+00:00
+modified: 2026-11-18T00:44:16.698771+00:00
 relationships:
   blocks:
   - DEV-623
@@ -90,6 +90,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb8ee33f-ec17-499f-892b-84afeba5dd1e
+releases:
+- 9
 description: |-
   Found: DEV-623 fix jobs job-20261117T201653.430Z-32 and job-20261117T204356.974Z-39 did the work (commits 474c69575, 3c5d8a729; checks passed) and then failed: git branch --force agent/DEV-623 <sha> refused, because agent/DEV-623 is checked out in worktree /Users/mallox/.t3/worktrees/lotar/agent-DEV-623-fdc58bb7d25a0a16 (still at d8659a72). Retries repeat the failure.
   Check: git worktree list shows agent/DEV-623 in a worktree; the move fails.
@@ -185,3 +187,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-623"],"related":["DEV-623","DEV-573","DEV-577","DEV-676"]}'
     new: '{"blocks":["DEV-623"],"related":["DEV-623","DEV-573","DEV-577","DEV-676","DEV-645"]}'
+- at: 2026-11-18T00:44:16.698771+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T22:20:59.906600+00:00
-modified: 2026-11-17T22:39:11.668120+00:00
+modified: 2026-11-18T00:44:16.897296+00:00
 relationships:
   related:
   - DEV-677
@@ -69,6 +69,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac11cca5c-ca9e-495f-a496-7fc2dd72e741
+releases:
+- 9
 description: |-
   Found (review of DEV-677, 2026-11-17): DEV-677 checks the other repo (merge::work_elsewhere) only when lotar's own branch is already on main. When lotar's agent/<ID> has commits too, Merge::run (merge.rs) rebases and lands it, and ensure_branch_merged (agent_job_service.rs, Ok(false) arm: git merge --ff-only, then Ok) completes the job without asking work_elsewhere. A ticket with work in both repos then goes Done with the other repo's main unchanged. Check: a ticket whose lotar branch and another named repo's agent/<ID> both hold commits beyond their mains; merge job ends completed with the other repo unmerged. Done: the merge (deterministic and agent path) refuses to complete while work_elsewhere finds unmerged commits, with a test.
 
@@ -155,3 +157,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T00:44:16.897296+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

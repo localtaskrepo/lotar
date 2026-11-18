@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T18:59:30.165294+00:00
-modified: 2026-11-17T20:17:05.720546+00:00
+modified: 2026-11-18T00:44:16.227611+00:00
 relationships:
   related:
   - DEV-672
@@ -76,6 +76,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7d340b2d-0883-4227-8ee1-842ef56c412b
+releases:
+- 9
 description: |-
   Found in standards STD-207 (lotar 0.15.3).
 
@@ -152,3 +154,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-672"]}'
     new: '{"related":["DEV-672","DEV-673"]}'
+- at: 2026-11-18T00:44:16.227611+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

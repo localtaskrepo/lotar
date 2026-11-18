@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T19:35:53.990076+00:00
-modified: 2026-11-17T20:43:46.202913+00:00
+modified: 2026-11-18T00:44:16.327181+00:00
 relationships:
   related:
   - DEV-530
@@ -82,6 +82,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A328c233b-7d5a-4678-9428-c2668685e8f2
+releases:
+- 9
 description: |-
   Found in STD-208 (standards), checking STD-207's headless merge.
 
@@ -198,3 +200,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-530","DEV-671"]}'
     new: '{"related":["DEV-530","DEV-671","DEV-619"]}'
+- at: 2026-11-18T00:44:16.327181+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

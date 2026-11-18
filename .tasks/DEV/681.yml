@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T23:42:58.849777+00:00
-modified: 2026-11-18T00:13:54.653080+00:00
+modified: 2026-11-18T00:44:17.159610+00:00
 relationships:
   blocks:
   - DEV-658
@@ -84,6 +84,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf565c24-5200-4aa0-bd06-76d7ab47feaf
+releases:
+- 9
 description: 'Found: Quality Assurance on main 2f8b1cb (2026-11-17 22:39) failed in Rust Quality Checks: lotar-lib::integration dev623_memory_gate_test::a_queued_job_waits_while_memory_is_short panicked at crates/lotar-lib/tests/dev623_memory_gate_test.rs:64:5 (the queue shows TEST-1 pending, worker_running true). The run before (45fd197) was green. Check: gh run list -b main -w ''Quality Assurance''. Done: QA green on main; the v0.15.4 release (DEV-658) needs it.'
 tags:
 - health
@@ -160,3 +162,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T00:44:17.159610+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

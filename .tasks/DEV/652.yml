@@ -1,11 +1,11 @@
 title: A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-18T00:12:22.531038+00:00
+modified: 2026-11-18T01:11:05.216302+00:00
 relationships:
   depends_on:
   - DEV-657
@@ -147,12 +147,132 @@ comments:
     - Settle at job end through `harnessmux::backend::t3::settle` when the job completed and the ticket isn't HelpNeeded or assigned to the owner; a refusal is a job note only.
     - Tests get a fake T3 MCP server (0.1.10 sends every later turn through `/mcp`).
     - Docs: `docs/help/agent.md`; the standards comment in `configs/lotar/agents.yml` is in the standards repo.
+- date: 2026-11-18T00:48:10.044984+00:00
+  author: claude
+  text: |-
+    Implemented on `t3/t3-job-lotar-worktree-2` in `f6d837068` (harnessmux 0.1.10). Not merged.
+
+    - A t3 job now uses the ticket's worktree (`<dir>/<repo>/<ID>` on `agent/<ID>`) like every other runner; harnessmux starts the thread there with `t3_thread_launch` (existing worktree), so T3 Code makes no worktree or branch.
+    - Removed the code that pointed the ticket branch at `t3/*` thread branches, moved old worktrees aside, and moved continued threads' branches.
+    - `session: continue` sends the turn to the same thread. A thread from before DEV-652 (one that runs in a T3-made worktree) hands off to a new thread in the ticket's worktree.
+    - Settling (owner 2026-11-17): after the end rules ran, a completed job calls `t3_thread_organize settle`. The thread stays active when the job failed, or when the ticket is HelpNeeded, or open and assigned to a person. A refusal is only a job note.
+    - How I read "assigned to him": open and assigned to anyone who isn't an `@profile`. Done tickets keep mallox as assignee, so a Done ticket still settles.
+    - Tests: a fake T3 MCP server in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`; tests for the old behaviour removed or rewritten.
+    - Docs: `docs/help/agent.md` (t3 runner, worktrees, settling).
+  report:
+    commits:
+    - hash: f6d837068
+      what: t3 jobs run in the ticket's lotar worktree via harnessmux 0.1.10; completed jobs settle their thread
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2297 Rust, 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: real ticket run
+      result: not_run
+      reason: needs a lotar release with DEV-652 installed and a live T3 Code
+    - command: standards agents.yml comment
+      result: not_run
+      reason: it describes the installed lotar, change it after the release
+    next: 'Release lotar with DEV-652, run one t3 ticket end to end (worktree under .lotar-worktrees, nothing new in ~/.t3/worktrees, thread title and link, session: continue, settle), then update the comment at line 4 of standards configs/lotar/agents.yml'
+- date: 2026-11-18T00:48:22.199942+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261118T001014.272Z-10 failed again or on a rate limit (lotar agent logs job-20261118T001014.272Z-10). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-18T00:49:07.243287+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the last job finished the work in f6d837068 on t3/t3-job-lotar-worktree-2, then failed only at the end: git branch --force agent/DEV-652 refused, the branch is held by the old T3-made worktree in ~/.t3/worktrees/lotar/agent-DEV-652-dc465b1929db89d7. Do not redo the work: land f6d837068 on agent/DEV-652 (remove or move aside that stale T3 worktree first), then hand off for review.
+  answer:
+    to: 2026-11-18T00:48:22.199942+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the last job finished the work in f6d837068 on t3/t3-job-lotar-worktree-2, then failed only at the end: git branch --force agent/DEV-652 refused, the branch is held by the old T3-made worktree in ~/.t3/worktrees/lotar/agent-DEV-652-dc465b1929db89d7. Do not redo the work: land f6d837068 on agent/DEV-652 (remove or move aside that stale T3 worktree first), then hand off for review.'
+- date: 2026-11-18T01:05:00.787212+00:00
+  author: claude
+  text: |-
+    `agent/DEV-652` already points at `f6d837068`; no new work, ready for review.
+
+    - `git log -1 agent/DEV-652` = `f6d837068` (signed, `G`); the T3 worktree `~/.t3/worktrees/lotar/agent-DEV-652-dc465b1929db89d7` holding it is clean and on the same commit, so nothing had to be moved aside
+    - This job's branch `t3/t3-job-lotar-worktree-3` is the same commit; no file changes, no new commit
+    - Still open in Done when: the real-ticket checks (one worktree under lotar's folder, nothing new in `~/.t3/worktrees`, settle on a real ticket) need the merged build
+  report:
+    commits:
+    - hash: f6d837068
+      what: DEV-652 t3 jobs run in lotar's ticket worktree; settle threads on success
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: commit unchanged since the last job's passing run
+    - command: npm test
+      result: not_run
+      reason: commit unchanged since the last job's passing run (2297 Rust, 1548 UI)
+    - command: npm run smoke
+      result: not_run
+      reason: commit unchanged since the last job's passing run (405)
+    next: Review f6d837068 on agent/DEV-652, then merge; the real-ticket checks in Done when run after the merge
+- date: 2026-11-18T01:11:05.216302+00:00
+  author: automation
+  text: |-
+    The review job job-20261118T011100.247Z-27 failed (lotar agent logs job-20261118T011100.247Z-27), so the work on branch agent/DEV-652 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A753f88c8-c187-4bac-85b1-a1020e960f66
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7928dfd-8b02-4cea-be1f-145aa7a6299c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1e2226ce-5f74-40ec-bf11-141509e5ee1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29cbd039-1aee-40b3-ad0b-c284421245d8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8ac0bc1-1324-4ea5-b00b-256bad9c76d8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1aff80e-5e07-47a3-ab00-67cd0ff214d2
 description: |-
   Owner 2026-11-17 (DEV-579): "I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux." Owner 2026-11-16 (chief of staff options picker): "lotar makes them, T3 shows".
 
@@ -173,6 +293,7 @@ description: |-
   - [ ] lint, tests and smoke pass.
 tags:
 - fix-retried
+- retry-fix
 history:
 - at: 2026-11-17T06:47:32.201695+00:00
   actor: claude
@@ -414,5 +535,75 @@ history:
     new: InProgress
 - at: 2026-11-18T00:12:22.531038+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:48:10.044984+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:48:22.109182+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T00:48:22.199942+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:49:07.243287+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:49:07.245393+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T00:49:19.781504+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, retry-fix
+- at: 2026-11-18T01:04:18.581025+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T01:04:19.667111+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1aff80e-5e07-47a3-ab00-67cd0ff214d2
+- at: 2026-11-18T01:05:00.787212+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T01:05:09.013201+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T01:11:05.143344+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-18T01:11:05.216302+00:00
+  actor: automation
   changes:
   - field: comment_added

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:11:23.006068+00:00
-modified: 2026-11-17T16:53:12.235683+00:00
+modified: 2026-11-18T00:44:15.228346+00:00
 relationships:
   related:
   - DEV-638
@@ -85,6 +85,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7a1176a-a3a0-44f3-92e1-99a436b78b87
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2d115a50-4496-49e3-a2d1-67ad933d71ae
+releases:
+- 9
 description: 'Found in the DEV-638 merge on 2026-11-17: in a full smoke run (load average ~38) smoke/tests/harness.mcp-client.smoke.spec.ts:80 got ''Timed out waiting for MCP response with id 1'' instead of /exceeded maximum/ (5000 ms wait). It passed 3 of 3 runs alone and in a second full run. Check: npm run test:smoke:agent under load. Done when the oversized-line rejection does not depend on a 5 s response wait (e.g. the client rejects as soon as the line passes the limit) and the test passes under load.'
 tags:
 - health
@@ -170,3 +172,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T00:44:15.228346+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

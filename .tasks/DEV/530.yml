@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-17T20:29:54.935666+00:00
+modified: 2026-11-18T01:01:49.809223+00:00
 relationships:
   depends_on:
   - DEV-673
@@ -36,6 +36,7 @@ relationships:
   - DEV-669
   - DEV-673
   - DEV-672
+  - DEV-664
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -1959,3 +1960,9 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-18T01:01:49.809223+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-673"],"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672"]}'
+    new: '{"depends_on":["DEV-673"],"blocks":["DEV-637"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664"]}'

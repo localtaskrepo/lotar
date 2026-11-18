@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T17:28:46.731803+00:00
-modified: 2026-11-17T17:58:33.514544+00:00
+modified: 2026-11-18T00:44:15.713806+00:00
 relationships:
   related:
   - DEV-660
@@ -81,6 +81,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A033243f3-585e-4e8b-ad35-24d266d73da4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91105668-a66f-4d5f-a054-2e5cff890e9f
+releases:
+- 9
 description: |-
   ## Found
   - `lotar automation run <rule> --select id:<ID>` fires an `unblocked` rule only for a ticket with a prerequisite in another repo (`run_cross_repo_unblocked` in `crates/lotar-agent/src/services/automation_service.rs`, docs/help/automation.md "When prerequisites are done"). lotar 0.15.3.
@@ -179,3 +181,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-660","DEV-584","DEV-324"]}'
     new: '{"related":["DEV-660","DEV-584","DEV-324","DEV-353"]}'
+- at: 2026-11-18T00:44:15.713806+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

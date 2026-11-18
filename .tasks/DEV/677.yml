@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T21:38:23.343839+00:00
-modified: 2026-11-17T23:38:57.986295+00:00
+modified: 2026-11-18T00:44:16.806129+00:00
 relationships:
   related:
   - DEV-564
@@ -138,6 +138,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1281cd0-9ddf-4d8c-9f38-add5d9fe61ec
+releases:
+- 9
 description: 'Found (STD-138, 2026-11-17): DEV-564 lives in lotar''s .tasks but its work is harnessmux branch agent/DEV-564 (9977dec). Twice, review and merge ran in lotar''s checkout, saw lotar''s empty agent/DEV-564, reported ''Nothing to merge: agent/DEV-564 is in main already'' and automation set DEV-564 Done, though the reopen comment named the harnessmux checkout and branch. DEV-636 landed only because its reviewer read the fix comment''s next step. Check: a ticket in lotar''s .tasks with commits only in another repo''s agent/<ID> ends Done with that repo''s main unchanged. Done: jobs for such a ticket run in the repo that holds the work (or the merge refuses Done when the ticket names another repo''s branch with commits beyond its main), with a test.'
 tags:
 - health
@@ -305,3 +307,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-564","DEV-636","DEV-465","DEV-679","DEV-645"]}'
     new: '{"related":["DEV-564","DEV-636","DEV-465","DEV-679","DEV-645","DEV-680"]}'
+- at: 2026-11-18T00:44:16.806129+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

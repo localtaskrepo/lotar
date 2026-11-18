@@ -1,11 +1,11 @@
 title: A review that finds no work at all still lets the merge set the ticket Done
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T23:38:57.733684+00:00
-modified: 2026-11-18T00:10:13.738168+00:00
+modified: 2026-11-18T00:44:17.019044+00:00
 relationships:
   related:
   - DEV-652
@@ -49,8 +49,36 @@ comments:
     - **Reran:** `npm ci` ok. `npm run lint` passed. `cargo nextest run -p lotar-lib -p lotar-agent -E 'test(/dev605|agent_automation_integration|dev318|dev677|dev679|merge/)'`: 96 passed. Full `npm test` and `npm run smoke` were not rerun by me; the fix agent reports both passing. Worktree left clean.
     - **Minor, filed:** DEV-685. `merged_despite_failure` (`agent_job_service.rs:~4991`) doesn't call `built_anywhere`, so a merge runner that crashes on a nothing-built ticket still completes it as Done.
     - **No UI change:** only a smoke fixture changed (`ui.agent-jobs.smoke.spec.ts`), so no screenshots were needed.
+- date: 2026-11-18T00:27:40.107114+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-680` is in `main`.
+
+    - Rebased `agent/DEV-680` onto `main` (`748263aa785f`): `d60ef6da26fe`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `d60ef6da26fe`
+    - Amended the pending `.tasks` changes into the merged commit: `cced51c43cec`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[review:no-work-done]`
+  report:
+    commits:
+    - hash: cced51c43
+      what: DEV-680 A review that finds no work at all still lets the merge set the ticket Done
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5c4ec453-aaba-4d1a-86f6-a9b92b222f4e
+releases:
+- 9
 description: 'Found 2026-11-17 on DEV-657: its fix job only edited the ticket (no harnessmux or lotar commit). The review commented ''Review: nothing to review ... no code is written yet, so every Done when item is still open'' but left status/assignee, so the merge reported ''Nothing to merge: agent/DEV-657 is in main already'' and automation set DEV-657 Done. That restarted DEV-652 via ''Prerequisites done'' with the prerequisite unbuilt. DEV-677''s work_elsewhere guard doesn''t apply: no repo has commits on agent/DEV-657. Check: a ticket whose fix job made no commit anywhere and whose review says nothing was written ends Done. Done: such a ticket goes back to the fix step (or HelpNeeded) instead of Done, with a test.'
 tags:
 - health
@@ -111,3 +139,18 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T00:27:40.107114+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T00:27:40.308016+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-18T00:44:17.019044+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

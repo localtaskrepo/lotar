@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T08:14:39.859239+00:00
-modified: 2026-11-17T20:05:00.489756+00:00
+modified: 2026-11-18T00:44:15.055748+00:00
 relationships:
   blocks:
   - DEV-656
@@ -159,6 +159,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22cc2ed8-b7a2-4bb2-992f-a68f1bcd0471
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ebc7200-d4b6-4e1c-a6bb-3de3bc166a8e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7d44ed51-d61e-4874-b38c-75ff85f2b0a8
+releases:
+- 9
 description: |-
   Found in the DEV-634 review: testing-strategy says agent and automation tests that need only the services go in `crates/lotar-agent`, but two stayed in `crates/lotar-lib/tests`.
 
@@ -388,3 +390,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-656"],"related":["DEV-634","DEV-495","DEV-656","DEV-654"]}'
     new: '{"blocks":["DEV-656"],"related":["DEV-634","DEV-495","DEV-656","DEV-654","DEV-623"]}'
+- at: 2026-11-18T00:44:15.055748+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

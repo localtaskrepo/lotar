@@ -218,6 +218,23 @@ fn a_ticket_nothing_was_built_for_is_not_done() {
     assert!(summary.contains("nothing was built"), "{summary}");
 }
 
+/// DEV-685: the same ticket, merged by an agent that exits 1. Its empty
+/// branch is on main already, but that doesn't complete the job.
+#[test]
+fn a_failed_merge_agent_of_a_ticket_nothing_was_built_for_fails() {
+    let repo = Repo::new("");
+    let agent = repo.outside.path().join("merge-agent.sh");
+    let script = fs::read_to_string(&agent).expect("read agent");
+    fs::write(&agent, format!("{script}exit 1\n")).expect("write agent");
+
+    let (status, prompt) = repo.merge();
+
+    assert!(prompt.is_some(), "the merge agent ran");
+    assert_eq!(status, "failed");
+    let summary = AgentJobService::list_jobs_in(&repo.fixtures.tasks_root).into_iter().find_map(|job| job.summary).unwrap_or_default();
+    assert!(summary.contains("nothing was built"), "{summary}");
+}
+
 /// DEV-677: lotar's branch is empty, the ticket's commits are on the same
 /// branch of another repository its comment names. That repository's main
 /// checkout.

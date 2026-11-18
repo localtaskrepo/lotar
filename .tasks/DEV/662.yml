@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T17:12:58.754510+00:00
-modified: 2026-11-17T21:23:29.133432+00:00
+modified: 2026-11-18T00:44:15.613175+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -229,6 +229,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0b90132-f2dd-4516-bcf2-9a9f3aa8f9e7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A94ad83d3-c52f-4d7f-90f5-f5c31ce62c1e
+releases:
+- 9
 description: |-
   Found while reworking standards STD-199 (2026-11-17).
 
@@ -452,3 +454,8 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-501"],"related":["DEV-499"]}'
     new: '{"depends_on":["local:LOCA-501"],"related":["DEV-499","DEV-623"]}'
+- at: 2026-11-18T00:44:15.613175+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

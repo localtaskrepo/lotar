@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T20:57:48.292642+00:00
-modified: 2026-11-18T00:09:22.544764+00:00
+modified: 2026-11-18T00:44:14.356443+00:00
 relationships:
   depends_on:
   - DEV-675
@@ -396,6 +396,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A11f5df5e-1737-4f6f-864e-32ac5ee9ae7d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04178823-779d-4c96-812a-fc207a75fbe5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cef5b56-d5ff-4e0b-95fc-075776c798dc
+releases:
+- 9
 description: |-
   Owner 2026-11-16, after the Mac crashed (picked option 2 of 4 from the options picker): "Memory gate": lotar starts no new job while swap is nearly full or macOS reports memory pressure.
 
@@ -884,3 +886,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-675","DEV-676"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675","DEV-661","DEV-662","DEV-676","DEV-674"]}'
     new: '{"depends_on":["DEV-675","DEV-676"],"blocks":["DEV-645"],"related":["DEV-604","DEV-378","DEV-525","DEV-629","DEV-666","DEV-630","DEV-634","DEV-646","DEV-655","DEV-669","DEV-675","DEV-661","DEV-662","DEV-676","DEV-674","DEV-681"]}'
+- at: 2026-11-18T00:44:14.356443+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

@@ -5,7 +5,7 @@ type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-17T19:57:31.784714+00:00
-modified: 2026-11-17T20:21:34.913859+00:00
+modified: 2026-11-18T00:44:16.435122+00:00
 relationships:
   blocks:
   - DEV-530
@@ -98,6 +98,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af6528b5b-b6bf-4cfe-af1b-ddf5cdcb30b9
+releases:
+- 9
 description: 'Found: job-20261117T194848.004Z-23 (DEV-530) finished its rebase (commit 254749ae on t3/resume-held-jobs-after-prerequisites-2) and failed at the end: git branch --force agent/DEV-530 254749ae failed, agent/DEV-530 is checked out at /Users/mallox/.t3/worktrees/lotar/DEV-530 (still at 769a2130). DEV-595 and DEV-577 (Done) were meant to cover this. Check: rerun the job end with the ticket branch checked out in a worktree; the branch moves, or the job ends the worktree first. Done when: the DEV-530 case ends without error and a test covers it.'
 tags:
 - health
@@ -194,3 +196,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T00:44:16.435122+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'

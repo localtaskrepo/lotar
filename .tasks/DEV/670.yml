@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T18:25:53.916459+00:00
-modified: 2026-11-17T19:21:07.168434+00:00
+modified: 2026-11-18T00:44:16.100791+00:00
 relationships:
   related:
   - DEV-520
@@ -88,6 +88,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24d11501-1b19-4a0f-9117-2db78a77dbea
+releases:
+- 9
 description: |-
   Found 2026-11-17 during DEV-585 checks on main d6da943e plus DEV-585 (which doesn't touch this code): the test hits its 60 s wait_for("the job to end") at crates/lotar-lib/tests/dev510_t3_session_test.rs:203, in the full suite and alone. harnessmux 0.1.9 at ~/.cargo/bin. DEV-520/DEV-590 (Done) fixed an earlier hang here.
 
@@ -173,3 +175,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-18T00:44:16.100791+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#9'
