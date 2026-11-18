@@ -561,6 +561,9 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
     if cfg.agent_memory_gate != defaults.agent_memory_gate {
         agent.insert(Y::String("memory_gate".into()), serde_yaml_ng::to_value(&cfg.agent_memory_gate).unwrap_or(Y::Null));
     }
+    if cfg.agent_job_history != defaults.agent_job_history {
+        agent.insert(Y::String("job_history".into()), serde_yaml_ng::to_value(&cfg.agent_job_history).unwrap_or(Y::Null));
+    }
     if !agent.is_empty() {
         root.insert(Y::String("agent".into()), Y::Mapping(agent));
     }

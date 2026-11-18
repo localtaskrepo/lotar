@@ -199,3 +199,13 @@ fn dotted_and_nested_siblings_are_merged_without_order_dependent_loss() {
         assert_eq!(cfg.sprints.defaults.capacity_points, Some(21));
     }
 }
+
+/// DEV-693: `agent.job_history` is read, defaults to 14 days and 100 MiB, and survives a canonical rewrite.
+#[test]
+fn agent_job_history_round_trips() {
+    assert_eq!(parse_global_from_yaml_str("default.project: DEV\n").unwrap().agent_job_history.keep_days, 14);
+    let cfg = parse_global_from_yaml_str("agent:\n  job_history:\n    keep_days: 30\n").unwrap();
+    assert_eq!((cfg.agent_job_history.keep_days, cfg.agent_job_history.max_mb), (30, 100));
+    let again = parse_global_from_yaml_str(&to_canonical_global_yaml(&cfg)).unwrap();
+    assert_eq!(again.agent_job_history, cfg.agent_job_history);
+}

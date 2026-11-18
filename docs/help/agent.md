@@ -479,7 +479,20 @@ A rule's [`tell_agent`](automation.md#telling-the-tickets-agent) action hands th
 
 - Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running. Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.
 - Context history is persisted to `<project>/<ticket><extension>` files next to each ticket.
-- Job events are persisted to `<tasks dir>/@agent-logs/<JOB_ID>.jsonl` by default (`agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR` picks another folder; `off` turns it off). LoTaR writes a `.gitignore` into the folder so logs, which contain prompts and agent output, aren't committed, and keeps the newest 500 job logs. The `.gitignore` is only written when the folder holds nothing but job logs, only `job-*.jsonl` files are ever pruned, and a setting that names the workspace root itself (`agent.logs_dir: .`) uses a `lotar-agent-logs` subfolder.
+- Job events are persisted to `<tasks dir>/@agent-logs/<JOB_ID>.jsonl` by default (`agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR` picks another folder; `off` turns it off). LoTaR writes a `.gitignore` into the folder so logs, which contain prompts and agent output, aren't committed. The `.gitignore` is only written when the folder holds nothing but job logs, and a setting that names the workspace root itself (`agent.logs_dir: .`) uses a `lotar-agent-logs` subfolder.
+- Job history: `lotar agent list-jobs`, `lotar agent logs`, the timeline and the Agents page show a job as long as its log is kept (a server holds finished jobs in memory for a day only). When a job starts, LoTaR prunes that job's log folder:
+  - A log last written more than `agent.job_history.keep_days` days ago (default 14) is removed.
+  - While the folder's job logs take more than `agent.job_history.max_mb` MiB (default 100; `0`: no limit), the oldest removable logs go first, also ones younger than `keep_days`.
+  - Never removed, by age or by size: a job of an open ticket (its status is not a done state), of a ticket whose file can't be read, and a running job (in this process or another one). These win over both limits, so the folder can stay over `max_mb`. Jobs of done, archived and deleted tickets go, and so do logs without a header.
+  - Only `job-*.jsonl` files are pruned. A file that can't be read or removed is skipped; pruning never stops a job from starting.
+  - Both settings are global config only, not settable with `config set`. One job log takes about 5 KB, so at 250 jobs a day 14 days take about 18 MB.
+
+  ```yaml
+  agent:
+    job_history:
+      keep_days: 14
+      max_mb: 100
+  ```
 - `lotar agent status`, `lotar agent logs` and `lotar agent list-jobs` read these files when the job isn't in the current process. So do `GET /api/jobs`, `/api/jobs/get` and `/api/jobs/logs`, and with them the Agents page and the task panel's Timeline tab: jobs of earlier server runs and of other processes stay listed with their threads. A logged job without an end is `running` while a live process holds it, else `failed`. `/api/jobs/logs` returns a job's whole thread: its log holds every event with the `sequence` the live stream gave it, while the server keeps only a job's last 200 events in memory. Logs written before this version have no sequences; their events count by line.
 - `lotar task timeline <TASK_ID> [--threads]` and the MCP tool `task_timeline` list a task's agent jobs next to its changes, comments and commits, so an agent can read what earlier agents on the task said and did ([timeline](task.md#timeline)).
 - Assigning a ticket to an agent profile (e.g., `@claude-review`) automatically queues a job for that ticket, with the prompt and run settings of the first automation rule that assigns that profile ([agent run settings](automation.md#agent-run-settings)).

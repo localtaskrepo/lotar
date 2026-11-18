@@ -542,6 +542,34 @@ const fn default_memory_gate_settle_seconds() -> u64 {
     120
 }
 
+/// How long job logs are kept (DEV-693): `agent.job_history` in the global
+/// config. Jobs of open tickets and running jobs are always kept.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobHistoryConfig {
+    /// Days a job log is kept after it was last written.
+    #[serde(default = "default_job_history_keep_days")]
+    pub keep_days: u32,
+    /// MiB the job logs of a folder may take; over it, the oldest removable
+    /// logs go first, also younger ones. 0: no size limit.
+    #[serde(default = "default_job_history_max_mb")]
+    pub max_mb: u64,
+}
+
+impl Default for AgentJobHistoryConfig {
+    fn default() -> Self {
+        Self { keep_days: default_job_history_keep_days(), max_mb: default_job_history_max_mb() }
+    }
+}
+
+const fn default_job_history_keep_days() -> u32 {
+    14
+}
+
+const fn default_job_history_max_mb() -> u64 {
+    100
+}
+
 impl SyncConfig {
     pub fn is_empty(&self) -> bool {
         self.remotes.is_empty() && self.auth_profiles.is_empty()
@@ -1093,6 +1121,8 @@ pub struct GlobalConfig {
     pub agent_merge: Option<AgentMergeConfig>,
     #[serde(default)]
     pub agent_memory_gate: AgentMemoryGateConfig,
+    #[serde(default)]
+    pub agent_job_history: AgentJobHistoryConfig,
 
     /// Web UI branding (DEV-218): default theme, display name, and logo/icon
     /// images given as paths relative to the repository.
@@ -1207,6 +1237,8 @@ pub struct ResolvedConfig {
     pub agent_merge: Option<AgentMergeConfig>,
     #[serde(default)]
     pub agent_memory_gate: AgentMemoryGateConfig,
+    #[serde(default)]
+    pub agent_job_history: AgentJobHistoryConfig,
 
     #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
     pub remotes: BTreeMap<String, SyncRemoteConfig>,
@@ -1468,6 +1500,7 @@ impl Default for GlobalConfig {
             agent_worktree: AgentWorktreeConfig::default(),
             agent_merge: None,
             agent_memory_gate: AgentMemoryGateConfig::default(),
+            agent_job_history: AgentJobHistoryConfig::default(),
             ui_theme: None,
             ui_name: None,
             ui_logo: None,

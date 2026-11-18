@@ -1,14 +1,41 @@
 title: Job-log pruning removes the logs of a ticket whose ID is ambiguous across tasks roots
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T04:18:55.334249+00:00
-modified: 2026-11-18T04:39:33.002247+00:00
+modified: 2026-11-18T04:48:19.320272+00:00
 relationships:
   related:
   - DEV-693
+comments:
+- date: 2026-11-18T04:48:08.956147+00:00
+  author: claude
+  text: |-
+    Job logs of a ticket ID held by several tasks roots now stay, by age and under the size guard.
+
+    - `ticket_keeps_its_jobs` in `crates/lotar-agent/src/services/agent_job_service.rs`: `Ambiguous` keeps, `NotFound`/`Invalid` remove, archived still removes.
+    - New test `old_job_log_of_an_ambiguous_ticket_stays` (two nested roots, both with `PX-1`); fails without the fix, passes with it.
+    - `docs/help/agent.md` job history lists the ambiguous case among never-removed jobs.
+    - DEV-693 is still in Merging, so this branch sits on a cherry-pick of `76504c10b` on top of main.
+    - "Done when" got the unchanged NotFound/Invalid/archived cases and the docs line.
+  report:
+    commits:
+    - hash: ba00890bc
+      what: keep job logs of an ID held by several roots
+    - hash: 02a098f0f
+      what: cherry-pick of DEV-693 76504c10b (base, not yet on main)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2375 nextest + 1548 vitest
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    next: Review; merge after DEV-693 lands (rebase drops the cherry-picked 02a098f0f)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25b351b7-9605-42e4-8c6c-25a2d0eecb84
 description: |-
@@ -89,3 +116,16 @@ history:
       - [ ] Unchanged: a ticket ID no tasks root holds (`NotFound`) or a malformed one (`Invalid`) still lets its job's log go; archived tickets' logs still go.
       - [ ] `docs/help/agent.md` (job history) lists an ID held by several roots among the never-removed cases.
       - [ ] A test with two roots holding the same ID shows it.
+- at: 2026-11-18T04:48:08.956147+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:48:19.320272+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

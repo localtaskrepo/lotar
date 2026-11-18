@@ -3300,6 +3300,47 @@ fn init_job_log(
             agent_profile: JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.agent_profile.clone())),
         },
     );
+    if let Some(dir) = logs_dir.as_deref() {
+        prune_job_logs(tasks_dir, &workspace_root, dir, &config.agent_job_history, job_id);
+    }
+}
+
+/// Drop job logs past `agent.job_history` (DEV-693); jobs of open tickets
+/// and running jobs stay.
+fn prune_job_logs(
+    tasks_dir: &std::path::Path,
+    workspace_root: &std::path::Path,
+    logs_dir: &str,
+    history: &crate::config::types::AgentJobHistoryConfig,
+    starting_job: &str,
+) {
+    let mut running: HashSet<String> = crate::services::agent_active_jobs::list(tasks_dir).into_iter().map(|job| job.job_id).collect();
+    running.insert(starting_job.to_string());
+    if let Ok(registry) = JOB_REGISTRY.lock() {
+        running.extend(
+            registry
+                .jobs
+                .iter()
+                .filter(|(_, state)| state.runtime.is_some() || matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running))
+                .map(|(id, _)| id.clone()),
+        );
+    }
+    let mut open: HashMap<String, bool> = HashMap::new();
+    let mut keep = |header: Option<&crate::services::agent_log_service::JobLogHeader>| {
+        header.is_some_and(|header| {
+            running.contains(&header.job_id) || *open.entry(header.ticket_id.clone()).or_insert_with(|| ticket_keeps_its_jobs(tasks_dir, &header.ticket_id))
+        })
+    };
+    AgentLogService::prune_logs(workspace_root, logs_dir, history, &mut keep);
+}
+
+/// Whether a ticket's job logs are kept whatever their age: it is open, or
+/// its file can't be read to tell. Done, archived and deleted tickets' are not.
+fn ticket_keeps_its_jobs(tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
+    match ticket_done_state(tasks_dir, ticket_id) {
+        Some(done) => !done,
+        None => crate::storage::manager::Storage::new(tasks_dir).resolve_task_location(ticket_id).is_ok_and(|location| !location.archived),
+    }
 }
 
 #[expect(
@@ -6995,7 +7036,7 @@ mod tests {
 
 #[cfg(test)]
 mod dev21_ticket_done_state_tests {
-    use super::ticket_done_state;
+    use super::{AgentLogService, prune_job_logs, ticket_done_state};
 
     fn write_task(root: &std::path::Path, prefix: &str, num: u32, status: &str) {
         let dir = root.join(".tasks").join(prefix);
@@ -7045,6 +7086,43 @@ mod dev21_ticket_done_state_tests {
 
         // Unknown identity stays indeterminate (conservatively no cleanup).
         assert_eq!(ticket_done_state(&tasks_a, "PX-99"), None);
+    }
+
+    /// DEV-693: logs go by age, but an open ticket's jobs stay.
+    #[test]
+    fn old_job_logs_go_unless_their_ticket_is_open() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write_config(root, "Done");
+        write_task(root, "PX", 1, "Done");
+        write_task(root, "PX", 2, "Todo");
+        let tasks = root.join(".tasks");
+        let logs = tasks.join("@agent-logs");
+        let fifteen_days_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(15 * 86_400);
+        for (job, ticket) in [("job-done", "PX-1"), ("job-open", "PX-2"), ("job-gone", "PX-99"), ("job-running", "PX-1")] {
+            let header = crate::services::agent_log_service::JobLogHeader {
+                job_id: job.to_string(),
+                ticket_id: ticket.to_string(),
+                runner: "claude".to_string(),
+                created_at: "2026-11-01T00:00:00Z".to_string(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: None,
+                effort: None,
+                agent_profile: None,
+            };
+            AgentLogService::init_log(root, logs.to_str(), header).unwrap();
+            let path = logs.join(format!("{job}.jsonl"));
+            std::fs::File::options().write(true).open(&path).unwrap().set_modified(fifteen_days_ago).unwrap();
+        }
+
+        let history = crate::config::types::AgentJobHistoryConfig::default();
+        prune_job_logs(&tasks, root, logs.to_str().unwrap(), &history, "job-running");
+
+        assert!(!logs.join("job-done.jsonl").exists(), "a Done ticket's 15-day-old job goes");
+        assert!(!logs.join("job-gone.jsonl").exists(), "a deleted ticket's job goes");
+        assert!(logs.join("job-open.jsonl").exists(), "an open ticket's 15-day-old job stays");
+        assert!(logs.join("job-running.jsonl").exists(), "a running job stays");
     }
 }
 

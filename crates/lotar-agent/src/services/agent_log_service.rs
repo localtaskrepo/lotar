@@ -6,7 +6,7 @@
 //! Logs go to `<tasks dir>/@agent-logs` unless `agent_logs_dir` names another
 //! folder (relative to the workspace root, or absolute) or turns logging off
 //! with `off`. The folder gets a `.gitignore` so logs are never committed by
-//! accident, and only the newest [`MAX_JOB_LOGS`] job logs are kept.
+//! accident. Job logs are kept by age and size ([`prune_job_logs`], DEV-693).
 
 use crate::errors::{LoTaRError, LoTaRResult};
 use serde::{Deserialize, Serialize};
@@ -92,8 +92,6 @@ pub struct AgentLogService;
 
 /// Default log folder inside the tasks directory.
 pub const DEFAULT_LOGS_DIR: &str = "@agent-logs";
-/// How many job logs a folder keeps; older ones are removed when a job starts.
-pub const MAX_JOB_LOGS: usize = 500;
 
 /// The log folder to use: the configured one, the default
 /// `<tasks dir>/@agent-logs` when none is set, or `None` when logging is
@@ -106,7 +104,7 @@ pub fn effective_logs_dir(tasks_dir: &Path, configured: Option<&str>) -> Option<
     }
 }
 
-/// Keep logs out of version control and drop the oldest beyond the limit.
+/// Keep logs out of version control.
 fn prepare_logs_dir(dir: &Path) {
     // The `*` .gitignore only goes into a folder that holds nothing but job
     // logs, so pointing agent_logs_dir at an existing folder can't hide its
@@ -116,29 +114,72 @@ fn prepare_logs_dir(dir: &Path) {
     if !ignore.exists() && only_logs {
         let _ = fs::write(&ignore, "# Agent job logs written by LoTaR\n*\n");
     }
+}
+
+/// Remove job logs by age and size (DEV-693): a log last written more than
+/// `keep_days` ago goes, and while the folder's logs take more than `max_mb`
+/// MiB the oldest go first, also younger ones. `keep` is asked once per log
+/// that would go, with its header (`None`: the log has none); a log it keeps
+/// (an open ticket's or a running job's) stays whatever its age and size.
+/// Unreadable files and failed deletes are skipped. Returns the removed paths.
+pub fn prune_job_logs(
+    dir: &Path,
+    history: &crate::config::types::AgentJobHistoryConfig,
+    now: std::time::SystemTime,
+    keep: &mut dyn FnMut(Option<&JobLogHeader>) -> bool,
+) -> Vec<PathBuf> {
     let Ok(entries) = fs::read_dir(dir) else {
-        return;
+        return Vec::new();
     };
-    // Only LoTaR's own job logs are pruned.
-    let mut logs: Vec<(std::time::SystemTime, PathBuf)> = entries
+    let mut logs: Vec<(std::time::SystemTime, u64, PathBuf)> = entries
         .filter_map(Result::ok)
         .filter(|entry| is_job_log(&entry.path()))
         .filter_map(|entry| {
-            let modified = entry.metadata().ok()?.modified().ok()?;
-            Some((modified, entry.path()))
+            let metadata = entry.metadata().ok()?;
+            Some((metadata.modified().ok()?, metadata.len(), entry.path()))
         })
         .collect();
-    if logs.len() <= MAX_JOB_LOGS {
-        return;
-    }
     logs.sort();
-    let excess = logs.len() - MAX_JOB_LOGS;
-    for (_, path) in logs.into_iter().take(excess) {
-        let _ = fs::remove_file(path);
+    let cutoff = now.checked_sub(std::time::Duration::from_secs(u64::from(history.keep_days) * 86_400));
+    let limit = (history.max_mb > 0).then(|| history.max_mb.saturating_mul(1024 * 1024));
+    let mut total: u64 = logs.iter().map(|(_, len, _)| len).sum();
+    let mut removed = Vec::new();
+    for (modified, len, path) in logs {
+        let too_old = cutoff.is_some_and(|cutoff| modified < cutoff);
+        let too_big = limit.is_some_and(|limit| total > limit);
+        if !too_old && !too_big {
+            // Sorted oldest first: the rest are younger and the folder fits.
+            break;
+        }
+        if keep(read_header(&path).as_ref()) || fs::remove_file(&path).is_err() {
+            continue;
+        }
+        total = total.saturating_sub(len);
+        removed.push(path);
+    }
+    removed
+}
+
+/// A log's header line, `None` when the first line is no header.
+fn read_header(path: &Path) -> Option<JobLogHeader> {
+    let line = BufReader::new(File::open(path).ok()?).lines().next()?.ok()?;
+    match serde_json::from_str::<JobLogLine>(&line).ok()? {
+        JobLogLine::Header(header) => Some(header),
+        _ => None,
     }
 }
 
 impl AgentLogService {
+    /// [`prune_job_logs`] on a configured log folder, as of now.
+    pub fn prune_logs(
+        workspace_root: &Path,
+        logs_dir: &str,
+        history: &crate::config::types::AgentJobHistoryConfig,
+        keep: &mut dyn FnMut(Option<&JobLogHeader>) -> bool,
+    ) -> Vec<PathBuf> {
+        prune_job_logs(&resolve_logs_dir(workspace_root, logs_dir), history, std::time::SystemTime::now(), keep)
+    }
+
     /// Initialize log file for a new job. Writes header line.
     /// Only writes if logs_dir is provided.
     pub fn init_log(workspace_root: &Path, logs_dir: Option<&str>, header: JobLogHeader) -> LoTaRResult<()> {
@@ -431,20 +472,10 @@ mod tests {
         assert_eq!(effective_logs_dir(tasks, Some("None")), None);
     }
 
-    #[test]
-    fn log_folder_is_git_ignored_and_keeps_the_newest_logs() {
-        let dir = tempdir().unwrap();
-        let logs = dir.path().join("logs");
-        fs::create_dir_all(&logs).unwrap();
-        for index in 0..MAX_JOB_LOGS + 3 {
-            let path = logs.join(format!("job-{index:04}.jsonl"));
-            fs::write(&path, "{}\n").unwrap();
-            let time = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000 + index as u64);
-            File::options().write(true).open(&path).unwrap().set_modified(time).unwrap();
-        }
-        let header = JobLogHeader {
-            job_id: "job-new".to_string(),
-            ticket_id: "T-1".to_string(),
+    fn header(job_id: &str, ticket_id: &str) -> JobLogHeader {
+        JobLogHeader {
+            job_id: job_id.to_string(),
+            ticket_id: ticket_id.to_string(),
             runner: "claude".to_string(),
             created_at: "now".to_string(),
             worktree_path: None,
@@ -452,13 +483,79 @@ mod tests {
             model: None,
             effort: None,
             agent_profile: None,
-        };
-        AgentLogService::init_log(dir.path(), Some("logs"), header).unwrap();
-        assert!(fs::read_to_string(logs.join(".gitignore")).unwrap().contains('*'));
-        let remaining = fs::read_dir(&logs).unwrap().filter(|e| e.as_ref().unwrap().path().extension().is_some_and(|x| x == "jsonl")).count();
-        assert!(remaining <= MAX_JOB_LOGS + 1, "{remaining}");
-        assert!(!logs.join("job-0000.jsonl").exists(), "oldest log removed");
-        assert!(logs.join("job-new.jsonl").exists());
+        }
+    }
+
+    /// A job log of `size` bytes last written `days_ago` days before `now`.
+    fn old_log(logs: &Path, job_id: &str, ticket_id: &str, size: usize, now: std::time::SystemTime, days_ago: u64) {
+        let path = logs.join(format!("{job_id}.jsonl"));
+        let line = serde_json::to_string(&JobLogLine::Header(header(job_id, ticket_id))).unwrap();
+        fs::write(&path, format!("{line}\n{}", "x".repeat(size.saturating_sub(line.len() + 1)))).unwrap();
+        let modified = now - std::time::Duration::from_secs(days_ago * 86_400);
+        File::options().write(true).open(&path).unwrap().set_modified(modified).unwrap();
+    }
+
+    #[test]
+    fn log_folder_is_git_ignored() {
+        let dir = tempdir().unwrap();
+        AgentLogService::init_log(dir.path(), Some("logs"), header("job-new", "T-1")).unwrap();
+        assert!(fs::read_to_string(dir.path().join("logs").join(".gitignore")).unwrap().contains('*'));
+        assert!(dir.path().join("logs").join("job-new.jsonl").exists());
+    }
+
+    /// DEV-693: logs go by age; what `keep` keeps stays.
+    #[test]
+    fn logs_past_keep_days_go_unless_kept() {
+        let dir = tempdir().unwrap();
+        let now = std::time::SystemTime::now();
+        old_log(dir.path(), "job-old-done", "T-1", 100, now, 15);
+        old_log(dir.path(), "job-old-open", "T-2", 100, now, 15);
+        old_log(dir.path(), "job-young-done", "T-1", 100, now, 13);
+        fs::write(dir.path().join("job-headless.jsonl"), "not json\n").unwrap();
+        File::options()
+            .write(true)
+            .open(dir.path().join("job-headless.jsonl"))
+            .unwrap()
+            .set_modified(now - std::time::Duration::from_secs(20 * 86_400))
+            .unwrap();
+        fs::write(dir.path().join("notes.jsonl"), "{}\n").unwrap();
+        let history = crate::config::types::AgentJobHistoryConfig::default();
+        let mut asked = Vec::new();
+        let removed = prune_job_logs(dir.path(), &history, now, &mut |header| {
+            asked.push(header.map(|h| h.job_id.clone()));
+            header.is_some_and(|h| h.ticket_id == "T-2")
+        });
+        assert_eq!(removed.len(), 2, "{removed:?}");
+        assert!(!dir.path().join("job-old-done.jsonl").exists());
+        assert!(!dir.path().join("job-headless.jsonl").exists(), "a log without a header goes by age");
+        assert!(dir.path().join("job-old-open.jsonl").exists());
+        assert!(dir.path().join("job-young-done.jsonl").exists());
+        assert!(dir.path().join("notes.jsonl").exists(), "other files stay");
+        assert_eq!(asked.len(), 3, "young logs are not read: {asked:?}");
+    }
+
+    /// DEV-693: over `max_mb`, the oldest removable logs go, also young ones;
+    /// kept logs stay even when the folder stays over.
+    #[test]
+    fn size_guard_removes_the_oldest_removable_logs_first() {
+        let dir = tempdir().unwrap();
+        let now = std::time::SystemTime::now();
+        let mib = 1024 * 1024;
+        old_log(dir.path(), "job-a-open", "T-2", mib, now, 5);
+        old_log(dir.path(), "job-b-done", "T-1", mib, now, 4);
+        old_log(dir.path(), "job-c-done", "T-1", mib, now, 3);
+        old_log(dir.path(), "job-d-done", "T-1", mib, now, 2);
+        let history = crate::config::types::AgentJobHistoryConfig { keep_days: 14, max_mb: 2 };
+        let mut keep = |header: Option<&JobLogHeader>| header.is_some_and(|h| h.ticket_id == "T-2");
+        prune_job_logs(dir.path(), &history, now, &mut keep);
+        assert!(dir.path().join("job-a-open.jsonl").exists(), "an open ticket's job stays though it is oldest");
+        assert!(!dir.path().join("job-b-done.jsonl").exists());
+        assert!(!dir.path().join("job-c-done.jsonl").exists());
+        assert!(dir.path().join("job-d-done.jsonl").exists(), "the folder fits again");
+
+        let unlimited = crate::config::types::AgentJobHistoryConfig { keep_days: 14, max_mb: 0 };
+        old_log(dir.path(), "job-e-done", "T-1", 3 * mib, now, 1);
+        assert!(prune_job_logs(dir.path(), &unlimited, now, &mut keep).is_empty(), "max_mb 0: no size guard");
     }
 
     #[test]

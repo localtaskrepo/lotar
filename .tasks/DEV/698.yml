@@ -1,14 +1,42 @@
 title: 'config-reference: agent.job_history lines split the agent.memory_gate keys'
-status: Todo
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T04:18:56.381152+00:00
-modified: 2026-11-18T04:18:56.962525+00:00
+modified: 2026-11-18T04:47:26.888525+00:00
 relationships:
   related:
   - DEV-693
+comments:
+- date: 2026-11-18T04:47:05.647451+00:00
+  author: claude
+  text: |-
+    Moved the two `agent.job_history.*` lines below `agent.memory_gate.settle_seconds` in `docs/help/config-reference.md`.
+
+    - The lines exist only on `agent/DEV-693` (status Merging, not on main), so this branch now sits on DEV-693's tip `76504c10b` with `69d9fb732` on top.
+    - Merge: land DEV-693 first. Rebasing this branch onto main afterwards drops the identical DEV-693 commit and leaves only `69d9fb732`.
+    - The three `agent.memory_gate.*` lines are now 45-47, the `agent.job_history.*` lines 48-49.
+  report:
+    commits:
+    - hash: 69d9fb732
+      what: memory_gate keys together, job_history after them
+    checks:
+    - command: npx prettier --check docs/help/config-reference.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: 'docs-only line reorder (AGENTS.md: docs need consistency checks only)'
+    - command: npm test
+      result: not_run
+      reason: docs-only
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only
+    next: Review, then merge after DEV-693 lands
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0dcd910-8bc5-4f36-ab9d-42888de91562
 description: |-
   `docs/help/config-reference.md` lists the two new `agent.job_history.*` keys (DEV-693) between `agent.memory_gate.max_swap_percent` and `agent.memory_gate.settle_seconds`, so the memory gate's keys are split. Found in the DEV-693 review, 2026-11-17.
 
@@ -33,3 +61,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T04:46:06.425083+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T04:46:07.266554+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0dcd910-8bc5-4f36-ab9d-42888de91562
+- at: 2026-11-18T04:47:05.647451+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T04:47:26.888525+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
