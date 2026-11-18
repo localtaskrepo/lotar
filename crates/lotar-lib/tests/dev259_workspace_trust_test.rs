@@ -89,6 +89,33 @@ fn lotar_writes_keep_a_trusted_workspace_trusted() {
 }
 
 #[test]
+fn a_trust_record_from_an_older_build_stays_trusted() {
+    let env = TrustEnv::new();
+    env.write_rule(&env.root().join("RAN"));
+    env.lotar().arg("trust").assert().success();
+    let record = std::fs::read_to_string(&env.trust_file).unwrap();
+    assert!(record.contains("kinds:"), "lotar trust lists the kinds it covers: {record}");
+
+    // The record as builds before DEV-716 wrote it: no `kinds:`.
+    let legacy: String =
+        record.lines().filter(|line| !line.contains("kinds:") && !line.trim_start().starts_with("- ")).map(|line| format!("{line}\n")).collect();
+    assert!(!legacy.contains("kinds"), "{legacy}");
+    std::fs::write(&env.trust_file, legacy).unwrap();
+    env.lotar().args(["--format", "json", "trust", "--status"]).assert().success().stdout(predicate::str::contains("\"state\":\"trusted\""));
+
+    env.write_rule(&env.root().join("OTHER"));
+    env.lotar().args(["--format", "json", "trust", "--status"]).assert().success().stdout(predicate::str::contains("\"state\":\"changed\""));
+
+    // What `lotar trust` records with every kind set is trusted right away.
+    env.fixtures.create_config_in_dir(
+        &env.fixtures.tasks_root,
+        "agents:\n  bot:\n    runner: command\n    command: sh\nagent:\n  merge:\n    checks: [npm test]\n  worktree:\n    waiting_run: [cargo, clean]\n",
+    );
+    env.lotar().arg("trust").assert().success();
+    env.lotar().args(["--format", "json", "trust", "--status"]).assert().success().stdout(predicate::str::contains("\"state\":\"trusted\""));
+}
+
+#[test]
 fn repository_agent_profiles_wait_for_trust() {
     let env = TrustEnv::new();
     let marker = env.root().join("AGENT_RAN");

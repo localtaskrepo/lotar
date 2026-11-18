@@ -1,11 +1,11 @@
 title: 'Waiting cleanup for waits lotar or a rule sets: a job''s end drops the build output of a ticket it leaves HelpNeeded or Blocked'
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T20:06:24.875941+00:00
-modified: 2026-11-18T23:17:40.339580+00:00
+modified: 2026-11-18T23:25:19.400237+00:00
 relationships:
   blocks:
   - DEV-715
@@ -84,6 +84,30 @@ comments:
     - command: ui-review
       result: not_run
       reason: no UI change
+- date: 2026-11-18T23:25:18.712098+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-712` is in `main`.
+
+    - Rebased `agent/DEV-712` onto `main` (`3cb2acfa8fb6`): `1fba66016111`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `1fba66016111`
+    - Amended the pending `.tasks` changes into the merged commit: `b580a969f5d2`
+    - The merge changed rules, agent profiles or `agent.merge`: ran `lotar trust`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: b580a969f
+      what: 'DEV-712 Waiting cleanup for waits lotar or a rule sets: a job''s end drops the build output of a ticket it leaves HelpNeeded or Blocked'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b0cdad9-7699-4555-8e71-ac718d9fa284
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b8d09ba-3650-447c-80e2-286e292666cb
@@ -252,3 +276,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-653","DEV-715","DEV-716","DEV-637"]}'
     new: '{"blocks":["DEV-715"],"related":["DEV-653","DEV-715","DEV-716","DEV-637"]}'
+- at: 2026-11-18T23:25:18.712098+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:25:19.400237+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

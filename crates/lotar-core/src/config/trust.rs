@@ -10,6 +10,10 @@
 //! file in the home directory, and any change (a pull, a PR, a fresh clone)
 //! makes the workspace untrusted until `lotar trust` records it again.
 //!
+//! The record lists the source kinds the LoTaR that wrote it fingerprinted
+//! (DEV-716), so a newer LoTaR that adds a kind checks only those and a
+//! trusted repository stays trusted across the upgrade.
+//!
 //! Writes LoTaR makes itself (UI, REST, CLI and MCP config or automation
 //! edits) keep a trusted workspace trusted, see [`TrustService::rewrite`];
 //! they cannot turn an untrusted workspace into a trusted one.
@@ -34,7 +38,43 @@ struct TrustFile {
 struct TrustRecord {
     fingerprint: String,
     trusted_at: String,
+    /// The kinds `fingerprint` covers. Records written before DEV-716 have
+    /// none and cover [`LEGACY_KINDS`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kinds: Option<Vec<String>>,
 }
+
+impl TrustRecord {
+    fn covers(&self, kind: &str) -> bool {
+        match &self.kinds {
+            Some(kinds) => kinds.iter().any(|known| known == kind),
+            None => LEGACY_KINDS.contains(&kind),
+        }
+    }
+
+    /// Compares the sources of the kinds this record covers. Sources of a
+    /// kind the record's LoTaR didn't know don't count: that LoTaR never ran
+    /// them (DEV-716).
+    fn state(&self, sources: &[CommandSource]) -> TrustState {
+        let known = TrustService::fingerprint(sources.iter().filter(|source| self.covers(source.kind)));
+        if known.as_deref() == Some(self.fingerprint.as_str()) { TrustState::Trusted } else { TrustState::Changed }
+    }
+}
+
+/// The config blocks that can run commands, in fingerprint order. A new
+/// kind goes here; records written by older builds don't list it, so it
+/// doesn't make their repositories `changed`.
+type BlockFn = fn(&serde_yaml_ng::Value) -> Option<String>;
+const CONFIG_BLOCKS: &[(&str, BlockFn)] = &[("agents", agents_block), ("merge", merge_block), ("waiting_run", waiting_run_block)];
+
+/// Every kind of [`CommandSource`] this build fingerprints: automation files
+/// and [`CONFIG_BLOCKS`].
+fn kinds() -> impl Iterator<Item = &'static str> {
+    std::iter::once("automation").chain(CONFIG_BLOCKS.iter().map(|(kind, _)| *kind))
+}
+/// The kinds a record without `kinds:` covers: 0.15.4 and earlier, before
+/// DEV-716 (and DEV-712's `waiting_run`).
+const LEGACY_KINDS: &[&str] = &["automation", "agents", "merge"];
 
 /// One repository file that can make LoTaR run commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,14 +135,10 @@ impl TrustService {
             }
             let config =
                 std::fs::read_to_string(dir.join("config.yml")).ok().and_then(|content| serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&content).ok());
-            if let Some(agents) = config.as_ref().and_then(agents_block) {
-                out.push(CommandSource { path: format!("{rel_prefix}config.yml"), kind: "agents", content: agents });
-            }
-            if let Some(merge) = config.as_ref().and_then(merge_block) {
-                out.push(CommandSource { path: format!("{rel_prefix}config.yml"), kind: "merge", content: merge });
-            }
-            if let Some(waiting_run) = config.as_ref().and_then(waiting_run_block) {
-                out.push(CommandSource { path: format!("{rel_prefix}config.yml"), kind: "waiting_run", content: waiting_run });
+            for (kind, block) in CONFIG_BLOCKS {
+                if let Some(content) = config.as_ref().and_then(block) {
+                    out.push(CommandSource { path: format!("{rel_prefix}config.yml"), kind, content });
+                }
             }
         };
         push_dir(tasks_dir, "");
@@ -115,10 +151,9 @@ impl TrustService {
     }
 
     /// Fingerprint of the given sources; `None` when there are none.
-    fn fingerprint(sources: &[CommandSource]) -> Option<String> {
-        if sources.is_empty() {
-            return None;
-        }
+    fn fingerprint<'a>(sources: impl IntoIterator<Item = &'a CommandSource>) -> Option<String> {
+        let mut sources = sources.into_iter().peekable();
+        sources.peek()?;
         let mut hasher = blake3::Hasher::new();
         for source in sources {
             for part in [source.path.as_str(), source.kind, source.content.as_str()] {
@@ -130,17 +165,17 @@ impl TrustService {
     }
 
     pub fn state(tasks_dir: &Path) -> TrustState {
-        let Some(fingerprint) = Self::fingerprint(&Self::sources(tasks_dir)) else {
+        let sources = Self::sources(tasks_dir);
+        if sources.is_empty() {
             return TrustState::NothingToTrust;
-        };
+        }
         if trust_all() {
             return TrustState::Trusted;
         }
-        match load_trust_file().ok().and_then(|file| file.workspaces.get(&workspace_key(tasks_dir)).cloned()) {
-            Some(record) if record.fingerprint == fingerprint => TrustState::Trusted,
-            Some(_) => TrustState::Changed,
-            None => TrustState::Untrusted,
-        }
+        let Some(record) = load_trust_file().ok().and_then(|file| file.workspaces.get(&workspace_key(tasks_dir)).cloned()) else {
+            return TrustState::Untrusted;
+        };
+        record.state(&sources)
     }
 
     pub fn allows_commands(tasks_dir: &Path) -> bool {
@@ -153,8 +188,9 @@ impl TrustService {
         let Some(fingerprint) = Self::fingerprint(&Self::sources(tasks_dir)) else {
             return Ok(false);
         };
+        let kinds = Some(kinds().map(str::to_string).collect());
         update_trust_file(|file| {
-            file.workspaces.insert(workspace_key(tasks_dir), TrustRecord { fingerprint, trusted_at: crate::utils::time::now_rfc3339() });
+            file.workspaces.insert(workspace_key(tasks_dir), TrustRecord { fingerprint, trusted_at: crate::utils::time::now_rfc3339(), kinds });
         })?;
         Ok(true)
     }
@@ -354,5 +390,79 @@ mod tests {
             std::fs::write(tasks.join("config.yml"), dotted).unwrap();
             assert_eq!(TrustService::fingerprint(&TrustService::sources(tasks)), before, "{dotted}");
         }
+    }
+
+    fn record(sources: &[CommandSource], kinds: Option<&[&str]>) -> TrustRecord {
+        TrustRecord {
+            fingerprint: TrustService::fingerprint(sources).unwrap(),
+            trusted_at: String::new(),
+            kinds: kinds.map(|kinds| kinds.iter().map(|kind| (*kind).to_string()).collect()),
+        }
+    }
+
+    fn source(path: &str, kind: &'static str, content: &str) -> CommandSource {
+        CommandSource { path: path.to_string(), kind, content: content.to_string() }
+    }
+
+    #[test]
+    fn every_source_kind_is_listed() {
+        let dir = tempfile::tempdir().unwrap();
+        let tasks = dir.path();
+        std::fs::write(
+            tasks.join("config.yml"),
+            "agents:\n  bot:\n    runner: command\n    command: sh\nagent:\n  merge:\n    checks: [npm test]\n  worktree:\n    waiting_run: [cargo, clean]\n",
+        )
+        .unwrap();
+        std::fs::write(tasks.join("automation.yml"), "automation:\n  rules: []\n").unwrap();
+        let sources = TrustService::sources(tasks);
+        assert_eq!(sources.iter().map(|source| source.kind).collect::<Vec<_>>(), kinds().collect::<Vec<_>>(), "a test config with every kind");
+
+        // What `lotar trust` records is trusted right away.
+        let fresh = record(&sources, Some(&kinds().collect::<Vec<_>>()));
+        assert_eq!(fresh.state(&sources), TrustState::Trusted);
+        // A 0.15.4 record (no `kinds:`, no `waiting_run`) stays trusted.
+        let legacy_sources: Vec<_> = sources.iter().filter(|source| LEGACY_KINDS.contains(&source.kind)).cloned().collect();
+        assert_eq!(record(&legacy_sources, None).state(&sources), TrustState::Trusted, "DEV-712's waiting_run doesn't untrust it");
+    }
+
+    #[test]
+    fn a_kind_added_by_a_newer_build_keeps_the_trust() {
+        let automation = source("automation.yml", "automation", "automation: {}\n");
+        let merge = source("config.yml", "merge", "checks:\n- npm test\n");
+        // A build that knew only automation and agents trusted the repository,
+        // which already had `agent.merge`.
+        let trusted = record(std::slice::from_ref(&automation), Some(&["automation", "agents"]));
+        assert_eq!(trusted.state(&[automation.clone(), merge.clone()]), TrustState::Trusted, "the newly fingerprinted kind doesn't untrust it");
+
+        let edited = source("automation.yml", "automation", "automation: {rules: []}\n");
+        assert_eq!(trusted.state(&[edited.clone(), merge.clone()]), TrustState::Changed, "a kind the record covers still counts");
+
+        // A record of this build covers merge too.
+        let current = record(&[automation.clone(), merge.clone()], Some(&kinds().collect::<Vec<_>>()));
+        let other_merge = source("config.yml", "merge", "checks:\n- rm -rf build\n");
+        assert_eq!(current.state(&[automation.clone(), other_merge]), TrustState::Changed);
+        assert_eq!(current.state(std::slice::from_ref(&automation)), TrustState::Changed, "a removed source counts");
+    }
+
+    #[test]
+    fn a_record_without_kinds_covers_the_kinds_before_dev716() {
+        let automation = source("automation.yml", "automation", "automation: {}\n");
+        let agents = source("config.yml", "agents", "bot:\n  runner: command\n");
+        let merge = source("config.yml", "merge", "checks:\n- npm test\n");
+        let added = source("config.yml", "later_kind", "- cargo\n- clean\n");
+        let all = [automation.clone(), agents.clone(), merge.clone()];
+        let legacy = record(&all, None);
+        assert_eq!(legacy.state(&all), TrustState::Trusted, "this build reads the old record");
+        assert_eq!(legacy.state(&[automation.clone(), agents.clone(), merge.clone(), added]), TrustState::Trusted, "nor does a later kind untrust it");
+        let other_merge = source("config.yml", "merge", "checks:\n- rm -rf build\n");
+        assert_eq!(legacy.state(&[automation, agents, other_merge]), TrustState::Changed);
+    }
+
+    #[test]
+    fn a_kind_a_newer_build_drops_needs_trust_again() {
+        let automation = source("automation.yml", "automation", "automation: {}\n");
+        let gone = source("config.yml", "gone_kind", "x\n");
+        let trusted = record(&[automation.clone(), gone], Some(&["automation", "gone_kind"]));
+        assert_eq!(trusted.state(&[automation]), TrustState::Changed);
     }
 }

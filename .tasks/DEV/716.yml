@@ -1,15 +1,91 @@
 title: A lotar build that adds a trust source kind makes every trusted repository untrusted
-status: InProgress
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-18T23:16:57.132482+00:00
-modified: 2026-11-18T23:18:31.092437+00:00
+modified: 2026-11-18T23:36:44.987602+00:00
 relationships:
   related:
   - DEV-712
   - DEV-605
+comments:
+- date: 2026-11-18T23:25:31.252203+00:00
+  author: claude
+  text: |-
+    A new lotar build that adds a trust source kind no longer untrusts a trusted repository.
+
+    - `crates/lotar-core/src/config/trust.rs`: the record now stores `kinds:` (the kinds its fingerprint covers). `state` checks only sources of those kinds. A record without `kinds:` (older builds) covers `automation`, `agents`, `merge`, so today's trust files stay valid.
+    - Still `changed`: an edit to a covered kind, a removed source, or a build that drops a covered kind.
+    - Trade-off: content of a new kind that changed between the last `lotar trust` and the upgrade is accepted without review. The older lotar never ran it; the next `lotar trust` covers it.
+    - Tests: unit tests in `trust.rs` (added kind, legacy record, dropped kind, `KINDS` complete) and `a_trust_record_from_an_older_build_stays_trusted` in `dev259_workspace_trust_test.rs`.
+    - `docs/help/trust.md` updated.
+    - DEV-712 (`fbf4982dc`, not on main) also edits `trust.rs`: on rebase, add `waiting_run` to `KINDS`. The `every_source_kind_is_listed` test flags it if missed.
+  report:
+    commits:
+    - hash: 6781e9c53
+      what: trust record lists its kinds; newer kinds don't untrust
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: 2411 Rust, 1562 UI
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    next: 'Review, then merge. DEV-712 on rebase: add waiting_run to KINDS in trust.rs (not LEGACY_KINDS)'
+- date: 2026-11-18T23:28:29.291783+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix is right on its old base, but DEV-712 is now on main (`b580a969f`), and rebasing onto it silently breaks trust for `waiting_run`.
+
+    - Read: `6781e9c53` diff, ticket and Done when, DEV-712's `trust.rs` change on main, `rewrite`/`trust`/`state` callers. Done when items 1–5 are met on the branch's base `3cb2acfa8`.
+    - Reran: `npm ci` (ok), `cargo nextest run --workspace -E 'test(/trust/)'` (13 passed). Did not rerun `npm run lint`, `npm test` or `npm run smoke`.
+    - **Finding 1, `crates/lotar-core/src/config/trust.rs:64` (`KINDS`):** the rebase onto main conflicts only in the test module. A merge that keeps both sides leaves `KINDS` = `automation, agents, merge`. Then `trust()` fingerprints every source, `waiting_run` included, but records `kinds:` without it, and `state()` leaves it out. So `lotar trust` writes a record that is `changed` right away. lotar's own `.tasks/DEV/config.yml` sets `waiting_run`, so lotar's repo can't be trusted at all: rules' `run` actions are skipped and repository profiles refused.
+    - Proof: scratch rebase in `/tmp/dev716-rebase` (removed afterwards). I kept both sides of the conflict and left `KINDS` as is. All 7 trust unit tests passed. A probe test failed with `a record lotar trust just wrote` → `Changed`: it writes a `waiting_run` config, then checks a record built the way `trust()` builds one.
+    - **Finding 2, `trust.rs` `every_source_kind_is_listed`:** the fix comment says this test "flags it if missed". It doesn't. Its config sets only agents, merge and automation, so `sources().len() == KINDS.len()` still holds with `waiting_run` missing.
+    - Fix: rebase onto main. Add `waiting_run` to `KINDS`, not to `LEGACY_KINDS`: 0.15.4, the installed build, doesn't fingerprint it. Put `agent.worktree.waiting_run` in the test's config so it covers every kind `sources()` emits. Ideally also a test that a record `lotar trust` just wrote is `trusted` with every kind set.
+    - Note, no ticket: a record written without `kinds:` by a main build between DEV-712 and this fix covers 4 kinds and will show `changed` once. It needs one `lotar trust`. The installed build is 0.15.4, so this is unlikely.
+- date: 2026-11-18T23:34:55.783370+00:00
+  author: claude
+  text: |-
+    Both review findings fixed: rebased onto main, and the recorded kinds can no longer drift from what's fingerprinted.
+
+    - Review read `6781e9c53`, which was HEAD, so its findings stood.
+    - Rebased onto main `b580a969f` (DEV-712). The conflict was only in the test module; kept both sides.
+    - **Finding 1:** the hand-kept `KINDS` list is gone. `sources()` now walks one table, `CONFIG_BLOCKS` (`agents`, `merge`, `waiting_run`), and `kinds()` (what `lotar trust` records) comes from the same table. A new kind can't be fingerprinted without being recorded. `LEGACY_KINDS` stays `automation, agents, merge` (0.15.4).
+    - **Finding 2:** `every_source_kind_is_listed` now sets `waiting_run` too and compares the emitted kinds with `kinds()`. It also checks two records against those sources: one built the way `lotar trust` builds it, and one from 0.15.4 (no `kinds:`, no `waiting_run`). Both are `trusted`.
+    - `a_trust_record_from_an_older_build_stays_trusted` (`dev259_workspace_trust_test.rs`): now also runs `lotar trust` on a config with every kind set, `waiting_run` included, and checks `--status` shows `trusted`.
+    - Review's note: a record written without `kinds:` by a main build between DEV-712 and this fix needs one `lotar trust`. No code change; the installed build is 0.15.4.
+  report:
+    commits:
+    - hash: 307c508b9
+      what: rebased onto main (DEV-712); kinds come from the table sources() uses
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: 2412 Rust, 1562 UI
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 405 tests
+    next: Review again, then merge
+- date: 2026-11-18T23:36:38.604748+00:00
+  author: claude
+  text: |-
+    Review: passed. `307c508b9` on main `b580a969f` does every Done when item, and both findings from the last review are fixed.
+
+    - Read: `git diff main..HEAD` (`trust.rs`, `dev259_workspace_trust_test.rs`, `docs/help/trust.md`), the ticket and its comments, DEV-712's `waiting_run` on main, and the trust callers (`rewrite`, `merge.rs` `trust`/`state`, the profile, rule and `waiting_run` gates).
+    - Finding 1 is fixed: `CONFIG_BLOCKS` is the one table behind both `sources()` and `kinds()`, so `lotar trust` records `automation, agents, merge, waiting_run`. A legacy record (no `kinds:`) covers `LEGACY_KINDS` = 0.15.4's kinds.
+    - Finding 2 is fixed: `every_source_kind_is_listed` now sets `waiting_run`, compares the emitted kinds with `kinds()`, and checks that both a fresh record and a 0.15.4 record are `trusted`.
+    - Edge cases hold: a removed source or a dropped kind is `changed`; `rewrite` re-trusts with all kinds; `kinds:` is optional in serde, so older builds ignore it.
+    - Reran: `npm ci` (ok), `cargo nextest run --workspace -E 'test(/trust/) | test(/kind/)'` (43 passed), `npm run lint` (passed). `npm test` and `npm run smoke` were not rerun; the fix agent reports them passing on this commit.
+    - No stray files, no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93e04b7f-1eca-4124-bc9a-accd8796276f
 description: |-
@@ -28,6 +104,8 @@ description: |-
   - [ ] `lotar trust` writes `kinds:` with every kind this build fingerprints; the trust file stays readable by older builds (extra field ignored).
   - [ ] A build that drops a kind the record lists shows `changed` (safe side: needs `lotar trust`).
   - [ ] `docs/help/trust.md` says a new lotar version doesn't untrust a repository on its own.
+tags:
+- review-returned
 history:
 - at: 2026-11-18T23:16:57.776008+00:00
   actor: claude
@@ -80,3 +158,67 @@ history:
       - [ ] `lotar trust` writes `kinds:` with every kind this build fingerprints; the trust file stays readable by older builds (extra field ignored).
       - [ ] A build that drops a kind the record lists shows `changed` (safe side: needs `lotar trust`).
       - [ ] `docs/help/trust.md` says a new lotar version doesn't untrust a repository on its own.
+- at: 2026-11-18T23:25:31.252203+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:25:47.564460+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T23:28:29.291783+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:28:29.685635+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-18T23:28:47.873499+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-18T23:28:48.970359+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-18T23:34:55.783370+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:35:07.755416+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-18T23:36:38.604748+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:36:44.987602+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

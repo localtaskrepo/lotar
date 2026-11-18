@@ -1,11 +1,11 @@
 title: agent.worktree.waiting_run from the home config is skipped in an untrusted repository
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T23:16:52.507333+00:00
-modified: 2026-11-18T23:18:04.887046+00:00
+modified: 2026-11-18T23:35:42.520914+00:00
 relationships:
   depends_on:
   - DEV-712
@@ -20,19 +20,45 @@ comments:
     - `run_waiting_command` and `agent.worktree.waiting_run` exist only on `agent/DEV-712` (`fbf4982dc`, status Reviewing); main (`3cb2acfa8`) has neither.
     - Fixing it now would stack on an unreviewed commit that its review may still change.
     - Once DEV-712 is on main: check trust only when the `waiting_run` in effect comes from a repository config (`.tasks/config.yml` or a project config), not from `~/.lotar.yml`, and add a test that covers both cases.
+- date: 2026-11-18T23:35:35.014522+00:00
+  author: claude
+  text: |-
+    Fixed: a `waiting_run` from your home config now runs in an untrusted repository; a repository's still needs `lotar trust`.
+
+    - `run_waiting_command` (`crates/lotar-agent/src/services/agent_job_service.rs`) checks trust only when the user's own layers (home `~/.lotar`, env, CLI) don't set that exact command. The new `own_layers_config()` in `crates/lotar-core/src/config/resolution.rs` resolves those layers.
+    - Which one wins follows the usual precedence. Home beats the repository's `.tasks/config.yml`, so its command runs without trust. A project config beats home, so its command still needs trust and is skipped and logged when untrusted.
+    - Test (`agent_safety_test.rs`, waiting test): in an untrusted repository the repository's command is skipped, and a home config's command runs.
+    - Docs: `docs/help/trust.md`, `agent.md` and `config-reference.md`.
+  report:
+    commits:
+    - hash: bf025515c
+      what: home-config waiting_run runs untrusted; test and docs
+    checks:
+    - command: cargo nextest run --test integration waiting_build_output
+      result: passed
+      reason: fails without the fix at agent_safety_test.rs:634
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2407 Rust, 1562 UI
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae356ada3-5c1b-41fe-9622-12ac9d56068c
 description: |-
   Found in DEV-712's review (2026-11-18).
 
   - `run_waiting_command` (`crates/lotar-agent/src/services/agent_job_service.rs`) checks `TrustService::allows_commands(tasks_dir)` for the whole workspace, whatever config the command comes from.
-  - So a `waiting_run` set in `~/.lotar.yml` (the user's own) is skipped when the repository has other untrusted sources (rules, profiles, `agent.merge`).
+  - So a `waiting_run` set in the home config (`~/.lotar`, the user's own) is skipped when the repository has other untrusted sources (rules, profiles, `agent.merge`).
   - DEV-712 asks only a repository config's command to need trust; `docs/help/trust.md` says the user's own settings always run.
 
   ## Done when
   - [ ] A home-config `waiting_run` runs in an untrusted repository; a repository's still needs `lotar trust`. A test shows both.
-tags:
-- waits
+  - [ ] Which wins: the usual precedence (CLI > env > project > home > global). Home beats the repository's `.tasks/config.yml`, so its command runs untrusted; a project config's command beats home and needs trust; untrusted, it is skipped and the log says so, as before.
+  - [ ] `docs/help/trust.md`, `agent.md` and `config-reference.md` say so.
 history:
 - at: 2026-11-18T23:16:53.135667+00:00
   actor: claude
@@ -72,3 +98,52 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-18T23:25:25.043002+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-18T23:25:28.305983+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T23:29:43.286918+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-712's review (2026-11-18).
+
+      - `run_waiting_command` (`crates/lotar-agent/src/services/agent_job_service.rs`) checks `TrustService::allows_commands(tasks_dir)` for the whole workspace, whatever config the command comes from.
+      - So a `waiting_run` set in `~/.lotar.yml` (the user's own) is skipped when the repository has other untrusted sources (rules, profiles, `agent.merge`).
+      - DEV-712 asks only a repository config's command to need trust; `docs/help/trust.md` says the user's own settings always run.
+
+      ## Done when
+      - [ ] A home-config `waiting_run` runs in an untrusted repository; a repository's still needs `lotar trust`. A test shows both.
+    new: |-
+      Found in DEV-712's review (2026-11-18).
+
+      - `run_waiting_command` (`crates/lotar-agent/src/services/agent_job_service.rs`) checks `TrustService::allows_commands(tasks_dir)` for the whole workspace, whatever config the command comes from.
+      - So a `waiting_run` set in the home config (`~/.lotar`, the user's own) is skipped when the repository has other untrusted sources (rules, profiles, `agent.merge`).
+      - DEV-712 asks only a repository config's command to need trust; `docs/help/trust.md` says the user's own settings always run.
+
+      ## Done when
+      - [ ] A home-config `waiting_run` runs in an untrusted repository; a repository's still needs `lotar trust`. A test shows both.
+      - [ ] Which wins: the usual precedence (CLI > env > project > home > global). Home beats the repository's `.tasks/config.yml`, so its command runs untrusted; a project config's command beats home and needs trust; untrusted, it is skipped and the log says so, as before.
+      - [ ] `docs/help/trust.md`, `agent.md` and `config-reference.md` say so.
+- at: 2026-11-18T23:35:35.014522+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:35:42.520914+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -34,6 +34,8 @@ Rules from your home automation file (`~/.lotar.automation.yml`) and agent jobs 
 
 Any change to those files made outside LoTaR (an edit, a pull, a merge) makes the repository untrusted again until you review it and run `lotar trust`. `lotar trust --status` lists every `run` command, agent profile, merge and waiting command so you can review them. Changes to other settings in `config.yml` do not affect trust.
 
+A new LoTaR version that adds a kind of setting to this list doesn't make a trusted repository untrusted: the record names the kinds it covers, and settings of a kind added later count from your next `lotar trust`. A version that stops checking a kind shows the repository as changed until you run `lotar trust` again.
+
 Edits made through LoTaR itself (the web UI, REST, MCP, `lotar config set`) keep a trusted repository trusted. They cannot make an untrusted repository trusted.
 
 ## CI and containers
