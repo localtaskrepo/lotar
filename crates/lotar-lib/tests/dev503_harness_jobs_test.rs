@@ -1142,6 +1142,52 @@ fn the_tickets_branch_stays_when_only_it_has_the_commit_its_thread_rebased() {
     assert_ne!(rev(root, "agent/TEST-1"), rev(root, "t3/topic-0"), "the ticket's branch keeps commit A");
 }
 
+/// `agent/TEST-1` at `t3/topic-0`'s fix (and, with `backup`, `backup/TEST-1-fix` there too), and a newer logged
+/// thread branch `t3/topic-1` with TEST-1 work that doesn't build on it; then a review job runs. The fix, `t3/topic-1`'s
+/// tip, and the T3 log.
+fn newer_work_beside_the_fix(backup: bool) -> (TestFixtures, Vec<EnvVarGuard>, String, String, String) {
+    let other =
+        "git reset -q --hard main && echo other > other.txt && git add other.txt && GIT_COMMITTER_DATE=2099-01-01T00:00:00Z git commit -qm TEST-1-other";
+    let (fixtures, env) =
+        t3_harness_with(&[("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix", ""), ("other", other, ""), ("review", "", "")]);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    run_t3(&fixtures, "other").success();
+    let fix = rev(root, "t3/topic-0");
+    let newer = rev(root, "t3/topic-1");
+    git(root, &["branch", "-f", "agent/TEST-1", &fix]);
+    if backup {
+        git(root, &["branch", "backup/TEST-1-fix", &fix]);
+    }
+    run_t3(&fixtures, "review").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    (fixtures, env, fix, newer, log)
+}
+
+/// DEV-689: only the ticket's own earlier thread branch `t3/topic-0` has the fix. It doesn't count as keeping it
+/// (owner 2026-11-18: only branches outside the ticket's own thread branches count), so the DEV-602 guard holds:
+/// the review starts from the fix, not from the newer work that drops it.
+#[test]
+fn the_tickets_branch_stays_at_its_fix_that_only_its_own_thread_branch_also_has() {
+    let (fixtures, _env, fix, _newer, log) = newer_work_beside_the_fix(false);
+    assert_eq!(log.lines().nth(2).unwrap_or_default(), format!("agent/TEST-1 t3/topic-2 {fix}"), "the review starts from the fix: {log}");
+    assert_eq!(rev(fixtures.get_temp_path(), "agent/TEST-1"), fix, "the ticket's branch stays at the fix");
+}
+
+/// DEV-689: a branch outside the ticket's thread branches (`backup/TEST-1-fix`) keeps the fix, so the job moves the
+/// ticket's branch to the newer work, starts from it and names the backup (DEV-687).
+#[test]
+fn the_tickets_branch_follows_newer_work_when_a_backup_keeps_its_fix() {
+    let (fixtures, _env, _fix, newer, log) = newer_work_beside_the_fix(true);
+    assert_eq!(log.lines().nth(2).unwrap_or_default(), format!("agent/TEST-1 t3/topic-2 {newer}"), "the review starts from the newer work: {log}");
+    assert_eq!(rev(fixtures.get_temp_path(), "agent/TEST-1"), newer, "the ticket's branch moves to the newer work");
+    let logs: String = std::fs::read_dir(fixtures.tasks_root.join("@agent-logs"))
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap_or_default())
+        .collect();
+    assert!(logs.contains("Its commits that t3/topic-1 lacks stay on backup/TEST-1-fix."), "the job names the backup: {logs}");
+}
+
 /// DEV-581: a T3 Code thread keeps the ticket's branch checked out in its worktree, so a headless job after it failed
 /// on `git worktree add`. The headless review and merge now run in the thread's worktree, the rework continues the
 /// thread there, and Done cleanup removes it.

@@ -1922,7 +1922,7 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
     if thread_branch == ticket_branch {
         return Ok(());
     }
-    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &thread_branch, started_from.as_deref(), Some(job_id))
+    let moved = move_ticket_branch(tasks_dir, &repo_root, ticket_id, &ticket_branch, &thread_branch, started_from.as_deref(), Some(job_id))
         .map_err(|err| format!("{ticket_branch} stays where it is, not at {thread_branch} of the T3 Code thread: {err}"))?;
     let note = match moved {
         BranchMove::Already => None,
@@ -1958,11 +1958,7 @@ fn unlanded_ticket_branch(tasks_dir: &std::path::Path, ticket_id: &str, prefix: 
     let owners = BranchOwners::load(&repo_root, prefix);
     let jobs: Vec<_> = saved_jobs(tasks_dir).into_iter().filter(|job| job.header.ticket_id == ticket_id).collect();
     let commits: Vec<&str> = jobs.iter().filter_map(|job| job.status.as_ref()?.ticket_commit.as_deref()).collect();
-    let logged: Vec<&str> = jobs
-        .iter()
-        .flat_map(|job| [job.header.worktree_branch.as_deref(), job.status.as_ref().and_then(|status| status.worktree_branch.as_deref())])
-        .flatten()
-        .collect();
+    let logged = logged_branches(&jobs);
     refs.lines()
         .filter_map(|line| line.split_once(' '))
         .filter(|(_, branch)| main.as_deref() != Some(*branch) && except != Some(*branch))
@@ -2003,9 +1999,9 @@ fn holds_logged_work(repo_root: &std::path::Path, branch: &str, ticket_id: &str,
 /// worktree: a thread may commit on an earlier thread's branch (`t3/<topic>`)
 /// while the ticket's branch stays behind, and the review and merge then
 /// start from nothing. The ticket's branch stays when it has work of its
-/// own that the newer branch doesn't build on and no other branch keeps
-/// (DEV-687: a thread rebased it and kept the old commit on a backup
-/// branch). `Ok(Some(note))` when it
+/// own that the newer branch doesn't build on and no branch outside the
+/// ticket's thread branches keeps (DEV-687: a thread rebased it and kept
+/// the old commit on a backup branch; DEV-689). `Ok(Some(note))` when it
 /// moved; `Err` when git refused to move it.
 fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Result<Option<String>, String> {
     if !config.agent_worktree.enabled {
@@ -2023,12 +2019,12 @@ fn follow_ticket_work(tasks_dir: &std::path::Path, ticket_id: &str, config: &Res
         let builds_on = git_command(&repo_root).args(["merge-base", "--is-ancestor", &ticket_tip, &format!("refs/heads/{holder}")]).status();
         if !builds_on.is_ok_and(|status| status.success())
             && !branch_landed(&repo_root, &ticket_branch).unwrap_or(false)
-            && branch_keeping(&repo_root, &ticket_tip, &ticket_branch).is_none()
+            && branch_keeping(tasks_dir, &repo_root, &ticket_tip, ticket_id, &ticket_branch).is_none()
         {
             return Ok(None);
         }
     }
-    let moved = move_ticket_branch(tasks_dir, &repo_root, &ticket_branch, &holder, None, None)
+    let moved = move_ticket_branch(tasks_dir, &repo_root, ticket_id, &ticket_branch, &holder, None, None)
         .map_err(|err| format!("{ticket_branch} can't move to {holder}, which holds {ticket_id}'s newest work that isn't in the main checkout: {err}"))?;
     let tip = rev_parse(&repo_root, &format!("refs/heads/{holder}")).unwrap_or_default();
     Ok(match moved {
@@ -2060,7 +2056,8 @@ enum BranchMove {
 /// moving it would drop. Unless it is still at `started_from`, the commit
 /// the thread started from: then the thread rewrote that commit (an amend),
 /// or another local branch keeps its tip (a backup the thread kept when it
-/// rebased the commit, DEV-687): moving drops nothing then.
+/// rebased the commit, DEV-687; not a thread branch of `ticket_id`'s
+/// jobs, DEV-689): moving drops nothing then.
 /// A worktree of a finished job that still has `ticket_branch` checked out
 /// (an earlier thread's, which T3 Code leaves when a later thread takes
 /// over the branch, DEV-573) moves with it when clean, else is detached at
@@ -2072,6 +2069,7 @@ enum BranchMove {
 fn move_ticket_branch(
     tasks_dir: &std::path::Path,
     repo_root: &std::path::Path,
+    ticket_id: &str,
     ticket_branch: &str,
     thread_branch: &str,
     started_from: Option<&str>,
@@ -2094,7 +2092,7 @@ fn move_ticket_branch(
         }
         let lacks = started_from != Some(ticket_tip.as_str()) && git_output(&["cherry", &tip, &ticket_ref])?.lines().any(|line| line.starts_with('+'));
         if lacks && !branch_landed(repo_root, ticket_branch).unwrap_or(false) {
-            kept = branch_keeping(repo_root, &ticket_tip, ticket_branch);
+            kept = branch_keeping(tasks_dir, repo_root, &ticket_tip, ticket_id, ticket_branch);
             if kept.is_none() {
                 return Err(format!("it has commits that {thread_branch} lacks"));
             }
@@ -2128,11 +2126,25 @@ fn move_ticket_branch(
     Ok(BranchMove::Moved(kept))
 }
 
-/// A local branch other than `ticket_branch` whose history has `commit`,
-/// so moving `ticket_branch` away from it loses nothing (DEV-687).
-fn branch_keeping(repo_root: &std::path::Path, commit: &str, ticket_branch: &str) -> Option<String> {
+/// A local branch whose history has `commit`, so moving `ticket_branch`
+/// away from it loses nothing (DEV-687). Neither `ticket_branch` nor a
+/// thread branch a job of `ticket_id` logged counts: the ticket's work on
+/// an earlier thread's branch would then drop out of the review and merge
+/// (owner 2026-11-18, DEV-689: only branches outside the ticket's own
+/// thread branches count).
+fn branch_keeping(tasks_dir: &std::path::Path, repo_root: &std::path::Path, commit: &str, ticket_id: &str, ticket_branch: &str) -> Option<String> {
     let branches = git_stdout(repo_root, &["for-each-ref", "--contains", commit, "--format=%(refname:short)", "refs/heads/"]).ok()?;
-    branches.lines().map(str::trim).find(|branch| !branch.is_empty() && *branch != ticket_branch).map(str::to_string)
+    let jobs: Vec<_> = saved_jobs(tasks_dir).into_iter().filter(|job| job.header.ticket_id == ticket_id).collect();
+    let logged = logged_branches(&jobs);
+    branches.lines().map(str::trim).find(|branch| !branch.is_empty() && *branch != ticket_branch && !logged.contains(branch)).map(str::to_string)
+}
+
+/// The branches `jobs` logged as their worktree's.
+fn logged_branches(jobs: &[crate::services::agent_log_service::SavedJob]) -> Vec<&str> {
+    jobs.iter()
+        .flat_map(|job| [job.header.worktree_branch.as_deref(), job.status.as_ref().and_then(|status| status.worktree_branch.as_deref())])
+        .flatten()
+        .collect()
 }
 
 /// The note's ending that names `kept`, the branch keeping the commits the
