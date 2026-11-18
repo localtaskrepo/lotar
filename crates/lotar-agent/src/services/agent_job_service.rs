@@ -4271,8 +4271,11 @@ fn drive_turns(
         });
     };
     let finish = |exit_code: i32, reported_cost: bool| {
+        // In the log only: the job's last message, its summary, stays the agent's reply or the turn's error (DEV-704).
         if budget.is_some() && !reported_cost {
-            progress("The agent reported no cost, so the profile's max_budget_usd was not checked.".to_string());
+            update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some("The agent reported no cost, so the profile's max_budget_usd was not checked.".to_string()));
+            });
         }
         RunEnd::Exited(Some(exit_code))
     };
@@ -7253,5 +7256,26 @@ mod dev520_session_events_tests {
         };
         assert!(why.contains("ended: idle"), "{why}");
         let RunEnd::Failed(_) = ends_idle_after(vec![], dir.path()) else { panic!("a session that ends before the first turn ends fails the job") };
+    }
+
+    /// A turn that fails on a usage limit keeps its error as the job's last message, which becomes its summary;
+    /// the note that the budget went unchecked is in the log only (DEV-704).
+    #[test]
+    fn a_failed_turns_error_stays_the_last_message_when_no_cost_came() {
+        let dir = tempfile::tempdir().unwrap();
+        let job_id = "job-dev704-limit";
+        super::JOB_REGISTRY.lock().unwrap().jobs.insert(job_id.to_string(), super::tests::unit_job_state(job_id));
+        let error = "Internal error: You've hit your 5-hour limit · resets 6pm (America/Los_Angeles)";
+        let (tx, rx) = tokio::sync::broadcast::channel(16);
+        let (mut events, _) = SessionEvents::open(Err("no log".into()), || rx);
+        tx.send(event(1, 1, EventBody::TurnFailed { error: error.into() })).unwrap();
+        tx.send(Event { turn: None, ..event(2, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
+        let settings = TurnSettings { first: 1, prefixes: &[], budget: Some(5.0), stall_timeout_seconds: None, agent: "fake", link: None };
+        let end = drive_turns(job_id, dir.path(), &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new());
+        let state = super::JOB_REGISTRY.lock().unwrap().jobs.remove(job_id).unwrap();
+        assert!(matches!(end, RunEnd::Exited(Some(1))));
+        assert_eq!(state.record.last_message.as_deref(), Some(error));
+        let messages = state.events.iter().filter_map(|entry| entry.message.as_deref()).collect::<Vec<_>>();
+        assert_eq!(messages, [error, "The agent reported no cost, so the profile's max_budget_usd was not checked."]);
     }
 }

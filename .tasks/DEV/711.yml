@@ -3,14 +3,36 @@ status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-18T19:52:45.218211+00:00
+modified: 2026-11-18T20:23:47.690070+00:00
 relationships:
   depends_on:
   - DEV-683
   related:
   - DEV-584
+comments:
+- date: 2026-11-18T20:20:17.510756+00:00
+  author: claude
+  text: |-
+    Still blocked: harnessmux 0.2.0 isn't released. Release it, or should lotar depend on the git commit until then?
+
+    - DEV-683 is merged and pushed: harnessmux `main` is at `efc17df`, with `CHANGELOG.md` under `## 0.2.0 (unreleased)` and `version = "0.1.10"` in its `Cargo.toml`.
+    - crates.io's newest is still `0.1.10` (`cargo search harnessmux`, crates.io API); no `v0.2.0` tag.
+    - lotar asks for `harnessmux = "0.1.10"` (`Cargo.toml:23`), so "bump to 0.2.0" can't build yet.
+    - Publishing a crate is your call, so I changed no files.
+    - Options: (a) you release harnessmux 0.2.0, then an agent does this ticket; (b) lotar uses `harnessmux = { git = "https://github.com/localtaskrepo/harnessmux", rev = "efc17df" }` now and goes to `0.2.0` once it's out (a git dependency can't go into a crates.io release of lotar).
+- date: 2026-11-18T20:23:31.945460+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d of the job job-20261118T201946.638Z-27 again, with no lotar job (it resumed a turn a restart cut off, or someone wrote in the thread). lotar takes it over as the job job-20261118T202331.935Z-1: DEV-711 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-18T20:23:43.231069+00:00
+  author: claude
+  text: |-
+    Decision (mallox, 2026-11-18): "a": he releases harnessmux 0.2.0, then an agent does this ticket as written.
+
+    - Waits for harnessmux 0.2.0 on crates.io; checked again: newest is still `0.1.10`, no `v0.2.0` tag.
+    - No lotar files changed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
 description: |-
   Follow-up of DEV-584, which pauses a job on a provider's usage limit by matching the failure text (`crates/lotar-agent/src/services/usage_limit.rs`). harnessmux 0.2.0 (DEV-683) is not released yet: crates.io has 0.1.10, which reports `TurnFailed { error }` with no kind or reset time.
 
@@ -30,3 +52,55 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T20:19:47.280017+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T20:19:48.083268+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
+- at: 2026-11-18T20:20:17.510756+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:20:23.467149+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T20:23:31.912731+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-18T20:23:31.945460+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:23:32.302845+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-18T20:23:43.231069+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:23:47.690070+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+  - field: assignee
+    old: '@fix'
