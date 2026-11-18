@@ -26,8 +26,6 @@ automation:
             prompt: &fix-prompt |
               Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}"). Run lotar with
               LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex): lotar records it as the comment's author.
-              First rename this thread to "${{ticket.id}} fix: ${{ticket.title}}" (T3 Code tool t3_thread_update,
-              action rename, no threadId).
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. After
@@ -38,6 +36,9 @@ automation:
                  Before asking him, ask the agents that are running (T3 threads, other sessions) what they know, and
                  file every bug you find in its repo (lotar add --finding). When the fix still needs him, comment one
                  question, set the status to HelpNeeded, assign the ticket to mallox (the owner) and stop.
+                 It waits for another ticket: lotar task relationships add ${{ticket.id}} depends-on <ID>, lotar task
+                 edit ${{ticket.id}} --tag waits, comment what it waits for and stop. The ticket goes Blocked, and
+                 you continue in this thread when <ID> is done; tag waits keeps the review away until then.
                  He decided these already, so never ask them (STD-156: FND-11, QIS-198 asked though G-20 was answered):
                  a push of finished work in a repo whose entry in ~/Development/standards/repos.json says "push": true
                  ("On private repos you can decide to push in general", 2026-11-11,
@@ -99,8 +100,7 @@ automation:
               Work ticket ${{ticket.id}} ("${{ticket.title}}"): read it and its relationships, then do it the way this
               repo's AGENTS.md says, with the tests and checks it names. Run lotar with LOTAR_DEFAULT_REPORTER set to
               your agent name (claude, codex). After a failed merge your branch may hold earlier commits
-              (git log <main>..HEAD): build on them. First rename this thread to "${{ticket.id}} fix: ${{ticket.title}}"
-              (T3 Code tool t3_thread_update, action rename, no threadId).
+              (git log <main>..HEAD): build on them.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Before you code: a ticket without "## Done when", or with one that doesn't say what each surface and
@@ -113,6 +113,9 @@ automation:
               2. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
                  Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
                  status to HelpNeeded, assign the ticket to mallox and stop.
+                 It waits for another ticket: lotar task relationships add ${{ticket.id}} depends-on <ID>, lotar task
+                 edit ${{ticket.id}} --tag waits, comment what it waits for and stop. The ticket goes Blocked, and
+                 you continue in this thread when <ID> is done; tag waits keeps the review away until then.
                  Never ask what he decided already (STD-156): a push of finished work where
                  ~/Development/standards/repos.json says "push": true ("On private repos you can decide to push in
                  general", docs/decisions/2026-11-11-formatting.md, docs/decisions/2026-11-12-push-finished-work.md),
@@ -152,17 +155,19 @@ automation:
     # A fix job's work goes to an agent reviewer before the merge (owner 2026-11-12, STD-59: "Yes, I agree with your
     # recommendations", docs/decisions/2026-11-12-qa-step.md): a new headless session, the cheap model after @fix-light
     # (STD-124). Not the ticket's model fields: they pick the fix agent's model. Work that commits only .tasks passes at
-    # once. A fix agent that hands the ticket back (HelpNeeded, Blocked) sets status and assignee
-    # itself, which replaces these, so no review starts. So does one that commits nothing: it sets Done (or WontDo) and
-    # clears the assignee (owner 2026-11-13, STD-87, docs/decisions/2026-11-13-no-change-closes.md).
+    # once. A fix agent that hands the ticket back (HelpNeeded) sets status and assignee itself, which replaces these,
+    # so no review starts; one that waits for another ticket tags it waits (below). So does one that commits nothing:
+    # it sets Done (or WontDo) and clears the assignee (owner 2026-11-13, STD-87, docs/decisions/2026-11-13-no-change-closes.md).
     # UI work (tag ui, or a diff that changes pages, components or styles) also gets the ui-review step with screenshots
     # (owner 2026-11-13, STD-97, docs/decisions/2026-11-13-agent-roles.md). lotar's conditions match ticket fields, not
     # changed files, so the review prompt checks both instead of a rule per tag.
     - name: "Fix done: review on Codex"
       when:
-        any:
-          - assignee: "@fix"
-          - assignee: "@fix-fable"
+        all:
+          - any:
+              - assignee: "@fix"
+              - assignee: "@fix-fable"
+          - not: { tags: { any: [waits] } }
       on:
         job_completed:
           set:
@@ -215,7 +220,9 @@ automation:
                  "Review: passed" or "Review: blocking": what you read and reran, the findings, the tickets filed.
     - name: "Fix done: review on Claude"
       when:
-        assignee: "@fix-retry"
+        all:
+          - assignee: "@fix-retry"
+          - not: { tags: { any: [waits] } }
       on:
         job_completed:
           set:
@@ -224,13 +231,32 @@ automation:
           agent: *review
     - name: "Fix done: light review"
       when:
-        assignee: "@fix-light"
+        all:
+          - assignee: "@fix-light"
+          - not: { tags: { any: [waits] } }
       on:
         job_completed:
           set:
             assignee: "@review-light"
             status: Reviewing
           agent: *review
+    # A fix job that ends waiting for another ticket (tag waits, from the fix and work prompts) gets no review: it goes
+    # Blocked on its fix profile, and "Prerequisites done" continues it there, then the review follows. Without the tag
+    # it went to @review, whose job lotar parked Blocked; after the unblock tell_agent ran the fix as @review, whose end
+    # merged it unreviewed (STD-207). The tag, not the status: a status the job sets applies only after its end rules.
+    - name: "Fix waits: Blocked until its prerequisites are done"
+      when:
+        all:
+          - any:
+              - assignee: "@fix"
+              - assignee: "@fix-light"
+              - assignee: "@fix-fable"
+              - assignee: "@fix-retry"
+          - tags: { any: [waits] }
+      on:
+        job_completed:
+          set:
+            status: Blocked
     - name: "Review lifecycle"
       when:
         any:
@@ -241,10 +267,13 @@ automation:
         job_started:
           set:
             status: Reviewing
-    # Only a passed review merges (owner 2026-11-15, STD-133: "no merges without review"). The merge continues the
-    # reviewer's session when it ran on @merge's runner (Claude, lotar DEV-565), in the fix branch's worktree (owner
-    # 2026-11-11, docs/decisions/2026-11-11-merge-in-fix-thread.md, STD-47); after a Codex review it starts a session of
-    # its own (STD-124). Headless either way. Not the ticket's model fields.
+    # Only a passed review merges (owner 2026-11-15, STD-133: "no merges without review"). In a repo whose
+    # .tasks/config.yml has agent.merge, lotar merges itself and starts @merge only for what needs judgment, always in
+    # a fresh session with its comment before this prompt (lotar DEV-605, owner 2026-11-15, STD-188). session: continue
+    # counts only without agent.merge (or untrusted): the merge continues the reviewer's session when it ran on
+    # @merge's runner (Claude, lotar DEV-565), in the fix branch's worktree (owner 2026-11-11,
+    # docs/decisions/2026-11-11-merge-in-fix-thread.md, STD-47); after a Codex review it starts a session of its own
+    # (STD-124). Headless either way. Not the ticket's model fields.
     - name: "Review passed: merge"
       when:
         all:
@@ -267,6 +296,8 @@ automation:
               with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). You run headless: nobody reads this
               session, so never ask in it. To hand back, comment one question, set the status to HelpNeeded, assign
               the ticket to mallox and stop: that files it in his inbox.
+              When lotar's own merge handed off (its comment comes before this prompt), it ran these steps until one
+              needed judgment: start at that step, keep what it landed, and redo no step it finished.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Main is the main checkout's current branch (git -C <root> branch --show-current). When the ticket
@@ -281,7 +312,8 @@ automation:
                  Then, when ~/Development/standards/repos.json gives this repo an "install" (npm ci), run it in your
                  worktree, without asking, so the checks run on the rebased lockfile (lotar DEV-556). It fails: hand
                  back.
-              3. Run the checks this repo's AGENTS.md names, in your worktree. One fails: hand back.
+              3. Run the checks this repo's AGENTS.md names (agent.merge checks in .tasks/config.yml, where set), in
+                 your worktree. One fails: hand back.
                  Skip a check the fix or rework comment says passed on the commit that is still HEAD (the rebase
                  changed nothing: same hash before and after), and name it as skipped in your comment.
               4. git -C <root> merge --ff-only <your branch>. Main moved on: back to step 2. Refused
@@ -350,13 +382,13 @@ automation:
           agent: &rework
             # The continued thread keeps its model; these pick the model of a new one when that thread is gone.
             session: continue
+            thread_name: "${{ticket.id}} rework: ${{ticket.title}}"
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
             prompt: |
               The review of ticket ${{ticket.id}} ("${{ticket.title}}") found blocking problems: its last comments name
               them. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Your worktree's
-              branch holds the earlier commits (git log <main>..HEAD): build on them. First rename this thread to
-              "${{ticket.id}} rework: ${{ticket.title}}" (T3 Code tool t3_thread_update, action rename, no threadId).
+              branch holds the earlier commits (git log <main>..HEAD): build on them.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. First check the review read your branch's HEAD (git log -1 --format=%h): its comment names the commit
@@ -638,6 +670,8 @@ automation:
           - not: { tags: { any: [proposal, owner] } }
       on:
         unblocked:
+          remove: &waits
+            tags: [waits]
           agent:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
@@ -711,9 +745,10 @@ automation:
               Never delete work that isn't saved elsewhere, and never decide what only he decides: then comment one
               question, set the status to HelpNeeded, assign the ticket to mallox and stop.
     # What waits for the owner goes to his inbox, project INBOX in standards (owner 2026-11-12, STD-54,
-    # docs/decisions/2026-11-12-owner-inbox.md): HelpNeeded with assignee mallox, in either order, or tag owner. A
-    # status an agent sets during its job fires these rules when the job ends; the daily repos.ts --report files what
-    # a rule's own change set.
+    # docs/decisions/2026-11-12-owner-inbox.md): HelpNeeded with assignee mallox, in either order, or tag owner, also
+    # when a ticket with tag owner comes back to mallox (G-26 went from @fix to mallox in Todo, STD-234). A status an
+    # agent sets during its job fires these rules when the job ends; the live check (repos.ts --live --report, every 5
+    # minutes) files what a rule's own change set or a skipped rule missed.
     - name: "Inbox: file what waits for the owner"
       when:
         any:
@@ -723,6 +758,9 @@ automation:
           - all:
               - assignee: mallox
               - current: { status: HelpNeeded }
+          - all:
+              - assignee: mallox
+              - current: { tags: { any: [owner] } }
           - tags: { any: [owner] }
       on:
         created:
@@ -857,6 +895,7 @@ automation:
               - assignee: "@fix-retry"
       on:
         manual:
+          remove: *waits
           tell_agent:
             # The message of "Prerequisites done" with the prerequisites by ID: a manual run has no ${{unblocked.by}}.
             message: |

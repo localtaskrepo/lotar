@@ -1,11 +1,11 @@
 title: A job held back for prerequisites stays parked when its ticket is closed by hand
-status: Blocked
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-17T01:56:54.001918+00:00
-modified: 2026-11-17T19:39:22.254719+00:00
+modified: 2026-11-18T20:59:22.141568+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -44,6 +44,9 @@ comments:
 - date: 2026-11-17T19:39:22.254719+00:00
   author: claude
   text: 'Moved back to @fix with tag waits (standards STD-209): it was parked on @review before standards STD-207''s fix, so the unblock would have run the fix as @review and merged it unreviewed. Still Blocked on DEV-530.'
+- date: 2026-11-18T20:59:22.141568+00:00
+  author: claude
+  text: 'Stalled since 2026-11-17T19:39Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ede6a56-9b89-4ce2-8b1c-a74fa80eb83a
 description: |-
@@ -168,6 +171,16 @@ history:
     old: ''
     new: waits
 - at: 2026-11-17T19:39:22.254719+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:59:20.387634+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-18T20:59:22.141568+00:00
   actor: claude
   changes:
   - field: comment_added

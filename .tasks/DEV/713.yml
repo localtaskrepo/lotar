@@ -1,16 +1,20 @@
 title: lotar agent worktree run runs while the ticket's T3 Code thread still runs or waits for an answer
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-18T20:46:28.278416+00:00
-modified: 2026-11-18T20:46:45.531855+00:00
+modified: 2026-11-18T21:01:17.904563+00:00
 relationships:
+  depends_on:
+  - DEV-653
   related:
   - DEV-653
   - DEV-594
   - DEV-600
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A111244fc-866c-4402-97df-07ad00791c5d
 description: |-
   Found in DEV-653's review (2026-11-18, commit `05ea0d37e`).
 
@@ -18,8 +22,14 @@ description: |-
 
   Effect: a person sets such a ticket to HelpNeeded or Blocked, DEV's waiting rule runs `cargo clean --workspace` in the worktree under the thread's running build or tests, and they fail.
 
+  Builds on DEV-653 (`worktree run` exists only there until it lands).
+
   ## Done when
-  - [ ] `worktree run` runs nothing while a T3 Code thread of the ticket runs or waits for an answer, and says so; a test shows it (a shell script stands in for `t3`, as in `dev626_resumed_t3_threads_test.rs`).
+  - [ ] `worktree run` runs nothing while a T3 Code thread of an earlier t3 job on the ticket runs (status `running` or an active run) or waits for an answer (pending requests), the same check a new job's start makes (`running_t3_thread`). It exits 0 and says "Ran nothing: the T3 Code thread <id> of the job <job> still runs" / "... waits for an answer" (JSON: `skipped`).
+  - [ ] A running lotar job and a thread both apply: the job's message wins (checked first). No worktree: "has no agent worktree" wins over both.
+  - [ ] T3 Code can't be asked (no `t3` in the agent table, `t3 thread show` fails): the thread doesn't count, the command runs, as lotar's own worktree cleanup does.
+  - [ ] Once the thread is completed and waits for nothing, the command runs.
+  - [ ] A test shows the running, waiting and completed cases (a shell script stands in for `t3`, as in `dev626_resumed_t3_threads_test.rs`).
   - [ ] docs/help/agent.md "Build output while a ticket waits" says so.
 history:
 - at: 2026-11-18T20:46:29.051490+00:00
@@ -39,3 +49,50 @@ history:
   - field: title
     old: lotar agent worktree run skips a ticket whose T3 Code thread still runs or waits for an answer
     new: lotar agent worktree run runs while the ticket's T3 Code thread still runs or waits for an answer
+- at: 2026-11-18T20:59:41.116525+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T20:59:42.254276+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A111244fc-866c-4402-97df-07ad00791c5d
+- at: 2026-11-18T21:01:09.879910+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-653's review (2026-11-18, commit `05ea0d37e`).
+
+      `lotar agent worktree run` (`worktree_run`, `crates/lotar-lib/src/cli/handlers/agent.rs`) skips a ticket only while a lotar job runs for it (`has_active_job`, `running_job_for_ticket`). A T3 Code thread can run on after its job ended: it resumes a turn it paused for a usage limit, or the owner answers in the thread (DEV-594, DEV-600). lotar's own cleanup counts that thread as still working in the worktree (`finished_job_worktree` and `running_t3_thread` in `crates/lotar-agent/src/services/agent_job_service.rs`); `worktree run` doesn't.
+
+      Effect: a person sets such a ticket to HelpNeeded or Blocked, DEV's waiting rule runs `cargo clean --workspace` in the worktree under the thread's running build or tests, and they fail.
+
+      ## Done when
+      - [ ] `worktree run` runs nothing while a T3 Code thread of the ticket runs or waits for an answer, and says so; a test shows it (a shell script stands in for `t3`, as in `dev626_resumed_t3_threads_test.rs`).
+      - [ ] docs/help/agent.md "Build output while a ticket waits" says so.
+    new: |-
+      Found in DEV-653's review (2026-11-18, commit `05ea0d37e`).
+
+      `lotar agent worktree run` (`worktree_run`, `crates/lotar-lib/src/cli/handlers/agent.rs`) skips a ticket only while a lotar job runs for it (`has_active_job`, `running_job_for_ticket`). A T3 Code thread can run on after its job ended: it resumes a turn it paused for a usage limit, or the owner answers in the thread (DEV-594, DEV-600). lotar's own cleanup counts that thread as still working in the worktree (`finished_job_worktree` and `running_t3_thread` in `crates/lotar-agent/src/services/agent_job_service.rs`); `worktree run` doesn't.
+
+      Effect: a person sets such a ticket to HelpNeeded or Blocked, DEV's waiting rule runs `cargo clean --workspace` in the worktree under the thread's running build or tests, and they fail.
+
+      Builds on DEV-653 (`worktree run` exists only there until it lands).
+
+      ## Done when
+      - [ ] `worktree run` runs nothing while a T3 Code thread of an earlier t3 job on the ticket runs (status `running` or an active run) or waits for an answer (pending requests), the same check a new job's start makes (`running_t3_thread`). It exits 0 and says "Ran nothing: the T3 Code thread <id> of the job <job> still runs" / "... waits for an answer" (JSON: `skipped`).
+      - [ ] A running lotar job and a thread both apply: the job's message wins (checked first). No worktree: "has no agent worktree" wins over both.
+      - [ ] T3 Code can't be asked (no `t3` in the agent table, `t3 thread show` fails): the thread doesn't count, the command runs, as lotar's own worktree cleanup does.
+      - [ ] Once the thread is completed and waits for nothing, the command runs.
+      - [ ] A test shows the running, waiting and completed cases (a shell script stands in for `t3`, as in `dev626_resumed_t3_threads_test.rs`).
+      - [ ] docs/help/agent.md "Build output while a ticket waits" says so.
+- at: 2026-11-18T21:01:17.904563+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653","DEV-594","DEV-600"]}'
+    new: '{"depends_on":["DEV-653"],"related":["DEV-653","DEV-594","DEV-600"]}'
