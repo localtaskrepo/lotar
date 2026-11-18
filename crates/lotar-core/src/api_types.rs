@@ -1493,11 +1493,168 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskListResponse {
+    /// Tasks matching the query (all of them, also when `ids` narrows `tasks`).
     pub total: usize,
     pub limit: usize,
     pub offset: usize,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub tasks: Vec<TaskDTO>,
+    pub tasks: Vec<TaskListRow>,
+    /// With `ids` (DEV-692): each returned task's index in the full
+    /// filtered order, so a client can place it without the whole list.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
+    pub positions: BTreeMap<String, usize>,
+}
+
+/// A task as `GET /api/tasks/list` returns it (DEV-692): the [`TaskDTO`]
+/// without its description, comments and history, which make up most of a
+/// ticket and which no list view shows, plus what list views show of them.
+/// `GET /api/tasks/get` returns the whole ticket.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskListRow {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub url: Option<String>,
+    pub title: String,
+    pub status: crate::types::TaskStatus,
+    pub priority: crate::types::Priority,
+    pub task_type: crate::types::TaskType,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub deleted_at: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub archived: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub moved_from: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task_state: Option<TaskStateDTO>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reporter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub assignee: Option<String>,
+    pub created: String,
+    pub modified: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub due_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub subtitle: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub relationships: crate::types::TaskRelationships,
+    #[serde(default)]
+    pub references: Vec<crate::types::ReferenceEntry>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub acceptance_criteria: Vec<String>,
+    #[serde(default)]
+    pub sprints: Vec<u32>,
+    #[serde(skip_serializing_if = "crate::api_types::btreemap_u32_is_empty", default)]
+    pub sprint_order: BTreeMap<u32, u32>,
+    #[serde(default)]
+    pub releases: Vec<u32>,
+    #[serde(default)]
+    pub custom_fields: crate::types::CustomFields,
+    /// Number of comments.
+    pub comment_count: usize,
+    /// Number of history entries.
+    pub history_count: usize,
+    /// The newest question comment no answer points to (DEV-488), which
+    /// list rows and board cards let the reader answer.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub open_question: Option<crate::types::TaskComment>,
+    /// When the task entered its current status (board age rules, DEV-133):
+    /// the latest recorded change into it; the creation time when its
+    /// status never changed; else the latest recorded status change.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub status_since: Option<String>,
+    /// The whole history, only with `include=history`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub history: Option<Vec<crate::types::TaskChangeLogEntry>>,
+}
+
+impl TaskListRow {
+    /// The list row of `task`; `with_history` keeps its history.
+    pub fn from_task(task: TaskDTO, with_history: bool) -> Self {
+        let open_question = open_question(&task.comments).cloned();
+        let status_since = status_since(&task);
+        Self {
+            comment_count: task.comments.len(),
+            history_count: task.history.len(),
+            open_question,
+            status_since,
+            history: with_history.then_some(task.history),
+            id: task.id,
+            url: task.url,
+            title: task.title,
+            status: task.status,
+            priority: task.priority,
+            task_type: task.task_type,
+            deleted_at: task.deleted_at,
+            archived: task.archived,
+            moved_from: task.moved_from,
+            task_state: task.task_state,
+            reporter: task.reporter,
+            assignee: task.assignee,
+            created: task.created,
+            modified: task.modified,
+            due_date: task.due_date,
+            effort: task.effort,
+            subtitle: task.subtitle,
+            tags: task.tags,
+            relationships: task.relationships,
+            references: task.references,
+            acceptance_criteria: task.acceptance_criteria,
+            sprints: task.sprints,
+            sprint_order: task.sprint_order,
+            releases: task.releases,
+            custom_fields: task.custom_fields,
+        }
+    }
+}
+
+/// The newest question comment no answer points to (DEV-488), as the web
+/// view's `lastOpenQuestion` picks it.
+fn open_question(comments: &[crate::types::TaskComment]) -> Option<&crate::types::TaskComment> {
+    comments
+        .iter()
+        .rev()
+        .find(|comment| comment.question.is_some() && !comments.iter().any(|other| other.answer.as_ref().is_some_and(|answer| answer.to == comment.date)))
+}
+
+/// Status labels compared like board columns: case, spaces, `_` and `-`
+/// do not count.
+fn status_key(value: &str) -> String {
+    value.chars().filter(|c| !c.is_whitespace() && *c != '_' && *c != '-').flat_map(char::to_lowercase).collect()
+}
+
+/// When `task` entered its current status; see [`TaskListRow::status_since`].
+fn status_since(task: &TaskDTO) -> Option<String> {
+    let wanted = status_key(task.status.as_str());
+    let mut latest_into: Option<(jiff::Timestamp, &str)> = None;
+    let mut latest_any: Option<(jiff::Timestamp, &str)> = None;
+    let mut saw_status_change = false;
+    for entry in &task.history {
+        let changes: Vec<_> = entry.changes.iter().filter(|change| change.field == "status").collect();
+        if changes.is_empty() {
+            continue;
+        }
+        saw_status_change = true;
+        let Ok(at) = entry.at.parse::<jiff::Timestamp>() else { continue };
+        if latest_any.is_none_or(|(seen, _)| at > seen) {
+            latest_any = Some((at, entry.at.as_str()));
+        }
+        if changes.iter().any(|change| change.new.as_deref().is_some_and(|new| status_key(new) == wanted)) && latest_into.is_none_or(|(seen, _)| at > seen) {
+            latest_into = Some((at, entry.at.as_str()));
+        }
+    }
+    if let Some((_, at)) = latest_into {
+        return Some(at.to_string());
+    }
+    if !saw_status_change {
+        return task.created.parse::<jiff::Timestamp>().ok().map(|_| task.created.clone());
+    }
+    latest_any.map(|(_, at)| at.to_string())
 }
 
 /// Deletion request shared by REST, MCP, and UI clients (DEV-92).
@@ -2244,6 +2401,79 @@ pub struct SyncResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn dto(extra: &serde_json::Value) -> TaskDTO {
+        let mut base = json!({
+            "id": "DEMO-1", "title": "One", "status": "Doing", "priority": "Low", "task_type": "Feature",
+            "created": "2026-01-01T00:00:00Z", "modified": "2026-01-05T00:00:00Z",
+            "description": "long text", "tags": ["a"], "relationships": {}, "comments": [], "references": [],
+            "sprints": [], "releases": [], "history": [], "custom_fields": {}
+        });
+        for (key, value) in extra.as_object().into_iter().flatten() {
+            base[key] = value.clone();
+        }
+        serde_json::from_value(base).unwrap()
+    }
+
+    #[test]
+    fn list_row_keys_match_task_dto_but_heavy_fields() {
+        let task = dto(&json!({"assignee": "me", "due_date": "2026-02-01", "effort": "1d", "subtitle": "s",
+            "acceptance_criteria": ["x"], "sprints": [1], "sprint_order": {"1": 2}, "releases": [3],
+            "archived": true, "moved_from": ["OLD-1"], "deleted_at": "2026-01-06T00:00:00Z", "reporter": "r",
+            "url": "u", "references": [{"link": "https://x"}],
+            "comments": [{"date": "2026-01-02T00:00:00Z", "text": "c"}],
+            "history": [{"at": "2026-01-03T00:00:00Z", "changes": [{"field": "status", "old": "Todo", "new": "Doing"}]}]}));
+        let full = serde_json::to_value(&task).unwrap();
+        let row = serde_json::to_value(TaskListRow::from_task(task, false)).unwrap();
+        let mut full_keys: Vec<_> = full.as_object().unwrap().keys().cloned().collect();
+        full_keys.retain(|key| !["description", "comments", "history"].contains(&key.as_str()));
+        let mut row_keys: Vec<_> = row.as_object().unwrap().keys().cloned().collect();
+        row_keys.retain(|key| !["comment_count", "history_count", "open_question", "status_since"].contains(&key.as_str()));
+        full_keys.sort();
+        row_keys.sort();
+        assert_eq!(row_keys, full_keys, "TaskListRow must carry every TaskDTO field but description, comments and history");
+        assert_eq!(row["comment_count"], 1);
+        assert_eq!(row["history_count"], 1);
+        assert_eq!(row["status_since"], "2026-01-03T00:00:00Z");
+    }
+
+    #[test]
+    fn list_row_keeps_history_only_when_asked() {
+        let history = json!([{"at": "2026-01-03T00:00:00Z", "changes": [{"field": "title", "new": "One"}]}]);
+        let row = serde_json::to_value(TaskListRow::from_task(dto(&json!({"history": history.clone()})), true)).unwrap();
+        assert_eq!(row["history"], history);
+        let row = serde_json::to_value(TaskListRow::from_task(dto(&json!({"history": history})), false)).unwrap();
+        assert!(row.get("history").is_none(), "{row}");
+    }
+
+    #[test]
+    fn open_question_is_the_newest_unanswered_question() {
+        let question = |date: &str| json!({"date": date, "text": "q", "question": {"options": [{"key": "a", "label": "A"}]}});
+        let answer = json!({"date": "2026-01-04T00:00:00Z", "text": "A", "answer": {"to": "2026-01-03T00:00:00Z", "choice": ["A"]}});
+        let comments = json!([question("2026-01-02T00:00:00Z"), question("2026-01-03T00:00:00Z"), answer]);
+        let row = TaskListRow::from_task(dto(&json!({"comments": comments})), false);
+        assert_eq!(row.open_question.map(|c| c.date).as_deref(), Some("2026-01-02T00:00:00Z"));
+        let answered = json!([question("2026-01-03T00:00:00Z"), {"date": "2026-01-04T00:00:00Z", "text": "A", "answer": {"to": "2026-01-03T00:00:00Z"}}]);
+        assert!(TaskListRow::from_task(dto(&json!({"comments": answered})), false).open_question.is_none());
+    }
+
+    #[test]
+    fn status_since_follows_the_board_age_rules() {
+        let since = |history: serde_json::Value| TaskListRow::from_task(dto(&json!({"history": history})), false).status_since;
+        assert_eq!(since(json!([])).as_deref(), Some("2026-01-01T00:00:00Z"), "no status change: created");
+        let into = json!([
+            {"at": "2026-01-02T00:00:00Z", "changes": [{"field": "status", "new": "doing"}]},
+            {"at": "2026-01-03T00:00:00Z", "changes": [{"field": "status", "new": "Review"}]},
+            {"at": "2026-01-04T00:00:00Z", "changes": [{"field": "status", "new": "DOING"}]},
+            {"at": "2026-01-05T00:00:00Z", "changes": [{"field": "title", "new": "x"}]}
+        ]);
+        assert_eq!(since(into).as_deref(), Some("2026-01-04T00:00:00Z"), "latest change into the status, any case");
+        let elsewhere = json!([
+            {"at": "2026-01-02T00:00:00Z", "changes": [{"field": "status", "new": "Todo"}]},
+            {"at": "2026-01-03T00:00:00Z", "changes": [{"field": "status", "new": "Review"}]}
+        ]);
+        assert_eq!(since(elsewhere).as_deref(), Some("2026-01-03T00:00:00Z"), "no change into it: latest status change");
+    }
 
     #[test]
     fn sprint_update_request_handles_absent_closed_at() {

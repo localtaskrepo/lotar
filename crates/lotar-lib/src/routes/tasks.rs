@@ -5,6 +5,9 @@ use jiff::Timestamp;
 #[path = "../../tests/common/dev56_upload_coordination_cases.rs"]
 mod dev56_upload_coordination_cases;
 
+/// Most tasks one `GET /api/tasks/list?ids=` asks about (DEV-692).
+const MAX_LIST_IDS: usize = 100;
+
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/add", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
@@ -59,19 +62,61 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(msg) => return bad_request(msg),
         };
         let cfg = try_response!(load_merged_config(&resolver));
+        // `include` and `ids` shape the answer; they are not filters (DEV-692).
+        let mut params = req.query.clone();
+        let with_history = match params.remove("include") {
+            None => false,
+            Some(include) => {
+                let mut with_history = false;
+                for part in include.split(',').map(str::trim).filter(|part| !part.is_empty()) {
+                    if part != "history" {
+                        return bad_request(format!("Unknown include '{part}': only history can be included"));
+                    }
+                    with_history = true;
+                }
+                with_history
+            }
+        };
+        let ids = match params.remove("ids") {
+            None => None,
+            Some(raw) => {
+                let ids: Vec<String> = raw.split(',').map(str::trim).filter(|id| !id.is_empty()).map(str::to_string).collect();
+                if ids.len() > MAX_LIST_IDS {
+                    return bad_request(format!("ids lists {} tasks; at most {MAX_LIST_IDS} at a time", ids.len()));
+                }
+                Some(ids)
+            }
+        };
         // The shared task query (DEV-230): invalid explicit values are 400s,
         // never silently ignored; results come filtered and in global order.
-        let query = match parse_list_query(&req.query, &cfg, &resolver) {
+        let query = match parse_list_query(&params, &cfg, &resolver) {
             Ok(query) => query,
             Err(response) => return response,
         };
         let tasks = crate::services::task_list::run(&storage, &query, Timestamp::now());
-
         let total = tasks.len();
-        let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
-        let page_tasks = tasks[start..end].iter().map(|(_, task)| task.clone()).collect::<Vec<_>>();
 
-        let payload = crate::api_types::TaskListResponse { total, limit: page.limit, offset: page.offset, tasks: page_tasks };
+        // Rows leave out description, comments and history (DEV-692): they
+        // were ~90 % of the list and no list view shows them.
+        let payload = match ids {
+            Some(ids) => {
+                let mut positions = std::collections::BTreeMap::new();
+                let mut rows = Vec::new();
+                for (index, (_, task)) in tasks.into_iter().enumerate() {
+                    if ids.iter().any(|id| id.eq_ignore_ascii_case(&task.id)) {
+                        positions.insert(task.id.clone(), index);
+                        rows.push(crate::api_types::TaskListRow::from_task(task, with_history));
+                    }
+                }
+                crate::api_types::TaskListResponse { total, limit: rows.len(), offset: 0, tasks: rows, positions }
+            }
+            None => {
+                let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
+                let rows =
+                    tasks.into_iter().skip(start).take(end - start).map(|(_, task)| crate::api_types::TaskListRow::from_task(task, with_history)).collect();
+                crate::api_types::TaskListResponse { total, limit: page.limit, offset: page.offset, tasks: rows, positions: Default::default() }
+            }
+        };
 
         ok_json(200, json!({"data": payload}))
     });

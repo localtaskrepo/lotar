@@ -440,13 +440,13 @@ fn validator_catches_contract_drift() {
     let err = spec.validate_component("TaskListResponse", &json!({"total": 1, "limit": 50, "offset": 0, "tasks": [42]})).unwrap_err();
     assert!(err.contains("tasks[0]"), "{err}");
 
-    // Wrong nested field type on a TaskDTO entry.
+    // Wrong nested field type on a TaskListRow entry.
     let err = spec
         .validate_component(
             "TaskListResponse",
             &json!({"total": 1, "limit": 50, "offset": 0, "tasks": [
                 {"id": 7, "title": "t", "status": "Todo", "priority": "Medium",
-                 "task_type": "Feature", "created": "x", "modified": "y"}
+                 "task_type": "Feature", "created": "x", "modified": "y", "comment_count": 0, "history_count": 0}
             ]}),
         )
         .unwrap_err();
@@ -487,7 +487,7 @@ fn validator_catches_contract_drift() {
         spec.component("EnvelopeTaskList"),
         &json!({"data": {"total": 1, "limit": 50, "offset": 0, "tasks": [
             {"id": "QA-1", "title": "t", "status": "Todo", "priority": "Medium",
-             "task_type": "Feature", "created": "x", "modified": "y"}
+             "task_type": "Feature", "created": "x", "modified": "y", "comment_count": 0, "history_count": 0}
         ]}}),
         "repaired list envelope",
     );

@@ -55,7 +55,7 @@ lotar serve --web-ui-embedded
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Override tasks directory resolution
 
-Assets are served with compression: clients that send `Accept-Encoding: gzip` receive pre-compressed variants (~70% smaller transfer), and content-hashed asset files carry `Cache-Control: immutable` so repeat visits load from browser cache. The HTML entry points always revalidate (`no-cache`).
+Assets are served with compression: clients that send `Accept-Encoding: gzip` receive pre-compressed variants (~70% smaller transfer), and content-hashed asset files carry `Cache-Control: immutable` so repeat visits load from browser cache. The HTML entry points always revalidate (`no-cache`). JSON API responses of 1 KB or more are gzip-compressed for the same clients, and say `Vary: Accept-Encoding`.
 
 > Tip: `lotar serve` ignores the `--project/-p` global flag on purpose—project defaults are resolved dynamically per request inside the REST handlers—so passing `-p` before the command only changes the CLI project context, not the server port.
 
@@ -116,7 +116,10 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 		- `tags` (CSV)
 		- `q` (free-text search)
 		- `deletion=active|deleted|all` (default `active`; invalid/blank values return HTTP 400)
+		- `include=history` (keep each row's history; other values return HTTP 400)
+		- `ids` (CSV of up to 100 task IDs: only those, with `positions` in the full order)
 	- Notes:
+		- Rows leave out `description`, `comments` and `history` and carry `comment_count`, `history_count`, `open_question` and `status_since`; `GET /api/tasks/get` returns the whole task
 		- Invalid values for `status`, `priority`, or `type` return HTTP 400
 		- Any additional query key is treated as a property filter. Declared custom fields can be used directly (e.g., `?sprint=W35`). Multiple values allowed via CSV; matching is case- and separator-insensitive.
 - `GET /api/tasks/get?id=...` - Get task by id (deleted tasks are hidden; opt in with `include_deleted=true`)

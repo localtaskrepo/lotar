@@ -653,6 +653,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             void taskStore.version.value
             return task.id ? taskStore._map.value.get(task.id) : undefined
         },
+        fetchFull: (id) => taskStore.fetchOne(id),
         task,
         form,
         suppressWatch,

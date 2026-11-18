@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import { computed, nextTick, reactive, watch } from 'vue'
-import type { TaskDTO } from '../../api/types'
+import { isListRow, type TaskDTO } from '../../api/types'
 import { toDateInputValue } from '../../utils/date'
 import { applyTaskSnapshot, isDeletedTask } from '../../utils/text'
 import type { TaskPanelFormState } from './useTaskPanelPersistence'
@@ -49,6 +49,12 @@ interface UseTaskPanelExternalSyncOptions {
     active: () => boolean
     /** The shared store's entity for the open task (reactive). */
     entity: () => TaskDTO | undefined
+    /**
+     * Fetch the whole task (`GET /api/tasks/get`). The store may hold a list
+     * row (DEV-692), which lacks the description, comments and history the
+     * panel shows, so the panel never merges one.
+     */
+    fetchFull: (id: string) => Promise<TaskDTO | null>
     task: TaskDTO
     form: TaskPanelFormState
     suppressWatch: Ref<boolean>
@@ -250,7 +256,26 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
         // Delete/restore has its own authoritative reload (DEV-92).
         if (isDeletedTask(entity) !== isDeletedTask(options.task)) return
         if (compareModified(entity.modified, options.task.modified) <= 0) return
+        if (isListRow(entity)) {
+            void fetchAndMerge(entity.id, entity.modified)
+            return
+        }
         merge(entity)
+    }
+
+    let fetchingModified: string | null = null
+    async function fetchAndMerge(id: string, modified: string) {
+        if (fetchingModified === modified) return
+        fetchingModified = modified
+        try {
+            const full = await options.fetchFull(id)
+            if (!full || isListRow(full) || !options.active() || full.id !== options.task.id) return
+            if (isDeletedTask(full) !== isDeletedTask(options.task)) return
+            if (compareModified(full.modified, options.task.modified) <= 0) return
+            merge(full)
+        } finally {
+            if (fetchingModified === modified) fetchingModified = null
+        }
     }
 
     /**

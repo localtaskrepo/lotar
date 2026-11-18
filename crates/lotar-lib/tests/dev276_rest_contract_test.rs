@@ -83,6 +83,12 @@ fn task_collections_are_always_present() {
     let (status, body) = api.call("GET", "/api/tasks/list", &[], b"");
     assert_eq!(status, 200);
     let task = &body["data"]["tasks"][0];
+    for key in ["tags", "relationships", "references", "sprints", "custom_fields"] {
+        assert!(task.get(key).is_some(), "missing {key}: {task}");
+    }
+    let (status, body) = api.call("GET", "/api/tasks/get", &[("id", "DEMO-1")], b"");
+    assert_eq!(status, 200);
+    let task = &body["data"];
     for key in ["tags", "relationships", "comments", "references", "sprints", "history", "custom_fields"] {
         assert!(task.get(key).is_some(), "missing {key}: {task}");
     }

@@ -36,6 +36,11 @@ const statusKey = (value: unknown) =>
 export function statusEnteredAt(task: TaskDTO | null | undefined, status: string): number | null {
     if (!task) return null
     const wanted = statusKey(status)
+    // A list row (DEV-692) carries no history, only when it entered its own status.
+    if (!Array.isArray(task.history) && task.status_since && statusKey(task.status) === wanted) {
+        const since = Date.parse(task.status_since)
+        return Number.isNaN(since) ? null : since
+    }
     let latestInto: number | null = null
     let latestAny: number | null = null
     let sawStatusChange = false

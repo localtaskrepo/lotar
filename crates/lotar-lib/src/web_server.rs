@@ -438,7 +438,7 @@ fn handle_connection(
             // Embedded gzip-compressed by build.rs (DEV-221); sent as is to
             // clients that accept gzip, decompressed for the rest.
             static SPEC_GZ: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/openapi.json.gz"));
-            let accepts_gzip = headers.get("accept-encoding").is_some_and(|value| value.split(',').any(|part| part.trim().eq_ignore_ascii_case("gzip")));
+            let accepts_gzip = accepts_gzip(&headers);
             let (body, encoding) = if accepts_gzip {
                 (SPEC_GZ.to_vec(), "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n")
             } else {
@@ -470,6 +470,7 @@ fn handle_connection(
         // HEAD answers like GET without the body (link checkers, download
         // managers and caches probe attachments this way).
         let head = method.eq_ignore_ascii_case("HEAD");
+        let gzip_ok = accepts_gzip(&headers);
         let req = HttpRequest { method: if head { "GET".to_string() } else { method }, path: path.clone(), query, headers, body };
         let mut resp = api_server.handle_request(&req);
         resp.headers.push(("Access-Control-Allow-Methods".into(), "GET,POST,OPTIONS".into()));
@@ -483,6 +484,11 @@ fn handle_connection(
         // The socket serves exactly one request and then closes; say so.
         if !resp.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("Connection")) {
             resp.headers.push(("Connection".into(), "close".into()));
+        }
+        // DEV-692: JSON answers (a full ticket list is megabytes) go out
+        // gzip-compressed to clients that accept it.
+        if !not_modified {
+            compress_response(&mut resp, gzip_ok);
         }
         let headers_str = resp.headers.iter().map(|(k, v)| format!("{}: {}\r\n", k, v)).collect::<String>();
         let content_length = if not_modified { String::new() } else { format!("Content-Length: {}\r\n", resp.body.len()) };
@@ -505,7 +511,7 @@ fn handle_connection(
         let request_path = if path == "/" { "/index.html" } else { &path };
         let rel_path = request_path.trim_start_matches('/');
         let external_path = config.effective_web_ui_path();
-        let accepts_gzip = headers.get("accept-encoding").map(|value| value.split(',').any(|part| part.trim().eq_ignore_ascii_case("gzip"))).unwrap_or(false);
+        let accepts_gzip = accepts_gzip(&headers);
         let mut served = try_serve_static(rel_path, stream, external_path, accepts_gzip);
         if !served && should_fallback_to_index(&path) {
             served = try_serve_static("index.html", stream, external_path, accepts_gzip);
@@ -522,6 +528,54 @@ fn handle_connection(
             let _ = stream.flush();
         }
     }
+}
+
+/// Whether the request's `Accept-Encoding` allows gzip: listed (or `*`)
+/// without `q=0`.
+fn accepts_gzip(headers: &HashMap<String, String>) -> bool {
+    let Some(value) = headers.get("accept-encoding") else { return false };
+    let mut gzip = None;
+    let mut any = None;
+    for part in value.split(',') {
+        let mut pieces = part.split(';');
+        let coding = pieces.next().unwrap_or_default().trim();
+        let refused = pieces.any(|param| {
+            let param = param.trim();
+            param.len() > 2 && param[..2].eq_ignore_ascii_case("q=") && param[2..].trim().parse::<f32>().is_ok_and(|q| q <= 0.0)
+        });
+        if coding.eq_ignore_ascii_case("gzip") {
+            gzip = Some(!refused);
+        } else if coding == "*" {
+            any = Some(!refused);
+        }
+    }
+    gzip.or(any).unwrap_or(false)
+}
+
+/// Bodies smaller than this are sent as they are: gzip would barely shrink
+/// them.
+const MIN_GZIP_BODY: usize = 1024;
+
+/// Gzip a JSON API response in place when the client accepts it (DEV-692). Responses with an encoding
+/// of their own, other content types (attachments, images) and small bodies
+/// stay as they are; every JSON answer says it varies by `Accept-Encoding`.
+fn compress_response(resp: &mut api_server::HttpResponse, gzip_ok: bool) {
+    let is_json =
+        resp.headers.iter().any(|(k, v)| k.eq_ignore_ascii_case("Content-Type") && v.trim_start().to_ascii_lowercase().starts_with("application/json"));
+    if !is_json || resp.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("Content-Encoding")) {
+        return;
+    }
+    resp.headers.push(("Vary".into(), "Accept-Encoding".into()));
+    if !gzip_ok || resp.body.len() < MIN_GZIP_BODY {
+        return;
+    }
+    let mut encoder = flate2::write::GzEncoder::new(Vec::with_capacity(resp.body.len() / 4), flate2::Compression::fast());
+    if encoder.write_all(&resp.body).is_err() {
+        return;
+    }
+    let Ok(compressed) = encoder.finish() else { return };
+    resp.body = compressed;
+    resp.headers.push(("Content-Encoding".into(), "gzip".into()));
 }
 
 /// Reason phrase for an API status line; unknown codes keep their number.
@@ -1360,6 +1414,63 @@ mod tests {
                 None => Ok(0),
             }
         }
+    }
+
+    fn json_response(body: Vec<u8>) -> crate::api_server::HttpResponse {
+        crate::api_server::HttpResponse { status: 200, headers: vec![("Content-Type".into(), "application/json".into())], body }
+    }
+
+    fn header<'a>(resp: &'a crate::api_server::HttpResponse, name: &str) -> Option<&'a str> {
+        resp.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn gzip_follows_accept_encoding() {
+        // DEV-692
+        let accepts = |value: &str| super::accepts_gzip(&[("accept-encoding".to_string(), value.to_string())].into());
+        assert!(accepts("gzip, deflate, br"));
+        assert!(accepts("br;q=1.0, GZIP;q=0.5"));
+        assert!(accepts("*"));
+        assert!(!accepts("gzip;q=0"));
+        assert!(!accepts("gzip; q=0.0, *"));
+        assert!(!accepts("br, deflate"));
+        assert!(!accepts("*;q=0"));
+        assert!(!super::accepts_gzip(&std::collections::HashMap::new()));
+    }
+
+    #[test]
+    fn json_responses_are_gzipped_when_large_enough() {
+        // DEV-692
+        use std::io::Read;
+        let body = format!("[{}]", vec!["{\"id\":\"DEV-1\"}"; 200].join(",")).into_bytes();
+        let mut resp = json_response(body.clone());
+        super::compress_response(&mut resp, true);
+        assert_eq!(header(&resp, "Content-Encoding"), Some("gzip"));
+        assert_eq!(header(&resp, "Vary"), Some("Accept-Encoding"));
+        assert!(resp.body.len() < body.len() / 4, "{} bytes", resp.body.len());
+        let mut plain = Vec::new();
+        flate2::read::GzDecoder::new(&resp.body[..]).read_to_end(&mut plain).expect("valid gzip");
+        assert_eq!(plain, body);
+
+        let mut refused = json_response(body.clone());
+        super::compress_response(&mut refused, false);
+        assert_eq!(header(&refused, "Content-Encoding"), None);
+        assert_eq!(header(&refused, "Vary"), Some("Accept-Encoding"));
+        assert_eq!(refused.body, body);
+
+        let mut small = json_response(b"{\"ok\":true}".to_vec());
+        super::compress_response(&mut small, true);
+        assert_eq!(header(&small, "Content-Encoding"), None);
+
+        let mut own = json_response(body.clone());
+        own.headers.push(("Content-Encoding".into(), "identity".into()));
+        super::compress_response(&mut own, true);
+        assert_eq!(own.body, body);
+        assert_eq!(header(&own, "Vary"), None);
+
+        let mut binary = crate::api_server::HttpResponse { status: 200, headers: vec![("Content-Type".into(), "image/png".into())], body: body.clone() };
+        super::compress_response(&mut binary, true);
+        assert_eq!(binary.body, body);
     }
 
     #[test]

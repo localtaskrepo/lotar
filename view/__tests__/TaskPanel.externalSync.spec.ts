@@ -108,6 +108,26 @@ afterEach(() => {
 })
 
 describe('TaskPanel outside edits (DEV-263)', () => {
+    it('fetches the whole task when a newer list row arrives, never merging the row (DEV-692)', async () => {
+        server = task({ comments: [{ date: LOADED, text: 'Keep me' }] })
+        const wrapper = await openPanel()
+        const vm = wrapper.vm as any
+        expect(vm.form.description).toBe('Original text')
+
+        server = { ...server, title: 'Renamed elsewhere', description: 'New text', modified: LATER }
+        const { description: _d, comments: _c, history: _h, ...row } = JSON.parse(JSON.stringify(server))
+        api.getTask.mockClear()
+        api.listTasks.mockResolvedValueOnce({ tasks: [{ ...row, comment_count: 1, history_count: 0 }], total: 1 })
+        await useTaskStore().getQuery({ project: 'A' }).refresh()
+        await nextTick()
+        await flushPromises()
+
+        expect(api.getTask).toHaveBeenCalledTimes(1)
+        expect(vm.form.title).toBe('Renamed elsewhere')
+        expect(vm.form.description).toBe('New text')
+        expect(vm.task.comments).toEqual([{ date: LOADED, text: 'Keep me' }])
+    })
+
     it('shows a newer outside description, so the next edit builds on it', async () => {
         const wrapper = await openPanel()
         const vm = wrapper.vm as any

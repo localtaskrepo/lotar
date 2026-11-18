@@ -1,11 +1,11 @@
 title: A t3 job fails to move agent/<ticket> to its thread's branch when another worktree has agent/<ticket> checked out
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-18T03:15:25.092614+00:00
-modified: 2026-11-18T04:22:41.360530+00:00
+modified: 2026-11-18T05:02:55.781967+00:00
 relationships:
   blocks:
   - DEV-617
@@ -71,6 +71,39 @@ comments:
       result: not_run
       reason: no UI or CLI change
     next: Merge; DEV-617 needs lotar v0.15.4 (592abd9c4, has DEV-673) installed, the installed build is 0.15.3
+- date: 2026-11-18T05:02:55.629811+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-694` is in `main`.
+
+    - Rebased `agent/DEV-694` onto `main` (`78dd34675d44`): `7e834d461b71`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-694` onto `main` (`902f85aa26d2`): `b2257f9332d5`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `b2257f9332d5`
+    - Amended the pending `.tasks` changes into the merged commit: `afb9e823d5eb`
+    - Pushed 2 commits to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[infra:branch:agent-branch-in-use]`
+  report:
+    commits:
+    - hash: 902f85aa2
+      what: DEV-689 follow_ticket_work's DEV-687 rule (another branch keeps the ticket tip) has no test
+    - hash: afb9e823d
+      what: DEV-694 A t3 job fails to move agent/<ticket> to its thread's branch when another worktree has agent/<ticket> checked out
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A186456a2-7d85-4028-bdf4-76d7ea00293c
 description: 'Found 2026-11-18 on DEV-617: job-20261118T030735.468Z-23 finished its work (rebased commit b4d875195 on t3/fix-codex-retry-rate-limit-2, checks passed) and then failed: ''git branch --force agent/DEV-617 b4d875195 failed: fatal: cannot force update the branch used by worktree /Users/mallox/.t3/worktrees/lotar/agent-DEV-617-935f2c3d0bc84f24''. agent/DEV-617 stayed at 15135f656, so the review would read the old commit. Related: DEV-687 (Done, similar refusal). Check: lotar agent logs job-20261118T030735.468Z-23. Done when: a job whose ticket branch is checked out in another worktree still ends with agent/<ticket> at the thread''s commit (or the move happens in that worktree), with a test.'
@@ -145,3 +178,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T05:02:55.629811+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:02:55.781967+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

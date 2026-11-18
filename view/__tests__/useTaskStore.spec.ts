@@ -680,6 +680,7 @@ describe('TaskStore', () => {
     function listResponse(tasks: TaskDTO[], total = tasks.length) {
         return { total, limit: 1000, offset: 0, tasks }
     }
+    type TaskListResponseLike = ReturnType<typeof listResponse> & { positions?: Record<string, number> }
 
     describe('DEV-65 entity/query separation', () => {
         beforeEach(() => {
@@ -883,7 +884,7 @@ describe('TaskStore', () => {
             expect(store._map.value.get('T-3')?.deleted_at).toBeTruthy()
         })
 
-        it('retained queries converge membership via authoritative refresh after SSE moves, preserving server order', async () => {
+        it('retained queries converge membership via a per-task request after SSE moves, preserving server order', async () => {
             const query = store.getQuery({ status: ['Todo'] })
             query.retain()
             mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('T-2'), makeTask('T-1')]))
@@ -898,11 +899,17 @@ describe('TaskStore', () => {
             fireEvent('task_updated', makeTask('T-1', { status: 'Done' }))
             fireEvent('task_created', makeTask('T-3'))
 
-            mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('T-3'), makeTask('T-2')]))
+            // DEV-692: one `ids=` request for both changed tasks; T-1 is not answered.
+            mockClient.listTasks.mockResolvedValueOnce({
+                ...listResponse([makeTask('T-3')], 2),
+                positions: { 'T-3': 0 },
+            })
             await vi.advanceTimersByTimeAsync(300)
             await vi.waitFor(() => {
                 expect(query.tasks.value.map((t) => t.id)).toEqual(['T-3', 'T-2'])
             })
+            expect(mockClient.listTasks).toHaveBeenCalledTimes(2)
+            expect(query.total.value).toBe(2)
             expect([...query.ranks.value.entries()]).toEqual([
                 ['T-3', 0],
                 ['T-2', 1],
@@ -910,10 +917,9 @@ describe('TaskStore', () => {
             // The moved-out entity is retained for other consumers but is no member.
             expect(store._map.value.has('T-1')).toBe(true)
             expect(query.ids.value).not.toContain('T-1')
-            // The authoritative refresh re-issued the query filter verbatim.
-            expect(mockClient.listTasks).toHaveBeenLastCalledWith(
-                expect.objectContaining({ status: ['Todo'], limit: 1000, offset: 0 }),
-            )
+            // The per-task request carried the query filter verbatim, without paging.
+            const [lastFilter] = mockClient.listTasks.mock.lastCall as [TaskListFilter]
+            expect(lastFilter).toEqual({ status: ['Todo'], ids: 'T-1,T-3' })
             query.release()
         })
 
@@ -1054,6 +1060,186 @@ describe('TaskStore', () => {
     })
 
     // =========================================================================
+    // DEV-692: list rows and per-task refresh
+    // =========================================================================
+
+    describe('DEV-692 list rows and per-task refresh', () => {
+        function row(id: string, overrides: Partial<TaskDTO> = {}): TaskDTO {
+            const { comments: _c, history: _h, description: _d, ...rest } = makeTask(id, overrides)
+            return { ...rest, comment_count: 0, history_count: 0, ...overrides }
+        }
+
+        async function retainedQuery(filter: TaskListFilter, ids: string[]) {
+            const query = store.getQuery(filter)
+            query.retain()
+            mockClient.listTasks.mockResolvedValueOnce(listResponse(ids.map((id) => row(id))))
+            await query.refresh()
+            mockClient.listTasks.mockClear()
+            return query
+        }
+
+        beforeEach(() => {
+            store.connectSse()
+        })
+
+        it("a row of the same version keeps the full task's description, comments and history", async () => {
+            const comments = [{ date: '2025-01-02T00:00:00Z', text: 'hi' }]
+            const history = [{ at: '2025-01-02T00:00:00Z', changes: [] }]
+            store.upsert(makeTask('K-1', { description: 'long', comments, history }))
+            mockClient.listTasks.mockResolvedValueOnce(listResponse([row('K-1', { title: 'Same version' })]))
+            await store.getQuery({ project: 'K' }).refresh()
+            const entity = store._map.value.get('K-1')!
+            expect(entity.title).toBe('Same version')
+            expect(entity.description).toBe('long')
+            expect(entity.comments).toEqual(comments)
+            expect(entity.history).toEqual(history)
+        })
+
+        it("a newer row does not keep the older task's details", async () => {
+            store.upsert(makeTask('K-2', { description: 'old', comments: [{ date: 'x', text: 'old' }] }))
+            mockClient.listTasks.mockResolvedValueOnce(listResponse([row('K-2', { modified: '2025-02-01T00:00:00Z' })]))
+            await store.getQuery({ project: 'K' }).refresh()
+            const entity = store._map.value.get('K-2')!
+            expect(entity.modified).toBe('2025-02-01T00:00:00Z')
+            expect(entity.description).toBeUndefined()
+            expect(entity.comments).toBeUndefined()
+        })
+
+        it('an SSE burst asks each mounted list for just the changed tasks, one request per list', async () => {
+            const todo = await retainedQuery({ status: ['Todo'] }, ['A-1', 'A-2', 'A-3'])
+            const mine = await retainedQuery({ assignee: '@me' }, ['A-2'])
+            mockClient.listTasks.mockImplementation((filter: TaskListFilter) =>
+                Promise.resolve(
+                    filter.status
+                        ? { ...listResponse([row('A-3'), row('A-4')], 4), positions: { 'A-3': 0, 'A-4': 2 } }
+                        : { ...listResponse([], 0), positions: {} },
+                ),
+            )
+            fireEvent('task_updated', makeTask('A-3', { modified: '2025-03-01T00:00:00Z' }))
+            fireEvent('task_created', makeTask('A-4'))
+            fireEvent('task_updated', makeTask('A-2', { status: 'Done', modified: '2025-03-01T00:00:00Z' }))
+            fireEvent('task_updated', makeTask('A-3', { modified: '2025-03-02T00:00:00Z' }))
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(mine.ids.value).toEqual([]))
+            expect(mockClient.listTasks).toHaveBeenCalledTimes(2)
+            expect(mockClient.listTasks).toHaveBeenCalledWith({ status: ['Todo'], ids: 'A-3,A-4,A-2' })
+            expect(mockClient.listTasks).toHaveBeenCalledWith({ assignee: '@me', ids: 'A-3,A-4,A-2' })
+            expect(mockClient.getTask).not.toHaveBeenCalled()
+            // A-3 moved to the top, A-4 joined at its position, A-2 left.
+            expect(todo.ids.value).toEqual(['A-3', 'A-1', 'A-4'])
+            expect([...todo.ranks.value.entries()]).toEqual([
+                ['A-3', 0],
+                ['A-1', 1],
+                ['A-4', 2],
+            ])
+            expect(todo.total.value).toBe(4)
+            // The SSE DTO stays the entity: the older row did not replace it.
+            expect(store._map.value.get('A-3')?.modified).toBe('2025-03-02T00:00:00Z')
+            expect(store._map.value.get('A-3')?.comments).toEqual([])
+            todo.release()
+            mine.release()
+        })
+
+        it('an id-only watcher event fetches the one task and asks lists for it by ID', async () => {
+            const query = await retainedQuery({ project: 'W' }, ['W-1'])
+            mockClient.getTask.mockResolvedValueOnce(makeTask('W-1', { modified: '2025-04-01T00:00:00Z' }))
+            mockClient.listTasks.mockResolvedValueOnce({
+                ...listResponse([row('W-1', { modified: '2025-04-01T00:00:00Z' })]),
+                positions: { 'W-1': 0 },
+            })
+            fireEvent('task_updated', { id: 'W-1' })
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(1))
+            expect(mockClient.getTask).toHaveBeenCalledTimes(1)
+            expect(mockClient.listTasks).toHaveBeenCalledWith({ project: 'W', ids: 'W-1' })
+            await vi.waitFor(() => expect(store._map.value.get('W-1')?.comments).toEqual([]))
+            query.release()
+        })
+
+        it('reloads in full with more than 50 pending tasks', async () => {
+            const query = await retainedQuery({ project: 'M' }, ['M-1'])
+            mockClient.listTasks.mockResolvedValue(listResponse([row('M-1')]))
+            for (let index = 0; index < 51; index += 1) fireEvent('task_updated', makeTask(`M-${index + 2}`))
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(1))
+            expect(mockClient.listTasks).toHaveBeenCalledWith({ project: 'M', limit: 1000, offset: 0 })
+            query.release()
+        })
+
+        it('reloads in full when the per-task request fails', async () => {
+            const query = await retainedQuery({ project: 'F' }, ['F-1'])
+            mockClient.listTasks.mockRejectedValueOnce(new Error('offline'))
+            mockClient.listTasks.mockResolvedValueOnce(listResponse([row('F-1'), row('F-2')]))
+            fireEvent('task_created', makeTask('F-2'))
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(1))
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(query.ids.value).toEqual(['F-1', 'F-2']))
+            expect(mockClient.listTasks).toHaveBeenLastCalledWith({ project: 'F', limit: 1000, offset: 0 })
+            query.release()
+        })
+
+        it('reloads in full while a full reload runs, and when the list was never fully loaded', async () => {
+            const query = await retainedQuery({ project: 'R' }, ['R-1'])
+            const running = deferred<ReturnType<typeof listResponse>>()
+            mockClient.listTasks.mockImplementationOnce(() => running.promise)
+            const pending = query.refresh()
+            fireEvent('task_created', makeTask('R-2'))
+            await vi.advanceTimersByTimeAsync(300)
+            expect(mockClient.listTasks).toHaveBeenCalledTimes(1)
+            mockClient.listTasks.mockResolvedValueOnce(listResponse([row('R-1'), row('R-2')]))
+            running.resolve(listResponse([row('R-1')]))
+            await pending
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(query.ids.value).toEqual(['R-1', 'R-2']))
+            expect(mockClient.listTasks).toHaveBeenLastCalledWith({ project: 'R', limit: 1000, offset: 0 })
+
+            const never = store.getQuery({ project: 'N' })
+            never.retain()
+            mockClient.listTasks.mockClear()
+            mockClient.listTasks.mockResolvedValue(listResponse([]))
+            fireEvent('task_created', makeTask('N-1'))
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalled())
+            const calls = (mockClient.listTasks.mock.calls as Array<[TaskListFilter]>).filter(
+                ([f]) => f.project === 'N',
+            )
+            expect(calls.map(([filter]) => filter)).toEqual([{ project: 'N', limit: 1000, offset: 0 }])
+            never.release()
+            query.release()
+        })
+
+        it('reconnects and invalidateQueries (the day roll) reload in full', async () => {
+            const query = await retainedQuery({ project: 'D' }, ['D-1'])
+            mockClient.listTasks.mockResolvedValue(listResponse([row('D-1')]))
+            mockSseOptions[mockSseOptions.length - 1]!.onReconnect!()
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(1))
+            expect(mockClient.listTasks).toHaveBeenLastCalledWith({ project: 'D', limit: 1000, offset: 0 })
+            store.invalidateQueries()
+            await vi.advanceTimersByTimeAsync(300)
+            await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(2))
+            expect(mockClient.listTasks).toHaveBeenLastCalledWith({ project: 'D', limit: 1000, offset: 0 })
+            query.release()
+        })
+
+        it('drops a per-task answer when a full reload started meanwhile', async () => {
+            const query = await retainedQuery({ project: 'G' }, ['G-1'])
+            const ids = deferred<TaskListResponseLike>()
+            mockClient.listTasks.mockImplementationOnce(() => ids.promise)
+            fireEvent('task_created', makeTask('G-2'))
+            await vi.advanceTimersByTimeAsync(300)
+            expect(mockClient.listTasks).toHaveBeenCalledTimes(1)
+            mockClient.listTasks.mockResolvedValueOnce(listResponse([row('G-1')]))
+            await query.refresh()
+            ids.resolve({ ...listResponse([row('G-2')], 2), positions: { 'G-2': 0 } })
+            await vi.advanceTimersByTimeAsync(0)
+            expect(query.ids.value).toEqual(['G-1'])
+            query.release()
+        })
+    })
+
+    // =========================================================================
     // DEV-92: soft deletion / trash lifecycle
     // =========================================================================
 
@@ -1140,13 +1326,13 @@ describe('TaskStore', () => {
             mockClient.restoreTask.mockResolvedValueOnce(makeTask('R-1'))
             await store.restore('R-1')
 
+            mockClient.listTasks.mockResolvedValueOnce({ ...listResponse([makeTask('R-1')]), positions: { 'R-1': 0 } })
             await vi.advanceTimersByTimeAsync(300)
             await vi.waitFor(() => expect(mockClient.listTasks.mock.calls.length).toBe(2))
-            // The single debounced refresh (remove + restore coalesced) re-issued
-            // the retained query after the restore.
-            expect(mockClient.listTasks).toHaveBeenLastCalledWith(
-                expect.objectContaining({ project: 'R', limit: 1000, offset: 0 }),
-            )
+            // The single debounced per-task request (remove + restore coalesced)
+            // asked the retained query for the restored task.
+            expect(mockClient.listTasks).toHaveBeenLastCalledWith({ project: 'R', ids: 'R-1' })
+            expect(query.ids.value).toEqual(['R-1'])
             expect(store._map.value.get('R-1')?.deleted_at).toBeUndefined()
             query.release()
         })

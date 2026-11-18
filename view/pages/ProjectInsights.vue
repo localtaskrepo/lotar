@@ -266,7 +266,8 @@ let disposed = false
 async function refreshTasks() {
   if (disposed) return
   const { serverFilter } = buildServerFilter(filter.value, project.value)
-  await adoptQuery(store.getQuery(serverFilter)).refresh()
+  // DEV-692: list rows leave history out; the metrics need it.
+  await adoptQuery(store.getQuery({ ...serverFilter, include: 'history' })).refresh()
 }
 
 let filterDebounce: ReturnType<typeof setTimeout> | null = null

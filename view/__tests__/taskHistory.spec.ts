@@ -100,6 +100,11 @@ describe('statusEnteredAt (DEV-133)', () => {
         expect(statusEnteredAt(task, 'Shipped')).toBe(Date.parse('2026-01-06T00:00:00Z'))
     })
 
+    it("uses a list row's status_since, which has no history (DEV-692)", () => {
+        const { history: _h, ...row } = base({ status: 'Done', status_since: '2026-01-07T00:00:00Z' })
+        expect(statusEnteredAt(row as TaskDTO, 'done')).toBe(Date.parse('2026-01-07T00:00:00Z'))
+    })
+
     it('returns null when nothing can be dated', () => {
         expect(statusEnteredAt(base({ created: 'not a date' }, []), 'Done')).toBeNull()
         expect(statusEnteredAt(null, 'Done')).toBeNull()

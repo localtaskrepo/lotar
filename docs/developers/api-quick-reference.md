@@ -3,10 +3,13 @@
 Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 
 - POST /api/tasks/add (TaskCreate) -> { data: TaskDTO }
-- GET  /api/tasks/list -> { data: { total, limit, offset, tasks? } }; `tasks` is a `TaskDTO[]` page and is
+- GET  /api/tasks/list -> { data: { total, limit, offset, tasks?, positions? } }; `tasks` is a `TaskListRow[]` page
+  (a TaskDTO without `description`, `comments` and `history`, plus `comment_count`, `history_count`,
+  `open_question` and `status_since`; `include=history` keeps `history`; `ids=A-1,A-2` answers only those tasks,
+  with `positions` mapping each ID to its index in the full sorted list) and is
   omitted when the page is empty (treat missing as `[]`); empty page:
   `{ "data": { "total": 0, "limit": 50, "offset": 0 } }`, populated page:
-  `{ "data": { "total": 1, "limit": 50, "offset": 0, "tasks": [ { "id": "QA-1", "title": "Wire contract tests", "status": "Todo", "priority": "Medium", "task_type": "Feature", "created": "2026-09-15T10:00:00+00:00", "modified": "2026-09-15T11:30:00+00:00" } ] } }`
+  `{ "data": { "total": 1, "limit": 50, "offset": 0, "tasks": [ { "id": "QA-1", "title": "Wire contract tests", "status": "Todo", "priority": "Medium", "task_type": "Feature", "created": "2026-09-15T10:00:00+00:00", "modified": "2026-09-15T11:30:00+00:00", "comment_count": 0, "history_count": 0 } ] } }`
 - GET  /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true] -> { data: TaskDTO }; default reads hide deleted tasks
 - POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }
 - POST /api/tasks/delete ({ id, hard?: bool }[?project=PREFIX]) -> { data: { deleted: bool, hard: bool, warnings: string[] } }; soft by default; hard deletion retains attachments and warns about retained attachment references and incoming task relationships

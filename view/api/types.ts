@@ -134,6 +134,13 @@ export interface TaskRuntimeState {
     calendar_day: string
 }
 
+/**
+ * A task. `GET /api/tasks/get`, SSE payloads and mutation responses send all
+ * of it; `GET /api/tasks/list` rows (DEV-692, `TaskListRow` in
+ * crates/lotar-core/src/api_types.rs) leave out `description`, `comments`
+ * and `history` (unless `include=history`) and carry the summary fields
+ * instead. The task store holds both kinds; see {@link isListRow}.
+ */
 export interface TaskDTO {
     id: string
     /** The task's web link `<server.public_url>/task/<ID>`; absent while no public URL is set. */
@@ -165,7 +172,8 @@ export interface TaskDTO {
     description?: string | null
     tags: string[]
     relationships: TaskRelationships
-    comments: TaskComment[]
+    /** Absent in list rows (DEV-692). */
+    comments?: TaskComment[]
     references: ReferenceEntry[]
     /** Acceptance criteria entries; omitted when empty. */
     acceptance_criteria?: string[]
@@ -173,8 +181,26 @@ export interface TaskDTO {
     sprint_order?: Record<number, number>
     /** Releases the task belongs to (DEV-393); a task can be in several. */
     releases: number[]
-    history: TaskHistoryEntry[]
+    /** Absent in list rows unless the list asked for `include=history` (DEV-692). */
+    history?: TaskHistoryEntry[]
     custom_fields: Record<string, unknown>
+    /** List rows only (DEV-692): number of comments. */
+    comment_count?: number
+    /** List rows only (DEV-692): number of history entries. */
+    history_count?: number
+    /** List rows only (DEV-692): the newest question no answer points to. */
+    open_question?: TaskComment
+    /**
+     * List rows only (DEV-692): when the task entered its current status —
+     * the latest change into it, else `created` when its status never
+     * changed, else the latest status change.
+     */
+    status_since?: string
+}
+
+/** A `GET /api/tasks/list` row (DEV-692) rather than a whole task. */
+export function isListRow(task: TaskDTO | null | undefined): boolean {
+    return !!task && typeof task.comment_count === 'number'
 }
 
 /**
@@ -621,6 +647,10 @@ export interface TaskListFilter {
     deletion?: 'active' | 'deleted' | 'all'
     /** DEV-4 archive visibility: `no` (default) leaves archived tasks out, `yes` only them, `all` both. */
     archived?: 'no' | 'yes' | 'all'
+    /** DEV-692: `history` keeps each row's history (Insights). */
+    include?: 'history'
+    /** DEV-692: comma-separated task IDs (at most 100); the answer carries their `positions`. */
+    ids?: string
     [key: string]: unknown
 }
 
@@ -636,8 +666,10 @@ export interface TaskListResponse {
     total: number
     limit: number
     offset: number
-    /** Page of tasks; omitted (not `[]`) by the server when the page is empty — treat missing as empty. */
+    /** Page of list rows; omitted (not `[]`) by the server when the page is empty — treat missing as empty. */
     tasks?: TaskDTO[]
+    /** With `ids` (DEV-692): each returned task's index in the full filtered order. */
+    positions?: Record<string, number>
 }
 
 export interface SprintBacklogItem {

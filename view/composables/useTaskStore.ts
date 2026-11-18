@@ -24,7 +24,8 @@
  *
  * Consumers obtain a `TaskQueryHandle` via `getQuery(filter)`. Handles can be
  * `retain()`ed while their consumer is mounted; task SSE events then schedule
- * a debounced authoritative refresh of every retained query, so tasks moving
+ * a debounced authoritative refresh of every retained query (per task since
+ * DEV-692, see below), so tasks moving
  * in or out of a filter converge without any client-side predicate engine
  * (the server stays the only filter authority).
  *
@@ -34,6 +35,17 @@
  * events cannot keep a slow list in `loading` forever. Full-DTO events are
  * written to the entity map at once; the watcher's id-only echo of the same
  * write skips its single-task fetch.
+ *
+ * DEV-692 per-task refresh: list rows (`isListRow`) leave out the
+ * description, comments and history; a row of the same `modified` as the
+ * entity keeps the entity's copies. A task event or mutation does not reload
+ * every retained query: each asks `list?ids=<changed ids>` (debounced; a burst
+ * shares one request per query) and places the answered rows at the server's
+ * `positions`, dropping requested tasks the server left out. A query reloads
+ * in full instead while a full reload runs or is due, when its rows are not
+ * one whole server answer (`exact`), with more than `MAX_PENDING_IDS` tasks
+ * pending, or when the `ids=` request fails. SSE reconnects and the calendar
+ * day roll (`invalidateQueries`) always reload in full.
  *
  * The legacy flat surface (`items`/`count`/`orderIndex`/`serverTotal`/
  * `status`/`error`/`lastSyncAt`/`hydrateAll`/`hydratePage`/`forceRefresh`)
@@ -77,6 +89,7 @@ import type {
     TaskListResponse,
     TaskUpdate,
 } from '../api/types'
+import { isListRow } from '../api/types'
 import { displayText, isDeletedTask, projectOf } from '../utils/text'
 import { registerTaskQueryInvalidator } from './useCompletionPolicy'
 import { useSse } from './useSse'
@@ -266,6 +279,13 @@ interface QueryEntry {
     status: ShallowRef<StoreStatus>
     error: ShallowRef<string | null>
     lastSyncAt: ShallowRef<number>
+    /** The last refresh loaded every page of the server's answer, in its order (DEV-692). */
+    exact: boolean
+    /** Tasks whose membership an `ids=` request will settle (DEV-692). */
+    pendingIds: Set<string>
+    idsTimer: ReturnType<typeof setTimeout> | null
+    /** Per task: the latest `ids=` request that asked for it; older answers for it are dropped. */
+    idRequests: Map<string, number>
 }
 
 // The server scans every task file per request, so full-list views fetch in
@@ -283,6 +303,14 @@ const FETCH_ONE_DEBOUNCE_MS = 150
  * id, the echo's single-task fetch is redundant and skipped.
  */
 const FULL_DTO_ECHO_MS = 2000
+/**
+ * DEV-692: an event refreshes each retained list by asking the server for
+ * just the changed tasks (`ids=`). More pending tasks than this reload the
+ * list in full instead.
+ */
+const MAX_PENDING_IDS = 50
+/** DEV-692: list rows leave these out; a row keeps the entity's copy when it is the same version. */
+const LIST_ROW_OMITS = ['description', 'comments', 'history'] as const
 /** Paging params are per-request only; they must not fork the query key. */
 const PAGING_KEYS = new Set(['limit', 'offset', 'page'])
 
@@ -510,9 +538,23 @@ function createTaskStore(client: ApiClient): TaskStoreState {
             const existingRev = entityRevisions.get(id) ?? 0
             const cmp = compareModified(task.modified, existing.modified)
             if (existingRev > requestClock ? cmp <= 0 : cmp < 0) return false
+            if (cmp === 0 && isListRow(task)) {
+                writeEntity(withKeptDetails(task, existing))
+                return true
+            }
         }
         writeEntity(task)
         return true
+    }
+
+    /** A list row of the same version as `existing`, with the details only `existing` has (DEV-692). */
+    function withKeptDetails(row: TaskDTO, existing: TaskDTO): TaskDTO {
+        const merged: Record<string, unknown> = { ...row }
+        const held = existing as unknown as Record<string, unknown>
+        for (const key of LIST_ROW_OMITS) {
+            if (merged[key] === undefined && held[key] !== undefined) merged[key] = held[key]
+        }
+        return merged as unknown as TaskDTO
     }
 
     /** True when a live write newer than `requestClock` touched the entity. */
@@ -596,6 +638,10 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 status: shallowRef<StoreStatus>('idle'),
                 error: shallowRef<string | null>(null),
                 lastSyncAt: shallowRef(0),
+                exact: false,
+                pendingIds: new Set(),
+                idsTimer: null,
+                idRequests: new Map(),
             }
             queries.set(key, entry)
             queriesVersion.value += 1
@@ -658,12 +704,103 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         for (const entry of queries.values()) invalidateEntry(entry)
     }
 
+    function clearPendingIds(entry: QueryEntry): void {
+        if (entry.idsTimer !== null) {
+            clearTimeout(entry.idsTimer)
+            entry.idsTimer = null
+        }
+        entry.pendingIds.clear()
+    }
+
+    /**
+     * DEV-692: tasks `ids` changed. Each retained query asks the server where
+     * just those tasks stand in it (`ids=`, debounced so a burst shares one
+     * request) instead of reloading every row. A query reloads in full when a
+     * full reload is running or due anyway, when its rows are not one whole
+     * server answer, or when too many tasks are pending.
+     */
+    function invalidateTaskIds(ids: Iterable<string>): void {
+        const changed = Array.from(new Set(Array.from(ids).filter(Boolean)))
+        if (!changed.length) return
+        for (const entry of queries.values()) {
+            if (entry.liveHandles <= 0) continue
+            if (!entry.exact || isRefreshRunning(entry) || entry.dirty || entry.refreshTimer !== null) {
+                clearPendingIds(entry)
+                invalidateEntry(entry)
+                continue
+            }
+            for (const id of changed) entry.pendingIds.add(id)
+            if (entry.pendingIds.size > MAX_PENDING_IDS) {
+                clearPendingIds(entry)
+                invalidateEntry(entry)
+                continue
+            }
+            if (entry.idsTimer === null) {
+                entry.idsTimer = setTimeout(() => {
+                    entry.idsTimer = null
+                    void runIdsRefresh(entry)
+                }, LIVE_REFRESH_DEBOUNCE_MS)
+            }
+        }
+    }
+
+    let idsRequestSeq = 0
+
+    async function runIdsRefresh(entry: QueryEntry): Promise<void> {
+        const requested = Array.from(entry.pendingIds)
+        entry.pendingIds.clear()
+        if (!requested.length || entry.liveHandles <= 0) return
+        if (!entry.exact || isRefreshRunning(entry) || entry.refreshTimer !== null) {
+            invalidateEntry(entry)
+            return
+        }
+        const generation = entry.generation
+        const requestClock = writeClock
+        const seq = ++idsRequestSeq
+        for (const id of requested) entry.idRequests.set(id, seq)
+        const filter = Object.fromEntries(Object.entries(entry.filter).filter(([key]) => !PAGING_KEYS.has(key)))
+        let response: TaskListResponse
+        try {
+            response = await client.listTasks({ ...filter, ids: requested.join(',') })
+        } catch {
+            for (const id of requested) if (entry.idRequests.get(id) === seq) entry.idRequests.delete(id)
+            if (generation === entry.generation) invalidateEntry(entry)
+            return
+        }
+        // A full refresh started meanwhile answers these tasks too.
+        if (generation !== entry.generation || entry.liveHandles <= 0) return
+        const settled = new Set<string>()
+        for (const id of requested) {
+            if (entry.idRequests.get(id) !== seq) continue
+            entry.idRequests.delete(id)
+            settled.add(id.toUpperCase())
+        }
+        if (!settled.size) return
+        const rows = (Array.isArray(response.tasks) ? response.tasks : []).filter(
+            (task) => task.id && settled.has(task.id.toUpperCase()),
+        )
+        for (const task of rows) applyResponseEntity(task, requestClock)
+        const positions = response.positions ?? {}
+        const order = entry.ids.value.filter((id) => !settled.has(id.toUpperCase()))
+        const placed = rows
+            .map((task) => ({ id: task.id, at: positions[task.id] ?? Number.MAX_SAFE_INTEGER }))
+            .sort((a, b) => a.at - b.at)
+        for (const { id, at } of placed) order.splice(Math.min(at, order.length), 0, id)
+        entry.ids.value = order
+        entry.ranks.value = new Map(order.map((id, index) => [id, index]))
+        if (typeof response.total === 'number') entry.total.value = response.total
+        entry.lastSyncAt.value = Date.now()
+        bump()
+    }
+
     async function runQueryRefresh(
         entry: QueryEntry,
         opts: QueryRefreshOptions & { merge?: boolean } = {},
     ): Promise<void> {
         const generation = ++entry.generation
         const requestClock = writeClock
+        // A full refresh answers pending `ids=` work too (DEV-692).
+        clearPendingIds(entry)
         const pageSize = opts.pageSize ?? DEFAULT_PAGE_SIZE
         const merge = opts.merge === true
         entry.status.value = 'loading'
@@ -725,6 +862,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
             if (generation !== entry.generation) return
             entry.runs += 1
+            entry.exact = !merge && ids.size === ranks.size
             entry.ids.value = Array.from(ids)
             entry.ranks.value = ranks
             entry.total.value = expectedTotal || ids.size
@@ -735,6 +873,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         } catch (err: unknown) {
             if (generation !== entry.generation) return
             entry.runs += 1
+            entry.exact = false
             entry.status.value = 'error'
             entry.error.value = err instanceof Error ? err.message : String(err)
         } finally {
@@ -781,6 +920,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 entry.liveHandles = Math.max(0, entry.liveHandles - 1)
                 if (entry.liveHandles === 0) {
                     clearEntryTimer(entry)
+                    clearPendingIds(entry)
                     entry.dirty = false
                     // Last owner left: an in-flight refresh must not publish either.
                     if (entry.inFlight > 0) entry.generation += 1
@@ -860,6 +1000,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                 ids.add(task.id)
             }
             entry.runs += 1
+            entry.exact = false
             entry.ids.value = Array.from(ids)
             if (typeof response.total === 'number') entry.total.value = response.total
             entry.lastSyncAt.value = Date.now()
@@ -950,7 +1091,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         const requestClock = writeClock
         const created = await client.addTask(payload)
         applyMutationOutcome(created, requestClock)
-        invalidateRetainedQueries()
+        invalidateTaskIds([created.id])
         return created
     }
 
@@ -958,7 +1099,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         const requestClock = writeClock
         const updated = await client.updateTask(id, patch)
         applyMutationOutcome(updated, requestClock)
-        invalidateRetainedQueries()
+        invalidateTaskIds([id, updated.id])
         return updated
     }
 
@@ -970,7 +1111,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         } else {
             applySoftDeleteOutcome(id, requestClock)
         }
-        invalidateRetainedQueries()
+        invalidateTaskIds([id])
         return response
     }
 
@@ -980,7 +1121,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         // A soft delete that landed while the restore was in flight wins over
         // this late active DTO; otherwise the live write clears the tombstone.
         applyMutationOutcome(restored, requestClock)
-        invalidateRetainedQueries()
+        invalidateTaskIds([id, restored.id])
         return restored
     }
 
@@ -988,7 +1129,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         const requestClock = writeClock
         const updated = archive ? await client.archiveTask(id, project) : await client.unarchiveTask(id, project)
         applyMutationOutcome(updated, requestClock)
-        invalidateRetainedQueries()
+        invalidateTaskIds([id, updated.id])
         return updated
     }
 
@@ -1004,12 +1145,12 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         writeEntity(task)
         // Local panel upserts must converge membership exactly like SSE events;
         // applying a query response never schedules (no recursion).
-        invalidateRetainedQueries()
+        invalidateTaskIds([task.id])
     }
 
     function evict(id: string) {
         tombstoneEntity(id)
-        invalidateRetainedQueries()
+        invalidateTaskIds([id])
     }
 
     // ---- SSE ----------------------------------------------------------------
@@ -1027,7 +1168,8 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                     writeEntity(payload as TaskDTO)
                     noteFullDto(id)
                 }
-                invalidateRetainedQueries()
+                if (id) invalidateTaskIds([id])
+                else invalidateRetainedQueries()
                 break
             }
             case 'task_updated': {
@@ -1043,8 +1185,8 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                     // has nothing newer to fetch (DEV-274).
                     scheduleFetchOne(id, false)
                 }
-                // Membership still converges through the (coalesced) refresh.
-                invalidateRetainedQueries()
+                // Membership converges through the (coalesced) `ids=` request.
+                invalidateTaskIds([id])
                 break
             }
             case 'task_deleted': {
@@ -1063,8 +1205,10 @@ function createTaskStore(client: ApiClient): TaskStoreState {
                     // hard (evict + tombstone).
                     markDeleted(id)
                     scheduleFetchOne(id, true)
+                    invalidateTaskIds([id])
+                } else {
+                    invalidateRetainedQueries()
                 }
-                invalidateRetainedQueries()
                 break
             }
             // config_updated / project_changed: views can listen separately if needed

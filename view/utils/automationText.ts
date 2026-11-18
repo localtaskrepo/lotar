@@ -357,7 +357,7 @@ function readTaskValue(task: TaskDTO, path: string): string | null {
                 : list === 'releases'
                   ? task.releases
                   : list === 'comments'
-                    ? task.comments
+                    ? (task.comments ?? [])
                     : task.references
         const pick = (item: unknown) => {
             if (item == null) return ''

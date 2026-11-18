@@ -39,12 +39,15 @@ import UiButton from './UiButton.vue'
 import { showToast } from './toast'
 
 /** DEV-488: a task's newest open question on a board card or list row, answerable in place. */
-const props = defineProps<{ task: Pick<TaskDTO, 'id' | 'comments'> }>()
+const props = defineProps<{ task: Pick<TaskDTO, 'id' | 'comments' | 'open_question'> }>()
 
 const expanded = ref(false)
 const busy = ref(false)
 
-const question = computed(() => lastOpenQuestion(props.task.comments))
+// A list row (DEV-692) has no comments but names its open question.
+const question = computed(() =>
+  props.task.comments ? lastOpenQuestion(props.task.comments) : (props.task.open_question ?? null),
+)
 const prompt = computed(() => (question.value ? questionPrompt(question.value) : ''))
 const summary = computed(() => {
   const first = prompt.value.split('\n')[0]?.trim() || 'Open question'

@@ -3,7 +3,7 @@
   "info": {
     "title": "LoTaR API",
     "version": "1.0.0",
-    "description": "REST API for LoTaR task management. Includes task CRUD, projects, config, and realtime events via SSE. Archived tasks (DEV-4) are read-only: any request that would change one is refused with 400 unless it passes the query parameter force_archived=true. Task/sprint domain failures use the existing error envelope: invalid input/identity/safety refusals return 400 INVALID_ARGUMENT, missing resources return 404 NOT_FOUND, and I/O/serialization/index failures return 500 INTERNAL."
+    "description": "REST API for LoTaR task management. JSON responses of 1 KB or more are gzip-compressed when the request's Accept-Encoding allows gzip (DEV-692). Includes task CRUD, projects, config, and realtime events via SSE. Archived tasks (DEV-4) are read-only: any request that would change one is refused with 400 unless it passes the query parameter force_archived=true. Task/sprint domain failures use the existing error envelope: invalid input/identity/safety refusals return 400 INVALID_ARGUMENT, missing resources return 404 NOT_FOUND, and I/O/serialization/index failures return 500 INTERNAL."
   },
   "servers": [
     {
@@ -561,7 +561,7 @@
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
-        "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35); a key that is neither a parameter, a built-in field nor a declared custom field is a 400, and page, sort, format and cursor are rejected with a hint. Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. A version custom field (DEV-373) takes version ranges instead: affects=0.13 (any 0.13.x), affects=>=0.13 <0.14, affects=^0.13, affects=~0.13.2; CSV values are alternatives, and a value that is not a version range is a 400. < and > on any other field are a 400. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=<N>d|<N>w (modified within the last N days or weeks, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>), in version order for version fields; order is asc|desc. Default: modified desc with a natural task ID ascending tiebreak (A-2 before A-10) that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-1000).",
+        "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35); a key that is neither a parameter, a built-in field nor a declared custom field is a 400, and page, sort, format and cursor are rejected with a hint. Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. A version custom field (DEV-373) takes version ranges instead: affects=0.13 (any 0.13.x), affects=>=0.13 <0.14, affects=^0.13, affects=~0.13.2; CSV values are alternatives, and a value that is not a version range is a 400. < and > on any other field are a 400. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=<N>d|<N>w (modified within the last N days or weeks, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>), in version order for version fields; order is asc|desc. Default: modified desc with a natural task ID ascending tiebreak (A-2 before A-10) that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-1000). Rows (TaskListRow, DEV-692) leave out description, comments and history and carry comment_count, history_count, open_question and status_since instead; GET /api/tasks/get returns the whole task.",
         "parameters": [
           {
             "name": "deletion",
@@ -769,11 +769,30 @@
               "type": "string"
             },
             "description": "Keep tasks whose effort is at most this, inclusive (e.g. 4h, 1d, 5pt). Time and points never compare with each other; tasks without an effort are left out. Invalid values return 400."
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "history"
+              ]
+            },
+            "description": "DEV-692: history keeps each row's whole history (insights, charts). Any other value returns 400."
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "DEV-692: CSV of up to 100 task IDs (case-insensitive). Returns only those of them that match the filters, with positions (each one's index in the full filtered order) and the full total; limit and offset are ignored. A client keeps a loaded list current this way after a task event. More than 100 IDs return 400."
           }
         ],
         "responses": {
           "200": {
-            "description": "Task page; the tasks key is omitted when the page is empty",
+            "description": "Task page of list rows; the tasks key is omitted when the page is empty",
             "content": {
               "application/json": {
                 "schema": {
@@ -809,7 +828,10 @@
                             "modified": "2026-09-15T11:30:00+00:00",
                             "tags": [
                               "api"
-                            ]
+                            ],
+                            "comment_count": 2,
+                            "history_count": 3,
+                            "status_since": "2026-09-15T10:00:00+00:00"
                           }
                         ]
                       }
@@ -5097,15 +5119,175 @@
           "tasks": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/TaskDTO"
+              "$ref": "#/components/schemas/TaskListRow"
             },
-            "description": "TaskDTOs for the requested page. Omitted when the page is empty (serde skips empty arrays); treat a missing tasks key as an empty page."
+            "description": "List rows for the requested page. Omitted when the page is empty (serde skips empty arrays); treat a missing tasks key as an empty page."
+          },
+          "positions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "With ids (DEV-692): each returned task's index in the full filtered order. Omitted otherwise."
           }
         },
         "required": [
           "total",
           "limit",
           "offset"
+        ]
+      },
+      "TaskListRow": {
+        "type": "object",
+        "description": "A task as GET /api/tasks/list returns it (DEV-692): the TaskDTO without description, comments and history, plus what list views show of them. GET /api/tasks/get returns the whole task.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The task's web link `<server.public_url>/task/<ID>`; omitted while the workspace sets no public URL"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "task_state": {
+            "$ref": "#/components/schemas/TaskStateDTO"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "reporter": {
+            "type": "string",
+            "description": "Supports @me to resolve to current user"
+          },
+          "assignee": {
+            "type": "string",
+            "description": "Supports @me to resolve to current user"
+          },
+          "created": {
+            "type": "string"
+          },
+          "modified": {
+            "type": "string"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Soft-deletion timestamp; omitted for active tasks. Delete and restore do not change modified."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "True while the task file is in its project's @archive folder (DEV-4); archived tasks are read-only. Omitted otherwise."
+          },
+          "moved_from": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Earlier IDs of a task moved to another project, oldest first (DEV-183). Requests may use them. Omitted when empty."
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "effort": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "relationships": {
+            "$ref": "#/components/schemas/TaskRelationships"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferenceEntry"
+            }
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Acceptance criteria entries; omitted when empty."
+          },
+          "sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "releases": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Releases the task ships in (DEV-393)."
+          },
+          "sprint_order": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "comment_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of comments."
+          },
+          "history_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of history entries."
+          },
+          "open_question": {
+            "$ref": "#/components/schemas/TaskComment",
+            "description": "The newest question comment no answer points to (DEV-488); omitted when there is none."
+          },
+          "status_since": {
+            "type": "string",
+            "description": "When the task entered its current status: the latest recorded change into it, the creation time when its status never changed, else the latest recorded status change."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChangeLogEntry"
+            },
+            "description": "The whole history; only with include=history."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority",
+          "task_type",
+          "created",
+          "modified",
+          "comment_count",
+          "history_count"
         ]
       },
       "TaskCreate": {
