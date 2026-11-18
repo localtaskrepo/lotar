@@ -1,14 +1,16 @@
 title: 'Partial cleanup per step: each job step removes the build output the next step doesn''t use, measured'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-17T06:51:34.275016+00:00
-modified: 2026-11-18T20:11:46.419764+00:00
+modified: 2026-11-18T20:46:58.752133+00:00
 relationships:
   depends_on:
   - DEV-652
+  blocks:
+  - DEV-714
   related:
   - DEV-579
   - DEV-651
@@ -18,6 +20,7 @@ relationships:
   - DEV-707
   - DEV-584
   - DEV-712
+  - DEV-713
 comments:
 - date: 2026-11-18T05:55:39.106810+00:00
   author: claude
@@ -135,6 +138,30 @@ comments:
       result: not_run
       reason: needs a lotar release (server 0.15.4 lacks agent worktree run)
     next: 'After the release: set a real ticket with a worktree to HelpNeeded (or let an agent hand one back) and check target/ shrank; then STD-236 copies the rule'
+- date: 2026-11-18T20:46:45.663541+00:00
+  author: claude
+  text: |-
+    Review: passed. Reviewed HEAD `05ea0d37e` (= `t3/partial-build-cleanup-per-step-1`), applies cleanly on main. Two minor follow-ups filed.
+
+    **Read:** the diff, the ticket and its comments, the first review, DEV-712, STD-236, `worktree_run`, `running_t3_thread`/`finished_job_worktree` in `agent_job_service.rs`, the automation docs on `updated` and rule-set changes.
+
+    **Holds**
+    - Both review findings are handled. The docs (`docs/help/agent.md`, the comment at `.tasks/DEV/automation.yml:895`) now name exactly the waits the rule covers. The rest is DEV-712 (HelpNeeded, waiting on the owner's design choice).
+    - The new test runs a real job in a real worktree with the real CLI, and pins the limit (a rule's own HelpNeeded keeps the build).
+    - `status: HelpNeeded` in `when` needs the status to change, so a comment on a waiting ticket doesn't rerun the clean.
+    - STD-95 change: the owner said yes (INBOX-526, 2026-11-18).
+    - Measurements are in the first comment. The fix→review and review→merge rules were dropped with a reason.
+    - No stray files, no second branch.
+
+    **Reran**
+    - `npm ci`: passed
+    - `npm run -s lint:agent`: passed
+    - `npm run -s test:rust:agent`: 2374/2374 passed
+    - `npm run smoke`: not rerun, no UI or REST change
+
+    **Minor, filed**
+    - [DEV-713](https://lotar.pyxzl.net/task/DEV-713): `worktree run` doesn't check a T3 Code thread that runs on after its job ended. lotar's own cleanup does (`finished_job_worktree`). A person's HelpNeeded could then clean the worktree under a running build.
+    - [DEV-714](https://lotar.pyxzl.net/task/DEV-714): "Done when" 2 (rule run on a real ticket) only runs after a release that has `agent worktree run`. That check now lives in DEV-714, Blocked on this ticket, so it isn't lost when this ticket goes Done at merge.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A509492fe-d1ac-4c44-887b-244e75950add
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac8df013-267a-4c25-a134-08054d18ee06
@@ -300,3 +327,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-18T20:46:28.568965+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584","DEV-712"]}'
+    new: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584","DEV-712","DEV-713"]}'
+- at: 2026-11-18T20:46:33.337653+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584","DEV-712","DEV-713"]}'
+    new: '{"depends_on":["DEV-652"],"blocks":["DEV-714"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703","DEV-707","DEV-584","DEV-712","DEV-713"]}'
+- at: 2026-11-18T20:46:45.663541+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:46:58.752133+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

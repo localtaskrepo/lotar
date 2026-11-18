@@ -1,11 +1,11 @@
 title: A job that fails on a provider's usage limit pauses until the reset instead of failing into retries and owner questions
-status: Reviewing
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-18T20:10:08.926261+00:00
+modified: 2026-11-18T20:51:42.487604+00:00
 relationships:
   depends_on:
   - standards:STD-133
@@ -105,6 +105,58 @@ comments:
     **Holds**
     - No `job_failed` rule runs and the ticket keeps its status and assignee. The retry goes first on the same profile with `not_before`, and the worker stays alive while it waits (`agent_queue_service.rs:584`). `list-jobs` shows `paused (until …)`. `job_paused` works in YAML, `simulate`, the UI and the docs. The fake-t3 tests cover Codex's and Claude's messages and a pause that repeats.
     - `update_job_failure` now runs `job_paused` rules for DEV-604 queue pauses too. The docs say so; that is fine.
+- date: 2026-11-18T20:36:04.967938+00:00
+  author: claude
+  text: |-
+    Typed failures (DEV-683's TurnFailed kind/resets_at) are on harnessmux main but 0.2.0 isn't released; lotar is on 0.1.10. Land DEV-584 with the text match now and leave typed failures to DEV-711, or wait for you to release 0.2.0?
+
+    Options:
+    - split: Land now; DEV-711 adds typed failures after 0.2.0 (recommended)
+    - wait: I release harnessmux 0.2.0 first; DEV-584 uses it
+  question:
+    options:
+    - key: split
+      label: Land now; DEV-711 adds typed failures after 0.2.0
+    - key: wait
+      label: I release harnessmux 0.2.0 first; DEV-584 uses it
+    recommended: split
+- date: 2026-11-18T20:50:49.804261+00:00
+  author: claude
+  text: |-
+    **Rework done**
+
+    - **Agent text read as a limit:** fixed. Only the runner's own turn-failure report counts now. Agent messages and tool calls no longer do. New test: an agent that only talks about a rate limit fails as normal.
+    - **T3 Code resumes after a limit:** fixed. Its takeover now replaces the queued retry. The retry is dropped and the outcome carried. Two new tests: the takeover after a limit, and a plain queued job stays.
+    - **Split or wait:** that is your call. See my question above. Ticket is HelpNeeded for you.
+
+    Each new test fails with its fix turned off.
+  report:
+    commits:
+    - hash: fa2b3f679
+      what: rework amended into the DEV-584 commit
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2390 Rust, 139 UI files, release 60, hooks 7
+    - command: npm run smoke
+      result: passed
+      reason: 118 files, 405 tests
+    - command: cargo nextest run -p lotar-lib --test integration dev584|dev626
+      result: passed
+    next: 'Owner: answer the open question (split or wait); then the review on Codex runs'
+- date: 2026-11-18T20:51:40.689242+00:00
+  author: triage
+  text: |-
+    Answer: split (Land now; DEV-711 adds typed failures after 0.2.0)
+
+    Answered by the owner's decision on DEV-711 (2026-11-18 20:23, INBOX-549): he releases harnessmux 0.2.0, then an agent does DEV-711 as written, which is the typed-failures follow-up. So land DEV-584 with the text match now.
+  answer:
+    to: 2026-11-18T20:36:04.967938+00:00
+    choice:
+    - split
+    note: 'Answered by the owner''s decision on DEV-711 (2026-11-18 20:23, INBOX-549): he releases harnessmux 0.2.0, then an agent does DEV-711 as written, which is the typed-failures follow-up. So land DEV-584 with the text match now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae237cd7b-56b1-4808-8d93-a5027ca90283
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e0c894c-8d31-47dc-b9c6-2d4724c64a55
@@ -312,3 +364,36 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-18T20:35:32.102637+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-18T20:36:04.967938+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:50:49.804261+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:51:01.464327+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-18T20:51:40.689242+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:51:42.487604+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

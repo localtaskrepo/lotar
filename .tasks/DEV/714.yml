@@ -1,0 +1,17 @@
+title: Check DEV-653's waiting rule live after the release with lotar agent worktree run
+status: Blocked
+priority: Low
+type: Chore
+reporter: claude
+created: 2026-11-18T20:46:33.122471+00:00
+relationships:
+  depends_on:
+  - DEV-653
+description: |-
+  Found in DEV-653's review (2026-11-18, commit `05ea0d37e`). DEV-653's "Done when" asks that the kept rule run on a real ticket, checked, not assumed. Only an integration test checked it (`waiting_rule_drops_build_output_on_hand_back_and_person_change_only`): the installed lotar (0.15.4) lacks `agent worktree run`, so the rule fails and `ignore_failure` hides it until a release has the command. DEV-653 goes Done at merge, so this ticket keeps the check.
+
+  Waits for: DEV-653 on main and a lotar release with `lotar agent worktree run --help`.
+
+  ## Done when
+  - [ ] On a real DEV ticket with a lotar worktree, a status change to HelpNeeded or Blocked by a person, or an agent's hand-back during its job, ran `cargo clean --workspace` there: `target/` size before and after, and the automation log line, in a comment.
+  - [ ] Then STD-236 copies the rule into standards.

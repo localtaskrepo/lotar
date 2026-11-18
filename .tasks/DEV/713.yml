@@ -1,0 +1,41 @@
+title: lotar agent worktree run runs while the ticket's T3 Code thread still runs or waits for an answer
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-18T20:46:28.278416+00:00
+modified: 2026-11-18T20:46:45.531855+00:00
+relationships:
+  related:
+  - DEV-653
+  - DEV-594
+  - DEV-600
+description: |-
+  Found in DEV-653's review (2026-11-18, commit `05ea0d37e`).
+
+  `lotar agent worktree run` (`worktree_run`, `crates/lotar-lib/src/cli/handlers/agent.rs`) skips a ticket only while a lotar job runs for it (`has_active_job`, `running_job_for_ticket`). A T3 Code thread can run on after its job ended: it resumes a turn it paused for a usage limit, or the owner answers in the thread (DEV-594, DEV-600). lotar's own cleanup counts that thread as still working in the worktree (`finished_job_worktree` and `running_t3_thread` in `crates/lotar-agent/src/services/agent_job_service.rs`); `worktree run` doesn't.
+
+  Effect: a person sets such a ticket to HelpNeeded or Blocked, DEV's waiting rule runs `cargo clean --workspace` in the worktree under the thread's running build or tests, and they fail.
+
+  ## Done when
+  - [ ] `worktree run` runs nothing while a T3 Code thread of the ticket runs or waits for an answer, and says so; a test shows it (a shell script stands in for `t3`, as in `dev626_resumed_t3_threads_test.rs`).
+  - [ ] docs/help/agent.md "Build output while a ticket waits" says so.
+history:
+- at: 2026-11-18T20:46:29.051490+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-653"]}'
+    new: '{"related":["DEV-653","DEV-594","DEV-600"]}'
+- at: 2026-11-18T20:46:29.417285+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-18T20:46:45.531855+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: lotar agent worktree run skips a ticket whose T3 Code thread still runs or waits for an answer
+    new: lotar agent worktree run runs while the ticket's T3 Code thread still runs or waits for an answer

@@ -5251,25 +5251,33 @@ fn carry_outcome(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, car
 /// A completed t3 job settles its thread in T3 Code once the end rules moved
 /// the ticket on (owner 2026-11-17), so the sidebar keeps only the threads
 /// that still need someone. A ticket that waits for a person keeps its thread
-/// active, and a refused settle is a job note only.
+/// active, and a settle that can't happen is a job note only (DEV-710).
 fn settle_t3_thread(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) {
     let job = JOB_REGISTRY.lock().ok().and_then(|registry| {
         registry.jobs.get(job_id).map(|state| (state.record.runner.clone(), state.record.agent_profile.clone(), state.record.session_id.clone()))
     });
-    let Some((runner, agent, Some(session))) = job else { return };
-    if runner != AgentRunnerKind::T3.as_str() {
-        return;
-    }
+    // Only a t3 job has a thread, and a job the registry no longer holds has no log to note in.
+    let Some((_, agent, session)) = job.filter(|(runner, ..)| runner == AgentRunnerKind::T3.as_str()) else { return };
     let note = |message: String| {
         update_job(job_id, |state| {
             push_event(state, "agent_job_progress", Some(message.clone()));
         });
     };
+    let Some(session) = session else {
+        note("The T3 Code thread was not settled: the job has no harnessmux session.".to_string());
+        return;
+    };
     if let Some(waits) = ticket_waits_for_a_person(tasks_dir, ticket_id) {
         note(format!("The T3 Code thread stays active: {ticket_id} {waits}."));
         return;
     }
-    let Ok(record) = crate::services::agent_runner::registry().load(&session) else { return };
+    let record = match crate::services::agent_runner::registry().load(&session) {
+        Ok(record) => record,
+        Err(err) => {
+            note(format!("The T3 Code thread was not settled: session {session} can't be read: {err}"));
+            return;
+        }
+    };
     let table = match agent.as_deref().and_then(|name| config.agent_profiles.get(name)) {
         Some(profile) => crate::services::agent_runner::job_agent_table(&record.agent, profile),
         None => crate::services::agent_runner::agent_table(),
@@ -6274,6 +6282,26 @@ mod tests {
         assert_eq!(restored_assignee(started_unassigned), Some(None));
         assert_eq!(restored_assignee(recorded_assignee(Some(Some("@merge".to_string())))), Some(Some("@merge".to_string())));
         assert_eq!(restored_assignee(recorded_assignee(None)), None, "a job that is no merge job, or a record from an older lotar");
+    }
+
+    /// DEV-710: a t3 job whose thread can't be settled says why in its log instead of ending silently.
+    #[test]
+    fn a_t3_job_that_cannot_settle_its_thread_says_why() {
+        let dir = tempdir().unwrap();
+        let config = ResolvedConfig::from_global(GlobalConfig::default());
+        let notes = |id: &str, session: Option<&str>| {
+            let mut state = unit_job_state(id);
+            state.record.runner = AgentRunnerKind::T3.as_str().to_string();
+            state.record.session_id = session.map(str::to_string);
+            JOB_REGISTRY.lock().unwrap().jobs.insert(id.to_string(), state);
+            settle_t3_thread(id, "TEST-1", dir.path(), &config);
+            let state = JOB_REGISTRY.lock().unwrap().jobs.remove(id).unwrap();
+            state.events.into_iter().filter_map(|event| event.message).collect::<Vec<_>>()
+        };
+        assert_eq!(notes("job-dev710-no-session", None), vec!["The T3 Code thread was not settled: the job has no harnessmux session.".to_string()]);
+        let unreadable = notes("job-dev710-bad-session", Some("bad/name"));
+        assert_eq!(unreadable.len(), 1, "{unreadable:?}");
+        assert!(unreadable[0].starts_with("The T3 Code thread was not settled: session bad/name can't be read: "), "{unreadable:?}");
     }
 
     #[test]

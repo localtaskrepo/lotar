@@ -1,14 +1,30 @@
 title: 'Waiting cleanup for waits lotar or a rule sets: a job''s end drops the build output of a ticket it leaves HelpNeeded or Blocked'
-status: Todo
+status: HelpNeeded
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-18T20:06:24.875941+00:00
-modified: 2026-11-18T20:06:25.335916+00:00
+modified: 2026-11-18T20:35:29.535890+00:00
 relationships:
   related:
   - DEV-653
+comments:
+- date: 2026-11-18T20:35:21.301053+00:00
+  author: claude
+  text: |-
+    Needs your design choice before I code: how should lotar clean a ticket that it or a rule leaves waiting?
+
+    - Builds on [DEV-653](https://lotar.pyxzl.net/task/DEV-653), which is still in review (`agent/DEV-653`, `05ea0d37e`, not on main). Its rule, docs section and test live only there. I'll stack on that commit once you choose.
+    - The three waits differ. The rules that hand a ticket to mallox and the T3 thread that waits for an answer both happen at a job's end. Blocked on open prerequisites happens when a job would start, so no job ends there (`mark_task_blocked`, `automation_service.rs`).
+    - Lotar already treats `HelpNeeded` and `Blocked` as its waiting statuses by name (`hand_back_waiting_job`, `mark_task_blocked`).
+
+    **Question:** which of these?
+    1. **(Recommended) A command lotar runs:** new setting `agent.worktree.waiting_run: [cargo, clean, --workspace]`. Lotar runs it in the ticket's worktrees when it or a rule leaves the ticket HelpNeeded or Blocked: after the job is unregistered, and in `mark_task_blocked` when no job runs. This covers all three waits and saves 3.4 to 0.7 GB, the same as the rule. A repository's config needs `lotar trust` before lotar runs it, as with profiles. If the command fails, the job's log says so and nothing else changes.
+    2. **Paths only:** new setting `agent.worktree.waiting_cleanup_paths: [target/debug/incremental]`. It reuses the safe deletion that `cleanup_paths` already does, runs nothing and needs no trust, but saves only about 1.4 GB per ticket.
+    3. **Not worth it:** WontDo. The docs already name the waits that keep their build output.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b0cdad9-7699-4555-8e71-ac718d9fa284
 description: |-
   Found in DEV-653's review (2026-11-18): the waiting rule (`updated` on HelpNeeded/Blocked → `lotar agent worktree run <ticket> -- cargo clean --workspace`) fires only on a person's status change and an agent's hand-back. These waits write with `TaskUpdateContext::automation_disabled()` and fire no rule, so their build output (~2 GB each) stays until Done:
   - rules that hand a ticket to mallox: review failed, third blocking review, fix failed again, merge failed again (`.tasks/DEV/automation.yml`; "A rule's own change fires no other rule")
@@ -35,3 +51,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T20:33:12.823217+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T20:33:13.749123+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b0cdad9-7699-4555-8e71-ac718d9fa284
+- at: 2026-11-18T20:35:21.301053+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:35:29.535890+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

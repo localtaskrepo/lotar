@@ -1,11 +1,11 @@
 title: The resolved config sent by /api/config/show has agent_memory_gate, view/api/types.ts doesn't list it
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:36:18.364771+00:00
-modified: 2026-11-18T19:53:12.061440+00:00
+modified: 2026-11-18T20:32:50.674834+00:00
 relationships:
   related:
   - DEV-623
@@ -71,6 +71,36 @@ comments:
     - command: npm run test:smoke:agent
       result: not_run
       reason: diff is TS types only; fix agent reported it passed
+- date: 2026-11-18T20:32:50.509404+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-629` is in `main`.
+
+    - Rebased `agent/DEV-629` onto `main` (`01e84355a96a`): `db82672962e9`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-629` onto `main` (`cd5a49e9800d`): `6ceee675cf38`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `6ceee675cf38`
+    - Amended the pending `.tasks` changes into the merged commit: `9d7f4ad81d86`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: cd5a49e98
+      what: DEV-704 A job that fails on a usage limit is summarised as "The agent reported no cost" instead of the limit error
+    - hash: 9d7f4ad81
+      what: DEV-629 The resolved config sent by /api/config/show has agent_memory_gate, view/api/types.ts doesn't list it
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b42e58b-7525-4a3d-8a8a-b87581ff3bfb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8db6ee92-4226-4954-96e2-ea37b52d2f19
@@ -221,3 +251,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T20:32:50.509404+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:32:50.674834+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
