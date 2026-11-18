@@ -44,6 +44,8 @@ CLI > env > project > home > global > defaults (commands without a project skip 
 - agent.worktree.cleanup_paths: list of paths inside the worktree (default none), like `[target]`. When a job ends and no other job runs for its ticket, LoTaR deletes these paths from the job's worktree if git ignores them and tracks nothing under them; the worktree stays. Paths must be relative, without `..` or `.git`. `config set` takes a comma-separated list or a YAML list.
 - agent.memory_gate.enabled: boolean (unset: on on macOS, off elsewhere) — while the machine is short of memory, new agent jobs wait in the queue ([memory gate](./agent.md#memory-gate)). Global config only; not settable with `config set`.
 - agent.memory_gate.max_swap_percent: whole number (default 85) — swap use, in percent of the swap total, from which new jobs wait.
+- agent.job_history.keep_days: whole number (default 14) — days a job log is kept after it was last written; jobs of open tickets and running jobs are always kept ([job history](./agent.md)). Global config only; not settable with `config set`.
+- agent.job_history.max_mb: whole number (default 100; 0: no limit) — MiB a log folder's job logs may take; over it, the oldest removable logs go first.
 - agent.memory_gate.settle_seconds: whole number (default 120) — how long memory has to stay normal before held jobs start.
 - agent.job_history.keep_days: whole number (default 14) — days a job log is kept after it was last written; jobs of open tickets and running jobs are always kept ([job history](./agent.md)). Global config only; not settable with `config set`.
 - agent.job_history.max_mb: whole number (default 100; 0: no limit) — MiB a log folder's job logs may take; over it, the oldest removable logs go first.
