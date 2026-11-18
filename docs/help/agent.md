@@ -482,7 +482,7 @@ A rule's [`tell_agent`](automation.md#telling-the-tickets-agent) action hands th
 - Job history: `lotar agent list-jobs`, `lotar agent logs`, the timeline and the Agents page show a job as long as its log is kept (a server holds finished jobs in memory for a day only). When a job starts, LoTaR prunes that job's log folder:
   - A log last written more than `agent.job_history.keep_days` days ago (default 14) is removed.
   - While the folder's job logs take more than `agent.job_history.max_mb` MiB (default 100; `0`: no limit), the oldest removable logs go first, also ones younger than `keep_days`.
-  - Never removed, by age or by size: a job of an open ticket (its status is not a done state), of a ticket whose file can't be read, and a running job (in this process or another one). These win over both limits, so the folder can stay over `max_mb`. Jobs of done, archived and deleted tickets go, and so do logs without a header.
+  - Never removed, by age or by size: a job of an open ticket (its status is not a done state), of a ticket whose file can't be read or whose ID several tasks roots hold, and a running job (in this process or another one). These win over both limits, so the folder can stay over `max_mb`. Jobs of done, archived and deleted tickets go, and so do logs without a header.
   - Only `job-*.jsonl` files are pruned. A file that can't be read or removed is skipped; pruning never stops a job from starting.
   - Both settings are global config only, not settable with `config set`. One job log takes about 5 KB, so at 250 jobs a day 14 days take about 18 MB.
 

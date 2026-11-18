@@ -1,28 +1,78 @@
 title: 'Job-log pruning: no test that archived and malformed-ID tickets'' logs go'
-status: Todo
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-18T05:30:51.047164+00:00
-modified: 2026-11-18T05:30:51.670854+00:00
+modified: 2026-11-18T05:55:59.389640+00:00
 relationships:
   related:
   - DEV-697
   - DEV-693
+  - DEV-653
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3a7b67a-a3b1-4fc0-b101-30ecf4ca26de
 description: |-
   Found in the DEV-697 review, 2026-11-17.
 
   The pruning tests in `dev21_ticket_done_state_tests` (`crates/lotar-agent/src/services/agent_job_service.rs`) cover Done, open, deleted (NotFound), running and (DEV-697) ambiguous tickets. Two cases `ticket_keeps_its_jobs` and `docs/help/agent.md` (job history) promise have no test: an archived ticket's old log goes, and a log whose header ticket ID is malformed (`TaskLookupError::Invalid`) goes.
 
+  Writing the test showed a bug (2026-11-17): an archived ticket whose status is still open (e.g. Todo) kept its log, because the open status was checked before the archive. `docs/help/agent.md` says "Jobs of done, archived and deleted tickets go": archived wins over an open status.
+
   ## Done when
 
-  - [ ] A test shows a 15-day-old log of an archived ticket is removed by age.
+  - [ ] A test shows a 15-day-old log of an archived ticket is removed by age, also when the archived ticket's status is open (Todo).
   - [ ] A test shows a 15-day-old log whose header ticket ID is malformed (e.g. `not-a-ticket`) is removed.
   - [ ] Both fail when `ticket_keeps_its_jobs` returns true for that case.
+  - [ ] `ticket_keeps_its_jobs` drops an archived ticket's jobs whatever its status; open tickets' and unreadable tickets' jobs still stay.
 history:
 - at: 2026-11-18T05:30:51.670854+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-18T05:54:11.162216+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-18T05:54:12.202465+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3a7b67a-a3b1-4fc0-b101-30ecf4ca26de
+- at: 2026-11-18T05:55:39.384851+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-697","DEV-693"]}'
+    new: '{"related":["DEV-697","DEV-693","DEV-653"]}'
+- at: 2026-11-18T05:55:59.389640+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-697 review, 2026-11-17.
+
+      The pruning tests in `dev21_ticket_done_state_tests` (`crates/lotar-agent/src/services/agent_job_service.rs`) cover Done, open, deleted (NotFound), running and (DEV-697) ambiguous tickets. Two cases `ticket_keeps_its_jobs` and `docs/help/agent.md` (job history) promise have no test: an archived ticket's old log goes, and a log whose header ticket ID is malformed (`TaskLookupError::Invalid`) goes.
+
+      ## Done when
+
+      - [ ] A test shows a 15-day-old log of an archived ticket is removed by age.
+      - [ ] A test shows a 15-day-old log whose header ticket ID is malformed (e.g. `not-a-ticket`) is removed.
+      - [ ] Both fail when `ticket_keeps_its_jobs` returns true for that case.
+    new: |-
+      Found in the DEV-697 review, 2026-11-17.
+
+      The pruning tests in `dev21_ticket_done_state_tests` (`crates/lotar-agent/src/services/agent_job_service.rs`) cover Done, open, deleted (NotFound), running and (DEV-697) ambiguous tickets. Two cases `ticket_keeps_its_jobs` and `docs/help/agent.md` (job history) promise have no test: an archived ticket's old log goes, and a log whose header ticket ID is malformed (`TaskLookupError::Invalid`) goes.
+
+      Writing the test showed a bug (2026-11-17): an archived ticket whose status is still open (e.g. Todo) kept its log, because the open status was checked before the archive. `docs/help/agent.md` says "Jobs of done, archived and deleted tickets go": archived wins over an open status.
+
+      ## Done when
+
+      - [ ] A test shows a 15-day-old log of an archived ticket is removed by age, also when the archived ticket's status is open (Todo).
+      - [ ] A test shows a 15-day-old log whose header ticket ID is malformed (e.g. `not-a-ticket`) is removed.
+      - [ ] Both fail when `ticket_keeps_its_jobs` returns true for that case.
+      - [ ] `ticket_keeps_its_jobs` drops an archived ticket's jobs whatever its status; open tickets' and unreadable tickets' jobs still stay.

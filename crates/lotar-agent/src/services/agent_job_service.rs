@@ -3127,12 +3127,18 @@ fn prune_job_logs(
     AgentLogService::prune_logs(workspace_root, logs_dir, history, &mut keep);
 }
 
-/// Whether a ticket's job logs are kept whatever their age: it is open, or
-/// its file can't be read to tell. Done, archived and deleted tickets' are not.
+/// Whether a ticket's job logs are kept whatever their age: it is open, its
+/// file can't be read to tell, or its ID is held by several tasks roots
+/// (DEV-697). Done, archived, deleted and malformed tickets' are not.
 fn ticket_keeps_its_jobs(tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
+    use crate::storage::identity::TaskLookupError;
     match ticket_done_state(tasks_dir, ticket_id) {
         Some(done) => !done,
-        None => crate::storage::manager::Storage::new(tasks_dir).resolve_task_location(ticket_id).is_ok_and(|location| !location.archived),
+        None => match crate::storage::manager::Storage::new(tasks_dir).resolve_task_location(ticket_id) {
+            Ok(location) => !location.archived,
+            Err(TaskLookupError::Ambiguous { .. }) => true,
+            Err(TaskLookupError::NotFound(_) | TaskLookupError::Invalid(_)) => false,
+        },
     }
 }
 
@@ -6890,6 +6896,57 @@ mod dev21_ticket_done_state_tests {
         assert!(!logs.join("job-gone.jsonl").exists(), "a deleted ticket's job goes");
         assert!(logs.join("job-open.jsonl").exists(), "an open ticket's 15-day-old job stays");
         assert!(logs.join("job-running.jsonl").exists(), "a running job stays");
+    }
+
+    /// DEV-697: a ticket ID held by two tasks roots is indeterminate, so its
+    /// old job stays, also under the size guard.
+    #[test]
+    fn old_job_log_of_an_ambiguous_ticket_stays() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root_a = tmp.path().join("wsa");
+        let root_b = root_a.join("wsb");
+        write_config(&root_a, "Done");
+        write_config(&root_b, "Done");
+        write_task(&root_a, "PX", 1, "Done");
+        write_task(&root_b, "PX", 1, "Done");
+        write_task(&root_a, "PX", 2, "Done");
+        let tasks = root_a.join(".tasks");
+        assert!(matches!(
+            crate::storage::manager::Storage::new(&tasks).resolve_task_location("PX-1"),
+            Err(crate::storage::identity::TaskLookupError::Ambiguous { .. })
+        ));
+        let logs = tasks.join("@agent-logs");
+        let fifteen_days_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(15 * 86_400);
+        for (job, ticket) in [("job-ambiguous", "PX-1"), ("job-done", "PX-2")] {
+            let header = crate::services::agent_log_service::JobLogHeader {
+                job_id: job.to_string(),
+                ticket_id: ticket.to_string(),
+                runner: "claude".to_string(),
+                created_at: "2026-11-01T00:00:00Z".to_string(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: None,
+                effort: None,
+                agent_profile: None,
+            };
+            AgentLogService::init_log(&root_a, logs.to_str(), header).unwrap();
+            let path = logs.join(format!("{job}.jsonl"));
+            std::fs::File::options().write(true).open(&path).unwrap().set_modified(fifteen_days_ago).unwrap();
+        }
+
+        let over_size = crate::config::types::AgentJobHistoryConfig { keep_days: 365, max_mb: 1 };
+        let ambiguous_log = logs.join("job-ambiguous.jsonl");
+        let mut contents = std::fs::read(&ambiguous_log).unwrap();
+        contents.extend(std::iter::repeat_n(b'\n', 2 * 1024 * 1024));
+        std::fs::write(&ambiguous_log, contents).unwrap();
+        std::fs::File::options().write(true).open(&ambiguous_log).unwrap().set_modified(fifteen_days_ago).unwrap();
+        prune_job_logs(&tasks, &root_a, logs.to_str().unwrap(), &over_size, "job-starting");
+        assert!(logs.join("job-ambiguous.jsonl").exists(), "the size guard keeps an ambiguous ticket's job");
+
+        let by_age = crate::config::types::AgentJobHistoryConfig::default();
+        prune_job_logs(&tasks, &root_a, logs.to_str().unwrap(), &by_age, "job-starting");
+        assert!(logs.join("job-ambiguous.jsonl").exists(), "an ambiguous ticket's 15-day-old job stays");
+        assert!(!logs.join("job-done.jsonl").exists(), "a Done ticket's 15-day-old job goes");
     }
 }
 

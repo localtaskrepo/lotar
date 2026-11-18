@@ -1,11 +1,11 @@
 title: 'config-reference: agent.job_history lines split the agent.memory_gate keys'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T04:18:56.381152+00:00
-modified: 2026-11-18T05:28:47.366929+00:00
+modified: 2026-11-18T05:54:10.103866+00:00
 relationships:
   related:
   - DEV-693
@@ -47,6 +47,29 @@ comments:
     - Reran: `npm ci` passed. `npx prettier --check docs/help/config-reference.md` passed.
     - Docs only, so no lint, test or smoke run (AGENTS.md). No UI, so no screenshots.
     - No findings, no tickets filed.
+- date: 2026-11-18T05:54:09.925792+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-698` is in `main`.
+
+    - Rebased `agent/DEV-698` onto `main` (`7dee4d92cd11`): `4a9d0bde9fad`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `4a9d0bde9fad`
+    - Amended the pending `.tasks` changes into the merged commit: `f0fc02a1fee7`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: f0fc02a1f
+      what: 'DEV-698 config-reference: agent.job_history lines split the agent.memory_gate keys'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0dcd910-8bc5-4f36-ab9d-42888de91562
 description: |-
@@ -116,3 +139,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T05:54:09.925792+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:54:10.103866+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

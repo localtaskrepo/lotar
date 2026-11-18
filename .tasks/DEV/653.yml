@@ -1,17 +1,46 @@
 title: 'Partial cleanup per step: each job step removes the build output the next step doesn''t use, measured'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T06:51:34.275016+00:00
-modified: 2026-11-18T05:32:03.458467+00:00
+modified: 2026-11-18T05:55:56.912682+00:00
 relationships:
   depends_on:
   - DEV-652
   related:
   - DEV-579
   - DEV-651
+  - DEV-697
+  - DEV-701
+  - DEV-703
+comments:
+- date: 2026-11-18T05:55:39.106810+00:00
+  author: claude
+  text: |-
+    Measured: only the waiting-state rule saves lasting space. Fix→review and review→merge rules save nothing worth keeping. Question for you at the end.
+
+    Sizes in `agent/DEV-653`'s worktree after `lint:agent` + `test:agent` + `smoke` (cold: 80 s, 208 s, 48 s, all passed; load 22–48, sccache on):
+    - `target/` 2.7 GB: `debug/incremental` 1.4 GB (1.9 GB after one more edit-rebuild), workspace crates' own artifacts ~0.6 GB, dependencies ~0.65 GB, `smoke-artifacts` 6.5 MB, `nextest`/`web`/`web-embed` 4 MB. No coverage, release or ci builds: the checks don't make them.
+
+    Rebuild cost (lint / tests / smoke, seconds):
+    - Warm, nothing removed: 24 / 180 / 43
+    - Without `incremental`: 53 / 141 / 47. Nothing recompiles (fingerprints fresh); the differences are load noise
+    - After an edit (like a rebase), `cargo build --bins --tests`: 33 s with `incremental`, 22 s without. No measurable cost
+    - Without `incremental` + workspace crates (2.7 GB → 0.72 GB): 35 / 203 / 43, about +10–25 s
+
+    Per step:
+    - Fix done → review: only smoke artifacts (6.5 MB) go unused, and the review reruns the checks. Dropped.
+    - Review passed → merge: `incremental` (1.4 GB) costs nothing to drop. But the merge job starts in the worktree during the review's end rules, before `cleanup_paths` runs (`agent_job_service.rs` `finish_job`: `apply_job_end_rules` then `remove_build_output`, which skips a busy ticket). Within minutes the merge rebuilds `incremental`, then Done removes everything. Saves nothing lasting. Dropped.
+    - Waiting (HelpNeeded, Blocked): ~2 GB per waiting ticket, +10–25 s when it resumes. No lotar worktree waits right now (DEV-697 Merging, DEV-701 Reviewing, DEV-703 InProgress). It changes STD-95 ("build output stays until Done"), so it waits for your yes.
+    - Done: everything, as today.
+    - No files changed, nothing committed.
+
+    **Question:** should a ticket that goes to HelpNeeded or Blocked lose `target/debug/incremental` and the workspace crates' artifacts (~2 GB each, dependencies kept, +10–25 s rebuild on resume)? Yes: I build that rule (lotar needs a small cleanup action for it) and run it on a real ticket. No: this ticket closes with the measurements, no new rules.
+- date: 2026-11-18T05:55:47.609737+00:00
+  author: claude
+  text: 'Correction to the comment above: the function is `finalize_job` in `crates/lotar-agent/src/services/agent_job_service.rs`, not `finish_job`.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A509492fe-d1ac-4c44-887b-244e75950add
 description: |-
@@ -55,3 +84,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A509492fe-d1ac-4c44-887b-244e75950add
+- at: 2026-11-18T05:55:39.106810+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:55:39.384111+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651"]}'
+    new: '{"depends_on":["DEV-652"],"related":["DEV-579","DEV-651","DEV-697","DEV-701","DEV-703"]}'
+- at: 2026-11-18T05:55:47.609737+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T05:55:56.912682+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
