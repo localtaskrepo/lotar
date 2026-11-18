@@ -1,11 +1,11 @@
 title: A job that fails on a usage limit is summarised as "The agent reported no cost" instead of the limit error
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T17:10:47.476966+00:00
-modified: 2026-11-18T20:13:07.035177+00:00
+modified: 2026-11-18T20:25:16.264129+00:00
 comments:
 - date: 2026-11-18T18:50:53.353327+00:00
   author: claude
@@ -88,6 +88,16 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-18T20:25:10.730130+00:00
+  author: claude
+  text: |-
+    Merged and pushed: a failed turn's error now stays the job's summary.
+
+    - Commit `cd5a49e98` on `main` (fix `bf613ebed`, rebased once because main moved; the `.tasks` changes of others are amended into it), pushed to origin.
+    - Checks on the rebased branch: `npm ci`, `npm run lint:agent`, `npm run test:agent` (2380 passed). The first `test:agent` run failed on `sse_delivers_during_a_steady_stream_of_events` under load; it passed on three reruns, so a flake, not the work.
+    - `npm run smoke` skipped: backend-only change, the fix agent ran it (405 passed).
+    - No rules or profiles changed, so no `lotar trust`.
+    - Health check in standards (`agent list-jobs`) still lists old jobs with the old summary; the fix applies to new jobs only, as the fix comment said.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2c23c8d-ba3d-49d9-8b84-c77cb7f417ae
 description: |-
@@ -152,3 +162,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-18T20:25:10.730130+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-18T20:25:16.264129+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

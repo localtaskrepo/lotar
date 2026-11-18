@@ -1324,6 +1324,21 @@ export interface AgentWorktreeConfig {
     cleanup_paths?: string[]
 }
 
+/** `agent.memory_gate` (DEV-623, global only): new jobs wait while the machine is short of memory. */
+export interface AgentMemoryGateConfig {
+    /** Unset: on on macOS, off elsewhere. */
+    enabled?: boolean
+    max_swap_percent: number
+    settle_seconds: number
+}
+
+/** `agent.job_history` (DEV-693, global only): how long job logs are kept. */
+export interface AgentJobHistoryConfig {
+    keep_days: number
+    /** 0: no size limit. */
+    max_mb: number
+}
+
 /** `agent.merge` (DEV-605): lotar merges a merge job's branch itself; absent = the merge agent merges. */
 export interface AgentMergeConfig {
     checks?: string[]
@@ -1424,6 +1439,8 @@ export interface ResolvedConfigDTO {
     agent_instructions?: AgentInstructionsValue
     agent_worktree?: AgentWorktreeConfig
     agent_merge?: AgentMergeConfig | null
+    agent_memory_gate?: AgentMemoryGateConfig
+    agent_job_history?: AgentJobHistoryConfig
     sprint_defaults?: SprintDefaultsConfig
     sprint_notifications?: { enabled: boolean }
     remotes?: Record<string, SyncRemoteConfig>
