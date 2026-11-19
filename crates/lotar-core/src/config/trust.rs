@@ -14,6 +14,9 @@
 //! (DEV-716), so a newer LoTaR that adds a kind checks only those and a
 //! trusted repository stays trusted across the upgrade.
 //!
+//! A rule's `run` skipped while the workspace was untrusted is kept with
+//! the trust record (DEV-717), so `lotar trust` can run it afterwards.
+//!
 //! Writes LoTaR makes itself (UI, REST, CLI and MCP config or automation
 //! edits) keep a trusted workspace trusted, see [`TrustService::rewrite`];
 //! they cannot turn an untrusted workspace into a trusted one.
@@ -32,6 +35,30 @@ pub const TRUST_FILE_ENV: &str = "LOTAR_TRUST_FILE";
 struct TrustFile {
     #[serde(default)]
     workspaces: BTreeMap<String, TrustRecord>,
+    /// Rule runs skipped while untrusted, per workspace key (DEV-717).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    skipped_runs: BTreeMap<String, Vec<SkippedRun>>,
+}
+
+/// A rule's `run` skipped in an untrusted workspace (DEV-717): the command
+/// as it would have run then, with the ticket's values of that moment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkippedRun {
+    pub ticket: String,
+    pub rule: String,
+    pub skipped_at: String,
+    /// The rule's `run` as written (JSON), to tell whether it changed since.
+    pub run: String,
+    pub program: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
+    pub cwd: PathBuf,
+    pub wait: bool,
+    #[serde(default)]
+    pub ignore_failure: bool,
+    pub timeout_secs: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,6 +245,24 @@ impl TrustService {
                 .log_warn(format_args!("Could not update the trust record: {err}"));
         }
         Ok(result)
+    }
+
+    /// Keep a rule's `run` skipped while untrusted, for `lotar trust`.
+    pub fn record_skipped_run(tasks_dir: &Path, run: SkippedRun) -> LoTaRResult<()> {
+        let key = workspace_key(tasks_dir);
+        update_trust_file(|file| file.skipped_runs.entry(key).or_default().push(run))
+    }
+
+    /// The runs skipped in this workspace, oldest first, removed from the
+    /// trust file.
+    pub fn take_skipped_runs(tasks_dir: &Path) -> LoTaRResult<Vec<SkippedRun>> {
+        let key = workspace_key(tasks_dir);
+        if !load_trust_file()?.skipped_runs.contains_key(&key) {
+            return Ok(Vec::new());
+        }
+        let mut taken = Vec::new();
+        update_trust_file(|file| taken = file.skipped_runs.remove(&key).unwrap_or_default())?;
+        Ok(taken)
     }
 
     /// Whether an agent profile name is defined by a repository config file.

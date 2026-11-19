@@ -292,6 +292,10 @@ impl Merge<'_> {
         TrustService::trust(self.tasks_dir)
             .map_err(|err| hand_off(format!("`lotar trust` failed after the merge changed rules, agent profiles or `agent.merge`: {err}")))?;
         self.done.push("The merge changed rules, agent profiles or `agent.merge`: ran `lotar trust`".to_string());
+        for run in crate::services::automation_service::AutomationService::rerun_skipped_runs(self.tasks_dir) {
+            let what = if run.result == "rule_changed" { "not run, its run command changed" } else { run.result };
+            self.done.push(format!("Rule '{}' skipped on {} while untrusted: {what}", run.rule, run.ticket));
+        }
         Ok(())
     }
 

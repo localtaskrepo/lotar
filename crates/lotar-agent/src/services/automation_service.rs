@@ -2,6 +2,7 @@ use crate::api_types::{AgentJobCreateRequest, TaskDTO, TaskUpdate};
 use crate::automation::persistence as automation_persistence;
 use crate::automation::template::{Prerequisite, TemplateContext};
 use crate::automation::types::{AutomationAction, AutomationActionSet, AutomationFile, AutomationRule, AutomationRunAction, AutomationTagAction, StringOrVec};
+use crate::config::trust::{SkippedRun, TrustService};
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -1631,21 +1632,157 @@ fn run_allowed(tasks_dir: &Path, task: &TaskDTO) -> bool {
     if !project_file && matches!(automation_persistence::load_home_automation(), Ok(Some(_))) {
         return true;
     }
-    crate::config::trust::TrustService::allows_commands(tasks_dir)
+    TrustService::allows_commands(tasks_dir)
 }
 
 /// Report a `run` held back in an untrusted workspace (DEV-514) on stderr,
 /// as an `automation_skipped` event and as a comment on the ticket. The
 /// rule's other actions still apply.
-fn report_skipped_run(storage: &mut Storage, ticket_id: &str, rule: &str) -> LoTaRResult<()> {
-    let reason = crate::config::trust::TrustService::untrusted_message(&storage.root_path, "its run command");
-    let message = format!("Automation rule '{rule}' skipped on {ticket_id}. {reason} The rule's other actions applied.");
+fn report_skipped_run(storage: &mut Storage, ticket_id: &str, rule: &str, kept: bool) -> LoTaRResult<()> {
+    let reason = TrustService::untrusted_message(&storage.root_path, "its run command");
+    let later = if kept { " `lotar trust` runs it then, unless the rule's run command changes before." } else { "" };
+    let message = format!("Automation rule '{rule}' skipped on {ticket_id}. {reason} The rule's other actions applied.{later}");
     eprintln!("[lotar][warn] {message}");
     crate::api_events::emit(&crate::api_events::ApiEvent {
         kind: "automation_skipped".into(),
         data: serde_json::json!({"id": ticket_id, "rule": rule, "message": reason}),
     });
     append_automation_comment(storage, ticket_id, &message)
+}
+
+/// Keep a skipped `run`, as it would have run now, for `lotar trust`
+/// (DEV-717). Returns whether it was kept.
+fn keep_skipped_run(
+    run: &AutomationRunAction,
+    task: &TaskDTO,
+    config: &ResolvedConfig,
+    tasks_dir: &Path,
+    context: &AutomationActionContext,
+    tmpl: &TemplateContext,
+) -> bool {
+    let kept = prepare_run(run, task, config, tasks_dir, context, tmpl).and_then(|prepared| {
+        let skipped = SkippedRun {
+            ticket: task.id.clone(),
+            rule: context.rule.clone(),
+            skipped_at: time::now_rfc3339(),
+            run: serde_json::to_string(run).map_err(|err| LoTaRError::SerializationError(err.to_string()))?,
+            program: prepared.program,
+            args: prepared.args,
+            env: prepared.env.into_iter().collect(),
+            cwd: prepared.cwd,
+            wait: prepared.wait,
+            ignore_failure: prepared.ignore_failure,
+            timeout_secs: prepared.timeout.as_secs(),
+        };
+        TrustService::record_skipped_run(tasks_dir, skipped)
+    });
+    if let Err(err) = &kept {
+        eprintln!("[lotar][warn] Could not keep the skipped run of rule '{}' on {} for `lotar trust`: {err}", context.rule, task.id);
+    }
+    kept.is_ok()
+}
+
+/// What `lotar trust` did with a run skipped while untrusted (DEV-717).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SkippedRunOutcome {
+    pub ticket: String,
+    pub rule: String,
+    pub skipped_at: String,
+    /// `ran`, `failed` or `rule_changed` (not run).
+    pub result: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl AutomationService {
+    /// Run the rule runs skipped while this workspace was untrusted, once it
+    /// is trusted (DEV-717, owner 2026-11-19: right away, but only those
+    /// whose rule's `run` is unchanged; the others are listed, not run).
+    /// Each outcome is also a comment on its ticket.
+    pub fn rerun_skipped_runs(tasks_dir: &Path) -> Vec<SkippedRunOutcome> {
+        if !TrustService::allows_commands(tasks_dir) {
+            return Vec::new();
+        }
+        let skipped = match TrustService::take_skipped_runs(tasks_dir) {
+            Ok(skipped) => skipped,
+            Err(err) => {
+                eprintln!("[lotar][warn] Could not read the runs skipped before `lotar trust`: {err}");
+                return Vec::new();
+            }
+        };
+        let mut storage = Storage::new(tasks_dir);
+        skipped
+            .into_iter()
+            .map(|skipped| {
+                let (result, error) = if !rule_run_unchanged(tasks_dir, &skipped) {
+                    ("rule_changed", None)
+                } else {
+                    let prepared = PreparedRun {
+                        program: skipped.program.clone(),
+                        args: skipped.args.clone(),
+                        env: skipped.env.clone().into_iter().collect(),
+                        cwd: skipped.cwd.clone(),
+                        ignore_failure: skipped.ignore_failure,
+                        wait: skipped.wait,
+                        timeout: std::time::Duration::from_secs(skipped.timeout_secs),
+                    };
+                    match execute_prepared_run(prepared, &skipped.ticket) {
+                        Ok(()) => ("ran", None),
+                        Err(err) => ("failed", Some(err.to_string())),
+                    }
+                };
+                let SkippedRun { ticket, rule, skipped_at, .. } = skipped;
+                let comment = match (result, &error) {
+                    ("ran", _) => format!("Automation rule '{rule}' ran on {ticket} after `lotar trust`: its run command was skipped at {skipped_at}."),
+                    ("failed", Some(err)) => {
+                        format!("Automation rule '{rule}' failed on {ticket} after `lotar trust` (its run command was skipped at {skipped_at}): {err}")
+                    }
+                    _ => format!(
+                        "Automation rule '{rule}' didn't run on {ticket} after `lotar trust`: its run command changed since it was skipped at {skipped_at}."
+                    ),
+                };
+                if let Err(err) = append_automation_comment(&mut storage, &ticket, &comment) {
+                    eprintln!("[lotar][warn] {comment} (no comment on the ticket: {err})");
+                }
+                SkippedRunOutcome { ticket, rule, skipped_at, result, error }
+            })
+            .collect()
+    }
+}
+
+/// Whether the ticket's rule of that name still has the `run` it had when
+/// it was skipped.
+fn rule_run_unchanged(tasks_dir: &Path, skipped: &SkippedRun) -> bool {
+    let Ok(wanted) = serde_json::from_str::<serde_json::Value>(&skipped.run) else {
+        return false;
+    };
+    let project = crate::storage::TaskId::parse(&skipped.ticket).map(|parsed| parsed.project).unwrap_or_default();
+    let Ok((automation, _)) = load_effective_automation(tasks_dir, Some(project.as_str()), None) else {
+        return false;
+    };
+    automation.automation.rules().iter().enumerate().filter(|(index, rule)| rule_label(rule, &rule_identity(rule, *index)) == skipped.rule).any(|(_, rule)| {
+        let on = serde_json::to_value(&rule.on).unwrap_or_default();
+        let mut runs = Vec::new();
+        collect_runs(&on, &mut runs);
+        runs.contains(&&wanted)
+    })
+}
+
+/// Every `run` value in a rule's `on` block, at any depth.
+fn collect_runs<'a>(value: &'a serde_json::Value, out: &mut Vec<&'a serde_json::Value>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, child) in map {
+                if key == "run" && !child.is_null() {
+                    out.push(child);
+                } else {
+                    collect_runs(child, out);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|item| collect_runs(item, out)),
+        _ => {}
+    }
 }
 
 /// Default time a waited-for `run` command may take.
@@ -1724,6 +1861,17 @@ fn build_shell_command(raw: &str) -> (String, Vec<String>) {
     if cfg!(windows) { ("cmd".to_string(), vec!["/C".to_string(), raw.to_string()]) } else { ("sh".to_string(), vec!["-c".to_string(), raw.to_string()]) }
 }
 
+/// A `run` with its templates expanded: what runs, where and how.
+struct PreparedRun {
+    program: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    cwd: std::path::PathBuf,
+    ignore_failure: bool,
+    wait: bool,
+    timeout: std::time::Duration,
+}
+
 fn execute_run_action(
     run: &AutomationRunAction,
     task: &TaskDTO,
@@ -1732,7 +1880,19 @@ fn execute_run_action(
     context: &AutomationActionContext,
     tmpl: &TemplateContext,
 ) -> LoTaRResult<()> {
-    let (command, args, env, cwd, ignore_failure, wait, timeout) = match run {
+    let prepared = prepare_run(run, task, config, tasks_dir, context, tmpl)?;
+    execute_prepared_run(prepared, &task.id)
+}
+
+fn prepare_run(
+    run: &AutomationRunAction,
+    task: &TaskDTO,
+    config: &ResolvedConfig,
+    tasks_dir: &Path,
+    context: &AutomationActionContext,
+    tmpl: &TemplateContext,
+) -> LoTaRResult<PreparedRun> {
+    let (program, args, env, cwd, ignore_failure, wait, timeout) = match run {
         AutomationRunAction::Shell(raw) => {
             let expanded = tmpl.expand_for_shell(raw);
             let trimmed = expanded.script.trim().to_string();
@@ -1774,14 +1934,15 @@ fn execute_run_action(
     };
 
     let cwd = resolve_run_cwd(tasks_dir, cwd.as_deref())?;
-    let mut cmd = Command::new(command);
-    cmd.args(args).current_dir(cwd);
-
     let mut merged_env = build_automation_env(task, config, tasks_dir, context);
-    for (key, value) in env {
-        merged_env.insert(key, value);
-    }
-    cmd.envs(merged_env);
+    merged_env.extend(env);
+    Ok(PreparedRun { program, args, env: merged_env, cwd, ignore_failure, wait, timeout })
+}
+
+fn execute_prepared_run(run: PreparedRun, ticket_id: &str) -> LoTaRResult<()> {
+    let PreparedRun { program, args, env, cwd, ignore_failure, wait, timeout } = run;
+    let mut cmd = Command::new(program);
+    cmd.args(args).current_dir(cwd).envs(env);
 
     if wait {
         run_and_wait(cmd, timeout, ignore_failure)?;
@@ -1799,7 +1960,7 @@ fn execute_run_action(
         windows_async_stdio::detach_stdio_for_async_children();
         cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
         let child = cmd.spawn().map_err(|e| LoTaRError::ValidationError(format!("Failed to spawn async run command: {e}")))?;
-        spawn_async_run_monitor(child, task.id.clone());
+        spawn_async_run_monitor(child, ticket_id.to_string());
     }
     Ok(())
 }
@@ -2397,7 +2558,8 @@ fn apply_action(
         if run_allowed(&storage.root_path, task_for_env) {
             execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl)?;
         } else {
-            report_skipped_run(storage, &current.id, &action_context.rule)?;
+            let kept = keep_skipped_run(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl);
+            report_skipped_run(storage, &current.id, &action_context.rule, kept)?;
         }
     }
 

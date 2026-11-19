@@ -154,3 +154,44 @@ fn a_skipped_run_command_is_reported_on_the_ticket() {
     assert!(task.contains("relay'' skipped on TRU-1"), "the ticket says the run was skipped: {task}");
     assert!(task.contains("lotar trust"), "the comment says how to trust: {task}");
 }
+
+/// DEV-717: `lotar trust` runs what it skipped while untrusted, as it would
+/// have run then, unless the rule's `run` changed since; it lists both.
+#[test]
+fn lotar_trust_runs_the_runs_it_skipped() {
+    let env = TrustEnv::new();
+    let kept = env.root().join("KEPT");
+    let changed = env.root().join("CHANGED");
+    let rules = |changed_run: &str| {
+        format!(
+            "automation:\n  rules:\n    - name: relay\n      on:\n        created:\n          run: \"echo $LOTAR_TICKET_ID >> {}\"\n    - name: edited\n      on:\n        created:\n          run: \"{changed_run}\"\n",
+            kept.display()
+        )
+    };
+    std::fs::write(env.fixtures.tasks_root.join("automation.yml"), rules(&format!("touch {}", changed.display()))).unwrap();
+
+    env.lotar().args(["add", "untrusted", "--project=TRU"]).assert().success().stderr(predicate::str::contains("`lotar trust` runs it then"));
+    assert!(!kept.exists() && !changed.exists(), "an untrusted rule must not run");
+
+    // The second rule's run changes before the owner trusts the repository.
+    std::fs::write(env.fixtures.tasks_root.join("automation.yml"), rules(&format!("touch {}.new", changed.display()))).unwrap();
+    let out = env.lotar().args(["--format", "json", "trust"]).assert().success().get_output().stdout.clone();
+    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let runs: Vec<(&str, &str, &str)> = json["skipped_runs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|run| (run["ticket"].as_str().unwrap(), run["rule"].as_str().unwrap(), run["result"].as_str().unwrap()))
+        .collect();
+    assert_eq!(runs, vec![("TRU-1", "relay", "ran"), ("TRU-1", "edited", "rule_changed")], "{json}");
+    assert_eq!(std::fs::read_to_string(&kept).unwrap().trim(), "TRU-1", "the skipped run ran with the ticket's values");
+    assert!(!changed.exists(), "a changed rule's old run doesn't run");
+
+    let task = std::fs::read_to_string(env.fixtures.tasks_root.join("TRU").join("1.yml")).unwrap();
+    assert!(task.contains("relay'' ran on TRU-1 after `lotar trust`"), "{task}");
+    assert!(task.contains("edited'' didn''t run on TRU-1 after `lotar trust`"), "{task}");
+
+    // Each skipped run is handled once.
+    env.lotar().arg("trust").assert().success().stdout(predicate::str::contains("skipped while untrusted").not());
+    assert_eq!(std::fs::read_to_string(&kept).unwrap().trim(), "TRU-1");
+}

@@ -3,6 +3,7 @@
 
 use crate::config::trust::{TrustService, TrustState};
 use crate::output::{OutputFormat, OutputRenderer};
+use crate::services::automation_service::AutomationService;
 use crate::workspace::TasksDirectoryResolver;
 use std::path::Path;
 
@@ -50,10 +51,12 @@ impl TrustHandler {
         }
 
         let trusted = TrustService::trust(tasks_dir).map_err(|e| e.to_string())?;
+        let skipped_runs = if trusted { AutomationService::rerun_skipped_runs(tasks_dir) } else { Vec::new() };
         if json {
             renderer.emit_json(&serde_json::json!({
                 "trusted": trusted,
                 "commands": commands,
+                "skipped_runs": skipped_runs,
             }));
             return Ok(());
         }
@@ -67,6 +70,17 @@ impl TrustHandler {
             renderer.emit_raw_stdout(format_args!("  {command}"));
         }
         renderer.emit_info("Any change to these files (a pull, a merge) needs `lotar trust` again; edits made through LoTaR keep the trust.");
+        if !skipped_runs.is_empty() {
+            renderer.emit_info("Rule runs skipped while untrusted:");
+        }
+        for run in &skipped_runs {
+            let what = match (run.result, &run.error) {
+                ("ran", _) => "ran now".to_string(),
+                ("failed", Some(err)) => format!("failed now: {err}"),
+                _ => "not run: the rule's run command changed since".to_string(),
+            };
+            renderer.emit_raw_stdout(format_args!("  {} rule '{}' (skipped {}): {what}", run.ticket, run.rule, run.skipped_at));
+        }
         Ok(())
     }
 }
