@@ -1,11 +1,11 @@
 title: A worktree removal cut off between rename and git entry leaves a prunable worktree that blocks its branch
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T19:39:32.596277+00:00
-modified: 2026-11-19T19:59:32.412822+00:00
+modified: 2026-11-19T20:03:54.635160+00:00
 relationships:
   depends_on:
   - DEV-721
@@ -75,6 +75,32 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: no UI or REST change
+- date: 2026-11-19T20:03:54.459304+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-722` is in `main`.
+
+    - Rebased `agent/DEV-722` onto `main` (`8480fa5785df`): `88a388460e05`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `88a388460e05`
+    - Amended the pending `.tasks` changes into the merged commit: `4d440d27a782`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[agent-worker:prunable-worktree-after-cut-off-removal]`
+  report:
+    commits:
+    - hash: 4d440d27a
+      what: DEV-722 A worktree removal cut off between rename and git entry leaves a prunable worktree that blocks its branch
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afde40de3-2641-430f-be65-cdd521755c4f
 description: |-
@@ -188,3 +214,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-721"],"related":["DEV-721","DEV-723"]}'
     new: '{"depends_on":["DEV-721"],"blocks":["DEV-723"],"related":["DEV-721","DEV-723"]}'
+- at: 2026-11-19T20:03:54.459304+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-19T20:03:54.635160+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

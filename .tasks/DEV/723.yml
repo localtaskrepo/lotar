@@ -1,16 +1,18 @@
 title: Pruning a worktree whose folder is gone leaves its renamed trash folder behind
-status: Blocked
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-19T19:59:07.522902+00:00
-modified: 2026-11-19T19:59:42.555848+00:00
+modified: 2026-11-19T20:20:44.969812+00:00
 relationships:
   depends_on:
   - DEV-722
   related:
   - DEV-722
+  - DEV-721
+  - DEV-724
 comments:
 - date: 2026-11-19T19:59:32.965621+00:00
   author: claude
@@ -19,6 +21,91 @@ comments:
 
     - `prune_missing_worktree` exists only on `agent/DEV-722` (`29cc68a92`, DEV-722 in Reviewing); main and `agent/DEV-723` have just `remove_worktree_dir` in `crates/lotar-agent/src/services/agent_job_service.rs`.
     - Next: once DEV-722 is on main, rebase onto it and make the prune also delete `.<name>.lotar-removed` beside the gone path, with a test.
+- date: 2026-11-19T20:11:12.164084+00:00
+  author: claude
+  text: |-
+    Fixed: pruning a missing worktree now also deletes its `.<name>.lotar-removed` trash folder.
+
+    - Rebased `agent/DEV-723` onto main (`4d440d27a`, DEV-722).
+    - `prune_missing_worktree` in `crates/lotar-agent/src/services/agent_job_service.rs`: after deleting git's entry it deletes `.<name>.lotar-removed` beside the gone path; a missing trash folder is fine.
+    - Test `cleanup_prunes_a_worktree_whose_folder_is_gone_and_deletes_its_branch` (`crates/lotar-lib/tests/agent_safety_test.rs`) now renames the worktree to its trash name, the way a cut-off removal does, and asserts the trash is gone after both Done cleanup and `lotar agent worktree cleanup`. It failed before the fix and passes after.
+  report:
+    commits:
+    - hash: 54f59e39d
+      what: prune also deletes the renamed trash folder, test covers it
+    checks:
+    - command: cargo nextest run --cargo-profile dev -E 'test(/^agent_safety_test::/)'
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2415 Rust tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 406 tests
+    next: Review, then merge
+- date: 2026-11-19T20:15:01.326244+00:00
+  author: claude
+  text: |-
+    Review: passed — pruning a gone worktree now also deletes its `.<name>.lotar-removed` trash; no findings.
+
+    - Reviewed `54f59e39d` (only commit on `main..HEAD`; `agent/DEV-723` = HEAD, no rework branch).
+    - `prune_missing_worktree` (`crates/lotar-agent/src/services/agent_job_service.rs:2727`) builds the trash name the same way `remove_worktree_dir` does (`REMOVED_WORKTREE_SUFFIX`), deletes it after git's entry, ignores a missing one. Both callers get it: Done cleanup (`:2968`) and `lotar agent worktree cleanup` (`crates/lotar-lib/src/cli/handlers/agent.rs:728`).
+    - Scope matches "Done when"; no stray files, no owner decision touched. Recent main commits on the file (DEV-721, DEV-722) are what it builds on.
+    - `npm ci`: ok.
+    - Test `cleanup_prunes_a_worktree_whose_folder_is_gone_and_deletes_its_branch`: passes; with the fix reverted (scratch copy) it fails on "and deletes the renamed folder".
+    - Reran: `npm run lint:agent` passed; `cargo nextest run -p lotar-lib --test integration agent_safety_test` 37 passed; `cargo nextest run -p lotar-agent worktree` 4 passed. Full `npm test` / smoke not rerun (fix agent ran them).
+    - Tickets filed: none.
+- date: 2026-11-19T20:19:01.731657+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+     ✓ tests/api.identity.smoke.spec.ts (1 test) 345ms
+       ✓ API live identity (1)
+         ✓ refreshes externally edited identity for whoami and review authorization without restarting 344ms
+     ✓ tests/harness.git-init.smoke.spec.ts (2 tests) 971ms
+       ✓ smoke git fixture init (2)
+         ✓ initializes main deterministically under a hostile inherited init.defaultBranch 750ms
+     ✓ tests/harness.git-probe.smoke.spec.ts (9 tests) 496ms
+
+    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+     FAIL  tests/ui.description-preview.smoke.spec.ts > UI description preview toggle > stays clear of the text and the layout at 1280px
+    AssertionError: expected 8.993408203125 to be less than 8
+     ❯ tests/ui.description-preview.smoke.spec.ts:41:79
+         39|                         // Inside the box, hugging its bottom-right co…
+         40|                         expect(box.x + box.width - (button.x + button.…
+         41|                         expect(box.x + box.width - (button.x + button.…
+           |                                                                               ^
+         42|                         expect(box.y + box.height - (button.y + button…
+         43|                         expect(box.y + box.height - (button.y + button…
+     ❯ helpers/ui.ts:104:20
+     ❯ withBrowser helpers/ui.ts:84:20
+     ❯ tests/ui.description-preview.smoke.spec.ts:18:21
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+     Test Files  1 failed | 117 passed (118)
+          Tests  1 failed | 405 passed (406)
+       Start at  12:18:20
+       Duration  41.31s (tests 94%, import 5%, transform 1%)
+    ```.
+
+    - Rebase onto `main` changed nothing (`54f59e39da2b`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A640ab01a-8f2f-4336-b3a3-2a5a881b2644
 description: |-
@@ -35,7 +122,6 @@ description: |-
   Pruning a missing worktree also deletes its `.<name>.lotar-removed` trash beside the gone path; a test covers it.
 tags:
 - health
-- waits
 history:
 - at: 2026-11-19T19:59:08.161632+00:00
   actor: claude
@@ -75,3 +161,57 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-19T20:03:55.086665+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, waits
+    new: health
+- at: 2026-11-19T20:03:56.514470+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-19T20:11:12.164084+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T20:11:24.640403+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-19T20:15:01.326244+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T20:15:01.513094+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-722"],"related":["DEV-722"]}'
+    new: '{"depends_on":["DEV-722"],"related":["DEV-722","DEV-721"]}'
+- at: 2026-11-19T20:15:08.112125+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-19T20:19:01.731657+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-19T20:20:44.969812+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-722"],"related":["DEV-722","DEV-721"]}'
+    new: '{"depends_on":["DEV-722"],"related":["DEV-722","DEV-721","DEV-724"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T19:21:56.947455+00:00
-modified: 2026-11-19T19:47:33.254584+00:00
+modified: 2026-11-19T20:15:01.512685+00:00
 relationships:
   blocks:
   - DEV-722
@@ -13,6 +13,7 @@ relationships:
   - DEV-647
   - DEV-722
   - DEV-717
+  - DEV-723
 comments:
 - date: 2026-11-19T19:32:39.980545+00:00
   author: claude
@@ -231,3 +232,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-19T20:15:01.512685+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-722"],"related":["DEV-647","DEV-722","DEV-717"]}'
+    new: '{"blocks":["DEV-722"],"related":["DEV-647","DEV-722","DEV-717","DEV-723"]}'

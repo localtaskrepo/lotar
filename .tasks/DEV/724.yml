@@ -1,0 +1,52 @@
+title: 'Flaky smoke: description preview toggle sits 9px from the textarea''s right edge at 1280px'
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-19T20:20:44.717330+00:00
+modified: 2026-11-19T20:20:47.301487+00:00
+relationships:
+  related:
+  - DEV-723
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A086ff478-5723-4531-80bb-b9a321cd95b0
+description: |-
+  ## Found
+
+  During the DEV-723 merge, `npm run -s smoke` failed once: `smoke/tests/ui.description-preview.smoke.spec.ts` > 'stays clear of the text and the layout at 1280px', line 41: right-edge gap `8.993408203125` not less than `8`. The file alone passed 3 of 3 runs and the full suite passed on rerun (406/406); DEV-723 only changes Rust worktree cleanup.
+
+  ## Check
+
+  `npm run smoke` several times under full-suite load; the 1280px right-edge assertion holds every time.
+
+  ## Done when
+
+  The test measures after the layout settles (or the toggle's offset is stable), so the full suite does not flake on it.
+tags:
+- health
+custom_fields:
+  finding: npm run smoke:ui.description-preview
+history:
+- at: 2026-11-19T20:20:44.970311+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-723"]}'
+- at: 2026-11-19T20:20:45.197860+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-19T20:20:46.505029+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-19T20:20:47.301487+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A086ff478-5723-4531-80bb-b9a321cd95b0

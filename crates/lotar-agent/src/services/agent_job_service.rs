@@ -2722,12 +2722,21 @@ pub fn missing_worktree_entry(repo_root: &std::path::Path, path: &std::path::Pat
 }
 
 /// Delete the git entry `missing_worktree_entry` finds for `path`, as
-/// `git worktree prune` would; whether there was one.
+/// `git worktree prune` would, and the folder `remove_worktree_dir`
+/// renamed it to (DEV-723); whether there was an entry.
 pub fn prune_missing_worktree(repo_root: &std::path::Path, path: &std::path::Path) -> LoTaRResult<bool> {
     let Some(entry) = missing_worktree_entry(repo_root, path) else {
         return Ok(false);
     };
     fs::remove_dir_all(entry).map_err(LoTaRError::IoError)?;
+    if let (Some(parent), Some(name)) = (path.parent(), path.file_name()) {
+        let trash = parent.join(format!(".{}{REMOVED_WORKTREE_SUFFIX}", name.to_string_lossy()));
+        if let Err(err) = fs::remove_dir_all(&trash)
+            && err.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(LoTaRError::ValidationError(format!("git no longer lists it; deleting {} failed: {err}", trash.display())));
+        }
+    }
     Ok(true)
 }
 

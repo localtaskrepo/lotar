@@ -1185,7 +1185,8 @@ mod git_required {
     /// DEV-722: a removal cut off between its rename and the deletion of
     /// git's entry leaves a prunable worktree whose branch git refuses to
     /// delete. Done cleanup and `lotar agent worktree cleanup` prune the
-    /// entry, then delete the branch.
+    /// entry and delete the renamed folder beside it (DEV-723), then the
+    /// branch.
     #[test]
     fn cleanup_prunes_a_worktree_whose_folder_is_gone_and_deletes_its_branch() {
         common::require_git();
@@ -1193,16 +1194,18 @@ mod git_required {
         let root = fixture.get_temp_path();
         let branch = format!("agent/{ticket}");
         let worktree = root.join("worktrees").join(&ticket);
+        let trash = root.join("worktrees").join(format!(".{ticket}.lotar-removed"));
         let listed = || String::from_utf8(Command::new("git").args(["worktree", "list", "--porcelain"]).current_dir(root).output().unwrap().stdout).unwrap();
         let cut_off = || {
             git(root, &["worktree", "add", "-q", "-b", &branch, worktree.to_str().unwrap()]);
-            fs::remove_dir_all(&worktree).unwrap();
+            fs::rename(&worktree, &trash).unwrap();
             assert!(listed().contains("prunable"), "git lists the gone worktree: {}", listed());
         };
 
         cut_off();
         set_status(&fixture, &ticket, "Done", TaskUpdateContext::automation_disabled());
         assert!(!listed().contains(&ticket), "Done cleanup prunes the entry: {}", listed());
+        assert!(!trash.exists(), "and deletes the renamed folder");
         assert!(!branch_exists(root, &branch), "and deletes the branch");
 
         cut_off();
@@ -1214,6 +1217,7 @@ mod git_required {
             .unwrap();
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         assert!(!listed().contains(&ticket), "the cleanup command prunes the entry: {}", listed());
+        assert!(!trash.exists(), "and deletes the renamed folder");
         assert!(!branch_exists(root, &branch), "and deletes the branch");
     }
 
