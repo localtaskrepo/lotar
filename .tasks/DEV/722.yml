@@ -1,11 +1,11 @@
 title: A worktree removal cut off between rename and git entry leaves a prunable worktree that blocks its branch
-status: Blocked
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-19T19:39:32.596277+00:00
-modified: 2026-11-19T19:42:04.186451+00:00
+modified: 2026-11-19T19:47:39.769077+00:00
 relationships:
   depends_on:
   - DEV-721
@@ -35,7 +35,6 @@ description: |-
   Done cleanup (and `lotar agent worktree cleanup`) prunes the git entry of an agent worktree whose path is gone, then deletes its branch as usual; a test covers it.
 tags:
 - health
-- waits
 custom_fields:
   finding: agent-worker:prunable-worktree-after-cut-off-removal
 history:
@@ -83,3 +82,15 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-19T19:47:34.602413+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, waits
+    new: health
+- at: 2026-11-19T19:47:39.769077+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress

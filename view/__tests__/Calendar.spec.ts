@@ -107,6 +107,7 @@ const sprintsStore = {
 const openTaskPanelMock = vi.fn()
 
 vi.mock('vue-router', () => ({
+    onBeforeRouteLeave: vi.fn(),
     useRoute: () => routeState,
     useRouter: () => ({ push: routerPushMock }),
 }))

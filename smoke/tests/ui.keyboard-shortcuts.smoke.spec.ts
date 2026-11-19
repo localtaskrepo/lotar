@@ -137,6 +137,50 @@ describe('Keyboard shortcuts and command palette (DEV-158)', () => {
             await workspace.dispose();
         }
     });
+    it('keeps a g-chord navigation that starts while the boards page is still loading (DEV-720)', async ({
+        expect,
+    }) => {
+        const workspace = await SmokeWorkspace.create({ seedFiles: seed() });
+        const server = await startLotarServer(workspace);
+        try {
+            await withPage(`${server.url}/boards`, async (page) => {
+                // Hold the project list, which selects the lone project and writes
+                // ?project= to the URL, and the Calendar page chunk, so that write
+                // comes while the move to /calendar is pending.
+                let releaseProjects = () => {};
+                const projectsHeld = new Promise<void>((resolve) => (releaseProjects = resolve));
+                let releaseCalendar = () => {};
+                const calendarHeld = new Promise<void>((resolve) => (releaseCalendar = resolve));
+                let calendarRequested = () => {};
+                const calendarReached = new Promise<void>((resolve) => (calendarRequested = resolve));
+                await page.route('**/api/projects/list*', async (route) => {
+                    await projectsHeld;
+                    await route.continue();
+                });
+                await page.route(/\/assets\/Calendar-[^/]*\.js$/, async (route) => {
+                    calendarRequested();
+                    await calendarHeld;
+                    await route.continue();
+                });
+                // A first visit: no saved board filter selects the project early.
+                await page.evaluate(() => localStorage.clear());
+                await page.reload({ waitUntil: 'domcontentloaded' });
+                await page.getByTestId('filter-search').waitFor({ state: 'visible' });
+                await page.locator('body').click({ position: { x: 5, y: 5 } });
+                await page.keyboard.press('g');
+                await page.keyboard.press('c');
+                await calendarReached;
+                releaseProjects();
+                await page.waitForResponse('**/api/projects/list*');
+                await page.waitForTimeout(200);
+                releaseCalendar();
+                await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
+            });
+        } finally {
+            await server.stop();
+            await workspace.dispose();
+        }
+    });
     it('acts on the open task, lists recent tasks, applies quick filters and moves with j/k (DEV-198)', async ({
         expect,
     }) => {

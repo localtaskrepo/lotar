@@ -35,6 +35,7 @@ const routeState = reactive({ path: '/insights', query: {} })
 const routerPush = vi.hoisted(() => vi.fn())
 const routerReplace = vi.hoisted(() => vi.fn(async () => {}))
 vi.mock('vue-router', () => ({
+    onBeforeRouteLeave: vi.fn(),
     useRoute: () => routeState,
     useRouter: () => ({ push: routerPush, replace: routerReplace }),
     RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },

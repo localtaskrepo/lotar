@@ -5,6 +5,7 @@ import { nextTick, ref } from 'vue'
 const routeState: { query: Record<string, any>; hash: string } = { query: {}, hash: '' }
 
 vi.mock('vue-router', () => ({
+    onBeforeRouteLeave: vi.fn(),
     useRoute: () => routeState,
     useRouter: () => ({
         push: vi.fn(),

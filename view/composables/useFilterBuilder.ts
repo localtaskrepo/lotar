@@ -1,5 +1,5 @@
 import { computed, type Ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { TaskListFilter } from '../api/types'
 import { normalizeSortBy } from '../utils/taskSort'
 import { serializeFilterToken } from './useFilterGrammar'
@@ -138,8 +138,19 @@ export function useProjectFilterSync(
 
     const route = useRoute()
     const router = useRouter()
+    // A move to another page is underway (its page may still be loading): a push
+    // to this page's path now would cancel that navigation (DEV-720, as DEV-355).
+    let leaving = false
+    onBeforeRouteLeave(() => {
+        leaving = true
+        const stop = router.afterEach(() => {
+            leaving = false
+            stop()
+        })
+    })
 
     function syncProjectRoute(nextProject: string) {
+        if (leaving) return
         const desired = nextProject || ''
         const current = typeof route.query.project === 'string' ? route.query.project : ''
         if (current === desired) return

@@ -8,6 +8,7 @@ const sprintsState = vi.hoisted(() => ({
 }))
 
 vi.mock('vue-router', () => ({
+    onBeforeRouteLeave: vi.fn(),
     useRoute: () => routeState,
     useRouter: () => ({
         push: vi.fn(),

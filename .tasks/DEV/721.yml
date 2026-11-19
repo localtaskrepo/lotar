@@ -1,11 +1,11 @@
 title: Done-ticket cleanup leaves half-deleted worktrees when its git worktree remove is cut off
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T19:21:56.947455+00:00
-modified: 2026-11-19T19:46:21.433837+00:00
+modified: 2026-11-19T19:47:33.254584+00:00
 relationships:
   blocks:
   - DEV-722
@@ -95,6 +95,34 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-19T19:47:22.697009+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `6b43ed074` on origin.
+
+    - lotar had already rebased, run the checks (lint, test, smoke: all passed) and fast-forwarded. I didn't run them again.
+    - I amended lotar's handoff comment (`.tasks/DEV/721.yml`) into the merged commit. `27d632922` is now `6b43ed074`.
+    - Pushed `7943055c0` (DEV-717) as well. That ticket is Done, no DEV ticket is InProgress, and the main checkout is clean.
+    - No trust needed: the merge changes no rules or config files.
+    - Health check: `git -C ~/.t3/worktrees/foundera/agent-FND-14-108cbf1865fd4c51 status --short` still lists 28 ` D` lines. That worktree broke before this fix, which only stops new ones. FND-23 repairs it.
+  report:
+    commits:
+    - hash: 6b43ed074
+      what: DEV-721 rename-then-delete worktree removal, with pending .tasks amended in
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge, on 21c0483ef
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge, on 21c0483ef
+    - command: npm run -s smoke
+      result: passed
+      reason: lotar's merge, on 21c0483ef
+    - command: git -C ~/.t3/worktrees/foundera/agent-FND-14-108cbf1865fd4c51 status --short
+      result: failed
+      reason: still 28 D lines, the half-deleted worktree from before the fix; FND-23 repairs it
+    next: 'FND-23: repair the existing FND-14 worktree in foundera'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22d9efae-b49e-4dc3-872c-64754f1408dd
 description: |-
@@ -193,3 +221,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-19T19:47:22.697009+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:47:33.254584+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
