@@ -1,14 +1,14 @@
 title: Usage-limit pause reads harnessmux 0.2.0's typed failures before the text match
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-19T19:05:43.846465+00:00
+modified: 2026-11-19T19:11:31.619939+00:00
 relationships:
   depends_on:
   - DEV-683
+  - standards:STD-257
   related:
   - DEV-584
 comments:
@@ -46,6 +46,19 @@ comments:
       result: failed
       reason: newest is 0.1.10
     next: mallox releases harnessmux 0.2.0 to crates.io, then set DEV-711 to @fix
+- date: 2026-11-19T19:11:25.364199+00:00
+  author: triage
+  text: |-
+    Waits for harnessmux 0.2.0 on crates.io; continues when the prerequisite is done.
+
+    - Owner decision 2026-11-18 (option a): he releases harnessmux 0.2.0, then an agent does this ticket.
+    - Prerequisite: [STD-257](https://standards.pyxzl.net/task/STD-257), tag owner, done when `cargo search harnessmux` lists 0.2.0.
+- date: 2026-11-19T19:11:26.155894+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: standards:STD-257.'
+- date: 2026-11-19T19:11:26.171681+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-711 yet. DEV-711 waits for standards:STD-257.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610a9a82-cb42-47ba-9eea-09f109d6be60
@@ -149,3 +162,38 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-19T19:11:24.362364+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-683"],"related":["DEV-584"]}'
+    new: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584"]}'
+- at: 2026-11-19T19:11:24.750469+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-19T19:11:25.364199+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:11:25.920782+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-19T19:11:26.155894+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:11:26.171681+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:11:31.619939+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'

@@ -1,0 +1,85 @@
+title: A worktree removal cut off between rename and git entry leaves a prunable worktree that blocks its branch
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-19T19:39:32.596277+00:00
+modified: 2026-11-19T19:42:04.186451+00:00
+relationships:
+  depends_on:
+  - DEV-721
+  related:
+  - DEV-721
+comments:
+- date: 2026-11-19T19:41:53.902150+00:00
+  author: claude
+  text: |-
+    Waits for DEV-721: the code this fix changes isn't on main yet.
+
+    - `remove_worktree_dir` exists only on `agent/DEV-721` (`2ce1b2ad8`, `21c0483ef`); DEV-721 is in Merging.
+    - Fixing it now would build on unmerged work and conflict with the merge. Continue once DEV-721 is on main.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afde40de3-2641-430f-be65-cdd521755c4f
+description: |-
+  ## Found
+
+  Review of DEV-721 (`2ce1b2ad8`): `remove_worktree_dir` in `crates/lotar-agent/src/services/agent_job_service.rs` renames the worktree aside, then deletes `.git/worktrees/<id>`. Cut off between the two, git still lists the worktree at a path that no longer exists (prunable). lotar never runs `git worktree prune`: `check_worktree_clean` fails on `canonicalize`, so every cleanup skips it, and `git branch -D` refuses the branch as checked out until git's own prune (gc, months later). The window is two syscalls wide, so rare.
+
+  ## Check
+
+  `git worktree list --porcelain` shows a `prunable` agent worktree whose ticket is Done.
+
+  ## Done when
+
+  Done cleanup (and `lotar agent worktree cleanup`) prunes the git entry of an agent worktree whose path is gone, then deletes its branch as usual; a test covers it.
+tags:
+- health
+- waits
+custom_fields:
+  finding: agent-worker:prunable-worktree-after-cut-off-removal
+history:
+- at: 2026-11-19T19:39:34.203201+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-721"]}'
+- at: 2026-11-19T19:39:35.503149+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-19T19:40:10.975673+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-19T19:40:16.262955+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afde40de3-2641-430f-be65-cdd521755c4f
+- at: 2026-11-19T19:41:53.310531+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-721"]}'
+    new: '{"depends_on":["DEV-721"],"related":["DEV-721"]}'
+- at: 2026-11-19T19:41:53.775022+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-19T19:41:53.902150+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:42:04.186451+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

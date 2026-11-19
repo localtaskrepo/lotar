@@ -1,0 +1,120 @@
+title: 'Flaky smoke: keyboard shortcut g c stays on /boards instead of /calendar'
+status: Merging
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-19T19:09:43.671027+00:00
+modified: 2026-11-19T19:40:36.317198+00:00
+relationships:
+  related:
+  - DEV-355
+  - DEV-719
+  - DEV-586
+comments:
+- date: 2026-11-19T19:27:08.722784+00:00
+  author: claude
+  text: |-
+    Fixed in the app, not just the spec: the Boards page cancelled the `g c` move to `/calendar`.
+
+    - Cause: on `/boards` the filter bar loads the project list, picks the only project and the page runs `router.push({ path: '/boards', query: { project } })`. When `g c` already started the move to `/calendar` (lazy chunk still loading under load), that push cancels it. Same kind of bug as DEV-355 on the tasks page.
+    - Fix: `useProjectFilterSync` in `view/composables/useFilterBuilder.ts` skips that push while a navigation away is pending (`onBeforeRouteLeave` + `afterEach`, the DEV-355 pattern). Covers Boards, Sprints and Insights.
+    - New smoke test in `smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts` holds `/api/projects/list` and the Calendar chunk to force the race: it failed without the fix (`expected '/boards' to be '/calendar'`, the CI error) and passes with it.
+    - New unit test in `view/__tests__/useProjectFilterSync.route.spec.ts`; 9 page specs got `onBeforeRouteLeave: vi.fn()` in their `vue-router` mock.
+    - Before the fix, 10 runs under CPU load did not reproduce the flake by chance; with the fix the spec passed 10/10 under load. A full smoke in parallel was not possible: the smoke run lock (DEV-586) allows one run per machine.
+  report:
+    commits:
+    - hash: 2628f820b
+      what: Boards/Sprints/Insights no longer push their ?project= URL while a move to another page is pending; regression smoke test
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 118 files, 406 tests
+    - command: keyboard-shortcuts spec x10 under 28 CPU burners
+      result: passed
+      reason: 10/10
+    next: Review, then merge
+- date: 2026-11-19T19:40:26.303597+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix stops the Boards page from cancelling the `g c` move, the new smoke test fails without it, and the spec passes under load.
+
+    - Read: commit `2628f820b` (the only one on `main..HEAD`), the ticket, DEV-355's identical pattern in `view/pages/TasksList.vue:1793`, and the recent `main` commits to the touched files.
+    - `view/composables/useFilterBuilder.ts:141-153`: `onBeforeRouteLeave` sets `leaving` and `afterEach` clears it, also after a cancelled move. Query-only pushes on the same page don't trigger the leave guard, so the normal `?project=` sync still works.
+    - Reran: `npm ci` passed, `npm run -s lint:agent` passed, `npm run -s test:ui:agent` passed (1563 tests), and `npm run -s test:smoke:agent -- smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts` passed (4/4).
+    - Failed before the fix: with `main`'s `useFilterBuilder.ts` the new test fails with `expected '/boards' to be '/calendar'`, the error CI saw. The file was put back afterwards.
+    - Under load (6× `yes`), 10 runs in a row: 10/10 passed.
+    - Full smoke `npm run -s test:smoke:quick:agent`: 118 files, 406 tests passed.
+    - Not run: Rust tests, because nothing on the Rust side changed. No screenshots: the change is routing logic in a composable, with no change to pages, components or styles.
+    - No stray files and no second branch. Minor findings: none.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aca6f0f08-ac94-4753-83c2-4e55cee66044
+description: |-
+  Found: DEV-719's merge run of `npm run -s smoke` (2026-11-19) failed in `smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts:53`: after `g` then `c` the path stayed `/boards`, expected `/calendar`. That change touched only `.tasks/DEV/automation.yml`. The spec then passed 3/3 alone and the full smoke passed. Same spec as DEV-355 (palette Enter), now in the g-chord step: likely the second key lands before the chord listener is ready, or the chord times out under load.
+
+  Check: run `npm run -s test:smoke:quick:agent -- smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts` repeatedly under load (full smoke in parallel).
+
+  Done when: the spec waits for the state the chord needs instead of racing it, and it passes repeated runs under load.
+tags:
+- health
+custom_fields:
+  finding: flaky:smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts
+history:
+- at: 2026-11-19T19:09:43.927718+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-355","DEV-719"]}'
+- at: 2026-11-19T19:09:44.237888+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-19T19:11:05.483118+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-19T19:11:06.393086+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aca6f0f08-ac94-4753-83c2-4e55cee66044
+- at: 2026-11-19T19:27:08.722784+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:27:09.114771+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-355","DEV-719"]}'
+    new: '{"related":["DEV-355","DEV-719","DEV-586"]}'
+- at: 2026-11-19T19:27:38.933311+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-19T19:40:26.303597+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:40:36.317198+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

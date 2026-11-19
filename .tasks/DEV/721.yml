@@ -1,0 +1,195 @@
+title: Done-ticket cleanup leaves half-deleted worktrees when its git worktree remove is cut off
+status: Merging
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-19T19:21:56.947455+00:00
+modified: 2026-11-19T19:46:21.433837+00:00
+relationships:
+  blocks:
+  - DEV-722
+  related:
+  - DEV-647
+  - DEV-722
+  - DEV-717
+comments:
+- date: 2026-11-19T19:32:39.980545+00:00
+  author: claude
+  text: |-
+    Fixed: an interrupted cleanup now leaves only a folder of trash, never a half-removed registered worktree.
+
+    - New `remove_worktree_dir` in `crates/lotar-agent/src/services/agent_job_service.rs`: renames the worktree to `.<name>.lotar-removed` beside it, deletes git's entry (`.git/worktrees/<id>`, checked to be this repo's), then deletes the renamed folder. Locked worktrees stay, as with git.
+    - The next removal in the same folder deletes leftover `*.lotar-removed` trash.
+    - `remove_worktree` logs `[lotar][warn]` on failure instead of ignoring it; `lotar agent worktree cleanup` uses the same removal.
+    - Test `done_cleanup_cut_off_while_deleting_leaves_no_half_removed_worktree` (`crates/lotar-lib/tests/agent_safety_test.rs`): deletion stops part way, path is gone, git no longer lists it, branch deleted, next removal clears the trash.
+    - DEV-647 test now holds `git branch -D` instead of `git worktree remove`, which lotar no longer runs.
+    - Not repaired: the existing half-deleted FND-14 worktree in foundera still needs a manual fix (FND-23).
+  report:
+    commits:
+    - hash: 2ce1b2ad8
+      what: worktree removal renames aside first, logs failures
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2413 Rust, 1562 UI
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    next: Review, then merge
+- date: 2026-11-19T19:39:49.992769+00:00
+  author: claude
+  text: |-
+    Review: passed. The rename, then drop git's entry, then delete order does what "Done when" asks, and the new test fails on the old code.
+
+    - Reviewed `2ce1b2ad8` (main moved one commit, DEV-717, nothing conflicting). It touches `agent_job_service.rs`, `cli/handlers/agent.rs` and `agent_safety_test.rs`. No stray files.
+    - `remove_worktree_dir` checks that the git dir is `<common>/worktrees/<id>` and that the worktree isn't locked. If deleting the git entry fails, it puts the folder back. The cleanliness checks before it (`check_worktree_clean`: untracked, modified, ignored) still guard the removal that `git worktree remove` without `--force` used to refuse.
+    - `remove_worktree` and the manual `lotar agent worktree cleanup` now log or report failures instead of ignoring them.
+    - Test fails before the fix: I ran the new test against `HEAD~1` in a scratch worktree. It fails at `agent_safety_test.rs:1171` (`worktree.exists()`). Scratch removed.
+    - The DEV-647 test now holds `branch -D`. It still shows that the job registry stays free while the removal runs.
+    - Minor, filed [DEV-722](https://lotar.pyxzl.net/task/DEV-722): a removal cut off between the rename and the git entry's deletion leaves a prunable worktree. lotar never prunes it, so its branch stays.
+    - Not from this diff: the existing half-deleted FND-14 worktree still needs FND-23.
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/done_cleanup|worktree/)'
+      result: passed
+      reason: 29 tests
+    - command: new test on HEAD~1 (pre-fix code)
+      result: passed
+      reason: fails at agent_safety_test.rs:1171 as expected
+    - command: npm run lint:agent
+      result: passed
+    - command: cargo nextest run --workspace
+      result: passed
+      reason: 2413 tests
+    - command: npm ci
+      result: passed
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or REST change; fix agent reports it passed
+- date: 2026-11-19T19:46:21.433837+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    7943055c0 DEV-717 Rule runs skipped until lotar trust are never run after it: the owner's inbox answers stay lost
+    ```.
+
+    - Rebased `agent/DEV-721` onto `main` (`7943055c03eb`): `21c0483efe08`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `21c0483efe08`
+    - Amended the pending `.tasks` changes into the merged commit: `27d632922722`
+  report:
+    commits:
+    - hash: 21c0483ef
+      what: DEV-721 Done-ticket cleanup leaves half-deleted worktrees when its git worktree remove is cut off
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22d9efae-b49e-4dc3-872c-64754f1408dd
+description: |-
+  ## Found
+
+  In foundera (FND-23), two agent worktrees lost the same 28 tracked files and nothing else: FND-9 (removed since, FND-21) and FND-14 (`~/.t3/worktrees/foundera/agent-FND-14-108cbf1865fd4c51`, still there).
+
+  - FND-14 went Done at 18:45:24 UTC (`claude`, `lotar status` from its agent). The worktree folder changed at 18:45:27, `node_modules/.pnpm` last at 18:46:20, with 157 of 501 entries left. FND-9 lost its files the minute its merge agent set Done.
+  - `status_changed` in `crates/lotar-agent/src/task_hooks.rs` calls `cleanup_done_ticket_worktree` in the same process, here the agent's `lotar status` CLI. `remove_worktree` (`agent_job_service.rs:2651`) then runs `git worktree remove` in the foreground and ignores the result.
+  - git deletes entries in directory order (APFS order, the same in every worktree of a repo). It got past the top-level tracked files that come before `node_modules`, then stopped in `node_modules/.pnpm`, most likely because the agent's command or job was killed. The admin dir `.git/worktrees/<id>` and the `.git` file are still there. A clean git failure deletes them both (tried in a scratch repo), so git was killed and did not fail on its own.
+  - Result: the worktree is still registered, `git status` shows only ` D` lines, the next cleanup refuses it as "uncommitted", and repos.ts reports it as a leftover worktree with 28 changes.
+
+  ## Check
+
+  `git -C <worktree> status --short` shows only ` D` lines in an agent worktree whose ticket is Done.
+
+  ## Done when
+
+  An interrupted cleanup can't leave a half-removed worktree:
+  - Rename the worktree out of the way first (one rename on the same filesystem), drop its git entry, then delete the renamed folder. An interruption leaves only a folder of trash.
+  - Or run the removal where an agent's end can't kill it, and have a later cleanup finish a worktree whose only changes are deletions of files that are still in HEAD.
+
+  Add a test for the interrupted case. `remove_worktree` should also log a failure instead of ignoring it.
+tags:
+- health
+custom_fields:
+  finding: worktree-cleanup:interrupted-remove
+history:
+- at: 2026-11-19T19:21:57.257020+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-19T19:22:44.708632+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-19T19:22:46.060006+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22d9efae-b49e-4dc3-872c-64754f1408dd
+- at: 2026-11-19T19:32:39.980545+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:32:40.331035+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-647"]}'
+- at: 2026-11-19T19:32:51.835214+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-19T19:39:34.202664+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-647"]}'
+    new: '{"related":["DEV-647","DEV-722"]}'
+- at: 2026-11-19T19:39:49.992769+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:39:50.955280+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-647","DEV-722"]}'
+    new: '{"related":["DEV-647","DEV-722","DEV-717"]}'
+- at: 2026-11-19T19:40:06.667006+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-19T19:41:53.310038+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-647","DEV-722","DEV-717"]}'
+    new: '{"blocks":["DEV-722"],"related":["DEV-647","DEV-722","DEV-717"]}'
+- at: 2026-11-19T19:46:21.433837+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,15 +1,16 @@
 title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T18:55:08.902987+00:00
-modified: 2026-11-19T19:06:34.668156+00:00
+modified: 2026-11-19T19:09:59.745643+00:00
 relationships:
   related:
   - DEV-706
   - DEV-530
+  - DEV-720
 comments:
 - date: 2026-11-19T18:56:59.274374+00:00
   author: claude
@@ -90,6 +91,34 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-19T19:09:52.865671+00:00
+  author: claude
+  text: |-
+    Merged, pushed and trusted: `1df5a355d` is on `main` and `origin/main`.
+
+    - The smoke failure was a flake: the diff touches only `.tasks/DEV/automation.yml`. `ui.keyboard-shortcuts.smoke.spec.ts` then passed 3/3 alone, and the full `npm run -s smoke` passed 405/405.
+    - Filed [DEV-720](https://lotar.pyxzl.net/task/DEV-720) for the flaky `g c` chord step, tag `health`.
+    - Rebase changed nothing (`3743f45ca`), so I didn't rerun lint and test; lotar's run had passed them.
+    - Fast-forwarded `main`, amended the pending `.tasks` files into the merge commit, and pushed `701cab623..1df5a355d`.
+    - `lotar trust` ran because `DEV/automation.yml` changed; `lotar trust --status` says Trusted.
+    - `repos.ts localtaskrepo/lotar` no longer lists `drift:.tasks/DEV/automation.yml`.
+  report:
+    commits:
+    - hash: 1df5a355d
+      what: DEV-719 automation.yml copy matches the standard again (with .tasks files amended in)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: in lotar's merge run, same hash
+    - command: npm run -s test:agent
+      result: passed
+      reason: in lotar's merge run, same hash
+    - command: npm run -s smoke
+      result: passed
+      reason: 405/405 on rerun; first run hit a flake
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: drift finding gone
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc2c9ab3-bf32-497c-9a1f-484c04b185db
 description: |-
@@ -162,3 +191,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-19T19:09:43.927324+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-706","DEV-530"]}'
+    new: '{"related":["DEV-706","DEV-530","DEV-720"]}'
+- at: 2026-11-19T19:09:52.865671+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:09:59.745643+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

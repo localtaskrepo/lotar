@@ -1088,7 +1088,8 @@ mod git_required {
 
     /// DEV-647: under load `git worktree remove` ran 38 s while Done's
     /// cleanup held the job registry, and every job thread waited for it.
-    /// A job for the ticket still waits for the cleanup to end.
+    /// A job for the ticket still waits for the cleanup to end. The fake
+    /// git holds the branch deletion that follows the worktree's removal.
     #[test]
     fn done_cleanup_leaves_the_job_registry_free_while_git_removes_the_worktree() {
         common::require_git();
@@ -1103,7 +1104,7 @@ mod git_required {
         fs::write(
             bin.join("git"),
             format!(
-                "#!/bin/sh\nif [ \"$1 $2\" = 'worktree remove' ]; then touch '{0}/removing'; while [ ! -f '{0}/release' ]; do sleep 0.05; done; fi\nexec '{1}' \"$@\"\n",
+                "#!/bin/sh\nif [ \"$1 $2\" = 'branch -D' ]; then touch '{0}/removing'; while [ ! -f '{0}/release' ]; do sleep 0.05; done; fi\nexec '{1}' \"$@\"\n",
                 root.display(),
                 real_git.trim()
             ),
@@ -1145,6 +1146,40 @@ mod git_required {
         assert!(!worktree.exists(), "Done removes the worktree");
         start.join().unwrap().unwrap();
         wait_idle();
+    }
+
+    /// DEV-721: `git worktree remove`, killed with the agent's `lotar
+    /// status Done`, deleted part of the files in place and left the
+    /// worktree registered, which later cleanups refused as uncommitted.
+    /// Removal now renames the worktree aside first: a deletion cut off
+    /// leaves only a folder of trash, which the next removal deletes.
+    #[test]
+    fn done_cleanup_cut_off_while_deleting_leaves_no_half_removed_worktree() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let worktrees = root.join("worktrees");
+        let branch = format!("agent/{ticket}");
+        let worktree = worktrees.join(&ticket);
+        git(root, &["worktree", "add", "-q", "-b", &branch, worktree.to_str().unwrap()]);
+        // A folder whose files can't be deleted stops the deletion part way.
+        let stuck = worktree.join(".tasks");
+        fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::automation_disabled());
+
+        let trash = worktrees.join(format!(".{ticket}.lotar-removed"));
+        assert!(!worktree.exists(), "nothing is left at the worktree's path");
+        assert!(trash.exists(), "the cut-off deletion leaves its trash");
+        let listed = Command::new("git").args(["worktree", "list", "--porcelain"]).current_dir(root).output().unwrap();
+        let listed = String::from_utf8(listed.stdout).unwrap();
+        assert!(!listed.contains(&ticket), "git no longer lists the worktree: {listed}");
+        assert!(!branch_exists(root, &branch));
+
+        fs::set_permissions(trash.join(".tasks"), fs::Permissions::from_mode(0o755)).unwrap();
+        let next = worktrees.join("next");
+        git(root, &["worktree", "add", "-q", "-b", "agent/next", next.to_str().unwrap()]);
+        lotar::services::agent_job_service::remove_worktree_dir(root, &next).unwrap();
+        assert!(!next.exists() && !trash.exists(), "the next removal deletes the trash beside it");
     }
 
     /// DEV-343: Done set while a job still runs for the ticket waits for

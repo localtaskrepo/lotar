@@ -2647,15 +2647,59 @@ fn reworked_landing(repo_root: &std::path::Path, start: &str, branch: &str, tick
 
 /// Remove a worktree `check_worktree_cleanup` passed, and its branch when
 /// `delete_branch` is set. The branch's commits are in the main checkout,
-/// possibly rebased, which `git branch -d` would refuse.
+/// possibly rebased, which `git branch -d` would refuse. A failure is
+/// logged: the worktree stays for a later cleanup.
 fn remove_worktree(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, delete_branch: bool, prefix: &str) {
-    let worktree_arg = path.to_string_lossy().to_string();
-    if run_git_command(repo_root, &["worktree", "remove", &worktree_arg]).is_ok()
-        && delete_branch
-        && let Some(branch) = branch
-    {
-        let _ = delete_landed_branch(repo_root, prefix, branch);
+    if let Err(err) = remove_worktree_dir(repo_root, path) {
+        eprintln!("[lotar][warn] Could not remove the worktree {}: {err}", path.display());
+        return;
     }
+    if delete_branch
+        && let Some(branch) = branch
+        && let Err(err) = delete_landed_branch(repo_root, prefix, branch)
+    {
+        eprintln!("[lotar][warn] Could not delete the branch {branch}: {err}");
+    }
+}
+
+/// The suffix of a worktree folder `remove_worktree_dir` renamed aside.
+const REMOVED_WORKTREE_SUFFIX: &str = ".lotar-removed";
+
+/// Remove a linked worktree of the repository so that an interruption
+/// can't leave it half removed (DEV-721). `git worktree remove` deletes the
+/// files in place and git's entry last: a git killed with the agent's
+/// command left a registered worktree with tracked files missing, which
+/// every later cleanup refused as uncommitted. Here one rename moves the
+/// folder aside, then git's entry goes, then the renamed folder; cut off,
+/// that leaves a folder of trash, which the next removal next to it
+/// deletes. A locked worktree stays, as with git.
+pub fn remove_worktree_dir(repo_root: &std::path::Path, path: &std::path::Path) -> LoTaRResult<()> {
+    let target = fs::canonicalize(path).map_err(LoTaRError::IoError)?;
+    let common = verified_common_dir(repo_root).map_err(LoTaRError::IoError)?;
+    let git_dir = git_stdout(&target, &["rev-parse", "--absolute-git-dir"])?;
+    let git_dir = fs::canonicalize(git_dir.trim()).map_err(LoTaRError::IoError)?;
+    if git_dir.parent() != Some(common.join("worktrees").as_path()) {
+        return Err(LoTaRError::ValidationError("it is not a linked worktree of this repository".into()));
+    }
+    if git_dir.join("locked").exists() {
+        return Err(LoTaRError::ValidationError("it is locked (`git worktree unlock`)".into()));
+    }
+    let (Some(parent), Some(name)) = (target.parent(), target.file_name()) else {
+        return Err(LoTaRError::ValidationError("it has no parent folder".into()));
+    };
+    for entry in fs::read_dir(parent).map_err(LoTaRError::IoError)?.flatten() {
+        let leftover = entry.file_name().to_string_lossy().into_owned();
+        if leftover.starts_with('.') && leftover.ends_with(REMOVED_WORKTREE_SUFFIX) {
+            let _ = fs::remove_dir_all(entry.path());
+        }
+    }
+    let trash = parent.join(format!(".{}{REMOVED_WORKTREE_SUFFIX}", name.to_string_lossy()));
+    fs::rename(&target, &trash).map_err(LoTaRError::IoError)?;
+    if let Err(err) = fs::remove_dir_all(&git_dir) {
+        let _ = fs::rename(&trash, &target);
+        return Err(LoTaRError::IoError(err));
+    }
+    fs::remove_dir_all(&trash).map_err(|err| LoTaRError::ValidationError(format!("git no longer lists it; deleting {} failed: {err}", trash.display())))
 }
 
 /// A worktree of an agent ticket branch (DEV-476): it has the ticket

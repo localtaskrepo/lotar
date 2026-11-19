@@ -11,7 +11,7 @@ use crate::services::agent_log_service::AgentLogService;
 use crate::services::agent_queue_service::{AgentQueueService, WorkerState};
 use crate::services::automation_service::AutomationService;
 use crate::services::task_service::TaskService;
-use crate::utils::git::{git_command, verified_common_dir};
+use crate::utils::git::verified_common_dir;
 use crate::workspace::TasksDirectoryResolver;
 use serde::Serialize;
 use std::fmt::Write as _;
@@ -748,11 +748,8 @@ impl AgentHandler {
                 continue;
             }
 
-            // Remove worktree
-            let worktree_result = git_command(&repo_root).args(["worktree", "remove", &wt.path]).current_dir(&repo_root).output();
-
-            match worktree_result {
-                Ok(output) if output.status.success() => {
+            match agent_job_service::remove_worktree_dir(&repo_root, std::path::Path::new(&wt.path)) {
+                Ok(()) => {
                     renderer.emit_success(format!("Removed worktree: {} ({})", wt.ticket_id, wt.path));
 
                     if args.delete_branches && !wt.detached {
@@ -769,14 +766,9 @@ impl AgentHandler {
                     }
                     removed.push(wt.ticket_id.clone());
                 }
-                Ok(output) => {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    errors.push(format!("{}: {}", wt.ticket_id, stderr.trim()));
-                    renderer.emit_error(format!("Failed to remove worktree {}: {}", wt.ticket_id, stderr.trim()));
-                }
-                Err(e) => {
-                    errors.push(format!("{}: {}", wt.ticket_id, e));
-                    renderer.emit_error(format!("Failed to remove worktree {}: {}", wt.ticket_id, e));
+                Err(err) => {
+                    errors.push(format!("{}: {}", wt.ticket_id, err));
+                    renderer.emit_error(format!("Failed to remove worktree {}: {}", wt.ticket_id, err));
                 }
             }
         }
