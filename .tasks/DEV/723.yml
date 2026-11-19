@@ -1,11 +1,11 @@
 title: Pruning a worktree whose folder is gone leaves its renamed trash folder behind
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T19:59:07.522902+00:00
-modified: 2026-11-19T20:20:44.969812+00:00
+modified: 2026-11-19T20:21:19.655050+00:00
 relationships:
   depends_on:
   - DEV-722
@@ -106,6 +106,31 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-19T20:21:13.213961+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `8d5086799` on `main` (fast-forward; `.tasks` changes added to it).
+
+    - lotar's smoke failure was a flake in `smoke/tests/ui.description-preview.smoke.spec.ts` (1280px right-edge gap `8.99` vs `< 8`); this branch only touches Rust worktree cleanup.
+    - That spec alone passed 3/3 (`npm run -s test:smoke:quick -- <file>`); full `npm run -s smoke` rerun passed 406/406.
+    - Filed [DEV-724](https://lotar.pyxzl.net/task/DEV-724) for the flake.
+    - Health check: `cleanup_prunes_a_worktree_whose_folder_is_gone_and_deletes_its_branch` asserts the trash folder is gone; passed in `test:agent`.
+    - No rules or config changed: `lotar trust` not needed. Pushed `4d440d27a..8d5086799`; nothing else was waiting.
+  report:
+    commits:
+    - hash: 8d5086799
+      what: prune deletes the .<name>.lotar-removed trash (with .tasks)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s smoke
+      result: passed
+      reason: rerun 406/406 after one flaky failure
+    next: none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A640ab01a-8f2f-4336-b3a3-2a5a881b2644
 description: |-
@@ -215,3 +240,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-722"],"related":["DEV-722","DEV-721"]}'
     new: '{"depends_on":["DEV-722"],"related":["DEV-722","DEV-721","DEV-724"]}'
+- at: 2026-11-19T20:21:13.213961+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T20:21:19.655050+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

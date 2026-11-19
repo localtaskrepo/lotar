@@ -1,14 +1,48 @@
 title: 'Flaky smoke: description preview toggle sits 9px from the textarea''s right edge at 1280px'
-status: InProgress
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-19T20:20:44.717330+00:00
-modified: 2026-11-19T20:20:47.301487+00:00
+modified: 2026-11-19T20:33:41.589021+00:00
 relationships:
   related:
   - DEV-723
+comments:
+- date: 2026-11-19T20:29:12.557367+00:00
+  author: claude
+  text: |-
+    Smoke test now measures the toggle after the layout settles.
+
+    - Cause: `smoke/tests/ui.description-preview.smoke.spec.ts` took the textarea and toggle boxes in two separate `boundingBox()` round trips; under load the layout can change between them (panel slide-in, textarea resize), giving a 9px gap.
+    - Fix: one `page.evaluate` reads both rects and the padding in the same animation frame, polled until two frames agree; the assertions (gap < 8px) are unchanged.
+    - Test-only change; no UI or style change.
+  report:
+    commits:
+    - hash: fbd1ba990
+      what: measure textarea and toggle in one frame once the layout is stable
+    checks:
+    - command: npm run smoke
+      result: passed
+      reason: 3 full-suite runs, 406/406 each
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: rust 2415, ui 1563, release 60, hooks 7
+    next: Review, then merge
+- date: 2026-11-19T20:33:35.802006+00:00
+  author: claude
+  text: |-
+    Review: passed. The test fix in `fbd1ba990` does what "Done when" asks; the full smoke suite passed 3 of 3 runs.
+
+    - Read: the diff (only `smoke/tests/ui.description-preview.smoke.spec.ts`), the ticket, [DEV-723](https://lotar.pyxzl.net/task/DEV-723), the toggle CSS in `view/components/TaskPanel.vue:2982-3008`, and the last 5 main commits to the test file. Nothing on main since the fix changes what it relies on.
+    - The fix: one `page.evaluate` reads the textarea box, the toggle box and the padding in the same `requestAnimationFrame`, and polls until two readings match. The two boxes can no longer come from different moments of the panel's slide-in, which explains a 9px gap where 4px is expected. The limits (< 8px) are unchanged, so the test is not weaker.
+    - No failing test before the fix: this is a flake that wasn't reproduced, so that's expected. No app, UI or style change, so no ui-review or screenshots are needed. No stray files.
+    - Reran: `npm ci` passed; full smoke `npm run -s test:smoke:agent` plus 2× `test:smoke:quick:agent` gave 406/406 each time; `lint:frontend`, `lint:js` and `prettier --check` on the file passed. The worktree is still clean.
+    - Not rerun: `npm test` and the Rust lint. Rust and UI code are unchanged, and the fix agent reported both as passed.
+    - Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A086ff478-5723-4531-80bb-b9a321cd95b0
 description: |-
@@ -50,3 +84,29 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A086ff478-5723-4531-80bb-b9a321cd95b0
+- at: 2026-11-19T20:29:12.557367+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T20:29:24.672379+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-19T20:33:35.802006+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T20:33:41.589021+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

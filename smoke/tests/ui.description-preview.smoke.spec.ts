@@ -30,12 +30,42 @@ describe.concurrent('UI description preview toggle', () => {
                             ).join('\n'),
                         );
                         const toggle = page.getByTestId('description-preview-toggle');
-                        const box = (await textarea.boundingBox())!;
-                        const button = (await toggle.boundingBox())!;
-
-                        const paddingBottom = await textarea.evaluate((el) =>
-                            parseFloat(getComputedStyle(el).paddingBottom),
-                        );
+                        await toggle.waitFor();
+                        // Measure the textarea and the toggle in the same frame,
+                        // once two frames in a row agree: under full-suite load
+                        // the panel can still be sliding in or the textarea
+                        // resizing to its text (DEV-724).
+                        const measure = () =>
+                            page.evaluate(
+                                () =>
+                                    new Promise<{ box: DOMRect; button: DOMRect; paddingBottom: number }>((resolve) =>
+                                        requestAnimationFrame(() => {
+                                            const area = document.querySelector(
+                                                '.task-panel__description-body textarea',
+                                            )!;
+                                            const toggleEl = document.querySelector(
+                                                '[data-testid="description-preview-toggle"]',
+                                            )!;
+                                            resolve({
+                                                box: area.getBoundingClientRect().toJSON(),
+                                                button: toggleEl.getBoundingClientRect().toJSON(),
+                                                paddingBottom: parseFloat(getComputedStyle(area).paddingBottom),
+                                            });
+                                        }),
+                                    ),
+                            );
+                        let layout = await measure();
+                        await expect
+                            .poll(
+                                async () => {
+                                    const previous = JSON.stringify(layout);
+                                    layout = await measure();
+                                    return JSON.stringify(layout) === previous;
+                                },
+                                { timeout: 10_000 },
+                            )
+                            .toBe(true);
+                        const { box, button, paddingBottom } = layout;
                         // Inside the box, hugging its bottom-right corner.
                         expect(box.x + box.width - (button.x + button.width)).toBeGreaterThanOrEqual(0);
                         expect(box.x + box.width - (button.x + button.width)).toBeLessThan(8);
