@@ -1,0 +1,77 @@
+title: Pruning a worktree whose folder is gone leaves its renamed trash folder behind
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-19T19:59:07.522902+00:00
+modified: 2026-11-19T19:59:42.555848+00:00
+relationships:
+  depends_on:
+  - DEV-722
+  related:
+  - DEV-722
+comments:
+- date: 2026-11-19T19:59:32.965621+00:00
+  author: claude
+  text: |-
+    Waits for DEV-722: the code to fix isn't on main yet.
+
+    - `prune_missing_worktree` exists only on `agent/DEV-722` (`29cc68a92`, DEV-722 in Reviewing); main and `agent/DEV-723` have just `remove_worktree_dir` in `crates/lotar-agent/src/services/agent_job_service.rs`.
+    - Next: once DEV-722 is on main, rebase onto it and make the prune also delete `.<name>.lotar-removed` beside the gone path, with a test.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A640ab01a-8f2f-4336-b3a3-2a5a881b2644
+description: |-
+  ## Found
+
+  Review of DEV-722 (`29cc68a92`): a removal cut off after its rename leaves `.<name>.lotar-removed` beside the gone worktree. `prune_missing_worktree` in `crates/lotar-agent/src/services/agent_job_service.rs` deletes only git's entry; the trash (a full worktree copy, build output included) stays until a later `remove_worktree_dir` runs in the same parent folder, which may never happen for the last worktree there.
+
+  ## Check
+
+  After cleanup prunes an entry, `ls -a` of the worktree's parent shows no `.<name>.lotar-removed` for it.
+
+  ## Done when
+
+  Pruning a missing worktree also deletes its `.<name>.lotar-removed` trash beside the gone path; a test covers it.
+tags:
+- health
+- waits
+history:
+- at: 2026-11-19T19:59:08.161632+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-19T19:59:09.482507+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-19T19:59:10.357083+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A640ab01a-8f2f-4336-b3a3-2a5a881b2644
+- at: 2026-11-19T19:59:32.413393+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-722"]}'
+    new: '{"depends_on":["DEV-722"],"related":["DEV-722"]}'
+- at: 2026-11-19T19:59:32.908043+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-19T19:59:32.965621+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:59:42.555848+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

@@ -716,6 +716,27 @@ impl AgentHandler {
                 errors.push(format!("{}: ticket state changed or a job is active", wt.ticket_id));
                 continue;
             }
+            // A removal cut off left only git's entry (DEV-722); its branch
+            // then goes with the idle branches below.
+            let path = std::path::Path::new(&wt.path);
+            if agent_job_service::missing_worktree_entry(&repo_root, path).is_some() {
+                if args.dry_run {
+                    renderer.emit_info(format!("Would prune missing worktree: {} ({})", wt.ticket_id, wt.path));
+                    removed.push(wt.ticket_id.clone());
+                    continue;
+                }
+                match agent_job_service::prune_missing_worktree(&repo_root, path) {
+                    Ok(_) => {
+                        renderer.emit_success(format!("Pruned missing worktree: {} ({})", wt.ticket_id, wt.path));
+                        removed.push(wt.ticket_id.clone());
+                    }
+                    Err(err) => {
+                        errors.push(format!("{}: {}", wt.ticket_id, err));
+                        renderer.emit_warning(format!("Failed to prune missing worktree {}: {}", wt.ticket_id, err));
+                    }
+                }
+                continue;
+            }
             let allow_ignored = wt
                 .ticket_id
                 .rsplit_once('-')

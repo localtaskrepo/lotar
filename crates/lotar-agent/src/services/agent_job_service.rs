@@ -2702,6 +2702,35 @@ pub fn remove_worktree_dir(repo_root: &std::path::Path, path: &std::path::Path) 
     fs::remove_dir_all(&trash).map_err(|err| LoTaRError::ValidationError(format!("git no longer lists it; deleting {} failed: {err}", trash.display())))
 }
 
+/// The git entry (`.git/worktrees/<id>`) of a linked worktree whose folder
+/// is gone, as `remove_worktree_dir` cut off between its rename and the
+/// entry's deletion leaves it (DEV-722). Git lists it as prunable and
+/// refuses to delete its branch. `None` while the folder exists, the entry
+/// is locked or not found.
+pub fn missing_worktree_entry(repo_root: &std::path::Path, path: &std::path::Path) -> Option<std::path::PathBuf> {
+    if fs::symlink_metadata(path).map_or_else(|err| err.kind() != std::io::ErrorKind::NotFound, |_| true) {
+        return None;
+    }
+    let gitdir = path.join(".git");
+    let common = verified_common_dir(repo_root).ok()?;
+    fs::read_dir(common.join("worktrees"))
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|entry| fs::read_to_string(entry.join("gitdir")).is_ok_and(|listed| std::path::Path::new(listed.trim()) == gitdir))
+        .filter(|entry| !entry.join("locked").exists())
+}
+
+/// Delete the git entry `missing_worktree_entry` finds for `path`, as
+/// `git worktree prune` would; whether there was one.
+pub fn prune_missing_worktree(repo_root: &std::path::Path, path: &std::path::Path) -> LoTaRResult<bool> {
+    let Some(entry) = missing_worktree_entry(repo_root, path) else {
+        return Ok(false);
+    };
+    fs::remove_dir_all(entry).map_err(LoTaRError::IoError)?;
+    Ok(true)
+}
+
 /// A worktree of an agent ticket branch (DEV-476): it has the ticket
 /// branch or a T3 Code thread branch created from it checked out, or was
 /// detached from one when a later thread took over the branch.
@@ -2926,6 +2955,10 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
     }
     let delete_branches = config.agent_worktree.cleanup_delete_branches;
     for worktree in worktrees.iter().filter(|worktree| worktree.ticket_branch == branch) {
+        // Its branch then goes with the idle branches below.
+        if prune_missing_worktree(&repo_root, &worktree.path).unwrap_or(false) {
+            continue;
+        }
         let Ok(removal) = check_done_worktree_cleanup(&repo_root, worktree, ticket_id, config.agent_worktree.cleanup_ignored_files) else {
             continue;
         };

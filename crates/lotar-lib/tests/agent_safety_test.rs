@@ -1182,6 +1182,41 @@ mod git_required {
         assert!(!next.exists() && !trash.exists(), "the next removal deletes the trash beside it");
     }
 
+    /// DEV-722: a removal cut off between its rename and the deletion of
+    /// git's entry leaves a prunable worktree whose branch git refuses to
+    /// delete. Done cleanup and `lotar agent worktree cleanup` prune the
+    /// entry, then delete the branch.
+    #[test]
+    fn cleanup_prunes_a_worktree_whose_folder_is_gone_and_deletes_its_branch() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let branch = format!("agent/{ticket}");
+        let worktree = root.join("worktrees").join(&ticket);
+        let listed = || String::from_utf8(Command::new("git").args(["worktree", "list", "--porcelain"]).current_dir(root).output().unwrap().stdout).unwrap();
+        let cut_off = || {
+            git(root, &["worktree", "add", "-q", "-b", &branch, worktree.to_str().unwrap()]);
+            fs::remove_dir_all(&worktree).unwrap();
+            assert!(listed().contains("prunable"), "git lists the gone worktree: {}", listed());
+        };
+
+        cut_off();
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::automation_disabled());
+        assert!(!listed().contains(&ticket), "Done cleanup prunes the entry: {}", listed());
+        assert!(!branch_exists(root, &branch), "and deletes the branch");
+
+        cut_off();
+        let output = Command::new(crate::common::lotar_bin())
+            .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "agent", "worktree", "cleanup", "--delete-branches"])
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(!listed().contains(&ticket), "the cleanup command prunes the entry: {}", listed());
+        assert!(!branch_exists(root, &branch), "and deletes the branch");
+    }
+
     /// DEV-343: Done set while a job still runs for the ticket waits for
     /// the job's end.
     #[test]
