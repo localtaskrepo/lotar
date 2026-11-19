@@ -1,10 +1,11 @@
 title: Usage-limit pause reads harnessmux 0.2.0's typed failures before the text match
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
+assignee: mallox
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-18T20:23:47.690070+00:00
+modified: 2026-11-19T19:05:43.846465+00:00
 relationships:
   depends_on:
   - DEV-683
@@ -31,8 +32,23 @@ comments:
 
     - Waits for harnessmux 0.2.0 on crates.io; checked again: newest is still `0.1.10`, no `v0.2.0` tag.
     - No lotar files changed.
+- date: 2026-11-19T19:05:25.516509+00:00
+  author: claude
+  text: |-
+    Still waiting: harnessmux 0.2.0 isn't on crates.io yet. Will you release it now, or should this wait longer?
+
+    - Checked 2026-11-19: `cargo search harnessmux` and the crates.io API show `0.1.10` as the newest.
+    - GitHub: newest tag `v0.1.10`, `main` at `efc17df`, still `version = "0.1.10"` in its `Cargo.toml`.
+    - Your decision (a) from 2026-11-18 stands: the agent does the ticket after the release. No lotar files changed, no commit.
+  report:
+    checks:
+    - command: cargo search harnessmux
+      result: failed
+      reason: newest is 0.1.10
+    next: mallox releases harnessmux 0.2.0 to crates.io, then set DEV-711 to @fix
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610a9a82-cb42-47ba-9eea-09f109d6be60
 description: |-
   Follow-up of DEV-584, which pauses a job on a provider's usage limit by matching the failure text (`crates/lotar-agent/src/services/usage_limit.rs`). harnessmux 0.2.0 (DEV-683) is not released yet: crates.io has 0.1.10, which reports `TurnFailed { error }` with no kind or reset time.
 
@@ -104,3 +120,32 @@ history:
     new: Blocked
   - field: assignee
     old: '@fix'
+- at: 2026-11-19T19:01:37.311988+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-19T19:04:57.366677+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-19T19:05:00.421152+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610a9a82-cb42-47ba-9eea-09f109d6be60
+- at: 2026-11-19T19:05:25.516509+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:05:43.846465+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

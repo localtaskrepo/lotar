@@ -1,0 +1,135 @@
+title: 'Rule runs skipped until lotar trust are never run after it: the owner''s inbox answers stay lost'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-19T14:05:00.304366+00:00
+modified: 2026-11-19T19:03:09.223872+00:00
+comments:
+- date: 2026-11-19T14:06:31.659632+00:00
+  author: claude
+  text: |-
+    Question: should `lotar trust` rerun the runs it skipped by itself, or only list them with a command that reruns them?
+
+    - Plan either way: when a rule's `run` is skipped (untrusted repo), lotar saves the command it would have run (ticket, rule, time) next to the trust record in `~/.lotar.trust.yml`. `lotar trust` lists them.
+    - A (recommended): `lotar trust` reruns them right away, but only those whose rule's `run` is unchanged since the skip; changed ones are listed, not run. Agents run `lotar trust` for you, so an inbox answer like INBOX-317 goes on without anyone acting.
+    - B: `lotar trust` lists them and prints `lotar trust --rerun-skipped` to run them. Nothing old runs by surprise (e.g. a skipped agent start days later), but someone has to run it, or the answer stays lost.
+    - Answer A or B.
+- date: 2026-11-19T18:51:59.847048+00:00
+  author: mallox
+  text: 'Answer: A (lotar trust reruns them right away, only those whose rule is unchanged since the skip; changed ones are listed, not run) (answered in INBOX-556)'
+- date: 2026-11-19T19:02:48.586885+00:00
+  author: claude
+  text: |-
+    Done as you chose (A): `lotar trust` now reruns the runs it skipped, if their rule is unchanged.
+
+    - A skipped rule `run` is saved in `~/.lotar.trust.yml` (`skipped_runs`), as it would have run then: command, ticket values, rule, time (`crates/lotar-core/src/config/trust.rs`)
+    - `lotar trust` runs them oldest first; a run whose rule's `run` changed is listed, not run. Both are listed in the output (`--format json`: `skipped_runs`) and commented on the ticket, then dropped, so nothing runs twice
+    - lotar's own merge reruns them too when it trusts merged rules again
+    - The skip comment now says `lotar trust` runs it later
+    - Test: `lotar_trust_runs_the_runs_it_skipped` in `crates/lotar-lib/tests/dev259_workspace_trust_test.rs`
+    - Docs: `docs/help/trust.md` (Skipped runs), `docs/help/automation.md`
+    - Runs skipped before this build (the QIS answers) weren't saved, so they can't rerun
+  report:
+    commits:
+    - hash: a787d4b41
+      what: skipped rule runs are kept and rerun by lotar trust
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2413 Rust, 1562 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    next: Merge agent lands a787d4b41 on main
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aef1e4fed-0915-4689-8ea0-46da7704e090
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc6d79c3-6848-4041-9d10-870ae11668d3
+description: |-
+  ## Found
+
+  - 2026-11-15 23:10 the owner answered INBOX-317 (QIS-95 "close"), INBOX-319 (QIS-20) and INBOX-320 (QIS-58). The standards rule 'Inbox: the owner's answer goes to the source' was skipped on each: standards' rules had changed since the last `lotar trust`. lotar left a comment on each inbox ticket and nothing else.
+  - standards was trusted again later, but the skipped runs never ran. The three answers sat for 3.5 days until the chief of staff noticed them (staff, 2026-11-18 midday run) and asked the owner whether to send them on. The inbox entries are still Todo.
+  - The same loss happened before in another way (STD-110: answers lost when the relay comment failed).
+
+  ## How to check
+
+  - `lotar --format json show INBOX-317` in ~/Development/standards: the owner's answer, then the 'skipped' automation comment, nothing after it.
+  - Reproduce: change a rule, let it skip a run, run `lotar trust`: nothing reruns or lists the skipped run.
+
+  ## Done when
+
+  - After `lotar trust`, the run commands it skipped while untrusted are not silently dropped: `lotar trust` lists them and either reruns them or offers a command that does (which one is the owner's call if it is not obvious; ask him on this ticket).
+  - A test: a skipped run is listed (or rerun) after trust.
+  - The three QIS answers above are not this ticket's job: the chief of staff has asked the owner about them.
+tags:
+- health
+custom_fields:
+  finding: comms:trust-skipped-runs
+history:
+- at: 2026-11-19T14:05:00.572363+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-19T14:05:02.146793+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-19T14:05:02.956699+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aef1e4fed-0915-4689-8ea0-46da7704e090
+- at: 2026-11-19T14:06:31.659632+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T14:06:43.224027+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-19T18:51:59.847048+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-19T18:52:00.504176+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-19T18:52:02.050549+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-19T18:52:02.948168+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc6d79c3-6848-4041-9d10-870ae11668d3
+- at: 2026-11-19T19:02:48.586885+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T19:03:09.223872+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,11 +1,11 @@
 title: agent.worktree.waiting_run from the home config is skipped in an untrusted repository
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T23:16:52.507333+00:00
-modified: 2026-11-18T23:44:01.343159+00:00
+modified: 2026-11-18T23:48:17.939661+00:00
 relationships:
   depends_on:
   - DEV-712
@@ -74,6 +74,29 @@ comments:
     - command: UI test suite
       result: not_run
       reason: no UI change
+- date: 2026-11-18T23:48:17.781870+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-715` is in `main`.
+
+    - Rebased `agent/DEV-715` onto `main` (`31f09d52c856`): `2164afdf6541`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `2164afdf6541`
+    - Amended the pending `.tasks` changes into the merged commit: `701cab6235b1`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 701cab623
+      what: DEV-715 agent.worktree.waiting_run from the home config is skipped in an untrusted repository
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae356ada3-5c1b-41fe-9622-12ac9d56068c
 description: |-
@@ -188,3 +211,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-18T23:48:17.781870+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-18T23:48:17.939661+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

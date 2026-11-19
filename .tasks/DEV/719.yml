@@ -1,0 +1,164 @@
+title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
+status: Merging
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-19T18:55:08.902987+00:00
+modified: 2026-11-19T19:06:34.668156+00:00
+relationships:
+  related:
+  - DEV-706
+  - DEV-530
+comments:
+- date: 2026-11-19T18:56:59.274374+00:00
+  author: claude
+  text: |-
+    `.tasks/DEV/automation.yml` is copied from `configs/lotar/automation.yml` again (STD-249: `relationships add --kind depends-on`).
+
+    - Took the standard whole; the lotar-only rule "Waiting: drop the workspace build output" stays at the end.
+    - The DEV-530 sentence inside the "Prerequisites done" comment was a repo edit in the middle of the standard; moved it to a note at the end, so the copy matches the source.
+    - `lotar config validate` passes. `repos.ts` still shows the drift here because it checks the main checkout; it should clear after the merge.
+  report:
+    commits:
+    - hash: 3743f45ca
+      what: .tasks/DEV/automation.yml copied from the standard again
+    checks:
+    - command: /opt/homebrew/bin/lotar config validate
+      result: passed
+    - command: repos.ts localtaskrepo/lotar
+      result: not_run
+      reason: it reads the main checkout and dates the copy by its commit; runs after the merge
+    next: Merge agent reruns node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar on main
+- date: 2026-11-19T18:57:41.091494+00:00
+  author: claude
+  text: |-
+    Review: passed
+
+    - Read `3743f45ca` (only `.tasks/DEV/automation.yml`, 11+/10−) against `~/Development/standards/configs/lotar/automation.yml`.
+    - `diff` of the copy and the source: the only difference is lotar's own rule "Waiting: drop the workspace build output" at the end, plus the moved DEV-530 note. That is what "Done when" asks.
+    - Changes in the middle match STD-249 (`af3edc2`, `--kind depends-on`); no other standard commit since the copy.
+    - DEV-530 sentence is kept as a note at the end, so no repo knowledge was lost.
+    - `lotar config validate` passes. `repos.ts` drift check not rerun: it reads the main checkout and clears after the merge.
+    - No tickets filed.
+- date: 2026-11-19T19:06:34.668156+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+     FAIL  tests/ui.keyboard-shortcuts.smoke.spec.ts > Keyboard shortcuts and command palette (DEV-158) > navigates, creates and finds tasks from the keyboard
+    AssertionError: expected '/boards' to be '/calendar' // Object.is equality
+
+    Expected: "/calendar"
+    Received: "/boards"
+
+     ❯ tests/ui.keyboard-shortcuts.smoke.spec.ts:53:71
+         51|                 await page.keyboard.press('g');
+         52|                 await page.keyboard.press('c');
+         53|                 await expect.poll(() => new URL(page.url()).pathname).…
+           |                                                                       ^
+         54|
+         55|                 // ? shows the reference; Esc closes it.
+     ❯ helpers/ui.ts:104:20
+     ❯ withBrowser helpers/ui.ts:84:20
+     ❯ tests/ui.keyboard-shortcuts.smoke.spec.ts:33:13
+
+    Caused by: Error: Matcher did not succeed in time.
+     ❯ tests/ui.keyboard-shortcuts.smoke.spec.ts:53:17
+     ❯ helpers/ui.ts:104:20
+     ❯ withBrowser helpers/ui.ts:84:20
+     ❯ tests/ui.keyboard-shortcuts.smoke.spec.ts:33:13
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+     Test Files  1 failed | 117 passed (118)
+          Tests  1 failed | 404 passed (405)
+       Start at  11:05:19
+       Duration  74.89s (tests 91%, import 8%, transform 1%, setup 1%)
+    ```.
+
+    - Rebase onto `main` changed nothing (`3743f45ca5a4`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc2c9ab3-bf32-497c-9a1f-484c04b185db
+description: |-
+  .tasks/DEV/automation.yml: configs/lotar/automation.yml changed since the copy (1 commits: git -C ~/Development/standards log -- configs/lotar/automation.yml)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `drift:.tasks/DEV/automation.yml`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[drift:.tasks/DEV/automation.yml]` while the problem is there.
+
+  ## Done when
+
+  The copy matches its source in ~/Development/standards/configs again (repo additions kept at its end) and the repo's checks pass.
+tags:
+- health
+- light
+custom_fields:
+  finding: drift:.tasks/DEV/automation.yml
+history:
+- at: 2026-11-19T18:55:43.630948+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-19T18:55:54.659622+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-19T18:55:55.781275+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abc2c9ab3-bf32-497c-9a1f-484c04b185db
+- at: 2026-11-19T18:56:59.274374+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T18:56:59.651401+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-706"]}'
+    new: '{"related":["DEV-706","DEV-530"]}'
+- at: 2026-11-19T18:57:03.862742+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-light'
+    new: '@review-light'
+- at: 2026-11-19T18:57:41.091494+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T18:57:44.266107+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-light'
+    new: '@merge'
+- at: 2026-11-19T19:06:34.668156+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,0 +1,22 @@
+title: 'Worktree install command out of sync: t3'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-19T18:53:27.978451+00:00
+description: |-
+  T3 runs "npm ci" on worktree create, repos.json says "npm ci": set "lotar agent worktree setup; npm ci" in the T3 project's scripts (the setup writes the lotar jobs' Claude settings)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `install:t3`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[install:t3]` while the problem is there.
+
+  ## Done when
+
+  The repo's T3 project runs the install command of repos.json on worktree create, after lotar agent worktree setup in a repo with lotar tickets, and a repo with a JS lockfile has an install in repos.json.
+tags:
+- owner
+custom_fields:
+  finding: install:t3

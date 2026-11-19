@@ -1,11 +1,10 @@
 title: 'Commits only on this Mac: branches'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
 created: 2026-11-17T18:08:11.962632+00:00
-modified: 2026-11-18T22:54:33.627844+00:00
+modified: 2026-11-19T18:55:06.967805+00:00
 relationships:
   depends_on:
   - DEV-530
@@ -194,12 +193,53 @@ comments:
     - key: keep
       label: Keep them and push them to origin
     recommended: delete
+- date: 2026-11-19T18:52:37.349776+00:00
+  author: mallox
+  text: |-
+    Answer: delete (Delete the 7 DEV-530 branches)
+
+    (answered in INBOX-555)
+  answer:
+    to: 2026-11-18T22:54:26.202604+00:00
+    choice:
+    - delete
+    note: (answered in INBOX-555)
+- date: 2026-11-19T18:53:32.353943+00:00
+  author: claude
+  text: |-
+    Deleted the 7 DEV-530 draft branches as you answered in INBOX-555; the check is clean.
+
+    - `git branch -D` on `t3/dev-530-review-held-job-resume` (`f5a440856`), `t3/resume-held-job-after-prerequisites` (`6564ad129`), `t3/resume-held-jobs-after-prerequisites` (`b76f5dda3`), `t3/resume-held-jobs-when-unblocked` (`4e2f775ad`), `t3/review-dev-530-held-job-resume` (`7c998bc75`), `t3/review-dev-530-held-job-resume-1` (`fb7de8791`), `t3/review-dev-530-held-job-resume-2` (`c5fd40f2b`)
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[unpushed:branches]`
+    - No files changed, no commit
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no [unpushed:branches]
+- date: 2026-11-19T18:53:39.436793+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-19.
+
+    8 commits on no remote, only on this Mac: t3/dev-530-review-held-job-resume 1, t3/resume-held-job-after-prerequisites 1, t3/resume-held-jobs-after-prerequisites 1, t3/resume-held-jobs-when-unblocked 1, t3/review-dev-530-held-job-resume 2, t3/review-dev-530-held-job-resume-1 1, t3/review-dev-530-held-job-resume-2 1 (git log <branch> --not --remotes)
+
+    Filed by the daily repo-health run (`repos.ts --report`, finding `unpushed:branches`).
+
+    ## Check
+
+    `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+    ## Done when
+
+    git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A24c7a417-96aa-4455-9816-fdc146b16874
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04e1abd9-b055-4f46-a224-25e431b9804a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A947f85ae-287b-4f05-a37c-5169f75e92ce
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab20a1a2b-4a46-4d17-972e-679a85c035e9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad68a754a-1ba9-49be-a2b8-9a7cb7731736
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A576dceb1-ce8c-44ef-9161-cdfb86917af0
 description: |-
   11 commits on no remote, only on this Mac: agent/DEV-516 1, agent/DEV-528 1, agent/DEV-585 1, agent/DEV-628 1, backup/DEV-466-896309c0 3, backup/DEV-585-d6dbec07 1, t3/b9902be4 1, t3/review-held-job-resume 2 (git log <branch> --not --remotes)
 
@@ -215,7 +255,6 @@ description: |-
 tags:
 - health
 - light
-- fix-retried
 custom_fields:
   finding: unpushed:branches
 history:
@@ -492,3 +531,46 @@ history:
   - field: assignee
     old: '@fix-fable'
     new: mallox
+- at: 2026-11-19T18:52:37.349776+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-19T18:52:38.106388+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-19T18:52:41.183261+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-19T18:52:42.303868+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A576dceb1-ce8c-44ef-9161-cdfb86917af0
+- at: 2026-11-19T18:53:32.353943+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T18:53:39.436793+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-19T18:54:33.397093+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-19T18:55:06.967805+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, light, fix-retried
+    new: health, light
