@@ -219,7 +219,9 @@ LoTaR: write `<repo>:<ID>`, where `<repo>` is a name in the global
 [`repos`](./config-reference.md) setting (`repos: { lotar: ~/Development/lotar }`).
 Only `depends_on` and `related` hold such references, and only the focused
 task changes: the other repo is never written and does not know the dependent.
-Adding one checks that the task exists there. `task relationships`, `show`
+Adding one checks that the task exists there. A plain ID such as `DEV-374`
+works too when its project is in no tasks folder of this repo but in exactly
+one registered repo: it is stored as `lotar:DEV-374`. `task relationships`, `show`
 and `task relationships --format json` (as `cross_repo`) show its status,
 title and link (the other repo's `server.public_url`).
 

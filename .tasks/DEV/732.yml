@@ -1,0 +1,420 @@
+title: A queue worker started from a job's worktree keeps that folder as its cwd; after the worktree is removed every job it starts fails with ENOENT process.cwd
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: triage
+assignee: '@fix'
+created: 2026-11-20T13:45:47.182735+00:00
+modified: 2026-11-20T17:55:28.194764+00:00
+relationships:
+  blocks:
+  - DEV-730
+  - DEV-731
+  related:
+  - DEV-728
+  - DEV-730
+  - DEV-731
+  - DEV-361
+  - DEV-729
+  - DEV-733
+  - DEV-378
+comments:
+- date: 2026-11-20T14:22:54.037142+00:00
+  author: automation
+  text: The fix agent's job job-20261120T134548.567Z-11 failed (lotar agent logs job-20261120T134548.567Z-11); @fix-retry retries it on branch agent/DEV-732.
+- date: 2026-11-20T14:40:58.616748+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261120T142256.382Z-15 failed again or on a rate limit (lotar agent logs job-20261120T142256.382Z-15). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T14:56:48.036458+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): both jobs ended with 'The t3 runner exited with code 1' after the T3 run went 'waiting' on a background build; no rate limit, and the earlier session left a fix and a test.
+  answer:
+    to: 2026-11-20T14:40:58.616748+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): both jobs ended with ''The t3 runner exited with code 1'' after the T3 run went ''waiting'' on a background build; no rate limit, and the earlier session left a fix and a test.'
+- date: 2026-11-20T14:57:05.008271+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab70b2201dc506b65659fbeb8a6803e7af1e9887feb27c22e58ab7f6cda773f6b of the job job-20261120T134548.567Z-11 again, beside the running job job-20261120T145650.279Z-30. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-20T15:20:39.296040+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab70b2201dc506b65659fbeb8a6803e7af1e9887feb27c22e58ab7f6cda773f6b of the job job-20261120T134548.567Z-11 again, beside the running job job-20261120T145650.279Z-30. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-20T15:26:38.093832+00:00
+  author: claude
+  text: |-
+    The resumed T3 thread of job `job-20261120T134548.567Z-11` stops here; job `job-20261120T145650.279Z-30` owns the worktree.
+
+    - Two Claude sessions were editing `agent/DEV-732` at the same time. This one leaves the files as they are and makes no commit.
+    - Root cause: lotar runs harnessmux in the worker's own process, so the Claude adapter (Node) inherits the worker's cwd. The fix belongs in `spawn_worker` (`current_dir`), as the current diff in `crates/lotar-agent/src/services/agent_queue_service.rs` does.
+    - Test `crates/lotar-lib/tests/dev732_worker_leaves_its_launchers_folder_test.rs`: tests run the job under `lotar-agent-wrapper`, so the job's grandparent (`ps -o ppid= -p $PPID`), not `$PPID`, is the worker. The test now reads the grandparent and passes with the current diff. It has not been run against unfixed code since that change.
+    - `target/debug/lotar` disappeared once mid-run (another session's build or clean). Rebuild with `cargo build` before the integration tests.
+    - Worker `8934` (cwd `.DEV-728.lotar-removed`) is still running. Once the fixed build is installed it exits after its jobs end (DEV-361), and the next worker starts from the repo root.
+- date: 2026-11-20T15:35:11.250959+00:00
+  author: claude
+  text: |-
+    Fixed: a new queue worker starts in the tasks folder's parent, so removing the worktree it was started from no longer breaks it.
+
+    - `spawn_worker` in `crates/lotar-agent/src/services/agent_queue_service.rs` makes the tasks dir absolute and sets `current_dir` to its parent
+    - Test `crates/lotar-lib/tests/dev732_worker_leaves_its_launchers_folder_test.rs` walks up from the job to the `agent worker` process and checks its cwd. Earlier probes read the runner wrapper's cwd (`.tasks`) or matched the probe's own command line
+    - Worker 8934 still runs in `.DEV-728.lotar-removed`, but I left it running: it holds two running T3 jobs, DEV-733's and this one. The fixed build replaces it once installed
+    - Three threads (b70b, f878, 3ff69d) worked in this worktree at once; the first two stopped on request (see DEV-729)
+  report:
+    commits:
+    - hash: eba6d1334
+      what: the queue worker starts in the tasks folder's parent, not the launching command's folder
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev732
+      result: passed
+      reason: fails on unfixed code (worker cwd = launcher folder)
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: 'After merge and install: worker 8934 (cwd .DEV-728.lotar-removed) exits on the binary change and its successor starts in the repo root; if it is still there, kill it once no job runs and run lotar agent queue resume'
+- date: 2026-11-20T15:35:41.872502+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-732 is assigned to @review now.'
+- date: 2026-11-20T15:35:44.174352+00:00
+  author: automation
+  text: |-
+    The review job job-20261120T153542.613Z-32 failed (lotar agent logs job-20261120T153542.613Z-32), so the work on branch agent/DEV-732 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T17:49:31.882356+00:00
+  author: mallox
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    (answered in INBOX-592)
+  answer:
+    to: 2026-11-20T15:35:44.174352+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-592)
+- date: 2026-11-20T17:51:10.834190+00:00
+  author: claude
+  text: |-
+    Branch checked, and the stuck worker 8934 is replaced, so the review can start this time.
+
+    - The failed review `job-20261120T153542.613Z-32` was this bug itself: worker 8934 (cwd `.DEV-728.lotar-removed`) couldn't start its Claude session (`ENOENT: process.cwd failed`). The fix on the branch wasn't at fault
+    - Branch unchanged: `eba6d1334` on top of main `2a67f1f82`; its test `dev732_worker_leaves_its_launchers_folder_test` passes
+    - Killed 8934 and started a detached worker (pid 32048, installed 0.15.5) from the main checkout, so its cwd is `/Users/mallox/Development/@localtaskrepo/lotar`, which nothing removes
+    - The new worker adopted both T3 jobs (DEV-378): this one resumed, DEV-733's had ended and was settled; DEV-733's review session then started without ENOENT
+    - Until the fixed build is installed, a worker started from a worktree can still get stuck; the merge plus install ends that
+  report:
+    commits:
+    - hash: eba6d1334
+      what: a new queue worker starts in the tasks folder's parent, not its launcher's folder
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev732
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: branch unchanged since eba6d1334, whose run passed lint:agent, npm test and npm run smoke; main has not moved past its base 2a67f1f82
+    next: Review the branch again; it can start now that the stuck worker is replaced
+- date: 2026-11-20T17:55:06.636928+00:00
+  author: automation
+  text: |-
+    The review job job-20261120T175119.822Z-2 failed (lotar agent logs job-20261120T175119.822Z-2), so the work on branch agent/DEV-732 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T17:55:28.194494+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job-20261120T175119.822Z-2 died because its worker (pid 32048) exited and the session could not be resumed; a new error, not the branch, and the same answer as his in INBOX-592.
+  answer:
+    to: 2026-11-20T17:55:06.636928+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job-20261120T175119.822Z-2 died because its worker (pid 32048) exited and the session could not be resumed; a new error, not the branch, and the same answer as his in INBOX-592.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab70b2201dc506b65659fbeb8a6803e7af1e9887feb27c22e58ab7f6cda773f6b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af878a77dc15131b8a4180f28618a4f7811675498b6c54b3d86cdf37f38f030a7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ff69d9e823c46361b80290297bde0df697d2f7a803af205ebbb9349999d9d1b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa6772f5477ebf7a14f906da60043bb22b03245cc02c61d3910f4c6f89ab6d890
+description: 'Found (DEV-730, 2026-11-20): review jobs job-20261120T134401.077Z-8 and job-20261120T134519.998Z-10 failed with ''ENOENT: process.cwd failed ... current working directory was likely removed''. Live worker pid 8934 (started 05:23) has cwd .../.lotar-worktrees/lotar/.DEV-728.lotar-removed, so Claude sessions it starts can''t start. Same family as DEV-731 (worker inherits the queuing agent''s environment). Check: a worker started from a folder that is then removed still starts jobs (worker sets its cwd to the repo root or home). Done: a removed cwd doesn''t fail later jobs; the stuck worker 8934 is restarted.'
+tags:
+- health
+- fix-retried
+- retry-fix
+custom_fields:
+  finding: infra:worker:removed-cwd
+history:
+- at: 2026-11-20T13:45:47.486711+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-728","DEV-730","DEV-731"]}'
+- at: 2026-11-20T13:45:47.801068+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T13:45:49.541278+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T13:45:49.956793+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab70b2201dc506b65659fbeb8a6803e7af1e9887feb27c22e58ab7f6cda773f6b
+- at: 2026-11-20T13:45:53.802575+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-730","DEV-731"]}'
+    new: '{"blocks":["DEV-730"],"related":["DEV-728","DEV-730","DEV-731"]}'
+- at: 2026-11-20T14:22:53.604339+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-20T14:22:54.037142+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T14:22:58.295682+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af878a77dc15131b8a4180f28618a4f7811675498b6c54b3d86cdf37f38f030a7
+- at: 2026-11-20T14:40:58.164568+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-20T14:40:58.616748+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T14:56:48.036458+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T14:56:48.036499+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T14:56:50.907328+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fix
+- at: 2026-11-20T14:56:51.219513+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T14:56:52.851200+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ff69d9e823c46361b80290297bde0df697d2f7a803af205ebbb9349999d9d1b
+- at: 2026-11-20T14:57:05.008271+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:20:39.296040+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:26:38.093832+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:26:38.384143+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730"],"related":["DEV-728","DEV-730","DEV-731"]}'
+    new: '{"blocks":["DEV-730"],"related":["DEV-728","DEV-730","DEV-731","DEV-361"]}'
+- at: 2026-11-20T15:35:11.250959+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:35:11.564801+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730"],"related":["DEV-728","DEV-730","DEV-731","DEV-361"]}'
+    new: '{"blocks":["DEV-730"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733"]}'
+- at: 2026-11-20T15:35:20.477700+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T15:35:41.872502+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:35:44.082274+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-20T15:35:44.174352+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:34.841405+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733"]}'
+    new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733"]}'
+- at: 2026-11-20T17:49:31.882356+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-20T17:49:31.882390+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T17:49:33.927102+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T17:49:34.738744+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa6772f5477ebf7a14f906da60043bb22b03245cc02c61d3910f4c6f89ab6d890
+- at: 2026-11-20T17:51:10.834190+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T17:51:11.007026+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733"]}'
+    new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378"]}'
+- at: 2026-11-20T17:51:19.345827+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T17:55:06.535796+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-20T17:55:06.636928+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T17:55:28.194494+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T17:55:28.194764+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

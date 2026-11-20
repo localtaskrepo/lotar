@@ -1,0 +1,364 @@
+title: A queue worker started by an agent's lotar call keeps that agent's PATH for every later job
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-20T13:33:39.558052+00:00
+modified: 2026-11-20T15:43:51.608774+00:00
+relationships:
+  depends_on:
+  - DEV-732
+  related:
+  - DEV-726
+  - DEV-727
+  - DEV-728
+  - DEV-730
+  - DEV-732
+  - DEV-733
+comments:
+- date: 2026-11-20T14:04:20.131144+00:00
+  author: automation
+  text: The fix agent's job job-20261120T133341.014Z-6 failed (lotar agent logs job-20261120T133341.014Z-6); @fix-retry retries it on branch agent/DEV-731.
+- date: 2026-11-20T14:22:54.404519+00:00
+  author: automation
+  text: 'The queued @fix-retry job waits: T3 Code still runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e977638d68bc4e75f621fc5b0a47d7965c6212a6131ff3c2250534b2d0d6494 of the job job-20261120T133341.014Z-6. The job starts once the thread ends.'
+- date: 2026-11-20T14:57:20.153604+00:00
+  author: claude
+  text: |-
+    The queue worker now adds the login shell's PATH, and the short PATH came from launchd plists.
+
+    - Source: `~/Development/local/scripts/mac/net.pyxzl.repo-health.plist` (and `live-checks`) set `PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`. lotar puts its own dir in front, which gives the doubled `/opt/homebrew/bin` seen in pid 94972. Filed as LOCA-557
+    - Fix: `complete_path_from_login_shell` in `crates/lotar-agent/src/services/agent_queue_service.rs` runs `$SHELL -l -c` once when the worker starts (5 s timeout, a marker skips anything the profile prints). It appends the entries the worker's PATH lacks. If that fails, it says so on stderr and keeps the PATH it got
+    - Test: `worker_started_with_short_path_runs_jobs_with_login_path` starts the worker with `PATH=/usr/bin:/bin` and a fake login shell. The job finds a program on the login PATH
+    - Docs: `docs/help/agent.md` (queue worker)
+    - Also found: the worker keeps the queuing agent's `CLAUDE_CODE_SESSION_ID`/`T3CODE_THREAD_ID` (pid 8934), filed as DEV-733
+  report:
+    commits:
+    - hash: ed15359af
+      what: worker completes its PATH from the login shell
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration worker_started_with_short_path
+      result: passed
+      reason: failed before the fix
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 9 UI tests timed out at load 97; their 5 files passed on rerun
+    next: Review, then merge; LOCA-557 fixes the launch agents' PATH
+- date: 2026-11-20T15:35:40.569580+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261120T153520.911Z-31 failed again or on a rate limit (lotar agent logs job-20261120T153520.911Z-31). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T15:36:09.517666+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): both jobs ended with 't3 runner exited with code 1' while the agent's thread was 'waiting' on background tests. Commit ed15359af is on agent/DEV-731 with the hand-off report; the retry only needs to confirm the checks and hand off.
+  answer:
+    to: 2026-11-20T15:35:40.569580+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): both jobs ended with ''t3 runner exited with code 1'' while the agent''s thread was ''waiting'' on background tests. Commit ed15359af is on agent/DEV-731 with the hand-off report; the retry only needs to confirm the checks and hand off.'
+- date: 2026-11-20T15:41:25.453001+00:00
+  author: claude
+  text: |-
+    Fix ready for review: lint, tests and smoke pass on `ed15359af`.
+
+    - Commit `ed15359af`: `complete_path_from_login_shell` in `crates/lotar-agent/src/services/agent_queue_service.rs` adds the login shell's PATH entries the worker lacks, before it runs any job
+    - Check: `worker_started_with_short_path_runs_jobs_with_login_path` starts the worker with `PATH=/usr/bin:/bin`, and its job finds a program on the login PATH
+    - Where the short PATH came from: the launchd plists in `~/Development/local/scripts/mac` (LOCA-557)
+    - `CLAUDE_CODE_SESSION_ID` and `T3CODE_THREAD_ID` still leak from the queuing agent: DEV-733
+  report:
+    commits:
+    - hash: ed15359af
+      what: worker adds the login shell's PATH entries it lacks
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2419 Rust tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 406 tests
+    - command: cargo nextest run -E 'test(worker_started_with_short_path_runs_jobs_with_login_path)'
+      result: passed
+      reason: worker started with PATH=/usr/bin:/bin finds a program on the login PATH
+    next: Review on another model, then merge
+- date: 2026-11-20T15:43:08.635072+00:00
+  author: claude
+  text: |-
+    Retry: checks on `ed15359af` all pass again; no code change.
+
+    - Earlier jobs died waiting on background test runs; this run ran them in the foreground
+    - Fix and PATH source (launchd plists, LOCA-557) as in the 14:57 comment
+  report:
+    commits:
+    - hash: ed15359af
+      what: worker completes its PATH from the login shell
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration worker_started_with_short_path
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2419 Rust, 1563 UI, 7 node tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 406 tests
+    next: Review, then merge; LOCA-557 fixes the launch agents' PATH
+- date: 2026-11-20T15:43:15.450376+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-731 is assigned to @review now.'
+- date: 2026-11-20T15:43:17.669956+00:00
+  author: automation
+  text: |-
+    The review job job-20261120T154316.160Z-34 failed (lotar agent logs job-20261120T154316.160Z-34), so the work on branch agent/DEV-731 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T15:43:43.679157+00:00
+  author: triage
+  text: |-
+    Review job failed on infrastructure, not the work; DEV-731 waits for DEV-732.
+
+    - `job-20261120T154316.160Z-34` ended with `ENOENT: process.cwd failed` starting the review session: the queue worker's cwd is a removed worktree (DEV-732)
+    - Fix is ready on branch `agent/DEV-731` (`ed15359af`, checks passed); only review and merge are left
+    - Continues when DEV-732 is done ("Prerequisites done")
+- date: 2026-11-20T15:43:44.335202+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-732. It starts once they are done.'
+- date: 2026-11-20T15:43:45.339343+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-731 yet. DEV-731 waits for DEV-732.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e977638d68bc4e75f621fc5b0a47d7965c6212a6131ff3c2250534b2d0d6494
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa61a280256663cea82ad0e51ba83aae65afc2109e04181dc12cdc9dbf9f6b454
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8c749d7c445638d4e4d44b88a912146f0c96bd8688109c6afbb8888b90f26b51
+description: |-
+  Found (DEV-730, 2026-11-20): `lotar agent worker` is spawned by whichever lotar process queues a job and inherits its environment. Workers started by the triage agent's `lotar assignee` ran without `~/.cargo/bin` on PATH (live harnessmux worker pid 94972, started 12:51 UTC: `PATH=/opt/homebrew/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`), and one such worker ran DEV jobs -1..-27 from 05:22 to 13:06 UTC, so every `agent.worktree.waiting_run` (`cargo clean --workspace`) in that time failed (DEV-726, DEV-727, DEV-728). The jobs' agents got the same short PATH. Where Claude Code's headless shell gets that PATH is not known yet; the standards service's own PATH is complete.
+  Check: start the worker from a process with PATH=/usr/bin:/bin; a job's command runner and waiting_run still find a program in the service's PATH (or the job log says the PATH is short).
+  Done: a worker's jobs don't depend on which agent shell happened to queue first, and the short PATH's source is known.
+tags:
+- health
+- fix-retried
+- retry-fix
+custom_fields:
+  finding: worker:inherited-path
+history:
+- at: 2026-11-20T13:33:39.969851+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-726","DEV-727","DEV-728","DEV-730"]}'
+- at: 2026-11-20T13:33:40.336664+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T13:33:42.420190+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T13:33:42.873706+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e977638d68bc4e75f621fc5b0a47d7965c6212a6131ff3c2250534b2d0d6494
+- at: 2026-11-20T13:45:47.486403+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-727","DEV-728","DEV-730"]}'
+    new: '{"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732"]}'
+- at: 2026-11-20T14:04:06.147206+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732"]}'
+    new: '{"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733"]}'
+- at: 2026-11-20T14:04:19.885731+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-20T14:04:20.131144+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T14:22:54.404519+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T14:57:20.153604+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:35:22.189060+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa61a280256663cea82ad0e51ba83aae65afc2109e04181dc12cdc9dbf9f6b454
+- at: 2026-11-20T15:35:40.480652+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-20T15:35:40.569580+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:36:09.517666+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:36:09.517689+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T15:36:10.477548+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T15:36:10.559594+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fix
+- at: 2026-11-20T15:36:10.917345+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8c749d7c445638d4e4d44b88a912146f0c96bd8688109c6afbb8888b90f26b51
+- at: 2026-11-20T15:41:25.453001+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:08.635072+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:15.203063+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T15:43:15.450376+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:17.593068+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-20T15:43:17.669956+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:34.840778+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733"]}'
+    new: '{"depends_on":["DEV-732"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733"]}'
+- at: 2026-11-20T15:43:41.933132+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-20T15:43:43.679157+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:44.120996+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T15:43:44.335202+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:45.339343+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:43:51.608774+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'

@@ -1,17 +1,19 @@
 title: relationships add --kind depends-on can't name a ticket in another repo, so a ticket can't wait for one there
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-20T05:28:46.710582+00:00
-modified: 2026-11-20T13:01:46.429560+00:00
+modified: 2026-11-20T17:55:10.345864+00:00
 relationships:
   related:
   - DEV-386
   - DEV-1
   - DEV-728
   - DEV-661
+  - DEV-731
+  - DEV-730
 comments:
 - date: 2026-11-20T06:15:21.972832+00:00
   author: automation
@@ -229,6 +231,9 @@ comments:
       result: not_run
       reason: test:agent failed first
     next: 'Answer: land c90f187fe despite the DEV-728 flake, or wait for DEV-728'
+- date: 2026-11-20T17:55:04.752353+00:00
+  author: claude
+  text: 'Owner 2026-11-20 (picker, via the chief of staff): "Merge now (Recommended)". DEV-728, the flaky test that failed the merge check, is Done.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A64620dc6e0d4603e9f949b19e2e62ee3739b716525cefdb69bee8941c9afc17f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5e7fbe4d2514fd22e33ef7146522fa10f350d9c35d94d980ccf471a7f54e81e
@@ -437,3 +442,31 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-20T13:33:39.967572+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661"]}'
+    new: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661","DEV-731"]}'
+- at: 2026-11-20T13:33:49.176368+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661","DEV-731"]}'
+    new: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661","DEV-731","DEV-730"]}'
+- at: 2026-11-20T17:55:04.752353+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T17:55:05.155857+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@merge'
+- at: 2026-11-20T17:55:10.345864+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Merging

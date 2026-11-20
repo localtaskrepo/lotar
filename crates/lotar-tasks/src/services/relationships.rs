@@ -375,6 +375,11 @@ impl Inventory {
         let state = self.state(&id);
         let record = match self.unique(&id) {
             Some(record) if state == "active" => record,
+            _ if state == "missing" => {
+                return Err(invalid(format!(
+                    "Relationship task '{raw}' is missing; name a ticket in another repo as <repo>:<ID>, with <repo> from the repos setting"
+                )));
+            }
             _ => {
                 return Err(invalid(format!("Relationship task '{raw}' is {state}")));
             }
@@ -1448,7 +1453,9 @@ pub(crate) fn emit_counterparts(storage: &Storage, ids: &[String]) {
 }
 
 pub fn mutate(storage: &Storage, request: &RelationshipMutationRequest) -> LoTaRResult<RelationshipMutationResponse> {
-    if let Some(reference) = crate::services::external_tasks::canonical(&request.target) {
+    let cross_repo =
+        crate::services::external_tasks::canonical(&request.target).or_else(|| crate::services::external_tasks::qualify(&storage.root_path, &request.target));
+    if let Some(reference) = cross_repo {
         return mutate_cross_repo(storage, request, &reference);
     }
     let external = external_locks(storage)?;

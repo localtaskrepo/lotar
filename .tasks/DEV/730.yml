@@ -1,23 +1,197 @@
 title: 'agent.worktree.waiting_run reports ''could not start in <worktree>: No such file or directory'' for a worktree that exists'
-status: InProgress
+status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-20T13:25:13.774179+00:00
-modified: 2026-11-20T13:26:00.833800+00:00
+modified: 2026-11-20T13:46:00.671365+00:00
 relationships:
+  depends_on:
+  - DEV-732
   related:
   - DEV-728
   - DEV-729
+  - DEV-731
+  - DEV-726
+  - DEV-727
+  - DEV-732
+comments:
+- date: 2026-11-20T13:33:48.900923+00:00
+  author: claude
+  text: |-
+    Cause found: `cargo` wasn't on the PATH of the worker that ran the job; the worktree was there.
+
+    - `DEV-728` folder: born 13:01:12 UTC, unchanged since (`stat` birth/ctime), so it never went away. Same for DEV-726 and DEV-727, which failed the same way.
+    - Jobs `-1`..`-27` (05:22–13:06 UTC) ran in one `lotar agent worker`, started by the triage agent's `lotar assignee`. The job at 13:07 ran in another worker triage started.
+    - A worker triage started at 12:51 (harnessmux, still running) has `PATH=/opt/homebrew/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`: no `~/.cargo/bin`. The worker started 13:23 has it, and its run for DEV-729 worked.
+    - Filed the root cause as [DEV-731](https://lotar.pyxzl.net/task/DEV-731).
+    - Fix here: the log line now says "the folder is gone" or "`cargo` is not on this lotar's PATH (<PATH>)".
+- date: 2026-11-20T13:34:09.676489+00:00
+  author: automation
+  text: The fix agent's job job-20261120T132538.856Z-5 failed (lotar agent logs job-20261120T132538.856Z-5); @fix-retry retries it on branch agent/DEV-730.
+- date: 2026-11-20T13:39:33.578299+00:00
+  author: claude
+  text: |-
+    Fixed: a waiting_run that can't start now says which thing is missing.
+
+    - `start_failure` in `crates/lotar-agent/src/services/agent_job_service.rs`: "the folder is gone", "`cargo` is not on this lotar's PATH (<PATH>)", or "`<path>` doesn't exist" for a program given as a path; other errors as before.
+    - Test `waiting_run_start_failure_names_the_missing_program_or_folder` spawns each case for real.
+    - `docs/help/agent.md` describes the new log text.
+    - DEV-728 cause: `cargo` missing from the PATH of a worker the triage agent started (see the comment above); the fix for that is [DEV-731](https://lotar.pyxzl.net/task/DEV-731).
+  report:
+    commits:
+    - hash: 14b6f9177
+      what: waiting_run start failures name the missing folder or the program and PATH
+    checks:
+    - command: cargo nextest run -p lotar-agent waiting_run_start_failure
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2418 Rust + node tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Review, then merge; DEV-731 fixes the worker's inherited PATH
+- date: 2026-11-20T13:43:52.470686+00:00
+  author: claude
+  text: |-
+    Fixed: a waiting_run that can't start now says if the worktree is gone or the program isn't on PATH.
+
+    - Cause of the DEV-728 line: `cargo` missing from that worker's PATH; the worktree existed (root cause filed as DEV-731).
+    - `start_failure` in `crates/lotar-agent/src/services/agent_job_service.rs`: "the folder is gone", "`<program>` doesn't exist" (path given), or "`<program>` is not on this lotar's PATH (<PATH>)".
+    - Test `waiting_run_start_failure_names_the_missing_program_or_folder` covers all three; `docs/help/agent.md` says so.
+    - Commit `14b6f9177`.
+  report:
+    commits:
+    - hash: 14b6f9177
+      what: waiting_run start failure names the gone folder or the program missing from PATH, with test and help
+    checks:
+    - command: cargo nextest run -p lotar-agent waiting_run
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 406 tests
+    next: Review, then merge
+- date: 2026-11-20T13:44:03.945454+00:00
+  author: automation
+  text: |-
+    The review job job-20261120T134401.077Z-8 failed (lotar agent logs job-20261120T134401.077Z-8), so the work on branch agent/DEV-730 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T13:44:32.514816+00:00
+  author: triage
+  text: |-
+    Answer: fix (An agent checks the branch and sends it to review again)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): review job job-20261120T134401.077Z-8 failed to start, 'ENOENT: process.cwd failed ... current working directory was likely removed' (no work failure).
+  answer:
+    to: 2026-11-20T13:44:03.945454+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): review job job-20261120T134401.077Z-8 failed to start, ''ENOENT: process.cwd failed ... current working directory was likely removed'' (no work failure).'
+- date: 2026-11-20T13:45:10.856862+00:00
+  author: claude
+  text: |-
+    Branch checked again, unchanged: ready for review.
+
+    - The last review job didn't start (its working folder was gone), not a problem with the work.
+    - `git diff main...HEAD`: only `crates/lotar-agent/src/services/agent_job_service.rs` and `docs/help/agent.md`, commit `14b6f9177`, no uncommitted changes.
+    - The targeted test `waiting_run_start_failure_names_the_missing_program_or_folder` passes again.
+  report:
+    commits:
+    - hash: 14b6f9177
+      what: waiting_run start failure names the missing folder or program
+    checks:
+    - command: cargo nextest run -p lotar-agent waiting_run_start_failure
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+      reason: earlier run on the same commit, no change since
+    - command: npm run test:agent
+      result: passed
+      reason: earlier run on the same commit
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: earlier run on the same commit
+    next: Review on another model, then merge
+- date: 2026-11-20T13:45:19.198255+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-730 is assigned to @review now.'
+- date: 2026-11-20T13:45:22.100307+00:00
+  author: automation
+  text: |-
+    The review job job-20261120T134519.998Z-10 failed (lotar agent logs job-20261120T134519.998Z-10), so the work on branch agent/DEV-730 isn't merged without a review. Review again, merge it yourself, or WontDo?
+
+    Options:
+    - fix: An agent checks the branch and sends it to review again
+    - self: I merge it myself
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent checks the branch and sends it to review again
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T13:45:56.139933+00:00
+  author: triage
+  text: |-
+    Waits for DEV-732: the review can't start until the worker's removed working folder is fixed.
+
+    - Last review jobs `job-20261120T134401.077Z-8` and `job-20261120T134519.998Z-10` both failed with `ENOENT: process.cwd failed`.
+    - Worker pid 8934 has cwd `.lotar-worktrees/lotar/.DEV-728.lotar-removed` (found with `lsof -a -p 8934 -d cwd`), so every Claude session it starts fails. The work itself is untouched (`14b6f9177`).
+    - Retry rule used once (fix) and the same error came back; a third retry would fail the same way.
+    - Continues when DEV-732 is done.
+- date: 2026-11-20T13:45:56.815565+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-732. It starts once they are done.'
+- date: 2026-11-20T13:45:57.851466+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-730 yet. DEV-730 waits for DEV-732.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae91c8bcb6c87393265f36bb06f2ad25ad8708f7b454d932fe86fc871d783b959
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c9ee95b11482e04538814920039b5a4ee670172959192857a1c0ac8a2c917ef
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A29cd25318129945bdcdb838aebbbe9efa36ec5e84df2adbdfd848517aaa3b861
 description: |-
   Found (DEV-729, 2026-11-20): `lotar agent logs job-20261120T130633.048Z-1` at 13:07:12 logged "agent.worktree.waiting_run (`cargo clean --workspace`) could not start in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-728: No such file or directory (os error 2)". The folder exists now, and the lotar service's PATH (launchd plist) has ~/.cargo/bin, so either the worktree was briefly gone (another job's cleanup while retries ran) or the spawn failed for another reason; the message doesn't say which (program or folder).
   Check: a waiting_run whose program or folder is missing names which one in the log; a test covers both.
   Done: the log line tells the program-not-found case from the missing-worktree case, and the DEV-728 cause is known.
 tags:
 - health
+- fix-retried
+- retry-fix
 custom_fields:
   finding: waiting_run:spawn-enoent
 history:
@@ -43,3 +217,165 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae91c8bcb6c87393265f36bb06f2ad25ad8708f7b454d932fe86fc871d783b959
+- at: 2026-11-20T13:33:39.969564+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-729"]}'
+    new: '{"related":["DEV-728","DEV-729","DEV-731"]}'
+- at: 2026-11-20T13:33:48.900923+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:33:49.177447+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-729","DEV-731"]}'
+    new: '{"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727"]}'
+- at: 2026-11-20T13:34:09.290485+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-20T13:34:09.676489+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:34:11.539791+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c9ee95b11482e04538814920039b5a4ee670172959192857a1c0ac8a2c917ef
+- at: 2026-11-20T13:39:33.578299+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:43:52.470686+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:44:00.242516+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-20T13:44:03.808110+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review-claude'
+    new: mallox
+- at: 2026-11-20T13:44:03.945454+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:44:32.514816+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:44:32.514932+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T13:44:39.125236+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fix
+- at: 2026-11-20T13:44:40.496917+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T13:44:42.601866+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A29cd25318129945bdcdb838aebbbe9efa36ec5e84df2adbdfd848517aaa3b861
+- at: 2026-11-20T13:45:10.856862+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:45:18.912146+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T13:45:19.198255+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:45:21.986914+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-20T13:45:22.100307+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:45:47.485752+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727"]}'
+    new: '{"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732"]}'
+- at: 2026-11-20T13:45:53.801791+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732"]}'
+    new: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732"]}'
+- at: 2026-11-20T13:45:54.254720+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-20T13:45:56.139933+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:45:56.594352+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T13:45:56.815565+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:45:57.851466+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:46:00.671365+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'

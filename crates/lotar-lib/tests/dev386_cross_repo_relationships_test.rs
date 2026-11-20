@@ -76,6 +76,28 @@ fn a_ticket_depends_on_a_ticket_in_another_repo_and_is_unblocked_when_it_closes(
     assert!(!std::fs::read_to_string(standards.join("STD/1.yml")).unwrap().contains("- lotar:DEV-1"));
 }
 
+/// DEV-727: a bare ID whose project is in no local tasks folder but in one
+/// registered repo names the ticket there, as `repo:ID` would.
+#[test]
+fn a_bare_id_of_a_project_in_one_registered_repo_names_the_ticket_there() {
+    let sandbox = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
+    let (lotar, standards) = repos(sandbox.path());
+
+    ok(run(&standards, &["task", "relationships", "add", "--kind", "depends-on", "STD-1", "DEV-1"]));
+    let stored = std::fs::read_to_string(standards.join("STD/1.yml")).unwrap();
+    assert!(stored.contains("- lotar:DEV-1"), "{stored}");
+    assert_eq!(blocked(&standards), ["lotar:DEV-1"]);
+    ok(run(&lotar, &["status", "DEV-1", "Done"]));
+    assert!(blocked(&standards).is_empty());
+
+    ok(run(&standards, &["task", "relationships", "remove", "STD-1", "DEV-1", "--kind", "depends-on"]));
+    assert!(!std::fs::read_to_string(standards.join("STD/1.yml")).unwrap().contains("- lotar:DEV-1"));
+
+    // A project in no registered repo stays missing, with the way to name one.
+    let missing = failure(run(&standards, &["task", "relationships", "add", "--kind", "depends-on", "STD-1", "HARN-2"]));
+    assert!(missing.contains("Relationship task 'HARN-2' is missing") && missing.contains("<repo>:<ID>"), "{missing}");
+}
+
 /// DEV-388: the other repo never learns of the dependent, so `lotar
 /// automation run` fires its `unblocked` rule once the prerequisite is done.
 #[test]

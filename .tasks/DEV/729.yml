@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-20T13:23:02.862143+00:00
-modified: 2026-11-20T13:25:38.370664+00:00
+modified: 2026-11-20T15:35:11.564549+00:00
 relationships:
   depends_on:
   - standards:STD-257
@@ -13,6 +13,7 @@ relationships:
   - DEV-728
   - DEV-730
   - DEV-711
+  - DEV-732
 comments:
 - date: 2026-11-20T13:25:23.500075+00:00
   author: claude
@@ -87,3 +88,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-20T15:35:11.564549+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732"]}'

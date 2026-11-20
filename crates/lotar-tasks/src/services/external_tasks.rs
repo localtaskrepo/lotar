@@ -25,6 +25,30 @@ pub fn canonical(raw: &str) -> Option<String> {
     parse(raw).map(|(repo, id)| format!("{repo}:{id}"))
 }
 
+/// `repo:ID` for a bare ID whose project is in no local tasks folder but in
+/// exactly one registered repo (DEV-727): `HARN-2` names the ticket there.
+pub fn qualify(local_root: &Path, raw: &str) -> Option<String> {
+    if parse(raw).is_some() {
+        return None;
+    }
+    let id = TaskId::parse(raw.trim()).ok()?;
+    if has_project(local_root, &id.project) {
+        return None;
+    }
+    let mut repos = registry(local_root).into_keys().filter(|name| tasks_dir(local_root, name).is_ok_and(|root| has_project(&root, &id.project)));
+    match (repos.next(), repos.next()) {
+        (Some(repo), None) => Some(format!("{repo}:{}", id.canonical())),
+        _ => None,
+    }
+}
+
+/// Whether a tasks folder, or a sibling workspace root of it, holds `project`.
+fn has_project(root: &Path, project: &str) -> bool {
+    crate::storage::locator::StorageLocator::candidate_task_roots(root).iter().any(|candidate| {
+        std::fs::read_dir(candidate).is_ok_and(|entries| entries.flatten().any(|entry| entry.file_name().to_str() == Some(project) && entry.path().is_dir()))
+    })
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalTask {
     /// `repo:ID` with the canonical ID.

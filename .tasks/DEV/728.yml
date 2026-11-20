@@ -1,17 +1,21 @@
 title: 'Flaky test: a queued @copilot job''s give-up comment lands in cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T13:01:07.317903+00:00
-modified: 2026-11-20T13:29:42.698334+00:00
+modified: 2026-11-20T14:04:06.146450+00:00
 relationships:
   related:
   - DEV-661
   - DEV-727
   - DEV-729
   - DEV-730
+  - DEV-726
+  - DEV-731
+  - DEV-732
+  - DEV-733
 comments:
 - date: 2026-11-20T13:05:10.750164+00:00
   author: automation
@@ -191,6 +195,26 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-20T13:30:16.944341+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `2a67f1f82` on origin.
+
+    - lotar's merge had fast-forwarded `main` and run lint, test and smoke; I redid none of them.
+    - `08df3f6a0` (DEV-726) was the unpushed commit that stopped lotar; DEV-726 is Done, so I pushed it too (`e63dfc1a2..2a67f1f82`).
+    - Amended the newer `.tasks/DEV/728.yml` change into the merge commit before pushing.
+    - No rule or config files changed: `lotar trust` not needed.
+  report:
+    commits:
+    - hash: 2a67f1f82
+      what: DEV-728 test waits for the queue (with .tasks amended)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae9183805a434e49a49d4c0c1af31011e3379c28af4cc07eabe7a3a1741eac035
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16ecdca505072f3e8c5994dacbc62e0aaf92fad9a172091863f9e4ed90643393
@@ -201,8 +225,6 @@ description: |-
   Done: the test is deterministic.
 tags:
 - health
-- fix-retried
-- retry-fable
 custom_fields:
   finding: test:agent:cli_noop_mutations_test
 history:
@@ -365,3 +387,40 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-20T13:30:16.944341+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:30:17.166151+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730"]}'
+    new: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730","DEV-726"]}'
+- at: 2026-11-20T13:30:22.973023+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, retry-fable
+    new: health
+- at: 2026-11-20T13:33:39.968712+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730","DEV-726"]}'
+    new: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730","DEV-726","DEV-731"]}'
+- at: 2026-11-20T13:45:47.484791+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730","DEV-726","DEV-731"]}'
+    new: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730","DEV-726","DEV-731","DEV-732"]}'
+- at: 2026-11-20T14:04:06.146450+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730","DEV-726","DEV-731","DEV-732"]}'
+    new: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730","DEV-726","DEV-731","DEV-732","DEV-733"]}'

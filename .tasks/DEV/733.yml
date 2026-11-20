@@ -1,0 +1,113 @@
+title: A queue worker keeps the session variables of the agent whose lotar call started it
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review-claude'
+created: 2026-11-20T14:04:05.906098+00:00
+modified: 2026-11-20T17:50:51.341881+00:00
+relationships:
+  related:
+  - DEV-728
+  - DEV-731
+  - DEV-732
+comments:
+- date: 2026-11-20T14:22:52.266285+00:00
+  author: automation
+  text: The fix agent's job job-20261120T140421.129Z-12 failed (lotar agent logs job-20261120T140421.129Z-12); @fix-retry retries it on branch agent/DEV-733.
+- date: 2026-11-20T15:30:54.443303+00:00
+  author: claude
+  text: |-
+    Fixed: a queue worker no longer passes the starting agent's session to later jobs.
+
+    - `spawn_worker` (`crates/lotar-agent/src/services/agent_queue_service.rs`) removes `AGENT_SESSION_VARS`: `CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_MESSAGING_SOCKET`/`_TOKEN`, `CLAUDE_PID`, `CODEX_THREAD_ID`, `T3CODE_THREAD_ID`, etc. Settings like `T3CODE_HOME` stay.
+    - Test `dev733_worker_drops_agent_session_env_test`: `lotar add` runs with `T3CODE_THREAD_ID=x CLAUDE_CODE_SESSION_ID=y CLAUDECODE=1`, and the command runner job's env has none of them. It fails without the fix.
+    - `docs/help/agent.md` (queue worker section) says this.
+    - Already running workers (e.g. pid `8934`) keep the old env until they exit.
+  report:
+    commits:
+    - hash: 432aaec3b
+      what: spawn_worker drops the starting agent's session variables; test and docs
+    checks:
+    - command: cargo nextest run --test integration dev733
+      result: passed
+      reason: fails without the fix (the job inherited T3CODE_THREAD_ID=)
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+    next: Review, then merge; after the merge the check runs against main
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85a1af63d2b7077c8fe1b7d0d379788afbc559e3c82d0fe3b7c656e4db3d066e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae006afd0a1c62a22eefe39cc4b44c8b06c41d4bc595dcc3a2cfe8719d9e5d6a2
+description: |-
+  Found (DEV-731, 2026-11-20): worker pid 8934 (`lotar agent worker` for the DEV tasks dir, started 05:23) has the env of the DEV-728 Claude thread that queued it: `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_MESSAGING_SOCKET`/`_TOKEN`, `CLAUDE_PID`, `T3CODE_THREAD_ID`, `CLAUDECODE=1`. Every later job's agent inherits them unless `job_env` overrides them (`ps eww -o command= -p <worker pid>`).
+  Check: start the worker from a process with `T3CODE_THREAD_ID=x CLAUDE_CODE_SESSION_ID=y`; a command runner job's env has neither.
+  Done: `spawn_worker` (`crates/lotar-agent/src/services/agent_queue_service.rs`) drops the starting agent's session variables, or the worker does at start.
+tags:
+- health
+- fix-retried
+custom_fields:
+  finding: worker:inherited-session-env
+history:
+- at: 2026-11-20T14:04:06.147411+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-728","DEV-731"]}'
+- at: 2026-11-20T14:04:06.404116+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T14:04:22.282410+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T14:04:22.859708+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85a1af63d2b7077c8fe1b7d0d379788afbc559e3c82d0fe3b7c656e4db3d066e
+- at: 2026-11-20T14:22:51.390855+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-20T14:22:52.266285+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T14:22:57.055289+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae006afd0a1c62a22eefe39cc4b44c8b06c41d4bc595dcc3a2cfe8719d9e5d6a2
+- at: 2026-11-20T15:30:54.443303+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T15:35:11.565143+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-731"]}'
+    new: '{"related":["DEV-728","DEV-731","DEV-732"]}'
+- at: 2026-11-20T17:50:51.341881+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
