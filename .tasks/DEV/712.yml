@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T20:06:24.875941+00:00
-modified: 2026-11-18T23:25:19.400237+00:00
+modified: 2026-11-20T00:06:52.717309+00:00
 relationships:
   blocks:
   - DEV-715
@@ -111,6 +111,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b0cdad9-7699-4555-8e71-ac718d9fa284
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b8d09ba-3650-447c-80e2-286e292666cb
+releases:
+- 10
 description: |-
   Found in DEV-653's review (2026-11-18): the waiting rule (`updated` on HelpNeeded/Blocked → `lotar agent worktree run <ticket> -- cargo clean --workspace`) fires only on a person's status change and an agent's hand-back. These waits write with `TaskUpdateContext::automation_disabled()` and fire no rule, so their build output (~2 GB each) stays until Done:
   - rules that hand a ticket to mallox: review failed, third blocking review, fix failed again, merge failed again (`.tasks/DEV/automation.yml`; "A rule's own change fires no other rule")
@@ -286,3 +288,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.717309+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

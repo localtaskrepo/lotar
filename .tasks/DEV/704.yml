@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T17:10:47.476966+00:00
-modified: 2026-11-18T21:17:41.165377+00:00
+modified: 2026-11-20T00:06:52.597934+00:00
 relationships:
   related:
   - DEV-584
@@ -103,6 +103,8 @@ comments:
     - Health check in standards (`agent list-jobs`) still lists old jobs with the old summary; the fix applies to new jobs only, as the fix comment said.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2c23c8d-ba3d-49d9-8b84-c77cb7f417ae
+releases:
+- 10
 description: |-
   ## Found
   - The communication review (standards STD-17, 2026-11-18) saw 53 failed headless Claude jobs in standards since 2026-11-16 whose summary is only "The agent reported no cost, so the profile's max_budget_usd was not checked." (18 on 2026-11-18 01:07-01:13Z, INBOX-491 to INBOX-509).
@@ -181,3 +183,8 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-584"]}'
+- at: 2026-11-20T00:06:52.597934+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T04:18:56.381152+00:00
-modified: 2026-11-18T05:54:10.103866+00:00
+modified: 2026-11-20T00:06:52.485410+00:00
 relationships:
   related:
   - DEV-693
@@ -72,6 +72,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0dcd910-8bc5-4f36-ab9d-42888de91562
+releases:
+- 10
 description: |-
   `docs/help/config-reference.md` lists the two new `agent.job_history.*` keys (DEV-693) between `agent.memory_gate.max_swap_percent` and `agent.memory_gate.settle_seconds`, so the memory gate's keys are split. Found in the DEV-693 review, 2026-11-17.
 
@@ -149,3 +151,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.485410+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

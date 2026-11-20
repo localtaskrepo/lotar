@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T05:11:32.664705+00:00
-modified: 2026-11-18T05:27:57.495566+00:00
+modified: 2026-11-20T00:06:51.923596+00:00
 relationships:
   related:
   - DEV-606
@@ -160,6 +160,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa74dd3d2-a827-40f0-9b54-b914b794f40c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a918fc-ce4e-4947-96ea-4af19c6d46ae
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aed0f9dc4-bccc-4e79-bf30-dcaa0a4f3441
+releases:
+- 10
 description: 'Found in the DEV-606 review on 2026-11-15: 1 of 4 full smoke runs (`npm run -s test:smoke:quick:agent`, worktree of agent/DEV-606) failed `smoke/tests/ui.relationships.smoke.spec.ts:313` ''previews safe reciprocal repair without writes and applies only after confirmation'' (log: 2 × waiting for element to be visible, enabled and stable); the other 3 runs passed 405/405. Check: `npm run test:smoke:agent` repeatedly. Done when the test no longer depends on load and the full smoke passes repeatedly.'
 tags:
 - health
@@ -325,3 +327,8 @@ history:
   - field: tags
     old: health, fix-retried
     new: health
+- at: 2026-11-20T00:06:51.923596+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

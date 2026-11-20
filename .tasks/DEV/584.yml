@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-18T21:34:06.507203+00:00
+modified: 2026-11-20T00:06:51.840158+00:00
 relationships:
   depends_on:
   - standards:STD-133
@@ -230,6 +230,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae237cd7b-56b1-4808-8d93-a5027ca90283
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e0c894c-8d31-47dc-b9c6-2d4724c64a55
+releases:
+- 10
 description: |-
   Step 2 of standards STD-133 (owner 2026-11-15: "Detect usage-limit and quota failures as their own state and pause cleanly instead of looping @fix retries or blaming code bugs; stop asking me the same question repeatedly."). Waits for step 1 (STD-133: no merge without a passed review), in the owner's order.
 
@@ -564,3 +566,8 @@ history:
   - field: tags
     old: review-returned
     new: ''
+- at: 2026-11-20T00:06:51.840158+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

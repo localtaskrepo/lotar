@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T23:16:52.507333+00:00
-modified: 2026-11-18T23:48:17.939661+00:00
+modified: 2026-11-20T00:06:52.800732+00:00
 relationships:
   depends_on:
   - DEV-712
@@ -99,6 +99,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae356ada3-5c1b-41fe-9622-12ac9d56068c
+releases:
+- 10
 description: |-
   Found in DEV-712's review (2026-11-18).
 
@@ -221,3 +223,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.800732+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

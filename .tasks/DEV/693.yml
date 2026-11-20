@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T03:06:47.346896+00:00
-modified: 2026-11-18T18:57:56.229433+00:00
+modified: 2026-11-20T00:06:52.321517+00:00
 relationships:
   related:
   - DEV-211
@@ -74,6 +74,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A563a35e9-0b82-40bc-9af6-83c1dfab9f26
+releases:
+- 10
 description: |-
   Owner 2026-11-17 in the cos thread, on lotar and T3 performance, picked "Job history by age" (keep job logs by days, for example 14, instead of the last 500 per repo).
 
@@ -205,3 +207,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-211","DEV-560","DEV-697","DEV-698","DEV-703"]}'
     new: '{"related":["DEV-211","DEV-560","DEV-697","DEV-698","DEV-703","DEV-629"]}'
+- at: 2026-11-20T00:06:52.321517+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T19:15:05.822593+00:00
-modified: 2026-11-18T20:52:14.808630+00:00
+modified: 2026-11-20T00:06:52.676848+00:00
 relationships:
   related:
   - DEV-629
   - DEV-652
+  - DEV-702
 comments:
 - date: 2026-11-18T20:00:36.631324+00:00
   author: claude
@@ -100,6 +101,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa61fe3f-cbf9-4b4e-88f2-4ca921629f53
+releases:
+- 10
 description: |-
   Found (chief of staff, 2026-11-18): lotar 0.15.4 includes DEV-652 (da8d50d0e), which should settle a completed t3 job's thread when the ticket doesn't wait for a person (owner 2026-11-17: "moving threads into settled that I didn't need to look at are also a good idea"). No job does it. 20 finished job threads of Done, Reviewing and Merging tickets across lotar, standards, local, gairola, mailgpg and autospec stayed unsettled, and the owner reads them as spam. None of the t3 job logs since the install has a note from settle_t3_thread, neither 'Settled the T3 Code thread', 'was not settled' nor 'stays active'. Example: job-20261118T185623.076Z-10 (DEV-629) ends with agent_job_completed, then 'DEV-629 is now Reviewing, assigned to @review', and nothing after that. Settling by hand worked on the same session: `harnessmux settle lotar-95e687-DEV-629-fix` returned the thread link. So one of the silent early returns in crates/lotar-agent/src/services/agent_job_service.rs settle_t3_thread fires: the registry entry or its session_id is missing, the runner is not 't3', or agent_runner::registry().load(&session) fails.
 
@@ -173,3 +176,14 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:04:50.689070+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-629","DEV-652"]}'
+    new: '{"related":["DEV-629","DEV-652","DEV-702"]}'
+- at: 2026-11-20T00:06:52.676848+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

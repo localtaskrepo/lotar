@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T04:14:08.203839+00:00
-modified: 2026-11-18T05:45:19.408017+00:00
+modified: 2026-11-20T00:06:52.400012+00:00
 relationships:
   related:
   - DEV-682
@@ -52,6 +52,8 @@ comments:
     - Rules/config unchanged, so no `lotar trust` needed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e9d9bf-5491-4e57-a598-0ec2fb68f499
+releases:
+- 10
 description: |-
   DEV-682's reconcile is tested only at the watch: `a_job_whose_ticket_moved_on_is_cancelled_after_the_grace` (`crates/lotar-agent/src/services/agent_job_service/watch.rs`) checks that `JobWatch::check_at` returns `MovedOn` and logs the notes. Nothing runs a job and sees it end as cancelled with `job_cancelled` rules, through `drive_turns` or `run_command` (`agent_job_service.rs`).
 
@@ -149,3 +151,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.400012+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

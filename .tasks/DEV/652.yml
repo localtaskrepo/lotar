@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T06:47:32.006217+00:00
-modified: 2026-11-18T19:15:06.072207+00:00
+modified: 2026-11-20T00:11:48.607026+00:00
 relationships:
   depends_on:
   - DEV-657
@@ -37,6 +37,7 @@ relationships:
   - DEV-689
   - DEV-694
   - DEV-710
+  - DEV-702
 comments:
 - date: 2026-11-17T06:49:42.579878+00:00
   author: claude
@@ -482,6 +483,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa1aff80e-5e07-47a3-ab00-67cd0ff214d2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A690b5e25-981f-4cec-87f8-ba282d5661da
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39d2f9ec-fd4b-4119-89ab-c9179c46c2fb
+releases:
+- 10
 description: |-
   Owner 2026-11-17 (DEV-579): "I'm not really willing to let t3 handle worktrees again. That was the main reason we moved to harnesmux." Owner 2026-11-16 (chief of staff options picker): "lotar makes them, T3 shows".
 
@@ -1004,3 +1007,14 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-657"],"blocks":["DEV-653","DEV-700"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699","DEV-700","DEV-682","DEV-689","DEV-694"]}'
     new: '{"depends_on":["DEV-657"],"blocks":["DEV-653","DEV-700"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699","DEV-700","DEV-682","DEV-689","DEV-694","DEV-710"]}'
+- at: 2026-11-20T00:06:52.121926+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'
+- at: 2026-11-20T00:11:48.607026+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-657"],"blocks":["DEV-653","DEV-700"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699","DEV-700","DEV-682","DEV-689","DEV-694","DEV-710"]}'
+    new: '{"depends_on":["DEV-657"],"blocks":["DEV-653","DEV-700"],"related":["DEV-318","DEV-579","DEV-635","DEV-638","DEV-644","DEV-353","DEV-657","DEV-680","DEV-618","DEV-619","DEV-634","DEV-673","DEV-674","DEV-675","DEV-604","DEV-672","DEV-687","DEV-628","DEV-699","DEV-700","DEV-682","DEV-689","DEV-694","DEV-710","DEV-702"]}'

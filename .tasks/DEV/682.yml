@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T23:52:06.189581+00:00
-modified: 2026-11-18T05:28:39.456005+00:00
+modified: 2026-11-20T00:06:52.201247+00:00
 relationships:
   related:
   - DEV-657
@@ -226,6 +226,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab633688f-62e2-4bd0-a509-75f41d400c27
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5f40a7a6-4bc2-4399-aa2f-498af6e18e69
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f0ca270-c400-43bd-9790-c262b6953996
+releases:
+- 10
 description: |-
   A running agent job that hangs holds its parallel slot and its ticket indefinitely, and a job keeps running (and spending tokens) after its ticket goes Done or is reassigned. Found in the survey of similar projects mallox asked for on 2026-11-17 ([report](https://claude.ai/artifact/KSCDeRRHZqQRqkqHfjVRKf), section lotar).
 
@@ -421,3 +423,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-657","DEV-688","DEV-694","DEV-695","DEV-644","DEV-652"]}'
     new: '{"related":["DEV-657","DEV-688","DEV-694","DEV-695","DEV-644","DEV-652","DEV-698"]}'
+- at: 2026-11-20T00:06:52.201247+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

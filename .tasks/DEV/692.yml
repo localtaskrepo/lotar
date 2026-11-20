@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T03:06:46.818129+00:00
-modified: 2026-11-18T05:09:13.273647+00:00
+modified: 2026-11-20T00:06:52.281614+00:00
 comments:
 - date: 2026-11-18T04:03:32.949630+00:00
   author: claude
@@ -108,6 +108,8 @@ references:
 - attachment: before-list-dark-390.dcc42c52f7fa48bd6b5d195dc70311c5.png
 - attachment: before-list-light-1920.e1e04cc20ed4d4fa065f9563bf92cb7e.png
 - attachment: before-list-light-390.c2d5544f110bca6b25c2a8d11132609f.png
+releases:
+- 10
 description: |-
   Owner 2026-11-17 in the cos thread, on lotar and T3 performance ("We now have over a thousand items on each of them and we're quickly creating more. I want to make sure we don't run into issues and slow downs"), picked "Slim ticket list API".
 
@@ -356,3 +358,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.281614+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

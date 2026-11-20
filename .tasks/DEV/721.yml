@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T19:21:56.947455+00:00
-modified: 2026-11-19T20:15:01.512685+00:00
+modified: 2026-11-20T00:06:52.997181+00:00
 relationships:
   blocks:
   - DEV-722
@@ -126,6 +126,8 @@ comments:
     next: 'FND-23: repair the existing FND-14 worktree in foundera'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22d9efae-b49e-4dc3-872c-64754f1408dd
+releases:
+- 10
 description: |-
   ## Found
 
@@ -238,3 +240,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-722"],"related":["DEV-647","DEV-722","DEV-717"]}'
     new: '{"blocks":["DEV-722"],"related":["DEV-647","DEV-722","DEV-717","DEV-723"]}'
+- at: 2026-11-20T00:06:52.997181+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

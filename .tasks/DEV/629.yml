@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T23:36:18.364771+00:00
-modified: 2026-11-18T20:32:50.674834+00:00
+modified: 2026-11-20T00:06:52.003882+00:00
 relationships:
   related:
   - DEV-623
@@ -104,6 +104,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b42e58b-7525-4a3d-8a8a-b87581ff3bfb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8db6ee92-4226-4954-96e2-ea37b52d2f19
+releases:
+- 10
 description: |-
   ## Found (claude, review of DEV-623, 2026-11-16)
   - DEV-623 added `agent_memory_gate` to `ResolvedConfig` (`crates/lotar-core/src/config/types.rs`), which `config_service.rs:39` serializes for `GET /api/config/show`, so the REST reply now carries it.
@@ -261,3 +263,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.003882+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

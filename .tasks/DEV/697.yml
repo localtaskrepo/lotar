@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T04:18:55.334249+00:00
-modified: 2026-11-18T06:01:16.894782+00:00
+modified: 2026-11-20T00:06:52.438352+00:00
 relationships:
   related:
   - DEV-693
@@ -65,6 +65,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25b351b7-9605-42e4-8c6c-25a2d0eecb84
+releases:
+- 10
 description: |-
   Job-log pruning (DEV-693) removes a job's log when its ticket ID resolves to more than one tasks root, though the ticket exists and may be open. Found in the DEV-693 review, 2026-11-17.
 
@@ -187,3 +189,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.438352+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

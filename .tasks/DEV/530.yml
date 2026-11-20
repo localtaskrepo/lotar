@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-19T18:56:59.648786+00:00
+modified: 2026-11-20T00:06:51.788301+00:00
 relationships:
   depends_on:
   - DEV-673
@@ -990,6 +990,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8841da47-b3e2-4fc1-9a39-9ff8db727eb5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade442be8-2502-4950-b6e5-487f4bbfd53d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc6e9155-6ac0-4e20-b6cf-1bc1a226d79f
+releases:
+- 10
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -2194,3 +2196,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-673"],"blocks":["DEV-637","DEV-664"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664","DEV-604","DEV-661","DEV-701","DEV-610","DEV-584"]}'
     new: '{"depends_on":["DEV-673"],"blocks":["DEV-637","DEV-664"],"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586","DEV-543","DEV-576","DEV-577","DEV-588","DEV-592","DEV-600","DEV-643","DEV-633","DEV-669","DEV-673","DEV-672","DEV-664","DEV-604","DEV-661","DEV-701","DEV-610","DEV-584","DEV-719"]}'
+- at: 2026-11-20T00:06:51.788301+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

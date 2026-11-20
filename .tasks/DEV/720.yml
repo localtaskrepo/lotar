@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T19:09:43.671027+00:00
-modified: 2026-11-19T19:54:25.261654+00:00
+modified: 2026-11-20T00:06:52.957117+00:00
 relationships:
   related:
   - DEV-355
@@ -86,6 +86,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aca6f0f08-ac94-4753-83c2-4e55cee66044
+releases:
+- 10
 description: |-
   Found: DEV-719's merge run of `npm run -s smoke` (2026-11-19) failed in `smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts:53`: after `g` then `c` the path stayed `/boards`, expected `/calendar`. That change touched only `.tasks/DEV/automation.yml`. The spec then passed 3/3 alone and the full smoke passed. Same spec as DEV-355 (palette Enter), now in the g-chord step: likely the second key lands before the chord listener is ready, or the chord times out under load.
 
@@ -161,3 +163,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T00:06:52.957117+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-19T14:05:00.304366+00:00
-modified: 2026-11-19T19:39:50.954289+00:00
+modified: 2026-11-20T00:06:52.878713+00:00
 relationships:
   related:
   - DEV-721
@@ -97,6 +97,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aef1e4fed-0915-4689-8ea0-46da7704e090
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc6d79c3-6848-4041-9d10-870ae11668d3
+releases:
+- 10
 description: |-
   ## Found
 
@@ -207,3 +209,8 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-721"]}'
+- at: 2026-11-20T00:06:52.878713+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'

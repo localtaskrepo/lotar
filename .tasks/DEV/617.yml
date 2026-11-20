@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T18:41:03.338621+00:00
-modified: 2026-11-18T06:21:43.210182+00:00
+modified: 2026-11-20T00:06:51.963804+00:00
 relationships:
   depends_on:
   - DEV-644
@@ -369,6 +369,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8238297-f9ab-4bc8-b8fd-61f2b0d1b2c1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A597b9085-d698-4828-aa24-30df4ebefbbc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa60c867-3dfd-4876-bd00-bf287aa88c75
+releases:
+- 10
 description: 'Found 2026-11-16 on DEV-606: job job-20261116T062103.231Z-76 (profile fix-codex) ran in a T3 thread with model claude-opus-5-5 (~/.local/state/harnessmux/sessions/lotar-95e687-DEV-606-fix-codex.json, profile.model) and failed in 7 s with ''Claude API rate limit reached'', just like the @fix job before it, so the ticket went to the owner. Check: that session file shows profile.model claude-opus-5-5 for LOTAR_AGENT_PROFILE fix-codex. Done: a fix-codex job runs on a Codex model (or the profile is renamed to what it runs), with a test; related to DEV-584 (wait through usage limits).'
 tags:
 - health
@@ -750,3 +752,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-644","DEV-694"],"related":["DEV-584","DEV-606","DEV-644","DEV-633","DEV-634","DEV-642","DEV-694"]}'
     new: '{"depends_on":["DEV-644","DEV-694"],"related":["DEV-584","DEV-606","DEV-644","DEV-633","DEV-634","DEV-642","DEV-694","DEV-701"]}'
+- at: 2026-11-20T00:06:51.963804+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#10'
