@@ -586,7 +586,7 @@ mod git_required {
         assert!(worktree.join("target").exists() && !worktree.join("target/debug").exists(), "the agent's hand-back drops the build output");
         // DEV-726: the rule's run leaves a line in the job's log, not only on stderr.
         let log = AgentJobService::events_for(&job.id).into_iter().filter_map(|event| event.message).collect::<Vec<_>>().join("\n");
-        let ran = format!("Automation rule 'Waiting' ran `{} agent worktree run {ticket} -- sh -c rm -rf target/debug` on {ticket}.", bin.display());
+        let ran = format!("Automation rule 'Waiting' ran `{} agent worktree run {ticket} -- sh -c rm -rf target/debug` on {ticket}: exit 0 in ", bin.display());
         assert!(log.contains(&ran), "{log}");
 
         fs::create_dir_all(worktree.join("target/debug")).unwrap();

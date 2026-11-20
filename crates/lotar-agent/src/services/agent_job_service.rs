@@ -3723,7 +3723,19 @@ fn start_job(
         return false;
     }
 
-    let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, AutomationEvent::JobStarted, job_context_for(job_id));
+    // Like the end rules (DEV-726), each `run` leaves a note in the job's
+    // log: the rule, its exit and how long it took (DEV-744).
+    let (result, runs) = crate::services::automation_service::with_run_notes(|| {
+        AutomationService::apply_job_event(tasks_dir, ticket_id, AutomationEvent::JobStarted, job_context_for(job_id))
+    });
+    update_job(job_id, |state| {
+        for note in &runs {
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
+        }
+        if let Err(err) = &result {
+            record_and_emit(state, "agent_job_progress", Some(format!("The start rules for {ticket_id} failed: {err}")));
+        }
+    });
 
     if merge::is_merge_job(job_id)
         && let Some(head) = resolve_repo_root(tasks_dir).and_then(|root| rev_parse(&root, "HEAD"))

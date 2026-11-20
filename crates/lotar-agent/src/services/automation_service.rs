@@ -1884,16 +1884,47 @@ fn execute_run_action(
 ) -> LoTaRResult<()> {
     let prepared = prepare_run(run, task, config, tasks_dir, context, tmpl)?;
     let shown = shown_command(&prepared);
+    let started = Instant::now();
     let result = execute_prepared_run(prepared, &task.id);
+    let took = format_duration(started.elapsed());
     note_run(match &result {
         Ok(None) => format!("Automation rule '{}' started `{shown}` on {} (wait: false, so its end isn't logged here).", context.rule, task.id),
-        Ok(Some((output, ignored))) => {
-            let status = ignored.map(|status| format!(", which failed ({status}; ignore_failure)")).unwrap_or_default();
-            format!("Automation rule '{}' ran `{shown}` on {}{status}.{}", context.rule, task.id, output_tail(output))
-        }
-        Err(err) => format!("Automation rule '{}' ran `{shown}` on {}: {err}", context.rule, task.id),
+        Ok(Some((output, None))) => format!("Automation rule '{}' ran `{shown}` on {}: exit 0 in {took}.{}", context.rule, task.id, output_tail(output)),
+        Ok(Some((output, Some(status)))) => format!(
+            "Automation rule '{}' ran `{shown}` on {}: failed ({}) in {took}, ignored (ignore_failure).{}",
+            context.rule,
+            task.id,
+            exit_label(*status),
+            output_tail(output)
+        ),
+        Err(err) => format!("Automation rule '{}' ran `{shown}` on {} for {took}: {err}", context.rule, task.id),
     });
     result.map(|_| ())
+}
+
+/// A run's exit, as `exit <code>` or the signal that ended it.
+fn exit_label(status: std::process::ExitStatus) -> String {
+    if let Some(code) = status.code() {
+        return format!("exit {code}");
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if let Some(signal) = status.signal() {
+            return format!("signal {signal}");
+        }
+    }
+    status.to_string()
+}
+
+/// A run's duration for its note: `850ms`, `12s`, `1m43s`.
+fn format_duration(elapsed: std::time::Duration) -> String {
+    let secs = elapsed.as_secs();
+    match secs {
+        0 => format!("{}ms", elapsed.as_millis()),
+        1..60 => format!("{secs}s"),
+        _ => format!("{}m{:02}s", secs / 60, secs % 60),
+    }
 }
 
 /// The command a prepared run starts, as one line: a short-form `run` shows
@@ -2632,6 +2663,7 @@ fn apply_action(
             execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl)?;
         } else {
             let kept = keep_skipped_run(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl);
+            note_run(format!("Automation rule '{}' skipped its run on {}: this workspace isn't trusted (`lotar trust`).", action_context.rule, current.id));
             report_skipped_run(storage, &current.id, &action_context.rule, kept)?;
         }
     }
@@ -4221,6 +4253,46 @@ mod run_note_tests {
         assert_eq!(outer, vec!["first".to_string(), "second".to_string()]);
         let ((), none) = with_run_notes(|| ());
         assert!(none.is_empty());
+    }
+
+    /// DEV-744: a `run` held back in an untrusted workspace leaves a note
+    /// too, so a job's log says the rule didn't run.
+    #[test]
+    fn a_run_skipped_while_untrusted_leaves_a_note() {
+        let temp = tempfile::tempdir().unwrap();
+        // SAFETY: test-local overrides; nextest runs each test in its own process.
+        unsafe {
+            std::env::remove_var("LOTAR_TRUST_ALL");
+            std::env::set_var("LOTAR_TRUST_FILE", temp.path().join("trust.yml"));
+            std::env::set_var("LOTAR_IGNORE_HOME_CONFIG", "1");
+            std::env::set_var("LOTAR_AGENT_QUEUE_DIR", temp.path().join("queue"));
+        }
+        let tasks_dir = temp.path().join(".tasks");
+        std::fs::create_dir_all(tasks_dir.join("PX")).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "issue:\n  states: [Todo, Done]\n").unwrap();
+        std::fs::write(
+            tasks_dir.join("PX/1.yml"),
+            "title: t1\nstatus: Todo\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n",
+        )
+        .unwrap();
+        let marker = temp.path().join("ran");
+        std::fs::write(
+            tasks_dir.join("automation.yml"),
+            format!("automation:\n  rules:\n    - name: Set up\n      on:\n        job_started:\n          run: 'touch \"{}\"'\n", marker.display()),
+        )
+        .unwrap();
+
+        let (result, notes) = with_run_notes(|| AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobStarted, None));
+        result.unwrap();
+        assert!(!marker.exists());
+        assert_eq!(notes, vec!["Automation rule 'Set up' skipped its run on PX-1: this workspace isn't trusted (`lotar trust`).".to_string()]);
+    }
+
+    #[test]
+    fn a_duration_reads_in_ms_s_or_m_s() {
+        assert_eq!(format_duration(std::time::Duration::from_millis(850)), "850ms");
+        assert_eq!(format_duration(std::time::Duration::from_secs(12)), "12s");
+        assert_eq!(format_duration(std::time::Duration::from_secs(103)), "1m43s");
     }
 
     #[test]
