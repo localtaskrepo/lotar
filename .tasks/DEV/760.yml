@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T18:41:12.412781+00:00
-modified: 2026-11-22T08:53:34.103680+00:00
+modified: 2026-11-22T19:03:30.778534+00:00
 relationships:
   related:
   - DEV-755
@@ -130,6 +130,8 @@ comments:
     next: 'None: lands as Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10f78536a6bc71ca3c50ba4771447f494bc69025d15433bdfba9156d8d571001
+releases:
+- 11
 description: 'Found in the DEV-755 merge (2026-11-21): `npm run -s test:agent` failed at `crates/lotar-lib/tests/dev271_storage_robustness_test.rs:70`, `assert!(!stored.contains("1970"))`. The stored file''s timestamp was `2026-11-21T18:24:50.751970+00:00`: the fraction `751970` contains 1970, no epoch date. Check: `cargo nextest run -p lotar-lib dev271_storage_robustness_test`. Done: the test checks the `created:` value''s year (for example parse it, or match `created: 1970-`), so it can''t hit a timestamp fraction.'
 tags:
 - health
@@ -240,3 +242,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775","DEV-762","DEV-725"]}'
     new: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775","DEV-762","DEV-725","DEV-785"]}'
+- at: 2026-11-22T19:03:30.778534+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

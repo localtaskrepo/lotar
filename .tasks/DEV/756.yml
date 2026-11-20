@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T10:31:53.742738+00:00
-modified: 2026-11-22T08:12:49.529461+00:00
+modified: 2026-11-22T19:03:30.001663+00:00
 relationships:
   depends_on:
   - DEV-752
@@ -79,6 +79,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ade895137d0d6d42e15be596b34ae4d841d38618cdc3bbdef4171fb534b193749
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2c5fa7f1dceb1d11ca33a15c7a5217bc9b4fb9425570274f3a5397c8bf8692f8
+releases:
+- 11
 description: 'Found (review of DEV-752): `carried_outcome_of` (`crates/lotar-agent/src/services/agent_job_service.rs:5477`) closes the job''s outcome guard before `AgentQueueService::pause` / `requeue_after_limit` run. If those fail, the job ends as failed and `end_and_take_outcome` applies the agent''s recorded status/assignee (`automation_service.rs:679`). An owner''s change made between the close and that end applied directly and is now overwritten; before DEV-752 it merged into the outcome and won. Rare: only when writing the queue''s pause or retry fails. Check: a unit test where the pause write fails, the owner sets the assignee after close_outcome, and the failed job''s end keeps it. Done: close the guard only once the pause or retry is saved, or reopen it when that fails.'
 tags:
 - health
@@ -216,3 +218,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-752"],"related":["DEV-752","DEV-781","DEV-761","DEV-783","DEV-770","DEV-725"]}'
     new: '{"depends_on":["DEV-752"],"related":["DEV-752","DEV-781","DEV-761","DEV-783","DEV-770","DEV-725","DEV-768"]}'
+- at: 2026-11-22T19:03:30.001663+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

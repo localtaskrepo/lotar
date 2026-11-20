@@ -1,14 +1,42 @@
 title: 'harness.agent-launcher smoke: a failed 45 s start wait loses its wrapper stderr to the 120 s test timeout'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T11:07:54.938084+00:00
-modified: 2026-11-22T18:46:40.461584+00:00
+modified: 2026-11-22T18:58:52.932327+00:00
 relationships:
   related:
   - DEV-781
+comments:
+- date: 2026-11-22T18:58:43.115280+00:00
+  author: claude
+  text: |-
+    A failed start wait now reports within 1 s instead of hanging to vitest's 120 s timeout.
+
+    - `smoke/tests/harness.agent-launcher.smoke.spec.ts`: new `exitDetail(exit)` races the wrapper exit against 1 s; the shim, fwd and conflict catch blocks all use it.
+    - `awaitExit` also exposes `stderrSoFar()`, so a hung wrapper still reports its stderr (`wrapper still running stderr=…`).
+    - Check: with the shim wait set to label `nolabel` for 2 s, the test failed in ~3 s with that message (change reverted).
+    - On main the waits are still 10 s; DEV-781 (Merging) raises them to 45 s and doesn't touch these catch lines, so the two combine without conflict.
+  report:
+    commits:
+    - hash: 1d7885621
+      what: catch blocks race the wrapper exit against 1 s via exitDetail
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 118 files / 407 tests at load ~70-85
+    - command: forced hung-wrapper start wait
+      result: passed
+      reason: fails in ~3 s with own message
+    next: Review, then merge; rebases cleanly onto DEV-781 (catch lines untouched there)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3a5b702f4f0841a6f3112eafa0efcf6e0ff29db5b01c7ccf1a8355cbacaadde
 description: |-
@@ -40,3 +68,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3a5b702f4f0841a6f3112eafa0efcf6e0ff29db5b01c7ccf1a8355cbacaadde
+- at: 2026-11-22T18:58:43.115280+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:58:52.932327+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

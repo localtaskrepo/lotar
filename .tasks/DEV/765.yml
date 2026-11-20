@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:03.411406+00:00
-modified: 2026-11-22T14:20:28.286686+00:00
+modified: 2026-11-22T19:03:31.883589+00:00
 relationships:
   blocks:
   - DEV-782
@@ -119,6 +119,8 @@ references:
 - attachment: DEV-765-before-light-1440.a2b95b70282572f7b9282a8938964318.png
 - attachment: DEV-765-before-light-1920.87af7f5a16193c339978a7b1e22d430f.png
 - attachment: DEV-765-before-light-390.ee2fd2eeb9c8dba2b1d65e714e1512ca.png
+releases:
+- 11
 description: |-
   The web UI shows a job's activity live only when the job runs inside the `lotar serve` process that serves the page. Jobs run by the queue worker, `lotar agent run --wait` or an MCP session only append to `.tasks/@agent-logs/<job>.jsonl`. The Agents page, the task panel's thread and the board's activity pills see those lines only after a reload or an SSE reconnect. Automation jobs (@fix, @review, @merge) usually run in the queue worker, so most jobs aren't live. The owner asked on 2026-11-21: "make sure that the Web UI properly represents the activity of any agents we're running through harnessmux … in real time".
 
@@ -394,3 +396,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779","DEV-780","DEV-781"]}'
     new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779","DEV-780","DEV-781","DEV-766"]}'
+- at: 2026-11-22T19:03:31.883589+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

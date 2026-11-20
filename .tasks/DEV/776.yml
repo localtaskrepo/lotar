@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:39:20.858113+00:00
-modified: 2026-11-22T16:34:41.497220+00:00
+modified: 2026-11-22T19:03:33.727328+00:00
 relationships:
   blocks:
   - DEV-791
@@ -15,6 +15,7 @@ relationships:
   - DEV-770
   - DEV-775
   - DEV-788
+  - DEV-738
 comments:
 - date: 2026-11-22T02:53:13.779728+00:00
   author: claude
@@ -104,6 +105,8 @@ comments:
     next: 'None: lands as Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa8aed42de28a4aafdd4ad3d8ff4a47cd7e7c19faf1b1f7b425aa0f3d7109a0b9
+releases:
+- 11
 description: 'Found: lotar comment DEV-768 --commit … - <<EOF saved the text ''-'' and dropped the heredoc; only -F - reads stdin (DEV-768 hand-off). Check: lotar comment <ID> - < file. Done: a lone - reads stdin like -F -, or is refused with a hint to use -F -.'
 tags:
 - health
@@ -190,3 +193,14 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-22T18:57:10.202844+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791","DEV-770","DEV-775","DEV-788"]}'
+    new: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791","DEV-770","DEV-775","DEV-788","DEV-738"]}'
+- at: 2026-11-22T19:03:33.727328+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

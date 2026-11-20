@@ -47,7 +47,7 @@ Combine filters freely: e.g., subscribe to only `task_created` from project `ENG
 - `agent_job_completed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "completed", "finished_at": "...", "exit_code": 0, "sequence": 7, "at": "..." }`.
 - `agent_job_failed` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "failed", "finished_at": "...", "exit_code": 1, "sequence": 7, "at": "..." }`.
 - `agent_job_cancelled` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "cancelled", "finished_at": "...", "sequence": 5, "at": "..." }`.
-- `agent_job_paused` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "paused", "finished_at": "...", "message": "Paused, not failed: ...", "sequence": 7, "at": "..." }`: the job failed on commit signing or a full disk and the queue paused (see `agent.md`, Paused queue).
+- `agent_job_paused` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "paused", "finished_at": "...", "message": "Paused, not failed: ...", "sequence": 7, "at": "..." }`: the job paused instead of failing: on its provider's usage limit, on commit signing or a full disk (the queue paused), or as a taken-over job that runs again in a new session (see `agent.md`: Usage limits, Paused queue, Jobs whose process died).
 
 Every `agent_job_*` SSE event carries `sequence` and `at` taken from the exact
 same log entry served by `GET /api/jobs/logs`: `sequence` is the stable per-job

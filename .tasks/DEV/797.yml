@@ -1,0 +1,31 @@
+title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T19:02:53.318852+00:00
+modified: 2026-11-22T19:02:57.524782+00:00
+description: |-
+  Owner decision 2026-11-22 (chief of staff's options picker, after a 72 h pipeline measurement): picked "Full suites once, one at a time": fix and review jobs run only the tests for what changed; only the merge runs the full suites; one full suite runs on the machine at a time (a shared lock in lotar). Not picked: the lock alone, or 2 parallel jobs instead of 3.
+
+  Why (measured 2026-11-20..22, 657 jobs): load average 50-60 on 14 cores; 37 of 44 lotar merge check rounds failed (84%), about 24 of 43 analysed failures were load timeouts that passed alone; each DEV ticket ran the full suites 3-4 times (fix, review, merge, merge-agent reruns); one full round (lint + test:agent + smoke) took a median 34.7 min under load vs 4-12 min on a quiet machine; checks plus merge-agent cleanup after failed checks: 43.8 slot-h; flaky-test tickets another 35 slot-h.
+
+  Scope:
+  - A machine-wide lock (or queue) so only one full suite (lotar's test:agent, smoke; and the same for other repos' full checks run by lotar's merge) runs at a time; others wait for it instead of running side by side. Waiting must not count as a stall or a timeout.
+  - The fix and review prompts in .tasks/DEV/automation.yml (and the other repos' automation, standards' shared prompts if they hold the same text) ask for targeted tests only; the merge runs the full suites once.
+  - The git hooks (pre-commit, pre-push) of lotar must not run the full suites again in a job's worktree if that defeats this; say what they run and propose, don't widen or skip hooks.
+
+  Done when:
+  - [ ] Two jobs that reach a full suite at the same time run them one after the other (a test shows it).
+  - [ ] Fix and review prompts ask for targeted tests; only the merge runs full suites.
+  - [ ] docs/help/agent.md describes the lock and the check rule.
+  - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline.
+tags:
+- agent
+history:
+- at: 2026-11-22T19:02:57.524782+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T19:41:20.057266+00:00
-modified: 2026-11-22T09:10:40.414161+00:00
+modified: 2026-11-22T19:03:31.000608+00:00
 relationships:
   related:
   - DEV-625
@@ -94,6 +94,8 @@ comments:
     next: Watch the next full smoke run; the failing harness.agent-launcher test is load flake, not this change
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8f8b5fcc7c47b3238c4a8dbc117ea039dcaf1cbf443f4834940591edc9d186c5
+releases:
+- 11
 description: |-
   Found in the review of DEV-754, on the unchanged dev503 test.
 
@@ -234,3 +236,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-625","DEV-747","DEV-754","DEV-734","DEV-756","DEV-764","DEV-725","DEV-783"]}'
     new: '{"related":["DEV-625","DEV-747","DEV-754","DEV-734","DEV-756","DEV-764","DEV-725","DEV-783","DEV-785"]}'
+- at: 2026-11-22T19:03:31.000608+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

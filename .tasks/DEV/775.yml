@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:03:37.168173+00:00
-modified: 2026-11-22T16:34:28.227215+00:00
+modified: 2026-11-22T19:03:33.523889+00:00
 relationships:
   related:
   - DEV-755
@@ -14,6 +14,7 @@ relationships:
   - DEV-765
   - DEV-785
   - DEV-776
+  - DEV-738
 comments:
 - date: 2026-11-22T02:44:44.140146+00:00
   author: claude
@@ -65,6 +66,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad485dc0a8b158d70bd91376263ff6604b4338a79008fe1f0f757bb0583ac0ca8
+releases:
+- 11
 description: 'Found in the DEV-760 merge (2026-11-21), load average 46: `npm run -s smoke` failed in `smoke/tests/ui.agent-jobs.smoke.spec.ts`: ''stops queued and running jobs only after accessible confirmation'' (line 739, ''Timed out after 20000ms waiting for stop-all to cancel every job'') and ''shows the agent''s permission question in the job view and answers it'' (line 784, locator.waitFor 15000ms). Alone the spec passes, 11/11 in 29 s. Check: `npm run -s smoke` under load. Done: like DEV-755, these waits allow for full-run load, so only a hang fails them.'
 tags:
 - health
@@ -153,3 +156,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-755","DEV-760","DEV-764","DEV-765","DEV-785"]}'
     new: '{"related":["DEV-755","DEV-760","DEV-764","DEV-765","DEV-785","DEV-776"]}'
+- at: 2026-11-22T18:57:10.202292+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-760","DEV-764","DEV-765","DEV-785","DEV-776"]}'
+    new: '{"related":["DEV-755","DEV-760","DEV-764","DEV-765","DEV-785","DEV-776","DEV-738"]}'
+- at: 2026-11-22T19:03:33.523889+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

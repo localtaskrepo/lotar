@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T14:27:47.932717+00:00
-modified: 2026-11-22T06:21:22.060583+00:00
+modified: 2026-11-22T19:03:30.330247+00:00
 relationships:
   blocks:
   - DEV-777
@@ -113,6 +113,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85739529f08a807d68f7a4c82772fd89eed8a4bce5c902f2a4b228907f4ed9ac
+releases:
+- 11
 description: |-
   A job that continues a ticket's session (a review, a merge, a rework, or the turn your comment starts) fails outright when the agent can't resume that session. lotar then reports "Could not start the claude session ...", and every retry continues the same broken session, so it fails again. DEV-734 fixed this for one case: a worker that takes over an orphaned job now runs it again in a new session. A plain continue job still has no fallback. DEV-734 also found how this happens: Claude never wrote the session's transcript, so `session/load` can never succeed. Sortie fixed the same bug last week. Found in the daily outside look (lotar and harnessmux, 2026-11-21).
 
@@ -251,3 +253,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764","DEV-770","DEV-725"]}'
     new: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764","DEV-770","DEV-725","DEV-772"]}'
+- at: 2026-11-22T19:03:30.330247+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

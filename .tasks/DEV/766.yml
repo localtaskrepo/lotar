@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:04.045653+00:00
-modified: 2026-11-22T14:20:28.290837+00:00
+modified: 2026-11-22T19:03:32.416720+00:00
 relationships:
   blocks:
   - DEV-769
@@ -18,6 +18,7 @@ relationships:
   - DEV-789
   - DEV-790
   - DEV-765
+  - DEV-738
 comments:
 - date: 2026-11-21T22:42:52.723697+00:00
   author: claude
@@ -118,6 +119,8 @@ references:
 - attachment: DEV-766-after-dark-390.515947b06ed890939e4faf3afa0fb52f.png
 - attachment: DEV-766-after-light-1440-thinking-open.a01681c1cf879255078bd76bb7d1072a.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1feeea09cb33319a99988fc5778fb2a4173f0601d40e241d18931167012fed63
+releases:
+- 11
 description: |-
   Job logs show a tool call as the text `Tool: <title>`. For Claude the title is almost always generic: 2,574 of the tool lines in `.tasks/@agent-logs` (2026-11-17 to 2026-11-21) are `Tool: Terminal`, with no command and no result. A failed tool shows only its id (`Failed: toolu_0111…`, 46 times). The owner asked on 2026-11-21 to show tool calls in the logs.
 
@@ -432,3 +435,14 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790"]}'
     new: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790","DEV-765"]}'
+- at: 2026-11-22T18:57:10.200638+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790","DEV-765"]}'
+    new: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790","DEV-765","DEV-738"]}'
+- at: 2026-11-22T19:03:32.416720+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

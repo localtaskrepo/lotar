@@ -1,17 +1,20 @@
 title: A t3 job taken over whose harnessmux record is gone runs again in a new T3 Code thread while its first thread may still run
-status: HelpNeeded
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix-fable'
 created: 2026-11-20T20:32:05.812565+00:00
-modified: 2026-11-22T18:47:34.897332+00:00
+modified: 2026-11-22T18:59:53.626995+00:00
 relationships:
   depends_on:
   - DEV-734
   related:
   - DEV-734
   - DEV-757
+  - DEV-766
+  - DEV-775
+  - DEV-776
 comments:
 - date: 2026-11-20T21:09:43.252329+00:00
   author: claude
@@ -88,10 +91,33 @@ comments:
     choice:
     - fix-fable
     note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the same error came back twice (job-20261122T111009.524Z-169, job-20261122T184637.892Z-3): the t3 thread ended its turn ''waiting'' while lint/test/smoke ran in the background, so the runner exited with code 1. The fix is committed (7ecd3de1d); only the checks need to run to the end in the foreground.'
+- date: 2026-11-22T18:57:08.786408+00:00
+  author: claude
+  text: |-
+    Checks pass on the DEV-738 commit `7ecd3de1d`, ready for review.
+
+    - The earlier run ended while its checks were still running. This run repeated them with no file changes
+    - `npm run lint:agent`, `npm run test:agent` (2457 Rust tests, 1564 UI tests, release and hooks tests) and `npm run test:smoke:agent` (407 tests) all pass
+    - The branch is based on `b18be094a`. main has 3 newer commits (DEV-766, DEV-775, DEV-776), which the merge agent rebases onto
+  report:
+    commits:
+    - hash: 7ecd3de1d
+      what: t3 takeover with a lost session fails instead of running again; tests and docs
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2457 Rust, 1564 UI, release and hooks tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 407 smoke tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A307e79648a44f94e77a66ae9a9e1c2bc3358efcb3cc2f4afe2fb2b0a2a3eaacb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8e00b511ae7a936e7eab274a7e6c9b20d70ffb41671cd32ad36e0d96f9cc7ab6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c3058150474b974691f040dd630f743ca2dae8ae1ac8d27c0e9bdd4a96edb97
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa7d00ad34d4bad6293aa0383dbdf38ecff19484be6e1722b7678312aef383b7b
 description: |-
   Found in the DEV-734 review (2026-11-20): `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2169`) now queues any taken-over job whose session can't be opened again with `session: fresh`. For a `t3` job the T3 Code thread keeps running in T3 Code (docs/help/agent.md: the takeover follows it, and starts no thread when it can't tell whether one exists, as that could be a second one). When only harnessmux's record is gone (the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` in `dev510_t3_session_test.rs` does exactly this), the retry starts a second thread next to the first. Check: take over a t3 job whose harnessmux session record is deleted while its thread still runs. Done: lotar starts no second thread then (fails as before, or finds the thread by its title) and the docs say which.
 
@@ -260,3 +286,24 @@ history:
   - field: tags
     old: backend, fix-retried
     new: backend, fix-retried, retry-fable
+- at: 2026-11-22T18:57:08.786408+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:57:10.199975+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-734"],"related":["DEV-734","DEV-757"]}'
+    new: '{"depends_on":["DEV-734"],"related":["DEV-734","DEV-757","DEV-766","DEV-775","DEV-776"]}'
+- at: 2026-11-22T18:59:53.141288+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T18:59:53.626995+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa7d00ad34d4bad6293aa0383dbdf38ecff19484be6e1722b7678312aef383b7b

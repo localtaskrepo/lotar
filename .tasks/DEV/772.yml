@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T22:31:39.633028+00:00
-modified: 2026-11-22T17:42:51.845948+00:00
+modified: 2026-11-22T19:03:33.013471+00:00
 relationships:
   related:
   - DEV-749
@@ -100,6 +100,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d50435ac4b95a33a40b7a036d38d49370d6e05cd443fc57bd69e2fd72d10c7f
+releases:
+- 11
 description: 'Found in the DEV-760 merge (2026-11-21), load average about 35: `npm run -s test:agent` failed twice, once at `crates/lotar-lib/tests/agent_automation_integration_test.rs:2785` (`merge_job_whose_branch_was_rebased_elsewhere_passes`, "the rebased branch counts as merged"), once at line 2494 (`merge_job_that_cannot_fast_forward_fails`, "unmerged merge should hand the ticket back"). Both wait 10_000 ms, raised to `WAIT_FLOOR_MS` (30 s), for a ticket that three agent jobs move; alone the first passes in 11 s. Check: `npm run -s test:agent` under load. Done: like DEV-749, the waits for a ticket that several jobs move use `JOB_END_LIMIT_MS`, so the limit only catches a hang.'
 tags:
 - health
@@ -182,3 +184,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-749","DEV-760","DEV-787","DEV-743","DEV-757","DEV-764"]}'
     new: '{"related":["DEV-749","DEV-760","DEV-787","DEV-743","DEV-757","DEV-764","DEV-785"]}'
+- at: 2026-11-22T19:03:33.013471+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
