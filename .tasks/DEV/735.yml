@@ -1,0 +1,40 @@
+title: 'Waiting for the owner without a question: DEV-732'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-20T18:06:59.019448+00:00
+modified: 2026-11-20T18:07:01.109905+00:00
+relationships:
+  related:
+  - DEV-732
+description: |-
+  DEV-732 (A queue worker started from a job's worktree keeps that folder as its cwd; after the worktree is removed every job it starts fails with ENOENT process.cwd) is HelpNeeded, but its last comment asks no question: "Answer: fix (An agent checks the branch and sends it to review again) Retry rule, owner 2026-11-15 (docs/decisions/2026…" (lotar show DEV-732)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-732`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-732]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: question:DEV-732
+history:
+- at: 2026-11-20T18:07:00.220235+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-732"]}'
+- at: 2026-11-20T18:07:01.109905+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'

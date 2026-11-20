@@ -1025,6 +1025,31 @@ fn save_state(file: &mut File, state: &AgentQueueState) -> LoTaRResult<()> {
     Ok(())
 }
 
+/// The session of the agent whose lotar call starts a worker: its thread, its
+/// messaging socket, its process. The worker outlives that session and runs
+/// every later job, whose agents would act as that session (DEV-733).
+const AGENT_SESSION_VARS: &[&str] = &[
+    "AI_AGENT",
+    "CLAUDECODE",
+    "CLAUDE_PID",
+    "CLAUDE_EFFORT",
+    "CLAUDE_AGENT_SDK_VERSION",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ATTENDED",
+    "CLAUDE_CODE_MESSAGING_SOCKET",
+    "CLAUDE_CODE_MESSAGING_TOKEN",
+    "CLAUDE_CODE_ENTRYPOINT",
+    "CLAUDE_CODE_EXECPATH",
+    "CLAUDE_CODE_CHILD_SESSION",
+    "CLAUDE_CODE_CHILD_NOTES_DIR",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
+    "CODEX_THREAD_ID",
+    "CODEX_SANDBOX",
+    "CODEX_SANDBOX_NETWORK_DISABLED",
+    "CODEX_CI",
+    "T3CODE_THREAD_ID",
+];
+
 fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
     // The path lotar was started as, so an upgraded install starts the new
     // build (DEV-361).
@@ -1032,6 +1057,9 @@ fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
     let mut cmd = Command::new(exe);
     cmd.arg("--tasks-dir").arg(tasks_dir).arg("agent").arg("worker");
     cmd.env("LOTAR_TASKS_DIR", tasks_dir);
+    for key in AGENT_SESSION_VARS {
+        cmd.env_remove(key);
+    }
     cmd.stdin(Stdio::null());
     // Its own process group: launchd kills a job's group when the job ends,
     // and the worker would die with the entries it took (DEV-660).

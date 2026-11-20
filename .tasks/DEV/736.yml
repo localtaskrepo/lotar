@@ -1,0 +1,39 @@
+title: 'Done with an open step no ticket tracks: DEV-710'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T18:07:02.290865+00:00
+modified: 2026-11-20T18:07:08.951155+00:00
+relationships:
+  related:
+  - DEV-710
+description: |-
+  DEV-710 (A completed t3 job never settles its T3 Code thread: settle_t3_thread returns before calling T3 and leaves no note) is Done, but a comment names a step still open and no open ticket is linked: "- Not done yet: the ticket's live check, which needs release 0.15.5 to be installed." (lotar show DEV-710)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-710`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-710]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-710
+history:
+- at: 2026-11-20T18:07:05.406338+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-710"]}'
+- at: 2026-11-20T18:07:08.951155+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

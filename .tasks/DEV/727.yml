@@ -1,11 +1,11 @@
 title: relationships add --kind depends-on can't name a ticket in another repo, so a ticket can't wait for one there
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T05:28:46.710582+00:00
-modified: 2026-11-20T17:55:10.345864+00:00
+modified: 2026-11-20T18:04:08.732325+00:00
 relationships:
   related:
   - DEV-386
@@ -14,6 +14,7 @@ relationships:
   - DEV-661
   - DEV-731
   - DEV-730
+  - DEV-732
 comments:
 - date: 2026-11-20T06:15:21.972832+00:00
   author: automation
@@ -234,6 +235,32 @@ comments:
 - date: 2026-11-20T17:55:04.752353+00:00
   author: claude
   text: 'Owner 2026-11-20 (picker, via the chief of staff): "Merge now (Recommended)". DEV-728, the flaky test that failed the merge check, is Done.'
+- date: 2026-11-20T18:01:48.819717+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-727` is in `main`.
+
+    - Rebased `agent/DEV-727` onto `main` (`2a67f1f829a2`): `43dadc35aa89`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `43dadc35aa89`
+    - Amended the pending `.tasks` changes into the merged commit: `7323bb8a9302`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[cross-repo-depends-on:relationships]`
+  report:
+    commits:
+    - hash: 7323bb8a9
+      what: DEV-727 relationships add --kind depends-on can't name a ticket in another repo, so a ticket can't wait for one there
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A64620dc6e0d4603e9f949b19e2e62ee3739b716525cefdb69bee8941c9afc17f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5e7fbe4d2514fd22e33ef7146522fa10f350d9c35d94d980ccf471a7f54e81e
@@ -470,3 +497,19 @@ history:
   - field: status
     old: HelpNeeded
     new: Merging
+- at: 2026-11-20T18:01:48.819717+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T18:01:49.274551+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-20T18:04:08.732325+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661","DEV-731","DEV-730"]}'
+    new: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661","DEV-731","DEV-730","DEV-732"]}'

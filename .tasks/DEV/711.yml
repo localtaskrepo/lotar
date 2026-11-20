@@ -3,8 +3,9 @@ status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
+assignee: '@fix'
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-20T13:25:23.787943+00:00
+modified: 2026-11-20T18:08:26.793808+00:00
 relationships:
   depends_on:
   - DEV-683
@@ -204,3 +205,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584"]}'
     new: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584","DEV-729"]}'
+- at: 2026-11-20T18:08:26.793808+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

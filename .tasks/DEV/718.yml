@@ -24,6 +24,7 @@ tags:
 - owner
 custom_fields:
   finding: install:t3
+  finding_seen: 2026-11-20
 history:
 - at: 2026-11-20T05:21:51.222574+00:00
   actor: claude

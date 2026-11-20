@@ -1,0 +1,40 @@
+title: 'Done with an open step no ticket tracks: DEV-686'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T18:07:10.293121+00:00
+modified: 2026-11-20T18:07:13.508463+00:00
+relationships:
+  related:
+  - DEV-604
+  - DEV-686
+description: |-
+  DEV-686 (DEV-604 is Done, but its work e4edce9b never reached main) is Done, but a comment names a step still open and no open ticket is linked: "- **Not done here:** "Done when" also asks to delete those branches, which can only happen after the merge." (lotar show DEV-686)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-686`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-686]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-686
+history:
+- at: 2026-11-20T18:07:12.074946+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-604","DEV-686"]}'
+- at: 2026-11-20T18:07:13.508463+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

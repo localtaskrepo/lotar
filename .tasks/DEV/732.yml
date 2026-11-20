@@ -1,11 +1,11 @@
 title: A queue worker started from a job's worktree keeps that folder as its cwd; after the worktree is removed every job it starts fails with ENOENT process.cwd
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-20T13:45:47.182735+00:00
-modified: 2026-11-20T17:55:28.194764+00:00
+modified: 2026-11-20T18:07:00.215757+00:00
 relationships:
   blocks:
   - DEV-730
@@ -18,6 +18,9 @@ relationships:
   - DEV-729
   - DEV-733
   - DEV-378
+  - DEV-734
+  - DEV-727
+  - DEV-735
 comments:
 - date: 2026-11-20T14:22:54.037142+00:00
   author: automation
@@ -196,11 +199,34 @@ comments:
     choice:
     - fix
     note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the review job-20261120T175119.822Z-2 died because its worker (pid 32048) exited and the session could not be resumed; a new error, not the branch, and the same answer as his in INBOX-592.'
+- date: 2026-11-20T18:04:08.039597+00:00
+  author: claude
+  text: |-
+    Branch checked again; the last review died with its worker, not on the fix. Back to review.
+
+    - The review `job-20261120T175119.822Z-2` failed because worker pid 32048 exited mid-job and the adopting worker 45178 couldn't resume the Claude session (`Resource not found: sessionId`). Filed as [DEV-734](https://lotar.pyxzl.net/task/DEV-734)
+    - Branch unchanged: `eba6d1334` on `2a67f1f82`; `cargo nextest run dev732` passes. Main has since moved to `7323bb8a9` (DEV-727); the merge agent rebases
+    - Running workers sit in folders nothing removes: 45178 in the lotar main checkout, 45115 in `standards`, 75157 in `local`
+  report:
+    checks:
+    - command: cargo nextest run dev732
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: branch unchanged since it passed on eba6d1334
+    - command: npm test
+      result: not_run
+      reason: branch unchanged since it passed
+    - command: npm run smoke
+      result: not_run
+      reason: branch unchanged since it passed
+    next: 'Review agent reviews eba6d1334, then merge (main moved to 7323bb8a9: rebase)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab70b2201dc506b65659fbeb8a6803e7af1e9887feb27c22e58ab7f6cda773f6b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af878a77dc15131b8a4180f28618a4f7811675498b6c54b3d86cdf37f38f030a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ff69d9e823c46361b80290297bde0df697d2f7a803af205ebbb9349999d9d1b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa6772f5477ebf7a14f906da60043bb22b03245cc02c61d3910f4c6f89ab6d890
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab0093b753225b1e3c06b2930fc2cd603a2bc9d2cac40b276a2b63f85df5f45d6
 description: 'Found (DEV-730, 2026-11-20): review jobs job-20261120T134401.077Z-8 and job-20261120T134519.998Z-10 failed with ''ENOENT: process.cwd failed ... current working directory was likely removed''. Live worker pid 8934 (started 05:23) has cwd .../.lotar-worktrees/lotar/.DEV-728.lotar-removed, so Claude sessions it starts can''t start. Same family as DEV-731 (worker inherits the queuing agent''s environment). Check: a worker started from a folder that is then removed still starts jobs (worker sets its cwd to the repo root or home). Done: a removed cwd doesn''t fail later jobs; the stuck worker 8934 is restarted.'
 tags:
 - health
@@ -418,3 +444,45 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-20T18:03:26.984904+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T18:03:27.396248+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab0093b753225b1e3c06b2930fc2cd603a2bc9d2cac40b276a2b63f85df5f45d6
+- at: 2026-11-20T18:03:56.458407+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378"]}'
+    new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734"]}'
+- at: 2026-11-20T18:04:08.039597+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T18:04:08.737005+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734"]}'
+    new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727"]}'
+- at: 2026-11-20T18:04:24.294237+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T18:07:00.215757+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727"]}'
+    new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735"]}'

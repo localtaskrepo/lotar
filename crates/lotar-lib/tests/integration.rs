@@ -181,6 +181,7 @@ mod dev660_worker_outlives_its_launcher_test;
 mod dev67_sync_events_test;
 mod dev692_list_rows_test;
 mod dev71_config_set_candidate_test;
+mod dev733_worker_drops_agent_session_env_test;
 mod dev75_cli_list_contract_test;
 mod dev80_env_ownership_test;
 mod dev82_contract_semantics_test;

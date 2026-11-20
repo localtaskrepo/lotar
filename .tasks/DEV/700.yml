@@ -1,11 +1,10 @@
 title: Check DEV-652 on a real t3 ticket once a build with it is installed
-status: Blocked
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-18T04:32:01.039948+00:00
-modified: 2026-11-20T17:55:09.598003+00:00
+modified: 2026-11-20T18:03:45.717086+00:00
 relationships:
   depends_on:
   - DEV-702
@@ -15,6 +14,7 @@ relationships:
   - DEV-714
   - DEV-658
   - DEV-718
+  - DEV-728
 comments:
 - date: 2026-11-18T05:10:37.853417+00:00
   author: claude
@@ -107,10 +107,38 @@ comments:
 - date: 2026-11-20T17:55:06.101130+00:00
   author: claude
   text: 'Owner 2026-11-20 (picker, via the chief of staff): "Wait (Recommended)": the next ticket that runs fix, review and merge jobs under 0.15.5 becomes the test; no extra agent run for it.'
+- date: 2026-11-20T18:03:37.513455+00:00
+  author: claude
+  text: |-
+    Checked on DEV-728 under 0.15.5: all DEV-652 points pass.
+
+    Test ticket: DEV-728 (fix on t3, then review and merge, Done 13:30 UTC). Fix jobs `job-20261120T130111.184Z-26`, `job-20261120T130512.436Z-27`, `job-20261120T130633.048Z-1`, `job-20261120T132305.770Z-1`; review `job-20261120T132319.828Z-3`; merge `job-20261120T132428.856Z-4`.
+
+    - **One worktree:** every job ran in `~/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-728` on `agent/DEV-728` (fix commit `969484160`, merged as `2a67f1f82`). `ls -t ~/.t3/worktrees/lotar` shows nothing for DEV-728
+    - **Thread title and link:** T3 Code shows three threads titled "DEV-728 fix: Flaky test: …", one per new session. All three are linked on the ticket (`mcp:launch:e9183805…`, `16ecdca5…`, `4820fc4d…`)
+    - **session continue:** `job-20261120T132305.770Z-1` logged `t3 session resumed, mcp:launch:4820fc4d…`, the same thread as `job-20261120T130633.048Z-1`
+    - **Settled:** `job-20261120T132305.770Z-1` logged `Settled the T3 Code thread …4820fc4d…` (ticket moved to Reviewing). T3 Code shows that thread settled at 13:23:19
+    - **stays active:** `job-20261120T052024.071Z-1` (DEV-700, 0.15.5) logged `The T3 Code thread stays active: DEV-700 is HelpNeeded.`, so no scratch run was needed. DEV-728's failed jobs (`…-27`, `…-1` at 13:06) left their threads unsettled in T3 Code. As designed, they log no line: only completed jobs reach the settle step (`agent_job_service.rs`, `settle_t3_thread`)
+    - Note: review and merge ran on the claude runner, as their profiles say, so they have no T3 thread
+    - No files changed, no commit
+  report:
+    checks:
+    - command: lotar agent logs (DEV-728 jobs, job-20261120T052024.071Z-1)
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: no files changed
+    - command: npm test
+      result: not_run
+      reason: no files changed
+    - command: npm run smoke
+      result: not_run
+      reason: no files changed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6dcc807a-74b4-403e-8751-be20c9c3464d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3fbe677c-7b78-4063-bb16-503a256d38c5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6bea0b7842ecc05ba6b996fc062b13143e1da41d5e185c4ae1c8a71b2918105b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad2ef821034f0139667747e11920d392a3857ea83406ebed15fbb21008e77242b
 description: |-
   Found (review of DEV-652): DEV-652's "Done when" asks for checks on a real ticket, not assumed, and none ran: the installed lotar is 0.15.3 without `f16031633`. Tests cover them with a fake t3 (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`).
 
@@ -332,3 +360,32 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-20T18:01:52.138109+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-20T18:01:53.120300+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad2ef821034f0139667747e11920d392a3857ea83406ebed15fbb21008e77242b
+- at: 2026-11-20T18:03:37.513455+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T18:03:37.749236+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652","DEV-714","DEV-658","DEV-718"]}'
+    new: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652","DEV-714","DEV-658","DEV-718","DEV-728"]}'
+- at: 2026-11-20T18:03:45.717086+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

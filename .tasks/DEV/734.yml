@@ -1,0 +1,47 @@
+title: A worker that adopts an orphaned Claude job can't resume its session (Resource not found sessionId) and fails the job
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T18:03:55.898155+00:00
+modified: 2026-11-20T18:04:28.571429+00:00
+relationships:
+  related:
+  - DEV-732
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
+description: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on lotar''s worker pid 32048, which exited at 17:55:05 UTC (new workers 45178 for lotar and 45115 for standards started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
+tags:
+- health
+custom_fields:
+  finding: agent-job-adopt:resume-claude-session
+history:
+- at: 2026-11-20T18:03:56.460290+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-732"]}'
+- at: 2026-11-20T18:03:57.086927+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T18:04:07.955252+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on worker pid 32048, which exited at 17:55:05 UTC (workers 45115 and 45178 for other repos started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
+    new: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on lotar''s worker pid 32048, which exited at 17:55:05 UTC (new workers 45178 for lotar and 45115 for standards started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
+- at: 2026-11-20T18:04:27.774976+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T18:04:28.571429+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
