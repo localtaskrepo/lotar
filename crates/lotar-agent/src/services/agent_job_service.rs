@@ -2090,7 +2090,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 worker_running: true,
                 main_head_at_start: None,
                 assignee_at_start: restored_assignee(job.assignee_at_start.clone()),
-                request: None,
+                request: job.request.clone(),
                 commit_retry: None,
                 carried_outcome: None,
                 commits: true,
@@ -2109,7 +2109,8 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
 
 /// End a taken-over job (DEV-378). A session job resumes its session in this
 /// process and asks the agent to go on, as its turn ended with the process
-/// that owned it; a `command` job fails, as its result went with its process.
+/// that owned it, and runs again when that session can't be resumed
+/// (DEV-734); a `command` job fails, as its result went with its process.
 fn finish_orphaned_job(
     job: &crate::services::agent_active_jobs::ActiveJob,
     runner_kind: AgentRunnerKind,
@@ -2143,7 +2144,8 @@ fn finish_orphaned_job(
 
 /// Resume the session `name` in this process and end the job with its turn:
 /// a `t3` session follows its thread's run without sending a turn, others
-/// ask the agent to go on. `why` starts the failure when it can't be resumed.
+/// ask the agent to go on. `why` starts the note when it can't be resumed:
+/// the job then runs again in a new session, else fails.
 #[expect(clippy::too_many_arguments, reason = "the job's independent inputs from both of its takeovers")]
 fn resume_session_to_end(
     job_id: &str,
@@ -2168,7 +2170,10 @@ fn resume_session_to_end(
         Ok(session) => session,
         Err(err) => {
             let message = format!("{why}, and its session {name} could not be resumed: {err}");
-            update_job_failure(job_id, ticket_id, message, tasks_dir);
+            match run_again_in_new_session(job_id, tasks_dir) {
+                Some(note) => end_unfinished_job(job_id, ticket_id, format!("{message}. {note}"), true, tasks_dir),
+                None => update_job_failure(job_id, ticket_id, message, tasks_dir),
+            }
             return;
         }
     };
@@ -5462,7 +5467,7 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
     let resumes_at = limit.resume_at(Timestamp::now()).to_rfc3339();
     let mut retry = AgentQueueEntry::retry_of(&request, None, carried);
     retry.not_before = Some(resumes_at.clone());
-    AgentQueueService::requeue_after_limit(tasks_dir, &retry).ok()?;
+    AgentQueueService::requeue_first(tasks_dir, &retry).ok()?;
     let provider = request.provider.clone().or_else(|| resolve_profile(config, &request).ok()?.provider).unwrap_or_else(|| runner.clone());
     let profile = request.agent.as_deref().map_or_else(|| format!("the {runner} runner"), |agent| format!("@{agent}"));
     let when = if limit.resets_at.is_some() { "after the reset" } else { "after the default wait (the provider named no reset time)" };
@@ -5616,7 +5621,6 @@ fn exit_description(exit_code: Option<i32>) -> String {
 }
 
 fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir: &std::path::Path) {
-    let now = time::now_rfc3339();
     let active = JOB_REGISTRY
         .lock()
         .ok()
@@ -5625,7 +5629,30 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
     let pause_note =
         active.then(|| pause_cause_in([message.as_str()])).flatten().and_then(|(reason, line)| pause_queue(job_id, tasks_dir, reason, &line, false));
     let paused = pause_note.is_some();
-    let message = pause_note.unwrap_or(message);
+    end_unfinished_job(job_id, ticket_id, pause_note.unwrap_or(message), paused, tasks_dir);
+}
+
+/// Queue a taken-over job whose session can't be resumed to run again
+/// first, in a new session (DEV-734), with the status and assignee change it
+/// recorded. The job's note; `None` when it can't (no request: a T3 Code
+/// thread lotar took over, or a record of an older build).
+fn run_again_in_new_session(job_id: &str, tasks_dir: &std::path::Path) -> Option<String> {
+    let (mut request, ticket_id) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        let state = registry.jobs.get(job_id)?;
+        Some((state.request.clone()?, state.record.ticket_id.clone()))
+    })?;
+    let carried = carried_outcome_of(tasks_dir, job_id, &ticket_id);
+    request.ticket_id = ticket_id;
+    // `continue` would try the same session again.
+    request.session = Some(crate::config::types::AgentSession::Fresh);
+    AgentQueueService::requeue_first(tasks_dir, &AgentQueueEntry::retry_of(&request, None, carried)).ok()?;
+    Some("Paused, not failed: the job runs again in a new session, first in the queue.".to_string())
+}
+
+/// End a job that didn't finish: failed, or paused when it runs again.
+/// A paused job runs its `job_paused` rules, a failed one its `job_failed` rules.
+fn end_unfinished_job(job_id: &str, ticket_id: &str, message: String, paused: bool, tasks_dir: &std::path::Path) {
+    let now = time::now_rfc3339();
     let mut failed = false;
     update_job(job_id, |state| {
         if !matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running) {
@@ -5731,6 +5758,7 @@ fn active_record_of(state: &AgentJobState, ticket_id: &str, started_at: &str, se
         merge: state.record.is_merge_job,
         assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
         in_setup: false,
+        request: state.request.clone(),
     }
 }
 
@@ -6781,6 +6809,7 @@ mod tests {
             session_id: Some("thread-1".to_string()),
             assignee_at_start: None,
             in_setup: false,
+            request: None,
             merge,
         }
     }

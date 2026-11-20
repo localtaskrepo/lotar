@@ -193,6 +193,7 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
             merge: false,
             assignee_at_start: None,
             in_setup: false,
+            request: None,
         },
     );
 
@@ -299,6 +300,7 @@ fn setting_the_current_value_back_lets_the_job_completed_rule_decide() {
             merge: false,
             assignee_at_start: None,
             in_setup: false,
+            request: None,
         },
     );
     let run = |args: &[&str]| {
@@ -377,6 +379,7 @@ fn clearing_the_assignee_during_a_job_records_a_cleared_assignee() {
             merge: false,
             assignee_at_start: None,
             in_setup: false,
+            request: None,
         },
     );
     let out = cmd().args(["assignee", "OUTL-1", "--clear"]).output().unwrap();
@@ -410,6 +413,7 @@ fn an_assignment_recorded_after_the_job_ended_applies_directly() {
         merge: false,
         assignee_at_start: None,
         in_setup: false,
+        request: None,
     };
     agent_active_jobs::register(&tasks_dir, &job);
     assert!(agent_active_jobs::end_and_take_outcome(&tasks_dir, "job-ending", "OUTE-1", Some).is_none());
@@ -485,6 +489,7 @@ fn the_outcome_fires_the_updated_and_assigned_rules() {
             merge: false,
             assignee_at_start: None,
             in_setup: false,
+            request: None,
         },
     );
     let patch = lotar::api_types::TaskUpdate { status: Some("HelpNeeded".into()), assignee: Some("mallox".into()), ..Default::default() };

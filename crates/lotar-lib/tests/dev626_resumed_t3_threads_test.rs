@@ -326,7 +326,7 @@ fn a_thread_t3_code_resumes_after_a_usage_limit_is_taken_over_instead_of_its_que
     AgentQueueService::enqueue(&tasks_dir, request).unwrap();
     let mut retry = AgentQueueService::list_pending(&tasks_dir).unwrap().remove(0);
     retry.not_before = Some("2099-01-01T00:00:00Z".into());
-    AgentQueueService::requeue_after_limit(&tasks_dir, &retry).unwrap();
+    AgentQueueService::requeue_first(&tasks_dir, &retry).unwrap();
 
     harness.list(&[("t1", "running")]);
     harness.show("t1", "running", Some("r2"), 0, "Working again after the reset.");

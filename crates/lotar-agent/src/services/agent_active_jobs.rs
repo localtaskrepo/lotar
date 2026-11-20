@@ -42,6 +42,10 @@ pub struct ActiveJob {
     /// fails it for that and writes the log (DEV-598).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub in_setup: bool,
+    /// What the job was started with, so a takeover whose session can't be
+    /// resumed runs the job again instead of failing it (DEV-734).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<crate::api_types::AgentJobCreateRequest>,
 }
 
 /// What a ticket should be when its job ends, set while the job ran
@@ -408,6 +412,7 @@ mod tests {
             merge: false,
             assignee_at_start: None,
             in_setup: false,
+            request: None,
         };
         register(tasks.path(), &job);
         assert_eq!(for_ticket(tasks.path(), "T-1"), Some(job.clone()));

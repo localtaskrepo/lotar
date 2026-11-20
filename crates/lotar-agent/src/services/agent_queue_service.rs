@@ -522,10 +522,11 @@ impl AgentQueueService {
         paused.ok_or_else(|| LoTaRError::ValidationError("The queue could not be paused".to_string()))
     }
 
-    /// Queue the retry of a job that stopped on a provider's usage limit,
-    /// first, to start at its `not_before` time (DEV-584). Other jobs run
-    /// meanwhile; the queue itself stays open.
-    pub fn requeue_after_limit(tasks_dir: &Path, retry: &AgentQueueEntry) -> LoTaRResult<()> {
+    /// Queue the retry of a job first: one that stopped on a provider's
+    /// usage limit starts at its `not_before` time (DEV-584), and other jobs
+    /// run meanwhile; the queue itself stays open. A taken-over job whose
+    /// session can't be resumed starts next (DEV-734).
+    pub fn requeue_first(tasks_dir: &Path, retry: &AgentQueueEntry) -> LoTaRResult<()> {
         with_locked_queue(tasks_dir, |state| {
             state.pending.retain(|item| !same_entry(item, retry));
             state.pending.insert(0, retry.clone());

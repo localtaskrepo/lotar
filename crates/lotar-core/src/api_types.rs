@@ -843,7 +843,7 @@ pub struct AgentJobQuestionOption {
     pub kind: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobCreateRequest {
     pub ticket_id: String,
