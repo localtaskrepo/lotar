@@ -1,15 +1,17 @@
 title: Usage-limit pause reads harnessmux 0.2.0's typed failures before the text match
-status: Reviewing
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-20T21:07:31.701038+00:00
+modified: 2026-11-20T22:00:15.916416+00:00
 relationships:
   depends_on:
   - DEV-683
   - standards:STD-257
+  blocks:
+  - DEV-740
   related:
   - DEV-584
   - DEV-729
@@ -86,6 +88,24 @@ comments:
       result: passed
       reason: 406 tests
     next: Merge agent lands agent/DEV-711 on main
+- date: 2026-11-20T21:07:44.265012+00:00
+  author: claude
+  text: |-
+    Review: passed. `5cb9e3364` does all three "Done when" points, and the checks I reran pass.
+
+    - Read: the diff against `main` (6 files), the ticket and its comments, DEV-584, DEV-729, and harnessmux 0.2.0's `src/failure.rs` and `src/backend/t3.rs`. `main` has no newer commits to the touched files.
+    - `Cargo.toml` uses `harnessmux = "0.2.0"`. `drive_turns` keeps each `TurnFailed { error, kind, resets_at, retryable }` as a `harnessmux::Failure`. `usage_limit::of_failures_in` reads `rate_limited`/`quota` and `resets_at` first. Kind `other` uses the text match, as the ticket asks.
+    - Test `a_typed_rate_limit_pauses_the_job_until_its_resets_at`: a fake claude-agent-acp sends `errorKind: rate_limit` with a text that names no limit, so only the typed data can pause the job.
+    - Reran: `npm ci` (ok); `cargo nextest run -p lotar-agent usage_limit dev520` (16 passed); `cargo nextest run -p lotar-lib --test integration dev584 dev520` (4 passed); `cargo clippy -p lotar-agent --all-targets -- -D warnings` (clean); `rustfmt --check` and `prettier --check` on the changed files (clean). Full `npm run lint`/`test`/`smoke` not rerun; the fix agent reports them passed.
+    - Minor, filed [DEV-740](https://lotar.pyxzl.net/task/DEV-740): harnessmux classifies by text with sign-in first. So a t3 failure text that names both "unauthorized" and a usage limit becomes `auth_required` and no longer pauses. `docs/help/agent.md` still says "a limit wins over any other failure".
+    - Merge note: `agent/DEV-729` (`86de0410d`) does the same harnessmux bump and the same test edits in `agent_job_service.rs`. Whichever lands second gets a small rebase conflict at `EventBody::TurnFailed`; keep DEV-711's version.
+    - The owner's decisions aren't touched. The fix agent's own calls are announced in its comment: other kinds never pause, and quota retries hourly.
+- date: 2026-11-20T21:27:47.371007+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-711` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-711` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610a9a82-cb42-47ba-9eea-09f109d6be60
@@ -266,3 +286,32 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584","DEV-729"]}'
     new: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584","DEV-729","DEV-740"]}'
+- at: 2026-11-20T21:07:44.265012+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:08:00.088527+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-20T21:27:47.371007+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:28:28.769434+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584","DEV-729","DEV-740"]}'
+    new: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740"]}'
+- at: 2026-11-20T22:00:15.916416+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

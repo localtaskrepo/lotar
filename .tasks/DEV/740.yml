@@ -1,18 +1,42 @@
 title: A runner failure that names both a sign-in error and a usage limit fails instead of pausing, though docs/help/agent.md says a limit wins
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-20T21:07:30.522875+00:00
-modified: 2026-11-20T21:07:32.471367+00:00
+modified: 2026-11-20T22:00:42.993282+00:00
 relationships:
+  depends_on:
+  - DEV-711
   related:
   - DEV-711
+comments:
+- date: 2026-11-20T21:28:29.221996+00:00
+  author: claude
+  text: |-
+    Waiting for DEV-711: the code to change is only on `agent/DEV-711` so far.
+
+    - `usage_limit::of_failures_in` and the harnessmux 0.2.0 `Failure` input come from `5cb9e3364` (DEV-711). Main still has the old `usage_limit::find`.
+    - DEV-711 is in Merging. Its rebase onto main conflicted in `agent_job_service.rs`, and the merge agent has it.
+    - Added "Done when" with the choice: pause on a limit line whatever the kind, so the doc's "A limit wins" stays true. harnessmux's `Failure` doesn't say where its kind came from, so the text match runs for every kind.
+    - Next: once DEV-711 is on main, change `of_failures_in`, add tests, update `docs/help/agent.md`.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab243cb4cc26f9d7a16831b9f3da94be5b82dcf3a6e620526a8c67a7ba1ad246f
 description: |-
   Found in the DEV-711 review (2026-11-20). harnessmux 0.2.0 sorts a failure by its text with sign-in first (`kind_of_text`, `harnessmux-0.2.0/src/failure.rs`: `unauthorized`, `failed to authenticate` … before `usage limit`). So a t3 failure text (`t3 exited with …: <T3's error output>`) that names both comes back as `auth_required`, and `usage_limit::of_failures_in` (`crates/lotar-agent/src/services/usage_limit.rs`) gives no pause. Before DEV-711 the line-by-line text match paused it. `docs/help/agent.md` (Usage limits, What counts) still says 'A limit wins over any other failure in the same output, a full disk or a signing failure included'.
   Check: a TurnFailed of kind auth_required (or overloaded) from text alone whose text has a usage-limit line: either pause on it (e.g. also run the text match for kinds harnessmux took from text) or reword the doc sentence; a unit test covers the choice.
   Done: the doc and the behaviour agree.
+
+  ## Done when
+  Chosen: pause, keeping the doc's "A limit wins" (and the behaviour before DEV-711). harnessmux 0.2.0's `Failure` doesn't say whether its kind came from error data or from text, so the text match runs for every kind.
+  - [ ] `usage_limit::of_failures_in`: a failure of kind `auth_required`, `overloaded`, `context` or `transport` whose text has a usage-limit line pauses at the time that line names, else the default wait.
+  - [ ] `rate_limited`/`quota` unchanged: `resets_at` wins over a time in the text; with neither, the default wait.
+  - [ ] A failure of any kind with no limit line in its text still fails (no pause).
+  - [ ] Several failed turns: the first one that is a limit wins.
+  - [ ] Unit tests in `usage_limit.rs` cover an `auth_required` failure and an `overloaded` failure that both name a limit, and an `auth_required` failure that names none.
+  - [ ] `docs/help/agent.md` (Usage limits, What counts) says a limit line in the text counts whatever kind harnessmux gave; "A limit wins…" stays true.
+  - [ ] Runs on DEV-711's code (`of_failures_in`); it waits until DEV-711 is on main.
 history:
 - at: 2026-11-20T21:07:31.702841+00:00
   actor: claude
@@ -25,3 +49,64 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-20T21:27:31.714902+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T21:27:36.634591+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab243cb4cc26f9d7a16831b9f3da94be5b82dcf3a6e620526a8c67a7ba1ad246f
+- at: 2026-11-20T21:28:28.386605+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-711 review (2026-11-20). harnessmux 0.2.0 sorts a failure by its text with sign-in first (`kind_of_text`, `harnessmux-0.2.0/src/failure.rs`: `unauthorized`, `failed to authenticate` … before `usage limit`). So a t3 failure text (`t3 exited with …: <T3's error output>`) that names both comes back as `auth_required`, and `usage_limit::of_failures_in` (`crates/lotar-agent/src/services/usage_limit.rs`) gives no pause. Before DEV-711 the line-by-line text match paused it. `docs/help/agent.md` (Usage limits, What counts) still says 'A limit wins over any other failure in the same output, a full disk or a signing failure included'.
+      Check: a TurnFailed of kind auth_required (or overloaded) from text alone whose text has a usage-limit line: either pause on it (e.g. also run the text match for kinds harnessmux took from text) or reword the doc sentence; a unit test covers the choice.
+      Done: the doc and the behaviour agree.
+    new: |-
+      Found in the DEV-711 review (2026-11-20). harnessmux 0.2.0 sorts a failure by its text with sign-in first (`kind_of_text`, `harnessmux-0.2.0/src/failure.rs`: `unauthorized`, `failed to authenticate` … before `usage limit`). So a t3 failure text (`t3 exited with …: <T3's error output>`) that names both comes back as `auth_required`, and `usage_limit::of_failures_in` (`crates/lotar-agent/src/services/usage_limit.rs`) gives no pause. Before DEV-711 the line-by-line text match paused it. `docs/help/agent.md` (Usage limits, What counts) still says 'A limit wins over any other failure in the same output, a full disk or a signing failure included'.
+      Check: a TurnFailed of kind auth_required (or overloaded) from text alone whose text has a usage-limit line: either pause on it (e.g. also run the text match for kinds harnessmux took from text) or reword the doc sentence; a unit test covers the choice.
+      Done: the doc and the behaviour agree.
+
+      ## Done when
+      Chosen: pause, keeping the doc's "A limit wins" (and the behaviour before DEV-711). harnessmux 0.2.0's `Failure` doesn't say whether its kind came from error data or from text, so the text match runs for every kind.
+      - [ ] `usage_limit::of_failures_in`: a failure of kind `auth_required`, `overloaded`, `context` or `transport` whose text has a usage-limit line pauses at the time that line names, else the default wait.
+      - [ ] `rate_limited`/`quota` unchanged: `resets_at` wins over a time in the text; with neither, the default wait.
+      - [ ] A failure of any kind with no limit line in its text still fails (no pause).
+      - [ ] Several failed turns: the first one that is a limit wins.
+      - [ ] Unit tests in `usage_limit.rs` cover an `auth_required` failure and an `overloaded` failure that both name a limit, and an `auth_required` failure that names none.
+      - [ ] `docs/help/agent.md` (Usage limits, What counts) says a limit line in the text counts whatever kind harnessmux gave; "A limit wins…" stays true.
+      - [ ] Runs on DEV-711's code (`of_failures_in`); it waits until DEV-711 is on main.
+- at: 2026-11-20T21:28:28.770033+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-711"]}'
+    new: '{"depends_on":["DEV-711"],"related":["DEV-711"]}'
+- at: 2026-11-20T21:28:29.178403+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-20T21:28:29.221996+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:28:37.819482+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-20T22:00:42.993282+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''

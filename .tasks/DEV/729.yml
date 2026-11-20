@@ -1,11 +1,11 @@
 title: 'A t3 agent job fails when its thread waits on a background command: ''run ended with status waiting'', runner exit code 1'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T13:23:02.862143+00:00
-modified: 2026-11-20T20:57:36.043429+00:00
+modified: 2026-11-20T21:38:37.580587+00:00
 relationships:
   depends_on:
   - standards:STD-257
@@ -15,6 +15,7 @@ relationships:
   - DEV-711
   - DEV-732
   - DEV-683
+  - DEV-731
 comments:
 - date: 2026-11-20T13:25:23.500075+00:00
   author: claude
@@ -77,6 +78,61 @@ comments:
     - command: npm run -s test:smoke:agent
       result: not_run
       reason: backend-only change, no UI touched; fix agent ran it (406 passed)
+- date: 2026-11-20T21:23:48.938671+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1605 filtered out; finished in 31.38s
+
+      stderr ───
+
+        thread 'dev604_queue_pauses_test::a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit' (119712024) panicked at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:173:5:
+        {"pending":[],"waiting_for_prerequisites":[],"worker_running":true,"worker_state":"active","reason":null,"memory_hold":null,"memory_error":null,"pause":{"reason":"signing","message":"error: Couldn't find key in agent","since":"2026-11-20T21:23:30.704242+00:00","next_try_at":"2026-11-20T21:23:39.369946+00:00","job_id":"job-20261120T212332.922Z-2","ticket_id":"TEST-1"},"running_jobs":2,"queued_jobs":0}
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+            FAIL [  33.373s] (1588/2421) lotar-lib::integration dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+      stdout ───
+
+        running 1 test
+        test dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge ... FAILED
+
+        failures:
+
+        failures:
+            dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1605 filtered out; finished in 32.80s
+
+      stderr ───
+
+        thread 'dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge' (119712274) panicked at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451:5:
+        the merge waited for the background process: 20.311315833s
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 831/2421 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-729` onto `main` (`c11351f1f109`): `399973c57be8`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-20T21:28:47.685391+00:00
+  author: claude
+  text: |-
+    Merged to main but not pushed yet: `test:agent` is running again on `399973c57` in the main checkout.
+
+    - lotar fast-forwarded `main` to `399973c57` at 13:27:08 and set Done while the merge agent was still running `test:agent` in the worktree. It then removed the worktree, so that run failed with `target/debug/lotar is missing`, not from the code.
+    - Cause: the merge agent's turn ended while it waited on a background command, and lotar treated that as the job's end (same kind of bug as this ticket, for claude jobs).
+    - The two tests that failed in lotar's own check run (`dev604 a_signing_failure_pauses_the_queue…`, `dev605 a_check_that_leaves_a_process_running…`) pass on their own; they are timing tests and the load average was ~26.
+    - Next: when `test:agent` and `smoke` pass on main, push; otherwise hand back.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9d34bbb50316ad91176ff5be8c7892813a138026f11a871fe6075b20c39b4608
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92d4e898c9ff947fbbb09b4adf75c16342a423093bca3abb7e045dbdc683d7da
@@ -199,3 +255,23 @@ history:
   - field: relationships
     old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732"]}'
     new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683"]}'
+- at: 2026-11-20T21:23:48.938671+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:27:11.052561+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-20T21:28:47.685391+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:38:37.580587+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731"]}'

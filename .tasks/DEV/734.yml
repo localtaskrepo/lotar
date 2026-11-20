@@ -1,17 +1,21 @@
 title: A worker that adopts an orphaned Claude job can't resume its session (Resource not found sessionId) and fails the job
-status: Merging
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: '@review'
 created: 2026-11-20T18:03:55.898155+00:00
-modified: 2026-11-20T20:39:57.650540+00:00
+modified: 2026-11-20T21:53:31.729788+00:00
 relationships:
+  blocks:
+  - DEV-738
   related:
   - DEV-732
   - DEV-738
   - DEV-739
   - DEV-733
+  - TEST-2
+  - DEV-742
 comments:
 - date: 2026-11-20T18:37:16.210363+00:00
   author: claude
@@ -90,11 +94,119 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: no UI change
+- date: 2026-11-20T21:19:33.018595+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1605 filtered out; finished in 26.40s
+
+      stderr ───
+
+        thread 'dev604_queue_pauses_test::a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit' (119617939) panicked at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:173:5:
+        {"pending":[{"ticket_id":"TEST-1","agent":"writer","queued_at":"2026-11-20T21:19:14.898273+00:00","attempts":0,"not_before":null}],"waiting_for_prerequisites":[],"worker_running":true,"worker_state":"active","reason":"the queue is paused since 2026-11-20T21:19:09.358544+00:00 because commit signing fails (job job-20261120T211911.768Z-2 on TEST-1: error: Couldn't find key in agent); one held job tries again at 2026-11-20T21:19:16.898277+00:00","memory_hold":null,"memory_error":null,"pause":{"reason":"signing","message":"error: Couldn't find key in agent","since":"2026-11-20T21:19:09.358544+00:00","next_try_at":"2026-11-20T21:19:16.898277+00:00","job_id":"job-20261120T211911.768Z-2","ticket_id":"TEST-1"},"running_jobs":1,"queued_jobs":1}
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+            FAIL [  31.412s] (1588/2421) lotar-lib::integration dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+      stdout ───
+
+        running 1 test
+        test dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge ... FAILED
+
+        failures:
+
+        failures:
+            dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1605 filtered out; finished in 31.19s
+
+      stderr ───
+
+        thread 'dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge' (119618304) panicked at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451:5:
+        the merge waited for the background process: 23.39265525s
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 830/2421 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-734` onto `main` (`c11351f1f109`): `c7991181608b`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-20T21:26:35.952172+00:00
+  author: claude
+  text: |-
+    Not merged: the fix breaks the signing-pause retry. Should the fix agent rework it, or do you want something else?
+
+    - Rebased onto main `c11351f1f` as `c79911816` (lotar's merge). Lint passed
+    - `dev604_queue_pauses_test::a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit` fails every time, also when run alone. After signing works again the queue never resumes: `pause` stays set, `next_try_at` passes, `running_jobs: 1`, TEST-2 stays pending (`dev604_queue_pauses_test.rs:173`)
+    - Cause: the branch. In `active_record_of` (`agent_job_service.rs`), I put back `request: None` instead of `state.request.clone()` and the test passed (9.8 s). Then I restored the file, so the worktree is clean
+    - `dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge` also failed in lotar's run, but it passes alone. It is a timing test, and the load average was 21
+    - Main checkout not touched, nothing pushed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge, on c79911816
+    - command: npm run -s test:agent
+      result: failed
+      reason: dev604 a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit fails on this branch
+    - command: npm run smoke
+      result: not_run
+      reason: test:agent failed first
+    next: Fix the dev604 regression on agent/DEV-734, then merge again
+- date: 2026-11-20T21:28:04.687679+00:00
+  author: triage
+  text: |-
+    Yes, rework it: fix the dev604 regression on `agent/DEV-734`, then merge again.
+
+    - Retry rule, owner 2026-11-15 (`docs/decisions/2026-11-15-inbox-triage.md`): a failing check on the work goes back to the fix agent
+    - Your finding stands: `active_record_of` puts back `request: None`; keep `state.request.clone()` without breaking `a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit`
+    - `dev605 ...a_check_that_leaves_a_process_running...` is a load-timing test that passes alone; rerun it alone
+- date: 2026-11-20T21:53:22.498268+00:00
+  author: claude
+  text: |-
+    No regression to fix: the branch doesn't cause the dev604 failure, so `c79911816` stays as it is and can be merged again.
+
+    - With `state.request.clone()` kept, `a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit` passed every time: 6 runs alone, 12 in parallel, 16 in parallel with CPU stress (load 30), with a lotar job's `LOTAR_*` variables set, and in the full `npm run -s test:rust:agent` (2421/2421)
+    - By the code it can't matter: only `adopt_orphaned_job` reads the request from the record. A taken-over `command` job (this test's runner) still fails in `finish_orphaned_job` as before. The new rerun is only on the `resume_session_to_end` path of session runners
+    - The failure was load: in lotar's run the test took 26 s (alone it takes 8 s), at load average 21, and dev605's timing test failed in the same run. The merge agent's pass with `request: None` was a single run
+    - `dev605 ...a_check_that_leaves_a_process_running...` passes alone (6.3 s)
+    - Filed the flaky test as [DEV-742](https://lotar.pyxzl.net/task/DEV-742)
+  report:
+    commits:
+    - hash: c79911816
+      what: unchanged, no new commit
+    checks:
+    - command: npm run -s test:rust:agent
+      result: passed
+      reason: 2421/2421
+    - command: dev604 signing-pause test
+      result: passed
+      reason: 6 alone, 12 and 16 in parallel at load 30, also with a lotar job's LOTAR_* vars
+    - command: dev605 a_check_that_leaves_a_process_running alone
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: no code change since lotar's lint:agent passed on c79911816
+    - command: npm run test:ui, test:release, test:hooks, npm run smoke
+      result: not_run
+      reason: no code change; the merge check runs them
+    next: Merge c79911816 again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4551288540da697c0aa1df1dbeccd029ed1a6b5102ae0a721e3412307ab007c
 description: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on lotar''s worker pid 32048, which exited at 17:55:05 UTC (new workers 45178 for lotar and 45115 for standards started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
 tags:
 - health
+- retry-fix
 custom_fields:
   finding: agent-job-adopt:resume-claude-session
 history:
@@ -182,3 +294,84 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-20T21:09:37.326254+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-738","DEV-739","DEV-733"]}'
+    new: '{"blocks":["DEV-738"],"related":["DEV-732","DEV-738","DEV-739","DEV-733"]}'
+- at: 2026-11-20T21:19:33.018595+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:26:35.952172+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:26:39.881887+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-738"],"related":["DEV-732","DEV-738","DEV-739","DEV-733"]}'
+    new: '{"blocks":["DEV-738"],"related":["DEV-732","DEV-738","DEV-739","DEV-733","TEST-2"]}'
+- at: 2026-11-20T21:26:57.379690+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-20T21:28:04.687679+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:28:06.819123+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T21:28:07.487385+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health
+    new: health, retry-fix
+- at: 2026-11-20T21:28:07.609905+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-20T21:42:20.984397+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T21:42:22.449501+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4551288540da697c0aa1df1dbeccd029ed1a6b5102ae0a721e3412307ab007c
+- at: 2026-11-20T21:53:11.176269+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-738"],"related":["DEV-732","DEV-738","DEV-739","DEV-733","TEST-2"]}'
+    new: '{"blocks":["DEV-738"],"related":["DEV-732","DEV-738","DEV-739","DEV-733","TEST-2","DEV-742"]}'
+- at: 2026-11-20T21:53:22.498268+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:53:31.729788+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

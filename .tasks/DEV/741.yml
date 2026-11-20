@@ -1,0 +1,91 @@
+title: 'Flaky test: sse_delivers_during_a_steady_stream_of_events delivers nothing within 1.5 s under full-suite load'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-20T21:09:13.348749+00:00
+modified: 2026-11-20T21:36:32.260491+00:00
+relationships:
+  related:
+  - DEV-704
+  - DEV-726
+  - DEV-732
+  - DEV-273
+comments:
+- date: 2026-11-20T21:36:18.504677+00:00
+  author: claude
+  text: |-
+    Test no longer has a 1.5 s deadline, and now actually catches the DEV-273 bug.
+
+    - `crates/lotar-lib/tests/web_api_integration_test.rs`: waits up to `WATCH_EVENT_DEADLINE` (15 s) for the first event, then asserts the emitter had not finished yet (an `AtomicBool` set after the last emit). So a slow machine can't fail it, but delivery only after the stream stops still fails.
+    - Also found: test servers run with `LOTAR_TEST_FAST_IO=1`, which caps the debounce at 20 ms (`web_server.rs:799`). The old 50 ms gap between events was longer than that, so the test passed even with the moving-deadline bug put back. Events now come every 5 ms (300 of them, ~1.5 s+).
+    - Checked: with the bug put back (`if buffer.is_empty()` → `if true` in `web_server.rs:855`) the test fails; with the fix it passes.
+    - Worktree had no `node_modules`; ran `npm ci` first.
+  report:
+    commits:
+    - hash: 6a6ca2ddc
+      what: steady-stream SSE test waits for the first event and checks the stream was still running
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2421 Rust + 1563 UI tests, load avg ~18
+    - command: npm run -s lint
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: cargo nextest run -p lotar-lib sse_delivers_during (15x during full suite)
+      result: passed
+    - command: npm run -s test:agent at load avg ~30
+      result: not_run
+      reason: machine load was ~14-21 during the runs
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acf99943c821ddc87e00cedab3dccb0740e11d234dd55910d2fb22a12961df1f5
+description: 'Found: fails ''nothing delivered while events kept coming'' (crates/lotar-lib/tests/web_api_integration_test.rs:1444) in merge runs of DEV-704, DEV-726 and DEV-732 (2026-11-20, 2 of 4 full runs, load avg 25-34); passes alone. Check: npm run -s test:agent at load avg ~30. Done: the test passes under full-suite load without a fixed 1.5 s wall-clock deadline.'
+tags:
+- health
+custom_fields:
+  finding: npm run -s test:agent:sse_delivers_during_a_steady_stream_of_events
+history:
+- at: 2026-11-20T21:09:14.452242+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732"]}'
+- at: 2026-11-20T21:09:15.507907+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T21:28:47.549656+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T21:28:49.683365+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acf99943c821ddc87e00cedab3dccb0740e11d234dd55910d2fb22a12961df1f5
+- at: 2026-11-20T21:36:18.504677+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:36:18.720623+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273"]}'
+- at: 2026-11-20T21:36:32.260491+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

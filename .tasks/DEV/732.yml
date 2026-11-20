@@ -1,11 +1,11 @@
 title: A queue worker started from a job's worktree keeps that folder as its cwd; after the worktree is removed every job it starts fails with ENOENT process.cwd
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-20T13:45:47.182735+00:00
-modified: 2026-11-20T20:08:18.721889+00:00
+modified: 2026-11-20T21:09:26.578553+00:00
 relationships:
   blocks:
   - DEV-730
@@ -21,6 +21,7 @@ relationships:
   - DEV-734
   - DEV-727
   - DEV-735
+  - DEV-741
 comments:
 - date: 2026-11-20T14:22:54.037142+00:00
   author: automation
@@ -257,6 +258,35 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-732` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`, `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-732` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-20T21:09:03.672251+00:00
+  author: claude
+  text: |-
+    Merged: `c11351f1f` is on `main` and pushed.
+
+    - Rebase conflicted with DEV-733 (`fb454e86c`) in `spawn_worker` and the `integration.rs` mod list; kept both: absolute tasks dir + `current_dir` (DEV-732) and the `AGENT_SESSION_VARS` removal (DEV-733); both test mods
+    - First test run failed to compile: a stale `lotar-agent` build-script output still pointed `LOTAR_DOCS_DIR` at the reviewer's deleted scratch copy; `cargo clean -p lotar-agent` fixed it
+    - Test and smoke failures were load timeouts (load avg 25-44), a different set each run; all passed on rerun, full Rust suite 2420/2420
+    - Ticket files in the main checkout amended into the merged commit; no rule or config change, so no `lotar trust`
+    - Running workers: none in a removed folder. Worker 36658 (since Nov 18) runs from another session's scratch folder, which still exists; left alone
+  report:
+    commits:
+    - hash: c11351f1f
+      what: queue worker runs in the tasks dir's parent, not the launcher's folder (rebased onto DEV-733, ticket files amended in)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2420/2420 on the 4th full run; earlier runs each failed one to three different timing tests (SSE steady stream, agent template, merge/queue tests) at load avg 25-34, each passed alone; UI 1563/1563, release, hooks passed
+    - command: npm run -s smoke
+      result: passed
+      reason: full run had 13 timeouts at load avg 44; the 9 failed files rerun alone passed 42/42
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no finding about worker cwd
+    next: None
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab70b2201dc506b65659fbeb8a6803e7af1e9887feb27c22e58ab7f6cda773f6b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af878a77dc15131b8a4180f28618a4f7811675498b6c54b3d86cdf37f38f030a7
@@ -266,8 +296,6 @@ references:
 description: 'Found (DEV-730, 2026-11-20): review jobs job-20261120T134401.077Z-8 and job-20261120T134519.998Z-10 failed with ''ENOENT: process.cwd failed ... current working directory was likely removed''. Live worker pid 8934 (started 05:23) has cwd .../.lotar-worktrees/lotar/.DEV-728.lotar-removed, so Claude sessions it starts can''t start. Same family as DEV-731 (worker inherits the queuing agent''s environment). Check: a worker started from a folder that is then removed still starts jobs (worker sets its cwd to the repo root or home). Done: a removed cwd doesn''t fail later jobs; the stuck worker 8934 is restarted.'
 tags:
 - health
-- fix-retried
-- retry-fix
 custom_fields:
   finding: infra:worker:removed-cwd
 history:
@@ -546,3 +574,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-20T21:09:03.672251+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:09:14.450776+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735"]}'
+    new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735","DEV-741"]}'
+- at: 2026-11-20T21:09:26.578553+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, retry-fix
+    new: health

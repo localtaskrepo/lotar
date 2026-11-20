@@ -3,9 +3,8 @@ status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-19T18:53:27.978451+00:00
-modified: 2026-11-20T20:31:11.567027+00:00
+modified: 2026-11-20T21:08:46.968035+00:00
 relationships:
   related:
   - DEV-700
@@ -19,6 +18,17 @@ comments:
 - date: 2026-11-20T20:31:11.103734+00:00
   author: claude
   text: 'Superseded by STD-270 (owner 2026-11-20: "File it"). Every T3 project gets the same two standards commands, set by agents through T3''s MCP tool, so this per-repo install string goes away and the check is reworked. WontDo here.'
+- date: 2026-11-20T21:08:37.595802+00:00
+  author: claude
+  text: |-
+    No, not current: nothing to set by hand. Your npm-task idea is now STD-270.
+
+    - You don't need to set `lotar agent worktree setup; npm ci` in any T3 project.
+    - [STD-270](https://standards.pyxzl.net/task/STD-270) (you said "File it", 2026-11-20): every T3 project gets the same two fixed commands, one on worktree create and one on settle. They call a standards script that reads `repos.json`. Changing what a worktree needs is then a script change, never a T3 setting. Agents set the commands through T3's MCP tool.
+    - STD-270 also reworks the `install:t3` check in `scripts/repos.ts`, so this ticket goes away with it. It is waiting on you (HelpNeeded).
+    - I set this ticket back to WontDo, not Todo, so that the inbox doesn't report it again.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad2d3ba003d97e756924da07330e9a08dd7ca464d5b34f91602ab2a1e5f63aa16
 description: |-
   T3 runs "npm ci" on worktree create, repos.json says "npm ci": set "lotar agent worktree setup; npm ci" in the T3 project's scripts (the setup writes the lotar jobs' Claude settings)
 
@@ -66,3 +76,26 @@ history:
   - field: status
     old: Todo
     new: WontDo
+- at: 2026-11-20T21:08:06.781109+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: WontDo
+    new: InProgress
+- at: 2026-11-20T21:08:08.443361+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad2d3ba003d97e756924da07330e9a08dd7ca464d5b34f91602ab2a1e5f63aa16
+- at: 2026-11-20T21:08:37.595802+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:08:46.968035+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+  - field: assignee
+    old: '@fix'

@@ -1,17 +1,39 @@
 title: A t3 job taken over whose harnessmux record is gone runs again in a new T3 Code thread while its first thread may still run
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-20T20:32:05.812565+00:00
-modified: 2026-11-20T20:32:11.350655+00:00
+modified: 2026-11-20T21:09:52.021377+00:00
 relationships:
+  depends_on:
+  - DEV-734
   related:
   - DEV-734
-description: 'Found in the DEV-734 review (2026-11-20): `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2169`) now queues any taken-over job whose session can''t be opened again with `session: fresh`. For a `t3` job the T3 Code thread keeps running in T3 Code (docs/help/agent.md: the takeover follows it, and starts no thread when it can''t tell whether one exists, as that could be a second one). When only harnessmux''s record is gone (the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` in `dev510_t3_session_test.rs` does exactly this), the retry starts a second thread next to the first. Check: take over a t3 job whose harnessmux session record is deleted while its thread still runs. Done: lotar starts no second thread then (fails as before, or finds the thread by its title) and the docs say which.'
+comments:
+- date: 2026-11-20T21:09:43.252329+00:00
+  author: claude
+  text: |-
+    Waits for DEV-734: the code this ticket fixes is only on its branch, not on main yet.
+
+    - `run_again_in_new_session` and the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` exist only in `aa2b8b2f8` on `agent/DEV-734` (status Merging)
+    - Planned fix: `resume_session_to_end` doesn't queue a `t3` job again; it fails as before, with no second thread. Other runners keep DEV-734's re-run
+    - Added "## Done when" to the description; depends-on DEV-734, tag `waits`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A307e79648a44f94e77a66ae9a9e1c2bc3358efcb3cc2f4afe2fb2b0a2a3eaacb
+description: |-
+  Found in the DEV-734 review (2026-11-20): `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2169`) now queues any taken-over job whose session can't be opened again with `session: fresh`. For a `t3` job the T3 Code thread keeps running in T3 Code (docs/help/agent.md: the takeover follows it, and starts no thread when it can't tell whether one exists, as that could be a second one). When only harnessmux's record is gone (the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` in `dev510_t3_session_test.rs` does exactly this), the retry starts a second thread next to the first. Check: take over a t3 job whose harnessmux session record is deleted while its thread still runs. Done: lotar starts no second thread then (fails as before, or finds the thread by its title) and the docs say which.
+
+  ## Done when
+  - [ ] A taken-over `t3` job whose session can't be opened again (its harnessmux record is gone) is not queued to run again: it fails as before DEV-734, with the reason, its `job_failed` rules run, and no second T3 Code thread starts. Its thread may still run in T3 Code; the thread look-up (docs/help/agent.md "T3 Code threads") takes it over again when T3 Code runs it.
+  - [ ] Other session runners (Claude, Codex, …) keep DEV-734's behaviour: the job ends paused and runs again first with `session: fresh`.
+  - [ ] Test in `dev510_t3_session_test.rs`: the t3 takeover with the record deleted ends `failed`, queues no entry for the ticket, and makes no second thread; it fails on DEV-734's code. A non-t3 test still covers the run-again path (add one if `a_taken_over_job_whose_session_cant_be_resumed_runs_again` was the only one).
+  - [ ] docs/help/agent.md (Takeover after a restart) says a `t3` job fails there instead of running again, and why (a second thread).
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
 tags:
 - backend
+- waits
 history:
 - at: 2026-11-20T20:32:09.446911+00:00
   actor: claude
@@ -24,3 +46,50 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-20T21:08:52.526828+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T21:08:54.454207+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A307e79648a44f94e77a66ae9a9e1c2bc3358efcb3cc2f4afe2fb2b0a2a3eaacb
+- at: 2026-11-20T21:09:37.103125+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found in the DEV-734 review (2026-11-20): `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2169`) now queues any taken-over job whose session can''t be opened again with `session: fresh`. For a `t3` job the T3 Code thread keeps running in T3 Code (docs/help/agent.md: the takeover follows it, and starts no thread when it can''t tell whether one exists, as that could be a second one). When only harnessmux''s record is gone (the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` in `dev510_t3_session_test.rs` does exactly this), the retry starts a second thread next to the first. Check: take over a t3 job whose harnessmux session record is deleted while its thread still runs. Done: lotar starts no second thread then (fails as before, or finds the thread by its title) and the docs say which.'
+    new: |-
+      Found in the DEV-734 review (2026-11-20): `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2169`) now queues any taken-over job whose session can't be opened again with `session: fresh`. For a `t3` job the T3 Code thread keeps running in T3 Code (docs/help/agent.md: the takeover follows it, and starts no thread when it can't tell whether one exists, as that could be a second one). When only harnessmux's record is gone (the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` in `dev510_t3_session_test.rs` does exactly this), the retry starts a second thread next to the first. Check: take over a t3 job whose harnessmux session record is deleted while its thread still runs. Done: lotar starts no second thread then (fails as before, or finds the thread by its title) and the docs say which.
+
+      ## Done when
+      - [ ] A taken-over `t3` job whose session can't be opened again (its harnessmux record is gone) is not queued to run again: it fails as before DEV-734, with the reason, its `job_failed` rules run, and no second T3 Code thread starts. Its thread may still run in T3 Code; the thread look-up (docs/help/agent.md "T3 Code threads") takes it over again when T3 Code runs it.
+      - [ ] Other session runners (Claude, Codex, …) keep DEV-734's behaviour: the job ends paused and runs again first with `session: fresh`.
+      - [ ] Test in `dev510_t3_session_test.rs`: the t3 takeover with the record deleted ends `failed`, queues no entry for the ticket, and makes no second thread; it fails on DEV-734's code. A non-t3 test still covers the run-again path (add one if `a_taken_over_job_whose_session_cant_be_resumed_runs_again` was the only one).
+      - [ ] docs/help/agent.md (Takeover after a restart) says a `t3` job fails there instead of running again, and why (a second thread).
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-20T21:09:37.326754+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-734"]}'
+    new: '{"depends_on":["DEV-734"],"related":["DEV-734"]}'
+- at: 2026-11-20T21:09:37.742412+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: backend
+    new: backend, waits
+- at: 2026-11-20T21:09:43.252329+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:09:52.021377+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

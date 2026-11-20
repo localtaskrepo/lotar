@@ -2,7 +2,8 @@
 //! reset instead of failing: no failure rule runs, its `job_paused` rules
 //! do, the ticket keeps its status and assignee, and the job runs again on
 //! the same profile after the reset. A shell script stands in for T3's CLI
-//! and prints the provider's message as Codex and Claude do.
+//! and prints the provider's message as Codex and Claude do; another for
+//! claude-agent-acp fails the turn with typed error data (DEV-711).
 #![cfg(unix)]
 
 use crate::common;
@@ -36,6 +37,28 @@ case "$1 $2" in
 esac
 "#;
 
+/// An ACP agent on stdio that fails every prompt as claude-agent-acp does on
+/// a usage limit: an internal error whose data names the kind and, in
+/// `$dir/resets_at` (Unix seconds), the reset. The text names no limit, so
+/// only the typed data can pause the job. Each prompt adds a line to
+/// `$dir/starts`.
+const FAKE_ACP: &str = r#"#!/bin/sh
+dir=$(dirname "$0")
+respond() { printf '{"jsonrpc":"2.0","id":%s,"result":%s}\n' "$1" "$2"; }
+while IFS= read -r line; do
+  id=$(printf '%s' "$line" | sed -nE 's/.*"id":("[^"]*"|[0-9]+).*/\1/p')
+  case "$line" in
+    *'"method":"initialize"'*)
+      respond "$id" '{"protocolVersion":1,"agentCapabilities":{"loadSession":true},"agentInfo":{"name":"fake-acp","version":"1.0.0"},"authMethods":[]}' ;;
+    *'"method":"session/new"'*) respond "$id" '{"sessionId":"fake-1"}' ;;
+    *'"method":"session/prompt"'*)
+      echo x >> "$dir/starts"
+      printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32603,"message":"Internal error","data":{"message":"Claude stopped the turn","errorKind":"rate_limit","rateLimit":{"resetsAt":%s}}}}\n' "$id" "$(cat "$dir/resets_at")" ;;
+    *'"method":'*) if [ -n "$id" ]; then respond "$id" '{}'; fi ;;
+  esac
+done
+"#;
+
 struct Workspace {
     _fixtures: TestFixtures,
     root: PathBuf,
@@ -62,15 +85,22 @@ impl Drop for Workspace {
 /// `limited` times. Rules comment on the job's pause and failure and close
 /// the ticket when the job completes.
 fn workspace(message: &str, limited: u32) -> Workspace {
+    let ws = workspace_on(FAKE_T3, "[agents.t3]\nkind = \"t3\"\n", "    runner: t3\n    provider: codex\n    model: gpt-5.5\n");
+    std::fs::write(ws.t3.join("message"), format!("{message}\n")).unwrap();
+    std::fs::write(ws.t3.join("limited"), limited.to_string()).unwrap();
+    ws
+}
+
+/// `fake` as the harnessmux agent `agent` names (its `agents.toml` lines but
+/// the command), for the `fixer` profile's `runner` lines.
+fn workspace_on(fake: &str, agent: &str, runner: &str) -> Workspace {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path().to_path_buf();
     let t3 = root.join("t3");
     std::fs::create_dir_all(&t3).unwrap();
     let script = t3.join("t3");
-    std::fs::write(&script, FAKE_T3).unwrap();
+    std::fs::write(&script, fake).unwrap();
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-    std::fs::write(t3.join("message"), format!("{message}\n")).unwrap();
-    std::fs::write(t3.join("limited"), limited.to_string()).unwrap();
     std::fs::write(
         t3.join("show.json"),
         r#"{"thread":{"threadId":"t1","link":"https://app.t3.codes/threads/env/t1","status":"completed","activeRunId":null,"latestRunId":"r1","pendingRequestCount":0},"messages":[{"role":"assistant","runId":"r1","text":"Fixed."}]}"#,
@@ -78,10 +108,10 @@ fn workspace(message: &str, limited: u32) -> Workspace {
     .unwrap();
     let home = root.join("harnessmux");
     std::fs::create_dir_all(home.join("config")).unwrap();
-    std::fs::write(home.join("config/agents.toml"), format!("[agents.t3]\nkind = \"t3\"\ncommand = [\"{}\"]\n", script.display())).unwrap();
+    std::fs::write(home.join("config/agents.toml"), format!("{agent}command = [\"{}\"]\n", script.display())).unwrap();
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
-        "default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fixer:\n    runner: t3\n    provider: codex\n    model: gpt-5.5\n",
+        format!("default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fixer:\n{runner}"),
     )
     .unwrap();
     std::fs::write(
@@ -207,4 +237,25 @@ fn an_agent_that_only_talks_about_a_rate_limit_fails() {
     wait_for("the job_failed rule", || json(&ws, &["show", "TEST-1"])["status"] == "HelpNeeded");
     wait_for("the job_failed rule's comment", || comments(&ws).iter().any(|text| text == "failed"));
     assert!(!comments(&ws).iter().any(|text| text.starts_with("paused")), "{:?}", comments(&ws));
+}
+
+/// harnessmux 0.2.0 types the failure (DEV-711): a rate limit the agent's
+/// error data names pauses the job until its `resetsAt`, though the text
+/// names no limit.
+#[test]
+fn a_typed_rate_limit_pauses_the_job_until_its_resets_at() {
+    let ws = workspace_on(FAKE_ACP, "[agents.claude]\n", "    runner: claude\n");
+    std::fs::write(ws.t3.join("resets_at"), "4099766400").unwrap();
+    run(&ws);
+    wait_for("the job to pause", || !jobs(&ws, "paused").is_empty());
+    let paused = jobs(&ws, "paused").remove(0);
+    assert_eq!(paused["resumes_at"], "2099-12-01T00:00:00+00:00", "it runs again at the reset the error data names: {paused}");
+    let summary = paused["summary"].as_str().unwrap_or_default();
+    assert!(summary.contains("hit its usage limit (Claude stopped the turn)") && summary.contains("after the reset"), "{summary}");
+    assert!(jobs(&ws, "failed").is_empty(), "no job failed");
+    let queue = json(&ws, &["agent", "queue"]);
+    assert_eq!(queue["pending"][0]["not_before"], "2099-12-01T00:00:00+00:00", "{queue}");
+    wait_for("the job_paused rule's comment", || comments(&ws).iter().any(|text| text == "paused: claude"));
+    assert!(!comments(&ws).iter().any(|text| text == "failed"), "no failure rule ran: {:?}", comments(&ws));
+    assert_eq!(starts(&ws.t3), 1, "the retry waits for the reset");
 }

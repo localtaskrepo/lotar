@@ -1,0 +1,28 @@
+title: 'Flaky test: a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit times out at line 173 under load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T21:53:10.914860+00:00
+modified: 2026-11-20T21:53:11.425628+00:00
+relationships:
+  related:
+  - DEV-734
+description: 'Found (DEV-734, 2026-11-20): it failed in lotar''s merge check of agent/DEV-734 (`npm run -s test:agent`, load average 21; dev605''s timing test failed in the same run). After signing works again the queue didn''t resume within the 30 s `wait_for`: pause set, `next_try_at` passed, `running_jobs: 1`. The run took 26 s; alone it takes 8 s. The same commit then passed 6 runs alone, 12 in parallel, 16 in parallel at load 30, and the full `npm run -s test:rust:agent` (2421/2421). Check: find what the running job waits on when this happens (keep the worker and job logs when it fails), then fix the cause or the deadline. Done: the test passes in a full agent suite run under load.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:dev604_queue_pauses_test
+history:
+- at: 2026-11-20T21:53:11.176935+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-734"]}'
+- at: 2026-11-20T21:53:11.425628+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

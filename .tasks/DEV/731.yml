@@ -1,10 +1,11 @@
 title: A queue worker started by an agent's lotar call keeps that agent's PATH for every later job
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
+assignee: '@review'
 created: 2026-11-20T13:33:39.558052+00:00
-modified: 2026-11-20T15:43:51.608774+00:00
+modified: 2026-11-20T21:38:44.711480+00:00
 relationships:
   depends_on:
   - DEV-732
@@ -15,6 +16,7 @@ relationships:
   - DEV-730
   - DEV-732
   - DEV-733
+  - DEV-729
 comments:
 - date: 2026-11-20T14:04:20.131144+00:00
   author: automation
@@ -178,10 +180,38 @@ comments:
 - date: 2026-11-20T15:43:45.339343+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-731 yet. DEV-731 waits for DEV-732.'
+- date: 2026-11-20T21:38:37.383971+00:00
+  author: claude
+  text: |-
+    DEV-732 is done; the fix on `agent/DEV-731` (`ed15359af`) is unchanged and goes back to review.
+
+    - Main moved on: DEV-733 `fb454e86c`, DEV-732 `c11351f1f`, DEV-729 `399973c57`
+    - `agent_queue_service.rs` merges cleanly: DEV-733/732 change `spawn_worker`, this fix changes `run_worker` and adds new functions
+    - One conflict, in `docs/help/agent.md` (queue worker paragraph): DEV-733 and this fix each add a sentence after "...a terminal closes)." Keep both: DEV-733's session-variables sentence, then this fix's PATH sentence
+    - I didn't rebase: this job doesn't rewrite history, the merge agent rebases
+  report:
+    commits:
+    - hash: ed15359af
+      what: worker completes its PATH from the login shell (unchanged)
+    checks:
+    - command: git merge-tree --write-tree main agent/DEV-731
+      result: failed
+      reason: docs/help/agent.md conflicts; Rust merges cleanly
+    - command: npm run lint:agent
+      result: not_run
+      reason: no code change since ed15359af, passed in the 15:43 retry
+    - command: npm run test:agent
+      result: not_run
+      reason: no code change since ed15359af, passed in the 15:43 retry
+    - command: npm run test:smoke:agent
+      result: not_run
+      reason: no code change since ed15359af, passed in the 15:43 retry
+    next: 'Review ed15359af, then merge: rebase onto main and resolve the docs/help/agent.md paragraph'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e977638d68bc4e75f621fc5b0a47d7965c6212a6131ff3c2250534b2d0d6494
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa61a280256663cea82ad0e51ba83aae65afc2109e04181dc12cdc9dbf9f6b454
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8c749d7c445638d4e4d44b88a912146f0c96bd8688109c6afbb8888b90f26b51
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af58b34d88ce5505bdf0d670149bfa011dcb7c56d48b34915c8720ac5c908d94f
 description: |-
   Found (DEV-730, 2026-11-20): `lotar agent worker` is spawned by whichever lotar process queues a job and inherits its environment. Workers started by the triage agent's `lotar assignee` ran without `~/.cargo/bin` on PATH (live harnessmux worker pid 94972, started 12:51 UTC: `PATH=/opt/homebrew/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`), and one such worker ran DEV jobs -1..-27 from 05:22 to 13:06 UTC, so every `agent.worktree.waiting_run` (`cargo clean --workspace`) in that time failed (DEV-726, DEV-727, DEV-728). The jobs' agents got the same short PATH. Where Claude Code's headless shell gets that PATH is not known yet; the standards service's own PATH is complete.
   Check: start the worker from a process with PATH=/usr/bin:/bin; a job's command runner and waiting_run still find a program in the service's PATH (or the job log says the PATH is short).
@@ -362,3 +392,38 @@ history:
   changes:
   - field: assignee
     old: '@fix'
+- at: 2026-11-20T21:09:32.110855+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T21:38:01.845677+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-20T21:38:03.653226+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af58b34d88ce5505bdf0d670149bfa011dcb7c56d48b34915c8720ac5c908d94f
+- at: 2026-11-20T21:38:37.383971+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:38:37.581061+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-732"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733"]}'
+    new: '{"depends_on":["DEV-732"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729"]}'
+- at: 2026-11-20T21:38:44.711480+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

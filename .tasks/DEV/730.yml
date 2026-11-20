@@ -1,10 +1,11 @@
 title: 'agent.worktree.waiting_run reports ''could not start in <worktree>: No such file or directory'' for a worktree that exists'
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
+assignee: '@review'
 created: 2026-11-20T13:25:13.774179+00:00
-modified: 2026-11-20T19:54:52.324204+00:00
+modified: 2026-11-20T21:37:53.539670+00:00
 relationships:
   depends_on:
   - DEV-732
@@ -181,10 +182,36 @@ comments:
 - date: 2026-11-20T13:45:57.851466+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-730 yet. DEV-730 waits for DEV-732.'
+- date: 2026-11-20T21:37:34.740774+00:00
+  author: claude
+  text: |-
+    DEV-732 is done, so this goes back to review; the branch needed no changes.
+
+    - The wait was for the review job to be able to start (worker cwd fix, `c11351f1f` on main), not for a release check.
+    - Branch `agent/DEV-730`: one commit `14b6f9177`, clean tree; main has 5 newer commits, so the merge agent rebases.
+    - `cargo nextest run -p lotar-agent waiting_run_start_failure`: 1 passed.
+  report:
+    commits:
+    - hash: 14b6f9177
+      what: log line names missing worktree vs missing program vs not on PATH
+    checks:
+    - command: cargo nextest run -p lotar-agent waiting_run_start_failure
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: unchanged commit, passed in the earlier fix session
+    - command: npm test
+      result: not_run
+      reason: unchanged commit, passed in the earlier fix session
+    - command: npm run smoke
+      result: not_run
+      reason: unchanged commit, passed in the earlier fix session
+    next: 'Review the branch agent/DEV-730, then merge (rebase onto main first: main moved on by 5 commits)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae91c8bcb6c87393265f36bb06f2ad25ad8708f7b454d932fe86fc871d783b959
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c9ee95b11482e04538814920039b5a4ee670172959192857a1c0ac8a2c917ef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A29cd25318129945bdcdb838aebbbe9efa36ec5e84df2adbdfd848517aaa3b861
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7dd037d69ba738791fceb2aa7a80bfd9fc76444913ecb86794bdc0e232b2529a
 description: |-
   Found (DEV-729, 2026-11-20): `lotar agent logs job-20261120T130633.048Z-1` at 13:07:12 logged "agent.worktree.waiting_run (`cargo clean --workspace`) could not start in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-728: No such file or directory (os error 2)". The folder exists now, and the lotar service's PATH (launchd plist) has ~/.cargo/bin, so either the worktree was briefly gone (another job's cleanup while retries ran) or the spawn failed for another reason; the message doesn't say which (program or folder).
   Check: a waiting_run whose program or folder is missing names which one in the log; a test covers both.
@@ -386,3 +413,32 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732"]}'
     new: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732","DEV-710"]}'
+- at: 2026-11-20T21:09:29.775751+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T21:37:04.210192+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-20T21:37:05.453208+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7dd037d69ba738791fceb2aa7a80bfd9fc76444913ecb86794bdc0e232b2529a
+- at: 2026-11-20T21:37:34.740774+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:37:53.539670+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

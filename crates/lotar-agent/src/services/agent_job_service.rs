@@ -134,10 +134,11 @@ struct AgentJobState {
     /// The runner reported a failure in its output (an error result, a
     /// failed turn), so the job fails even if the process exits 0.
     runner_failed: bool,
-    /// The runner's own reports of a failed turn (harnessmux `TurnFailed`),
-    /// apart from the agent's words: a usage limit is read only from these,
-    /// so an agent that talked about a rate limit doesn't pause (DEV-584).
-    runner_errors: Vec<String>,
+    /// The runner's own reports of a failed turn (harnessmux `TurnFailed`,
+    /// with its kind and reset time), apart from the agent's words: a usage
+    /// limit is read only from these, so an agent that talked about a rate
+    /// limit doesn't pause (DEV-584, DEV-711).
+    runner_errors: Vec<harnessmux::Failure>,
     /// A worker thread runs the job; it clears this only after the job's
     /// end automation, context and worktree cleanup (DEV-322).
     worker_running: bool,
@@ -4652,8 +4653,9 @@ fn drive_turns(
                     }
                 };
             }
-            EventBody::TurnFailed { error, .. } => {
-                update_job(job_id, |state| state.runner_errors.push(error.clone()));
+            EventBody::TurnFailed { error, kind, resets_at, retryable } => {
+                let failure = harnessmux::Failure { error: error.clone(), kind, resets_at, retryable };
+                update_job(job_id, |state| state.runner_errors.push(failure.clone()));
                 progress(error);
                 exit_code = 1;
             }
@@ -5417,14 +5419,15 @@ fn pause_cause(job_id: &str, note: Option<&str>) -> Option<(PauseReason, String)
 /// with the retry. The job's note and when it runs again; `None` when the
 /// runner reported no limit or the job can't be retried (taken over from
 /// another process). Only the runner's failure reports count
-/// (`runner_errors`): the agent's messages and tool calls are its words,
-/// and a failed job that only talked about a rate limit fails.
+/// (`runner_errors`, their kind first, DEV-711): the agent's messages and
+/// tool calls are its words, and a failed job that only talked about a rate
+/// limit fails.
 fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) -> Option<(String, String)> {
     let (mut request, ticket_id, runner, errors) = JOB_REGISTRY.lock().ok().and_then(|registry| {
         let state = registry.jobs.get(job_id)?;
         Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.runner.clone(), state.runner_errors.clone()))
     })?;
-    let limit = crate::services::usage_limit::find(errors.iter().map(String::as_str), Timestamp::now())?;
+    let limit = crate::services::usage_limit::of_failures(&errors, Timestamp::now())?;
     let carried = carried_outcome_of(tasks_dir, job_id, &ticket_id);
     request.ticket_id = ticket_id;
     let resumes_at = limit.resume_at(Timestamp::now()).to_rfc3339();

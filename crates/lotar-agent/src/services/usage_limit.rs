@@ -1,6 +1,10 @@
 //! A provider's usage limit in a failed job's output (DEV-584): the line that
 //! names it and, when the provider says, when the limit resets.
 //!
+//! harnessmux types a failed turn (DEV-711): `rate_limited` and `quota` are
+//! limits, with the reset time the agent's error data gives. A failure it
+//! gives no kind (`other`) is read from its text.
+//!
 //! A job that stops on such a limit pauses until the reset instead of failing.
 //! Codex prints "You've hit your usage limit. Upgrade to Pro or try again at
 //! Nov 20th, 2026 7:43 PM."; Claude prints "Claude API rate limit reached. Try
@@ -8,6 +12,7 @@
 
 use std::sync::LazyLock;
 
+use harnessmux::{Failure, FailureKind};
 use jiff::{SignedDuration, Timestamp, civil, tz::TimeZone};
 use regex::Regex;
 
@@ -51,10 +56,33 @@ fn default_wait() -> SignedDuration {
     SignedDuration::from_secs(seconds.max(0))
 }
 
-/// The first usage limit in `texts`, read line by line, with its reset time
-/// read in the system time zone.
-pub fn find<'a>(texts: impl IntoIterator<Item = &'a str>, now: Timestamp) -> Option<UsageLimit> {
-    find_in(texts, now, &TimeZone::system())
+/// The first usage limit among the runner's failed turns, a time in their
+/// text read in the system time zone.
+pub fn of_failures(failures: &[Failure], now: Timestamp) -> Option<UsageLimit> {
+    of_failures_in(failures, now, &TimeZone::system())
+}
+
+/// A failure typed as a limit is one, with its `resets_at`, else the time its
+/// text names; one of no kind is a limit when its text names one; any other
+/// kind (sign-in, overload, context, transport) is none.
+fn of_failures_in(failures: &[Failure], now: Timestamp, zone: &TimeZone) -> Option<UsageLimit> {
+    failures.iter().find_map(|failure| {
+        let from_text = find_in([failure.error.as_str()], now, zone);
+        match failure.kind {
+            FailureKind::RateLimited | FailureKind::Quota => {
+                let line = from_text.as_ref().map_or_else(|| first_line(&failure.error), |limit| limit.line.clone());
+                let resets_at = failure.resets_at.as_deref().and_then(|at| at.parse::<Timestamp>().ok()).or(from_text.and_then(|limit| limit.resets_at));
+                Some(UsageLimit { line, resets_at })
+            }
+            FailureKind::Other => from_text,
+            _ => None,
+        }
+    })
+}
+
+/// The first non-empty line of `text`, shortened.
+fn first_line(text: &str) -> String {
+    shorten(text.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or_default())
 }
 
 fn find_in<'a>(texts: impl IntoIterator<Item = &'a str>, now: Timestamp, zone: &TimeZone) -> Option<UsageLimit> {
@@ -181,6 +209,37 @@ mod tests {
     fn a_past_reset_waits_at_least_a_minute() {
         let limit = find_in(["usage limit, resets 2026-11-18T09:00:00Z"], now(), &berlin()).expect("limit");
         assert_eq!(limit.resume_at(now()), "2026-11-18T10:01:00Z".parse().expect("timestamp"));
+    }
+
+    fn failure(error: &str, kind: FailureKind, resets_at: Option<&str>) -> Failure {
+        Failure { resets_at: resets_at.map(str::to_string), ..Failure::new(error, kind) }
+    }
+
+    #[test]
+    fn a_typed_limit_waits_for_its_resets_at_over_the_text() {
+        let failures = [
+            failure("You're out of extra usage", FailureKind::RateLimited, Some("2026-11-18T15:00:00Z")),
+            failure("usage limit, resets 2026-11-18T12:00:00Z", FailureKind::Other, None),
+        ];
+        let limit = of_failures_in(&failures, now(), &berlin()).expect("limit");
+        assert_eq!(limit, UsageLimit { line: "You're out of extra usage".into(), resets_at: Some("2026-11-18T15:00:00Z".parse().expect("timestamp")) });
+    }
+
+    #[test]
+    fn a_typed_limit_without_resets_at_reads_its_texts_time() {
+        let text = "You've hit your usage limit. Upgrade to Pro or try again at Nov 20th, 2026 7:43 PM.";
+        let limit = of_failures_in(&[failure(text, FailureKind::RateLimited, None)], now(), &berlin()).expect("limit");
+        assert_eq!(limit.resets_at, Some("2026-11-20T18:43:00Z".parse().expect("timestamp")));
+        let limit = of_failures_in(&[failure("Out of credits\nbuy more", FailureKind::Quota, None)], now(), &berlin()).expect("limit");
+        assert_eq!(limit, UsageLimit { line: "Out of credits".into(), resets_at: None });
+    }
+
+    #[test]
+    fn untyped_failures_fall_back_to_the_text_and_other_kinds_are_no_limit() {
+        let untyped = of_failures_in(&[failure("Claude API rate limit reached. Try again later.", FailureKind::Other, None)], now(), &berlin());
+        assert_eq!(untyped.map(|limit| limit.line).as_deref(), Some("Claude API rate limit reached. Try again later."));
+        let overloaded = failure("Codex exceeded retry limit: try again at Nov 20th, 2026 7:43 PM", FailureKind::Overloaded, None);
+        assert_eq!(of_failures_in(&[overloaded, failure("boom", FailureKind::Other, None)], now(), &berlin()), None);
     }
 
     #[test]

@@ -1,17 +1,66 @@
 title: docs/help/automation.md's job_paused names two causes; a taken-over job that runs again in a new session (DEV-734) is a third
-status: Todo
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-20T20:32:12.764651+00:00
-modified: 2026-11-20T20:32:15.158501+00:00
+modified: 2026-11-20T21:41:54.400336+00:00
 relationships:
   related:
   - DEV-734
-description: 'Found in the DEV-734 review (2026-11-20): `docs/help/automation.md:230` says `job_paused` fires on a usage limit or a paused queue. Since DEV-734, a taken-over job whose session can''t be resumed also ends paused and runs its `job_paused` rules (`docs/help/agent.md:226`). Done: automation.md lists that cause and links agent.md''s takeover section.'
+comments:
+- date: 2026-11-20T21:11:19.743133+00:00
+  author: claude
+  text: |-
+    automation.md's `job_paused` now names the third cause: a taken-over job that runs again in a new session
+
+    - `docs/help/automation.md:230`: adds the takeover cause, links `agent.md#jobs-whose-process-died`, and notes that a job with nothing to run again still fails
+    - Same gap in `docs/help/sse.md:48` and `docs/developers/sse.md:41`: `agent_job_paused` named only the paused queue (not even the usage limit). Both now list all three causes and link the three agent.md sections
+    - Wording follows DEV-734's agent.md bullet (`aa2b8b2f8`). That commit isn't on main yet (DEV-734 is Merging), so this one should land after it
+    - No other T3 thread was running or waiting, so I told no one
+  report:
+    commits:
+    - hash: 883e00b06
+      what: job_paused lists the takeover cause; SSE agent_job_paused lists all three
+    checks:
+    - command: npx prettier --check docs/help/automation.md docs/help/sse.md docs/developers/sse.md
+      result: passed
+    - command: anchor check (grep agent.md headings for usage-limits, paused-queue, jobs-whose-process-died)
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change, AGENTS.md asks link and consistency checks
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: 'Merge after DEV-734 (aa2b8b2f8, still Merging): these lines describe its behavior'
+- date: 2026-11-20T21:41:28.156414+00:00
+  author: claude
+  text: |-
+    Review: blocking. The docs describe DEV-734's behaviour, which isn't on main and went back to rework. Nothing makes this ticket wait for it.
+
+    - Read: `883e00b06` (3 docs files, one line each), the ticket's Done when, the fix comment, DEV-734's timeline and `git diff main...agent/DEV-734`. Reran `npm ci` (passed) and `npx prettier --check` on the 3 files (passed). The anchors `#usage-limits`, `#paused-queue` and `#jobs-whose-process-died` exist in `docs/help/agent.md`. Grepping `job_paused` in `docs/` finds no other page that lists only two causes
+    - **Blocking 1, `docs/help/automation.md:230`, `docs/help/sse.md:48`, `docs/developers/sse.md:41`:** they say a taken-over job whose session can't be resumed pauses and runs again. On main and on this branch, `docs/help/agent.md:226` still says "the job fails and says why", and the code does the same. DEV-734 (`aa2b8b2f8`, now `c79911816` on `agent/DEV-734`) went Merging → HelpNeeded → Todo at 21:28Z because it breaks `dev604_queue_pauses_test::a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit`. DEV-739 is only `related` to DEV-734, so a merge now would put docs on main that contradict agent.md and the code. Fix: add `lotar relationships add DEV-739 --kind depends-on DEV-734`, then rebase onto main after DEV-734 lands. Also check that DEV-734's final agent.md bullet still matches this wording
+    - **Blocking 2, `docs/help/automation.md:230`, same line:** "`job: { error: ... }` matches the pause note, which names the provider and when the job runs again". That is true for a usage limit, but DEV-734's takeover note is `<why>. Paused, not failed: the job runs again in a new session, first in the queue.` (`run_again_in_new_session` in `agent_job_service.rs`), which names neither a provider nor a time. Fix: say what the note names for each cause, or drop that clause. The sse.md `"message": "Paused, not failed: ..."` example also doesn't fit the takeover note, which starts with the reason. Mention that, or leave the example as an illustration only
+    - Done when: items 1, 2 and 4 are met. Item 3 is met in substance ("a job with nothing to run again fails"), but it leaves out the two examples (T3 Code thread, older build). That's fine to leave out
+    - Scope: the extra sse.md fixes are the same gap and in the spirit of Done when item 4. No stray files, and no other branch with this fix
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1bed5233326b43586d924cbfc83666f08ba6833a4325145d33153a12707c0c5e
+description: |-
+  Found in the DEV-734 review (2026-11-20): `docs/help/automation.md:230` says `job_paused` fires on a usage limit or a paused queue. Since DEV-734, a taken-over job whose session can't be resumed also ends paused and runs its `job_paused` rules (`docs/help/agent.md:226`). Done: automation.md lists that cause and links agent.md's takeover section.
+
+  ## Done when
+  - [ ] `docs/help/automation.md`'s `job_paused` entry names three causes: a usage limit, a paused queue, and a taken-over job whose session can't be resumed, which runs again in a new session
+  - [ ] The third cause links `agent.md#jobs-whose-process-died`, and the link resolves to that heading
+  - [ ] The wording agrees with agent.md's takeover bullet (DEV-734): no `job_failed` rule runs; a job with nothing to run again (taken over from a T3 Code thread, or started by an older build) still fails, so its `job_failed` rules run
+  - [ ] No other help page says `job_paused` has only two causes (grep `job_paused` in `docs/`)
 tags:
 - docs
+- review-returned
 history:
 - at: 2026-11-20T20:32:13.839027+00:00
   actor: claude
@@ -24,3 +73,59 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-20T21:09:39.612227+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T21:09:42.440131+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1bed5233326b43586d924cbfc83666f08ba6833a4325145d33153a12707c0c5e
+- at: 2026-11-20T21:10:18.057223+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found in the DEV-734 review (2026-11-20): `docs/help/automation.md:230` says `job_paused` fires on a usage limit or a paused queue. Since DEV-734, a taken-over job whose session can''t be resumed also ends paused and runs its `job_paused` rules (`docs/help/agent.md:226`). Done: automation.md lists that cause and links agent.md''s takeover section.'
+    new: |-
+      Found in the DEV-734 review (2026-11-20): `docs/help/automation.md:230` says `job_paused` fires on a usage limit or a paused queue. Since DEV-734, a taken-over job whose session can't be resumed also ends paused and runs its `job_paused` rules (`docs/help/agent.md:226`). Done: automation.md lists that cause and links agent.md's takeover section.
+
+      ## Done when
+      - [ ] `docs/help/automation.md`'s `job_paused` entry names three causes: a usage limit, a paused queue, and a taken-over job whose session can't be resumed, which runs again in a new session
+      - [ ] The third cause links `agent.md#jobs-whose-process-died`, and the link resolves to that heading
+      - [ ] The wording agrees with agent.md's takeover bullet (DEV-734): no `job_failed` rule runs; a job with nothing to run again (taken over from a T3 Code thread, or started by an older build) still fails, so its `job_failed` rules run
+      - [ ] No other help page says `job_paused` has only two causes (grep `job_paused` in `docs/`)
+- at: 2026-11-20T21:11:19.743133+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:11:30.612178+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T21:41:28.156414+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T21:41:36.896661+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: docs
+    new: docs, review-blocked
+- at: 2026-11-20T21:41:54.400336+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: docs, review-blocked
+    new: docs, review-returned
