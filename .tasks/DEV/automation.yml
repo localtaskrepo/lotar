@@ -138,6 +138,21 @@ automation:
                  Changed pages, components or styles: tag the ticket ui (lotar task edit ${{ticket.id}} --tag ui)
                  and attach the before and after screenshots of skill ui-review (lotar task reference add upload
                  ${{ticket.id}} <file>), linked in that comment; the reviewer blocks without them.
+    # Every job's worktree gets the repo's install from repos.json before the agent's first turn: lotar runs job_started
+    # rules after it made the worktree. The only trigger, no T3 Code scripts (owner 2026-11-20, STD-270: "keep
+    # automation all in one place", docs/decisions/2026-11-20-worktree-setup.md). It skips an install that already ran
+    # on the same lockfiles (review and merge reuse the worktree). A failed install is a comment on the ticket, not a
+    # failed job: the agent installs itself. Up to 20 minutes, as quarter-inch-studio installs five folders.
+    - name: "Jobs: set up the worktree"
+      when:
+        assignee: "@agent"
+      on:
+        job_started:
+          run:
+            command: sh
+            args: [-c, 'node "$HOME/Development/standards/scripts/worktree.ts" create']
+            timeout: 20m
+            ignore_failure: true
     - name: "Health: fix agent lifecycle"
       when:
         any:
