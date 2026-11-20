@@ -1,0 +1,439 @@
+title: relationships add --kind depends-on can't name a ticket in another repo, so a ticket can't wait for one there
+status: HelpNeeded
+priority: Medium
+type: Bug
+reporter: claude
+assignee: mallox
+created: 2026-11-20T05:28:46.710582+00:00
+modified: 2026-11-20T13:01:46.429560+00:00
+relationships:
+  related:
+  - DEV-386
+  - DEV-1
+  - DEV-728
+  - DEV-661
+comments:
+- date: 2026-11-20T06:15:21.972832+00:00
+  author: automation
+  text: The fix agent's job job-20261120T052849.247Z-3 failed (lotar agent logs job-20261120T052849.247Z-3); @fix-retry retries it on branch agent/DEV-727.
+- date: 2026-11-20T06:18:19.172380+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261120T061530.845Z-8 failed again or on a rate limit (lotar agent logs job-20261120T061530.845Z-8). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T06:51:20.446865+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A64620dc6e0d4603e9f949b19e2e62ee3739b716525cefdb69bee8941c9afc17f of the job job-20261120T052849.247Z-3 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261120T065120.392Z-16: DEV-727 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-20T06:51:24.907975+00:00
+  author: triage
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): two jobs ended the same way, the run went 'waiting' on a background clippy build and the t3 runner exited 1. The diff in the worktree is finished: only lint, npm test and npm run smoke remain. Run the checks in the foreground (wait for them), then commit.
+  answer:
+    to: 2026-11-20T06:18:19.172380+00:00
+    choice:
+    - fix-fable
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): two jobs ended the same way, the run went ''waiting'' on a background clippy build and the t3 runner exited 1. The diff in the worktree is finished: only lint, npm test and npm run smoke remain. Run the checks in the foreground (wait for them), then commit.'
+- date: 2026-11-20T06:56:44.415695+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5e7fbe4d2514fd22e33ef7146522fa10f350d9c35d94d980ccf471a7f54e81e of the job job-20261120T061530.845Z-8 again, beside the running job job-20261120T065120.392Z-16. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-20T06:58:14.595510+00:00
+  author: claude
+  text: |-
+    Fixed: `relationships add --kind depends-on STD-259 HARN-2` now resolves `HARN-2` to `harnessmux:HARN-2` when only one registered repo has project HARN.
+
+    - `crates/lotar-tasks/src/services/external_tasks.rs`: new `qualify()`. A bare ID whose project is in no local tasks folder but in exactly one repo from the `repos` setting becomes `repo:ID`.
+    - `crates/lotar-tasks/src/services/relationships.rs`: `mutate` tries `qualify()` after `repo:ID`. The "missing" error now says to name the ticket as `<repo>:<ID>`.
+    - New test in `crates/lotar-lib/tests/dev386_cross_repo_relationships_test.rs`: the ticket is accepted, goes Blocked, unblocks when the other ticket is Done, and can be removed. A project in no registered repo still gives the error.
+    - `docs/help/task.md` updated.
+    - Still needed: harnessmux is not in `repos` on this machine. [STD-261](https://standards.pyxzl.net/task/STD-261) (in progress in standards) adds it. Until then the STD-259 command still reports HARN-2 as missing.
+  report:
+    commits:
+    - hash: c90f187fe
+      what: a bare ID of a project found in one registered repo is stored as repo:ID
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2416 Rust, 1563 UI
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    - command: STD-259 command on the real machine
+      result: not_run
+      reason: harnessmux is not in repos yet (STD-261)
+    next: Review, then merge; the STD-259 command works once STD-261 registers harnessmux
+- date: 2026-11-20T07:00:17.650879+00:00
+  author: claude
+  text: |-
+    Fixed: `relationships add --kind depends-on STD-1 HARN-2` names the ticket in another repo when HARN is in no local tasks folder and in exactly one repo of the `repos` setting.
+
+    - `external_tasks::qualify` turns the bare ID into `harnessmux:HARN-2`; `relationships::mutate` uses it (CLI, REST, MCP).
+    - A missing ID now says to write `<repo>:<ID>` with a repo from the `repos` setting.
+    - Blocking and unblocking work as for `repo:ID` (DEV-386): test `a_bare_id_of_a_project_in_one_registered_repo_names_the_ticket_there`.
+    - Docs: `docs/help/task.md` (Tasks in another repo).
+    - Ran against the real `~/Development/@localtaskrepo/harnessmux` from a scratch workspace that registers it: `HARN-2` stored as `harnessmux:HARN-2 [Todo]`.
+    - The STD-259 command itself still fails: harnessmux is missing from `repos:` in standards' `configs/lotar/agents.yml`. Filed as [STD-261](https://standards.pyxzl.net/task/STD-261).
+  report:
+    commits:
+    - hash: c90f187fe
+      what: a bare ID of a project found only in one registered repo is stored as repo:ID
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2416 Rust, 1563 UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    - command: STD-259 command on the real machine
+      result: not_run
+      reason: harnessmux is not in repos yet (STD-261)
+    next: Review, then merge; the STD-259 command works once STD-261 registers harnessmux
+- date: 2026-11-20T07:01:28.776252+00:00
+  author: claude
+  text: |-
+    Retry job (@fix-fable): the fix is already committed as `c90f187fe`, the worktree is clean, nothing more to change.
+
+    - Rechecked on `c90f187fe`: `cargo nextest run -p lotar-lib --test integration dev386`, 7 of 7 passed.
+    - Ran the worktree build from a scratch workspace that registers the real `~/Development/@localtaskrepo/harnessmux`: `task relationships add --kind depends-on STD-1 HARN-2` stores `harnessmux:HARN-2` and shows it as `[Todo]`.
+    - Lint, `npm test` and `npm run smoke` passed in the earlier job on the same commit; I did not rerun them.
+    - The STD-259 command itself still fails on this machine: `configs/lotar/agents.yml` in standards has no `harnessmux` under `repos:`. [STD-261](https://standards.pyxzl.net/task/STD-261) adds it, and is Blocked on STD-259.
+  report:
+    commits:
+    - hash: c90f187fe
+      what: a bare ID of a project found only in one registered repo is stored as repo:ID
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev386
+      result: passed
+      reason: 7 tests, this job
+    - command: npm run lint
+      result: passed
+      reason: earlier job on c90f187fe, not rerun
+    - command: npm test
+      result: passed
+      reason: earlier job on c90f187fe, not rerun
+    - command: npm run smoke
+      result: passed
+      reason: earlier job on c90f187fe, not rerun
+    - command: STD-259 command on the real machine
+      result: not_run
+      reason: harnessmux is not in repos yet (STD-261)
+    next: Review, then merge; the STD-259 command works once STD-261 registers harnessmux
+- date: 2026-11-20T10:14:49.171443+00:00
+  author: claude
+  text: |-
+    Review: passed. `c90f187fe` makes a bare `HARN-2` work when only one registered repo holds HARN; the STD-259 command itself still needs standards to register harnessmux.
+
+    - **Read:** the diff (`external_tasks.rs` `qualify`, `relationships.rs` `mutate` and the missing-task hint, `docs/help/task.md`), the ticket and its comments, DEV-386, AGENTS.md, testing-strategy. main hasn't touched these files since the branch point (`e63dfc1a2`).
+    - **Design fits the ticket:** "registered workspace" = the `repos` setting from DEV-386. A local project wins, a project in two repos stays ambiguous (error), and only one-sided `mutate` paths change (CLI, REST, MCP all go through it).
+    - **Test failed before the fix:** with the two source files reverted and the `lotar` binary rebuilt, `a_bare_id_of_a_project_in_one_registered_repo_names_the_ticket_there` failed with "Relationship task 'DEV-1' is missing". With the fix: `cargo nextest run -p lotar-lib --test integration dev386` gave 7/7 passed. Files restored, worktree clean.
+    - **Caveat on the fix agent's recheck:** `-p lotar-lib` doesn't rebuild the root `lotar` binary (testing-strategy line 39), so a `-p` run alone proves nothing. My before and after runs rebuilt it with `cargo build -p lotar --bin lotar`.
+    - **Also ran:** `npm ci` passed, `rustfmt --edition 2024 --check` on the 3 changed files passed.
+    - **Not rerun:** `npm run lint`, `npm test`, `npm run smoke`. The fix agent reports they passed on this same commit.
+    - **Done line, outside lotar:** standards' `.tasks/config.yml` `repos:` has no harnessmux. [STD-261](https://standards.pyxzl.net/task/STD-261) adds it but is Blocked on STD-259, which needs STD-261 first, so neither will resume. Filed [STD-262](https://standards.pyxzl.net/task/STD-262), related to DEV-727.
+    - **My slip, fixed:** a first `lotar add` without `--tasks-dir` filed that ticket here as DEV-728 (tag health). I hard-deleted it within a minute and removed its `related` link from DEV-727.
+- date: 2026-11-20T12:47:37.830992+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+     57, 55, 57, 48, 49, 43, 48, 48, 58, 48, 48, 10, 109, 111, 100, 105, 102, 105, 101, 100, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 51, 46, 49, 55, 56, 57, 51, 50, 43, 48, 48, 58, 48, 48, 10, 99, 111, 109, 109, 101, 110, 116, 115, 58, 10, 45, 32, 100, 97, 116, 101, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 51, 46, 49, 55, 56, 57, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 117, 116, 104, 111, 114, 58, 32, 97, 117, 116, 111, 109, 97, 116, 105, 111, 110, 10, 32, 32, 116, 101, 120, 116, 58, 32, 39, 84, 104, 101, 32, 113, 117, 101, 117, 101, 100, 32, 64, 99, 111, 112, 105, 108, 111, 116, 32, 106, 111, 98, 32, 100, 105, 100, 32, 110, 111, 116, 32, 115, 116, 97, 114, 116, 32, 97, 102, 116, 101, 114, 32, 52, 32, 116, 114, 105, 101, 115, 32, 97, 110, 100, 32, 108, 101, 102, 116, 32, 116, 104, 101, 32, 113, 117, 101, 117, 101, 58, 32, 86, 97, 108, 105, 100, 97, 116, 105, 111, 110, 32, 101, 114, 114, 111, 114, 58, 32, 85, 110, 115, 117, 112, 112, 111, 114, 116, 101, 100, 32, 114, 117, 110, 110, 101, 114, 32, 39, 39, 102, 97, 107, 101, 45, 114, 117, 110, 110, 101, 114, 39, 39, 46, 32, 69, 120, 112, 101, 99, 116, 101, 100, 32, 99, 108, 97, 117, 100, 101, 44, 32, 99, 111, 100, 101, 120, 44, 32, 99, 111, 112, 105, 108, 111, 116, 44, 32, 103, 101, 109, 105, 110, 105, 44, 32, 99, 117, 114, 115, 111, 114, 44, 32, 97, 109, 112, 44, 32, 100, 114, 111, 105, 100, 44, 32, 111, 112, 101, 110, 99, 111, 100, 101, 44, 32, 107, 105, 108, 111, 44, 32, 97, 110, 116, 105, 103, 114, 97, 118, 105, 116, 121, 44, 32, 116, 51, 44, 32, 99, 111, 109, 109, 97, 110, 100, 39, 10, 104, 105, 115, 116, 111, 114, 121, 58, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 51, 49, 56, 55, 54, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 55, 50, 53, 51, 49, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 49, 46, 56, 55, 48, 55, 51, 54, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 50, 46, 56, 51, 53, 50, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 97, 108, 105, 99, 101, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 51, 46, 49, 55, 56, 57, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 97, 117, 116, 111, 109, 97, 116, 105, 111, 110, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 99, 111, 109, 109, 101, 110, 116, 95, 97, 100, 100, 101, 100, 10]
+         right: [116, 105, 116, 108, 101, 58, 32, 65, 103, 101, 110, 116, 32, 100, 105, 114, 101, 99, 116, 105, 118, 101, 32, 116, 97, 114, 103, 101, 116, 10, 115, 116, 97, 116, 117, 115, 58, 32, 84, 111, 100, 111, 10, 112, 114, 105, 111, 114, 105, 116, 121, 58, 32, 77, 101, 100, 105, 117, 109, 10, 116, 121, 112, 101, 58, 32, 70, 101, 97, 116, 117, 114, 101, 10, 114, 101, 112, 111, 114, 116, 101, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 97, 115, 115, 105, 103, 110, 101, 101, 58, 32, 97, 108, 105, 99, 101, 10, 99, 114, 101, 97, 116, 101, 100, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 49, 57, 55, 57, 48, 49, 43, 48, 48, 58, 48, 48, 10, 109, 111, 100, 105, 102, 105, 101, 100, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 50, 46, 56, 51, 53, 50, 51, 50, 43, 48, 48, 58, 48, 48, 10, 104, 105, 115, 116, 111, 114, 121, 58, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 51, 49, 56, 55, 54, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 55, 50, 53, 51, 49, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 49, 46, 56, 55, 48, 55, 51, 54, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 50, 46, 56, 51, 53, 50, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 97, 108, 105, 99, 101, 10]
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [  29.938s] 800/2416 tests run: 799 passed, 1 failed, 0 skipped
+            FAIL [   3.432s] ( 787/2416) lotar-lib::integration cli_noop_mutations_test::cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions
+      stdout ───
+
+        running 1 test
+        test cli_noop_mutations_test::cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions ... FAILED
+
+        failures:
+
+        failures:
+            cli_noop_mutations_test::cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1602 filtered out; finished in 3.36s
+
+      stderr ───
+
+        thread 'cli_noop_mutations_test::cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions' (106678314) panicked at crates/lotar-lib/tests/cli_noop_mutations_test.rs:134:5:
+        assertion `left == right` failed: unregistered human @-alias and case variants: task YAML bytes must be preserved
+          left: [116, 105, 116, 108, 101, 58, 32, 65, 103, 101, 110, 116, 32, 100, 105, 114, 101, 99, 116, 105, 118, 101, 32, 116, 97, 114, 103, 101, 116, 10, 115, 116, 97, 116, 117, 115, 58, 32, 84, 111, 100, 111, 10, 112, 114, 105, 111, 114, 105, 116, 121, 58, 32, 77, 101, 100, 105, 117, 109, 10, 116, 121, 112, 101, 58, 32, 70, 101, 97, 116, 117, 114, 101, 10, 114, 101, 112, 111, 114, 116, 101, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 97, 115, 115, 105, 103, 110, 101, 101, 58, 32, 97, 108, 105, 99, 101, 10, 99, 114, 101, 97, 116, 101, 100, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 49, 57, 55, 57, 48, 49, 43, 48, 48, 58, 48, 48, 10, 109, 111, 100, 105, 102, 105, 101, 100, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 51, 46, 49, 55, 56, 57, 51, 50, 43, 48, 48, 58, 48, 48, 10, 99, 111, 109, 109, 101, 110, 116, 115, 58, 10, 45, 32, 100, 97, 116, 101, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 51, 46, 49, 55, 56, 57, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 117, 116, 104, 111, 114, 58, 32, 97, 117, 116, 111, 109, 97, 116, 105, 111, 110, 10, 32, 32, 116, 101, 120, 116, 58, 32, 39, 84, 104, 101, 32, 113, 117, 101, 117, 101, 100, 32, 64, 99, 111, 112, 105, 108, 111, 116, 32, 106, 111, 98, 32, 100, 105, 100, 32, 110, 111, 116, 32, 115, 116, 97, 114, 116, 32, 97, 102, 116, 101, 114, 32, 52, 32, 116, 114, 105, 101, 115, 32, 97, 110, 100, 32, 108, 101, 102, 116, 32, 116, 104, 101, 32, 113, 117, 101, 117, 101, 58, 32, 86, 97, 108, 105, 100, 97, 116, 105, 111, 110, 32, 101, 114, 114, 111, 114, 58, 32, 85, 110, 115, 117, 112, 112, 111, 114, 116, 101, 100, 32, 114, 117, 110, 110, 101, 114, 32, 39, 39, 102, 97, 107, 101, 45, 114, 117, 110, 110, 101, 114, 39, 39, 46, 32, 69, 120, 112, 101, 99, 116, 101, 100, 32, 99, 108, 97, 117, 100, 101, 44, 32, 99, 111, 100, 101, 120, 44, 32, 99, 111, 112, 105, 108, 111, 116, 44, 32, 103, 101, 109, 105, 110, 105, 44, 32, 99, 117, 114, 115, 111, 114, 44, 32, 97, 109, 112, 44, 32, 100, 114, 111, 105, 100, 44, 32, 111, 112, 101, 110, 99, 111, 100, 101, 44, 32, 107, 105, 108, 111, 44, 32, 97, 110, 116, 105, 103, 114, 97, 118, 105, 116, 121, 44, 32, 116, 51, 44, 32, 99, 111, 109, 109, 97, 110, 100, 39, 10, 104, 105, 115, 116, 111, 114, 121, 58, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 51, 49, 56, 55, 54, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 55, 50, 53, 51, 49, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 49, 46, 56, 55, 48, 55, 51, 54, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 50, 46, 56, 51, 53, 50, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 97, 108, 105, 99, 101, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 51, 46, 49, 55, 56, 57, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 97, 117, 116, 111, 109, 97, 116, 105, 111, 110, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 99, 111, 109, 109, 101, 110, 116, 95, 97, 100, 100, 101, 100, 10]
+         right: [116, 105, 116, 108, 101, 58, 32, 65, 103, 101, 110, 116, 32, 100, 105, 114, 101, 99, 116, 105, 118, 101, 32, 116, 97, 114, 103, 101, 116, 10, 115, 116, 97, 116, 117, 115, 58, 32, 84, 111, 100, 111, 10, 112, 114, 105, 111, 114, 105, 116, 121, 58, 32, 77, 101, 100, 105, 117, 109, 10, 116, 121, 112, 101, 58, 32, 70, 101, 97, 116, 117, 114, 101, 10, 114, 101, 112, 111, 114, 116, 101, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 97, 115, 115, 105, 103, 110, 101, 101, 58, 32, 97, 108, 105, 99, 101, 10, 99, 114, 101, 97, 116, 101, 100, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 49, 57, 55, 57, 48, 49, 43, 48, 48, 58, 48, 48, 10, 109, 111, 100, 105, 102, 105, 101, 100, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 50, 46, 56, 51, 53, 50, 51, 50, 43, 48, 48, 58, 48, 48, 10, 104, 105, 115, 116, 111, 114, 121, 58, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 51, 49, 56, 55, 54, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 48, 46, 55, 50, 53, 51, 49, 49, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 49, 46, 56, 55, 48, 55, 51, 54, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 39, 64, 99, 111, 112, 105, 108, 111, 116, 39, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 45, 32, 97, 116, 58, 32, 50, 48, 50, 54, 45, 49, 49, 45, 50, 48, 84, 49, 50, 58, 52, 55, 58, 51, 50, 46, 56, 51, 53, 50, 51, 50, 43, 48, 48, 58, 48, 48, 10, 32, 32, 97, 99, 116, 111, 114, 58, 32, 100, 101, 118, 111, 110, 101, 111, 104, 10, 32, 32, 99, 104, 97, 110, 103, 101, 115, 58, 10, 32, 32, 45, 32, 102, 105, 101, 108, 100, 58, 32, 97, 115, 115, 105, 103, 110, 101, 101, 10, 32, 32, 32, 32, 111, 108, 100, 58, 32, 99, 111, 112, 105, 108, 111, 116, 10, 32, 32, 32, 32, 110, 101, 119, 58, 32, 97, 108, 105, 99, 101, 10]
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 1616/2416 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    ```.
+
+    - Rebase onto `main` changed nothing (`c90f187fe35b`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-20T13:01:26.807533+00:00
+  author: claude
+  text: |-
+    Merge stopped: `test:agent` fails on a flaky test unrelated to DEV-727. Land anyway, or wait for [DEV-728](https://lotar.pyxzl.net/task/DEV-728)?
+
+    - No rebase needed: `c90f187fe` already sits on main `e63dfc1a2`. `lint:agent` passed in lotar's run.
+    - `cli_noop_mutations_test::cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions` failed in lotar's run and in 1 of my 3 full runs; alone it passed 5 of 5. The cause: assigning `@copilot` (fake runner) queues a job, and the job's give-up comment (from DEV-661) sometimes lands after the test's last snapshot. DEV-727 doesn't touch assignment or the queue, so main has the same flake.
+    - My other 2 full runs failed on timeouts while the load average was 30 to 49: `dev503_harness_jobs_test::a_ticket_hands_its_context…` and `web_api_integration_test::sse_delivers_during_a_steady_stream_of_events`. Both passed alone or in the other runs.
+    - `test:agent` allows no retries, so I didn't land the branch. Filed [DEV-728](https://lotar.pyxzl.net/task/DEV-728) for the flake.
+    - Not run: `npm run smoke`.
+  report:
+    checks:
+    - command: npm run -s test:agent
+      result: failed
+      reason: flaky cli_noop_mutations_test (DEV-728), 2 of 3 runs; the other runs hit load timeouts in dev503 and SSE tests
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run smoke
+      result: not_run
+      reason: test:agent failed first
+    next: 'Answer: land c90f187fe despite the DEV-728 flake, or wait for DEV-728'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A64620dc6e0d4603e9f949b19e2e62ee3739b716525cefdb69bee8941c9afc17f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5e7fbe4d2514fd22e33ef7146522fa10f350d9c35d94d980ccf471a7f54e81e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87c4fed47c069df2c0f3af11bb18f4917fa1d1debfbe16535ea916e4a50d767e
+description: |-
+  Found (standards STD-259, 2026-11-19): the fix job's step "It waits for another ticket: lotar task relationships add --kind depends-on STD-259 <ID>" fails when the blocker lives in another repo: `lotar --tasks-dir ~/Development/standards/.tasks task relationships add --kind depends-on STD-259 HARN-2` gives "Validation error: Relationship task 'HARN-2' is missing" (HARN-2 is in ~/Development/@localtaskrepo/harnessmux/.tasks).
+
+  - Effect: the ticket doesn't go Blocked on its own and nothing resumes it when the other repo's ticket is done; the agent sets Blocked by hand.
+  Check: a depends-on to a ticket of another lotar repo on this machine (a registered workspace) is accepted, blocks the ticket and unblocks it when that ticket is done.
+  Done: the STD-259 command above works.
+tags:
+- health
+custom_fields:
+  finding: cross-repo-depends-on:relationships
+history:
+- at: 2026-11-20T05:28:46.972430+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T05:29:07.329692+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T05:29:17.544935+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A64620dc6e0d4603e9f949b19e2e62ee3739b716525cefdb69bee8941c9afc17f
+- at: 2026-11-20T06:15:21.079013+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-20T06:15:21.972832+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:15:38.640366+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5e7fbe4d2514fd22e33ef7146522fa10f350d9c35d94d980ccf471a7f54e81e
+- at: 2026-11-20T06:18:18.607874+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-20T06:18:19.172380+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:51:20.346233+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T06:51:20.446865+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:51:23.499082+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T06:51:24.907975+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:51:27.862840+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fable
+- at: 2026-11-20T06:56:44.415695+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:58:14.595510+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T07:00:17.650879+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T07:00:17.835909+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-386"]}'
+- at: 2026-11-20T07:00:28.088452+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+- at: 2026-11-20T07:00:28.222379+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-fable'
+- at: 2026-11-20T07:00:34.226526+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-20T07:00:35.419325+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87c4fed47c069df2c0f3af11bb18f4917fa1d1debfbe16535ea916e4a50d767e
+- at: 2026-11-20T07:01:28.776252+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T07:01:34.817554+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-fable'
+    new: '@review'
+- at: 2026-11-20T10:13:51.554757+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386"]}'
+    new: '{"related":["DEV-386","DEV-728"]}'
+- at: 2026-11-20T10:14:29.785443+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386","DEV-728"]}'
+    new: '{"related":["DEV-386"]}'
+- at: 2026-11-20T10:14:49.171443+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T10:14:50.084448+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386"]}'
+    new: '{"related":["DEV-386","DEV-1"]}'
+- at: 2026-11-20T10:15:00.167683+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-20T12:47:37.830992+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:01:08.532421+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386","DEV-1"]}'
+    new: '{"related":["DEV-386","DEV-1","DEV-728"]}'
+- at: 2026-11-20T13:01:26.807533+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:01:27.633080+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386","DEV-1","DEV-728"]}'
+    new: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661"]}'
+- at: 2026-11-20T13:01:46.286704+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried, retry-fable
+    new: health
+- at: 2026-11-20T13:01:46.429560+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T16:52:16.648521+00:00
-modified: 2026-11-18T19:15:14.749378+00:00
+modified: 2026-11-20T13:01:27.630708+00:00
 relationships:
   depends_on:
   - local:LOCA-501
@@ -14,6 +14,8 @@ relationships:
   - DEV-623
   - DEV-676
   - DEV-530
+  - DEV-728
+  - DEV-727
 comments:
 - date: 2026-11-17T17:21:46.437045+00:00
   author: automation
@@ -473,3 +475,15 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676"]}'
     new: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676","DEV-530"]}'
+- at: 2026-11-20T13:01:08.524874+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676","DEV-530"]}'
+    new: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676","DEV-530","DEV-728"]}'
+- at: 2026-11-20T13:01:27.630708+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676","DEV-530","DEV-728"]}'
+    new: '{"depends_on":["local:LOCA-501"],"related":["DEV-660","DEV-623","DEV-676","DEV-530","DEV-728","DEV-727"]}'

@@ -56,7 +56,10 @@ impl NoopCliEnv {
 
     fn lotar(&self) -> assert_cmd::Command {
         let mut cmd = common::lotar_cmd().expect("lotar binary");
+        // Assigning a registered agent queues a job; without a worker it stays
+        // queued instead of giving up and commenting on the ticket (DEV-728).
         cmd.env("LOTAR_TEST_SILENT", "1")
+            .env("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1")
             .env("LOTAR_DEFAULT_REPORTER", "devoneoh")
             .current_dir(self.fixtures.get_temp_path())
             .arg("--tasks-dir")
@@ -108,9 +111,8 @@ impl NoopCliEnv {
 
     /// Register a FAKE agent profile in the NOP project config: the name is
     /// a recognized directive for normalization/comparison, but no real
-    /// model, runner binary, or repository exists and assigning it never
-    /// launches anything (assignment only stores the directive; no
-    /// automation is configured in this fixture).
+    /// model, runner binary, or repository exists. Assigning it queues a job
+    /// that never starts: `lotar()` disables the queue worker.
     fn register_fake_agent_profile(&self, name: &str) {
         let project_dir = self.fixtures.tasks_root.join("NOP");
         std::fs::create_dir_all(&project_dir).expect("create project dir");
@@ -264,9 +266,9 @@ fn cli_assignee_same_value_aliases_report_property_noop() {
 /// persist the exact directive/human spelling, write bytes, bump
 /// `modified`, and record one history entry each. Unregistered-human
 /// spellings (`@alice` vs `alice`, case variants) remain no-ops. The
-/// agent profile is a fake fixture (`agents: {copilot: fake-runner}`):
-/// assignment only stores the directive, so no agent process is launched
-/// and nothing needs cleanup.
+/// agent profile is a fake fixture (`agents: {copilot: fake-runner}`); the
+/// job its assignment queues never starts because the fixture disables the
+/// queue worker, so nothing writes to the ticket behind the test's back.
 #[test]
 fn cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions() {
     let env = NoopCliEnv::new("auto.populate_members: true\n");

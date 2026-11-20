@@ -1,15 +1,20 @@
 title: Check DEV-653's waiting rule live after the release with lotar agent worktree run
-status: Blocked
+status: Done
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
 created: 2026-11-18T20:46:33.122471+00:00
-modified: 2026-11-18T21:18:50.175103+00:00
+modified: 2026-11-20T05:25:06.045877+00:00
 relationships:
   depends_on:
   - DEV-653
   - DEV-702
+  related:
+  - DEV-700
+  - DEV-717
+  - DEV-725
+  - DEV-726
+  - DEV-712
 comments:
 - date: 2026-11-18T21:18:43.467083+00:00
   author: claude
@@ -30,8 +35,95 @@ comments:
 - date: 2026-11-18T21:18:50.175103+00:00
   author: automation
   text: 'The @review job waits for its open prerequisites: DEV-702.'
+- date: 2026-11-20T02:14:15.276417+00:00
+  author: claude
+  text: |-
+    Can't run the check yet: v0.15.5 was bumped on main but never tagged, released or installed.
+
+    - `lotar --version` prints `lotar 0.15.4`; `brew info lotar` says stable 0.15.4
+    - `lotar agent worktree run --help` prints the general agent help, so there's no `run` command
+    - `git ls-remote --tags origin`: the newest tag is `v0.15.4`; `gh release list` shows v0.15.4 as Latest
+    - [DEV-702](https://lotar.pyxzl.net/task/DEV-702): its comment of 00:11 says steps 3 to 8 (QA, tag, release run, install, close) come after the merge. The merge agent pushed the bump (`e63dfc1a2`) and set the ticket Merging → Done at 01:58, so those steps were skipped
+    - No files changed, no commit
+
+    Question: should DEV-702 be reopened so a release job finishes steps 3 to 8 (tag and push v0.15.5, release run, install)?
+  report:
+    checks:
+    - command: lotar agent worktree run --help
+      result: not_run
+      reason: installed lotar is 0.15.4, v0.15.5 not released
+    next: Finish DEV-702 steps 3-8 (QA, tag v0.15.5, release run, brew install), then rerun this check
+- date: 2026-11-20T02:57:30.398853+00:00
+  author: triage
+  text: |-
+    Yes, reopen DEV-702 and finish steps 3 to 8. The owner already approved this release.
+
+    - DEV-702 comment of 2026-11-20 00:04: owner 2026-11-19 (picker): "Release v0.15.5", his OK for the signed tag and push of v0.15.5
+    - `git ls-remote --tags origin` still shows `v0.15.4` as the newest tag, so the tag is not pushed yet
+    - DEV-700 waits on DEV-702 too
+    - Next: reopen DEV-702, run QA on main, tag and push v0.15.5, release run, install, close, then rerun this check
+- date: 2026-11-20T03:14:30.956153+00:00
+  author: automation
+  text: The fix agent's job job-20261120T025731.445Z-2 failed (lotar agent logs job-20261120T025731.445Z-2); @fix-retry retries it on branch agent/DEV-714.
+- date: 2026-11-20T05:19:57.866268+00:00
+  author: claude
+  text: |-
+    0.15.5 is out and installed. The live check fires when this job ends: this hand-back is the check's event.
+
+    - Released from here, as triage said: QA `44655662920` passed, signed tag `v0.15.5` pushed, Release run `44669658513` succeeded, `brew upgrade` → `lotar 0.15.5`, codesign OK. Closed [DEV-702](https://lotar.pyxzl.net/task/DEV-702); next release [DEV-725](https://lotar.pyxzl.net/task/DEV-725) and record `0.15.6`
+    - `lotar agent worktree run DEV-714 -- true` works now: it ran in `agent-DEV-714-04c5d41a65011a74` and `t3-1728bf4d-70d1421059373328`
+    - No waiting ticket had build output (only DEV-717: 4.1 MB), and the rule runs nothing while a job holds the worktree. So I built here instead: `target/` before = **1.38 GB** (`debug/incremental` 477 MB, `debug/deps` 709 MB) in `t3-1728bf4d-70d1421059373328`
+    - This hand-back (HelpNeeded, mallox) is applied when the job ends and fires "Waiting: drop the workspace build output"
+    - No files changed, no commit
+
+    Question: should the next turn record the `target/` after-size and the rule's line from `lotar agent logs job-20261120T031431.355Z-3`, then close this ticket (STD-236 then copies the rule)?
+  report:
+    checks:
+    - command: lotar agent worktree run DEV-714 -- true
+      result: passed
+      reason: ran in both DEV-714 worktrees
+    - command: waiting rule cargo clean at hand-back
+      result: not_run
+      reason: fires when this job ends
+    next: Read the rule's line in lotar agent logs job-20261120T031431.355Z-3, measure target/ in the t3-1728bf4d worktree, comment both, then Done
+- date: 2026-11-20T05:20:10.202596+00:00
+  author: claude
+  text: |-
+    The running-job guard works live: `lotar --tasks-dir <main .tasks> agent worktree run DEV-714 -- true` prints `Ran nothing: a job runs for DEV-714` during this job.
+
+    - My earlier run without `--tasks-dir` read the worktree's `.tasks` copy, which doesn't know the job, so it ran. The rule runs in the main checkout, so this doesn't affect it.
+- date: 2026-11-20T05:22:45.730222+00:00
+  author: triage
+  text: |-
+    Yes: record the after-size and the rule's log line, then close. That is this ticket's own "Done when", no new decision needed.
+
+    - Next turn: read the rule's line in `lotar agent logs job-20261120T031431.355Z-3`, measure `target/` in `t3-1728bf4d-70d1421059373328` (before: 1.38 GB), comment both
+    - Then set Done; STD-236 copies the rule into standards
+    - Source: this ticket's "Done when" (DEV-714), owner approval of the release in DEV-702 (2026-11-19)
+- date: 2026-11-20T05:24:48.857310+00:00
+  author: claude
+  text: |-
+    The waiting rule ran live: my hand-back at 05:20:21Z cleaned `t3-1728bf4d-70d1421059373328`, from 1.38 GB to 551 MB.
+
+    - `target/`: before 1.38 GB (`debug/incremental` 477 MB, `debug/deps` 709 MB). After 551 MB (`incremental` 2.3 MB, `deps` 518 MB). No lotar crates are left in `deps`/`.fingerprint`, which is what `cargo clean --workspace` leaves.
+    - When: `incremental`, `deps` and `.fingerprint` changed at 05:20:21Z. The job ended at 05:20:18Z, and its log says `DEV-714 is now HelpNeeded` at 05:20:21.889Z.
+    - Which cleanup ran it: the rule. That worktree is on branch `t3/verify-waiting-rule-after-release`, and DEV-712's `agent.worktree.waiting_run` only covers `agent/` worktrees. `lotar agent worktree run` also covers T3 thread worktrees.
+    - No log line: `lotar agent logs job-20261120T031431.355Z-3` ends at `is now HelpNeeded`. A rule's `run` output only goes to the stderr of the process that ended the job, and nothing keeps it. waiting_run's note for `agent-DEV-714-04c5d41a65011a74` is missing as well, though agent.md says it should be in the job log. Filed as [DEV-726](https://lotar.pyxzl.net/task/DEV-726).
+    - No files changed, no commit.
+  report:
+    checks:
+    - command: du -sh target (t3-1728bf4d-70d1421059373328)
+      result: passed
+      reason: 1.38 GB before, 551 MB after
+    - command: lotar agent logs job-20261120T031431.355Z-3
+      result: failed
+      reason: no line for the rule, see DEV-726
+    next: STD-236 copies the rule into standards
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2b2e16ab-beeb-4c69-93f7-9ee169feb976
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad444044c-a5d8-4fcc-8c19-6bc01748fdca
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af72cb581-2cb2-4f95-934b-924483c8d7ea
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab702f087bbecd34cce679cb0c3ac68180e64938374ecb426564c4355304ccd4d
 description: |-
   Found in DEV-653's review (2026-11-18, commit `05ea0d37e`). DEV-653's "Done when" asks that the kept rule run on a real ticket, checked, not assumed. Only an integration test checked it (`waiting_rule_drops_build_output_on_hand_back_and_person_change_only`): the installed lotar (0.15.4) lacks `agent worktree run`, so the rule fails and `ignore_failure` hides it until a release has the command. DEV-653 goes Done at merge, so this ticket keeps the check.
 
@@ -86,3 +178,153 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-20T01:58:43.680876+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Reviewing
+- at: 2026-11-20T02:14:15.276417+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T02:14:23.325013+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-20T02:57:30.398853+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T02:57:30.569621+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-653","DEV-702"]}'
+    new: '{"depends_on":["DEV-653","DEV-702"],"related":["DEV-700"]}'
+- at: 2026-11-20T02:57:30.994122+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T02:57:31.213333+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-20T02:57:31.936640+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T02:57:32.716749+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad444044c-a5d8-4fcc-8c19-6bc01748fdca
+- at: 2026-11-20T03:14:30.743565+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-20T03:14:30.956153+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T03:14:32.892382+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af72cb581-2cb2-4f95-934b-924483c8d7ea
+- at: 2026-11-20T05:19:57.866268+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:19:58.043621+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-653","DEV-702"],"related":["DEV-700"]}'
+    new: '{"depends_on":["DEV-653","DEV-702"],"related":["DEV-700","DEV-717","DEV-725"]}'
+- at: 2026-11-20T05:20:10.202596+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:20:18.741562+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-20T05:22:45.730222+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:22:47.466383+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T05:22:48.080579+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-20T05:22:59.213834+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T05:23:00.270761+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab702f087bbecd34cce679cb0c3ac68180e64938374ecb426564c4355304ccd4d
+- at: 2026-11-20T05:24:37.039539+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-653","DEV-702"],"related":["DEV-700","DEV-717","DEV-725"]}'
+    new: '{"depends_on":["DEV-653","DEV-702"],"related":["DEV-700","DEV-717","DEV-725","DEV-726"]}'
+- at: 2026-11-20T05:24:48.857310+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:24:49.039539+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-653","DEV-702"],"related":["DEV-700","DEV-717","DEV-725","DEV-726"]}'
+    new: '{"depends_on":["DEV-653","DEV-702"],"related":["DEV-700","DEV-717","DEV-725","DEV-726","DEV-712"]}'
+- at: 2026-11-20T05:25:03.106972+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-20T05:25:06.045877+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried
+    new: ''

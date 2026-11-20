@@ -1,0 +1,367 @@
+title: 'Flaky test: a queued @copilot job''s give-up comment lands in cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions'
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-20T13:01:07.317903+00:00
+modified: 2026-11-20T13:29:42.698334+00:00
+relationships:
+  related:
+  - DEV-661
+  - DEV-727
+  - DEV-729
+  - DEV-730
+comments:
+- date: 2026-11-20T13:05:10.750164+00:00
+  author: automation
+  text: The fix agent's job job-20261120T130111.184Z-26 failed (lotar agent logs job-20261120T130111.184Z-26); @fix-retry retries it on branch agent/DEV-728.
+- date: 2026-11-20T13:06:02.118915+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261120T130512.436Z-27 failed again or on a rate limit (lotar agent logs job-20261120T130512.436Z-27). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T13:06:27.089858+00:00
+  author: triage
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): both jobs (-26, -27) ended with 'run ended with status waiting' and exit code 1 while the 3x `npm run -s test:agent` check was running; no rate limit. The fix is in the worktree, uncommitted. Run the 3 checks in the background and poll, or in one go with a long timeout.
+  answer:
+    to: 2026-11-20T13:06:02.118915+00:00
+    choice:
+    - fix-fable
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): both jobs (-26, -27) ended with ''run ended with status waiting'' and exit code 1 while the 3x `npm run -s test:agent` check was running; no rate limit. The fix is in the worktree, uncommitted. Run the 3 checks in the background and poll, or in one go with a long timeout.'
+- date: 2026-11-20T13:07:00.530698+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261120T130633.048Z-1 failed again or on a rate limit (lotar agent logs job-20261120T130633.048Z-1). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T13:20:18.811824+00:00
+  author: claude
+  text: |-
+    Fixed: the test no longer races the agent queue.
+
+    - `crates/lotar-lib/tests/cli_noop_mutations_test.rs`: `lotar()` sets `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1`, the switch other agent tests use. The `@copilot` job stays queued and never comments on the ticket.
+    - Proof: with a 10 s sleep before the last `freeze`, the test passed with the fix (earlier session); the sleep is removed again.
+    - Doc comments that said assignment queues nothing are corrected.
+  report:
+    commits:
+    - hash: '969484160'
+      what: noop-mutation tests run lotar with the queue worker disabled
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 3 full runs in a row
+    - command: npm run lint
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: test:agent covers the same suites
+    next: Review, then merge
+- date: 2026-11-20T13:21:15.013164+00:00
+  author: claude
+  text: |-
+    Fixed: the test no longer races the agent queue.
+
+    - Cause: assigning `@copilot` queues a job; the worker gives up on `fake-runner` after 4 tries and comments, sometimes after the last `freeze`.
+    - Reproduced: a 10 s sleep before the last `assert_frozen` failed every time on the give-up comment.
+    - Fix: `NoopCliEnv::lotar()` in `crates/lotar-lib/tests/cli_noop_mutations_test.rs` sets `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1`, as the other queue tests do. The job stays queued in the isolated queue dir and never starts. With the sleep left in, the test passed.
+    - Fixed the doc comments that said assignment launches nothing.
+  report:
+    commits:
+    - hash: '969484160'
+      what: the no-op CLI fixture runs lotar with the queue worker off
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 3 full runs in a row
+    - command: npm run lint
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review, then merge
+- date: 2026-11-20T13:22:41.609673+00:00
+  author: claude
+  text: |-
+    Fixed: the test no longer races the agent queue; `npm run -s test:agent` passed 3 full runs in a row.
+
+    - Cause: assigning `@copilot` queues a job; the queue gave up after 4 tries and commented on the ticket, sometimes after the test's last `freeze`.
+    - Fix, in `crates/lotar-lib/tests/cli_noop_mutations_test.rs` only: the file's `lotar()` command sets `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1`, as other agent tests do, so the queued job never starts. Two test comments that said assigning queues nothing are corrected.
+    - Commit `969484160` on `agent/DEV-728`, signed. It was made at 05:20 while my third run was still going, not by my `git commit` (its trailer names Claude Opus 5.5); it holds exactly the diff I checked, so I left it.
+    - One earlier attempt at a run doesn't count: it died with `vite: command not found` before any test, because the worktree's `npm install` was still finishing.
+    - `npm run lint` and `npm run smoke` passed on the same tree.
+  report:
+    commits:
+    - hash: '969484160'
+      what: the noop-mutation tests' lotar command sets LOTAR_AGENT_QUEUE_DISABLE_WORKER=1
+    checks:
+    - command: npm run -s test:agent (3 full runs in a row)
+      result: passed
+      reason: 2417 Rust tests each, plus UI, release and hook tests
+    - command: npm run lint
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 118 files, 406 tests
+    next: Review, then merge and rerun the check on main
+- date: 2026-11-20T13:23:05.779127+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4820fc4ddc1b3041f407f771e6791aa025708341d9a645e4ef17c9e17e782f40 of the job job-20261120T130633.048Z-1 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261120T132305.770Z-1: DEV-728 goes back to @fix-fable, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-20T13:23:10.195759+00:00
+  author: claude
+  text: |-
+    The open retry question is out of date: no retry is needed, the fix is committed (`969484160`) and checked; what's left is review and merge.
+
+    - The three fix jobs were marked failed while their threads were only waiting on the background check; filed as DEV-729.
+    - I left status and assignee as they are: moving it on to review is your call.
+- date: 2026-11-20T13:29:42.698334+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    08df3f6a0 DEV-726 A job's end leaves no log line for the waiting cleanup: neither the waiting rule's run nor agent.worktree.waiting_run shows in lotar agent logs
+    ```.
+
+    - Rebase onto `main` changed nothing (`969484160626`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `969484160626`
+    - Amended the pending `.tasks` changes into the merged commit: `f9b1824264ce`
+  report:
+    commits:
+    - hash: '969484160'
+      what: 'DEV-728 Flaky test: a queued @copilot job''s give-up comment lands in cli_assignee_agent_directive_vs_same_name_human_is_genuine_both_directions'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae9183805a434e49a49d4c0c1af31011e3379c28af4cc07eabe7a3a1741eac035
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16ecdca505072f3e8c5994dacbc62e0aaf92fad9a172091863f9e4ed90643393
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4820fc4ddc1b3041f407f771e6791aa025708341d9a645e4ef17c9e17e782f40
+description: |-
+  Found (DEV-727 merge, 2026-11-20): `npm run -s test:agent` failed in 2 of 4 full runs at `crates/lotar-lib/tests/cli_noop_mutations_test.rs:307` ("unregistered human @-alias and case variants: task YAML bytes must be preserved"); alone it passed 5 of 5. The test assigns `@copilot` with a fake profile (`copilot: fake-runner`) and assumes that launches nothing, but the assignment queues a job; the queue gives up after 4 tries and adds the comment 'The queued @copilot job did not start after 4 tries and left the queue: Validation error: Unsupported runner ''fake-runner''' (DEV-661) to the ticket, sometimes after the test's last `freeze`, so the bytes differ. On main as well: DEV-727 doesn't touch assignment or the queue.
+  Check: `npm run -s test:agent` passes 3 full runs in a row; the test doesn't race against the queue (no job queued, or it waits for the queue to settle before freezing).
+  Done: the test is deterministic.
+tags:
+- health
+- fix-retried
+- retry-fable
+custom_fields:
+  finding: test:agent:cli_noop_mutations_test
+history:
+- at: 2026-11-20T13:01:08.539454+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-661","DEV-727"]}'
+- at: 2026-11-20T13:01:09.495543+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T13:01:14.797855+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T13:01:16.094499+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae9183805a434e49a49d4c0c1af31011e3379c28af4cc07eabe7a3a1741eac035
+- at: 2026-11-20T13:05:09.348206+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-20T13:05:10.750164+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:05:18.684211+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16ecdca505072f3e8c5994dacbc62e0aaf92fad9a172091863f9e4ed90643393
+- at: 2026-11-20T13:06:01.708168+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-20T13:06:02.118915+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:06:27.089858+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:06:27.089892+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'
+- at: 2026-11-20T13:06:31.974868+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fable
+- at: 2026-11-20T13:06:36.405369+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T13:06:38.052458+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4820fc4ddc1b3041f407f771e6791aa025708341d9a645e4ef17c9e17e782f40
+- at: 2026-11-20T13:06:59.673141+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-fable'
+    new: mallox
+- at: 2026-11-20T13:07:00.530698+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:20:18.811824+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:21:15.013164+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:22:41.609673+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:23:03.079385+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-661","DEV-727"]}'
+    new: '{"related":["DEV-661","DEV-727","DEV-729"]}'
+- at: 2026-11-20T13:23:05.746588+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'
+- at: 2026-11-20T13:23:05.779127+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:23:06.163855+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T13:23:10.195759+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:23:19.364985+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-fable'
+    new: '@review'
+- at: 2026-11-20T13:24:28.224108+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-20T13:25:14.084808+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-661","DEV-727","DEV-729"]}'
+    new: '{"related":["DEV-661","DEV-727","DEV-729","DEV-730"]}'
+- at: 2026-11-20T13:29:42.698334+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -4,6 +4,10 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-19T18:53:27.978451+00:00
+modified: 2026-11-20T05:21:51.222574+00:00
+relationships:
+  related:
+  - DEV-700
 description: |-
   T3 runs "npm ci" on worktree create, repos.json says "npm ci": set "lotar agent worktree setup; npm ci" in the T3 project's scripts (the setup writes the lotar jobs' Claude settings)
 
@@ -20,3 +24,10 @@ tags:
 - owner
 custom_fields:
   finding: install:t3
+history:
+- at: 2026-11-20T05:21:51.222574+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-700"]}'

@@ -4,7 +4,7 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.685592+00:00
-modified: 2026-11-12T20:52:20.918113+00:00
+modified: 2026-11-20T10:14:50.080241+00:00
 relationships:
   related:
   - DEV-268
@@ -12,6 +12,7 @@ relationships:
   - DEV-332
   - DEV-340
   - DEV-385
+  - DEV-727
 comments:
 - date: 2026-09-06T13:12:53.690451+00:00
   text: |-
@@ -104,3 +105,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-268","DEV-253","DEV-332","DEV-340","DEV-385","DEV-388"]}'
     new: '{"related":["DEV-268","DEV-253","DEV-332","DEV-340","DEV-385"]}'
+- at: 2026-11-20T10:14:50.080241+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-268","DEV-253","DEV-332","DEV-340","DEV-385"]}'
+    new: '{"related":["DEV-268","DEV-253","DEV-332","DEV-340","DEV-385","DEV-727"]}'

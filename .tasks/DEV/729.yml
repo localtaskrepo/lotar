@@ -1,0 +1,89 @@
+title: 'A t3 agent job fails when its thread waits on a background command: ''run ended with status waiting'', runner exit code 1'
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T13:23:02.862143+00:00
+modified: 2026-11-20T13:25:38.370664+00:00
+relationships:
+  depends_on:
+  - standards:STD-257
+  related:
+  - DEV-728
+  - DEV-730
+  - DEV-711
+comments:
+- date: 2026-11-20T13:25:23.500075+00:00
+  author: claude
+  text: |-
+    Waits for harnessmux 0.2.0 on crates.io ([STD-257](https://standards.pyxzl.net/task/STD-257)): the fix is already in harnessmux, not in lotar.
+
+    - The failure comes from harnessmux's t3 backend, not lotar: `follow_run` in `harnessmux-0.1.10/src/backend/t3.rs:347` fails the turn on status `waiting` with no pending question.
+    - Fixed in harnessmux by HARN-3 (`df08093` on harnessmux `main`): `waiting` with `pendingBackgroundTasks` or `blockedOnThreadWait` keeps the turn running. Listed under 0.2.0 (unreleased) in its `CHANGELOG.md`.
+    - `cargo search harnessmux` still shows `0.1.10`; lotar pins `harnessmux = "0.1.10"` in `Cargo.toml`.
+    - When 0.2.0 is out: bump it (together with [DEV-711](https://lotar.pyxzl.net/task/DEV-711), which needs the same bump and the `TurnFailed { error, .. }` match), and add a lotar test with a fake t3 harness whose turn ends after a `waiting` stretch, checking the job is not failed or retried.
+    - The `waiting_run` "No such file or directory" line is filed separately as [DEV-730](https://lotar.pyxzl.net/task/DEV-730).
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9d34bbb50316ad91176ff5be8c7892813a138026f11a871fe6075b20c39b4608
+description: |-
+  Found (DEV-728 fix, 2026-11-20): three fix jobs in a row (job-20261120T130111.184Z-26, job-20261120T130512.436Z-27, job-20261120T130633.048Z-1) were recorded as failed seconds after they started a long check (3x `npm run -s test:agent`) as a background command and marked it with T3's `t3_background_wait`. `lotar agent logs job-20261120T130633.048Z-1`: "the T3 Code thread's run ended with status 'waiting'", then "[agent_job_failed] The t3 runner exited with code 1". The threads kept working: all three later finished the checks, and commit 969484160 and three hand-off comments landed on a ticket already moved to HelpNeeded with a retry question. So each retry started another agent on the same worktree while the earlier ones still ran.
+  Also in that log: "agent.worktree.waiting_run (`cargo clean --workspace`) could not start in <worktree>: No such file or directory (os error 2)".
+  Check: a t3 job whose thread ends a turn in status 'waiting' (background command pending) stays running until the thread finishes, or fails only after the thread is really done; a test covers it.
+  Done: a job that waits on a background command is not reported as failed and not retried while its thread works.
+tags:
+- health
+- waits
+custom_fields:
+  finding: agent-job:t3-waiting-status
+history:
+- at: 2026-11-20T13:23:03.478858+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T13:23:07.068458+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T13:23:07.420972+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9d34bbb50316ad91176ff5be8c7892813a138026f11a871fe6075b20c39b4608
+- at: 2026-11-20T13:25:14.085564+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728"]}'
+    new: '{"related":["DEV-728","DEV-730"]}'
+- at: 2026-11-20T13:25:22.765147+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-730"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730"]}'
+- at: 2026-11-20T13:25:23.371988+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-20T13:25:23.500075+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T13:25:23.788408+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711"]}'
+- at: 2026-11-20T13:25:38.370664+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

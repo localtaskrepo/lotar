@@ -1,0 +1,45 @@
+title: 'agent.worktree.waiting_run reports ''could not start in <worktree>: No such file or directory'' for a worktree that exists'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T13:25:13.774179+00:00
+modified: 2026-11-20T13:26:00.833800+00:00
+relationships:
+  related:
+  - DEV-728
+  - DEV-729
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae91c8bcb6c87393265f36bb06f2ad25ad8708f7b454d932fe86fc871d783b959
+description: |-
+  Found (DEV-729, 2026-11-20): `lotar agent logs job-20261120T130633.048Z-1` at 13:07:12 logged "agent.worktree.waiting_run (`cargo clean --workspace`) could not start in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-728: No such file or directory (os error 2)". The folder exists now, and the lotar service's PATH (launchd plist) has ~/.cargo/bin, so either the worktree was briefly gone (another job's cleanup while retries ran) or the spawn failed for another reason; the message doesn't say which (program or folder).
+  Check: a waiting_run whose program or folder is missing names which one in the log; a test covers both.
+  Done: the log line tells the program-not-found case from the missing-worktree case, and the DEV-728 cause is known.
+tags:
+- health
+custom_fields:
+  finding: waiting_run:spawn-enoent
+history:
+- at: 2026-11-20T13:25:14.085802+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-728","DEV-729"]}'
+- at: 2026-11-20T13:25:14.504390+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T13:26:00.277037+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T13:26:00.833800+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae91c8bcb6c87393265f36bb06f2ad25ad8708f7b454d932fe86fc871d783b959

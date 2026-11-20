@@ -1,17 +1,20 @@
 title: Check DEV-652 on a real t3 ticket once a build with it is installed
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-18T04:32:01.039948+00:00
-modified: 2026-11-18T05:10:48.739117+00:00
+modified: 2026-11-20T05:21:59.493052+00:00
 relationships:
   depends_on:
   - DEV-702
   - DEV-652
   related:
   - DEV-652
+  - DEV-714
+  - DEV-658
+  - DEV-718
 comments:
 - date: 2026-11-18T05:10:37.853417+00:00
   author: claude
@@ -26,8 +29,85 @@ comments:
 - date: 2026-11-18T05:10:48.739117+00:00
   author: automation
   text: 'The @review job waits for its open prerequisites: DEV-652, DEV-702.'
+- date: 2026-11-20T02:14:14.817686+00:00
+  author: claude
+  text: |-
+    Still blocked: v0.15.5 isn't released or installed, so no installed lotar has DEV-652 yet. The check can't run.
+
+    - `lotar --version` prints `lotar 0.15.4`; `/opt/homebrew/bin/lotar` links to `Cellar/lotar/0.15.4`; brew stable is `0.15.4`
+    - [DEV-702](https://lotar.pyxzl.net/task/DEV-702) is Done, but it only merged the version bump (`278394afa`, main `e63dfc1a2`). There's no `v0.15.5` tag, and `gh release list` shows `v0.15.4` as latest
+    - DEV-652 is on `main` as `da8d50d0e` but isn't in `v0.15.4`
+    - Jobs still run on the old behaviour: new T3 worktrees keep appearing under `~/.t3/worktrees/lotar` (`agent-DEV-724-…`, `agent-DEV-717-…`, 2026-11-19)
+    - No files changed, no commit
+
+    **Question:** will you tag and publish v0.15.5 and run `brew upgrade lotar`, so this check can run on the installed build?
+  report:
+    checks:
+    - command: lotar --version prints 0.15.5 or later
+      result: failed
+      reason: prints lotar 0.15.4
+    - command: real t3 ticket check (Done when)
+      result: not_run
+      reason: no installed build has DEV-652
+    - command: npm run lint
+      result: not_run
+      reason: no file changes
+    - command: npm test
+      result: not_run
+      reason: no file changes
+    - command: npm run smoke
+      result: not_run
+      reason: no file changes
+    next: 'Owner: tag and publish v0.15.5, brew upgrade lotar, then send DEV-700 back to @fix'
+- date: 2026-11-20T02:30:38.310357+00:00
+  author: triage
+  text: |-
+    Answered by an earlier decision: tag and publish v0.15.5 yourself, then `brew upgrade lotar`, then run this check.
+
+    - Owner 2026-11-11 (`~/Development/standards/docs/decisions/2026-11-11-repo-health.md`): "Yes, you can go ahead create a new release" (lotar push true, release without asking).
+    - DEV-702 is Done but only merged the version bump; no `v0.15.5` tag exists yet.
+    - Next: tag and publish v0.15.5, `brew upgrade lotar`, confirm `lotar --version` prints 0.15.5, then run the Done-when checks.
+- date: 2026-11-20T03:14:54.543073+00:00
+  author: claude
+  text: |-
+    Not released: the decision triage cites doesn't give a standing OK to publish, so I'm asking before pushing the `v0.15.5` tag.
+
+    - `~/Development/standards/docs/decisions/2026-11-11-repo-health.md` contradicts itself. Line 20 says "Yes, you can go ahead create a new release". Line 27 (lotar 0.13.1) says "each further release still asks him (no standing permission given)"
+    - The release skill (`.github/skills/release/SKILL.md` step 4) says to push the tag only with your OK. v0.15.4 got its own OK (your comment on DEV-658, 2026-11-18)
+    - Ready apart from that: `main` `e63dfc1a2` has the 0.15.5 bump and DEV-652 (`da8d50d0e`). Quality Assurance is green (run `44655662920`). No `v0.15.5` tag yet
+    - Installed is still `lotar 0.15.4`, so the DEV-652 check can't run
+    - No files changed, no commit
+
+    **Question:** OK to tag and publish v0.15.5 now (signed tag, push, `brew upgrade lotar`), then run this check? A yes that also covers future lotar releases would settle the line 27 note too.
+- date: 2026-11-20T04:15:50.142687+00:00
+  author: claude
+  text: 'Owner 2026-11-19 16:10 PST (picker, via the chief of staff): "Release v0.15.5". This is his OK for v0.15.5 only: signed tag, push, release run, `brew upgrade lotar` (recorded on DEV-702 at 00:04 UTC). DEV-702 closed after the merge and skipped steps 3 to 8; finish them here, then run the DEV-652 check. Whether future lotar releases need his OK is still open and asked separately.'
+- date: 2026-11-20T04:15:50.582061+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-702.'
+- date: 2026-11-20T05:21:51.040156+00:00
+  author: claude
+  text: |-
+    Not checked yet: 0.15.5 is installed, but no ticket has run fix, review and merge jobs on it.
+
+    - `lotar --version` prints `lotar 0.15.5` (installed 2026-11-20 04:16 UTC). Tag `v0.15.5` is out
+    - `lotar agent list-jobs`: the only job since then is this one (`job-20261120T052024.071Z-1`). The DEV-702 job at 04:16 was cancelled
+    - DEV-700 can't be the test ticket. Its worktree `~/.t3/worktrees/lotar/agent-DEV-700-1ca2b67d53d6f872` was made by T3 Code on 2026-11-17, before DEV-652. This job only reused it (log: "agent/DEV-700 is checked out in the worktree …, so this job runs there")
+    - lotar's own folder `~/Development/@localtaskrepo/.lotar-worktrees/lotar` is still empty, so no ticket has a fresh lotar-made worktree yet
+    - Seen on the side: the DEV-702 job logged "The thread started without the profile's tools.disallowed and env" (DEV-718 covers that)
+    - No files changed, no commit
+
+    **Question:** Which ticket should this check run on? (a) the next ticket that goes through fix, review and merge on its own: keep DEV-700 Blocked until then, or (b) start one now, for example DEV-718, and check its jobs.
+  report:
+    checks:
+    - command: DEV-652 Done-when on a real t3 ticket
+      result: not_run
+      reason: no ticket has had fix, review and merge jobs on 0.15.5 yet
+    next: Owner picks the ticket to check on; then a job runs the Done-when list against its jobs
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6dcc807a-74b4-403e-8751-be20c9c3464d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3fbe677c-7b78-4063-bb16-503a256d38c5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6bea0b7842ecc05ba6b996fc062b13143e1da41d5e185c4ae1c8a71b2918105b
 description: |-
   Found (review of DEV-652): DEV-652's "Done when" asks for checks on a real ticket, not assumed, and none ran: the installed lotar is 0.15.3 without `f16031633`. Tests cover them with a fake t3 (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`).
 
@@ -112,3 +192,124 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-20T01:58:43.125312+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Reviewing
+- at: 2026-11-20T02:14:14.817686+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T02:14:21.810492+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-20T02:30:38.310357+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T02:30:38.715144+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T02:30:38.944167+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-20T02:30:40.181450+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T02:30:41.169916+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3fbe677c-7b78-4063-bb16-503a256d38c5
+- at: 2026-11-20T02:57:30.569286+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652"]}'
+    new: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652","DEV-714"]}'
+- at: 2026-11-20T03:14:54.543073+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T03:14:54.732180+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652","DEV-714"]}'
+    new: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652","DEV-714","DEV-658"]}'
+- at: 2026-11-20T03:15:03.029526+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-20T04:15:50.142687+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T04:15:50.350330+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T04:15:50.548434+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-20T04:15:50.582061+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:20:24.855863+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-20T05:20:25.218752+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6bea0b7842ecc05ba6b996fc062b13143e1da41d5e185c4ae1c8a71b2918105b
+- at: 2026-11-20T05:21:51.040156+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:21:51.222062+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652","DEV-714","DEV-658"]}'
+    new: '{"depends_on":["DEV-702","DEV-652"],"related":["DEV-652","DEV-714","DEV-658","DEV-718"]}'
+- at: 2026-11-20T05:21:59.493052+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

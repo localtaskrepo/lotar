@@ -1,0 +1,538 @@
+title: 'A job''s end leaves no log line for the waiting cleanup: neither the waiting rule''s run nor agent.worktree.waiting_run shows in lotar agent logs'
+status: Done
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-20T05:24:36.819620+00:00
+modified: 2026-11-20T12:56:59.220165+00:00
+relationships:
+  related:
+  - DEV-714
+  - DEV-712
+  - DEV-715
+comments:
+- date: 2026-11-20T05:58:46.572700+00:00
+  author: automation
+  text: The fix agent's job job-20261120T052439.206Z-2 failed (lotar agent logs job-20261120T052439.206Z-2); @fix-retry retries it on branch agent/DEV-726.
+- date: 2026-11-20T06:15:15.866148+00:00
+  author: automation
+  text: 'The queued @fix-retry job waits: T3 Code still runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac213873f08c23c365093d974d5a9cbca04d8dca9688578047fa44e519c0aece6 of the job job-20261120T052439.206Z-2. The job starts once the thread ends.'
+- date: 2026-11-20T06:34:39.841785+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac213873f08c23c365093d974d5a9cbca04d8dca9688578047fa44e519c0aece6 of the job job-20261120T052439.206Z-2 again, beside the running job job-20261120T061553.815Z-15. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-20T06:52:01.115668+00:00
+  author: claude
+  text: |-
+    Rule runs fired by a job's end now leave a line in `lotar agent logs <job>`; waiting_run was already logged.
+
+    - Why waiting_run left no note in DEV-714: the job started at 03:14 in a 0.15.4 process (DEV-712 `b580a969f` first ships in v0.15.5; 0.15.5 was installed at 04:16, mid-job). The hand-back's rule ran the `lotar` on PATH, which was 0.15.5, so its `cargo clean` worked, but the output went only to stderr.
+    - `automation_service.rs`: `with_run_notes` collects one note per `run` on the thread: `Automation rule '<name>' ran `<cmd>` on <ID>.` plus the last 10 output lines, the exit status `ignore_failure` let pass, or the error. `wait: false` logs that it started. Output still goes to stderr as well.
+    - `agent_job_service.rs` `apply_job_end_rules`: wraps `apply_job_event`, so the job's own end rules and the `updated`/`assigned` rules its outcome fires are covered. Runs outside a job's end don't change.
+    - Test: `agent_safety_test` waiting-rule test now asserts the line; unit tests in `run_note_tests`.
+    - Docs: `docs/help/automation.md` (synchronous vs asynchronous) and `docs/help/agent.md` (build output while a ticket waits).
+    - No guidance correction.
+  report:
+    commits:
+    - hash: 08df3f6a0
+      what: a rule's run at a job's end leaves a line in the job's log
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: Rust 2417/2417, release 60, hooks 7; 8 UI tests timed out at load 29 and passed on rerun of their files (177/177)
+    - command: npm run smoke
+      result: passed
+      reason: 9 failed at load 30 (killed lotar task add, click timeouts, vitest workers not starting); the 7 files passed on rerun (37/37)
+    - command: cargo nextest -E test(/waiting_build_output/)
+      result: passed
+      reason: fails without the fix at the new assertion
+    next: Review, then merge
+- date: 2026-11-20T06:52:35.168376+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261120T061553.815Z-15 failed again or on a rate limit (lotar agent logs job-20261120T061553.815Z-15). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-20T06:53:07.369538+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261120T061553.815Z-15 failed with 'The t3 runner exited with code 1' right after the thread went to 'waiting'. The work is committed on agent/DEV-726 (08df3f6a0) with lint, tests and smoke passed per the earlier comment; the retry should verify it and hand off. waiting_run also could not start: the job's worktree directory was gone.
+  answer:
+    to: 2026-11-20T06:52:35.168376+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261120T061553.815Z-15 failed with ''The t3 runner exited with code 1'' right after the thread went to ''waiting''. The work is committed on agent/DEV-726 (08df3f6a0) with lint, tests and smoke passed per the earlier comment; the retry should verify it and hand off. waiting_run also could not start: the job''s worktree directory was gone.'
+- date: 2026-11-20T06:59:24.407677+00:00
+  author: claude
+  text: |-
+    Retry verified the committed fix: lint, tests and smoke pass on `08df3f6a0`; ready for review.
+
+    - No new changes: `git log main..HEAD` is the one commit `08df3f6a0`, worktree clean.
+    - The earlier job's agent session (c2750934) was still running checks in this worktree after its job "failed"; I reused its `npm run test:agent` and `npm run test:smoke:agent` runs on the same commit instead of starting a second one in the same `target/`, and ran `npm run lint:agent` myself.
+    - Tests cover the change: `run_note_tests` in `crates/lotar-agent/src/services/automation_service.rs` and the job-log assertion in `crates/lotar-lib/tests/agent_safety_test.rs` (`Automation rule 'Waiting' ran ... on <ID>.`).
+    - Note: this worktree had a half-installed `node_modules` (no `vue-tsc`); I reinstalled it with `npm ci`.
+  report:
+    commits:
+    - hash: 08df3f6a0
+      what: a job's end rule runs (and the waiting rule's) leave a line in lotar agent logs; docs agent.md, automation.md
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2417 Rust, 1563 UI, release and hooks tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 406 tests
+    next: Review on another model, then merge agent lands agent/DEV-726
+- date: 2026-11-20T06:59:34.933474+00:00
+  author: claude
+  text: |-
+    Retry verified: commit `08df3f6a0` passes lint, tests and smoke as one tree.
+
+    - I fixed nested backticks in `docs/help/automation.md`. The earlier thread's commit `08df3f6a0` already has that fix; the working tree is clean.
+    - Checks run on that tree: `npm run lint:agent`, `npm run test:agent` (2417/2417 Rust), `npm run test:smoke:agent` (406/406).
+    - No guidance correction.
+  report:
+    commits:
+    - hash: 08df3f6a0
+      what: rule runs fired by a job's end leave a line in the job's log
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2417 Rust tests, UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Review on another model, then merge
+- date: 2026-11-20T07:00:02.055525+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-726 is assigned to @review now.'
+- date: 2026-11-20T09:42:27.551415+00:00
+  author: claude
+  text: |-
+    Review: passed. `08df3f6a0` does what "Done when" asks; nothing blocking, no tickets filed.
+
+    - Read: the diff (5 files), the ticket and its comments, DEV-714/DEV-712 context, AGENTS.md, the last commits to `automation_service.rs`/`agent_job_service.rs` on main (DEV-715–723); nothing there conflicts.
+    - Job end: every end path (`JobCompleted`/`Failed`/`Cancelled`/`Paused`) goes through `apply_job_end_rules` (`agent_job_service.rs:5639`), which wraps `apply_job_event` in `with_run_notes`, so the waiting rule's `updated` run gets a line too. Each `run` writes its line in `execute_run_action` (`automation_service.rs:1883`): the rule, the command, its last 10 output lines, `ignore_failure` status, the error or timeout, and a "started" line for `wait: false`. stderr is unchanged.
+    - Unchanged elsewhere: a person's `lotar status` has no collector, so its output goes to stderr only. `apply_pending_outcomes` (later worker) and `rerun_skipped_runs` aren't wrapped. `update_job` does nothing for a job the process doesn't know. A note that can't be written changes nothing else.
+    - Test: `waiting_build_output_goes_on_hand_back_person_change_and_waits_lotar_sets` checks the job's log for the Waiting rule's line. Main has no such message (`git grep` on main), so the test fails without the fix. Unit tests `run_note_tests` cover scope and the output tail.
+    - Docs: `docs/help/agent.md:465` and `docs/help/automation.md:406` say where the line goes.
+    - Reran: `npm ci` passed. `npm run lint:agent` passed. Targeted `cargo nextest` (run_note, waiting_build_output, pending_outcome, skipped_run): 14/14 passed.
+    - Smoke: `npm run test:smoke:agent` had 404/406 pass at load average ~30. `harness.agent-launcher` (fixture launcher) and `ui.agent-jobs` (reviewed workflow) timed out; both passed when rerun alone (`vitest -t`), so the failures came from load, not the change. Full `npm run test:agent` not rerun: the earlier job ran it on this commit (2417/2417).
+    - Worktree left clean.
+- date: 2026-11-20T10:18:43.342779+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [ 183.286s] 830/2417 tests run: 829 passed (7 slow), 1 failed, 0 skipped
+            FAIL [  64.342s] ( 817/2417) lotar-lib::integration cli_serve_features_test::serve_with_project_data_lists_exact_tasks
+      stdout ───
+
+        running 1 test
+        test cli_serve_features_test::serve_with_project_data_lists_exact_tasks has been running for over 60 seconds
+        test cli_serve_features_test::serve_with_project_data_lists_exact_tasks ... FAILED
+
+        failures:
+
+        failures:
+            cli_serve_features_test::serve_with_project_data_lists_exact_tasks
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1601 filtered out; finished in 63.79s
+
+      stderr ───
+
+        thread 'cli_serve_features_test::serve_with_project_data_lists_exact_tasks' (106044426) panicked at crates/lotar-lib/tests/cli_serve_features_test.rs:177:9:
+        serve did not advertise readiness within 15s; stdout so far:
+
+        stderr:
+
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 1587/2417 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    ```.
+
+    - Rebase onto `main` changed nothing (`08df3f6a0722`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-20T10:57:36.389378+00:00
+  author: automation
+  text: The merge agent's job job-20261120T095745.007Z-21 failed (lotar agent logs job-20261120T095745.007Z-21); the fix agent retries it on branch agent/DEV-726.
+- date: 2026-11-20T12:50:35.622915+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (106827068) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [ 176.512s] 2296/2417 tests run: 2295 passed, 1 failed, 0 skipped
+            FAIL [  10.033s] (2283/2417) lotar-lib::integration web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+      stdout ───
+
+        running 1 test
+        test web_api_integration_test::sse_delivers_during_a_steady_stream_of_events ... FAILED
+
+        failures:
+
+        failures:
+            web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1601 filtered out; finished in 9.99s
+
+      stderr ───
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (106827068) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 121/2417 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebase onto `main` changed nothing (`08df3f6a0722`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-20T12:54:42.212184+00:00
+  author: claude
+  text: |-
+    Merged: `08df3f6a0` fast-forwarded onto `main` in the main checkout.
+
+    - The failed check was a timing flake: `sse_delivers_during_a_steady_stream_of_events` waits 1.5 s, and the load average was about 34. The commit doesn't touch SSE.
+    - That test alone passed in 2.7 s; the full `npm run -s test:agent` rerun passed.
+    - The earlier merge failure (`serve_with_project_data_lists_exact_tasks`, readiness timeout) was also load-related.
+  report:
+    commits:
+    - hash: 08df3f6a0
+      what: job-end rule runs leave a line in lotar agent logs
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2417/2417 Rust, 1563/1563 UI on rerun
+    - command: npm run -s lint:agent
+      result: passed
+      reason: LoTaR's run on the same commit
+    - command: npm run smoke
+      result: not_run
+      reason: passed 406/406 in the fix retry on this commit; merge checks don't include it
+- date: 2026-11-20T12:55:35.362355+00:00
+  author: claude
+  text: |-
+    Review: nothing to review. `git log main..HEAD` is empty: `08df3f6a0` is already on `main`.
+
+    - The merge job fast-forwarded `08df3f6a0` onto `main` at 12:54Z (see its comment). `agent/DEV-726` has no commits after it.
+    - An earlier review (09:42Z) passed this same commit.
+- date: 2026-11-20T12:56:51.917813+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-726` is in `main` already.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac213873f08c23c365093d974d5a9cbca04d8dca9688578047fa44e519c0aece6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae3261be557c00adfece3ae9d5ea4df28e9ccc38383cbbbada58be28ac164cbbb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af6167ecd6479455bca8c1b8aa09a2270524ccbfabe79cbb19351e0373c8bffe3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3543ef9cf23cef2418cb1ec0349073f1ab2a1126fb32b577c4522a2ddd99e2e0
+description: |-
+  Found in DEV-714 (2026-11-20). Job `job-20261120T031431.355Z-3` ended at 05:20:18Z with DEV-714 handed back to HelpNeeded. At 05:20:21Z `cargo clean --workspace` ran in `t3-1728bf4d-70d1421059373328` (target/ 1.38 GB -> 551 MB, no lotar crates left in deps), but `lotar agent logs job-20261120T031431.355Z-3` shows no line for it.
+
+  - The rule's `run` prints only to the stderr of the process that ended the job; nothing keeps it (`~/Library/Logs/lotar-services/lotar.log` last written 20:16 local).
+  - docs/help/agent.md says each waiting_run goes to the job's log; `agent-DEV-714-04c5d41a65011a74` (branch agent/DEV-714) still has target/ and the log has no waiting_run note, run or skip.
+
+  Cause of the missing waiting_run note (checked 2026-11-19): the job started at 03:14 in a process from 0.15.4, which has no waiting_run (DEV-712 `b580a969f` is first in v0.15.5); 0.15.5 was installed mid-job at 04:16. The hand-back's rule ran `lotar` from PATH, 0.15.5, so its `worktree run` worked. No waiting_run code change is needed.
+
+  ## Done when
+  - [ ] A rule's `run` that a job's end fires (the job's own end rules, or the `updated`/`assigned` rules its outcome fires, such as the waiting rule) leaves a line in `lotar agent logs <job>`: the rule, the command, and the last lines of its output; a failed or timed-out run says so with the error. Its output still goes to stderr too.
+  - [ ] A `run` with `wait: false` logs that it started (its exit isn't waited for).
+  - [ ] Runs outside a job's end (a person's `lotar status`) are unchanged: stderr only. End rules replayed by a later worker log nothing new (unchanged).
+  - [ ] When the log line can't be written, nothing else changes.
+  - [ ] waiting_run already logs each run, skip and failure (`run_waiting_command_for_job`); the missing note is explained above.
+  - [ ] Covered by a test; docs/help/agent.md and docs/help/automation.md say where the line goes.
+history:
+- at: 2026-11-20T05:24:37.040070+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-714"]}'
+- at: 2026-11-20T05:24:37.257309+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T05:24:50.905927+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T05:24:55.730490+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac213873f08c23c365093d974d5a9cbca04d8dca9688578047fa44e519c0aece6
+- at: 2026-11-20T05:27:01.754566+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-714 (2026-11-20). Job `job-20261120T031431.355Z-3` ended at 05:20:18Z with DEV-714 handed back to HelpNeeded. At 05:20:21Z `cargo clean --workspace` ran in `t3-1728bf4d-70d1421059373328` (target/ 1.38 GB -> 551 MB, no lotar crates left in deps), but `lotar agent logs job-20261120T031431.355Z-3` shows no line for it.
+
+      - The rule's `run` prints only to the stderr of the process that ended the job; nothing keeps it (`~/Library/Logs/lotar-services/lotar.log` last written 20:16 local).
+      - docs/help/agent.md says each waiting_run goes to the job's log; `agent-DEV-714-04c5d41a65011a74` (branch agent/DEV-714) still has target/ and the log has no waiting_run note, run or skip.
+
+      ## Done when
+      - [ ] A job's end that fires the waiting rule, and its waiting_run, each leave a line in `lotar agent logs <job>`, covered by a test.
+      - [ ] Or the docs say where the line goes, and waiting_run's missing note is explained or fixed.
+    new: |-
+      Found in DEV-714 (2026-11-20). Job `job-20261120T031431.355Z-3` ended at 05:20:18Z with DEV-714 handed back to HelpNeeded. At 05:20:21Z `cargo clean --workspace` ran in `t3-1728bf4d-70d1421059373328` (target/ 1.38 GB -> 551 MB, no lotar crates left in deps), but `lotar agent logs job-20261120T031431.355Z-3` shows no line for it.
+
+      - The rule's `run` prints only to the stderr of the process that ended the job; nothing keeps it (`~/Library/Logs/lotar-services/lotar.log` last written 20:16 local).
+      - docs/help/agent.md says each waiting_run goes to the job's log; `agent-DEV-714-04c5d41a65011a74` (branch agent/DEV-714) still has target/ and the log has no waiting_run note, run or skip.
+
+      Cause of the missing waiting_run note (checked 2026-11-19): the job started at 03:14 in a process from 0.15.4, which has no waiting_run (DEV-712 `b580a969f` is first in v0.15.5); 0.15.5 was installed mid-job at 04:16. The hand-back's rule ran `lotar` from PATH, 0.15.5, so its `worktree run` worked. No waiting_run code change is needed.
+
+      ## Done when
+      - [ ] A rule's `run` that a job's end fires (the job's own end rules, or the `updated`/`assigned` rules its outcome fires, such as the waiting rule) leaves a line in `lotar agent logs <job>`: the rule, the command, and the last lines of its output; a failed or timed-out run says so with the error. Its output still goes to stderr too.
+      - [ ] A `run` with `wait: false` logs that it started (its exit isn't waited for).
+      - [ ] Runs outside a job's end (a person's `lotar status`) are unchanged: stderr only. End rules replayed by a later worker log nothing new (unchanged).
+      - [ ] When the log line can't be written, nothing else changes.
+      - [ ] waiting_run already logs each run, skip and failure (`run_waiting_command_for_job`); the missing note is explained above.
+      - [ ] Covered by a test; docs/help/agent.md and docs/help/automation.md say where the line goes.
+- at: 2026-11-20T05:27:01.963935+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-714"]}'
+    new: '{"related":["DEV-714","DEV-712"]}'
+- at: 2026-11-20T05:50:48.371753+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-20T05:58:46.572700+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:15:15.866148+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:18:14.306072+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae3261be557c00adfece3ae9d5ea4df28e9ccc38383cbbbada58be28ac164cbbb
+- at: 2026-11-20T06:34:39.841785+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:52:01.115668+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:52:34.721690+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-20T06:52:35.168376+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:53:07.369538+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:53:07.369625+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-20T06:53:11.133617+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, retry-fix
+- at: 2026-11-20T06:53:11.340956+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-20T06:53:13.161033+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af6167ecd6479455bca8c1b8aa09a2270524ccbfabe79cbb19351e0373c8bffe3
+- at: 2026-11-20T06:59:24.407677+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:59:34.933474+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T06:59:56.962603+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T07:00:02.055525+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T09:42:27.551415+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T09:42:28.589299+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-714","DEV-712"]}'
+    new: '{"related":["DEV-714","DEV-712","DEV-715"]}'
+- at: 2026-11-20T09:57:42.039299+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-20T10:18:43.342779+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T10:57:10.212004+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: fix-retried, retry-fix
+    new: fix-retried, retry-fix, merge-retried
+- at: 2026-11-20T10:57:36.389378+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T11:14:59.839525+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-20T12:50:35.622915+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T12:50:36.178755+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3543ef9cf23cef2418cb1ec0349073f1ab2a1126fb32b577c4522a2ddd99e2e0
+- at: 2026-11-20T12:54:42.212184+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T12:54:48.510887+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T12:55:35.362355+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T12:55:45.041499+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-20T12:56:51.917813+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T12:56:59.220165+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried, retry-fix, merge-retried
+    new: ''

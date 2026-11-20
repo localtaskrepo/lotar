@@ -1,11 +1,11 @@
 title: Release v0.15.5
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: claude
 created: 2026-11-18T05:10:18.248830+00:00
-modified: 2026-11-20T01:35:50.857130+00:00
+modified: 2026-11-20T05:17:40.455718+00:00
 relationships:
   blocks:
   - DEV-700
@@ -15,6 +15,7 @@ relationships:
   - DEV-710
   - DEV-652
   - DEV-653
+  - DEV-725
 comments:
 - date: 2026-11-20T00:04:50.490910+00:00
   author: claude
@@ -85,8 +86,66 @@ comments:
       result: not_run
       reason: 'skipped: passed on `278394afa95c`, which the rebase left unchanged'
     next: The merge agent takes over in a new session
+- date: 2026-11-20T01:43:24.455444+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `e63dfc1a2` on GitHub.
+
+    - lotar's merge had already rebased (no change), fast-forwarded `main` and amended `.tasks` (`0a0c53c4e`)
+    - The ticket's newer `.tasks/DEV/702.yml` edits were amended in too: `e63dfc1a2`
+    - `git push` worked on retry (the earlier failure was the ssh agent refusing to sign); pre-push hook passed
+    - No rules or agent profiles changed, so no `lotar trust` needed
+    - Checks not rerun: the rebase left HEAD at `278394afa`, where lint passed; tests and smoke not rerun on this version-only commit
+  report:
+    commits:
+    - hash: e63dfc1a2
+      what: DEV-702 Release v0.15.5 (version bump plus pending .tasks)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: review and fix runs on unchanged HEAD 278394afa
+    - command: npm test
+      result: not_run
+      reason: review run hit the 30-minute limit; fix agent's run passed; rebase changed nothing
+    - command: npm run smoke
+      result: not_run
+      reason: version-only change, rebase changed nothing
+    - command: pre-push hook (Rust formatting and clippy)
+      result: passed
+    next: 'Release steps 3 to 8: QA, tag v0.15.5, release run, install, close'
+- date: 2026-11-20T03:15:30.515417+00:00
+  author: claude
+  text: |-
+    Reopened: steps 3 to 8 were skipped when the merge set this Done (asked in DEV-714, triage: "reopen DEV-702 and finish steps 3 to 8").
+
+    - Step 3: QA run `44655662920` for `e63dfc1a2` on main succeeded
+    - Next: signed tag `v0.15.5`, push, release run, install, close
+- date: 2026-11-20T04:16:11.874791+00:00
+  author: claude
+  text: 'Reopened by the chief of staff 2026-11-19 19:35 PST: the merge closed this ticket after step 2, so steps 3 to 8 never ran (QA, signed tag v0.15.5, push, release run, brew install, close). The owner''s OK of 2026-11-19 ("Release v0.15.5", comment above) covers them. DEV-700 and DEV-714 wait on the installed 0.15.5.'
+- date: 2026-11-20T05:02:15.219105+00:00
+  author: claude
+  text: |-
+    Steps 3 to 6 done from DEV-714's job: v0.15.5 is tagged, released and installed. Left: steps 7 (close) and 8 (next release ticket).
+
+    - Step 3: QA `44655662920` for `e63dfc1a2` passed
+    - Step 4: signed tag `v0.15.5` (`dbf0dc994`) pushed; `lotar release release 0.15.5` done
+    - Step 5: Release run `44669658513` succeeded; GitHub shows v0.15.5 as Latest
+    - Step 6: `brew upgrade localtaskrepo/lotar/lotar` (needed a tap fetch first); `lotar --version` prints `lotar 0.15.5`; `codesign` shows Developer ID `3HKD37M482`, `net.pyxzl.lotar`
+    - I leave 7 and 8 to the job running here (`job-20261120T041612.472Z-4`)
+- date: 2026-11-20T05:02:17.803186+00:00
+  author: claude
+  text: 'Chief of staff 19:40 PST: my reopen above was a duplicate. The DEV-714 job (job-20261120T031431.355Z-3) had already reopened this ticket at 03:15 UTC, pushed v0.15.5 and installed it. I cancelled the @fix job it started (job-20261120T041612.472Z-4) and restored InProgress, claude.'
+- date: 2026-11-20T05:17:40.066005+00:00
+  author: claude
+  text: |-
+    Steps 7 and 8 done: v0.15.5 is shipped and this ticket is closed.
+
+    - Step 8: next release ticket [DEV-725](https://lotar.pyxzl.net/task/DEV-725) "Release v0.15.6" (mallox) and release record `0.15.6` holding it
+    - Step 7: closing now hands DEV-700 (Blocked on this) to @fix; DEV-714 continues in its running job
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46f70dd1-7179-49d1-b2fc-b239833ac5cc
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e0988d2-b005-43c4-a8fb-adfbc35a7da4
 releases:
 - 10
 description: |-
@@ -180,3 +239,86 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-20T01:43:24.455444+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T01:58:41.457373+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-20T03:15:30.418201+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-11-20T03:15:30.472007+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: claude
+- at: 2026-11-20T03:15:30.515417+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T04:16:11.819560+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Todo
+- at: 2026-11-20T04:16:11.874791+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T04:16:12.074585+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-20T04:16:12.983786+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T04:16:13.745736+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2e0988d2-b005-43c4-a8fb-adfbc35a7da4
+- at: 2026-11-20T05:02:15.219105+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:02:17.754212+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-20T05:02:17.803186+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:17:40.066005+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T05:17:40.233468+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-700","DEV-714"],"related":["DEV-658","DEV-710","DEV-652","DEV-653"]}'
+    new: '{"blocks":["DEV-700","DEV-714"],"related":["DEV-658","DEV-710","DEV-652","DEV-653","DEV-725"]}'
+- at: 2026-11-20T05:17:40.455718+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
