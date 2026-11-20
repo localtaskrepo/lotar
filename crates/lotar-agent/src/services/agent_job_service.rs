@@ -3227,14 +3227,31 @@ pub(crate) fn run_waiting_command(ticket_id: &str, tasks_dir: &std::path::Path, 
                         message: format!("agent.worktree.waiting_run (`{command_line}`) failed in {place} ({}){last}", output.status),
                     }
                 }
-                Err(err) => {
-                    WaitingRunNote { failed: true, message: format!("agent.worktree.waiting_run (`{command_line}`) could not start in {place}: {err}") }
-                }
+                Err(err) => WaitingRunNote {
+                    failed: true,
+                    message: format!("agent.worktree.waiting_run (`{command_line}`) could not start in {place}: {}", start_failure(program, &wt.path, &err)),
+                },
             }
         })
         .collect();
     drop(claim);
     notes
+}
+
+/// Why `program` could not start in `dir`. A missing folder and a program
+/// that isn't on PATH fail alike, with "No such file or directory" (DEV-730).
+fn start_failure(program: &str, dir: &std::path::Path, err: &std::io::Error) -> String {
+    if err.kind() != std::io::ErrorKind::NotFound {
+        return err.to_string();
+    }
+    if !dir.is_dir() {
+        return "the folder is gone".to_string();
+    }
+    if program.contains('/') {
+        return format!("`{program}` doesn't exist");
+    }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    format!("`{program}` is not on this lotar's PATH ({})", path.to_string_lossy())
 }
 
 /// The job's [`run_waiting_command`] notes go to its log.
@@ -5986,6 +6003,24 @@ fn record_and_emit(state: &mut AgentJobState, kind: &str, message: Option<String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// DEV-730: a waiting_run that can't start says whether its program or
+    /// its folder is missing; both fail with the same OS error.
+    #[test]
+    fn waiting_run_start_failure_names_the_missing_program_or_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let spawn = |program: &str, cwd: &std::path::Path| Command::new(program).current_dir(cwd).output().unwrap_err();
+
+        let missing_program = start_failure("lotar-no-such-program", dir.path(), &spawn("lotar-no-such-program", dir.path()));
+        assert!(missing_program.starts_with("`lotar-no-such-program` is not on this lotar's PATH ("), "{missing_program}");
+
+        let gone = dir.path().join("gone");
+        assert_eq!(start_failure("sh", &gone, &spawn("sh", &gone)), "the folder is gone");
+
+        let script = dir.path().join("no-such-script");
+        let program = script.to_str().unwrap();
+        assert_eq!(start_failure(program, dir.path(), &spawn(program, dir.path())), format!("`{program}` doesn't exist"));
+    }
 
     /// DEV-604: which failures pause the queue, and the line that says so.
     #[test]
