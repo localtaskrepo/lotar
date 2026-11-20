@@ -1424,26 +1424,37 @@ fn sse_project_changed_emitted_on_fs_change() {
 #[test]
 fn sse_delivers_during_a_steady_stream_of_events() {
     // DEV-273: the debounce deadline moved with every event, so a steady
-    // stream delivered nothing until it stopped.
+    // stream delivered nothing until it stopped. The deadline rule itself is
+    // checked in web_server's unit tests (DEV-741); under load a socket can't
+    // show that no gap passed the 20 ms test debounce (LOTAR_TEST_FAST_IO).
+    // This checks that the stream reaches the client while it runs.
     let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
     let mut server = start_server();
     let port = server.port();
     let (mut sse, leftover) = open_sse(port, "debounce_ms=150&kinds=task_updated&ready=1");
-    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+    let ready = read_sse_until(&mut sse, WATCH_EVENT_DEADLINE, leftover, |events| events.iter().any(|(kind, _)| kind == "ready"));
+    assert!(ready.iter().any(|(kind, _)| kind == "ready"), "no ready event: {ready:?}");
 
-    let started = Instant::now();
-    let emitter = std::thread::spawn(|| {
-        for n in 0..40 {
-            lotar::api_events::emit(&lotar::api_events::ApiEvent { kind: "task_updated".into(), data: json!({"id": format!("STR-{n}")}) });
-            std::thread::sleep(Duration::from_millis(50));
+    // The emitter runs until the client got an event, and longer than the
+    // client waits, so a delivery always comes while events keep coming.
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let emitter = std::thread::spawn({
+        let stop = stop.clone();
+        move || {
+            let until = Instant::now() + 2 * WATCH_EVENT_DEADLINE;
+            let mut n = 0;
+            while !stop.load(std::sync::atomic::Ordering::SeqCst) && Instant::now() < until {
+                lotar::api_events::emit(&lotar::api_events::ApiEvent { kind: "task_updated".into(), data: json!({"id": format!("STR-{n}")}) });
+                n += 1;
+                std::thread::sleep(Duration::from_millis(5));
+            }
         }
     });
-    let first = read_sse_events(&mut sse, 1, Duration::from_millis(1500), Vec::new());
-    let first_at = started.elapsed();
+    let first = read_sse_until(&mut sse, WATCH_EVENT_DEADLINE, Vec::new(), |events| events.iter().any(|(kind, _)| kind == "task_updated"));
+    stop.store(true, std::sync::atomic::Ordering::SeqCst);
     emitter.join().unwrap();
-    assert!(!first.is_empty(), "nothing delivered while events kept coming");
-    assert!(first_at < Duration::from_millis(1500), "first event took {first_at:?}; the stream lasts ~2 s");
     server.stop();
+    assert!(first.iter().any(|(kind, _)| kind == "task_updated"), "nothing delivered while events kept coming: {first:?}");
 }
 
 #[test]

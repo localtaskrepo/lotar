@@ -1,17 +1,20 @@
 title: 'Flaky test: merge_agent_that_hands_back_without_end_rules_does_not_land sees the merge job still running under full-suite load'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T22:20:16.414328+00:00
-modified: 2026-11-21T01:38:28.867680+00:00
+modified: 2026-11-21T02:58:54.788305+00:00
 relationships:
   related:
   - DEV-741
   - DEV-748
   - DEV-731
   - DEV-734
+  - DEV-742
+  - DEV-749
+  - DEV-745
 comments:
 - date: 2026-11-20T22:55:24.537133+00:00
   author: claude
@@ -97,6 +100,27 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-21T01:50:03.826349+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `9e20d3a3c` is on `main` and `origin/main`.
+
+    - lotar's merge had rebased onto `d3040a8e3` and passed `lint:agent`; its `test:agent` failed only on `dev605_…a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge` (21.0 s vs 20 s), the known load flake [DEV-748](https://lotar.pyxzl.net/task/DEV-748), in progress
+    - Reran `npm run -s test:agent` at load ~20: 2428/2428 passed, both DEV-743 merge tests included (this is also the ticket's check)
+    - `git merge --ff-only` to `bb84b0773`, then amended the pending `.tasks` changes in: `9e20d3a3c`
+    - No rules or config changed: no `lotar trust` needed
+    - Pushed with DEV-742's `d3040a8e3` (Done); main checkout clean
+  report:
+    commits:
+    - hash: 9e20d3a3c
+      what: DEV-743 wait for the merge job's end, not the 30 s floor (with the pending .tasks changes)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge ran it on bb84b0773
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2428/2428 on the rerun at load ~20; the first run failed on the DEV-748 dev605 flake
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aec951db3e734b6e58489b043d966e72234745ad92b050bdf8068211860ea84d7
 description: 'Found: failed in the DEV-741 review run of npm run -s test:agent (2026-11-20, load avg ~38): job NRH-1 status ''running'' instead of finished, after 39.66 s (agent_automation_integration_test::git_required). The DEV-741 diff only touches an SSE test. Check: npm run -s test:agent at load avg ~30. Done: the test waits for the job''s end instead of a fixed budget and passes under full-suite load.'
@@ -169,3 +193,31 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-21T01:50:03.826349+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:50:04.750295+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734"]}'
+    new: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734","DEV-742"]}'
+- at: 2026-11-21T01:50:14.533144+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-21T01:56:55.571951+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734","DEV-742"]}'
+    new: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734","DEV-742","DEV-749"]}'
+- at: 2026-11-21T02:58:54.788305+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734","DEV-742","DEV-749"]}'
+    new: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734","DEV-742","DEV-749","DEV-745"]}'

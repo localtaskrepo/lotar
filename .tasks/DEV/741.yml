@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T21:09:13.348749+00:00
-modified: 2026-11-21T01:04:05.904652+00:00
+modified: 2026-11-21T02:50:32.926645+00:00
 relationships:
   related:
   - DEV-704
@@ -15,6 +15,8 @@ relationships:
   - DEV-743
   - DEV-749
   - DEV-742
+  - DEV-751
+  - DEV-752
 comments:
 - date: 2026-11-20T21:36:18.504677+00:00
   author: claude
@@ -133,6 +135,52 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: no UI or REST change; flush_deadline does the same as the old if, and the rest are test edits
+- date: 2026-11-21T02:11:32.863955+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1607 filtered out; finished in 34.32s
+
+      stderr ───
+
+        thread 'agent_automation_integration_test::git_required::merge_job_retries_a_sandbox_blocked_check_and_lands' (132239352) panicked at crates/lotar-lib/tests/agent_automation_integration_test.rs:2584:32:
+        SBX-1 did not reach Done: Ok(TaskDTO { id: "SBX-1", url: None, title: "Sandboxed check", status: TaskStatus("Merging"), priority: Priority("Medium"), task_type: TaskType("Feature"), deleted_at: None, archived: false, moved_from: [], task_state: Some(TaskStateDTO { is_done: false, done_states: ["Done"], due_bucket: None, calendar_day: "2026-11-20" }), reporter: Some("Agent Tests"), assignee: Some("@merge"), created: "2026-11-21T02:10:16.912052+00:00", modified: "2026-11-21T02:10:30.527382+00:00", due_date: None, effort: None, subtitle: None, description: None, tags: [], relationships: TaskRelationships { depends_on: [], blocks: [], related: [], parent: None, children: [], fixes: [], duplicate_of: None, extra: {} }, comments: [], references: [], acceptance_criteria: [], sprints: [], sprint_order: {}, releases: [], history: [TaskChangeLogEntry { at: "2026-11-21T02:10:17.166777+00:00", actor: Some("Agent Tests"), changes: [TaskChange { field: "assignee", old: None, new: Some("@implement") }], extra: {} }, TaskChangeLogEntry { at: "2026-11-21T02:10:20.267327+00:00", actor: Some("Agent Tests"), changes: [TaskChange { field: "status", old: Some("Todo"), new: Some("InProgress") }], extra: {} }, TaskChangeLogEntry { at: "2026-11-21T02:10:23.013512+00:00", actor: Some("Agent Tests"), changes: [TaskChange { field: "status", old: Some("InProgress"), new: Some("Testing") }, TaskChange { field: "assignee", old: Some("@implement"), new: Some("@test") }], extra: {} }, TaskChangeLogEntry { at: "2026-11-21T02:10:30.527382+00:00", actor: Some("Agent Tests"), changes: [TaskChange { field: "status", old: Some("Testing"), new: Some("Merging") }, TaskChange { field: "assignee", old: Some("@test"), new: Some("@merge") }], extra: {} }], custom_fields: {} })
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+            FAIL [  47.577s] (1593/2429) lotar-lib::integration dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+      stdout ───
+
+        running 1 test
+        test dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge ... FAILED
+
+        failures:
+
+        failures:
+            dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1607 filtered out; finished in 47.28s
+
+      stderr ───
+
+        thread 'dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge' (132242880) panicked at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451:5:
+        the merge waited for the background process: 37.507965959s
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 832/2429 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-741` onto `main` (`9e20d3a3cf04`): `22d59d1c3c2a`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acf99943c821ddc87e00cedab3dccb0740e11d234dd55910d2fb22a12961df1f5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0cff3950f328479efe894b3ebb28fa56df7853acf0077e26735cfb482484c05b
@@ -258,3 +306,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-21T02:11:32.863955+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T02:41:29.922756+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751"]}'
+- at: 2026-11-21T02:50:32.926645+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752"]}'

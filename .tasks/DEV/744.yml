@@ -1,17 +1,18 @@
 title: 'A job_started rule''s run leaves no line in lotar agent logs: the standards worktree setup ran 1m43s unseen'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T22:24:52.009642+00:00
-modified: 2026-11-21T01:02:52.693277+00:00
+modified: 2026-11-21T02:58:54.797375+00:00
 relationships:
   related:
   - DEV-726
   - DEV-739
   - DEV-730
   - DEV-731
+  - DEV-745
 comments:
 - date: 2026-11-20T23:17:19.190992+00:00
   author: claude
@@ -54,6 +55,52 @@ comments:
     - One test was flaky in that run: `agent_safety_test::git_required::a_later_job_end_removes_a_done_worktree_a_process_kept` passed on its second try (24s under parallel load). Run alone 3 times with `--retries 0` it passed each time in 3s. That test checks worktree removal, which this change doesn't touch.
     - Not rerun: the full `npm test` and `npm run smoke`, because they take too long for a review. The fix agent reports both passed.
     - No UI changes, no stray files, no owner decision needed. Tickets filed: none.
+- date: 2026-11-21T01:53:40.135785+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (131743090) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [ 211.298s] 2329/2431 tests run: 2328 passed, 1 failed, 0 skipped
+            FAIL [   9.752s] (2316/2431) lotar-lib::integration web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+      stdout ───
+
+        running 1 test
+        test web_api_integration_test::sse_delivers_during_a_steady_stream_of_events ... FAILED
+
+        failures:
+
+        failures:
+            web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1608 filtered out; finished in 9.72s
+
+      stderr ───
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (131743090) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 102/2431 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-744` onto `main` (`d3040a8e3d43`): `1f23e1387d43`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afcac4c32621b06e3af47986ebaa016611f886cf96d34c2870bda623f33e0394a
 description: |-
@@ -147,3 +194,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-21T01:53:40.135785+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T02:15:20.931177+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-21T02:58:54.797375+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-739","DEV-730","DEV-731"]}'
+    new: '{"related":["DEV-726","DEV-739","DEV-730","DEV-731","DEV-745"]}'

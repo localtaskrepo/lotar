@@ -1,11 +1,11 @@
 title: Settle a ticket's kept T3 Code threads once a later job completes or the ticket is done
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-20T23:08:35.010019+00:00
-modified: 2026-11-21T01:48:38.236205+00:00
+modified: 2026-11-21T02:24:13.431939+00:00
 relationships:
   related:
   - DEV-729
@@ -112,6 +112,13 @@ comments:
       result: not_run
       reason: needs the build installed and lotar serve restarted
     next: Review, then merge; after install and a serve restart, check that the T3 sidebar's leftover threads are settled
+- date: 2026-11-21T02:24:13.431939+00:00
+  author: claude
+  text: |-
+    Review started: the work was done and checked but the ticket stayed HelpNeeded on @fix (LOCA-566).
+
+    - The 01:48Z retry comment (checks pass on `eafd1cc49`) came from the thread, after job `job-20261121T014347.979Z-49` failed, so no job-end rule moved it on.
+    - No job or T3 thread is working on it. `lotar status DEV-747 InProgress`, `lotar assignee DEV-747 --clear`, then rule "Answered in the thread: review on Codex" (status Reviewing, `@review`, queued behind DEV's 2 running jobs).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac5af945f0aa031fe5013f35f34d2616f9a34f0e8ce5b5367c14578ba5fd111c4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4b4bcc92b1f1f48844822ef4578fd546c0defb2976565edd25215a5cc619eb2
@@ -294,6 +301,29 @@ history:
     old: fix-retried
     new: fix-retried, retry-fix
 - at: 2026-11-21T01:48:38.236205+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T02:24:07.483575+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-21T02:24:07.973110+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-21T02:24:08.175505+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-21T02:24:13.431939+00:00
   actor: claude
   changes:
   - field: comment_added

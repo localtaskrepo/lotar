@@ -1,11 +1,11 @@
 title: A worker that adopts an orphaned Claude job can't resume its session (Resource not found sessionId) and fails the job
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-20T18:03:55.898155+00:00
-modified: 2026-11-21T01:17:00.838275+00:00
+modified: 2026-11-21T02:18:01.116323+00:00
 relationships:
   depends_on:
   - DEV-742
@@ -316,9 +316,41 @@ comments:
 - date: 2026-11-20T23:44:25.485259+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-734 yet. DEV-734 waits for DEV-742.'
+- date: 2026-11-21T02:17:53.116296+00:00
+  author: claude
+  text: |-
+    Ready to merge again: DEV-742 is on `main`, and the branch needs no change.
+
+    - DEV-742's fix is on `main` as `d3040a8e3`; `main` is now at `4b56e5eb3`
+    - `git merge-tree --write-tree main HEAD`: clean, no conflicts
+    - Branch still `4d871c349` (10 files, the reviewed fix); nothing changed, no new commit
+    - `cargo nextest run --workspace -E 'test(/dev510_t3_session_test|dev604_queue_pauses_test|a_check_that_leaves_a_process_running/)'`: 17/17 passed
+    - The merge agent rebases onto `main` and runs `npm run -s test:agent` there, now with DEV-742's race fix
+  report:
+    commits:
+    - hash: 4d871c349
+      what: unchanged, the fix as reviewed
+    checks:
+    - command: git merge-tree main HEAD
+      result: passed
+      reason: no conflicts with main 4b56e5eb3
+    - command: cargo nextest run --workspace -E dev510_t3_session_test|dev604_queue_pauses_test|a_check_that_leaves_a_process_running
+      result: passed
+      reason: 17/17
+    - command: npm run lint
+      result: not_run
+      reason: no file changed since the merge run passed it
+    - command: npm test
+      result: not_run
+      reason: the merge agent runs it on the rebased branch
+    - command: npm run smoke
+      result: not_run
+      reason: the merge agent runs it
+    next: 'Merge agent: rebase 4d871c349 onto main (has DEV-742 d3040a8e3) and run the merge checks'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4551288540da697c0aa1df1dbeccd029ed1a6b5102ae0a721e3412307ab007c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac0f794164fe3247154a7cd9153fa0a8041dd2d7b7155685d0444191d6c157f97
 description: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on lotar''s worker pid 32048, which exited at 17:55:05 UTC (new workers 45178 for lotar and 45115 for standards started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
 tags:
 - health
@@ -590,3 +622,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-21T02:16:14.864771+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-21T02:16:17.162137+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac0f794164fe3247154a7cd9153fa0a8041dd2d7b7155685d0444191d6c157f97
+- at: 2026-11-21T02:17:53.116296+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T02:18:01.116323+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

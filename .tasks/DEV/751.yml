@@ -1,0 +1,28 @@
+title: 'Flaky test: advances the reviewed template workflow live without reloads times out waiting for Review under full smoke load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T02:41:28.724747+00:00
+modified: 2026-11-21T02:41:30.857759+00:00
+relationships:
+  related:
+  - DEV-741
+description: 'Found: failed in the DEV-741 merge''s `npm run -s smoke` (2026-11-20, load avg ~25-50): ''Timed out waiting for task UI reviewed workflow to include Review'' (smoke/tests/ui.agent-jobs.smoke.spec.ts:100, a fixed 80 x 250 ms = 20 s wait for an agent job). Passed 3/3 alone right after, in 10-13 s. Check: npm run -s smoke at load avg ~30. Done: the test passes under full-suite load without a fixed 20 s wall-clock deadline.'
+tags:
+- health
+custom_fields:
+  finding: smoke:advances the reviewed template workflow live without reloads
+history:
+- at: 2026-11-21T02:41:29.925813+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-741"]}'
+- at: 2026-11-21T02:41:30.857759+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

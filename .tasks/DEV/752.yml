@@ -1,0 +1,29 @@
+title: 'Flaky test: a_full_disk_pauses_every_job_until_one_completes ends with assignee mallox, not sam, under full-suite load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T02:50:31.682302+00:00
+modified: 2026-11-21T02:50:33.971962+00:00
+relationships:
+  related:
+  - DEV-741
+  - DEV-742
+description: 'Found: failed at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:238 in the merges of DEV-742 and DEV-741 (2026-11-20, load avg ~10-30): (InProgress, mallox) instead of (InProgress, sam). The ticket history has only the job''s ''assignee mallox'' change, so the owner''s ''assignee sam'' during the pause was lost or the paused job ran its script after it. Check: npm run -s test:agent at load avg ~30. Done: the test passes under full-suite load, and the owner''s reassignment during a pause always stays.'
+tags:
+- health
+custom_fields:
+  finding: test:agent:a_full_disk_pauses_every_job_until_one_completes
+history:
+- at: 2026-11-21T02:50:32.931436+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-741","DEV-742"]}'
+- at: 2026-11-21T02:50:33.971962+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

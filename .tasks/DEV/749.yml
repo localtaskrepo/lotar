@@ -1,15 +1,46 @@
 title: 'Flaky test: merge_job_retries_a_sandbox_blocked_check_and_lands stops at Merging within its 10 s wait under load'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T01:03:26.149609+00:00
-modified: 2026-11-21T01:03:37.358046+00:00
+modified: 2026-11-21T01:57:06.448465+00:00
 relationships:
   related:
   - DEV-741
   - DEV-516
+  - DEV-743
+comments:
+- date: 2026-11-21T01:56:55.124064+00:00
+  author: claude
+  text: |-
+    Fixed: the sandboxed-check merge tests wait for the end state, not a fixed 30 s.
+
+    - Cause: `run_merge_with_sandboxed_check` waited `10_000` ms (raised to the 30 s `WAIT_FLOOR_MS`) for three agent jobs; under load the merge job was still running (ticket at Merging)
+    - `crates/lotar-lib/tests/agent_automation_integration_test.rs`: that wait and the SBF test's merge-job wait now use `JOB_END_LIMIT_MS` (300 s, as DEV-743), which ends as soon as the state is reached and only catches a hang
+    - Commit `e128a27b5`
+  report:
+    commits:
+    - hash: e128a27b5
+      what: sandboxed-check merge tests wait up to JOB_END_LIMIT_MS for the ticket state and the merge job's end
+    checks:
+    - command: npm run -s test:rust:agent
+      result: passed
+      reason: 2428/2428 at load avg 24 (no 30-40 load available)
+    - command: cargo nextest run -p lotar-lib --test integration merge_job_
+      result: passed
+    - command: npm run -s lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: only a Rust test file changed; its Rust part ran via test:rust:agent
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or server change
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b5fd86ad90af43c01e1d84fdd0b3dd42996f26e8e83e2ae11814313e433dd
 description: 'Found: failed in the review of DEV-741 (2026-11-20, load avg ~42): ''SBX-1 did not reach Done'', ticket still Merging, assigned @merge (crates/lotar-lib/tests/agent_automation_integration_test.rs:2579, wait_for_task_state with a fixed 10_000 ms). Passed in a later full run at load ~7-18. Check: npm run -s test:rust:agent at load avg ~30-40. Done: the test passes under full-suite load without a fixed 10 s wall-clock deadline.'
 tags:
 - health
@@ -27,3 +58,33 @@ history:
   - field: description
     old: 'Found: failed in the review of DEV-741 (2026-11-20, 1 of 3 full Rust runs, load avg ~42): ''SBX-1 did not reach Done'', ticket still Merging, assigned @merge (crates/lotar-lib/tests/agent_automation_integration_test.rs:2579, wait_for_task_state with a fixed 10_000 ms). Passed in the other 2 runs. Check: npm run -s test:rust:agent at load avg ~30-40. Done: the test passes under full-suite load without a fixed 10 s wall-clock deadline.'
     new: 'Found: failed in the review of DEV-741 (2026-11-20, load avg ~42): ''SBX-1 did not reach Done'', ticket still Merging, assigned @merge (crates/lotar-lib/tests/agent_automation_integration_test.rs:2579, wait_for_task_state with a fixed 10_000 ms). Passed in a later full run at load ~7-18. Check: npm run -s test:rust:agent at load avg ~30-40. Done: the test passes under full-suite load without a fixed 10 s wall-clock deadline.'
+- at: 2026-11-21T01:52:05.652783+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T01:52:20.844491+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b5fd86ad90af43c01e1d84fdd0b3dd42996f26e8e83e2ae11814313e433dd
+- at: 2026-11-21T01:56:55.124064+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:56:55.572309+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-516"]}'
+    new: '{"related":["DEV-741","DEV-516","DEV-743"]}'
+- at: 2026-11-21T01:57:06.448465+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -849,12 +849,7 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                             continue;
                         }
                     }
-                    // The window opens with the first buffered event and is
-                    // not pushed back by later ones, so a steady stream is
-                    // still delivered every `debounce` (DEV-273).
-                    if buffer.is_empty() {
-                        deadline = Some(Instant::now() + debounce);
-                    }
+                    deadline = Some(flush_deadline(deadline, Instant::now(), debounce));
                     coalesce_into(&mut buffer, evt);
                     if buffer.len() >= MAX_SSE_BUFFER {
                         deadline = Some(Instant::now());
@@ -885,6 +880,13 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
 
 /// Flush early once a client has this many events waiting.
 const MAX_SSE_BUFFER: usize = 500;
+
+/// When a client's buffered events go out. The window opens with the first
+/// buffered event and is not pushed back by later ones, so a steady stream is
+/// still delivered every `debounce` (DEV-273).
+fn flush_deadline(open: Option<std::time::Instant>, now: std::time::Instant, debounce: Duration) -> std::time::Instant {
+    open.unwrap_or(now + debounce)
+}
 
 /// Add `evt` to an SSE buffer, merging repeated task_updated and
 /// project_changed events for the same task or project: an id-only echo
@@ -1422,6 +1424,19 @@ mod tests {
 
     fn header<'a>(resp: &'a crate::api_server::HttpResponse, name: &str) -> Option<&'a str> {
         resp.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn later_events_do_not_push_the_sse_flush_back() {
+        // DEV-741: a socket test can't tell under load whether events kept
+        // coming, so the rule is checked on event times.
+        let debounce = std::time::Duration::from_millis(20);
+        let start = std::time::Instant::now();
+        let mut deadline = None;
+        for n in 0..10 {
+            deadline = Some(super::flush_deadline(deadline, start + std::time::Duration::from_millis(15 * n), debounce));
+        }
+        assert_eq!(deadline, Some(start + debounce));
     }
 
     #[test]
