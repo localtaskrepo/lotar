@@ -5646,7 +5646,15 @@ fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
             push_event(state, "agent_job_progress", Some(format!("{ticket_id} was reassigned ({to}) while the job ran: its end rules don't move it again")));
         });
     }
-    if let Err(err) = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context) {
+    // The rules' `run` output would reach only this process's stderr: the
+    // job's log keeps a note on each (DEV-726).
+    let (result, runs) = crate::services::automation_service::with_run_notes(|| AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context));
+    update_job(job_id, |state| {
+        for note in &runs {
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
+        }
+    });
+    if let Err(err) = result {
         update_job(job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(format!("The end rules for {ticket_id} failed: {err}")));
         });

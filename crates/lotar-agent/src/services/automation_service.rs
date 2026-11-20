@@ -1727,7 +1727,7 @@ impl AutomationService {
                         timeout: std::time::Duration::from_secs(skipped.timeout_secs),
                     };
                     match execute_prepared_run(prepared, &skipped.ticket) {
-                        Ok(()) => ("ran", None),
+                        Ok(_) => ("ran", None),
                         Err(err) => ("failed", Some(err.to_string())),
                     }
                 };
@@ -1792,7 +1792,8 @@ const DEFAULT_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
 /// (DEV-278): stdin is empty, so it can't swallow MCP requests, and its
 /// output goes to stderr, so it can't corrupt MCP frames or `--format json`
 /// output. A command that outlives `timeout` is stopped with its children.
-fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: bool) -> LoTaRResult<()> {
+/// Returns its output, and the exit status `ignore_failure` let pass.
+fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: bool) -> LoTaRResult<(String, Option<std::process::ExitStatus>)> {
     use std::io::Read;
     cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
     #[cfg(unix)]
@@ -1843,6 +1844,7 @@ fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: 
             eprintln!("{text}");
         }
     }
+    let output = format!("{out}\n{err}");
     match status {
         None => Err(LoTaRError::ValidationError(format!("Automation run command did not finish within {}s and was stopped", timeout.as_secs()))),
         Some(status) if !status.success() && !ignore_failure => {
@@ -1853,7 +1855,7 @@ fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: 
                 format!("Automation run command failed with status {status}: {detail}")
             }))
         }
-        Some(_) => Ok(()),
+        Some(status) => Ok((output, Some(status).filter(|status| !status.success()))),
     }
 }
 
@@ -1881,7 +1883,77 @@ fn execute_run_action(
     tmpl: &TemplateContext,
 ) -> LoTaRResult<()> {
     let prepared = prepare_run(run, task, config, tasks_dir, context, tmpl)?;
-    execute_prepared_run(prepared, &task.id)
+    let shown = shown_command(&prepared);
+    let result = execute_prepared_run(prepared, &task.id);
+    note_run(match &result {
+        Ok(None) => format!("Automation rule '{}' started `{shown}` on {} (wait: false, so its end isn't logged here).", context.rule, task.id),
+        Ok(Some((output, ignored))) => {
+            let status = ignored.map(|status| format!(", which failed ({status}; ignore_failure)")).unwrap_or_default();
+            format!("Automation rule '{}' ran `{shown}` on {}{status}.{}", context.rule, task.id, output_tail(output))
+        }
+        Err(err) => format!("Automation rule '{}' ran `{shown}` on {}: {err}", context.rule, task.id),
+    });
+    result.map(|_| ())
+}
+
+/// The command a prepared run starts, as one line: a short-form `run` shows
+/// its script, the `command` form its program and arguments.
+fn shown_command(run: &PreparedRun) -> String {
+    match run.args.as_slice() {
+        [flag, script] if run.program == "sh" && flag == "-c" => script.clone(),
+        [flag, script] if run.program == "cmd" && flag == "/C" => script.clone(),
+        args => std::iter::once(run.program.as_str()).chain(args.iter().map(String::as_str)).collect::<Vec<_>>().join(" "),
+    }
+}
+
+/// How many of a run's last output lines go to the job's log.
+const RUN_NOTE_LINES: usize = 10;
+
+/// The last [`RUN_NOTE_LINES`] non-empty lines of a run's output, each on
+/// its own line after a colon; empty when it printed nothing.
+fn output_tail(output: &str) -> String {
+    let lines: Vec<&str> = output.lines().map(str::trim_end).filter(|line| !line.trim().is_empty()).collect();
+    if lines.is_empty() {
+        return String::new();
+    }
+    let tail = &lines[lines.len().saturating_sub(RUN_NOTE_LINES)..];
+    format!(" Output:\n{}", tail.join("\n"))
+}
+
+thread_local! {
+    /// Notes on the rule runs of the job end that [`with_run_notes`]
+    /// collects on this thread (DEV-726); `None` outside one.
+    static RUN_NOTES: std::cell::RefCell<Option<Vec<String>>> = const { std::cell::RefCell::new(None) };
+}
+
+fn note_run(note: String) {
+    RUN_NOTES.with(|notes| {
+        if let Some(notes) = notes.borrow_mut().as_mut() {
+            notes.push(note);
+        }
+    });
+}
+
+/// Restores the collection [`with_run_notes`] replaced, also on a panic.
+struct RunNotesScope(Option<Option<Vec<String>>>);
+
+impl Drop for RunNotesScope {
+    fn drop(&mut self) {
+        if let Some(outer) = self.0.take() {
+            RUN_NOTES.with(|notes| *notes.borrow_mut() = outer);
+        }
+    }
+}
+
+/// Run `f`, and return with its result a note on each rule `run` it ran on
+/// this thread: what ran, for which rule, and how it ended (DEV-726). A
+/// job's end puts them in the job's log; elsewhere a run's output goes to
+/// stderr only.
+pub(crate) fn with_run_notes<T>(f: impl FnOnce() -> T) -> (T, Vec<String>) {
+    let mut scope = RunNotesScope(Some(RUN_NOTES.with(|notes| notes.replace(Some(Vec::new())))));
+    let result = f();
+    let notes = RUN_NOTES.with(|notes| notes.replace(scope.0.take().unwrap_or_default())).unwrap_or_default();
+    (result, notes)
 }
 
 fn prepare_run(
@@ -1939,30 +2011,31 @@ fn prepare_run(
     Ok(PreparedRun { program, args, env: merged_env, cwd, ignore_failure, wait, timeout })
 }
 
-fn execute_prepared_run(run: PreparedRun, ticket_id: &str) -> LoTaRResult<()> {
+/// Start a prepared run. A waited-for one returns its output and the exit
+/// status `ignore_failure` let pass; one that runs on returns `None`.
+fn execute_prepared_run(run: PreparedRun, ticket_id: &str) -> LoTaRResult<Option<(String, Option<std::process::ExitStatus>)>> {
     let PreparedRun { program, args, env, cwd, ignore_failure, wait, timeout } = run;
     let mut cmd = Command::new(program);
     cmd.args(args).current_dir(cwd).envs(env);
 
     if wait {
-        run_and_wait(cmd, timeout, ignore_failure)?;
-    } else {
-        // Async: spawn, then monitor in background threads for logging.
-        // Keep detached commands independent of the caller's stdio handles.
-        // stdin/stdout are NUL and stderr is captured by a pipe that a
-        // dedicated reader drains while the exit is awaited, so a chatty
-        // child cannot deadlock on a full pipe before its exit is observed.
-        //
-        // Windows additionally needs the child to not inherit THIS
-        // process's own stdio pipe write ends: see
-        // `windows_async_stdio::detach_stdio_for_async_children`.
-        #[cfg(windows)]
-        windows_async_stdio::detach_stdio_for_async_children();
-        cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
-        let child = cmd.spawn().map_err(|e| LoTaRError::ValidationError(format!("Failed to spawn async run command: {e}")))?;
-        spawn_async_run_monitor(child, ticket_id.to_string());
+        return run_and_wait(cmd, timeout, ignore_failure).map(Some);
     }
-    Ok(())
+    // Async: spawn, then monitor in background threads for logging.
+    // Keep detached commands independent of the caller's stdio handles.
+    // stdin/stdout are NUL and stderr is captured by a pipe that a
+    // dedicated reader drains while the exit is awaited, so a chatty
+    // child cannot deadlock on a full pipe before its exit is observed.
+    //
+    // Windows additionally needs the child to not inherit THIS
+    // process's own stdio pipe write ends: see
+    // `windows_async_stdio::detach_stdio_for_async_children`.
+    #[cfg(windows)]
+    windows_async_stdio::detach_stdio_for_async_children();
+    cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
+    let child = cmd.spawn().map_err(|e| LoTaRError::ValidationError(format!("Failed to spawn async run command: {e}")))?;
+    spawn_async_run_monitor(child, ticket_id.to_string());
+    Ok(None)
 }
 
 /// Bounded stderr retained for async run failure logging.
@@ -4115,6 +4188,49 @@ mod retry_while_busy_tests {
         });
         assert!(result.is_err());
         assert_eq!(calls, 1);
+    }
+}
+
+#[cfg(test)]
+mod run_note_tests {
+    use super::*;
+
+    fn prepared(program: &str, args: &[&str]) -> PreparedRun {
+        PreparedRun {
+            program: program.into(),
+            args: args.iter().map(|arg| (*arg).to_string()).collect(),
+            env: HashMap::new(),
+            cwd: std::env::temp_dir(),
+            ignore_failure: false,
+            wait: true,
+            timeout: DEFAULT_RUN_TIMEOUT,
+        }
+    }
+
+    /// DEV-726: a job's end collects a note per run; the collection ends
+    /// with it, and an outer one gets back what it had.
+    #[test]
+    fn run_notes_are_collected_only_inside_their_scope() {
+        note_run("outside".into());
+        let ((), outer) = with_run_notes(|| {
+            note_run("first".into());
+            let ((), inner) = with_run_notes(|| note_run("inner".into()));
+            assert_eq!(inner, vec!["inner".to_string()]);
+            note_run("second".into());
+        });
+        assert_eq!(outer, vec!["first".to_string(), "second".to_string()]);
+        let ((), none) = with_run_notes(|| ());
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn a_note_shows_the_command_and_the_last_output_lines() {
+        assert_eq!(shown_command(&prepared("sh", &["-c", "cargo clean"])), "cargo clean");
+        assert_eq!(shown_command(&prepared("lotar", &["agent", "worktree", "run", "DEV-1"])), "lotar agent worktree run DEV-1");
+        assert_eq!(output_tail("\n  \n"), "");
+        let output = (1..=12).map(|n| format!("line {n}")).collect::<Vec<_>>().join("\n\n");
+        let tail = output_tail(&output);
+        assert!(tail.starts_with(" Output:\nline 3\n") && tail.ends_with("line 12"), "{tail}");
     }
 }
 

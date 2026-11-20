@@ -511,7 +511,7 @@ mod git_required {
     /// `agent worktree run` drops the build output when the agent hands the
     /// ticket back during its job (applied once the job ended) and when a
     /// person sets the status. A rule's own HelpNeeded fires no rule, so the
-    /// build output stays then.
+    /// build output stays then. The job's log notes the rule's run (DEV-726).
     #[test]
     fn waiting_build_output_goes_on_hand_back_person_change_and_waits_lotar_sets() {
         common::require_git();
@@ -563,6 +563,10 @@ mod git_required {
         assert_eq!(TaskService::get(&fixture.create_storage(), &ticket, None).unwrap().status.as_str(), "HelpNeeded");
         let worktree = Path::new(job.worktree_path.as_deref().unwrap()).to_path_buf();
         assert!(worktree.join("target").exists() && !worktree.join("target/debug").exists(), "the agent's hand-back drops the build output");
+        // DEV-726: the rule's run leaves a line in the job's log, not only on stderr.
+        let log = AgentJobService::events_for(&job.id).into_iter().filter_map(|event| event.message).collect::<Vec<_>>().join("\n");
+        let ran = format!("Automation rule 'Waiting' ran `{} agent worktree run {ticket} -- sh -c rm -rf target/debug` on {ticket}.", bin.display());
+        assert!(log.contains(&ran), "{log}");
 
         fs::create_dir_all(worktree.join("target/debug")).unwrap();
         status("Todo");
