@@ -1,14 +1,16 @@
 title: docs/help/automation.md's job_paused names two causes; a taken-over job that runs again in a new session (DEV-734) is a third
-status: Reviewing
+status: Blocked
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-20T20:32:12.764651+00:00
-modified: 2026-11-20T21:41:54.400336+00:00
+modified: 2026-11-20T22:25:04.377664+00:00
 relationships:
-  related:
+  depends_on:
   - DEV-734
+  related:
+  - DEV-744
 comments:
 - date: 2026-11-20T21:11:19.743133+00:00
   author: claude
@@ -48,8 +50,41 @@ comments:
     - **Blocking 2, `docs/help/automation.md:230`, same line:** "`job: { error: ... }` matches the pause note, which names the provider and when the job runs again". That is true for a usage limit, but DEV-734's takeover note is `<why>. Paused, not failed: the job runs again in a new session, first in the queue.` (`run_again_in_new_session` in `agent_job_service.rs`), which names neither a provider nor a time. Fix: say what the note names for each cause, or drop that clause. The sse.md `"message": "Paused, not failed: ..."` example also doesn't fit the takeover note, which starts with the reason. Mention that, or leave the example as an illustration only
     - Done when: items 1, 2 and 4 are met. Item 3 is met in substance ("a job with nothing to run again fails"), but it leaves out the two examples (T3 Code thread, older build). That's fine to leave out
     - Scope: the extra sse.md fixes are the same gap and in the spirit of Done when item 4. No stray files, and no other branch with this fix
+- date: 2026-11-20T22:24:53.963692+00:00
+  author: claude
+  text: |-
+    Both review findings fixed; commit amended to `223ec1dc4`
+
+    - Review read `883e00b06`, which was HEAD
+    - **Blocking 1:** DEV-739 now depends on DEV-734 (`lotar task relationships move DEV-739 DEV-734 --from related --to depends-on`), so it can't merge before it. The review's command lacked `task`. DEV-734's current `c79911816` has the same agent.md takeover bullet that this wording follows. Rebase onto main once DEV-734 lands
+    - **Blocking 2:** `docs/help/automation.md:230` now says what each pause note names: for a usage limit, the provider and when the job runs again; for a paused queue, the cause and when the queue tries again; for a taken-over job, why its session couldn't be resumed (checked against `run_again_in_new_session` and `pause_queue` in `agent_job_service.rs` on `agent/DEV-734`)
+    - sse.md `"message": "Paused, not failed: ..."` examples: left as they are. Two of the three notes start that way, and the field is shown only as an example
+  report:
+    commits:
+    - hash: 223ec1dc4
+      what: job_paused names three causes; the pause note clause says what each note names
+    checks:
+    - command: npx prettier --check docs/help/automation.md docs/help/sse.md docs/developers/sse.md
+      result: passed
+    - command: grep job_paused in docs/
+      result: passed
+      reason: no page lists only two causes
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: Merge after DEV-734 lands; rebase onto main then and check agent.md's takeover bullet still matches
+- date: 2026-11-20T22:25:04.377664+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-734. It starts once they are done.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1bed5233326b43586d924cbfc83666f08ba6833a4325145d33153a12707c0c5e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0d2421313df406ec3d391335287bfcb3e9436bed646cb2c6e9744c9636e0c6bc
 description: |-
   Found in the DEV-734 review (2026-11-20): `docs/help/automation.md:230` says `job_paused` fires on a usage limit or a paused queue. Since DEV-734, a taken-over job whose session can't be resumed also ends paused and runs its `job_paused` rules (`docs/help/agent.md:226`). Done: automation.md lists that cause and links agent.md's takeover section.
 
@@ -129,3 +164,49 @@ history:
   - field: tags
     old: docs, review-blocked
     new: docs, review-returned
+- at: 2026-11-20T22:24:05.322625+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-20T22:24:19.174299+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0d2421313df406ec3d391335287bfcb3e9436bed646cb2c6e9744c9636e0c6bc
+- at: 2026-11-20T22:24:46.335985+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-734"]}'
+    new: '{"depends_on":["DEV-734"]}'
+- at: 2026-11-20T22:24:52.232663+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-734"]}'
+    new: '{"depends_on":["DEV-734"],"related":["DEV-744"]}'
+- at: 2026-11-20T22:24:53.963692+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T22:25:03.635522+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T22:25:04.290130+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Blocked
+- at: 2026-11-20T22:25:04.377664+00:00
+  actor: automation
+  changes:
+  - field: comment_added

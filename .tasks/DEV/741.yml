@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-20T21:09:13.348749+00:00
-modified: 2026-11-20T21:36:32.260491+00:00
+modified: 2026-11-20T23:07:17.254528+00:00
 relationships:
   related:
   - DEV-704
   - DEV-726
   - DEV-732
   - DEV-273
+  - DEV-743
 comments:
 - date: 2026-11-20T21:36:18.504677+00:00
   author: claude
@@ -40,11 +41,72 @@ comments:
       result: not_run
       reason: machine load was ~14-21 during the runs
     next: Review, then merge
+- date: 2026-11-20T22:21:06.354186+00:00
+  author: claude
+  text: |-
+    Review: blocking. The test passes with the DEV-273 bug put back, so it still checks nothing.
+
+    - Read: commit `6a6ca2ddc` (only `crates/lotar-lib/tests/web_api_integration_test.rs`), the ticket, DEV-273, the SSE loop in `crates/lotar-lib/src/web_server.rs:740-880`, recent commits to both files on main.
+    - The 1.5 s deadline is gone, as Done asks. Under load the test can't flake now, but it doesn't check what it should.
+    - **Bug 1, `web_api_integration_test.rs:1432`:** the `ready` event is still read with a 500 ms budget. The server waits up to 5 s for the watcher before sending `ready` (`web_server.rs:758`). Here `ready` came after 712 ms, so `first` at `:1449` was `[("ready", "{}")]` and the test passed. This is probably also why it failed before: with the stream already over 1.5 s, it saw nothing.
+      - Fix: wait for `ready` with `read_sse_until(..., WATCH_EVENT_DEADLINE, leftover, |e| e.iter().any(|(k, _)| k == "ready"))`, as the tests at `:1477` and `:1528` do. Then assert that `first` is a `task_updated`.
+    - **Bug 2, `:1442-1445`:** even with bug 1 fixed in a scratch copy, the bug put back (`if buffer.is_empty()` → `if true`, `web_server.rs:855`) passed 4 of 4 runs at load ~15-26. Events still came while the stream ran. A 5 ms sleep plus the emit often takes more than the 20 ms fast-IO debounce, so the moving deadline still runs out. The fix agent's claim that the test fails with the bug put back didn't hold here.
+      - Fix: the test needs a gap between events that load can't stretch past the debounce. Options: emit in a tight loop without sleeping, or test the deadline rule as a pure function of the event times instead of over a socket.
+    - Put the bug back in a detached copy (`/tmp/dev741-review-scratch`, now removed). This worktree is unchanged.
+    - Filed [DEV-743](https://lotar.pyxzl.net/task/DEV-743): `merge_agent_that_hands_back_without_end_rules_does_not_land` failed in my `npm run -s test:agent` at load ~38. That test is outside this diff.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+      reason: unrelated DEV-743 (merge_agent_that_hands_back_without_end_rules_does_not_land, load ~38); 948 tests not run after it
+    - command: cargo nextest run -p lotar-lib --test integration sse_delivers_during, DEV-273 bug put back
+      result: failed
+      reason: test passed 9 of 9 runs, should fail
+    - command: npm run -s lint
+      result: not_run
+      reason: diff is one test file, test:agent compiles it warning-free
+    - command: npm run -s smoke
+      result: not_run
+      reason: no UI or server change
+    next: 'Fix agent: wait for ready with read_sse_until, check the first event is task_updated, make the bug reliably fail the test'
+- date: 2026-11-20T23:07:05.819282+00:00
+  author: claude
+  text: |-
+    Both review findings fixed: the DEV-273 rule now has a test that fails with the bug put back, every time.
+
+    - **Bug 1 (ready read in 500 ms):** `sse_delivers_during_a_steady_stream_of_events` now waits for `ready` with `read_sse_until(..., WATCH_EVENT_DEADLINE, ...)` and asserts it, then waits for a `task_updated`, not just any event.
+    - **Bug 2 (the socket test can't catch the bug under load):** agreed, load can always stretch a gap past the 20 ms test debounce. Took the reviewer's second option: the rule moved into `flush_deadline()` in `crates/lotar-lib/src/web_server.rs`, which the SSE loop calls. The new unit test `later_events_do_not_push_the_sse_flush_back` feeds it events 15 ms apart with a 20 ms debounce.
+    - With the bug put back (`now + debounce` on every event), the unit test failed; with the fix it passes. Source restored after.
+    - The socket test now only checks that the stream reaches the client while it runs: the emitter keeps sending until the client gets an event (cap 30 s, longer than the client's 15 s wait). No fixed wall-clock deadline left, as Done asks.
+    - Amended `6a6ca2ddc` → `4141311d2` (signed).
+  report:
+    commits:
+    - hash: 4141311d2
+      what: deadline rule unit-tested; socket test waits for ready and checks wiring only
+    checks:
+    - command: cargo nextest run -p lotar-lib -E 'test(later_events_do_not_push_the_sse_flush_back) | test(sse_delivers_during_a_steady_stream_of_events)'
+      result: passed
+    - command: unit test with DEV-273 bug put back
+      result: failed
+      reason: expected, catches the bug
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2422 Rust + 1563 UI, load avg ~27
+    - command: npm run -s smoke
+      result: passed
+      reason: 406 tests
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acf99943c821ddc87e00cedab3dccb0740e11d234dd55910d2fb22a12961df1f5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0cff3950f328479efe894b3ebb28fa56df7853acf0077e26735cfb482484c05b
 description: 'Found: fails ''nothing delivered while events kept coming'' (crates/lotar-lib/tests/web_api_integration_test.rs:1444) in merge runs of DEV-704, DEV-726 and DEV-732 (2026-11-20, 2 of 4 full runs, load avg 25-34); passes alone. Check: npm run -s test:agent at load avg ~30. Done: the test passes under full-suite load without a fixed 1.5 s wall-clock deadline.'
 tags:
 - health
+- review-returned
 custom_fields:
   finding: npm run -s test:agent:sse_delivers_during_a_steady_stream_of_events
 history:
@@ -81,6 +143,55 @@ history:
     old: '{"related":["DEV-704","DEV-726","DEV-732"]}'
     new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273"]}'
 - at: 2026-11-20T21:36:32.260491+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T22:20:18.953009+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743"]}'
+- at: 2026-11-20T22:20:44.609406+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-20T22:21:06.354186+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T22:21:28.717184+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-20T22:57:51.192735+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-20T22:57:55.620573+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0cff3950f328479efe894b3ebb28fa56df7853acf0077e26735cfb482484c05b
+- at: 2026-11-20T23:07:05.819282+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T23:07:17.254528+00:00
   actor: claude
   changes:
   - field: status

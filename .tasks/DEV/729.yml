@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T13:23:02.862143+00:00
-modified: 2026-11-20T21:38:37.580587+00:00
+modified: 2026-11-20T23:08:35.248623+00:00
 relationships:
   depends_on:
   - standards:STD-257
@@ -16,6 +16,8 @@ relationships:
   - DEV-732
   - DEV-683
   - DEV-731
+  - DEV-734
+  - DEV-747
 comments:
 - date: 2026-11-20T13:25:23.500075+00:00
   author: claude
@@ -275,3 +277,15 @@ history:
   - field: relationships
     old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683"]}'
     new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731"]}'
+- at: 2026-11-20T22:32:21.575101+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731","DEV-734"]}'
+- at: 2026-11-20T23:08:35.248623+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731","DEV-734"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731","DEV-734","DEV-747"]}'

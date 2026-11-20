@@ -1,11 +1,11 @@
 title: 'agent.worktree.waiting_run reports ''could not start in <worktree>: No such file or directory'' for a worktree that exists'
-status: Reviewing
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-20T13:25:13.774179+00:00
-modified: 2026-11-20T21:37:53.539670+00:00
+modified: 2026-11-20T23:49:04.341609+00:00
 relationships:
   depends_on:
   - DEV-732
@@ -17,6 +17,9 @@ relationships:
   - DEV-727
   - DEV-732
   - DEV-710
+  - DEV-711
+  - DEV-733
+  - DEV-740
 comments:
 - date: 2026-11-20T13:33:48.900923+00:00
   author: claude
@@ -207,6 +210,65 @@ comments:
       result: not_run
       reason: unchanged commit, passed in the earlier fix session
     next: 'Review the branch agent/DEV-730, then merge (rebase onto main first: main moved on by 5 commits)'
+- date: 2026-11-20T22:04:29.151191+00:00
+  author: claude
+  text: |-
+    Review: passed. The log line now tells a gone worktree from a program missing on PATH, and the DEV-728 cause is known.
+
+    - Read: commit `14b6f9177` (`crates/lotar-agent/src/services/agent_job_service.rs`, `docs/help/agent.md`), all ticket comments, DEV-731 and DEV-732, and the last 5 main commits to both files.
+    - Done when: `start_failure` returns "the folder is gone", "`<program>` doesn't exist" or "`<program>` is not on this lotar's PATH (<PATH>)", and passes other errors through unchanged. The cause is recorded: `cargo` was missing from the worker's inherited PATH and the folder was there (`stat` evidence). That fix is in DEV-731.
+    - The PATH shown is the one the spawn used: `clear_repository_env` only drops `GIT_*` routing keys, not `PATH`.
+    - Test `waiting_run_start_failure_names_the_missing_program_or_folder` runs all three real spawns. `start_failure` is new, so there is no "fails on the old code" version of it; the old raw `os error 2` couldn't tell the cases apart.
+    - Main moved on (DEV-711, DEV-729, DEV-733 touch the same files) but `git merge-tree main HEAD` is clean. No stray files and no second branch.
+    - `npm ci`: passed.
+    - Reran: `cargo nextest run -p lotar-agent waiting_run` (1 passed), `cargo clippy -p lotar-agent --all-targets --all-features -- -D warnings` (clean), `rustfmt --check` and `prettier --check` on the touched files (clean). Not rerun: full `npm test` and `npm run smoke` (they passed on this commit in the fix session).
+    - No UI changes. No tickets filed.
+- date: 2026-11-20T22:51:23.809964+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (126172562) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1445:5:
+        first event took 1.513681459s; the stream lasts ~2 s
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 1 test still running
+    ────────────
+         Summary [ 189.345s] 2368/2426 tests run: 2367 passed, 1 failed, 0 skipped
+            FAIL [   9.929s] (2367/2426) lotar-lib::integration web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+      stdout ───
+
+        running 1 test
+        test web_api_integration_test::sse_delivers_during_a_steady_stream_of_events ... FAILED
+
+        failures:
+
+        failures:
+            web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1606 filtered out; finished in 9.84s
+
+      stderr ───
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (126172562) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1445:5:
+        first event took 1.513681459s; the stream lasts ~2 s
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 58/2426 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-730` onto `main` (`7b5a53d2c067`): `5346b8fa22bf`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae91c8bcb6c87393265f36bb06f2ad25ad8708f7b454d932fe86fc871d783b959
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c9ee95b11482e04538814920039b5a4ee670172959192857a1c0ac8a2c917ef
@@ -218,8 +280,6 @@ description: |-
   Done: the log line tells the program-not-found case from the missing-worktree case, and the DEV-728 cause is known.
 tags:
 - health
-- fix-retried
-- retry-fix
 custom_fields:
   finding: waiting_run:spawn-enoent
 history:
@@ -442,3 +502,41 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-20T22:04:29.151191+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T22:04:30.050325+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732","DEV-710"]}'
+    new: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732","DEV-710","DEV-711","DEV-733"]}'
+- at: 2026-11-20T22:04:39.804097+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-20T22:51:23.809964+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T23:17:07.730146+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, retry-fix
+    new: health
+- at: 2026-11-20T23:49:04.341609+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732","DEV-710","DEV-711","DEV-733"]}'
+    new: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732","DEV-710","DEV-711","DEV-733","DEV-740"]}'

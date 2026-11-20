@@ -1,0 +1,51 @@
+title: Settle a ticket's kept T3 Code threads once a later job completes or the ticket is done
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T23:08:35.010019+00:00
+modified: 2026-11-20T23:08:35.533226+00:00
+relationships:
+  related:
+  - DEV-729
+  - DEV-732
+description: |-
+  A T3 Code job thread that lotar leaves active is never settled later. On 2026-11-20 the owner saw 43 unsettled threads and asked whether they needed him. 33 of them were leftovers: 21 from failed or cancelled jobs, 2 from jobs that ended while the ticket was HelpNeeded, and the rest from jobs that ran before auto-settle existed. Most of those tickets are Done by now. The owner chose this fix on 2026-11-20 ("Settle + file lotar fix").
+
+  ## Context
+
+  - `settle_t3_thread` (crates/lotar-agent/src/services/agent_job_service.rs:5529) runs only when a job completes. Per docs/help/agent.md:179, the thread stays active when the job failed or was cancelled, or when the ticket waits for a person. That is right at the time, but nothing settles those threads afterwards.
+  - Examples:
+    - DEV-732: failed jobs job-20261120T134548.567Z-11 and job-20261120T142256.382Z-15 (DEV-729) left threads b70b2201… and f878a77d… active. Later DEV-732 jobs settled their own threads, and the ticket is Done.
+    - STD-262 (job-20261120T101421.894Z-1) and FND-24 (job-20261120T180657.811Z-1) were HelpNeeded at job end and are Done now.
+  - Agents can't clear these threads by hand. `t3_thread_organize settle` on a full-access `mcp:launch:` thread is refused with `runtime_mode_escalation_denied`, so only lotar (through `harnessmux::backend::t3::settle`) or the owner can settle them.
+
+  ## Plan
+
+  1. Record each t3 job's thread whether or not it was settled. The job's harnessmux session already holds it.
+  2. Settle every thread of a ticket that lotar kept active when either of these happens:
+     - a later job on the same ticket completes and settles its own thread;
+     - the ticket reaches a done state (Done, WontDo, or the project's done statuses), whichever way it got there (agent, owner, web UI, CLI).
+     In both cases skip a thread whose run is still going, and log `Settled the T3 Code thread <link>` in the job it belongs to, or in the ticket's history.
+  3. Catch-up: the same check runs once on `lotar serve` start, or on `lotar agent worktree cleanup`, so leftovers from before this change get cleared.
+  4. Tests: a failed job's thread is settled once a later job completes; a HelpNeeded thread is settled once the ticket is Done; a running thread is left alone.
+  5. Update docs/help/agent.md:179.
+
+  ## Done when
+
+  - [ ] Kept threads are settled after a later successful job or a done state, with tests
+  - [ ] The catch-up clears today's leftovers on the owner's machine (the T3 sidebar shows only threads that still need someone)
+  - [ ] docs/help/agent.md says so
+history:
+- at: 2026-11-20T23:08:35.249950+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-729","DEV-732"]}'
+- at: 2026-11-20T23:08:35.533226+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

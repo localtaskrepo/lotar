@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-20T22:00:15.916416+00:00
+modified: 2026-11-20T22:32:21.571616+00:00
 relationships:
   depends_on:
   - DEV-683
@@ -16,6 +16,8 @@ relationships:
   - DEV-584
   - DEV-729
   - DEV-740
+  - DEV-730
+  - DEV-734
 comments:
 - date: 2026-11-18T20:20:17.510756+00:00
   author: claude
@@ -106,6 +108,35 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-711` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-711` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-20T22:03:28.807665+00:00
+  author: claude
+  text: |-
+    Merged into main as `b98036dbb`, not pushed: the UI tests and smoke didn't finish before lotar ended the job.
+
+    - Rebase conflict at `EventBody::TurnFailed` in `agent_job_service.rs`: main (DEV-729) had only added `{ error, .. }` to build with harnessmux 0.2.0. I kept DEV-711's `{ error, kind, resets_at, retryable }`, as the review advised. `runner_errors` is already `Vec<harnessmux::Failure>` on main, and that was the only conflicting hunk.
+    - `npm ci` and `lint:agent` passed. Rust tests: 2425 of 2425 passed on the 4th run. Runs 1 to 3 each failed a different timing test (SSE, dev604, dev605) at load 16 to 90. All of them pass alone, and none goes through the typed-failure code.
+    - At 22:00 UTC lotar fast-forwarded main to `7cc3b5c45` and removed the worktree, so the UI tests crashed (`Worker exited unexpectedly`) and smoke never ran.
+    - I folded the pending `.tasks` changes into the DEV-711 commit (`b98036dbb`), as step 4 says. No rules or config changed, so `lotar trust` isn't needed.
+    - Not pushed: `origin/main` is at `c11351f1f`, and DEV-729 (`399973c57`) is waiting too.
+  report:
+    commits:
+    - hash: b98036dbb
+      what: DEV-711 rebased onto main (DEV-729), .tasks folded in
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+      reason: Rust 2425/2425 passed on the 4th run; runs 1-3 each failed one or two different timing tests (sse_delivers…, dev604 a_full_disk…, dev604 a_signing_failure…, dev605 a_check_that_leaves…), all pass alone, load 16-90; the UI part crashed when lotar removed the worktree mid-run
+    - command: npm run -s smoke
+      result: not_run
+      reason: the worktree was removed before it could run
+    - command: git push
+      result: not_run
+      reason: smoke and the UI tests didn't finish
+    next: Run npm run smoke and the UI tests on main b98036dbb, then push main (also DEV-729's 399973c57)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610a9a82-cb42-47ba-9eea-09f109d6be60
@@ -315,3 +346,19 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-20T22:03:28.807665+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T22:04:30.049143+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740"]}'
+    new: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740","DEV-730"]}'
+- at: 2026-11-20T22:32:21.571616+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740","DEV-730"]}'
+    new: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740","DEV-730","DEV-734"]}'

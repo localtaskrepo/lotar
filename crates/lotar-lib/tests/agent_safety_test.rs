@@ -119,6 +119,27 @@ fn worker_process_waits_for_runner_and_finalization() {
     assert!(context.messages.iter().any(|message| message.role == "user" && message.content == "run"), "worker must await context persistence");
 }
 
+/// A worker started from a shell with a short PATH (an agent's `lotar`
+/// call) still runs its jobs with the login shell's PATH (DEV-731).
+#[test]
+fn worker_started_with_short_path_runs_jobs_with_login_path() {
+    let (fixture, ticket) = setup("lotar-login-probe", false);
+    let root = fixture.get_temp_path();
+    let bin = root.join("login-bin");
+    fs::create_dir_all(&bin).unwrap();
+    let probe = bin.join("lotar-login-probe");
+    fs::write(&probe, "#!/bin/sh\nprintf found > \"$LOTAR_TASKS_DIR/../probe-marker\"\n").unwrap();
+    fs::set_permissions(&probe, fs::Permissions::from_mode(0o755)).unwrap();
+    // A login shell whose profile prints a greeting and adds `login-bin`.
+    let shell = root.join("login-shell");
+    fs::write(&shell, format!("#!/bin/sh\necho 'Welcome'\nPATH=\"{}:$PATH\" exec /bin/sh \"$2\" \"$3\"\n", bin.display())).unwrap();
+    fs::set_permissions(&shell, fs::Permissions::from_mode(0o755)).unwrap();
+    let mut worker = worker_command(&fixture, &ticket);
+    worker.env("PATH", "/usr/bin:/bin").env("SHELL", &shell);
+    wait_worker(worker.spawn().unwrap());
+    assert_eq!(fs::read_to_string(root.join("probe-marker")).unwrap(), "found");
+}
+
 #[test]
 fn enabled_worktree_without_repository_fails_closed() {
     let (fixture, ticket) = setup("touch \"$LOTAR_TASKS_DIR/../executed-in-main\"", false);

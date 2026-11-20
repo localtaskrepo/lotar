@@ -1,0 +1,80 @@
+title: 'Flaky test: merge_agent_that_hands_back_without_end_rules_does_not_land sees the merge job still running under full-suite load'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-20T22:20:16.414328+00:00
+modified: 2026-11-20T22:55:36.018662+00:00
+relationships:
+  related:
+  - DEV-741
+comments:
+- date: 2026-11-20T22:55:24.537133+00:00
+  author: claude
+  text: |-
+    Fixed: the merge-without-end-rules tests now wait for the job's end, not the 30 s floor.
+
+    - Cause: `run_merge_without_end_rules` waited `wait_for_ticket_jobs(.., 10_000, ..)`, raised to `WAIT_FLOOR_MS` (30 s); at load avg 38 the merge job was still `running` when that ran out
+    - Change: new `JOB_END_LIMIT_MS` (300 s) in `crates/lotar-lib/tests/agent_automation_integration_test.rs`, used by that wait; it returns as soon as the job is settled, the limit only catches a hang (nextest's 90 s `slow-timeout` only marks a test as slow, it doesn't kill it)
+    - Covers both `merge_agent_that_hands_back_…` and `merge_agent_that_sets_a_status_…`
+    - Commit `5529ec2f6`; `test:agent` ran at load avg ~19, so I couldn't recreate the ~30 load
+  report:
+    commits:
+    - hash: 5529ec2f6
+      what: merge-without-end-rules tests wait for the job's end, 5 min hang limit
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: load avg ~19, not ~30
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2425 Rust tests
+    - command: npm run smoke
+      result: passed
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aec951db3e734b6e58489b043d966e72234745ad92b050bdf8068211860ea84d7
+description: 'Found: failed in the DEV-741 review run of npm run -s test:agent (2026-11-20, load avg ~38): job NRH-1 status ''running'' instead of finished, after 39.66 s (agent_automation_integration_test::git_required). The DEV-741 diff only touches an SSE test. Check: npm run -s test:agent at load avg ~30. Done: the test waits for the job''s end instead of a fixed budget and passes under full-suite load.'
+tags:
+- health
+custom_fields:
+  finding: npm run -s test:agent:merge_agent_that_hands_back_without_end_rules_does_not_land
+history:
+- at: 2026-11-20T22:20:18.954559+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-741"]}'
+- at: 2026-11-20T22:20:20.166034+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T22:47:41.355181+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T22:47:43.197422+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aec951db3e734b6e58489b043d966e72234745ad92b050bdf8068211860ea84d7
+- at: 2026-11-20T22:55:24.537133+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T22:55:36.018662+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

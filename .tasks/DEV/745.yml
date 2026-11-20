@@ -1,0 +1,87 @@
+title: Queue worker hangs at start when the login shell's profile leaves a background process holding its stdout
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T22:28:14.806321+00:00
+modified: 2026-11-20T23:18:12.745063+00:00
+relationships:
+  depends_on:
+  - DEV-731
+  related:
+  - DEV-731
+comments:
+- date: 2026-11-20T23:18:04.332113+00:00
+  author: claude
+  text: |-
+    Waits for DEV-731 to land on main: the code this fixes isn't there yet.
+
+    - `login_shell_path` (`crates/lotar-agent/src/services/agent_queue_service.rs`) exists only on `agent/DEV-731` (`ed15359af`), status Merging
+    - `main` (`5346b8fa2`) has no login-shell PATH lookup, so there's nothing to fix on this branch
+    - Next: once DEV-731 is merged, rebase `agent/DEV-745` on main, swap the `reader.join()` for `recv_timeout` against the same 5 s deadline, add the fake-shell test with a background `sleep`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2709f94f3ae56b54cec4da8792ab3483952368e9ccd6e48744e2ac87f76329d
+description: |-
+  The queue worker's login-shell PATH lookup (DEV-731) can hang the worker for good, although `docs/help/agent.md` says it gives up after 5 seconds. Found in the DEV-731 review, 2026-11-20.
+
+  ## Cause
+
+  - `login_shell_path` in `crates/lotar-agent/src/services/agent_queue_service.rs` enforces its 5 second limit only while the shell runs (`child.try_wait()` loop)
+  - After the shell exits it calls `reader.join()` with no limit. The reader thread only ends when the pipe closes, i.e. when every process holding stdout has exited
+  - A profile that starts something in the background without redirecting its stdout (an agent, a daemon, `cmd &`) keeps the pipe open, so the worker blocks before it takes its first job
+
+  ## Fix
+
+  Give up on the reader too once the deadline passes, for example by receiving its output over a channel with `recv_timeout`. On a timeout, keep the PATH the worker got, as the docs already say.
+
+  ## Done when
+
+  - [ ] A test with a fake login shell that leaves a background `sleep` holding stdout shows that the worker still runs its job with its own PATH within about 5 s
+tags:
+- waits
+history:
+- at: 2026-11-20T22:28:15.610454+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-731"]}'
+- at: 2026-11-20T22:28:16.379763+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T23:17:29.682827+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T23:17:31.207344+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2709f94f3ae56b54cec4da8792ab3483952368e9ccd6e48744e2ac87f76329d
+- at: 2026-11-20T23:18:03.883642+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-731"]}'
+    new: '{"depends_on":["DEV-731"],"related":["DEV-731"]}'
+- at: 2026-11-20T23:18:04.288608+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-20T23:18:04.332113+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T23:18:12.745063+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

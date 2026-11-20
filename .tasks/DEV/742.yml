@@ -1,14 +1,49 @@
 title: 'Flaky test: a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit times out at line 173 under load'
-status: Todo
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-20T21:53:10.914860+00:00
-modified: 2026-11-20T21:53:11.425628+00:00
+modified: 2026-11-21T00:24:14.702303+00:00
 relationships:
+  blocks:
+  - DEV-734
   related:
   - DEV-734
+  - TEST-1
+comments:
+- date: 2026-11-20T22:47:01.296826+00:00
+  author: claude
+  text: |-
+    Fixed: a real race in the pause, not a slow deadline. A try that outlasted the retry interval let a second held job start.
+
+    - The failing line 173 in DEV-734's run was the 5 s check `assert!(queued(&queue, "TEST-2"))`, not the 30 s wait (the test ended after 26 s). `TEST-2` had left the queue and was running
+    - Cause 1: `next_try_at` counted from the moment a try started. Under load TEST-1's commit retry took 3 s, longer than the 2 s interval, so the next try came due while it ran and went to the held `TEST-2`. In production (10 min interval) a disk-pause retry that reruns the agent for over 10 min would do the same
+    - Cause 2: when the paused job was still finishing as its retry was taken, the retry hit "ticket busy" and went back to the end of the queue (`settle_taken`), behind `TEST-2`
+    - Fix in `agent_queue_service.rs`: `QueuePause.trying` holds the ticket whose job paused the queue or took the last try. No try is due until that job has ended (`try_free`), in the queue worker and in `lotar serve` (`take_held_try`). Old queue files still load (field is optional)
+    - The signing test now runs with `LOTAR_AGENT_PAUSE_RETRY_SECONDS=0`, so the race shows without load: the first half of the fix still failed 1 of 3 runs that way, the full fix passed 8/8. A failing `wait_for` or the 5 s check now prints every job's log
+    - New unit-test case in `a_pause_holds_jobs_in_its_scope_and_admits_one_try_when_due`; it fails without the fix
+    - `docs/help/agent.md` (Paused queue, Retry) says a try waits for the previous one to end
+  report:
+    commits:
+    - hash: 43e005051
+      what: a paused queue gives no try while the job that paused it or took the last try still runs
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2425/2425 Rust at load average 34 (12 extra busy loops), UI 1563/1563
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 406/406
+    - command: cargo nextest run -p lotar-lib --test integration --stress-count 8 -E 'test(a_signing_failure_pauses)'
+      result: passed
+      reason: 8/8
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1e86cb0af4dd19c56f9030c01d5f4fca391f7d09344d1cfb212c15342bbd55a6
 description: 'Found (DEV-734, 2026-11-20): it failed in lotar''s merge check of agent/DEV-734 (`npm run -s test:agent`, load average 21; dev605''s timing test failed in the same run). After signing works again the queue didn''t resume within the 30 s `wait_for`: pause set, `next_try_at` passed, `running_jobs: 1`. The run took 26 s; alone it takes 8 s. The same commit then passed 6 runs alone, 12 in parallel, 16 in parallel at load 30, and the full `npm run -s test:rust:agent` (2421/2421). Check: find what the running job waits on when this happens (keep the worker and job logs when it fails), then fix the cause or the deadline. Done: the test passes in a full agent suite run under load.'
 tags:
 - health
@@ -26,3 +61,48 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-20T22:25:18.036716+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T22:25:19.019505+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1e86cb0af4dd19c56f9030c01d5f4fca391f7d09344d1cfb212c15342bbd55a6
+- at: 2026-11-20T22:47:01.296826+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T22:47:01.587589+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-734"]}'
+    new: '{"related":["DEV-734","TEST-1"]}'
+- at: 2026-11-20T22:47:12.583836+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T23:44:09.365466+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-734","TEST-1"]}'
+    new: '{"blocks":["DEV-734"],"related":["DEV-734","TEST-1"]}'
+- at: 2026-11-21T00:24:14.702303+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

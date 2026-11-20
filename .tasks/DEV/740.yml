@@ -1,16 +1,17 @@
 title: A runner failure that names both a sign-in error and a usage limit fails instead of pausing, though docs/help/agent.md says a limit wins
-status: Blocked
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-20T21:07:30.522875+00:00
-modified: 2026-11-20T22:00:42.993282+00:00
+modified: 2026-11-20T23:49:22.676736+00:00
 relationships:
   depends_on:
   - DEV-711
   related:
   - DEV-711
+  - DEV-730
 comments:
 - date: 2026-11-20T21:28:29.221996+00:00
   author: claude
@@ -21,8 +22,46 @@ comments:
     - DEV-711 is in Merging. Its rebase onto main conflicted in `agent_job_service.rs`, and the merge agent has it.
     - Added "Done when" with the choice: pause on a limit line whatever the kind, so the doc's "A limit wins" stays true. harnessmux's `Failure` doesn't say where its kind came from, so the text match runs for every kind.
     - Next: once DEV-711 is on main, change `of_failures_in`, add tests, update `docs/help/agent.md`.
+- date: 2026-11-20T22:37:59.270935+00:00
+  author: claude
+  text: |-
+    Done: a failure harnessmux typed as sign-in, overload, context or transport now pauses when its text has a usage-limit line.
+
+    - Branch fast-forwarded to main (`7b5a53d2c`, has DEV-711's `b98036dbb`).
+    - `crates/lotar-agent/src/services/usage_limit.rs`: `of_failures_in` runs the text match for every kind other than `rate_limited`/`quota` (those unchanged: `resets_at` over a time in the text, else default wait).
+    - New tests: `auth_required` with a limit line pauses at its time; `overloaded` with one waits the default; any kind without a limit line stays a failure; first limit among several failed turns wins.
+    - `docs/help/agent.md` (What counts): a limit line counts whatever kind harnessmux gave; "A limit wins…" stays.
+    - The only caller is `usage_limit_pause` in `agent_job_service.rs`, unchanged.
+  report:
+    commits:
+    - hash: a89ee06f5
+      what: pause on a limit line in a failure of any kind; tests; doc
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2429 Rust, 1563 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Merge agent lands agent/DEV-740 on main
+- date: 2026-11-20T23:48:57.263760+00:00
+  author: claude
+  text: |-
+    Review: passed. `a89ee06f5` does what "Done when" asks, and the code and the doc agree.
+
+    - **Read:** the diff of `main..HEAD` (one commit, `usage_limit.rs` and `docs/help/agent.md`), the ticket and its comments, DEV-711's `b98036dbb`, and the only caller, `usage_limit_pause` in `agent_job_service.rs:5430`, which is unchanged. Main is one commit ahead (`5346b8fa2`, DEV-730). That commit touches neither file.
+    - **Behaviour:** `of_failures_in` now reads the text for every kind except `rate_limited` and `quota`. Those two keep `resets_at` over a time in the text, else the default wait. A failure without a limit line still fails, and the first failed turn that is a limit wins (`find_map`).
+    - **Tests failed before the fix:** with the old match arms (`Other => from_text, _ => None`) put back, 3 of the new tests fail: sign-in, overloaded, first-limit-wins. File restored afterwards.
+    - **One intended change:** an overloaded `exceeded retry limit: try again at …` text now pauses, where the old test said it fails. That is what the ticket's checklist asks for.
+    - **Doc:** "What counts" now says the text counts for any kind, and "A limit wins…" stays true.
+    - **Reran:** `npm ci` passed; `cargo fmt --all --check` passed; `cargo clippy --all-targets --all-features -D warnings` passed; `cargo nextest run -p lotar-agent` passed (204/204).
+    - **Not rerun:** `npm run smoke` and the UI and JS tests. The change has no UI or JS part; the fix agent reports they passed.
+    - **Findings:** none. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab243cb4cc26f9d7a16831b9f3da94be5b82dcf3a6e620526a8c67a7ba1ad246f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aad0962db015d694a8baaaef13f597357cdcda7a02959f6934b6c0a88d6a7cfac
 description: |-
   Found in the DEV-711 review (2026-11-20). harnessmux 0.2.0 sorts a failure by its text with sign-in first (`kind_of_text`, `harnessmux-0.2.0/src/failure.rs`: `unauthorized`, `failed to authenticate` … before `usage limit`). So a t3 failure text (`t3 exited with …: <T3's error output>`) that names both comes back as `auth_required`, and `usage_limit::of_failures_in` (`crates/lotar-agent/src/services/usage_limit.rs`) gives no pause. Before DEV-711 the line-by-line text match paused it. `docs/help/agent.md` (Usage limits, What counts) still says 'A limit wins over any other failure in the same output, a full disk or a signing failure included'.
   Check: a TurnFailed of kind auth_required (or overloaded) from text alone whose text has a usage-limit line: either pause on it (e.g. also run the text match for kinds harnessmux took from text) or reword the doc sentence; a unit test covers the choice.
@@ -110,3 +149,46 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-20T22:32:45.496205+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-20T22:32:47.133999+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aad0962db015d694a8baaaef13f597357cdcda7a02959f6934b6c0a88d6a7cfac
+- at: 2026-11-20T22:37:59.270935+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T22:38:08.994500+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T23:48:57.263760+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T23:49:04.350046+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-711"],"related":["DEV-711"]}'
+    new: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730"]}'
+- at: 2026-11-20T23:49:22.676736+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

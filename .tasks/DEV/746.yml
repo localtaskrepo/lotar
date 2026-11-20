@@ -1,0 +1,88 @@
+title: In-process run_worker in tests runs the real login shell and calls set_var while other threads run
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T22:28:17.130177+00:00
+modified: 2026-11-20T23:18:25.044028+00:00
+relationships:
+  depends_on:
+  - DEV-731
+  related:
+  - DEV-731
+comments:
+- date: 2026-11-20T23:18:16.056187+00:00
+  author: claude
+  text: |-
+    Waits for DEV-731: the code this ticket changes isn't on main yet.
+
+    - `complete_path_from_login_shell` comes from DEV-731's commit `ed15359af`, which is only on `agent/DEV-731` (status `Merging`). `git log main..HEAD` on `agent/DEV-746` is empty, and `grep complete_path crates` finds nothing
+    - Plan once it's on main: move the call out of `run_worker` (`crates/lotar-agent/src/services/agent_queue_service.rs`) into the `lotar agent worker` handler (`crates/lotar-lib/src/cli/handlers/agent.rs`), so in-process `run_worker` in tests (`dev503_harness_jobs_test.rs:1246`, `agent_automation_integration_test.rs`) starts no login shell and calls no `set_var`
+    - Then check that `worker_started_with_short_path_runs_jobs_with_login_path` still passes
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A467e3597696cfa7e586c1f1ae1e3e395288f477ceba17561faac49b8bc7435e3
+description: |-
+  Tests that call `AgentQueueService::run_worker` in process now run the developer's real login shell and change PATH with `std::env::set_var`, which can happen while other threads are running. Found in the DEV-731 review, 2026-11-20.
+
+  ## Cause
+
+  - DEV-731 added `complete_path_from_login_shell` at the start of `run_worker`, in `crates/lotar-agent/src/services/agent_queue_service.rs`. Its SAFETY comment says the worker has started no thread yet. That holds for `lotar agent worker`, where the CLI runs single-threaded
+  - In tests it doesn't hold: `crates/lotar-lib/tests/dev503_harness_jobs_test.rs:1246` runs `run_worker` on a spawned thread while the main thread keeps reading tickets. `agent_automation_integration_test.rs` (3371, 3424, 3432, 3606, 3678) calls it in process too
+  - These tests also take `$SHELL -l` from the developer's machine, so their PATH depends on that machine's profile
+
+  ## Fix
+
+  Run the PATH completion only in the `lotar agent worker` CLI entry (`crates/lotar-lib/src/cli/handlers/agent.rs`, `worker`), before it calls `run_worker`. Or leave it out when the worker runs in process.
+
+  ## Done when
+
+  - [ ] An in-process `run_worker` never calls `set_var` and starts no login shell
+  - [ ] `worker_started_with_short_path_runs_jobs_with_login_path` still passes
+tags:
+- waits
+history:
+- at: 2026-11-20T22:28:17.929863+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-731"]}'
+- at: 2026-11-20T22:28:18.576731+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T23:17:41.109938+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T23:17:42.712946+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A467e3597696cfa7e586c1f1ae1e3e395288f477ceba17561faac49b8bc7435e3
+- at: 2026-11-20T23:18:15.575934+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-731"]}'
+    new: '{"depends_on":["DEV-731"],"related":["DEV-731"]}'
+- at: 2026-11-20T23:18:16.003376+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-20T23:18:16.056187+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T23:18:25.044028+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

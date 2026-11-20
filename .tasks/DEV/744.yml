@@ -1,0 +1,113 @@
+title: 'A job_started rule''s run leaves no line in lotar agent logs: the standards worktree setup ran 1m43s unseen'
+status: Reviewing
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-20T22:24:52.009642+00:00
+modified: 2026-11-20T23:17:28.663134+00:00
+relationships:
+  related:
+  - DEV-726
+  - DEV-739
+comments:
+- date: 2026-11-20T23:17:19.190992+00:00
+  author: claude
+  text: |-
+    Each `run` of a job_started rule now leaves a line in `lotar agent logs`.
+
+    - `start_job` collects the run notes (DEV-726's `with_run_notes`) and logs them, plus `The start rules for <ID> failed: …` (before, that error was dropped)
+    - Note now has exit code and duration: `ran `<cmd>` on DEV-1: exit 0 in 1m43s.`; ignore_failure: `failed (exit 1) in 12s, ignored (ignore_failure)`; a hard failure or timeout gives the error and how long it ran. Job-end notes get the same fields
+    - Untrusted: `Automation rule '<rule>' skipped its run on <ID>: this workspace isn't trusted (`lotar trust`).`
+    - Tests: `crates/lotar-lib/tests/dev744_job_started_run_notes_test.rs` (exit 0, ignored exit 3, failed exit 5 in a real job); skip line in `run_note_tests` (untrusted, a repo profile can't start a job, so unit level)
+    - Docs: `docs/help/agent.md`, `docs/help/automation.md`
+    - No guidance correction
+  report:
+    commits:
+    - hash: c47f5a066
+      what: job_started runs logged with exit code and duration; skip and rule-failure lines
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent variant
+    - command: npm test
+      result: passed
+      reason: 2428 Rust, 1563 UI
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Review on another model, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afcac4c32621b06e3af47986ebaa016611f886cf96d34c2870bda623f33e0394a
+description: |-
+  Found in STD-276 (standards). Job job-20261120T222210.199Z-25 (DEV-739, fix) ran the rule 'Jobs: set up the worktree' (job_started, `run` of `node .../scripts/worktree.ts create`, timeout 20m, ignore_failure). It ran: node_modules and the stamp `standards-install` in the worktree's git dir appeared at 22:24, before the session started. The job log shows nothing between `agent_job_started` (22:22:31) and the next progress line (22:24:14), so a reader can't tell that the rule ran, how long it took, or whether it failed (ignore_failure hides a failure too). DEV-726 fixed the same gap for the end-of-job waiting cleanup.
+
+  ## Done when
+
+  - [ ] Each `run` action of a job_started rule writes one progress line to the job log: rule name, exit code, duration; with ignore_failure and a non-zero exit, the line says it failed and was ignored.
+  - [ ] A skipped run (untrusted repo) also leaves a line saying so.
+  - [ ] Test covers both lines; docs/help/agent.md names them.
+  - [ ] The line is the DEV-726 run note (`Automation rule '<rule>' ran `<cmd>` on <ID>`), now with `exit <code>` and the duration; the job-end run notes get the same two fields. A run that fails without ignore_failure or times out says so with the error and the duration; the job still goes on as before (job_started rules' errors don't stop the job).
+  - [ ] A `wait: false` run logs that it started (no exit code, no duration).
+  - [ ] A failure of the job_started rules themselves (not a run) also leaves a line; before it was dropped.
+  - [ ] Runs outside a job (a person's `lotar status`) stay stderr only.
+history:
+- at: 2026-11-20T22:24:52.232940+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-726","DEV-739"]}'
+- at: 2026-11-20T22:24:52.476846+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T23:07:50.733475+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T23:07:54.652746+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afcac4c32621b06e3af47986ebaa016611f886cf96d34c2870bda623f33e0394a
+- at: 2026-11-20T23:08:34.735205+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in STD-276 (standards). Job job-20261120T222210.199Z-25 (DEV-739, fix) ran the rule 'Jobs: set up the worktree' (job_started, `run` of `node .../scripts/worktree.ts create`, timeout 20m, ignore_failure). It ran: node_modules and the stamp `standards-install` in the worktree's git dir appeared at 22:24, before the session started. The job log shows nothing between `agent_job_started` (22:22:31) and the next progress line (22:24:14), so a reader can't tell that the rule ran, how long it took, or whether it failed (ignore_failure hides a failure too). DEV-726 fixed the same gap for the end-of-job waiting cleanup.
+
+      ## Done when
+
+      - [ ] Each `run` action of a job_started rule writes one progress line to the job log: rule name, exit code, duration; with ignore_failure and a non-zero exit, the line says it failed and was ignored.
+      - [ ] A skipped run (untrusted repo) also leaves a line saying so.
+      - [ ] Test covers both lines; docs/help/agent.md names them.
+    new: |-
+      Found in STD-276 (standards). Job job-20261120T222210.199Z-25 (DEV-739, fix) ran the rule 'Jobs: set up the worktree' (job_started, `run` of `node .../scripts/worktree.ts create`, timeout 20m, ignore_failure). It ran: node_modules and the stamp `standards-install` in the worktree's git dir appeared at 22:24, before the session started. The job log shows nothing between `agent_job_started` (22:22:31) and the next progress line (22:24:14), so a reader can't tell that the rule ran, how long it took, or whether it failed (ignore_failure hides a failure too). DEV-726 fixed the same gap for the end-of-job waiting cleanup.
+
+      ## Done when
+
+      - [ ] Each `run` action of a job_started rule writes one progress line to the job log: rule name, exit code, duration; with ignore_failure and a non-zero exit, the line says it failed and was ignored.
+      - [ ] A skipped run (untrusted repo) also leaves a line saying so.
+      - [ ] Test covers both lines; docs/help/agent.md names them.
+      - [ ] The line is the DEV-726 run note (`Automation rule '<rule>' ran `<cmd>` on <ID>`), now with `exit <code>` and the duration; the job-end run notes get the same two fields. A run that fails without ignore_failure or times out says so with the error and the duration; the job still goes on as before (job_started rules' errors don't stop the job).
+      - [ ] A `wait: false` run logs that it started (no exit code, no duration).
+      - [ ] A failure of the job_started rules themselves (not a run) also leaves a line; before it was dropped.
+      - [ ] Runs outside a job (a person's `lotar status`) stay stderr only.
+- at: 2026-11-20T23:17:19.190992+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T23:17:28.663134+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

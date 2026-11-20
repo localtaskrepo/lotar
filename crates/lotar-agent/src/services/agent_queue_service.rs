@@ -584,6 +584,8 @@ impl AgentQueueService {
         if lock_file.try_lock_exclusive().is_err() {
             return Ok(());
         }
+        // Before the worker starts threads: its jobs inherit this PATH.
+        complete_path_from_login_shell();
         // Entries a worker that died took: this worker starts them.
         restore_taken(tasks_dir)?;
 
@@ -1085,6 +1087,79 @@ fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
     Ok(())
 }
 
+/// Marks where the login shell's PATH starts in its output, after anything
+/// its profile prints.
+const LOGIN_PATH_MARKER: &str = "__LOTAR_LOGIN_PATH__";
+const LOGIN_SHELL_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// A worker runs every later job, whoever's `lotar` call started it: an
+/// agent's shell or a launchd job can have a short PATH (DEV-731). The
+/// entries of the user's login shell PATH that this one lacks go after it.
+fn complete_path_from_login_shell() {
+    if cfg!(windows) {
+        return;
+    }
+    let Some(shell) = std::env::var_os("SHELL").filter(|shell| !shell.is_empty()) else {
+        eprintln!("lotar agent worker: SHELL is not set; jobs keep PATH {}", std::env::var("PATH").unwrap_or_default());
+        return;
+    };
+    let current = std::env::var("PATH").unwrap_or_default();
+    match login_shell_path(&shell) {
+        Some(login) => {
+            let merged = merge_paths(&current, &login);
+            if merged != current {
+                // SAFETY: the worker has started no thread yet, and the
+                // login shell's reader thread has ended.
+                unsafe { std::env::set_var("PATH", merged) };
+            }
+        }
+        None => eprintln!("lotar agent worker: no PATH from login shell {}; jobs keep PATH {current}", shell.to_string_lossy()),
+    }
+}
+
+/// The PATH `shell -l` sets, or `None` when it fails or takes too long.
+fn login_shell_path(shell: &std::ffi::OsStr) -> Option<String> {
+    let mut child = Command::new(shell)
+        .args(["-l", "-c", &format!("printf '%s%s' '{LOGIN_PATH_MARKER}' \"$PATH\"")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reader = thread::spawn(move || {
+        let mut out = String::new();
+        let _ = stdout.read_to_string(&mut out);
+        out
+    });
+    let deadline = std::time::Instant::now() + LOGIN_SHELL_TIMEOUT;
+    let status = loop {
+        if let Ok(Some(status)) = child.try_wait() {
+            break status;
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return None;
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    let out = reader.join().ok()?;
+    let path = out.rsplit_once(LOGIN_PATH_MARKER)?.1.trim();
+    (status.success() && !path.is_empty()).then(|| path.to_string())
+}
+
+/// `current` followed by the entries of `login` it lacks.
+fn merge_paths(current: &str, login: &str) -> String {
+    let mut entries: Vec<&str> = current.split(':').filter(|entry| !entry.is_empty()).collect();
+    for entry in login.split(':') {
+        if !entry.is_empty() && !entries.contains(&entry) {
+            entries.push(entry);
+        }
+    }
+    entries.join(":")
+}
+
 fn queue_base_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("LOTAR_AGENT_QUEUE_DIR")
         && !dir.trim().is_empty()
@@ -1130,6 +1205,15 @@ mod tests {
     use super::*;
     use std::env;
     use tempfile::tempdir;
+
+    #[test]
+    fn merge_paths_appends_missing_login_entries() {
+        assert_eq!(
+            merge_paths("/opt/homebrew/bin:/opt/homebrew/bin:/usr/bin", "/a/.cargo/bin:/usr/bin::/opt/homebrew/bin"),
+            "/opt/homebrew/bin:/opt/homebrew/bin:/usr/bin:/a/.cargo/bin"
+        );
+        assert_eq!(merge_paths("", "/usr/bin"), "/usr/bin");
+    }
 
     struct EnvGuard {
         key: &'static str,
