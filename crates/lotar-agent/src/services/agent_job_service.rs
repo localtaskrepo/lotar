@@ -5773,7 +5773,9 @@ fn process_pending_queue() {
                     && matches!(slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id), Ok(None))
                     && crate::services::memory_gate::check(&pending.tasks_dir).is_none()
                     && (AgentQueueService::holding(&pending.tasks_dir, pending.commits).is_none()
-                        || AgentQueueService::take_held_try(&pending.tasks_dir, pending.commits))
+                        || AgentQueueService::take_held_try(&pending.tasks_dir, &pending.ticket_id, pending.commits, |ticket| {
+                            registry.active_by_ticket.contains_key(ticket) && !registry.pending_queue.iter().any(|queued| queued.ticket_id == ticket)
+                        }))
             });
             let Some(pending) = next.and_then(|index| registry.pending_queue.remove(index)) else {
                 break;

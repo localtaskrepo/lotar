@@ -18,6 +18,8 @@ struct Workspace {
     runs: PathBuf,
     /// While it exists, the fake signer or the fake disk fails.
     broken: PathBuf,
+    /// `LOTAR_AGENT_PAUSE_RETRY_SECONDS`.
+    retry_seconds: &'static str,
 }
 
 impl Drop for Workspace {
@@ -67,7 +69,7 @@ fn workspace(runner: &str, worktree: bool) -> Workspace {
         ),
     )
     .unwrap();
-    let ws = Workspace { _fixtures: fixtures, root: root.clone(), runs, broken };
+    let ws = Workspace { _fixtures: fixtures, root: root.clone(), runs, broken, retry_seconds: "2" };
     for title in ["first", "second"] {
         assert!(lotar(&ws).args(["add", title]).status().unwrap().success());
     }
@@ -101,7 +103,7 @@ fn lotar(ws: &Workspace) -> Command {
         .env_remove("LOTAR_AGENT_QUEUE_DISABLE_WORKER")
         .env("LOTAR_IGNORE_HOME_CONFIG", "1")
         .env("LOTAR_AGENT_QUEUE_DIR", ws.root.join("queue"))
-        .env("LOTAR_AGENT_PAUSE_RETRY_SECONDS", "2")
+        .env("LOTAR_AGENT_PAUSE_RETRY_SECONDS", ws.retry_seconds)
         .env("GIT_CONFIG_GLOBAL", ws.root.join("gitconfig"))
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("LOTAR_DEFAULT_REPORTER", "tester")
@@ -127,9 +129,21 @@ fn wait_for(ws: &Workspace, what: &str, done: impl Fn(&serde_json::Value) -> boo
         if done(&queue) {
             return queue;
         }
-        assert!(Instant::now() < deadline, "{what}: {queue}");
+        assert!(Instant::now() < deadline, "{what}: {queue}\n{}", job_logs(ws));
         std::thread::sleep(Duration::from_millis(100));
     }
+}
+
+/// Every job's log, for a failure message: what a job waited on (DEV-742).
+fn job_logs(ws: &Workspace) -> String {
+    let list = json(ws, &["agent", "list-jobs"]);
+    let mut text = String::new();
+    for job in list["jobs"].as_array().into_iter().flatten() {
+        let id = job["id"].as_str().unwrap_or_default();
+        let out = lotar(ws).args(["agent", "logs", id]).output().unwrap();
+        text += &format!("--- {job}\n{}{}\n", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    }
+    text
 }
 
 fn runs(ws: &Workspace) -> Vec<String> {
@@ -149,8 +163,11 @@ fn jobs(ws: &Workspace, ticket: &str, status: &str) -> Vec<serde_json::Value> {
 fn a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit() {
     common::require_git();
     // The agent also hands its ticket on, as a job's outcome (DEV-320).
-    let ws =
+    let mut ws =
         workspace("echo work > work.txt\n\"$LOTAR_BIN\" status \"$LOTAR_TICKET_ID\" InProgress\n\"$LOTAR_BIN\" assignee \"$LOTAR_TICKET_ID\" mallox", true);
+    // Each try is due as soon as the one before ended: a try that starts
+    // while another runs shows without load (DEV-742).
+    ws.retry_seconds = "0";
     std::fs::write(&ws.broken, "").unwrap();
 
     run(&ws, "TEST-1");
@@ -170,7 +187,7 @@ fn a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit() {
     std::thread::sleep(Duration::from_secs(5));
     assert_eq!(runs(&ws), ["TEST-1"], "the held job didn't run, the paused one didn't run again");
     let queue = json(&ws, &["agent", "queue"]);
-    assert!(queued(&queue, "TEST-2"), "{queue}");
+    assert!(queued(&queue, "TEST-2"), "{queue}\n{}", job_logs(&ws));
     assert_eq!(queue["pause"]["reason"], "signing", "{queue}");
     let show = json(&ws, &["show", "TEST-1"]);
     assert_eq!(show["status"], "Todo", "the ticket keeps its status: {show}");

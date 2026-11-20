@@ -85,6 +85,11 @@ pub struct QueuePause {
     /// The job that paused the queue, and its ticket.
     pub job_id: String,
     pub ticket_id: String,
+    /// The ticket whose job paused the queue or took the last try. While
+    /// that job runs, also to its end after the pause, no try is due: it
+    /// can outlast the interval (DEV-742).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trying: Option<String>,
 }
 
 impl QueuePause {
@@ -103,6 +108,18 @@ impl QueuePause {
             self.message,
             self.next_try_at
         )
+    }
+
+    /// The try's due and no job runs one: not `trying`'s, unless `ticket`
+    /// asks (its job ended), nor one `running` says runs in this process.
+    fn try_free(&self, tasks_dir: &Path, ticket: Option<&str>, running: impl Fn(&str) -> bool) -> bool {
+        if !self.retry_due() {
+            return false;
+        }
+        let Some(trying) = self.trying.as_deref().filter(|trying| Some(*trying) != ticket) else {
+            return true;
+        };
+        !running(trying) && !crate::services::agent_active_jobs::list(tasks_dir).iter().any(|job| job.ticket_id == trying)
     }
 }
 
@@ -473,7 +490,8 @@ impl AgentQueueService {
     /// Pause the queue because a job failed on `reason`, and put that job's
     /// retry first in the queue (DEV-604). An open disk pause stays one:
     /// it holds every job, a signing pause only those that commit. An open
-    /// pause keeps its start; its next try moves to an interval from now.
+    /// pause keeps its start; its next try moves to an interval from now,
+    /// and waits for the job to end.
     pub fn pause(tasks_dir: &Path, reason: PauseReason, message: &str, job_id: &str, retry: &AgentQueueEntry) -> LoTaRResult<QueuePause> {
         let now = jiff::Timestamp::now();
         let next_try_at = next_try_at_from(now);
@@ -482,6 +500,7 @@ impl AgentQueueService {
             let pause = match state.pause.take() {
                 Some(mut open) if open.reason == PauseReason::Disk && reason == PauseReason::Signing => {
                     open.next_try_at = next_try_at.clone();
+                    open.trying = Some(retry.ticket_id.clone());
                     open
                 }
                 open => QueuePause {
@@ -491,6 +510,7 @@ impl AgentQueueService {
                     next_try_at: next_try_at.clone(),
                     job_id: job_id.to_string(),
                     ticket_id: retry.ticket_id.clone(),
+                    trying: Some(retry.ticket_id.clone()),
                 },
             };
             state.pending.retain(|item| !same_entry(item, retry));
@@ -526,14 +546,15 @@ impl AgentQueueService {
     /// Give the pause's due try to a job that `commits` (or not) and waits
     /// outside the queue, in `lotar serve`, when no queue entry the pause
     /// holds waits for it: else nothing might ever end the pause (DEV-604).
+    /// `running` says whether a ticket's job runs in this process.
     /// Taken under the queue lock, so one process gets it.
-    pub fn take_held_try(tasks_dir: &Path, commits: bool) -> bool {
+    pub fn take_held_try(tasks_dir: &Path, ticket_id: &str, commits: bool, running: impl Fn(&str) -> bool) -> bool {
         if !Self::holding(tasks_dir, commits).is_some_and(|pause| pause.retry_due()) {
             return false;
         }
         let mut taken = false;
         let _ = with_locked_queue(tasks_dir, |state| {
-            let Some(pause) = state.pause.as_mut().filter(|pause| pause.reason.holds(commits) && pause.retry_due()) else {
+            let Some(pause) = state.pause.as_mut().filter(|pause| pause.reason.holds(commits) && pause.try_free(tasks_dir, Some(ticket_id), &running)) else {
                 return;
             };
             let reason = pause.reason;
@@ -541,6 +562,7 @@ impl AgentQueueService {
                 return;
             }
             pause.next_try_at = next_try_at();
+            pause.trying = Some(ticket_id.to_string());
             taken = true;
         });
         taken
@@ -827,7 +849,9 @@ fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
                 return;
             }
         };
-        let mut retry_due = state.pause.as_ref().is_some_and(QueuePause::retry_due);
+        let own: HashSet<String> =
+            AgentJobService::active_jobs().into_iter().map(|(ticket, _)| ticket).chain(state.taken.iter().map(|entry| entry.ticket_id.clone())).collect();
+        let mut retry_due = state.pause.as_ref().is_some_and(|pause| pause.try_free(tasks_dir, None, |ticket| own.contains(ticket)));
         let mut take = Vec::new();
         let mut keep = Vec::new();
         for entry in std::mem::take(&mut state.pending) {
@@ -845,6 +869,7 @@ fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
                     retry_due = false;
                     if let Some(pause) = state.pause.as_mut() {
                         pause.next_try_at = next_try_at();
+                        pause.trying = Some(entry.ticket_id.clone());
                     }
                 }
                 take.push(entry);
@@ -1316,9 +1341,24 @@ mod tests {
         assert_eq!(taken, ["TEST-3"]);
         assert!(dequeue_startable(&tasks_dir).unwrap().is_empty(), "one try per interval");
 
+        // DEV-742: a try that outlasts the interval keeps the next one back
+        // until its job ends.
+        settle_taken(&tasks_dir, &entry("TEST-3"), None).unwrap();
+        let record: crate::services::agent_active_jobs::ActiveJob = serde_json::from_value(serde_json::json!({
+            "job_id": "job-4", "ticket_id": "TEST-3", "runner": "command", "owner_pid": std::process::id(), "child_pid": 0, "started_at": due,
+        }))
+        .unwrap();
+        crate::services::agent_active_jobs::register(&tasks_dir, &record);
+        let due = time::now_rfc3339();
+        with_locked_queue(&tasks_dir, |state| state.pause.as_mut().unwrap().next_try_at = due.clone()).unwrap();
+        assert!(dequeue_startable(&tasks_dir).unwrap().is_empty(), "the try's job still runs");
+        crate::services::agent_active_jobs::unregister(&tasks_dir, "job-4");
+        let taken: Vec<String> = dequeue_startable(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(taken, ["TEST-2"], "its job ended: the next try is due");
+
         assert_eq!(AgentQueueService::end_pause(&tasks_dir, false).map(|pause| pause.reason), Some(PauseReason::Disk));
         assert!(AgentQueueService::pause_state(&tasks_dir).is_none());
-        assert_eq!(dequeue_startable(&tasks_dir).unwrap().len(), 2, "the held entries start");
+        assert_eq!(dequeue_startable(&tasks_dir).unwrap().len(), 1, "the held entries start");
     }
 
     #[test]
