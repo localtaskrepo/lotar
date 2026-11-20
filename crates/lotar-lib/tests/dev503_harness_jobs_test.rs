@@ -691,7 +691,8 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// for a send, to `$FAKE_LOG` (a launch's prompt to `$FAKE_LOG.prompt-<n>`), and runs `$FAKE_RUN` in the thread's
 /// worktree. Without the env the run still runs. It answers with status `running` while a file `running-<id>` is next
 /// to the script, an `activeRunId` while `active-<id>` is, as waiting for an answer while `waiting-<id>` is, and with
-/// status `failed` while `failed-<id>` is; it logs `show <id>` to `t3-show.log` there. `thread start` (a session in the
+/// status `failed` while `failed-<id>` is, and as waiting on a background command (status `waiting`,
+/// `pendingBackgroundTasks`) for as many more shows as the number in `background-<id>`; it logs `show <id>` to `t3-show.log` there. `thread start` (a session in the
 /// main checkout, before DEV-652) makes a thread in the project and runs it the same way. `auth pairing create` prints
 /// the pairing code `pair-1`.
 const FAKE_T3: &str = r#"#!/bin/sh
@@ -740,8 +741,13 @@ if [ -f "$threads/$id/pending" ]; then status=running; run=$(cat "$threads/$id/p
 [ -f "$dir/active-$id" ] && active='"r1"'
 [ -f "$dir/waiting-$id" ] && status=running pending=1
 [ -f "$dir/failed-$id" ] && status=failed
-printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","activeRunId":%s,"latestRunId":"%s","pendingRequestCount":%s,"worktreePath":"%s"},"messages":[{"role":"assistant","runId":"%s","text":"Done in %s"}]}\n' \
-  "$id" "$id" "$status" "$active" "$run" "$pending" "$(cat "$threads/$id/tree")" "$run" "$id"
+tasks='[]'
+if [ -f "$dir/background-$id" ]; then
+  left=$(cat "$dir/background-$id")
+  if [ "$left" -gt 0 ]; then status=waiting tasks='["npm test"]'; echo $((left - 1)) > "$dir/background-$id"; else rm "$dir/background-$id"; fi
+fi
+printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","activeRunId":%s,"latestRunId":"%s","pendingRequestCount":%s,"pendingBackgroundTasks":%s,"worktreePath":"%s"},"messages":[{"role":"assistant","runId":"%s","text":"Done in %s"}]}\n' \
+  "$id" "$id" "$status" "$active" "$run" "$pending" "$tasks" "$(cat "$threads/$id/tree")" "$run" "$id"
 "#;
 
 /// A fake T3 Code server for the fake `t3` in `dir`, with one project, the repository at `project`: the MCP OAuth
@@ -1088,6 +1094,23 @@ fn a_t3_thread_stays_active_while_its_ticket_waits_or_its_job_failed() {
     std::fs::write(root.join("organize-error"), "T3 Code refuses").unwrap();
     run_t3(&fixtures, "review").success();
     assert!(job_logs(&fixtures).contains("The T3 Code thread was not settled: "), "the refusal is a note");
+}
+
+/// DEV-729: a thread that ends a turn waiting on its own background command (status `waiting`,
+/// `pendingBackgroundTasks`) still works; its job runs on until the thread's run completes, instead of failing with
+/// "ended with status 'waiting'" and being retried while the thread still works.
+#[test]
+fn a_t3_job_runs_on_while_its_thread_waits_on_a_background_command() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    let background = root.join("background-thread-0");
+    std::fs::write(&background, "2").unwrap();
+    run_t3(&fixtures, "fix").success();
+    assert!(!background.exists(), "the job followed the thread through its background wait");
+    assert!(ticket_worktree(&fixtures).join("fix.txt").is_file(), "the thread's work landed");
+    assert_eq!(mcp_calls(root, "t3_thread_launch").len(), 1, "no second thread started");
+    let logs = job_logs(&fixtures);
+    assert!(!logs.contains("ended with status 'waiting'") && !logs.contains("agent_job_failed"), "{logs}");
 }
 
 /// DEV-618, DEV-652: a job whose profile sets `tools.disallowed` and `env` writes them into the ticket's worktree

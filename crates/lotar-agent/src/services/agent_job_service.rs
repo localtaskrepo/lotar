@@ -4652,7 +4652,7 @@ fn drive_turns(
                     }
                 };
             }
-            EventBody::TurnFailed { error } => {
+            EventBody::TurnFailed { error, .. } => {
                 update_job(job_id, |state| state.runner_errors.push(error.clone()));
                 progress(error);
                 exit_code = 1;
@@ -7430,7 +7430,7 @@ mod dev520_session_events_tests {
         assert!(matches!(drive(&mut events, dir.path()), RunEnd::Exited(Some(0))));
 
         let path = dir.path().join("failed.jsonl");
-        let mut events = lagged(EventBody::TurnFailed { error: "boom".into() }, Ok(path.clone()), &path);
+        let mut events = lagged(EventBody::failed("boom"), Ok(path.clone()), &path);
         assert!(matches!(drive(&mut events, dir.path()), RunEnd::Exited(Some(1))));
     }
 
@@ -7511,7 +7511,7 @@ mod dev520_session_events_tests {
         }
         let (tx, rx) = tokio::sync::broadcast::channel(1024);
         let (mut events, _) = SessionEvents::open(Ok(path.clone()), || rx);
-        for event in [delta(2, 2), event(3, 2, EventBody::TurnFailed { error: "boom".into() })] {
+        for event in [delta(2, 2), event(3, 2, EventBody::failed("boom"))] {
             writeln!(file, "{}", serde_json::to_string(&event).unwrap()).unwrap();
             tx.send(event).unwrap();
         }
@@ -7555,7 +7555,7 @@ mod dev520_session_events_tests {
     fn a_session_that_ends_idle_after_its_turn_ended_keeps_the_turns_outcome() {
         let dir = tempfile::tempdir().unwrap();
         assert!(matches!(ends_idle_after(vec![finished()], dir.path()), RunEnd::Exited(Some(0))));
-        let failed = EventBody::TurnFailed { error: "boom".into() };
+        let failed = EventBody::failed("boom");
         assert!(matches!(ends_idle_after(vec![failed], dir.path()), RunEnd::Exited(Some(1))));
 
         // A turn that started and didn't end: the session's end fails the job.
@@ -7576,7 +7576,7 @@ mod dev520_session_events_tests {
         let error = "Internal error: You've hit your 5-hour limit · resets 6pm (America/Los_Angeles)";
         let (tx, rx) = tokio::sync::broadcast::channel(16);
         let (mut events, _) = SessionEvents::open(Err("no log".into()), || rx);
-        tx.send(event(1, 1, EventBody::TurnFailed { error: error.into() })).unwrap();
+        tx.send(event(1, 1, EventBody::failed(error))).unwrap();
         tx.send(Event { turn: None, ..event(2, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
         let settings = TurnSettings { first: 1, prefixes: &[], budget: Some(5.0), stall_timeout_seconds: None, agent: "fake", link: None };
         let end = drive_turns(job_id, dir.path(), &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new());
