@@ -1,14 +1,24 @@
 title: 'Waiting for the owner without a question: DEV-732'
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-light'
 created: 2026-11-20T18:06:59.019448+00:00
-modified: 2026-11-20T18:07:01.109905+00:00
+modified: 2026-11-20T19:53:50.944538+00:00
 relationships:
   related:
   - DEV-732
+comments:
+- date: 2026-11-20T19:53:47.688984+00:00
+  author: claude
+  text: |-
+    Gone already: DEV-732 moved on, so it no longer waits for the owner without a question.
+
+    - DEV-732 is now `Merging` (review passed 2026-11-20 19:53); no longer HelpNeeded
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[question:DEV-732]`
+    - No file change, no commit
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3308533fcc97c4e374032d8eb49340305fd609ac9d15a65e919eff7f4c514345
 description: |-
   DEV-732 (A queue worker started from a job's worktree keeps that folder as its cwd; after the worktree is removed every job it starts fails with ENOENT process.cwd) is HelpNeeded, but its last comment asks no question: "Answer: fix (An agent checks the branch and sends it to review again) Retry rule, owner 2026-11-15 (docs/decisions/2026…" (lotar show DEV-732)
 
@@ -38,3 +48,26 @@ history:
   changes:
   - field: assignee
     new: '@fix-light'
+- at: 2026-11-20T19:53:18.770897+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T19:53:19.629118+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3308533fcc97c4e374032d8eb49340305fd609ac9d15a65e919eff7f4c514345
+- at: 2026-11-20T19:53:47.688984+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:53:50.944538+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

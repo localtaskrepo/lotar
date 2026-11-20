@@ -1,14 +1,95 @@
 title: A worker that adopts an orphaned Claude job can't resume its session (Resource not found sessionId) and fails the job
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-20T18:03:55.898155+00:00
-modified: 2026-11-20T18:04:28.571429+00:00
+modified: 2026-11-20T20:39:57.650540+00:00
 relationships:
   related:
   - DEV-732
+  - DEV-738
+  - DEV-739
+  - DEV-733
+comments:
+- date: 2026-11-20T18:37:16.210363+00:00
+  author: claude
+  text: |-
+    Cause found; fix written, full checks running.
+
+    - Claude never wrote the session's transcript: `~/.claude/projects/-Users-mallox-Development--localtaskrepo--lotar-worktrees-lotar-DEV-732/` has no `7d15b17f-….jsonl`, so `session/load` can't succeed. lotar can't make that resume work
+    - Fix: the job's record (`ActiveJob`) now keeps its request; a takeover whose resume fails queues the job again, first, with `session: fresh`, and ends it `paused` (its `job_paused` rules run, not `job_failed`)
+    - Test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` failed before the fix (`status: failed`) and passes now
+- date: 2026-11-20T19:52:43.472278+00:00
+  author: claude
+  text: 'Stalled since 2026-11-20T18:37Z with no lotar job: the live check restarted @fix as the next turn of its thread, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-20T19:52:48.234533+00:00
+  author: claude
+  text: |-
+    Fixed: a taken-over job whose session can't be resumed runs again, it doesn't fail to HelpNeeded.
+
+    - Cause: Claude never saved the transcript of `7d15b17f-…` (no `.jsonl` under `~/.claude/projects/…-DEV-732/`), so no resume can work. lotar now runs the job again instead
+    - `ActiveJob` (`agent_active_jobs.rs`) keeps the job's request. On a failed resume, `run_again_in_new_session` (`agent_job_service.rs`) queues it first with `session: fresh` and the status/assignee change it recorded; the job ends `paused` and its `job_paused` rules run
+    - A T3 thread lotar took over, or a record from 0.15.5, has no request and fails as before
+    - `requeue_after_limit` is now `requeue_first` (used by both); `docs/help/agent.md` updated
+    - Commit `aa2b8b2f8`
+  report:
+    commits:
+    - hash: aa2b8b2f8
+      what: a takeover whose session can't be resumed queues the job again in a new session, paused instead of failed
+    checks:
+    - command: cargo nextest run --test integration -E 'test(dev510_t3_session_test)'
+      result: passed
+      reason: new test failed before the fix (status failed), passes after
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: Rust 2419/2419; 2 UI specs timed out at load avg ~31 and pass on rerun; test:release and test:hooks passed
+    - command: npm run smoke
+      result: passed
+      reason: 29 tests timed out at load avg 63 (all 120s timeouts); their 13 files rerun alone, 113/113 passed
+    - command: kill a worker 3 min into a real Claude job
+      result: not_run
+      reason: needs a live Claude job; covered by the test with a lost session record
+    next: Review, then merge and install, so the workers run the fixed build
+- date: 2026-11-20T20:03:10.338971+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-734 is assigned to @review now.'
+- date: 2026-11-20T20:39:45.351407+00:00
+  author: claude
+  text: |-
+    Review: passed. A taken-over job whose session can't be resumed now runs again in a new session instead of failing, which is what "Done" asks for.
+
+    - Reviewed `aa2b8b2f8` against the merge base (`git diff main...HEAD`). Main has moved on to `fb454e86c` (DEV-733), and `git merge-tree` shows the rebase applies cleanly
+    - The real failure (`could not be resumed: … Resource not found`) comes from `open_session` in `resume_session_to_end` (`agent_job_service.rs:2169`), and that's the branch the fix changes. `requeue_first` calls `ensure_worker`. If the ticket is still busy, the retry waits for the old job (`is_ticket_busy`) instead of using up its retries
+    - I reverted only the `Err` branch in a scratch worktree and ran `a_taken_over_job_whose_session_cant_be_resumed_runs_again`: it failed with `status: "failed"`. With the fix it passes
+    - The T3 "can't list its threads" case still fails as the docs say: that error comes per turn in harnessmux (`backend/t3.rs`), not from `open_session`
+    - No UI, REST or `.tasks` changes beyond the ticket. `AgentJobCreateRequest` only gets `PartialEq, Eq` added
+    - Minor, filed: [DEV-738](https://lotar.pyxzl.net/task/DEV-738). A `t3` job whose harnessmux record is gone now starts a second T3 Code thread, while the first may still run. The new test hits exactly this
+    - Minor, filed: [DEV-739](https://lotar.pyxzl.net/task/DEV-739). `docs/help/automation.md:230` still lists only two causes for `job_paused`
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: cargo nextest run --cargo-profile dev -p lotar-agent
+      result: passed
+      reason: 197 tests
+    - command: cargo nextest (dev510, dev626, dev320, dev528, agent_safety, orphan, take)
+      result: passed
+      reason: 95 tests, 1 flaky retry in an unrelated worktree-cleanup test
+    - command: new test with the fix reverted
+      result: failed
+      reason: as expected, status failed
+    - command: npm test
+      result: not_run
+      reason: full suite, targeted tests cover the change
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
 description: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on lotar''s worker pid 32048, which exited at 17:55:05 UTC (new workers 45178 for lotar and 45115 for standards started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
@@ -45,3 +126,59 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
+- at: 2026-11-20T18:37:16.210363+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:52:43.472278+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:52:48.234533+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:53:01.271342+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T20:03:10.338971+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:32:09.442790+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732"]}'
+    new: '{"related":["DEV-732","DEV-738"]}'
+- at: 2026-11-20T20:32:13.837750+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-738"]}'
+    new: '{"related":["DEV-732","DEV-738","DEV-739"]}'
+- at: 2026-11-20T20:39:45.351407+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:39:46.343415+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-738","DEV-739"]}'
+    new: '{"related":["DEV-732","DEV-738","DEV-739","DEV-733"]}'
+- at: 2026-11-20T20:39:57.650540+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,13 +1,24 @@
 title: 'Worktree install command out of sync: t3'
-status: Todo
+status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
+assignee: '@fix'
 created: 2026-11-19T18:53:27.978451+00:00
-modified: 2026-11-20T05:21:51.222574+00:00
+modified: 2026-11-20T20:31:11.567027+00:00
 relationships:
   related:
   - DEV-700
+comments:
+- date: 2026-11-20T20:08:48.047759+00:00
+  author: mallox
+  text: Is this till current? You want me to set the onWorktreeTrigger in each t3 project to "lotar agent worktree setup; npm ci"? (answered in INBOX-563)
+- date: 2026-11-20T20:09:28.014907+00:00
+  author: mallox
+  text: I actually recommend we just set a npm task specifically on the trigger we want so that we can adjust the script when needed without touching t3 configs that need to be done manually (answered in INBOX-563)
+- date: 2026-11-20T20:31:11.103734+00:00
+  author: claude
+  text: 'Superseded by STD-270 (owner 2026-11-20: "File it"). Every T3 project gets the same two standards commands, set by agents through T3''s MCP tool, so this per-repo install string goes away and the check is reworked. WontDo here.'
 description: |-
   T3 runs "npm ci" on worktree create, repos.json says "npm ci": set "lotar agent worktree setup; npm ci" in the T3 project's scripts (the setup writes the lotar jobs' Claude settings)
 
@@ -32,3 +43,26 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-700"]}'
+- at: 2026-11-20T20:08:48.047759+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:08:48.763134+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-20T20:09:28.014907+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:31:11.103734+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:31:11.567027+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: WontDo

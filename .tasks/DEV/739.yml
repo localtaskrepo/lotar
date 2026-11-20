@@ -1,0 +1,26 @@
+title: docs/help/automation.md's job_paused names two causes; a taken-over job that runs again in a new session (DEV-734) is a third
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T20:32:12.764651+00:00
+modified: 2026-11-20T20:32:15.158501+00:00
+relationships:
+  related:
+  - DEV-734
+description: 'Found in the DEV-734 review (2026-11-20): `docs/help/automation.md:230` says `job_paused` fires on a usage limit or a paused queue. Since DEV-734, a taken-over job whose session can''t be resumed also ends paused and runs its `job_paused` rules (`docs/help/agent.md:226`). Done: automation.md lists that cause and links agent.md''s takeover section.'
+tags:
+- docs
+history:
+- at: 2026-11-20T20:32:13.839027+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-734"]}'
+- at: 2026-11-20T20:32:15.158501+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

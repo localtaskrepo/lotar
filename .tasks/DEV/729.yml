@@ -1,11 +1,11 @@
 title: 'A t3 agent job fails when its thread waits on a background command: ''run ended with status waiting'', runner exit code 1'
-status: Blocked
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-20T13:23:02.862143+00:00
-modified: 2026-11-20T18:06:42.832663+00:00
+modified: 2026-11-20T20:57:36.043429+00:00
 relationships:
   depends_on:
   - standards:STD-257
@@ -14,6 +14,7 @@ relationships:
   - DEV-730
   - DEV-711
   - DEV-732
+  - DEV-683
 comments:
 - date: 2026-11-20T13:25:23.500075+00:00
   author: claude
@@ -28,8 +29,57 @@ comments:
 - date: 2026-11-20T18:06:42.832663+00:00
   author: claude
   text: 'Stalled since 2026-11-20T15:35Z with no lotar job: the live check restarted @fix, its prerequisites are done (lotar rule "Prerequisites done: continue the waiting ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-20T20:02:58.205359+00:00
+  author: claude
+  text: |-
+    Fixed: lotar now uses harnessmux 0.2.0, so a t3 job whose thread waits on a background command keeps running.
+
+    - `Cargo.toml`: `harnessmux = "0.2.0"` (HARN-3: `waiting` with `pendingBackgroundTasks` keeps the turn running).
+    - `agent_job_service.rs`: `TurnFailed { error, .. }` match; unit tests build failures with `EventBody::failed`.
+    - New test `a_t3_job_runs_on_while_its_thread_waits_on_a_background_command` (`dev503_harness_jobs_test.rs`): the fake `t3` reports status `waiting` with a background task for two polls, then completes. The job succeeds, starts one thread, logs no failure.
+    - On 0.1.10 the same test failed with "the T3 Code thread's run ended with status 'waiting'", the bug from the ticket.
+    - Overlap: [DEV-711](https://lotar.pyxzl.net/task/DEV-711) needs the same bump; it's done here, so it only needs the typed `kind`/`resets_at` part.
+  report:
+    commits:
+    - hash: 86de0410d
+      what: harnessmux 0.2.0, test for a t3 thread waiting on a background command
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2418 Rust, 1563 UI
+    - command: npm run -s test:smoke:agent
+      result: passed
+      reason: '406'
+    next: Merge agent lands agent/DEV-729; DEV-711 still needs the typed TurnFailed kind/resets_at reading (the bump is in here)
+- date: 2026-11-20T20:57:17.558604+00:00
+  author: claude
+  text: |-
+    Review: passed. `86de0410d` does what the ticket asks for, and nothing beyond it.
+
+    - Read the ticket and its comments, [DEV-711](https://lotar.pyxzl.net/task/DEV-711), [DEV-730](https://lotar.pyxzl.net/task/DEV-730), [DEV-732](https://lotar.pyxzl.net/task/DEV-732), `AGENTS.md`, and the diff (`Cargo.toml`, `Cargo.lock`, `agent_job_service.rs`, `dev503_harness_jobs_test.rs`). No commits on main since the branch point (`08df3f6a0`) touch these files.
+    - Fix: in harnessmux 0.2.0, `src/backend/t3.rs:571` keeps a `waiting` turn running while `pendingBackgroundTasks` is non-empty. In 0.1.10, `t3.rs:347` failed the turn with "ended with status 'waiting'". The fake `t3` sends the same field shape that 0.2.0 reads.
+    - Test: the new test drives a whole t3 job through two `waiting` polls. It checks that the job succeeds, the work lands, only one `t3_thread_launch` runs, and no `agent_job_failed` appears. That covers "not failed, not retried". I did not rerun it on 0.1.10. Given the 0.1.10 code at `t3.rs:347`, it would fail there, as the fix agent says.
+    - The bump carries 0.2.0's other changes (typed `turn.failed`, Codex error texts, `decline` on denied permissions). Those were made for lotar's own tickets DEV-683/684/691, so nothing unasked-for comes in.
+    - Overlap: `agent/DEV-711` makes the identical `Cargo.toml` bump and also edits `agent_job_service.rs`. Whichever branch lands second needs a rebase; both tickets already say so. Not a second copy of this fix.
+    - The `waiting_run` ENOENT line from the description is [DEV-730](https://lotar.pyxzl.net/task/DEV-730), as agreed. It is not part of this fix.
+    - `npm ci` ran first. The worktree stayed clean. No tickets filed.
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2418 Rust, 1563 UI
+    - command: cargo nextest run -p lotar-lib a_t3_job_runs_on_while
+      result: passed
+    - command: npm run -s test:smoke:agent
+      result: not_run
+      reason: backend-only change, no UI touched; fix agent ran it (406 passed)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9d34bbb50316ad91176ff5be8c7892813a138026f11a871fe6075b20c39b4608
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92d4e898c9ff947fbbb09b4adf75c16342a423093bca3abb7e045dbdc683d7da
 description: |-
   Found (DEV-728 fix, 2026-11-20): three fix jobs in a row (job-20261120T130111.184Z-26, job-20261120T130512.436Z-27, job-20261120T130633.048Z-1) were recorded as failed seconds after they started a long check (3x `npm run -s test:agent`) as a background command and marked it with T3's `t3_background_wait`. `lotar agent logs job-20261120T130633.048Z-1`: "the T3 Code thread's run ended with status 'waiting'", then "[agent_job_failed] The t3 runner exited with code 1". The threads kept working: all three later finished the checks, and commit 969484160 and three hand-off comments landed on a ticket already moved to HelpNeeded with a retry question. So each retry started another agent on the same worktree while the earlier ones still ran.
   Also in that log: "agent.worktree.waiting_run (`cargo clean --workspace`) could not start in <worktree>: No such file or directory (os error 2)".
@@ -106,3 +156,46 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-20T19:53:04.782748+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-20T19:53:06.090438+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92d4e898c9ff947fbbb09b4adf75c16342a423093bca3abb7e045dbdc683d7da
+- at: 2026-11-20T20:02:58.205359+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:03:09.610076+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T20:55:35.252922+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-20T20:57:17.558604+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:57:36.043429+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683"]}'

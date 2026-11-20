@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T19:15:05.822593+00:00
-modified: 2026-11-20T18:07:05.378720+00:00
+modified: 2026-11-20T19:54:52.323791+00:00
 relationships:
   related:
   - DEV-629
   - DEV-652
   - DEV-702
   - DEV-736
+  - DEV-730
 comments:
 - date: 2026-11-18T20:00:36.631324+00:00
   author: claude
@@ -100,6 +101,19 @@ comments:
       result: passed
     - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
       result: passed
+- date: 2026-11-20T19:54:52.110280+00:00
+  author: claude
+  text: |-
+    Live check passed on the installed 0.15.5: finished t3 jobs settle their threads, and a HelpNeeded ticket's thread stays active.
+
+    - Settled: `job-20261120T134435.175Z-9` (DEV-730 → Reviewing, @review) logs `Settled the T3 Code thread …`; same in 9 more t3 jobs today, e.g. `job-20261120T180425.416Z-5`, `job-20261120T195315.801Z-2`
+    - Stays active: `job-20261120T052024.071Z-1` logs `The T3 Code thread stays active: DEV-700 is HelpNeeded.`
+    - Read with `lotar agent logs <job>`; `lotar --version` is `0.15.5`
+  report:
+    checks:
+    - command: live t3 job settles its thread
+      result: passed
+      reason: lotar 0.15.5 jobs log both notes
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa61fe3f-cbf9-4b4e-88f2-4ca921629f53
 releases:
@@ -194,3 +208,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-629","DEV-652","DEV-702"]}'
     new: '{"related":["DEV-629","DEV-652","DEV-702","DEV-736"]}'
+- at: 2026-11-20T19:54:52.110280+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:54:52.323791+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-629","DEV-652","DEV-702","DEV-736"]}'
+    new: '{"related":["DEV-629","DEV-652","DEV-702","DEV-736","DEV-730"]}'

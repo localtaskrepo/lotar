@@ -1,11 +1,11 @@
 title: A queue worker started from a job's worktree keeps that folder as its cwd; after the worktree is removed every job it starts fails with ENOENT process.cwd
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-20T13:45:47.182735+00:00
-modified: 2026-11-20T18:07:00.215757+00:00
+modified: 2026-11-20T20:08:18.721889+00:00
 relationships:
   blocks:
   - DEV-730
@@ -221,6 +221,42 @@ comments:
       result: not_run
       reason: branch unchanged since it passed
     next: 'Review agent reviews eba6d1334, then merge (main moved to 7323bb8a9: rebase)'
+- date: 2026-11-20T19:53:07.167633+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix is small and correct, and its test fails without it.
+
+    - `eba6d1334` changes `spawn_worker` in `crates/lotar-agent/src/services/agent_queue_service.rs`: the tasks dir becomes absolute and the worker's `current_dir` is set to that dir's parent. Jobs get `LOTAR_TASKS_DIR` = the main checkout's `.tasks` and T3 threads get `--tasks-dir` for it, so for jobs that parent is the main checkout, never a worktree
+    - `spawn_worker` is the only place that starts a worker (auto start and `queue resume` both go through it)
+    - Test `dev732_worker_leaves_its_launchers_folder_test.rs` passes. In a detached copy with the agent crate reverted to `HEAD~1` it fails (`left: …/launcher`). Note: `-p lotar-lib` doesn't rebuild the root `lotar` binary, so the unfixed run needed `cargo build` first
+    - Done when: worker 8934 is gone. The running workers sit in `standards` and in test temp folders; none is in a removed worktree
+    - Merge note: `git merge-tree` shows a conflict with main. DEV-733 (`fb454e86c`) changed the same lines of `spawn_worker` (it removes the agent session variables). Keep both changes when rebasing
+    - Reran `npm ci` and `npm run lint` (passed). Didn't rerun `npm test` or `npm run smoke`
+    - No stray files, no second branch. Nothing filed
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev732
+      result: passed
+    - command: dev732 test on unfixed code (HEAD~1 agent crate, fresh cargo build)
+      result: failed
+      reason: expected, worker cwd = launcher folder
+    - command: npm ci
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: long suite, passed for the fix agent on eba6d1334
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change, passed for the fix agent on eba6d1334
+    next: Merge agent rebases eba6d1334 onto main, resolving the conflict with DEV-733 in spawn_worker
+- date: 2026-11-20T20:08:18.721889+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-732` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`, `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-732` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab70b2201dc506b65659fbeb8a6803e7af1e9887feb27c22e58ab7f6cda773f6b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af878a77dc15131b8a4180f28618a4f7811675498b6c54b3d86cdf37f38f030a7
@@ -486,3 +522,27 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727"]}'
     new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735"]}'
+- at: 2026-11-20T19:53:07.167633+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:53:14.977956+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+- at: 2026-11-20T19:53:15.070878+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-20T19:53:58.065959+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-20T20:08:18.721889+00:00
+  actor: automation
+  changes:
+  - field: comment_added

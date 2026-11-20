@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T23:52:07.336095+00:00
-modified: 2026-11-18T19:52:33.937294+00:00
+modified: 2026-11-20T20:57:36.037925+00:00
 relationships:
   blocks:
   - DEV-711
@@ -16,6 +16,7 @@ relationships:
   - DEV-684
   - DEV-691
   - DEV-564
+  - DEV-729
 comments:
 - date: 2026-11-17T23:52:34.697482+00:00
   author: claude
@@ -711,3 +712,9 @@ history:
   - field: tags
     old: proposal, review-returned, review-returned-twice
     new: proposal
+- at: 2026-11-20T20:57:36.037925+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-711"],"related":["DEV-584","DEV-657","DEV-604","DEV-684","DEV-691","DEV-564"]}'
+    new: '{"blocks":["DEV-711"],"related":["DEV-584","DEV-657","DEV-604","DEV-684","DEV-691","DEV-564","DEV-729"]}'

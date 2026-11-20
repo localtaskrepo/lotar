@@ -1054,12 +1054,16 @@ fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
     // The path lotar was started as, so an upgraded install starts the new
     // build (DEV-361).
     let exe = crate::utils::binary_watch::watched_path().ok_or_else(|| LoTaRError::ValidationError("cannot locate the lotar executable".to_string()))?;
+    let tasks_dir = std::path::absolute(tasks_dir).map_err(LoTaRError::IoError)?;
     let mut cmd = Command::new(exe);
-    cmd.arg("--tasks-dir").arg(tasks_dir).arg("agent").arg("worker");
-    cmd.env("LOTAR_TASKS_DIR", tasks_dir);
+    cmd.arg("--tasks-dir").arg(&tasks_dir).arg("agent").arg("worker");
+    cmd.env("LOTAR_TASKS_DIR", &tasks_dir);
     for key in AGENT_SESSION_VARS {
         cmd.env_remove(key);
     }
+    // Not the starting command's folder: a job's worktree is removed while
+    // the worker lives on, and every job it starts then fails (DEV-732).
+    cmd.current_dir(tasks_dir.parent().unwrap_or(&tasks_dir));
     cmd.stdin(Stdio::null());
     // Its own process group: launchd kills a job's group when the job ends,
     // and the worker would die with the entries it took (DEV-660).

@@ -1,15 +1,27 @@
 title: 'Done with an open step no ticket tracks: DEV-686'
-status: Todo
+status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-20T18:07:10.293121+00:00
-modified: 2026-11-20T18:07:13.508463+00:00
+modified: 2026-11-20T19:55:52.529959+00:00
 relationships:
   related:
   - DEV-604
   - DEV-686
+  - DEV-690
+comments:
+- date: 2026-11-20T19:55:44.297599+00:00
+  author: claude
+  text: |-
+    Nothing left to do: the open step on DEV-686 (delete DEV-604's branches) was done by [DEV-690](https://lotar.pyxzl.net/task/DEV-690), which is Done.
+
+    - DEV-690 is linked to DEV-686 (depends on) and deleted the six branches and the stuck `t3-b9902be4` worktree on 2026-11-18.
+    - Checked in the main checkout: `git branch --list agent/DEV-604 t3/b9902be4 t3/09cc8d99 t3/ae62354d t3/pause-queue-on-signing-disk-failure t3/acb65239` lists none; `git worktree list` shows no `b9902be4`/`acb65239` worktree.
+    - The finding comes back only because the linked follow-up is closed, not open. WontDo so it isn't filed again.
+    - No files changed, no commits beyond main.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A67ddbf00063bafb46db3e90f5a2a42677f7fe1799dcc680e410b72b2862487d7
 description: |-
   DEV-686 (DEV-604 is Done, but its work e4edce9b never reached main) is Done, but a comment names a step still open and no open ticket is linked: "- **Not done here:** "Done when" also asks to delete those branches, which can only happen after the merge." (lotar show DEV-686)
 
@@ -38,3 +50,32 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-20T19:55:13.146527+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T19:55:15.090124+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A67ddbf00063bafb46db3e90f5a2a42677f7fe1799dcc680e410b72b2862487d7
+- at: 2026-11-20T19:55:44.297599+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:55:44.735379+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-686"]}'
+    new: '{"related":["DEV-604","DEV-686","DEV-690"]}'
+- at: 2026-11-20T19:55:52.529959+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+  - field: assignee
+    old: '@fix'

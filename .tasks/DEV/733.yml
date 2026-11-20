@@ -1,16 +1,17 @@
 title: A queue worker keeps the session variables of the agent whose lotar call started it
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T14:04:05.906098+00:00
-modified: 2026-11-20T18:03:25.055909+00:00
+modified: 2026-11-20T20:39:46.341607+00:00
 relationships:
   related:
   - DEV-728
   - DEV-731
   - DEV-732
+  - DEV-734
 comments:
 - date: 2026-11-20T14:22:52.266285+00:00
   author: automation
@@ -51,6 +52,32 @@ comments:
     - Reran: `npm ci`, `cargo nextest run --test integration dev733` (passed), `npm run lint:agent` (passed), `npm run test:agent` (2418 Rust and 1563 frontend tests passed). `git status` is clean afterwards.
     - Not rerun: `npm run test:smoke:agent`. The change touches no UI, and the fix agent ran it and it passed. No UI review was needed.
     - No minor tickets filed.
+- date: 2026-11-20T18:10:57.989209+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-733` is in `main`.
+
+    - Rebased `agent/DEV-733` onto `main` (`7323bb8a9302`): `03e0f2312a7e`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `03e0f2312a7e`
+    - Amended the pending `.tasks` changes into the merged commit: `fb454e86c208`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[worker:inherited-session-env]`
+  report:
+    commits:
+    - hash: fb454e86c
+      what: DEV-733 A queue worker keeps the session variables of the agent whose lotar call started it
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85a1af63d2b7077c8fe1b7d0d379788afbc559e3c82d0fe3b7c656e4db3d066e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae006afd0a1c62a22eefe39cc4b44c8b06c41d4bc595dcc3a2cfe8719d9e5d6a2
@@ -60,7 +87,6 @@ description: |-
   Done: `spawn_worker` (`crates/lotar-agent/src/services/agent_queue_service.rs`) drops the starting agent's session variables, or the worker does at start.
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: worker:inherited-session-env
 history:
@@ -136,3 +162,22 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-20T18:10:57.989209+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-20T18:10:58.501558+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried
+    new: health
+- at: 2026-11-20T20:39:46.341607+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-728","DEV-731","DEV-732"]}'
+    new: '{"related":["DEV-728","DEV-731","DEV-732","DEV-734"]}'

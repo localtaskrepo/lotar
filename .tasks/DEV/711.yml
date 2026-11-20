@@ -1,11 +1,11 @@
 title: Usage-limit pause reads harnessmux 0.2.0's typed failures before the text match
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-20T18:08:26.793808+00:00
+modified: 2026-11-20T21:07:31.701038+00:00
 relationships:
   depends_on:
   - DEV-683
@@ -13,6 +13,7 @@ relationships:
   related:
   - DEV-584
   - DEV-729
+  - DEV-740
 comments:
 - date: 2026-11-18T20:20:17.510756+00:00
   author: claude
@@ -61,9 +62,34 @@ comments:
 - date: 2026-11-19T19:11:26.171681+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-711 yet. DEV-711 waits for standards:STD-257.'
+- date: 2026-11-20T20:07:27.811413+00:00
+  author: claude
+  text: |-
+    Done: the usage-limit pause reads harnessmux 0.2.0's typed failure first, the text match stays the fallback.
+
+    - `cargo search harnessmux` lists `0.2.0`; `Cargo.toml` bumped from `0.1.10`. The branch was behind main (DEV-584 wasn't on it yet), so it fast-forwarded to main first.
+    - `agent_job_service.rs` keeps each `TurnFailed { error, kind, resets_at, retryable }` as a `harnessmux::Failure`.
+    - `usage_limit::of_failures`: `rate_limited`/`quota` pause, at `resets_at`, else the time the text names, else the default wait. Kind `other` uses the old text match. Other kinds (sign-in, overload, context, transport) don't pause, even when the text looks like a limit.
+    - Test `a_typed_rate_limit_pauses_the_job_until_its_resets_at` in `dev584_usage_limit_pause_test.rs`: a fake claude-agent-acp fails the prompt with `errorKind: rate_limit`, `rateLimit.resetsAt` and a text that names no limit. The job pauses until `2099-12-01T00:00:00+00:00`. Also new unit tests in `usage_limit.rs`.
+    - `docs/help/agent.md` Usage limits section describes the kind-first order.
+  report:
+    commits:
+    - hash: 5cb9e3364
+      what: harnessmux 0.2.0, typed usage-limit pause, fake-ACP test, docs
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2423 Rust, 1563 UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Merge agent lands agent/DEV-711 on main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610a9a82-cb42-47ba-9eea-09f109d6be60
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0aebad4f869d7aade0c4282dd8a0f6d9ca0f437e134a332ed8fdb7080fa445b6
 description: |-
   Follow-up of DEV-584, which pauses a job on a provider's usage limit by matching the failure text (`crates/lotar-agent/src/services/usage_limit.rs`). harnessmux 0.2.0 (DEV-683) is not released yet: crates.io has 0.1.10, which reports `TurnFailed { error }` with no kind or reset time.
 
@@ -210,3 +236,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-20T19:55:59.236473+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-20T19:56:00.715817+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0aebad4f869d7aade0c4282dd8a0f6d9ca0f437e134a332ed8fdb7080fa445b6
+- at: 2026-11-20T20:07:27.811413+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T20:07:42.760478+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-20T21:07:31.701038+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584","DEV-729"]}'
+    new: '{"depends_on":["DEV-683","standards:STD-257"],"related":["DEV-584","DEV-729","DEV-740"]}'

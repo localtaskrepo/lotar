@@ -1,14 +1,23 @@
 title: 'Done with an open step no ticket tracks: DEV-710'
-status: Todo
+status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-20T18:07:02.290865+00:00
-modified: 2026-11-20T18:07:08.951155+00:00
+modified: 2026-11-20T19:55:08.106372+00:00
 relationships:
   related:
   - DEV-710
+comments:
+- date: 2026-11-20T19:54:52.574306+00:00
+  author: claude
+  text: |-
+    Nothing left to track: DEV-710's open step (the live check after 0.15.5) has passed, so WontDo.
+
+    - 0.15.5 is installed (`lotar --version`); t3 jobs since then log `Settled the T3 Code thread …` (e.g. `job-20261120T134435.175Z-9`) and `stays active: DEV-700 is HelpNeeded` (`job-20261120T052024.071Z-1`)
+    - Recorded as a passed check on DEV-710; no file change, no commits beyond `main`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af28e2d1bb44a4a73654d020bed96c89c63b76da2caa548b4e3b5290b2699fe3a
 description: |-
   DEV-710 (A completed t3 job never settles its T3 Code thread: settle_t3_thread returns before calling T3 and leaves no note) is Done, but a comment names a step still open and no open ticket is linked: "- Not done yet: the ticket's live check, which needs release 0.15.5 to be installed." (lotar show DEV-710)
 
@@ -37,3 +46,26 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-20T19:53:56.769547+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-20T19:53:58.530322+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af28e2d1bb44a4a73654d020bed96c89c63b76da2caa548b4e3b5290b2699fe3a
+- at: 2026-11-20T19:54:52.574306+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-20T19:55:08.106372+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+  - field: assignee
+    old: '@fix'

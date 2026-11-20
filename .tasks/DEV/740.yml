@@ -1,0 +1,27 @@
+title: A runner failure that names both a sign-in error and a usage limit fails instead of pausing, though docs/help/agent.md says a limit wins
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-20T21:07:30.522875+00:00
+modified: 2026-11-20T21:07:32.471367+00:00
+relationships:
+  related:
+  - DEV-711
+description: |-
+  Found in the DEV-711 review (2026-11-20). harnessmux 0.2.0 sorts a failure by its text with sign-in first (`kind_of_text`, `harnessmux-0.2.0/src/failure.rs`: `unauthorized`, `failed to authenticate` … before `usage limit`). So a t3 failure text (`t3 exited with …: <T3's error output>`) that names both comes back as `auth_required`, and `usage_limit::of_failures_in` (`crates/lotar-agent/src/services/usage_limit.rs`) gives no pause. Before DEV-711 the line-by-line text match paused it. `docs/help/agent.md` (Usage limits, What counts) still says 'A limit wins over any other failure in the same output, a full disk or a signing failure included'.
+  Check: a TurnFailed of kind auth_required (or overloaded) from text alone whose text has a usage-limit line: either pause on it (e.g. also run the text match for kinds harnessmux took from text) or reword the doc sentence; a unit test covers the choice.
+  Done: the doc and the behaviour agree.
+history:
+- at: 2026-11-20T21:07:31.702841+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-711"]}'
+- at: 2026-11-20T21:07:32.471367+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
