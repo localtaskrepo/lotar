@@ -1,0 +1,29 @@
+title: 'Flaky test: merge_job_retries_a_sandbox_blocked_check_and_lands stops at Merging within its 10 s wait under load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T01:03:26.149609+00:00
+modified: 2026-11-21T01:03:37.358046+00:00
+relationships:
+  related:
+  - DEV-741
+  - DEV-516
+description: 'Found: failed in the review of DEV-741 (2026-11-20, load avg ~42): ''SBX-1 did not reach Done'', ticket still Merging, assigned @merge (crates/lotar-lib/tests/agent_automation_integration_test.rs:2579, wait_for_task_state with a fixed 10_000 ms). Passed in a later full run at load ~7-18. Check: npm run -s test:rust:agent at load avg ~30-40. Done: the test passes under full-suite load without a fixed 10 s wall-clock deadline.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:merge_job_retries_a_sandbox_blocked_check_and_lands
+history:
+- at: 2026-11-21T01:03:29.491542+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T01:03:37.358046+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found: failed in the review of DEV-741 (2026-11-20, 1 of 3 full Rust runs, load avg ~42): ''SBX-1 did not reach Done'', ticket still Merging, assigned @merge (crates/lotar-lib/tests/agent_automation_integration_test.rs:2579, wait_for_task_state with a fixed 10_000 ms). Passed in the other 2 runs. Check: npm run -s test:rust:agent at load avg ~30-40. Done: the test passes under full-suite load without a fixed 10 s wall-clock deadline.'
+    new: 'Found: failed in the review of DEV-741 (2026-11-20, load avg ~42): ''SBX-1 did not reach Done'', ticket still Merging, assigned @merge (crates/lotar-lib/tests/agent_automation_integration_test.rs:2579, wait_for_task_state with a fixed 10_000 ms). Passed in a later full run at load ~7-18. Check: npm run -s test:rust:agent at load avg ~30-40. Done: the test passes under full-suite load without a fixed 10 s wall-clock deadline.'

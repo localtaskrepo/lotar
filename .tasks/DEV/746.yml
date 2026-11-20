@@ -1,11 +1,11 @@
 title: In-process run_worker in tests runs the real login shell and calls set_var while other threads run
-status: Blocked
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-20T22:28:17.130177+00:00
-modified: 2026-11-20T23:18:25.044028+00:00
+modified: 2026-11-21T01:36:32.353593+00:00
 relationships:
   depends_on:
   - DEV-731
@@ -20,8 +20,37 @@ comments:
     - `complete_path_from_login_shell` comes from DEV-731's commit `ed15359af`, which is only on `agent/DEV-731` (status `Merging`). `git log main..HEAD` on `agent/DEV-746` is empty, and `grep complete_path crates` finds nothing
     - Plan once it's on main: move the call out of `run_worker` (`crates/lotar-agent/src/services/agent_queue_service.rs`) into the `lotar agent worker` handler (`crates/lotar-lib/src/cli/handlers/agent.rs`), so in-process `run_worker` in tests (`dev503_harness_jobs_test.rs:1246`, `agent_automation_integration_test.rs`) starts no login shell and calls no `set_var`
     - Then check that `worker_started_with_short_path_runs_jobs_with_login_path` still passes
+- date: 2026-11-21T01:32:07.358735+00:00
+  author: automation
+  text: The fix agent's job job-20261121T012707.843Z-46 failed (lotar agent logs job-20261121T012707.843Z-46); @fix-retry retries it on branch agent/DEV-746.
+- date: 2026-11-21T01:36:32.353593+00:00
+  author: claude
+  text: |-
+    Fixed: only the `lotar agent worker` process runs the login shell and sets PATH.
+
+    - `run_worker` (in process, tests) now leaves PATH alone; new `run_worker_process`, called by the CLI `worker` handler in `crates/lotar-lib/src/cli/handlers/agent.rs`, completes PATH after it takes the worker lock, as before
+    - New test `an_in_process_worker_starts_no_login_shell` (`agent_automation_integration_test.rs`) failed before the fix (the stub `$SHELL` ran), passes now
+    - `worker_started_with_short_path_runs_jobs_with_login_path` still passes
+    - Rebased `agent/DEV-746` onto main (it had no own commits), so DEV-731's `5a68d24a7` is under it
+    - Docs unchanged: `docs/help/agent.md` already describes the worker process only
+    - No guidance correction
+  report:
+    commits:
+    - hash: 57b109011
+      what: CLI worker completes PATH, in-process run_worker leaves it alone
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: cargo nextest run --test integration worker_started_with_short_path_runs_jobs_with_login_path
+      result: passed
+    next: Merge agent lands agent/DEV-746
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A467e3597696cfa7e586c1f1ae1e3e395288f477ceba17561faac49b8bc7435e3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1d8fe712c58edf675df104394de0ca56956b683267b45e557525b88cf152d5
 description: |-
   Tests that call `AgentQueueService::run_worker` in process now run the developer's real login shell and change PATH with `std::env::set_var`, which can happen while other threads are running. Found in the DEV-731 review, 2026-11-20.
 
@@ -40,7 +69,7 @@ description: |-
   - [ ] An in-process `run_worker` never calls `set_var` and starts no login shell
   - [ ] `worker_started_with_short_path_runs_jobs_with_login_path` still passes
 tags:
-- waits
+- fix-retried
 history:
 - at: 2026-11-20T22:28:17.929863+00:00
   actor: claude
@@ -86,3 +115,37 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-21T00:33:44.159969+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-21T01:27:11.449689+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-21T01:27:13.254889+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1d8fe712c58edf675df104394de0ca56956b683267b45e557525b88cf152d5
+- at: 2026-11-21T01:32:06.136801+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-21T01:32:07.358735+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:36:32.353593+00:00
+  actor: claude
+  changes:
+  - field: comment_added

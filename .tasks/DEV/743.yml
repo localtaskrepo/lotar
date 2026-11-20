@@ -1,14 +1,17 @@
 title: 'Flaky test: merge_agent_that_hands_back_without_end_rules_does_not_land sees the merge job still running under full-suite load'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-20T22:20:16.414328+00:00
-modified: 2026-11-20T22:55:36.018662+00:00
+modified: 2026-11-21T01:38:28.867680+00:00
 relationships:
   related:
   - DEV-741
+  - DEV-748
+  - DEV-731
+  - DEV-734
 comments:
 - date: 2026-11-20T22:55:24.537133+00:00
   author: claude
@@ -35,6 +38,65 @@ comments:
     - command: npm run smoke
       result: passed
     next: Review, then merge
+- date: 2026-11-21T00:39:04.838991+00:00
+  author: claude
+  text: |-
+    Review: passed. The merge-without-end-rules wait now ends when the job does; no blocking findings.
+
+    - Read: `5529ec2f6` (only `crates/lotar-lib/tests/agent_automation_integration_test.rs`), the ticket, DEV-741, the last 5 main commits to the file (none after the branch's base), AGENTS.md
+    - Claim holds: `.config/nextest.toml` sets `slow-timeout = "90s"` with no `terminate-after`, so the 300 s `JOB_END_LIMIT_MS` isn't cut short; `wait_for_ticket_jobs` returns as soon as the predicate holds, so normal runs don't slow down. Both `merge_agent_that_*_without_end_rules_*` tests use the helper
+    - No fail-before test: it's a load flake, which the ticket's own check covers
+    - `npm ci` ran fine
+    - `npm run -s test:agent` at load avg ~30: failed, fail-fast, on `dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge` (21.1 s against a 20 s budget). This diff doesn't touch it, and it fails the same way in DEV-731 and DEV-734 runs. The DEV-743 tests hadn't run yet
+    - So I ran `cargo nextest run -p lotar-lib --test integration --no-fail-fast --retries 0 -E 'test(/^agent_automation_integration_test::/)'` at load avg 19-28: 58/58 passed, both merge tests included
+    - Not rerun: `npm run lint`, `npm test`, `npm run smoke` (the change is in one test file)
+    - Filed: [DEV-748](https://lotar.pyxzl.net/task/DEV-748), the dev605 timing flake, related to this ticket
+- date: 2026-11-21T01:38:28.867680+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+        thread 'dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge' (130771274) panicked at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451:5:
+        the merge waited for the background process: 21.048978375s
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [ 142.417s] 1618/2428 tests run: 1617 passed, 1 failed, 0 skipped
+            FAIL [  25.515s] (1605/2428) lotar-lib::integration dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+      stdout ───
+
+        running 1 test
+        test dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge ... FAILED
+
+        failures:
+
+        failures:
+            dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1607 filtered out; finished in 25.44s
+
+      stderr ───
+
+        thread 'dev605_merge_without_agent_test::a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge' (130771274) panicked at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451:5:
+        the merge waited for the background process: 21.048978375s
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 810/2428 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-743` onto `main` (`d3040a8e3d43`): `bb84b07734b9`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aec951db3e734b6e58489b043d966e72234745ad92b050bdf8068211860ea84d7
 description: 'Found: failed in the DEV-741 review run of npm run -s test:agent (2026-11-20, load avg ~38): job NRH-1 status ''running'' instead of finished, after 39.66 s (agent_automation_integration_test::git_required). The DEV-741 diff only touches an SSE test. Check: npm run -s test:agent at load avg ~30. Done: the test waits for the job''s end instead of a fixed budget and passes under full-suite load.'
@@ -78,3 +140,32 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-21T00:38:46.115661+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741"]}'
+    new: '{"related":["DEV-741","DEV-748"]}'
+- at: 2026-11-21T00:39:04.838991+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T00:39:05.855990+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-748"]}'
+    new: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734"]}'
+- at: 2026-11-21T00:39:20.150600+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T01:38:28.867680+00:00
+  actor: automation
+  changes:
+  - field: comment_added

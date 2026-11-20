@@ -1,0 +1,82 @@
+title: 'Flaky test: a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge takes over its 20 s budget under full-suite load'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-21T00:38:44.586388+00:00
+modified: 2026-11-21T01:43:46.190691+00:00
+relationships:
+  related:
+  - DEV-731
+  - DEV-734
+  - DEV-743
+comments:
+- date: 2026-11-21T01:43:37.241399+00:00
+  author: claude
+  text: |-
+    The test no longer times the merge: it checks that lotar stopped the check's background process.
+
+    - The check is now `sleep 600 & echo $! > <pidfile>`. The process outlives the 60 s deadline in `merge()`, so a merge that waited for it fails there however slow the machine is
+    - After the merge the test asserts the PID is gone. lotar kills the check's process group after `OUTPUT_DRAIN_LIMIT` (5 s)
+    - Checked that it catches the bug: with `OUTPUT_DRAIN_LIMIT` raised to 700 s the test fails with "the merge job didn't end" (change reverted)
+    - `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs` only, commit `136acb93b`
+  report:
+    commits:
+    - hash: 136acb93b
+      what: test asserts lotar stopped the background process instead of a 20 s wall-clock budget
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: twice, load avg 21-29, 2428/2428
+    - command: npm run -s lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: not_run
+      reason: test-only change to one Rust test file
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8a9c4b13d3a3970df6512b42b9484abe6fad7cbfaa9e2cfa9d0d94bb4bc69f14
+description: 'Found: failed in the DEV-743 review run of npm run -s test:agent (2026-11-20, load avg ~30): ''the merge waited for the background process: 21.13s'' at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451; also failed in DEV-731 and DEV-734 runs (load 21-22), passes alone. The test''s check is ''sleep 30 &'' against a 20 s wall-clock budget, so load alone can push it over. Check: npm run -s test:agent at load avg ~30. Done: the test tells a merge that waited for the background process from a slow one without a wall-clock budget load can exceed (e.g. a much longer sleep, or asserting the merge ended before the background process did), and passes under full-suite load.'
+tags:
+- health
+custom_fields:
+  finding: test:agent:a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge
+history:
+- at: 2026-11-21T00:38:46.118581+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-731","DEV-734","DEV-743"]}'
+- at: 2026-11-21T00:38:48.527908+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T01:31:07.160784+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T01:31:13.199891+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8a9c4b13d3a3970df6512b42b9484abe6fad7cbfaa9e2cfa9d0d94bb4bc69f14
+- at: 2026-11-21T01:43:37.241399+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:43:46.190691+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

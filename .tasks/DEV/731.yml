@@ -1,11 +1,11 @@
 title: A queue worker started by an agent's lotar call keeps that agent's PATH for every later job
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T13:33:39.558052+00:00
-modified: 2026-11-20T23:18:22.637571+00:00
+modified: 2026-11-21T01:02:44.019550+00:00
 relationships:
   depends_on:
   - DEV-732
@@ -22,6 +22,12 @@ relationships:
   - DEV-729
   - DEV-745
   - DEV-746
+  - DEV-652
+  - DEV-654
+  - DEV-686
+  - DEV-748
+  - DEV-743
+  - DEV-744
 comments:
 - date: 2026-11-20T14:04:20.131144+00:00
   author: automation
@@ -237,6 +243,35 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-731` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-731` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-21T00:32:45.473724+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-731 is on main as `5a68d24a7`.
+
+    - Rebase conflict in `docs/help/agent.md` resolved as both comments said: DEV-733's session-variables sentence, then this fix's PATH sentence; the Rust code merged cleanly
+    - `git -C <root> merge --ff-only agent/DEV-731`, then `.tasks` amended into it; pushed `7b5a53d2c..5a68d24a7` (with DEV-730 `5346b8fa2`, Done)
+    - No rule or config changes, so no `lotar trust`
+    - Checks ran at load 20-62 (other sessions compiling): every failure was a timeout and passed when rerun alone, see the checks
+    - `repos.ts` still lists 4 problems of other tickets (t3 project, DEV-686, DEV-652, DEV-654), not this one
+  report:
+    commits:
+    - hash: 5a68d24a7
+      what: worker fills a short PATH from the login shell (rebased from ed15359af, .tasks amended in)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2427/2428 with --no-fail-fast at load 20-38; each run failed one different timing test (a_check_that_leaves_a_process_running..., a_full_disk_pauses..., automatic_cleanup_preserves...), each passes alone 3/3; UI 5 timeouts, the 2 files pass alone 94/94; release and hooks passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 395/406 at load 38, the 11 timeouts' 5 files pass alone 25/25
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: worker:inherited-path no longer listed
+    next: none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e977638d68bc4e75f621fc5b0a47d7965c6212a6131ff3c2250534b2d0d6494
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa61a280256663cea82ad0e51ba83aae65afc2109e04181dc12cdc9dbf9f6b454
@@ -248,8 +283,6 @@ description: |-
   Done: a worker's jobs don't depend on which agent shell happened to queue first, and the short PATH's source is known.
 tags:
 - health
-- fix-retried
-- retry-fix
 custom_fields:
   finding: worker:inherited-path
 history:
@@ -506,3 +539,40 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-21T00:32:45.473724+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T00:32:51.464791+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746"]}'
+    new: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686"]}'
+- at: 2026-11-21T00:33:14.431952+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, retry-fix
+    new: health
+- at: 2026-11-21T00:38:46.102023+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686"]}'
+    new: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686","DEV-748"]}'
+- at: 2026-11-21T00:39:05.848224+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686","DEV-748"]}'
+    new: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686","DEV-748","DEV-743"]}'
+- at: 2026-11-21T01:02:44.019550+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686","DEV-748","DEV-743"]}'
+    new: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686","DEV-748","DEV-743","DEV-744"]}'

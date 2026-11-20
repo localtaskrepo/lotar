@@ -110,6 +110,11 @@ fn job_for_ticket(ticket_id: &str) -> lotar::api_types::AgentJob {
 /// from failing the multi-phase pipelines (DEV-503: they needed 10 to 16 s at a load average of 12).
 const WAIT_FLOOR_MS: u64 = 30_000;
 
+/// For a wait that must see a job end however busy the machine is: it ends when the job does and the limit only
+/// catches a hang (DEV-743: a merge job outlasted the floor at a load average of 38).
+#[cfg(unix)]
+const JOB_END_LIMIT_MS: u64 = 300_000;
+
 fn wait_for_job_status(job_id: &str, status: &str, timeout_ms: u64) -> bool {
     let timeout_ms = timeout_ms.max(WAIT_FLOOR_MS);
     let start = Instant::now();
@@ -2676,8 +2681,12 @@ exit 0
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@merge".to_string()), ..Default::default() }).expect("assign merge agent");
 
         // The job's end (the agent's deferred handback, worktree cleanup) runs
-        // after it finishes: wait until its worker is done (DEV-553).
-        let jobs = wait_for_ticket_jobs(&created.id, 10_000, |jobs| jobs.iter().any(|job| job.finished_at.is_some() && AgentJobService::job_settled(&job.id)));
+        // after it finishes: wait until its worker is done (DEV-553). Under
+        // full-suite load the job outlasts the wait floor, so wait for its end;
+        // the limit only catches a hang (DEV-743).
+        let jobs = wait_for_ticket_jobs(&created.id, JOB_END_LIMIT_MS, |jobs| {
+            jobs.iter().any(|job| job.finished_at.is_some() && AgentJobService::job_settled(&job.id))
+        });
         let job = jobs.first().cloned().expect("merge job");
         let task = TaskService::get(&storage, &created.id, None).expect("get task");
         (fixtures, job, task, worktrees)

@@ -1,15 +1,120 @@
 title: Settle a ticket's kept T3 Code threads once a later job completes or the ticket is done
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-20T23:08:35.010019+00:00
-modified: 2026-11-20T23:08:35.533226+00:00
+modified: 2026-11-21T01:48:38.236205+00:00
 relationships:
   related:
   - DEV-729
   - DEV-732
+  - DEV-626
+comments:
+- date: 2026-11-21T00:49:25.895065+00:00
+  author: automation
+  text: The fix agent's job job-20261121T003923.951Z-41 failed (lotar agent logs job-20261121T003923.951Z-41); @fix-retry retries it on branch agent/DEV-747.
+- date: 2026-11-21T00:53:43.741745+00:00
+  author: claude
+  text: |-
+    Kept T3 Code threads are now settled once the ticket is done, or once a later job's thread on the ticket is settled.
+
+    - New `crates/lotar-agent/src/services/agent_job_service/kept.rs`: one check, run at every job end and in the 30 s look `lotar serve` and the worker already run (DEV-626). It also runs once at serve start, which is the catch-up.
+    - It uses `t3 thread list` (`settled`, `status`), so it records nothing new. Step 1 of the plan needed no change: the job's status line already holds its thread for every outcome.
+    - It settles only threads listed unsettled with status `completed`. It skips a thread that runs or waits, or that a live session follows. A failed settle is logged once per process.
+    - It logs `Settled the T3 Code thread <link>` in the newest job that ran the thread.
+    - Cancelled jobs' threads count too. `dev626…the_thread_of_a_cancelled_job_is_left_alone` no longer asserts that T3 Code isn't asked.
+    - 3 new tests in `dev503_harness_jobs_test.rs` (failed job then a later job; HelpNeeded then Done; running thread left alone). `docs/help/agent.md` is updated.
+    - No hook on status changes: a Done set from the CLI or UI is picked up by the next look or job end. `agent worktree cleanup` is unchanged.
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: eafd1cc49
+      what: settle kept T3 Code threads at job end and in the 30 s look
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2431 Rust tests, 1563 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    - command: catch-up on the owner's machine
+      result: not_run
+      reason: needs this build installed and lotar serve restarted
+    next: After merge and install, restart lotar serve and check the T3 sidebar shows only threads that still need someone
+- date: 2026-11-21T01:44:46.778135+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261121T014347.979Z-49 failed again or on a rate limit (lotar agent logs job-20261121T014347.979Z-49). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-21T01:45:15.482058+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the job ended its turn while the checks ran in the background (t3 run status 'waiting', exit code 1). Commit eafd1cc49 holds the work; the retry only needs to run the checks in the foreground and hand off.
+  answer:
+    to: 2026-11-21T01:44:46.778135+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the job ended its turn while the checks ran in the background (t3 run status ''waiting'', exit code 1). Commit eafd1cc49 holds the work; the retry only needs to run the checks in the foreground and hand off.'
+- date: 2026-11-21T01:48:38.236205+00:00
+  author: claude
+  text: |-
+    Retry: the checks now pass on commit `eafd1cc49`. The code is unchanged since the last job.
+
+    - The last job (`job-20261121T003923.951Z-41`) failed because it ended its turn while the checks were still running.
+    - `npm run lint:agent` passed.
+    - `npm run test:agent`: the first run failed 5 CLI tests because `target/debug/lotar` disappeared partway through the run. Something outside this job removed it after the build. The rerun passed all 2431 Rust tests, plus UI, release and hooks.
+    - `npm run test:smoke:agent`: 406 passed.
+    - Not checked here: today's leftover threads getting settled after install and a `lotar serve` restart.
+  report:
+    commits:
+    - hash: eafd1cc49
+      what: settle kept T3 Code threads (kept.rs), 3 tests, docs/help/agent.md
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2431 Rust tests plus UI, release and hooks
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    - command: settling today's leftovers on the installed build
+      result: not_run
+      reason: needs the build installed and lotar serve restarted
+    next: Review, then merge; after install and a serve restart, check that the T3 sidebar's leftover threads are settled
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac5af945f0aa031fe5013f35f34d2616f9a34f0e8ce5b5367c14578ba5fd111c4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4b4bcc92b1f1f48844822ef4578fd546c0defb2976565edd25215a5cc619eb2
 description: |-
   A T3 Code job thread that lotar leaves active is never settled later. On 2026-11-20 the owner saw 43 unsettled threads and asked whether they needed him. 33 of them were leftovers: 21 from failed or cancelled jobs, 2 from jobs that ended while the ticket was HelpNeeded, and the rest from jobs that ran before auto-settle existed. Most of those tickets are Done by now. The owner chose this fix on 2026-11-20 ("Settle + file lotar fix").
 
@@ -34,9 +139,17 @@ description: |-
 
   ## Done when
 
-  - [ ] Kept threads are settled after a later successful job or a done state, with tests
-  - [ ] The catch-up clears today's leftovers on the owner's machine (the T3 sidebar shows only threads that still need someone)
-  - [ ] docs/help/agent.md says so
+  The rule (one check, three triggers): a kept thread is a ticket's T3 Code thread of an ended t3 job (any outcome, cancelled too) that `t3 thread list` shows unsettled with status `completed`. It is settled when its ticket is in a done state, or when the thread of a later-ended job on the same ticket is settled. A thread whose run still goes or waits (status `running`/`waiting`, or a live harnessmux session follows it) is left alone; so is one with another status (`failed`, `interrupted`): harnessmux refuses to settle those.
+
+  - [ ] Trigger: every job end (after the job settles its own thread), and the scan `lotar serve` and the queue worker already run every 30 seconds (DEV-626), which also runs once at `lotar serve` start: that is the catch-up. A done state reached any way (CLI, web UI, agent) is picked up by the next scan or job end; no hook on status changes.
+  - [ ] Each settle logs `Settled the T3 Code thread <link>` in the newest job that ran the thread. A settle that fails (no harnessmux session, T3 Code refuses) logs `The T3 Code thread <link> was not settled: <reason>` once per process, and the next thread goes on.
+  - [ ] T3 Code can't list its threads: nothing happens, the next scan tries again.
+  - [ ] Tests (fake T3 Code): a failed job's thread is settled once a later job completes; a HelpNeeded job's thread is settled once the ticket is Done; a running thread is left alone.
+  - [ ] docs/help/agent.md (T3 Code threads) says so.
+  - [ ] After the build with this is installed and `lotar serve` restarted, today's leftovers are settled (T3 sidebar shows only threads that still need someone). Checked by the owner or a later job: this job can't install the build.
+tags:
+- fix-retried
+- retry-fix
 history:
 - at: 2026-11-20T23:08:35.249950+00:00
   actor: claude
@@ -49,3 +162,138 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-21T00:39:44.357138+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T00:39:46.506182+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac5af945f0aa031fe5013f35f34d2616f9a34f0e8ce5b5367c14578ba5fd111c4
+- at: 2026-11-21T00:42:49.352729+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      A T3 Code job thread that lotar leaves active is never settled later. On 2026-11-20 the owner saw 43 unsettled threads and asked whether they needed him. 33 of them were leftovers: 21 from failed or cancelled jobs, 2 from jobs that ended while the ticket was HelpNeeded, and the rest from jobs that ran before auto-settle existed. Most of those tickets are Done by now. The owner chose this fix on 2026-11-20 ("Settle + file lotar fix").
+
+      ## Context
+
+      - `settle_t3_thread` (crates/lotar-agent/src/services/agent_job_service.rs:5529) runs only when a job completes. Per docs/help/agent.md:179, the thread stays active when the job failed or was cancelled, or when the ticket waits for a person. That is right at the time, but nothing settles those threads afterwards.
+      - Examples:
+        - DEV-732: failed jobs job-20261120T134548.567Z-11 and job-20261120T142256.382Z-15 (DEV-729) left threads b70b2201… and f878a77d… active. Later DEV-732 jobs settled their own threads, and the ticket is Done.
+        - STD-262 (job-20261120T101421.894Z-1) and FND-24 (job-20261120T180657.811Z-1) were HelpNeeded at job end and are Done now.
+      - Agents can't clear these threads by hand. `t3_thread_organize settle` on a full-access `mcp:launch:` thread is refused with `runtime_mode_escalation_denied`, so only lotar (through `harnessmux::backend::t3::settle`) or the owner can settle them.
+
+      ## Plan
+
+      1. Record each t3 job's thread whether or not it was settled. The job's harnessmux session already holds it.
+      2. Settle every thread of a ticket that lotar kept active when either of these happens:
+         - a later job on the same ticket completes and settles its own thread;
+         - the ticket reaches a done state (Done, WontDo, or the project's done statuses), whichever way it got there (agent, owner, web UI, CLI).
+         In both cases skip a thread whose run is still going, and log `Settled the T3 Code thread <link>` in the job it belongs to, or in the ticket's history.
+      3. Catch-up: the same check runs once on `lotar serve` start, or on `lotar agent worktree cleanup`, so leftovers from before this change get cleared.
+      4. Tests: a failed job's thread is settled once a later job completes; a HelpNeeded thread is settled once the ticket is Done; a running thread is left alone.
+      5. Update docs/help/agent.md:179.
+
+      ## Done when
+
+      - [ ] Kept threads are settled after a later successful job or a done state, with tests
+      - [ ] The catch-up clears today's leftovers on the owner's machine (the T3 sidebar shows only threads that still need someone)
+      - [ ] docs/help/agent.md says so
+    new: |-
+      A T3 Code job thread that lotar leaves active is never settled later. On 2026-11-20 the owner saw 43 unsettled threads and asked whether they needed him. 33 of them were leftovers: 21 from failed or cancelled jobs, 2 from jobs that ended while the ticket was HelpNeeded, and the rest from jobs that ran before auto-settle existed. Most of those tickets are Done by now. The owner chose this fix on 2026-11-20 ("Settle + file lotar fix").
+
+      ## Context
+
+      - `settle_t3_thread` (crates/lotar-agent/src/services/agent_job_service.rs:5529) runs only when a job completes. Per docs/help/agent.md:179, the thread stays active when the job failed or was cancelled, or when the ticket waits for a person. That is right at the time, but nothing settles those threads afterwards.
+      - Examples:
+        - DEV-732: failed jobs job-20261120T134548.567Z-11 and job-20261120T142256.382Z-15 (DEV-729) left threads b70b2201… and f878a77d… active. Later DEV-732 jobs settled their own threads, and the ticket is Done.
+        - STD-262 (job-20261120T101421.894Z-1) and FND-24 (job-20261120T180657.811Z-1) were HelpNeeded at job end and are Done now.
+      - Agents can't clear these threads by hand. `t3_thread_organize settle` on a full-access `mcp:launch:` thread is refused with `runtime_mode_escalation_denied`, so only lotar (through `harnessmux::backend::t3::settle`) or the owner can settle them.
+
+      ## Plan
+
+      1. Record each t3 job's thread whether or not it was settled. The job's harnessmux session already holds it.
+      2. Settle every thread of a ticket that lotar kept active when either of these happens:
+         - a later job on the same ticket completes and settles its own thread;
+         - the ticket reaches a done state (Done, WontDo, or the project's done statuses), whichever way it got there (agent, owner, web UI, CLI).
+         In both cases skip a thread whose run is still going, and log `Settled the T3 Code thread <link>` in the job it belongs to, or in the ticket's history.
+      3. Catch-up: the same check runs once on `lotar serve` start, or on `lotar agent worktree cleanup`, so leftovers from before this change get cleared.
+      4. Tests: a failed job's thread is settled once a later job completes; a HelpNeeded thread is settled once the ticket is Done; a running thread is left alone.
+      5. Update docs/help/agent.md:179.
+
+      ## Done when
+
+      The rule (one check, three triggers): a kept thread is a ticket's T3 Code thread of an ended t3 job (any outcome, cancelled too) that `t3 thread list` shows unsettled with status `completed`. It is settled when its ticket is in a done state, or when the thread of a later-ended job on the same ticket is settled. A thread whose run still goes or waits (status `running`/`waiting`, or a live harnessmux session follows it) is left alone; so is one with another status (`failed`, `interrupted`): harnessmux refuses to settle those.
+
+      - [ ] Trigger: every job end (after the job settles its own thread), and the scan `lotar serve` and the queue worker already run every 30 seconds (DEV-626), which also runs once at `lotar serve` start: that is the catch-up. A done state reached any way (CLI, web UI, agent) is picked up by the next scan or job end; no hook on status changes.
+      - [ ] Each settle logs `Settled the T3 Code thread <link>` in the newest job that ran the thread. A settle that fails (no harnessmux session, T3 Code refuses) logs `The T3 Code thread <link> was not settled: <reason>` once per process, and the next thread goes on.
+      - [ ] T3 Code can't list its threads: nothing happens, the next scan tries again.
+      - [ ] Tests (fake T3 Code): a failed job's thread is settled once a later job completes; a HelpNeeded job's thread is settled once the ticket is Done; a running thread is left alone.
+      - [ ] docs/help/agent.md (T3 Code threads) says so.
+      - [ ] After the build with this is installed and `lotar serve` restarted, today's leftovers are settled (T3 sidebar shows only threads that still need someone). Checked by the owner or a later job: this job can't install the build.
+- at: 2026-11-21T00:42:49.653465+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-729","DEV-732"]}'
+    new: '{"related":["DEV-729","DEV-732","DEV-626"]}'
+- at: 2026-11-21T00:49:17.134233+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-21T00:49:25.895065+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T00:53:43.741745+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:43:53.464758+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4b4bcc92b1f1f48844822ef4578fd546c0defb2976565edd25215a5cc619eb2
+- at: 2026-11-21T01:44:46.428400+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-21T01:44:46.778135+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:45:15.482058+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:45:15.482158+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-21T01:45:21.691731+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, retry-fix
+- at: 2026-11-21T01:48:38.236205+00:00
+  actor: claude
+  changes:
+  - field: comment_added

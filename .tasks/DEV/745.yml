@@ -1,16 +1,17 @@
 title: Queue worker hangs at start when the login shell's profile leaves a background process holding its stdout
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-20T22:28:14.806321+00:00
-modified: 2026-11-20T23:18:12.745063+00:00
+modified: 2026-11-21T01:27:05.978888+00:00
 relationships:
   depends_on:
   - DEV-731
   related:
   - DEV-731
+  - DEV-750
 comments:
 - date: 2026-11-20T23:18:04.332113+00:00
   author: claude
@@ -20,8 +21,36 @@ comments:
     - `login_shell_path` (`crates/lotar-agent/src/services/agent_queue_service.rs`) exists only on `agent/DEV-731` (`ed15359af`), status Merging
     - `main` (`5346b8fa2`) has no login-shell PATH lookup, so there's nothing to fix on this branch
     - Next: once DEV-731 is merged, rebase `agent/DEV-745` on main, swap the `reader.join()` for `recv_timeout` against the same 5 s deadline, add the fake-shell test with a background `sleep`
+- date: 2026-11-21T01:26:34.838469+00:00
+  author: claude
+  text: |-
+    Fixed: the worker no longer hangs when a profile's background process keeps the login shell's output open.
+
+    - `login_shell_path` (`crates/lotar-agent/src/services/agent_queue_service.rs`): the reader thread sends its output over a channel; `recv_timeout` waits only until the same 5 s deadline, then the worker keeps its own PATH
+    - Test `worker_keeps_its_path_when_login_shell_output_stays_open` (`crates/lotar-lib/tests/agent_safety_test.rs`): fake shell runs `sleep 30 &`; the job runs with PATH ending `:/usr/bin:/bin`, no login entry, worker done in under 12 s
+    - `docs/help/agent.md`: the 5 s limit also covers output a background process keeps open
+    - Branch rebased on main `d3040a8e3` (has DEV-731)
+    - `npm run smoke`: two full runs each failed one unrelated UI test (`ui.advanced` insights dashboard, `ui.agent-jobs` live log stream); each file passes alone, machine load average was 27
+  report:
+    commits:
+    - hash: de71379ac
+      what: login-shell PATH lookup gives up on its output after the same 5 s deadline
+    checks:
+    - command: cargo nextest run --cargo-profile dev --workspace worker_keeps_its_path
+      result: passed
+      reason: failed before the fix (worker hung 15 s), 5.9 s after
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2429 Rust, 1563 UI
+    - command: npm run smoke
+      result: failed
+      reason: 1 of 406 each run, a different UI test each time (insights dashboard, agent-jobs live log), both pass alone; load average 27
+    next: Merge agent/DEV-745
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2709f94f3ae56b54cec4da8792ab3483952368e9ccd6e48744e2ac87f76329d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ec83ebee8f9ccace0d1bb09bad2ebb675f0a1e8087a45adb272ac660c81f543
 description: |-
   The queue worker's login-shell PATH lookup (DEV-731) can hang the worker for good, although `docs/help/agent.md` says it gives up after 5 seconds. Found in the DEV-731 review, 2026-11-20.
 
@@ -37,9 +66,7 @@ description: |-
 
   ## Done when
 
-  - [ ] A test with a fake login shell that leaves a background `sleep` holding stdout shows that the worker still runs its job with its own PATH within about 5 s
-tags:
-- waits
+  - [x] A test with a fake login shell that leaves a background `sleep` holding stdout shows that the worker still runs its job with its own PATH within about 5 s
 history:
 - at: 2026-11-20T22:28:15.610454+00:00
   actor: claude
@@ -85,3 +112,75 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-21T00:33:29.279159+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-21T01:18:15.772640+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-21T01:18:22.595755+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ec83ebee8f9ccace0d1bb09bad2ebb675f0a1e8087a45adb272ac660c81f543
+- at: 2026-11-21T01:26:34.838469+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:26:40.346097+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The queue worker's login-shell PATH lookup (DEV-731) can hang the worker for good, although `docs/help/agent.md` says it gives up after 5 seconds. Found in the DEV-731 review, 2026-11-20.
+
+      ## Cause
+
+      - `login_shell_path` in `crates/lotar-agent/src/services/agent_queue_service.rs` enforces its 5 second limit only while the shell runs (`child.try_wait()` loop)
+      - After the shell exits it calls `reader.join()` with no limit. The reader thread only ends when the pipe closes, i.e. when every process holding stdout has exited
+      - A profile that starts something in the background without redirecting its stdout (an agent, a daemon, `cmd &`) keeps the pipe open, so the worker blocks before it takes its first job
+
+      ## Fix
+
+      Give up on the reader too once the deadline passes, for example by receiving its output over a channel with `recv_timeout`. On a timeout, keep the PATH the worker got, as the docs already say.
+
+      ## Done when
+
+      - [ ] A test with a fake login shell that leaves a background `sleep` holding stdout shows that the worker still runs its job with its own PATH within about 5 s
+    new: |-
+      The queue worker's login-shell PATH lookup (DEV-731) can hang the worker for good, although `docs/help/agent.md` says it gives up after 5 seconds. Found in the DEV-731 review, 2026-11-20.
+
+      ## Cause
+
+      - `login_shell_path` in `crates/lotar-agent/src/services/agent_queue_service.rs` enforces its 5 second limit only while the shell runs (`child.try_wait()` loop)
+      - After the shell exits it calls `reader.join()` with no limit. The reader thread only ends when the pipe closes, i.e. when every process holding stdout has exited
+      - A profile that starts something in the background without redirecting its stdout (an agent, a daemon, `cmd &`) keeps the pipe open, so the worker blocks before it takes its first job
+
+      ## Fix
+
+      Give up on the reader too once the deadline passes, for example by receiving its output over a channel with `recv_timeout`. On a timeout, keep the PATH the worker got, as the docs already say.
+
+      ## Done when
+
+      - [x] A test with a fake login shell that leaves a background `sleep` holding stdout shows that the worker still runs its job with its own PATH within about 5 s
+- at: 2026-11-21T01:26:54.171473+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-731"],"related":["DEV-731"]}'
+    new: '{"depends_on":["DEV-731"],"related":["DEV-731","DEV-750"]}'
+- at: 2026-11-21T01:27:05.978888+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

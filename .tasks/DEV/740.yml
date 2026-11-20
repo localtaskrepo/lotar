@@ -3,9 +3,9 @@ status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-20T21:07:30.522875+00:00
-modified: 2026-11-20T23:49:22.676736+00:00
+modified: 2026-11-21T01:30:17.445805+00:00
 relationships:
   depends_on:
   - DEV-711
@@ -59,6 +59,55 @@ comments:
     - **Reran:** `npm ci` passed; `cargo fmt --all --check` passed; `cargo clippy --all-targets --all-features -D warnings` passed; `cargo nextest run -p lotar-agent` passed (204/204).
     - **Not rerun:** `npm run smoke` and the UI and JS tests. The change has no UI or JS part; the fix agent reports they passed.
     - **Findings:** none. No tickets filed.
+- date: 2026-11-21T01:10:13.128876+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (129525367) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [ 216.023s] 2330/2432 tests run: 2329 passed, 1 failed, 0 skipped
+            FAIL [  10.419s] (2317/2432) lotar-lib::integration web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+      stdout ───
+
+        running 1 test
+        test web_api_integration_test::sse_delivers_during_a_steady_stream_of_events ... FAILED
+
+        failures:
+
+        failures:
+            web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1607 filtered out; finished in 10.38s
+
+      stderr ───
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (129525367) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 102/2432 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-740` onto `main` (`5a68d24a73de`): `7355f22801bc`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T01:30:17.445805+00:00
+  author: automation
+  text: The merge agent's job job-20261121T010254.510Z-43 failed (lotar agent logs job-20261121T010254.510Z-43); the fix agent retries it on branch agent/DEV-740.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab243cb4cc26f9d7a16831b9f3da94be5b82dcf3a6e620526a8c67a7ba1ad246f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aad0962db015d694a8baaaef13f597357cdcda7a02959f6934b6c0a88d6a7cfac
@@ -76,6 +125,8 @@ description: |-
   - [ ] Unit tests in `usage_limit.rs` cover an `auth_required` failure and an `overloaded` failure that both name a limit, and an `auth_required` failure that names none.
   - [ ] `docs/help/agent.md` (Usage limits, What counts) says a limit line in the text counts whatever kind harnessmux gave; "A limit wins…" stays true.
   - [ ] Runs on DEV-711's code (`of_failures_in`); it waits until DEV-711 is on main.
+tags:
+- merge-retried
 history:
 - at: 2026-11-20T21:07:31.702841+00:00
   actor: claude
@@ -192,3 +243,20 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-21T01:10:13.128876+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:30:11.011179+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: ''
+    new: merge-retried
+- at: 2026-11-21T01:30:17.445805+00:00
+  actor: automation
+  changes:
+  - field: comment_added

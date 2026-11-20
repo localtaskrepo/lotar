@@ -3,8 +3,9 @@ status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
+assignee: '@fix'
 created: 2026-11-20T18:03:55.898155+00:00
-modified: 2026-11-20T23:44:35.239396+00:00
+modified: 2026-11-21T01:17:00.838275+00:00
 relationships:
   depends_on:
   - DEV-742
@@ -19,6 +20,8 @@ relationships:
   - DEV-742
   - DEV-711
   - DEV-729
+  - DEV-748
+  - DEV-743
 comments:
 - date: 2026-11-20T18:37:16.210363+00:00
   author: claude
@@ -570,3 +573,20 @@ history:
   changes:
   - field: assignee
     old: '@fix'
+- at: 2026-11-21T00:38:46.109764+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-742"],"blocks":["DEV-738","DEV-739"],"related":["DEV-732","DEV-738","DEV-733","TEST-2","DEV-742","DEV-711","DEV-729"]}'
+    new: '{"depends_on":["DEV-742"],"blocks":["DEV-738","DEV-739"],"related":["DEV-732","DEV-738","DEV-733","TEST-2","DEV-742","DEV-711","DEV-729","DEV-748"]}'
+- at: 2026-11-21T00:39:05.852116+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-742"],"blocks":["DEV-738","DEV-739"],"related":["DEV-732","DEV-738","DEV-733","TEST-2","DEV-742","DEV-711","DEV-729","DEV-748"]}'
+    new: '{"depends_on":["DEV-742"],"blocks":["DEV-738","DEV-739"],"related":["DEV-732","DEV-738","DEV-733","TEST-2","DEV-742","DEV-711","DEV-729","DEV-748","DEV-743"]}'
+- at: 2026-11-21T01:17:00.838275+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

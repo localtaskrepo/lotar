@@ -1,17 +1,18 @@
 title: 'Flaky test: a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit times out at line 173 under load'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T21:53:10.914860+00:00
-modified: 2026-11-21T00:24:14.702303+00:00
+modified: 2026-11-21T01:16:45.039517+00:00
 relationships:
   blocks:
   - DEV-734
   related:
   - DEV-734
   - TEST-1
+  - DEV-741
 comments:
 - date: 2026-11-20T22:47:01.296826+00:00
   author: claude
@@ -42,6 +43,52 @@ comments:
       result: passed
       reason: 8/8
     next: Review, then merge
+- date: 2026-11-21T01:14:34.530962+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ Created task: TEST-2
+          Title: second
+          Status: Todo
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ TEST-1: sam will be assigned when job job-20261121T011408.530Z-2 ends
+        test dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes ... FAILED
+
+        failures:
+
+        failures:
+            dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1607 filtered out; finished in 14.34s
+
+      stderr ───
+
+        thread 'dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes' (129607699) panicked at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:238:5:
+        assertion `left == right` failed: the paused job's status applies, its assignee gave way to the owner's: {"id":"TEST-1","title":"first","status":"InProgress","priority":"Medium","task_type":"Feature","task_state":{"is_done":false,"done_states":["Done"],"due_bucket":null,"calendar_day":"2026-11-20"},"reporter":"tester","assignee":"mallox","created":"2026-11-21T01:14:02.708685+00:00","modified":"2026-11-21T01:14:14.549312+00:00","tags":[],"relationships":{},"comments":[],"references":[],"sprints":[],"releases":[],"history":[{"at":"2026-11-21T01:14:14.549312+00:00","actor":"tester","changes":[{"field":"status","old":"Todo","new":"InProgress"},{"field":"assignee","new":"mallox"}]}],"custom_fields":{}}
+          left: (String("InProgress"), String("mallox"))
+         right: (String("InProgress"), String("sam"))
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 830/2428 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-742` onto `main` (`5a68d24a73de`): `d3040a8e3d43`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1e86cb0af4dd19c56f9030c01d5f4fca391f7d09344d1cfb212c15342bbd55a6
 description: 'Found (DEV-734, 2026-11-20): it failed in lotar''s merge check of agent/DEV-734 (`npm run -s test:agent`, load average 21; dev605''s timing test failed in the same run). After signing works again the queue didn''t resume within the 30 s `wait_for`: pause set, `next_try_at` passed, `running_jobs: 1`. The run took 26 s; alone it takes 8 s. The same commit then passed 6 runs alone, 12 in parallel, 16 in parallel at load 30, and the full `npm run -s test:rust:agent` (2421/2421). Check: find what the running job waits on when this happens (keep the worker and job logs when it fails), then fix the cause or the deadline. Done: the test passes in a full agent suite run under load.'
@@ -106,3 +153,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-21T01:03:51.363782+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-734"],"related":["DEV-734","TEST-1"]}'
+    new: '{"blocks":["DEV-734"],"related":["DEV-734","TEST-1","DEV-741"]}'
+- at: 2026-11-21T01:14:34.530962+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T01:16:45.039517+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

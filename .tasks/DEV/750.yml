@@ -1,0 +1,28 @@
+title: 'Flaky smoke under load: insights dashboard analytics and agent-jobs live log stream fail in the full run, pass alone'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T01:26:53.918022+00:00
+modified: 2026-11-21T01:26:54.409597+00:00
+relationships:
+  related:
+  - DEV-745
+description: 'Found in DEV-745 (2026-11-20), load average 27: two full `npm run smoke` runs each failed one test, a different one each time: `ui.advanced.smoke.spec.ts` ''surfaces analytics on the insights dashboard'' (`expected 0 to be greater than or equal to 4`) and `ui.agent-jobs.smoke.spec.ts` ''streams log entries live while a job is running''. Each file passes alone. Check: `npm run smoke` under load. Done: both tests wait for their condition instead of a fixed time and pass in the full run.'
+tags:
+- health
+custom_fields:
+  finding: npm run smoke:ui.advanced+ui.agent-jobs
+history:
+- at: 2026-11-21T01:26:54.171923+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-745"]}'
+- at: 2026-11-21T01:26:54.409597+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
