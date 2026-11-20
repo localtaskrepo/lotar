@@ -2,8 +2,10 @@
 //! names it and, when the provider says, when the limit resets.
 //!
 //! harnessmux types a failed turn (DEV-711): `rate_limited` and `quota` are
-//! limits, with the reset time the agent's error data gives. A failure it
-//! gives no kind (`other`) is read from its text.
+//! limits, with the reset time the agent's error data gives. A failure of any
+//! other kind is a limit when its text names one (DEV-740): harnessmux types a
+//! text that names both a sign-in error and a limit as `auth_required`, and a
+//! limit wins.
 //!
 //! A job that stops on such a limit pauses until the reset instead of failing.
 //! Codex prints "You've hit your usage limit. Upgrade to Pro or try again at
@@ -63,8 +65,10 @@ pub fn of_failures(failures: &[Failure], now: Timestamp) -> Option<UsageLimit> {
 }
 
 /// A failure typed as a limit is one, with its `resets_at`, else the time its
-/// text names; one of no kind is a limit when its text names one; any other
-/// kind (sign-in, overload, context, transport) is none.
+/// text names; one of any other kind (none, sign-in, overload, context,
+/// transport) is a limit when its text names one. harnessmux 0.2.0 doesn't say
+/// whether a kind came from error data or from text, so the text counts for
+/// every kind (DEV-740).
 fn of_failures_in(failures: &[Failure], now: Timestamp, zone: &TimeZone) -> Option<UsageLimit> {
     failures.iter().find_map(|failure| {
         let from_text = find_in([failure.error.as_str()], now, zone);
@@ -74,8 +78,7 @@ fn of_failures_in(failures: &[Failure], now: Timestamp, zone: &TimeZone) -> Opti
                 let resets_at = failure.resets_at.as_deref().and_then(|at| at.parse::<Timestamp>().ok()).or(from_text.and_then(|limit| limit.resets_at));
                 Some(UsageLimit { line, resets_at })
             }
-            FailureKind::Other => from_text,
-            _ => None,
+            _ => from_text,
         }
     })
 }
@@ -235,11 +238,43 @@ mod tests {
     }
 
     #[test]
-    fn untyped_failures_fall_back_to_the_text_and_other_kinds_are_no_limit() {
+    fn untyped_failures_fall_back_to_the_text() {
         let untyped = of_failures_in(&[failure("Claude API rate limit reached. Try again later.", FailureKind::Other, None)], now(), &berlin());
         assert_eq!(untyped.map(|limit| limit.line).as_deref(), Some("Claude API rate limit reached. Try again later."));
-        let overloaded = failure("Codex exceeded retry limit: try again at Nov 20th, 2026 7:43 PM", FailureKind::Overloaded, None);
-        assert_eq!(of_failures_in(&[overloaded, failure("boom", FailureKind::Other, None)], now(), &berlin()), None);
+    }
+
+    #[test]
+    fn a_sign_in_failure_whose_text_names_a_limit_pauses() {
+        let text = "t3 exited with exit status: 1: Failed to authenticate\nYou've hit your usage limit. Upgrade to Pro or try again at Nov 20th, 2026 7:43 PM.";
+        let limit = of_failures_in(&[failure(text, FailureKind::AuthRequired, None)], now(), &berlin()).expect("limit");
+        assert_eq!(limit.line, "You've hit your usage limit. Upgrade to Pro or try again at Nov 20th, 2026 7:43 PM.");
+        assert_eq!(limit.resume_at(now()), "2026-11-20T18:43:00Z".parse().expect("timestamp"));
+    }
+
+    #[test]
+    fn an_overloaded_failure_whose_text_names_a_limit_waits_the_default() {
+        let limit =
+            of_failures_in(&[failure("server overloaded\nClaude API rate limit reached. Try again later.", FailureKind::Overloaded, None)], now(), &berlin())
+                .expect("limit");
+        assert_eq!(limit, UsageLimit { line: "Claude API rate limit reached. Try again later.".into(), resets_at: None });
+    }
+
+    #[test]
+    fn a_failure_of_any_kind_without_a_limit_line_is_no_limit() {
+        for kind in [FailureKind::AuthRequired, FailureKind::Overloaded, FailureKind::ContextExhausted, FailureKind::Transport, FailureKind::Other] {
+            assert_eq!(of_failures_in(&[failure("Failed to authenticate. API Error: 401", kind, None)], now(), &berlin()), None);
+        }
+    }
+
+    #[test]
+    fn the_first_failed_turn_that_is_a_limit_wins() {
+        let failures = [
+            failure("Failed to authenticate", FailureKind::AuthRequired, None),
+            failure("unauthorized\nusage limit, resets 2026-11-18T12:00:00Z", FailureKind::AuthRequired, None),
+            failure("out of credits", FailureKind::Quota, Some("2026-11-18T15:00:00Z")),
+        ];
+        let limit = of_failures_in(&failures, now(), &berlin()).expect("limit");
+        assert_eq!(limit.resets_at, Some("2026-11-18T12:00:00Z".parse().expect("timestamp")));
     }
 
     #[test]
