@@ -1,0 +1,28 @@
+title: lotar comment saves a lone - as the comment text instead of reading stdin
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T23:39:20.858113+00:00
+modified: 2026-11-21T23:39:21.371705+00:00
+relationships:
+  related:
+  - DEV-768
+description: 'Found: lotar comment DEV-768 --commit … - <<EOF saved the text ''-'' and dropped the heredoc; only -F - reads stdin (DEV-768 hand-off). Check: lotar comment <ID> - < file. Done: a lone - reads stdin like -F -, or is refused with a hint to use -F -.'
+tags:
+- health
+custom_fields:
+  finding: cli:comment-dash-text
+history:
+- at: 2026-11-21T23:39:21.127052+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-768"]}'
+- at: 2026-11-21T23:39:21.371705+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

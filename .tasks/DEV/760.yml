@@ -1,11 +1,11 @@
 title: 'Flaky test: hand_written_task_without_created_is_readable fails when a timestamp''s fraction contains 1970'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T18:41:12.412781+00:00
-modified: 2026-11-21T23:03:39.404832+00:00
+modified: 2026-11-22T00:30:27.415200+00:00
 relationships:
   related:
   - DEV-755
@@ -13,6 +13,8 @@ relationships:
   - DEV-772
   - DEV-773
   - DEV-775
+  - DEV-762
+  - DEV-725
 comments:
 - date: 2026-11-21T19:47:23.816081+00:00
   author: claude
@@ -97,6 +99,34 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-21T23:13:18.060174+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `faa4b7652` is on `main` and `origin/main`.
+
+    - `test:agent` failed twice at load average 32–35 on tests outside this change: `merge_job_whose_branch_was_rebased_elsewhere_passes`, `merge_job_that_cannot_fast_forward_fails` (filed DEV-772) and `hanging_cat_file_fails_the_activity_feed_at_the_timeout` (filed DEV-773). The first passes alone in 11 s. The third run passed.
+    - `smoke` failed once at load average 46: two tests in `smoke/tests/ui.agent-jobs.smoke.spec.ts` (filed DEV-775). The spec passes alone (11/11), and the second full run passed 406/406.
+    - I fast-forwarded the main checkout from `050769e21`. The `.tasks` changes are amended into the commit. No rules or config changed, so no `lotar trust` was needed.
+    - Pushed: the main checkout was clean, and `faa4b7652` was the only unpushed commit.
+    - The ticket's check passes: `cargo nextest run -p lotar-lib dev271_storage_robustness_test` (4 passed).
+  report:
+    commits:
+    - hash: faa4b7652
+      what: 'test checks only the created: year (merged, pushed)'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: by LoTaR's merge on 3ceda0d02
+    - command: npm run -s test:agent
+      result: passed
+      reason: third run; runs 1-2 failed on load flakes outside this change (DEV-772, DEV-773)
+    - command: npm run -s smoke
+      result: passed
+      reason: second run, 406/406; run 1 failed on a load flake (DEV-775)
+    - command: cargo nextest run -p lotar-lib dev271_storage_robustness_test
+      result: passed
+      reason: 4 passed
+    next: 'None: lands as Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10f78536a6bc71ca3c50ba4771447f494bc69025d15433bdfba9156d8d571001
 description: 'Found in the DEV-755 merge (2026-11-21): `npm run -s test:agent` failed at `crates/lotar-lib/tests/dev271_storage_robustness_test.rs:70`, `assert!(!stored.contains("1970"))`. The stored file''s timestamp was `2026-11-21T18:24:50.751970+00:00`: the fraction `751970` contains 1970, no epoch date. Check: `cargo nextest run -p lotar-lib dev271_storage_robustness_test`. Done: the test checks the `created:` value''s year (for example parse it, or match `created: 1970-`), so it can''t hit a timestamp fraction.'
@@ -181,3 +211,25 @@ history:
   - field: relationships
     old: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773"]}'
     new: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775"]}'
+- at: 2026-11-21T23:13:18.060174+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T23:13:34.315001+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-22T00:05:41.429840+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775"]}'
+    new: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775","DEV-762"]}'
+- at: 2026-11-22T00:30:27.415200+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775","DEV-762"]}'
+    new: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775","DEV-762","DEV-725"]}'

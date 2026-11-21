@@ -1,11 +1,11 @@
 title: A kept T3 Code thread whose settle fails is named by its id, not its link as DEV-747 asks
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-21T04:06:18.165648+00:00
-modified: 2026-11-21T21:17:02.370098+00:00
+modified: 2026-11-22T00:32:41.001545+00:00
 relationships:
   depends_on:
   - DEV-747
@@ -15,6 +15,7 @@ relationships:
   - DEV-751
   - DEV-755
   - DEV-725
+  - DEV-780
 comments:
 - date: 2026-11-21T05:14:56.710646+00:00
   author: claude
@@ -141,6 +142,42 @@ comments:
 - date: 2026-11-21T21:14:47.296220+00:00
   author: automation
   text: The fix agent's job job-20261121T211326.368Z-110 failed (lotar agent logs job-20261121T211326.368Z-110); @fix-retry retries it on branch .
+- date: 2026-11-22T00:30:57.146366+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T003045.021Z-125 failed again or on a rate limit (lotar agent logs job-20261122T003045.021Z-125). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T00:32:31.348412+00:00
+  author: triage
+  text: |-
+    Done: the work is on main, both failed jobs only hit a leftover folder (triage, retry rule not applicable)
+
+    - `6732fe799` DEV-754 is on main (`git branch --merged main` lists agent/DEV-754); `kept.rs` writes `link.unwrap_or(&thread.thread)` in the failed settle note. All three Done-when items were reviewed passed on 2026-11-21.
+    - Both failed jobs (`job-20261121T211326.368Z-110`, `job-20261122T003045.021Z-125`): worktree setup, `.lotar-worktrees/lotar/DEV-754 already exists` (folder with only target/). Retrying would fail the same way; no work is left.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5fc406a534c860a0c3ee96a2a255475addda33482dff729cd1ca1219cd3a112f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16cbc593d074cf681cc0d8837e53fb2abfdc5d59b83930a078843db94ff3113b
@@ -153,8 +190,6 @@ description: |-
   - [ ] The note uses the link from `t3 thread list` (`Listed.link`), and the thread id only when no link is listed.
   - [ ] docs/help/agent.md (T3 Code threads) says `<link>`.
   - [ ] A dev503 test with `organize-error` checks the note's text.
-tags:
-- fix-retried
 history:
 - at: 2026-11-21T04:06:26.363905+00:00
   actor: claude
@@ -339,3 +374,44 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751","DEV-755"]}'
     new: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751","DEV-755","DEV-725"]}'
+- at: 2026-11-22T00:30:55.084759+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T00:30:57.146366+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T00:32:27.773163+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751","DEV-755","DEV-725"]}'
+    new: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751","DEV-755","DEV-725","DEV-780"]}'
+- at: 2026-11-22T00:32:31.348412+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T00:32:37.830219+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T00:32:40.690040+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-22T00:32:41.001545+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried
+    new: ''

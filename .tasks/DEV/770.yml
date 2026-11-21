@@ -1,15 +1,41 @@
 title: 'A usage-limit pause has no upper bound: its queue worker stays in memory until the reset, also one in 2099'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T21:10:33.155601+00:00
-modified: 2026-11-21T21:10:33.711208+00:00
+modified: 2026-11-22T00:29:46.198686+00:00
 relationships:
   related:
   - DEV-763
   - TEST-1
+comments:
+- date: 2026-11-22T00:29:35.142441+00:00
+  author: claude
+  text: |-
+    A reset more than 7 days after the pause is now ignored: the job waits the default and its note says so.
+
+    - `UsageLimit::ignored_reset` in `crates/lotar-agent/src/services/usage_limit.rs`: the named time, when it is past now + 7 days; `resume_at` then waits the default (1 h or `LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS`). Exactly 7 days is kept.
+    - Note in `agent_job_service.rs`: `… after the default wait (ignored the named reset <time>, more than 7 days away)`.
+    - Unit tests for both cases; `dev584_usage_limit_pause_test.rs` now uses resets 3 days ahead (it used 2099) plus a new 2099 test: default wait, note, retry completes.
+    - `docs/help/agent.md#usage-limits` updated. Only caller: `usage_limit_pause`. No other running T3 threads touched these files.
+  report:
+    commits:
+    - hash: 539a9cb37
+      what: ignore a usage-limit reset more than 7 days away, wait the default
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2446 Rust, 1563 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '406'
+    next: Review on another model, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A624acfd33bfac1adf31ec51122352a40df846c6308663862b5164f0916e606ec
 description: |-
   Found in DEV-763 (2026-11-21).
 
@@ -25,8 +51,11 @@ description: |-
 
   ## Done when
 
-  - [ ] A limit that names a reset more than 7 days away pauses the job for the default wait, and its log says so; a reset within 7 days is kept as today.
-  - [ ] A test covers both cases in `usage_limit.rs`.
+  - [ ] A named reset more than 7 days after the pause (`resets_at` from harnessmux or a time in the text, whichever wins today) pauses the job for the default wait (an hour, or `LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS`) instead.
+  - [ ] That job's note (its log and `job: { error }`) names the ignored time: `... after the default wait (ignored the named reset <time>, more than 7 days away)`.
+  - [ ] A reset up to exactly 7 days away is kept as today, with the one-minute minimum.
+  - [ ] Tests in `usage_limit.rs` cover a reset past 7 days and one at 7 days.
+  - [ ] `docs/help/agent.md#usage-limits` says so.
 history:
 - at: 2026-11-21T21:10:33.429543+00:00
   actor: claude
@@ -39,3 +68,68 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T00:22:48.527704+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T00:22:51.815197+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A624acfd33bfac1adf31ec51122352a40df846c6308663862b5164f0916e606ec
+- at: 2026-11-22T00:23:16.915465+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-763 (2026-11-21).
+
+      ## Found
+
+      - A debug `lotar agent worker` (pid 36658, from a deleted T3 worktree `~/.t3/worktrees/lotar/t3-5808df94-…`) ran for 3 days on a scratch `.tasks` (TEST project).
+      - Its only job, `job-20261118T192928.271Z-1` (TEST-1, runner `t3`), is `paused (until 2099-11-21T03:43:00+00:00)`: a fake t3 printed "try again at Nov 20th, 2099 7:43 PM".
+      - `usage_limit::UsageLimit::resume_at` takes any reset time in the future. The worker's loop (`run_worker_with` in `crates/lotar-agent/src/services/agent_queue_service.rs`) only exits when no job runs or waits in memory, so it would have waited until 2099. Its binary and worktree were gone; DEV-763 stopped it.
+
+      ## Fix
+
+      - A reset time further away than the longest real limit (7 days, the weekly limits) is not believed: the job waits the default wait instead, and the job log says the named time was ignored.
+
+      ## Done when
+
+      - [ ] A limit that names a reset more than 7 days away pauses the job for the default wait, and its log says so; a reset within 7 days is kept as today.
+      - [ ] A test covers both cases in `usage_limit.rs`.
+    new: |-
+      Found in DEV-763 (2026-11-21).
+
+      ## Found
+
+      - A debug `lotar agent worker` (pid 36658, from a deleted T3 worktree `~/.t3/worktrees/lotar/t3-5808df94-…`) ran for 3 days on a scratch `.tasks` (TEST project).
+      - Its only job, `job-20261118T192928.271Z-1` (TEST-1, runner `t3`), is `paused (until 2099-11-21T03:43:00+00:00)`: a fake t3 printed "try again at Nov 20th, 2099 7:43 PM".
+      - `usage_limit::UsageLimit::resume_at` takes any reset time in the future. The worker's loop (`run_worker_with` in `crates/lotar-agent/src/services/agent_queue_service.rs`) only exits when no job runs or waits in memory, so it would have waited until 2099. Its binary and worktree were gone; DEV-763 stopped it.
+
+      ## Fix
+
+      - A reset time further away than the longest real limit (7 days, the weekly limits) is not believed: the job waits the default wait instead, and the job log says the named time was ignored.
+
+      ## Done when
+
+      - [ ] A named reset more than 7 days after the pause (`resets_at` from harnessmux or a time in the text, whichever wins today) pauses the job for the default wait (an hour, or `LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS`) instead.
+      - [ ] That job's note (its log and `job: { error }`) names the ignored time: `... after the default wait (ignored the named reset <time>, more than 7 days away)`.
+      - [ ] A reset up to exactly 7 days away is kept as today, with the one-minute minimum.
+      - [ ] Tests in `usage_limit.rs` cover a reset past 7 days and one at 7 days.
+      - [ ] `docs/help/agent.md#usage-limits` says so.
+- at: 2026-11-22T00:29:35.142441+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T00:29:46.198686+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

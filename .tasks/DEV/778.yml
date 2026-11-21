@@ -1,0 +1,29 @@
+title: A job's build root folder outlives its worktree when the removal or cleanup is cut off
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T00:05:08.801449+00:00
+modified: 2026-11-22T00:05:12.444626+00:00
+relationships:
+  related:
+  - DEV-762
+description: |-
+  Found in the DEV-762 review. `remove_worktree_dir` (crates/lotar-agent/src/services/agent_job_service.rs ~2816) finds the build root folder before the rename, but deletes it only after the trash folder is gone. A removal cut off in between, or a failed delete of that folder, leaves `<build_root>/<repo>/<ticket>` with no link pointing at it. The next removal sweeps leftover `.<name>.lotar-removed` folders but not the build root. `remove_build_output` (~3243) has the same gap for its parked `.<ticket>.lotar-cleanup-<job>` folders in the build root. Those builds then take quota on /Volumes/Builds until someone deletes them by hand.
+
+  Check: interrupt between the rename and the build delete (or make the build folder undeletable), then run `lotar agent worktree cleanup`: the folder stays.
+
+  Done: a later removal or cleanup also deletes orphaned build root folders and parked cleanup folders of that repo, with a test.
+history:
+- at: 2026-11-22T00:05:10.705262+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-762"]}'
+- at: 2026-11-22T00:05:12.444626+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

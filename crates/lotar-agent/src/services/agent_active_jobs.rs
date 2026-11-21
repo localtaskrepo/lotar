@@ -207,6 +207,33 @@ pub fn close_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
     read_outcome(&dir.join(format!("{name}.outcome.json")))
 }
 
+/// Reopen the guard [`close_outcome`] ended: the job's pause or retry
+/// wasn't saved, so it fails and its end applies the outcome after all
+/// (DEV-756). `keep` decides what of the outcome still applies (a field the
+/// ticket changed in since the close stays as it is); `None` drops it.
+pub fn reopen_outcome(tasks_dir: &Path, job_id: &str, keep: impl FnOnce(JobOutcome) -> Option<JobOutcome>) {
+    let Some(name) = safe_name(job_id) else {
+        return;
+    };
+    let dir = dir(tasks_dir);
+    let _lock = lock_outcome(&dir, name);
+    let _ = std::fs::remove_file(dir.join(format!("{name}.ended")));
+    let path = dir.join(format!("{name}.outcome.json"));
+    let Some(outcome) = read_outcome(&path) else {
+        return;
+    };
+    match keep(outcome).filter(|outcome| !outcome.is_empty()) {
+        Some(outcome) => {
+            if let Ok(json) = serde_json::to_string(&outcome) {
+                let _ = crate::storage::safety::atomic_write_file(&path, &json);
+            }
+        }
+        None => {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+}
+
 /// End the job's guard and hand back its recorded outcome. The record goes
 /// first, so a change made from now on applies directly instead of being
 /// recorded for a job that no longer reads it. A change that checked for
@@ -472,6 +499,15 @@ mod tests {
         assert_eq!(record_outcome(tasks.path(), &outcome("job-3")).unwrap(), None, "after the pause closed the outcome");
         assert_eq!(end_and_take_outcome(tasks.path(), "job-3", "T-1", Some), Some(outcome("job-3")));
         settle_outcome(tasks.path(), "job-3");
+
+        // A pause that wasn't saved reopens it: the failed job records and applies it again.
+        record_outcome(tasks.path(), &outcome("job-4")).unwrap();
+        close_outcome(tasks.path(), "job-4");
+        reopen_outcome(tasks.path(), "job-4", Some);
+        let sam = JobOutcome { assignee: Some("sam".into()), ..outcome("job-4") };
+        assert_eq!(record_outcome(tasks.path(), &sam).unwrap(), Some(sam.clone()), "after the reopen");
+        assert_eq!(end_and_take_outcome(tasks.path(), "job-4", "T-1", Some), Some(sam));
+        settle_outcome(tasks.path(), "job-4");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 

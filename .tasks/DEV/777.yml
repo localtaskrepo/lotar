@@ -1,0 +1,29 @@
+title: A continue job treats any ACP error on resume as a session that can't be resumed, not only a refused session/resume or session/load
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T23:46:50.851529+00:00
+modified: 2026-11-21T23:46:55.716106+00:00
+relationships:
+  related:
+  - DEV-757
+description: |-
+  Found in the DEV-757 review (2026-11-21).
+
+  `open_session` (`crates/lotar-agent/src/services/agent_runner.rs:262`) maps every `harnessmux::Error::Protocol` from `Session::resume` to `OpenSessionError::NotResumable`. harnessmux 0.2.0 returns `Protocol` for any ACP request the agent refuses before the session is ready (`From<agent_client_protocol::Error>` in `src/error.rs:54`): `initialize`, `authenticate`, `session/set_config_option` as well as `session/resume`/`session/load` (`src/backend/acp.rs:265-310`). DEV-757 asks: "Only resume errors fall back."
+
+  Effect: an agent that fails `initialize` or authentication on resume gets its session closed and kept as `<name>.<last used>`, and a new session with a handoff is tried. That one usually fails the same way, so the job still fails, but the old session is no longer resumable.
+
+  ## Done when
+  - [ ] Only a refused `session/resume` or `session/load` counts as not resumable (harnessmux tells it apart, or lotar checks the error at that step); other `Protocol` errors fail the job and leave the session as it was
+  - [ ] A test with the fake ACP agent refusing `initialize` on resume: the job fails and the session keeps its name
+tags:
+- backend
+history:
+- at: 2026-11-21T23:46:55.716106+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

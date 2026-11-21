@@ -1,14 +1,16 @@
 title: Job worktree builds in a configurable build root (agent.worktree.build_root), clone and cleanup included
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T20:21:04.802424+00:00
-modified: 2026-11-21T21:01:20.393658+00:00
+modified: 2026-11-22T00:05:59.669533+00:00
 relationships:
   related:
   - DEV-635
+  - DEV-778
+  - DEV-760
 comments:
 - date: 2026-11-21T20:55:35.079582+00:00
   author: claude
@@ -47,6 +49,26 @@ comments:
       result: not_run
       reason: no second volume in tests; only the note path, untested end to end
     next: 'Review, merge, release; then LOCA-571 step 4 sets build_root: /Volumes/Builds'
+- date: 2026-11-22T00:05:39.993997+00:00
+  author: claude
+  text: |-
+    Review: passed. `4e32e4ff3` does what the ticket asks, and the merge can go ahead.
+
+    - Read: the diff (`git diff main...HEAD`, 12 files), the ticket and both fix comments, DEV-635's Done when, `AGENTS.md`. Main is 1 commit ahead (DEV-760, a test file this change doesn't touch); the rebase is clean.
+    - `npm ci`: passed.
+    - Reran: `cargo nextest run -p lotar-lib --test integration -E 'test(/agent_safety|dev153|worktree/)'` (52 passed); the build_root, clone and cleanup tests (6 passed); the `lotar-core` config field tests (14 passed); `npm run lint:agent` passed. Not rerun: full `npm test` and smoke (the fix agent ran both; the change has no UI). The worktree is unchanged.
+    - Checked against the ticket:
+      - the setting works globally and per project;
+      - unset, nothing changes (a test asserts no link);
+      - the link-instead-of-`CARGO_TARGET_DIR` choice is explained;
+      - the clone follows the source's link, and different volumes give a cold build with one log line, never a full copy;
+      - removal, `cleanup_paths`, `worktree run` and `waiting_run` all clean the build root;
+      - both docs pages are updated.
+    - DEV-635 said a symlinked `target/` is no clone source. This change makes it one, through its resolved folder, which is what this ticket asks.
+    - No REST contract change: `docs/openapi.json` has no `agent_worktree` schema, and `view/api/types.ts` is updated.
+    - No two repos in `repos.json` share a folder name, so `<build_root>/<repo>/<ticket>` can't collide today.
+    - Not covered by a test: the `cleanup_paths: [target]` and `waiting_run` relink paths, and the different-volume path (the fix agent said so too).
+    - Minor, filed: [DEV-778](https://lotar.pyxzl.net/task/DEV-778). A build root folder outlives its worktree when a removal or cleanup is cut off in the middle (`agent_job_service.rs` ~2816, ~3243).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A554b4ea9c0d8ed6283d447223332845ede88e3fc4c30c0320f2860da1f2baf4b
 description: |-
@@ -105,3 +127,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T00:05:10.700887+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635"]}'
+    new: '{"related":["DEV-635","DEV-778"]}'
+- at: 2026-11-22T00:05:39.993997+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T00:05:41.433924+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635","DEV-778"]}'
+    new: '{"related":["DEV-635","DEV-778","DEV-760"]}'
+- at: 2026-11-22T00:05:59.669533+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

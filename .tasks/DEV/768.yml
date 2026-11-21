@@ -1,14 +1,84 @@
 title: 'Assignee picker: searchable, grouped by people and agent roles, showing each profile''s runner, model and effort'
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-21T20:47:05.414784+00:00
-modified: 2026-11-21T20:47:26.917646+00:00
+modified: 2026-11-21T23:39:21.126331+00:00
 relationships:
   related:
   - DEV-769
+  - DEV-776
+comments:
+- date: 2026-11-21T23:36:23.239354+00:00
+  author: automation
+  text: The fix agent's job job-20261121T231338.839Z-119 failed (lotar agent logs job-20261121T231338.839Z-119); @fix-retry retries it on branch agent/DEV-768.
+- date: 2026-11-21T23:38:35.065578+00:00
+  author: claude
+  text: |-
+    Assignee picker done: one searchable picker for the task panel, bulk assign, the agent Run dialog and the rule editor.
+
+    - Groups: Unassigned, Recent (last 4 picks), You, People, then **Agents** by role (the profile name up to the first `-`). Each agent shows its runner · model · effort · provider.
+    - Typing searches name, runner, model and description; a value nobody has gets an "Assign to …" row. Arrows, Enter, Esc, PageUp/PageDown; on a phone it opens as a bottom sheet.
+    - Run dialog lists agents only; the rule editor adds the specials (`@reporter`, `@assignee`, …) and replaces the old datalists.
+    - Docs: new "Assignee picker" bullet in `docs/help/serve.md`.
+
+    Differs from Done-when:
+    - Variants show the base profile first, then by name: the server sorts profiles, so config order isn't available.
+    - Descriptions show only when the API sends one. The profile config has no description key yet, so today none show. Adding the key is your call.
+    - Home/End jump in the list only while the search is empty; in text they move the cursor.
+    - No role config key added: the role comes from the name.
+
+    Screenshots, before → after:
+    - Panel 1440 light: [before](attachment:before-panel-light-1440.01c5790c7b4f3981145bba18fc75451f.png) → [after](attachment:after-panel-light-1440.168f3b496f1073d6cf46e8cafbbee719.png)
+    - Panel 1440 dark: [before](attachment:before-panel-dark-1440.621b8d6d7b3ae543a88a9ffb8c67bc63.png) → [after](attachment:after-panel-dark-1440.cb7a215bc4c407a57dba91aac76cfbe3.png)
+    - Panel phone light: [before](attachment:before-panel-light-390.96403696d9d27800f41bdc2e1c7790df.png) → [after](attachment:after-panel-light-390.faff7cb07d46adcda0a8b194c521fa2e.png)
+    - Panel phone dark: [before](attachment:before-panel-dark-390.419c3fa51de6b8ceb46fe0758c2546e9.png) → [after](attachment:after-panel-dark-390.c5daa5f759fcf9a2566d70095c449580.png)
+    - Search: [1440 light](attachment:after-panel-search-light-1440.519e043f0c0127980f6cd3ff4637002a.png), [phone dark](attachment:after-panel-search-dark-390.f3eebb1c936fb419773e162eb122f886.png)
+    - Run dialog 1440 light: [before](attachment:before-run-light-1440.81f1ae1b67ff5b035084c94d4fef02df.png) → [after](attachment:after-run-light-1440.f48375647ddce8b85107ecf591a301d8.png)
+    - Run dialog phone dark: [before](attachment:before-run-dark-390.50566015c62f61422a5a0c64b1b38d3e.png) → [after](attachment:after-run-dark-390.4ba5d587ae7710f1d141c2ed601aaab6.png)
+    - Bulk assign: [before](attachment:before-bulk-light-1440.2ac717f44f18e0c0192ade4c45082781.png) → [after](attachment:after-bulk-light-1440.d7291ee691f6a9e14ce5b78b72228066.png)
+    - Rule editor: [light](attachment:after-automation-light.580b7405fd2e6114574d21ebd94d70bd.png), [dark](attachment:after-automation-dark.e4a61bebbc5bfd235e640881d2e978ed.png)
+    - Skins: terminal dark [before](attachment:before-skin-terminal-dark.2ef242d9e50d1173084d926cbe9f31c2.png) → [after](attachment:after-skin-terminal-dark.adfcde5660a87b426ff9a41793362667.png), paper light [before](attachment:before-skin-paper-light.dd80f00eb36689bc8765889a7c737a52.png) → [after](attachment:after-skin-paper-light.bf904d7385eee4397cfca58baf43644c.png)
+  report:
+    commits:
+    - hash: a7cd6024f
+      what: assignee picker in task panel, bulk assign, agent run dialog and rule editor
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2443 Rust, 1581 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: review agent checks the UI and the Done-when differences in this comment
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa12f0aa7aa7c3a5663ff7f38b51ea73b9a85fabf949074533a44458e86ad9e8a
+- attachment: after-automation-dark.e4a61bebbc5bfd235e640881d2e978ed.png
+- attachment: after-automation-light.580b7405fd2e6114574d21ebd94d70bd.png
+- attachment: after-bulk-light-1440.d7291ee691f6a9e14ce5b78b72228066.png
+- attachment: after-panel-dark-1440.cb7a215bc4c407a57dba91aac76cfbe3.png
+- attachment: after-panel-dark-390.c5daa5f759fcf9a2566d70095c449580.png
+- attachment: after-panel-light-1440.168f3b496f1073d6cf46e8cafbbee719.png
+- attachment: after-panel-light-390.faff7cb07d46adcda0a8b194c521fa2e.png
+- attachment: after-panel-search-dark-390.f3eebb1c936fb419773e162eb122f886.png
+- attachment: after-panel-search-light-1440.519e043f0c0127980f6cd3ff4637002a.png
+- attachment: after-run-dark-390.4ba5d587ae7710f1d141c2ed601aaab6.png
+- attachment: after-run-light-1440.f48375647ddce8b85107ecf591a301d8.png
+- attachment: after-skin-paper-light.bf904d7385eee4397cfca58baf43644c.png
+- attachment: after-skin-terminal-dark.adfcde5660a87b426ff9a41793362667.png
+- attachment: before-bulk-light-1440.2ac717f44f18e0c0192ade4c45082781.png
+- attachment: before-panel-dark-1440.621b8d6d7b3ae543a88a9ffb8c67bc63.png
+- attachment: before-panel-dark-390.419c3fa51de6b8ceb46fe0758c2546e9.png
+- attachment: before-panel-light-1440.01c5790c7b4f3981145bba18fc75451f.png
+- attachment: before-panel-light-390.96403696d9d27800f41bdc2e1c7790df.png
+- attachment: before-run-dark-390.50566015c62f61422a5a0c64b1b38d3e.png
+- attachment: before-run-light-1440.81f1ae1b67ff5b035084c94d4fef02df.png
+- attachment: before-skin-paper-light.dd80f00eb36689bc8765889a7c737a52.png
+- attachment: before-skin-terminal-dark.2ef242d9e50d1173084d926cbe9f31c2.png
 description: |-
   The task panel's assignee menu is hard to read and pick from now that there are many agent profile variants. It's a native `<select>` (`view/components/task-panel/TaskPanelOwnershipSection.vue` :36-63 via `UiSelect`) with people and every `@fix`, `@fix-light`, `@fix-fable`, `@fix-retry`, `@review-claude`, `@merge`… in one alphabetical list (`view/composables/useTaskPanelOwnership.ts` :71-87). It shows no runner, model or effort and has no search. "Custom…" swaps in a text field. The owner asked on 2026-11-21 for this select to "be rebuilt in a better way".
 
@@ -36,9 +106,27 @@ description: |-
   ## Done when
 
   - [ ] With all of this repo's profiles, the right variant can be found and picked by typing or by keyboard in a few keystrokes, and each row says what it runs.
+  - [ ] `AssigneePicker` (`view/components/AssigneePicker.vue`): a button shows the current value (avatar initial or agent glyph, name, short detail); click, Enter, Space or ArrowDown opens a popover with a search field (`role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`) over a grouped `role="listbox"`.
+  - [ ] Order: **Unassigned** first (where the field may be empty), then **Recent** (up to 4, only while the search is empty), **You**, **People**, **Agents** with one sub-heading per role. Base profile first, variants in config order: `fix`, `fix-light`, `fix-fable`, `fix-retry`, `fix-codex`; `review`, `review-claude`, `review-light`; `merge`. Roles in the order of their first profile.
+  - [ ] Role = profile name up to its first `-`. No `role`/`group` config key is added (the prefix groups every profile here; adding config waits for the owner).
+  - [ ] Each agent row: `@name`, then `runner · model · effort · provider` (only the parts set), the description as a second line.
+  - [ ] Search: every typed word must match the name, runner, model, effort, provider or description (any order, case-insensitive). The first match is active, so Enter picks it.
+  - [ ] A typed value that is no listed name offers "Assign to “<typed>”" (reporter: "Set reporter to “<typed>”") as the last row; this replaces Custom…. Where custom values aren't allowed (Run agent) it shows "No match".
+  - [ ] Which wins: a value that is both whoami and a member shows once, under You; `@name` of a known profile shows only under Agents; an unknown `@name` or a current value no list knows shows under People.
+  - [ ] Keyboard: ArrowUp/Down, Home/End move across groups; Enter picks; Escape closes the popover and is consumed (the task panel stays open); Tab closes it; focus goes back to the button after a pick or Escape.
+  - [ ] Recent picks are stored per viewer in `localStorage` (`lotar.assigneePicker.recent`). Storage missing, full or holding bad JSON: no Recent group, no error.
+  - [ ] Profiles fail to load: the Agents group is empty, people and typed values still work.
+  - [ ] Phone width (≤ 640 px): the popover is a bottom sheet over a backdrop; tapping the backdrop closes it.
+  - [ ] Task panel: assignee and reporter use it; a pick saves the field at once (edit mode) as before; the Custom… option and "Use list" button are gone.
+  - [ ] Run agent dialog: agents only (no Unassigned, no typed value); picking one sets the profile, its model and effort show as before.
+  - [ ] Bulk and single Assign dialog (tasks list): the picker with You, People, Agents and typed values; submit is disabled while empty; the last assignee is preselected as before.
+  - [ ] Automation rule editor: assignee/reporter values (condition `=`/`≠`, changes from/to, Set) use the picker with a **Special** group (`@assignee`, `@reporter`, `@me`, `@least_busy`… or `@agent`, `@user`, `@any` for conditions) with their descriptions; `in` and `matches` keep the text field.
+  - [ ] Tests: vitest for grouping, search, recent storage and keyboard; smoke specs that used `selectOption` on `#task-panel-assignee-select` pick through the picker; a new smoke picks `@fix-light` by typing "light".
+  - [ ] Skill ui-review: light and dark, every theme skin, phone width; before and after screenshots attached.
 tags:
 - ui
 - web-ui
+- fix-retried
 history:
 - at: 2026-11-21T20:47:05.720790+00:00
   actor: claude
@@ -51,3 +139,222 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-769"]}'
+- at: 2026-11-21T23:14:12.762422+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T23:14:15.908761+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa12f0aa7aa7c3a5663ff7f38b51ea73b9a85fabf949074533a44458e86ad9e8a
+- at: 2026-11-21T23:16:24.881557+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The task panel's assignee menu is hard to read and pick from now that there are many agent profile variants. It's a native `<select>` (`view/components/task-panel/TaskPanelOwnershipSection.vue` :36-63 via `UiSelect`) with people and every `@fix`, `@fix-light`, `@fix-fable`, `@fix-retry`, `@review-claude`, `@merge`… in one alphabetical list (`view/composables/useTaskPanelOwnership.ts` :71-87). It shows no runner, model or effort and has no search. "Custom…" swaps in a text field. The owner asked on 2026-11-21 for this select to "be rebuilt in a better way".
+
+      Related pickers that should use the same component:
+
+      - Run agent dialog: raw `<select>` showing `@name · runner` (`view/components/AgentRunDialog.vue` :38-45).
+      - Bulk Assign dialog: free text with a "Use @me" button (`view/pages/TasksList.vue` :290-331).
+      - Automation rule editor: `<datalist>` (`view/components/automation/AutomationRuleDialog.vue` :564-580).
+      - Reporter field: the same select as assignee.
+
+      ## Plan
+
+      - [ ] A combobox component (for example `view/components/AssigneePicker.vue`): a button showing the current value (avatar or agent glyph, name, short detail) that opens a popover with a search field and a grouped listbox. Build on ThemeSelect's popover listbox and `useSuggestList` / `useListKeyNavigation`, with full ARIA combobox semantics. On a phone it is a sheet.
+      - [ ] Groups:
+        - **You** (whoami).
+        - **People** (members, task values).
+        - **Agents** grouped by role, as the owner chose on 2026-11-21: "By role". Base profile first, variants under it: `fix`, then `fix-light`, `fix-fable`, `fix-retry`, `fix-codex`; then `review`, `review-claude`, `review-light`; then `merge`.
+        - Each agent row shows runner · model · effort (· provider) and the profile's description as a second line, from `AgentProfileInfo` (`view/api/types.ts` :1905). The composable keeps only the name today.
+      - [ ] Role = the profile name up to its first `-`, unless a profile config says otherwise. Find out whether a `role`/`group` key is worth adding; ask before adding config.
+      - [ ] Search matches name, runner, model and description. Recent picks first (per viewer, `localStorage`, guarded). Typing a name that isn't listed offers "Assign to '<typed>'", replacing Custom…. "Unassigned" stays first.
+      - [ ] Use it in the task panel (assignee and reporter), the Run agent dialog, bulk Assign and the automation rule editor.
+      - [ ] Tests: vitest for grouping, search and keyboard. Update the smoke specs that call `selectOption` on `#task-panel-assignee-select` (`ui.agent-jobs.smoke.spec.ts` :589, `ui.members.smoke.spec.ts` :88) and add one that picks an agent variant by search.
+      - [ ] Skill ui-review: light and dark, every theme skin, phone width, before and after screenshots attached.
+
+      ## Done when
+
+      - [ ] With all of this repo's profiles, the right variant can be found and picked by typing or by keyboard in a few keystrokes, and each row says what it runs.
+    new: |-
+      The task panel's assignee menu is hard to read and pick from now that there are many agent profile variants. It's a native `<select>` (`view/components/task-panel/TaskPanelOwnershipSection.vue` :36-63 via `UiSelect`) with people and every `@fix`, `@fix-light`, `@fix-fable`, `@fix-retry`, `@review-claude`, `@merge`… in one alphabetical list (`view/composables/useTaskPanelOwnership.ts` :71-87). It shows no runner, model or effort and has no search. "Custom…" swaps in a text field. The owner asked on 2026-11-21 for this select to "be rebuilt in a better way".
+
+      Related pickers that should use the same component:
+
+      - Run agent dialog: raw `<select>` showing `@name · runner` (`view/components/AgentRunDialog.vue` :38-45).
+      - Bulk Assign dialog: free text with a "Use @me" button (`view/pages/TasksList.vue` :290-331).
+      - Automation rule editor: `<datalist>` (`view/components/automation/AutomationRuleDialog.vue` :564-580).
+      - Reporter field: the same select as assignee.
+
+      ## Plan
+
+      - [ ] A combobox component (for example `view/components/AssigneePicker.vue`): a button showing the current value (avatar or agent glyph, name, short detail) that opens a popover with a search field and a grouped listbox. Build on ThemeSelect's popover listbox and `useSuggestList` / `useListKeyNavigation`, with full ARIA combobox semantics. On a phone it is a sheet.
+      - [ ] Groups:
+        - **You** (whoami).
+        - **People** (members, task values).
+        - **Agents** grouped by role, as the owner chose on 2026-11-21: "By role". Base profile first, variants under it: `fix`, then `fix-light`, `fix-fable`, `fix-retry`, `fix-codex`; then `review`, `review-claude`, `review-light`; then `merge`.
+        - Each agent row shows runner · model · effort (· provider) and the profile's description as a second line, from `AgentProfileInfo` (`view/api/types.ts` :1905). The composable keeps only the name today.
+      - [ ] Role = the profile name up to its first `-`, unless a profile config says otherwise. Find out whether a `role`/`group` key is worth adding; ask before adding config.
+      - [ ] Search matches name, runner, model and description. Recent picks first (per viewer, `localStorage`, guarded). Typing a name that isn't listed offers "Assign to '<typed>'", replacing Custom…. "Unassigned" stays first.
+      - [ ] Use it in the task panel (assignee and reporter), the Run agent dialog, bulk Assign and the automation rule editor.
+      - [ ] Tests: vitest for grouping, search and keyboard. Update the smoke specs that call `selectOption` on `#task-panel-assignee-select` (`ui.agent-jobs.smoke.spec.ts` :589, `ui.members.smoke.spec.ts` :88) and add one that picks an agent variant by search.
+      - [ ] Skill ui-review: light and dark, every theme skin, phone width, before and after screenshots attached.
+
+      ## Done when
+
+      - [ ] With all of this repo's profiles, the right variant can be found and picked by typing or by keyboard in a few keystrokes, and each row says what it runs.
+      - [ ] `AssigneePicker` (`view/components/AssigneePicker.vue`): a button shows the current value (avatar initial or agent glyph, name, short detail); click, Enter, Space or ArrowDown opens a popover with a search field (`role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`) over a grouped `role="listbox"`.
+      - [ ] Order: **Unassigned** first (where the field may be empty), then **Recent** (up to 4, only while the search is empty), **You**, **People**, **Agents** with one sub-heading per role. Base profile first, variants in config order: `fix`, `fix-light`, `fix-fable`, `fix-retry`, `fix-codex`; `review`, `review-claude`, `review-light`; `merge`. Roles in the order of their first profile.
+      - [ ] Role = profile name up to its first `-`. No `role`/`group` config key is added (the prefix groups every profile here; adding config waits for the owner).
+      - [ ] Each agent row: `@name`, then `runner · model · effort · provider` (only the parts set), the description as a second line.
+      - [ ] Search: every typed word must match the name, runner, model, effort, provider or description (any order, case-insensitive). The first match is active, so Enter picks it.
+      - [ ] A typed value that is no listed name offers "Assign to “<typed>”" (reporter: "Set reporter to “<typed>”") as the last row; this replaces Custom…. Where custom values aren't allowed (Run agent) it shows "No match".
+      - [ ] Which wins: a value that is both whoami and a member shows once, under You; `@name` of a known profile shows only under Agents; an unknown `@name` or a current value no list knows shows under People.
+      - [ ] Keyboard: ArrowUp/Down, Home/End move across groups; Enter picks; Escape closes the popover and is consumed (the task panel stays open); Tab closes it; focus goes back to the button after a pick or Escape.
+      - [ ] Recent picks are stored per viewer in `localStorage` (`lotar.assigneePicker.recent`). Storage missing, full or holding bad JSON: no Recent group, no error.
+      - [ ] Profiles fail to load: the Agents group is empty, people and typed values still work.
+      - [ ] Phone width (≤ 640 px): the popover is a bottom sheet over a backdrop; tapping the backdrop closes it.
+      - [ ] Task panel: assignee and reporter use it; a pick saves the field at once (edit mode) as before; the Custom… option and "Use list" button are gone.
+      - [ ] Run agent dialog: agents only (no Unassigned, no typed value); picking one sets the profile, its model and effort show as before.
+      - [ ] Bulk and single Assign dialog (tasks list): the picker with You, People, Agents and typed values; submit is disabled while empty; the last assignee is preselected as before.
+      - [ ] Automation rule editor: assignee/reporter values (condition `=`/`≠`, changes from/to, Set) use the picker with a **Special** group (`@assignee`, `@reporter`, `@me`, `@least_busy`… or `@agent`, `@user`, `@any` for conditions) with their descriptions; `in` and `matches` keep the text field.
+      - [ ] Tests: vitest for grouping, search, recent storage and keyboard; smoke specs that used `selectOption` on `#task-panel-assignee-select` pick through the picker; a new smoke picks `@fix-light` by typing "light".
+      - [ ] Skill ui-review: light and dark, every theme skin, phone width; before and after screenshots attached.
+- at: 2026-11-21T23:36:09.787675+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-automation-dark.e4a61bebbc5bfd235e640881d2e978ed.png
+- at: 2026-11-21T23:36:09.910766+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-automation-light.580b7405fd2e6114574d21ebd94d70bd.png
+- at: 2026-11-21T23:36:09.991953+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-bulk-light-1440.d7291ee691f6a9e14ce5b78b72228066.png
+- at: 2026-11-21T23:36:10.072476+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-dark-1440.cb7a215bc4c407a57dba91aac76cfbe3.png
+- at: 2026-11-21T23:36:10.179365+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-dark-390.c5daa5f759fcf9a2566d70095c449580.png
+- at: 2026-11-21T23:36:10.324481+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-light-1440.168f3b496f1073d6cf46e8cafbbee719.png
+- at: 2026-11-21T23:36:10.408156+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-light-390.faff7cb07d46adcda0a8b194c521fa2e.png
+- at: 2026-11-21T23:36:10.470049+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-search-dark-390.f3eebb1c936fb419773e162eb122f886.png
+- at: 2026-11-21T23:36:10.520543+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-search-light-1440.519e043f0c0127980f6cd3ff4637002a.png
+- at: 2026-11-21T23:36:10.568650+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-dark-390.4ba5d587ae7710f1d141c2ed601aaab6.png
+- at: 2026-11-21T23:36:10.636039+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-light-1440.f48375647ddce8b85107ecf591a301d8.png
+- at: 2026-11-21T23:36:10.692727+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-paper-light.bf904d7385eee4397cfca58baf43644c.png
+- at: 2026-11-21T23:36:10.741938+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-terminal-dark.adfcde5660a87b426ff9a41793362667.png
+- at: 2026-11-21T23:36:10.788276+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-bulk-light-1440.2ac717f44f18e0c0192ade4c45082781.png
+- at: 2026-11-21T23:36:10.834886+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-dark-1440.621b8d6d7b3ae543a88a9ffb8c67bc63.png
+- at: 2026-11-21T23:36:10.878045+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-dark-390.419c3fa51de6b8ceb46fe0758c2546e9.png
+- at: 2026-11-21T23:36:10.918141+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-light-1440.01c5790c7b4f3981145bba18fc75451f.png
+- at: 2026-11-21T23:36:10.958662+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-light-390.96403696d9d27800f41bdc2e1c7790df.png
+- at: 2026-11-21T23:36:10.998441+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-dark-390.50566015c62f61422a5a0c64b1b38d3e.png
+- at: 2026-11-21T23:36:11.037901+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-light-1440.81f1ae1b67ff5b035084c94d4fef02df.png
+- at: 2026-11-21T23:36:11.077091+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-paper-light.dd80f00eb36689bc8765889a7c737a52.png
+- at: 2026-11-21T23:36:11.124938+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-terminal-dark.2ef242d9e50d1173084d926cbe9f31c2.png
+- at: 2026-11-21T23:36:21.419905+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ui, web-ui
+    new: ui, web-ui, fix-retried
+- at: 2026-11-21T23:36:23.239354+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T23:38:35.065578+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T23:39:21.126331+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-769"]}'
+    new: '{"related":["DEV-769","DEV-776"]}'

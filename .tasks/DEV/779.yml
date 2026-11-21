@@ -1,0 +1,29 @@
+title: UI test workers take 8-14 s each to start while the machine stalls, pushing heavy vitest tests toward the 30 s timeout
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T00:21:29.120752+00:00
+modified: 2026-11-22T00:21:34.502665+00:00
+relationships:
+  related:
+  - DEV-753
+  - DEV-764
+description: 'Found: reviewing DEV-764 (2026-11-21, load ~10): `npm run -s test:ui:agent` passed 1563/1563 but took 221 s with ~8.4 s startup per worker (139 files); DEV-753/755 merges saw ~14 s; normal is ~0.27 s and ~9 s total. SprintsList.backlogPagination.spec.ts alone took 31-45 s instead of 3 s, on main and on the DEV-764 branch alike. The stall hit at load 10 too, so it is not CPU load alone (T3 Code processes were at 40-100% CPU). Check: `npm run -s test:ui:agent` reports worker startup per file; find what makes spawn+environment slow (vitest isolate/pool, jsdom setup, machine state). Done: the cause is shown and the full run stays near its normal time, or the suite tolerates the stall.'
+tags:
+- health
+custom_fields:
+  finding: test:ui:agent:worker-startup
+history:
+- at: 2026-11-22T00:21:32.036287+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-753","DEV-764"]}'
+- at: 2026-11-22T00:21:34.502665+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,0 +1,28 @@
+title: Leftover worktree folder DEV-754 (only target/) makes every job on DEV-754 fail at worktree setup
+status: Todo
+priority: Medium
+type: Feature
+reporter: triage
+assignee: '@fix'
+created: 2026-11-22T00:32:24.998213+00:00
+modified: 2026-11-22T00:32:29.435203+00:00
+relationships:
+  related:
+  - DEV-754
+description: 'Found: .lotar-worktrees/lotar/DEV-754 holds only target/ and git worktree list doesn''t show it; jobs job-20261121T211326.368Z-110 and job-20261122T003045.021Z-125 failed with ''already exists''. Check: git worktree add succeeds for a ticket whose folder has no worktree. Done: leftover folder removed, or worktree setup clears an empty leftover folder.'
+tags:
+- health
+custom_fields:
+  finding: infra:leftover-worktree:DEV-754
+history:
+- at: 2026-11-22T00:32:27.792541+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-754"]}'
+- at: 2026-11-22T00:32:29.435203+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'

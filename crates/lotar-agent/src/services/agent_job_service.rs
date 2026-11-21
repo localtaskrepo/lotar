@@ -5466,12 +5466,13 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
         Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.runner.clone(), state.runner_errors.clone()))
     })?;
     let limit = crate::services::usage_limit::of_failures(&errors, Timestamp::now())?;
-    let carried = carried_outcome_of(tasks_dir, job_id, &ticket_id);
-    request.ticket_id = ticket_id;
     let resumes_at = limit.resume_at(Timestamp::now()).to_rfc3339();
-    let mut retry = AgentQueueEntry::retry_of(&request, None, carried);
-    retry.not_before = Some(resumes_at.clone());
-    AgentQueueService::requeue_first(tasks_dir, &retry).ok()?;
+    request.ticket_id = ticket_id;
+    save_retry(tasks_dir, job_id, &request.ticket_id, |carried| {
+        let mut retry = AgentQueueEntry::retry_of(&request, None, carried);
+        retry.not_before = Some(resumes_at.clone());
+        AgentQueueService::requeue_first(tasks_dir, &retry)
+    })?;
     let provider = request.provider.clone().or_else(|| resolve_profile(config, &request).ok()?.provider).unwrap_or_else(|| runner.clone());
     let profile = request.agent.as_deref().map_or_else(|| format!("the {runner} runner"), |agent| format!("@{agent}"));
     let when = if limit.resets_at.is_some() { "after the reset" } else { "after the default wait (the provider named no reset time)" };
@@ -5479,15 +5480,33 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
     Some((note, resumes_at))
 }
 
-/// The status and assignee change the agent recorded during the job (a
-/// hand-back), with the ticket's state now, for the job's retry. The job
-/// records no change after this: one made while it still ends is the
-/// ticket's, which the retry's carried change gives way to (DEV-752).
-fn carried_outcome_of(tasks_dir: &std::path::Path, job_id: &str, ticket_id: &str) -> Option<CarriedOutcome> {
-    crate::services::agent_active_jobs::close_outcome(tasks_dir, job_id).filter(|outcome| !outcome.is_empty()).and_then(|outcome| {
-        let (status_at_pause, assignee_at_pause) = ticket_state(tasks_dir, ticket_id)?;
-        Some(CarriedOutcome { outcome, status_at_pause, assignee_at_pause })
-    })
+/// Save the job's retry with the status and assignee change the agent
+/// recorded during the job (a hand-back) and the ticket's state now. The
+/// job records no change after this: one made while it still ends is the
+/// ticket's, which the retry's carried change gives way to (DEV-752). When
+/// `save` fails the job fails instead and its end applies the recorded
+/// change, without a field the ticket changed in meanwhile (DEV-756).
+fn save_retry<T, E>(tasks_dir: &std::path::Path, job_id: &str, ticket_id: &str, save: impl FnOnce(Option<CarriedOutcome>) -> Result<T, E>) -> Option<T> {
+    let at_close = ticket_state(tasks_dir, ticket_id);
+    let carried = crate::services::agent_active_jobs::close_outcome(tasks_dir, job_id)
+        .filter(|outcome| !outcome.is_empty())
+        .zip(at_close.clone())
+        .map(|(outcome, (status_at_pause, assignee_at_pause))| CarriedOutcome { outcome, status_at_pause, assignee_at_pause });
+    let saved = save(carried).ok();
+    if saved.is_none() {
+        crate::services::agent_active_jobs::reopen_outcome(tasks_dir, job_id, |mut outcome| {
+            if let (Some((status_at_close, assignee_at_close)), Some((status, assignee))) = (&at_close, ticket_state(tasks_dir, ticket_id)) {
+                if status != *status_at_close {
+                    outcome.status = None;
+                }
+                if assignee != *assignee_at_close {
+                    outcome.assignee = None;
+                }
+            }
+            Some(outcome)
+        });
+    }
+    saved
 }
 
 /// Pause the queue for a job that failed on `reason` and queue its retry
@@ -5500,14 +5519,15 @@ fn pause_queue(job_id: &str, tasks_dir: &std::path::Path, reason: PauseReason, l
         let state = registry.jobs.get(job_id).filter(|state| reason.holds(state.commits || state.commit_retry.is_some()))?;
         Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.worktree_path.clone(), state.record.worktree_branch.clone()))
     })?;
-    // A status or assignee the agent set during the job (a hand-back) goes
-    // with the retry, which applies it when it ends.
-    let carried = carried_outcome_of(tasks_dir, job_id, &ticket_id);
-    request.ticket_id = ticket_id;
     let commit_retry =
         worktree.filter(|_| retry_commit).map(|worktree_path| CommitRetry { job_id: job_id.to_string(), worktree_path, worktree_branch: branch });
     let retry = if commit_retry.is_some() { "retries only its commit (the work stays in its worktree)" } else { "runs again" };
-    let pause = AgentQueueService::pause(tasks_dir, reason, line, job_id, &AgentQueueEntry::retry_of(&request, commit_retry, carried)).ok()?;
+    // A status or assignee the agent set during the job (a hand-back) goes
+    // with the retry, which applies it when it ends.
+    request.ticket_id = ticket_id;
+    let pause = save_retry(tasks_dir, job_id, &request.ticket_id, |carried| {
+        AgentQueueService::pause(tasks_dir, reason, line, job_id, &AgentQueueEntry::retry_of(&request, commit_retry, carried))
+    })?;
     let scope = match pause.reason {
         PauseReason::Signing => "the jobs that commit",
         PauseReason::Disk => "every job",
@@ -5651,11 +5671,12 @@ fn run_again_in_new_session(job_id: &str, tasks_dir: &std::path::Path) -> Option
         let state = registry.jobs.get(job_id)?;
         Some((state.request.clone()?, state.record.ticket_id.clone()))
     })?;
-    let carried = carried_outcome_of(tasks_dir, job_id, &ticket_id);
     request.ticket_id = ticket_id;
     // `continue` would try the same session again.
     request.session = Some(crate::config::types::AgentSession::Fresh);
-    AgentQueueService::requeue_first(tasks_dir, &AgentQueueEntry::retry_of(&request, None, carried)).ok()?;
+    save_retry(tasks_dir, job_id, &request.ticket_id, |carried| {
+        AgentQueueService::requeue_first(tasks_dir, &AgentQueueEntry::retry_of(&request, None, carried))
+    })?;
     Some("Paused, not failed: the job runs again in a new session, first in the queue.".to_string())
 }
 
@@ -6359,6 +6380,47 @@ mod tests {
         }
         drop(registry);
         assert_eq!(update.join().unwrap().unwrap().title, "Locks renamed");
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    /// A job whose pause wasn't saved fails, and its end applies what the
+    /// agent recorded; an assignee the owner set after the pause closed the
+    /// job's outcome applied directly and stays (DEV-756).
+    #[test]
+    fn an_owners_change_while_the_pause_fails_outlasts_the_failed_jobs_end() {
+        let dir = tempdir().unwrap();
+        let tasks_dir = dir.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+        fs::write(tasks_dir.join("config.yml"), "default:\n  project: PSE\n").unwrap();
+        // SAFETY: test-local override, as in the tests around it.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", dir.path().join("queue")) };
+        let mut storage = Storage::new(&tasks_dir);
+        let task = crate::services::task_service::TaskService::create(
+            &mut storage,
+            crate::api_types::TaskCreate { title: "Pause".to_string(), project: Some("PSE".to_string()), ..Default::default() },
+        )
+        .unwrap();
+        let recorded = crate::api_types::JobOutcome {
+            job_id: "job-1".to_string(),
+            status: Some("HelpNeeded".to_string()),
+            assignee: Some("claude".to_string()),
+            ..Default::default()
+        };
+        crate::services::agent_active_jobs::record_outcome(&tasks_dir, &recorded).unwrap();
+
+        let saved = save_retry(&tasks_dir, "job-1", &task.id, |carried| {
+            assert_eq!(carried.map(|carried| carried.outcome), Some(recorded.clone()));
+            let owners = crate::api_types::JobOutcome { job_id: "job-1".to_string(), assignee: Some("mallox".to_string()), ..Default::default() };
+            assert_eq!(crate::services::agent_active_jobs::record_outcome(&tasks_dir, &owners).unwrap(), None, "the pause closed the outcome");
+            let patch = crate::api_types::TaskUpdate { assignee: Some("mallox".to_string()), ..Default::default() };
+            crate::services::task_service::TaskService::update(&mut Storage::new(&tasks_dir), &task.id, patch).unwrap();
+            Err::<(), _>("disk full")
+        });
+
+        assert_eq!(saved, None);
+        let ended = crate::services::agent_active_jobs::end_and_take_outcome(&tasks_dir, "job-1", &task.id, Some);
+        assert_eq!(ended, Some(crate::api_types::JobOutcome { assignee: None, ..recorded }), "the owner's assignee stays");
+        crate::services::agent_active_jobs::settle_outcome(&tasks_dir, "job-1");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 
