@@ -440,15 +440,29 @@ fn a_projects_agent_merge_replaces_the_repositorys() {
 
 #[test]
 fn a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge() {
-    let repo = Repo::new("  merge:\n    checks: ['sleep 30 & exit 0']\n");
+    // The background process outlives `merge()`'s 60 s deadline: a merge that
+    // waited for it fails there, however slow the machine. One that doesn't
+    // stops it once the check's output has had its few seconds to drain.
+    let ran = tempfile::tempdir().expect("tempdir");
+    let pid_file = ran.path().join("pid");
+    let repo = Repo::new(&format!("  merge:\n    checks: ['sleep 600 & echo $! > \"{}\"; exit 0']\n", pid_file.display()));
     repo.commit_fix("feature.txt", "feature\n");
-    let started = Instant::now();
 
     let (status, prompt) = repo.merge();
 
+    let pid = fs::read_to_string(&pid_file).expect("the check ran").trim().to_string();
+    let running = || Command::new("kill").args(["-0", &pid]).stderr(std::process::Stdio::null()).status().is_ok_and(|status| status.success());
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while running() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let left_running = running();
+    if left_running {
+        let _ = Command::new("kill").arg(&pid).status();
+    }
+    assert!(!left_running, "the merge left the background process running");
     assert_eq!(status, "completed");
     assert_eq!(prompt, None, "no agent started");
-    assert!(started.elapsed() < Duration::from_secs(20), "the merge waited for the background process: {:?}", started.elapsed());
     assert!(repo.on_main("feature.txt"));
 }
 
