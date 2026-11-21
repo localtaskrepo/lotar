@@ -24,6 +24,7 @@ use std::sync::{Arc, Condvar, LazyLock, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod kept;
 mod merge;
 mod resumed;
 mod watch;
@@ -5390,6 +5391,9 @@ fn finalize_job(
         if success {
             settle_t3_thread(job_id, ticket_id, tasks_dir, config);
         }
+        // The threads earlier jobs kept active, now that this one may have
+        // settled its own or moved its ticket to done (DEV-747).
+        kept::settle_now(tasks_dir);
     }
 
     // A paused job's worktree stays as it is for its retry; a full disk
@@ -5586,18 +5590,22 @@ fn settle_t3_thread(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, 
             return;
         }
     };
-    let table = match agent.as_deref().and_then(|name| config.agent_profiles.get(name)) {
-        Some(profile) => crate::services::agent_runner::job_agent_table(&record.agent, profile),
-        None => crate::services::agent_runner::agent_table(),
-    };
-    let settled = table.map_err(|err| err.to_string()).and_then(|table| {
-        let spec = table.get(&record.agent).map_err(|err| err.to_string())?;
-        block_on(harnessmux::backend::t3::settle(spec, &record)).map_err(|err| err.to_string())
-    });
-    note(match settled {
+    note(match settle_session(&record, agent.as_deref(), config) {
         Ok(link) => format!("Settled the T3 Code thread {link}"),
         Err(err) => format!("The T3 Code thread was not settled: {err}"),
     });
+}
+
+/// Settle the T3 Code thread of the harnessmux session `record`, run by the
+/// agent profile `agent`: its link, or why T3 Code refused.
+fn settle_session(record: &harnessmux::SessionRecord, agent: Option<&str>, config: &ResolvedConfig) -> Result<String, String> {
+    let table = match agent.and_then(|name| config.agent_profiles.get(name)) {
+        Some(profile) => crate::services::agent_runner::job_agent_table(&record.agent, profile),
+        None => crate::services::agent_runner::agent_table(),
+    };
+    let table = table.map_err(|err| err.to_string())?;
+    let spec = table.get(&record.agent).map_err(|err| err.to_string())?;
+    block_on(harnessmux::backend::t3::settle(spec, record)).map_err(|err| err.to_string())
 }
 
 /// Why the ticket waits for a person, if it does: it is HelpNeeded, or open

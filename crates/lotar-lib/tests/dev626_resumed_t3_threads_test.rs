@@ -225,7 +225,7 @@ fn the_thread_of_a_cancelled_job_is_left_alone() {
 
     assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none(), "no job takes it over");
     assert_eq!(harness.task().comments.len(), comments);
-    assert!(!harness.calls().contains("thread list"), "T3 Code isn't asked: {}", harness.calls());
+    // T3 Code is still asked for its threads: a cancelled job's thread is settled once its ticket is done (DEV-747).
 }
 
 /// DEV-639: a waiting thread holds the ticket (DEV-600), so lotar takes over no other thread of it.

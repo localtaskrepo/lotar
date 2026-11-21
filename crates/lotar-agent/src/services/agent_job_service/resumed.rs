@@ -47,8 +47,9 @@ impl Resumed {
 }
 
 /// Take over or report the threads of the tasks directory's ended `t3` jobs
-/// that T3 Code runs again, at most every [`LOOK_EVERY`]. T3 Code is asked
-/// nothing while no ended job has a thread.
+/// that T3 Code runs again, and settle the threads lotar kept active whose
+/// time came ([`super::kept`]), at most every [`LOOK_EVERY`]. T3 Code is
+/// asked nothing while no ended job has a thread.
 pub(super) fn look(tasks_dir: &Path) {
     {
         let Ok(mut looks) = LAST_LOOK.lock() else {
@@ -60,7 +61,8 @@ pub(super) fn look(tasks_dir: &Path) {
         looks.insert(tasks_dir.to_path_buf(), Instant::now());
     }
     let ended = ended_threads(tasks_dir);
-    if ended.is_empty() {
+    let kept = super::kept::threads(tasks_dir);
+    if kept.is_empty() {
         return;
     }
     let Some((program, env, cwd)) = t3_cli(tasks_dir) else {
@@ -84,6 +86,7 @@ pub(super) fn look(tasks_dir: &Path) {
         threads.sort_by(|a, b| b.ended_at.cmp(&a.ended_at));
         on_ticket(tasks_dir, &ticket_id, threads, &program, &env, &cwd);
     }
+    super::kept::settle(tasks_dir, kept, &listed);
 }
 
 /// Each thread of an ended `t3` job with the newest job that ran it, unless
@@ -124,14 +127,16 @@ fn ended_threads(tasks_dir: &Path) -> Vec<Resumed> {
 }
 
 /// A thread as `t3 thread list --json` lists it.
-struct Listed {
-    status: String,
+pub(super) struct Listed {
+    pub(super) status: String,
     run: String,
     link: Option<String>,
+    /// Settled in T3 Code's sidebar (DEV-747).
+    pub(super) settled: bool,
 }
 
 /// The project's threads by id, from `t3 thread list --json`.
-fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path, tasks_dir: &Path) -> Option<HashMap<String, Listed>> {
+pub(super) fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path, tasks_dir: &Path) -> Option<HashMap<String, Listed>> {
     let project = crate::services::agent_runner::session_project(tasks_dir);
     let output = Command::new(program)
         .args(["thread", "list", "--project"])
@@ -151,7 +156,8 @@ fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path, tasks_dir:
             .iter()
             .map(|thread| {
                 let link = Some(text(thread, "link")).filter(|link| !link.is_empty());
-                (text(thread, "threadId"), Listed { status: text(thread, "status"), run: text(thread, "latestRunId"), link })
+                let settled = thread.get("settled").and_then(serde_json::Value::as_bool).unwrap_or(false);
+                (text(thread, "threadId"), Listed { status: text(thread, "status"), run: text(thread, "latestRunId"), link, settled })
             })
             .collect(),
     )
@@ -233,14 +239,14 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
 }
 
 /// The harnessmux session whose agent session is `thread`.
-fn session_of(thread: &str) -> Option<harnessmux::SessionRecord> {
+pub(super) fn session_of(thread: &str) -> Option<harnessmux::SessionRecord> {
     let registry = crate::services::agent_runner::registry();
     registry.list(None).ok()?.into_iter().filter(|record| record.agent_session.as_deref() == Some(thread)).max_by(|a, b| a.last_used.cmp(&b.last_used))
 }
 
 /// Whether a process owns the session, following its thread: its owner
 /// answers, as a pid saved before a restart may be another process's now.
-fn followed(record: &harnessmux::SessionRecord) -> bool {
+pub(super) fn followed(record: &harnessmux::SessionRecord) -> bool {
     let registry = crate::services::agent_runner::registry();
     super::block_on(harnessmux::ipc::owner_running(&registry, &record.name))
 }

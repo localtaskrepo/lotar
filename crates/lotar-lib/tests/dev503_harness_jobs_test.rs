@@ -692,7 +692,8 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// worktree. Without the env the run still runs. It answers with status `running` while a file `running-<id>` is next
 /// to the script, an `activeRunId` while `active-<id>` is, as waiting for an answer while `waiting-<id>` is, and with
 /// status `failed` while `failed-<id>` is, and as waiting on a background command (status `waiting`,
-/// `pendingBackgroundTasks`) for as many more shows as the number in `background-<id>`; it logs `show <id>` to `t3-show.log` there. `thread start` (a session in the
+/// `pendingBackgroundTasks`) for as many more shows as the number in `background-<id>`; it logs `show <id>` to `t3-show.log` there.
+/// While `list-threads` is there, `thread list` lists the threads with those statuses and whether they are settled. `thread start` (a session in the
 /// main checkout, before DEV-652) makes a thread in the project and runs it the same way. `auth pairing create` prints
 /// the pairing code `pair-1`.
 const FAKE_T3: &str = r#"#!/bin/sh
@@ -727,6 +728,20 @@ case "$1 $2" in
     echo "Done in $id"
     exit 0 ;;
   "thread show") ;;
+  "thread list")
+    [ -f "$dir/list-threads" ] || { echo '{}'; exit 0; }
+    printf '['; sep=''
+    for t in "$threads"/*; do
+      [ -d "$t" ] || continue
+      id=$(basename "$t") status=completed settled=false
+      [ -f "$t/pending" ] && status=running
+      [ -f "$dir/running-$id" ] && status=running
+      [ -f "$dir/failed-$id" ] && status=failed
+      [ -f "$t/settled" ] && settled=true
+      printf '%s{"threadId":"%s","link":"https://t3.test/%s","status":"%s","latestRunId":"%s","settled":%s}' "$sep" "$id" "$id" "$status" "$(cat "$t/latest" 2>/dev/null)" "$settled"
+      sep=,
+    done
+    echo ']'; exit 0 ;;
   "auth session") if [ "$3" = issue ]; then echo '{"sessionId":"s1","token":"secret"}'; else echo "$*" >> "$dir/t3-auth.log"; fi; exit 0 ;;
   *) echo '{}'; exit 0 ;;
 esac
@@ -754,7 +769,7 @@ printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","ac
 /// sign-in with the pairing code `pair-1`, and `/mcp`. `t3_thread_launch` makes thread `thread-<n>` in its
 /// `existing_worktree` (the same thread for a repeated `clientRequestId`) and `t3_thread_send` gives a thread a run;
 /// the fake `t3 thread show` does it. `t3_thread_organize` fails with the text in `organize-error` while that file is
-/// there. Each tool call is logged to `t3-mcp.log` (`<tool> <arguments>`). A WebSocket on `/ws` takes T3 Code's
+/// there; else it marks the thread settled. Each tool call is logged to `t3-mcp.log` (`<tool> <arguments>`). A WebSocket on `/ws` takes T3 Code's
 /// internal rename command (DEV-619), logs it there as `ws_rename <payload>` and answers success; while `ws-refuse` is
 /// there, `/ws` answers 404. Returns the origin.
 fn fake_t3_server(dir: &Path, project: &Path) -> String {
@@ -860,9 +875,13 @@ fn fake_t3_server(dir: &Path, project: &Path) -> String {
                                 }
                             }
                             "t3_thread_send" => Ok(run(arguments["threadId"].as_str().unwrap(), "send", None)),
-                            "t3_thread_organize" => {
-                                std::fs::read_to_string(dir.join("organize-error")).map_or_else(|_| Ok(serde_json::json!({"sequence": 1})), Err)
-                            }
+                            "t3_thread_organize" => std::fs::read_to_string(dir.join("organize-error")).map_or_else(
+                                |_| {
+                                    let _ = std::fs::write(threads.join(arguments["threadId"].as_str().unwrap_or_default()).join("settled"), "");
+                                    Ok(serde_json::json!({"sequence": 1}))
+                                },
+                                Err,
+                            ),
                             _ => Ok(serde_json::json!({"sequence": 1})),
                         };
                         let result = match result {
@@ -1094,6 +1113,67 @@ fn a_t3_thread_stays_active_while_its_ticket_waits_or_its_job_failed() {
     std::fs::write(root.join("organize-error"), "T3 Code refuses").unwrap();
     run_t3(&fixtures, "review").success();
     assert!(job_logs(&fixtures).contains("The T3 Code thread was not settled: "), "the refusal is a note");
+}
+
+/// The fake T3 Code server's settled threads, in the order it settled them.
+fn settled_threads(root: &Path) -> Vec<String> {
+    mcp_calls(root, "t3_thread_organize").iter().map(|call| call["threadId"].as_str().unwrap_or_default().to_string()).collect()
+}
+
+/// DEV-747: a failed job's thread stayed active for good, also after later jobs settled their own threads (DEV-732).
+/// It is settled once a later job on the ticket completes and settles its own thread.
+#[test]
+fn a_failed_jobs_thread_is_settled_once_a_later_job_completes() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    run_t3(&fixtures, "fix").failure();
+    assert!(settled_threads(root).is_empty(), "a failed job keeps its thread active");
+    // As DEV-729's threads did, the thread completes after its job failed.
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    run_t3(&fixtures, "review").success();
+    assert_eq!(settled_threads(root), vec!["thread-1", "thread-0"], "the later job settles its own thread, then the kept one");
+    let logs = job_logs(&fixtures);
+    assert!(logs.contains("Settled the T3 Code thread https://t3.test/thread-0"), "the failed job's log says so: {logs}");
+}
+
+/// DEV-747: a thread whose job ended while its ticket was HelpNeeded stays active until the ticket is done, however it
+/// got there; the look `lotar serve` runs at its start and every 30 seconds settles it then.
+#[test]
+fn a_helpneeded_jobs_thread_is_settled_once_the_ticket_is_done() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    lotar::services::automation_service::AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Ask\n      on:\n        job_completed:\n          set: { status: HelpNeeded, assignee: mallox }\n",
+    )
+    .expect("automation rules");
+    run_t3(&fixtures, "review").success();
+    assert!(settled_threads(root).is_empty(), "the ticket waits for mallox");
+    let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+    TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert_eq!(settled_threads(root), vec!["thread-0"]);
+    assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"), "the job's log says so");
+}
+
+/// DEV-747: a kept thread whose run still goes is left alone, also on a done ticket.
+#[test]
+fn a_kept_thread_that_still_runs_is_left_alone() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    run_t3(&fixtures, "fix").failure();
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    std::fs::write(root.join("running-thread-0"), "").unwrap();
+    let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+    TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert!(settled_threads(root).is_empty(), "the thread still runs");
 }
 
 /// DEV-729: a thread that ends a turn waiting on its own background command (status `waiting`,
