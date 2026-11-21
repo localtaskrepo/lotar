@@ -1,6 +1,6 @@
 import { computed, getCurrentScope, onScopeDispose, ref, type ComputedRef } from 'vue'
 import { api } from '../api/client'
-import type { AgentJob } from '../api/types'
+import type { AgentJob, AgentJobQuestion } from '../api/types'
 import { useSse } from './useSse'
 
 /** A job that is running or waiting to run for a task (DEV-249). */
@@ -11,6 +11,8 @@ export interface AgentActivity {
     agent: string
     /** Latest progress text the agent reported, if any. */
     message: string | null
+    /** What the agent asks and waits for (a permission request), if anything. */
+    question: string | null
     startedAt: string | null
 }
 
@@ -21,6 +23,9 @@ const EVENTS = [
     'agent_job_init',
     'agent_job_progress',
     'agent_job_message',
+    'agent_job_input',
+    'agent_job_question',
+    'agent_job_result',
     'agent_job_completed',
     'agent_job_failed',
     'agent_job_cancelled',
@@ -28,6 +33,12 @@ const EVENTS = [
 ]
 
 const jobs = ref(new Map<string, AgentActivity>())
+/**
+ * The newest event sequence seen per job: a job another process runs reaches
+ * the stream from its log (DEV-765), and an event seen already, or one older
+ * than the newest, must not bring back what a later one changed.
+ */
+const lastSequence = new Map<string, number>()
 let users = 0
 let stream: ReturnType<typeof useSse> | null = null
 let unsubscribers: Array<() => void> = []
@@ -40,6 +51,7 @@ function fromJob(job: AgentJob): AgentActivity | null {
         status: job.status === 'running' || job.status === 'starting' ? 'running' : 'queued',
         agent: job.agent || job.runner || 'Agent',
         message: job.last_message?.trim() || null,
+        question: job.question?.title.trim() || null,
         startedAt: job.started_at ?? null,
     }
 }
@@ -66,19 +78,31 @@ interface AgentJobEventPayload {
     runner?: string
     message?: string | null
     started_at?: string | null
+    status?: string
+    sequence?: number
+    question?: AgentJobQuestion | null
 }
 
 export function applyAgentJobEvent(kind: string, payload: AgentJobEventPayload | null | undefined) {
     if (!payload?.id) return
+    if (typeof payload.sequence === 'number') {
+        if (payload.sequence <= (lastSequence.get(payload.id) ?? 0)) return
+        lastSequence.set(payload.id, payload.sequence)
+    }
     const next = new Map(jobs.value)
-    if (DONE_EVENTS.has(kind)) {
+    // A note logged after the job ended carries its ended status.
+    if (DONE_EVENTS.has(kind) || (payload.status && !ACTIVE.has(payload.status))) {
         next.delete(payload.id)
     } else {
         const previous = next.get(payload.id)
+        const text = typeof payload.message === 'string' ? payload.message.trim() || null : null
         const message =
             (kind === 'agent_job_progress' || kind === 'agent_job_message') && typeof payload.message === 'string'
-                ? payload.message.trim() || null
+                ? text
                 : (previous?.message ?? null)
+        // Only the job's own process holds the question; elsewhere its event is
+        // all there is, and the agent's next event says it went on.
+        const question = kind === 'agent_job_question' ? text : payload.question?.title.trim() || null
         const jobId = payload.id
         const taskId = payload.ticket_id || previous?.taskId
         if (!taskId) return
@@ -88,6 +112,7 @@ export function applyAgentJobEvent(kind: string, payload: AgentJobEventPayload |
             status: 'running',
             agent: payload.agent || payload.runner || previous?.agent || 'Agent',
             message,
+            question,
             startedAt: payload.started_at || previous?.startedAt || null,
         })
     }
@@ -140,6 +165,7 @@ export function useAgentActivity() {
             if (users === 0) {
                 disconnect()
                 jobs.value = new Map()
+                lastSequence.clear()
             }
         })
     }
@@ -167,9 +193,11 @@ export function describeAgentActivity(activities: AgentActivity[]): string {
         .map((activity) =>
             activity.status === 'queued'
                 ? `${activity.agent} is queued to work on this task`
-                : activity.message
-                  ? `${activity.agent} is working on this: ${activity.message}`
-                  : `${activity.agent} is working on this task`,
+                : activity.question
+                  ? `${activity.agent} asks: ${activity.question}`
+                  : activity.message
+                    ? `${activity.agent} is working on this: ${activity.message}`
+                    : `${activity.agent} is working on this task`,
         )
         .join('\n')
 }

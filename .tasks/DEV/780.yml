@@ -1,14 +1,41 @@
 title: Leftover worktree folder DEV-754 (only target/) makes every job on DEV-754 fail at worktree setup
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T00:32:24.998213+00:00
-modified: 2026-11-22T00:32:29.435203+00:00
+modified: 2026-11-22T05:51:20.453396+00:00
 relationships:
   related:
   - DEV-754
+comments:
+- date: 2026-11-22T05:51:11.110659+00:00
+  author: claude
+  text: |-
+    Leftover DEV-754 folder removed, and worktree setup now clears such a folder itself.
+
+    - Cause: `.lotar-worktrees/lotar/DEV-754` held only `target/nextest/default/junit.xml` (written 2026-11-21 12:20 by a 567 s nextest run): the worktree was removed while the test run was still going.
+    - Removed the folder (`lsof` showed nothing using it); `git worktree add` at that path now works (added and removed again).
+    - `prepare_worktree` (`crates/lotar-agent/src/services/agent_job_service.rs`): a ticket folder with no worktree that holds only `target/` is removed before `git worktree add`. The job log says `Removed the leftover folder <path> (only target/, no worktree).` A folder with anything else in it stays, and the job fails as before.
+    - Test `a_leftover_folder_with_only_build_output_gives_way_to_the_worktree` (`crates/lotar-lib/tests/agent_safety_test.rs`) fails without the fix; `docs/help/agent.md` describes the new behaviour.
+  report:
+    commits:
+    - hash: f73d907da
+      what: worktree setup removes a ticket folder holding only target/
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: git worktree add at .lotar-worktrees/lotar/DEV-754
+      result: passed
+      reason: added and removed again
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4daf3b5b2d12896a61a7f9fca80a3131f0ea4b09b3f1277a7366a2ee06bf4c7c
 description: 'Found: .lotar-worktrees/lotar/DEV-754 holds only target/ and git worktree list doesn''t show it; jobs job-20261121T211326.368Z-110 and job-20261122T003045.021Z-125 failed with ''already exists''. Check: git worktree add succeeds for a ticket whose folder has no worktree. Done: leftover folder removed, or worktree setup clears an empty leftover folder.'
 tags:
 - health
@@ -26,3 +53,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T05:45:00.094769+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T05:45:03.697916+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4daf3b5b2d12896a61a7f9fca80a3131f0ea4b09b3f1277a7366a2ee06bf4c7c
+- at: 2026-11-22T05:51:11.110659+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T05:51:20.453396+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

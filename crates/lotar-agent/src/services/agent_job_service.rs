@@ -24,10 +24,13 @@ use std::sync::{Arc, Condvar, LazyLock, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod follow;
 mod kept;
 mod merge;
 mod resumed;
 mod watch;
+
+pub use follow::LogFollower;
 
 const EVENT_LOG_LIMIT: usize = 200;
 /// How long a runner's descendants may keep its output streams busy after it exits.
@@ -5634,7 +5637,7 @@ fn settle_t3_thread(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, 
     let Some((_, agent, session)) = job.filter(|(runner, ..)| runner == AgentRunnerKind::T3.as_str()) else { return };
     let note = |message: String| {
         update_job(job_id, |state| {
-            push_event(state, "agent_job_progress", Some(message.clone()));
+            record_and_emit(state, "agent_job_progress", Some(message.clone()));
         });
     };
     let Some(session) = session else {
@@ -5773,7 +5776,11 @@ fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
     {
         let to = assignee.as_deref().map_or_else(|| "unassigned".to_string(), |assignee| format!("to {assignee}"));
         update_job(job_id, |state| {
-            push_event(state, "agent_job_progress", Some(format!("{ticket_id} was reassigned ({to}) while the job ran: its end rules don't move it again")));
+            record_and_emit(
+                state,
+                "agent_job_progress",
+                Some(format!("{ticket_id} was reassigned ({to}) while the job ran: its end rules don't move it again")),
+            );
         });
     }
     // The rules' `run` output would reach only this process's stderr: the
@@ -5793,7 +5800,7 @@ fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
         && let Some(message) = ticket_move_note(ticket_id, &before, &after)
     {
         update_job(job_id, |state| {
-            push_event(state, "agent_job_progress", Some(message.clone()));
+            record_and_emit(state, "agent_job_progress", Some(message.clone()));
         });
     }
 }
@@ -6056,27 +6063,31 @@ fn flush_event_log() {
 }
 
 fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
-    let payload = json!({
-        "id": record.id,
-        "ticket_id": record.ticket_id,
-        "runner": record.runner,
-        "agent": record.agent_profile,
-        "status": record.status.as_str(),
-        "created_at": record.created_at,
-        "started_at": record.started_at,
-        "finished_at": record.finished_at,
-        "exit_code": record.exit_code,
+    crate::api_events::emit(&crate::api_events::ApiEvent { kind: event.kind.clone(), data: job_event_payload(&record.to_dto(), event) });
+}
+
+/// What an `agent_job_*` event carries: the job as it is now and the event.
+fn job_event_payload(job: &AgentJob, event: &AgentJobEvent) -> serde_json::Value {
+    json!({
+        "id": job.id,
+        "ticket_id": job.ticket_id,
+        "runner": job.runner,
+        "agent": job.agent,
+        "status": job.status,
+        "created_at": job.created_at,
+        "started_at": job.started_at,
+        "finished_at": job.finished_at,
+        "exit_code": job.exit_code,
         "sequence": event.sequence,
         "at": event.at,
         "message": event.message,
-        "worktree_path": record.worktree_path,
-        "worktree_branch": record.worktree_branch,
-        "model": record.model,
-        "effort": record.effort,
-        "usage": record.usage,
-        "question": record.question,
-    });
-    crate::api_events::emit(&crate::api_events::ApiEvent { kind: event.kind.clone(), data: payload });
+        "worktree_path": job.worktree_path,
+        "worktree_branch": job.worktree_branch,
+        "model": job.model,
+        "effort": job.effort,
+        "usage": job.usage,
+        "question": job.question,
+    })
 }
 
 /// Finished jobs stay in memory for a day (status, events for the UI) and
@@ -6105,8 +6116,8 @@ fn prune_finished_jobs(registry: &mut JobRegistry) {
     }
 }
 
-/// Record an event and stream it to the UI (SSE). Notes only the job log
-/// needs use bare `push_event`.
+/// Record an event and stream it to the UI (SSE), as a reload of the job's
+/// log would show it.
 fn record_and_emit(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
     let event = push_event(state, kind, message);
     emit_job_event(&event, &state.record);

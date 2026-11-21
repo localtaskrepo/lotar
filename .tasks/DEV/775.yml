@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-21T23:03:37.168173+00:00
-modified: 2026-11-22T02:44:52.196585+00:00
+modified: 2026-11-22T05:18:27.359426+00:00
 relationships:
   related:
   - DEV-755
   - DEV-760
+  - DEV-764
 comments:
 - date: 2026-11-22T02:44:44.140146+00:00
   author: claude
@@ -78,3 +79,9 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T05:18:27.359426+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-760"]}'
+    new: '{"related":["DEV-755","DEV-760","DEV-764"]}'

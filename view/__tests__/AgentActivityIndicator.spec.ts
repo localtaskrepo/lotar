@@ -79,4 +79,55 @@ describe('AgentActivityIndicator', () => {
         two.unmount()
         three.unmount()
     })
+
+    // DEV-765: jobs of other processes reach the stream from their logs.
+    it('shows a question, skips events seen already and drops a job whose event says it ended', async () => {
+        const card = mount(AgentActivityIndicator, { props: { taskId: 'DEV-7', label: true } })
+        await flushPromises()
+        const pill = () => card.find('[data-testid="agent-activity"]')
+
+        applyAgentJobEvent('agent_job_started', { id: 'job-7', ticket_id: 'DEV-7', agent: 'fix', sequence: 1 })
+        handlers.get('agent_job_question')!(
+            new MessageEvent('agent_job_question', {
+                data: JSON.stringify({
+                    id: 'job-7',
+                    ticket_id: 'DEV-7',
+                    status: 'running',
+                    sequence: 2,
+                    message: 'Run git push? (Allow, Deny)',
+                }),
+            }),
+        )
+        await flushPromises()
+        expect(pill().text()).toContain('Asks')
+        expect(pill().attributes('title')).toBe('fix asks: Run git push? (Allow, Deny)')
+
+        // The same event again, or an older one, changes nothing.
+        applyAgentJobEvent('agent_job_progress', { id: 'job-7', ticket_id: 'DEV-7', sequence: 2, message: 'old' })
+        await flushPromises()
+        expect(pill().attributes('title')).toBe('fix asks: Run git push? (Allow, Deny)')
+
+        // The agent's next event says it went on.
+        applyAgentJobEvent('agent_job_progress', {
+            id: 'job-7',
+            ticket_id: 'DEV-7',
+            sequence: 3,
+            message: 'Bash: git push',
+        })
+        await flushPromises()
+        expect(pill().text()).toContain('Working')
+        expect(pill().attributes('title')).toBe('fix is working on this: Bash: git push')
+
+        // A note logged after the end carries the ended status.
+        applyAgentJobEvent('agent_job_progress', {
+            id: 'job-7',
+            ticket_id: 'DEV-7',
+            status: 'completed',
+            sequence: 4,
+            message: 'Moved',
+        })
+        await flushPromises()
+        expect(pill().exists()).toBe(false)
+        card.unmount()
+    })
 })

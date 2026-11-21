@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T14:27:47.932717+00:00
-modified: 2026-11-22T03:32:33.494833+00:00
+modified: 2026-11-22T06:21:22.060583+00:00
 relationships:
   blocks:
   - DEV-777
@@ -16,6 +16,10 @@ relationships:
   - DEV-738
   - DEV-777
   - DEV-611
+  - DEV-764
+  - DEV-770
+  - DEV-725
+  - DEV-772
 comments:
 - date: 2026-11-21T14:27:54.794086+00:00
   author: claude
@@ -223,3 +227,27 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-22T05:18:27.326001+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611"]}'
+    new: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764"]}'
+- at: 2026-11-22T05:33:05.358732+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764"]}'
+    new: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764","DEV-770"]}'
+- at: 2026-11-22T05:44:07.008911+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764","DEV-770"]}'
+    new: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764","DEV-770","DEV-725"]}'
+- at: 2026-11-22T06:21:22.060583+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764","DEV-770","DEV-725"]}'
+    new: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611","DEV-764","DEV-770","DEV-725","DEV-772"]}'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-20T20:32:05.812565+00:00
-modified: 2026-11-21T14:27:48.159678+00:00
+modified: 2026-11-22T05:59:27.118880+00:00
 relationships:
   depends_on:
   - DEV-734
@@ -34,7 +34,6 @@ description: |-
   - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
 tags:
 - backend
-- waits
 history:
 - at: 2026-11-20T20:32:09.446911+00:00
   actor: claude
@@ -100,3 +99,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-734"],"related":["DEV-734"]}'
     new: '{"depends_on":["DEV-734"],"related":["DEV-734","DEV-757"]}'
+- at: 2026-11-22T05:59:27.118880+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: backend, waits
+    new: backend

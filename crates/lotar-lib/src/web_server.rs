@@ -1090,10 +1090,20 @@ fn start_tasks_watcher() {
         // (and repeated notifications) report one change several times.
         // Seeded before watching, so files written before the server started
         // (FSEvents replays recent history) are not announced (DEV-638).
-        let mut announced = seed_fingerprints(&tasks_dir);
+        // Job logs of jobs other processes run become their live events
+        // (DEV-765); a log folder outside the tasks directory is watched too.
+        let mut follower = crate::services::agent_job_service::LogFollower::new(&tasks_dir);
+        let outside: Vec<PathBuf> = follower.dirs().filter(|dir| !dir.starts_with(&tasks_dir)).map(Path::to_path_buf).collect();
+        let mut announced = seed_fingerprints(&tasks_dir, &follower);
 
         if watcher.watch(&tasks_dir, RecursiveMode::Recursive).is_err() {
             return;
+        }
+        for dir in &outside {
+            // The folder a job would create, so its first log is followed too.
+            if fs::create_dir_all(dir).is_ok() {
+                let _ = watcher.watch(dir, RecursiveMode::NonRecursive);
+            }
         }
 
         let enable_poll =
@@ -1112,6 +1122,9 @@ fn start_tasks_watcher() {
                 cfg,
             ) && poller.watch(&tasks_dir, RecursiveMode::Recursive).is_ok()
             {
+                for dir in &outside {
+                    let _ = poller.watch(dir, RecursiveMode::NonRecursive);
+                }
                 poll_watcher = Some(poller);
             }
         }
@@ -1158,7 +1171,7 @@ fn start_tasks_watcher() {
                     Err(_) => break,
                 }
             }
-            process_watch_batch(&tasks_dir, &paths, &mut order_snapshots, &mut sprint_members, &mut announced);
+            process_watch_batch(&tasks_dir, &paths, &mut order_snapshots, &mut sprint_members, &mut announced, &mut follower);
         }
 
         drop(poll_watcher);
@@ -1176,6 +1189,7 @@ fn process_watch_batch(
     order_snapshots: &mut HashMap<Option<u32>, Vec<String>>,
     sprint_members: &mut HashMap<Option<u32>, HashSet<String>>,
     announced: &mut HashMap<PathBuf, u64>,
+    follower: &mut crate::services::agent_job_service::LogFollower,
 ) {
     let mut projects: Vec<String> = Vec::new();
     let mut tasks: Vec<(String, PathBuf)> = Vec::new();
@@ -1186,6 +1200,12 @@ fn process_watch_batch(
     // match the canonical tasks directory as well.
     let canonical = tasks_dir.canonicalize().ok();
     for path in paths {
+        if follower.follows(path) {
+            for event in follower.changed(path) {
+                crate::api_events::emit(&event);
+            }
+            continue;
+        }
         let Some(relative) = path.strip_prefix(tasks_dir).ok().or_else(|| canonical.as_deref().and_then(|dir| path.strip_prefix(dir).ok())) else {
             continue;
         };
@@ -1283,15 +1303,16 @@ fn process_watch_batch(
 }
 
 /// Fingerprints of every watched file and directory under `tasks_dir`,
-/// keyed by relative path; dot-entries are skipped as the watcher skips them.
-fn seed_fingerprints(tasks_dir: &Path) -> HashMap<PathBuf, u64> {
+/// keyed by relative path; dot-entries are skipped as the watcher skips them,
+/// and the job logs the follower reads.
+fn seed_fingerprints(tasks_dir: &Path, follower: &crate::services::agent_job_service::LogFollower) -> HashMap<PathBuf, u64> {
     let mut fingerprints = HashMap::new();
     let mut pending = vec![tasks_dir.to_path_buf()];
     while let Some(dir) = pending.pop() {
         let Ok(entries) = fs::read_dir(&dir) else { continue };
         for entry in entries.flatten() {
             let path = entry.path();
-            if entry.file_name().to_string_lossy().starts_with('.') {
+            if entry.file_name().to_string_lossy().starts_with('.') || follower.dirs().any(|dir| dir == path) {
                 continue;
             }
             if let Ok(relative) = path.strip_prefix(tasks_dir) {
@@ -1647,11 +1668,12 @@ mod tests {
         std::fs::create_dir_all(task.parent().expect("parent")).expect("project dir");
         std::fs::write(&task, "title: before start\n").expect("write task");
 
-        let mut announced = super::seed_fingerprints(dir.path());
+        let mut follower = crate::services::agent_job_service::LogFollower::new(dir.path());
+        let mut announced = super::seed_fingerprints(dir.path(), &follower);
         let events = crate::api_events::subscribe();
-        let batch = |announced: &mut _| {
+        let mut batch = |announced: &mut _| {
             let paths = [task.clone(), task.parent().expect("parent").to_path_buf()];
-            super::process_watch_batch(dir.path(), &paths, &mut Default::default(), &mut Default::default(), announced);
+            super::process_watch_batch(dir.path(), &paths, &mut Default::default(), &mut Default::default(), announced, &mut follower);
         };
         // Events of this test's project; other tests share the event bus.
         let seen = || -> Vec<String> {

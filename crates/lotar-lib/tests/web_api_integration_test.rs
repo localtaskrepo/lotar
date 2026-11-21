@@ -1229,6 +1229,63 @@ fn sse_debounce_emits_all_events() {
     server.stop();
 }
 
+/// DEV-765: a job another process runs only appends to its log; the server
+/// sends each complete new line as the job's live event, in order, filtered
+/// by project like an in-process job's.
+#[test]
+fn sse_streams_job_log_lines_another_process_appends() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    let logs = tasks_dir.join("@agent-logs");
+    std::fs::create_dir_all(&logs).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
+
+    let mut server = start_server();
+    let port = server.port();
+    let kinds = "agent_job_started,agent_job_message,agent_job_progress,agent_job_question,agent_job_completed";
+    let (mut sse, leftover) = open_sse(port, &format!("debounce_ms=10&kinds={kinds}&project=FOL&ready=1"));
+    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+
+    let append = |name: &str, text: &str| {
+        std::fs::OpenOptions::new().create(true).append(true).open(logs.join(name)).unwrap().write_all(text.as_bytes()).unwrap();
+    };
+    let header = |job: &str, ticket: &str| {
+        format!(r#"{{"type":"header","job_id":"{job}","ticket_id":"{ticket}","runner":"claude","created_at":"2026-11-21T10:00:00Z"}}"#)
+    };
+    let event = |kind: &str, sequence: u64, message: &str| {
+        format!(r#"{{"type":"event","kind":"{kind}","at":"2026-11-21T10:00:00Z","message":"{message}","sequence":{sequence}}}"#)
+    };
+    append("job-other.jsonl", &format!("{}\n{}\n", header("job-other", "OTHER-1"), event("agent_job_started", 1, "")));
+    append("job-fol.jsonl", &format!("{}\n{}\n", header("job-fol", "FOL-1"), event("agent_job_started", 1, "")));
+    let message = event("agent_job_message", 2, "hello");
+    let (first, rest) = message.split_at(30);
+    append("job-fol.jsonl", first);
+    thread::sleep(Duration::from_millis(400));
+    append("job-fol.jsonl", &format!("{rest}\n{}\n{}\n", event("agent_job_progress", 3, "Bash: ls"), event("agent_job_question", 4, "Allow?")));
+    append(
+        "job-fol.jsonl",
+        &format!("{}\n{}\n", r#"{"type":"status","status":"completed","at":"2026-11-21T10:01:00Z","exit_code":0}"#, event("agent_job_completed", 5, "")),
+    );
+
+    let events = read_sse_events(&mut sse, 5, Duration::from_secs(5), Vec::new());
+    let seen: Vec<(String, Value)> = events.into_iter().map(|(kind, data)| (kind, serde_json::from_str(&data).expect("event JSON"))).collect();
+    let kinds_seen: Vec<&str> = seen.iter().map(|(kind, _)| kind.as_str()).collect();
+    assert_eq!(
+        kinds_seen,
+        ["agent_job_started", "agent_job_message", "agent_job_progress", "agent_job_question", "agent_job_completed"],
+        "FOL's lines in order, OTHER's filtered out: {seen:?}"
+    );
+    assert!(seen.iter().all(|(_, data)| data["id"] == "job-fol" && data["ticket_id"] == "FOL-1"));
+    assert_eq!(seen.iter().map(|(_, data)| data["sequence"].as_u64().unwrap()).collect::<Vec<_>>(), [1, 2, 3, 4, 5]);
+    assert_eq!(seen[1].1["message"], "hello", "the partial line went out once complete");
+    assert_eq!(seen[3].1["status"], "running");
+    assert_eq!(seen[4].1["status"], "completed");
+    assert_eq!(seen[4].1["finished_at"], "2026-11-21T10:01:00Z");
+
+    server.stop();
+}
+
 #[test]
 fn sse_includes_triggered_by_identity() {
     // Guard flags and tasks dir

@@ -219,6 +219,8 @@ A job runs inside the process that started it: `lotar serve`, the background que
 
 When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
 
+`lotar serve` shows every job live, whichever process runs it. A job it runs itself streams its events from memory. For the others it follows the job logs (see [Notes](#notes)): each new complete line becomes the same `agent_job_*` SSE event the job's own process sends, with the same `sequence` and the job's fields from the log's header and latest status line, within about a second. So the Agents page, the task panel's Timeline tab and the board's activity pill show the messages, tool lines, questions and end of a queue-worker, `agent run --wait` or MCP job without a reload. Lines already in a log when the server starts are not sent again. The log folders followed are the ones configured when the server starts; with logging `off` the server doesn't see other processes' jobs at all. A question of such a job shows (the activity pill says **Asks**), but only the job's own process can answer it: its card has no buttons.
+
 ### Jobs whose process died
 
 A job whose process exited before the job ended (a killed or crashed worker or server) no longer counts as running, and its record stays. The queue worker for the same tasks directory (the running one, or the next to start) or the next `lotar serve` there takes it over and ends it as if it had run there: the job log gets its end, the `job_completed`, `job_failed` or `job_cancelled` rules run once, and the [outcome](#status-and-assignee-during-a-job) recorded during the job applies.
@@ -520,7 +522,7 @@ A rule's [`tell_agent`](automation.md#telling-the-tickets-agent) action hands th
 
 ## Notes
 
-- Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running. Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.
+- Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running, for jobs of other processes from their logs ([Jobs in other processes](#jobs-in-other-processes)). Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.
 - Context history is persisted to `<project>/<ticket><extension>` files next to each ticket.
 - Job events are persisted to `<tasks dir>/@agent-logs/<JOB_ID>.jsonl` by default (`agent.logs_dir` or `LOTAR_AGENT_LOGS_DIR` picks another folder; `off` turns it off). LoTaR writes a `.gitignore` into the folder so logs, which contain prompts and agent output, aren't committed. The `.gitignore` is only written when the folder holds nothing but job logs, and a setting that names the workspace root itself (`agent.logs_dir: .`) uses a `lotar-agent-logs` subfolder.
 - Job history: `lotar agent list-jobs`, `lotar agent logs`, the timeline and the Agents page show a job as long as its log is kept (a server holds finished jobs in memory for a day only). When a job starts, LoTaR prunes that job's log folder:

@@ -1,0 +1,28 @@
+title: 'Flaky test risk: the shipped agent-pipeline template test waits for three agent jobs within the 30 s wait floor'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T06:13:38.957747+00:00
+modified: 2026-11-22T06:13:42.993439+00:00
+relationships:
+  related:
+  - DEV-772
+description: 'Found in the review of DEV-772 (2026-11-21): `crates/lotar-lib/tests/agent_automation_integration_test.rs:2376` waits `wait_for_completed_jobs(&created.id, 3, 6000)` (raised to the 30 s `WAIT_FLOOR_MS`) and then 10 s for Done, for the same implement, test, merge pipeline whose waits DEV-772 moved to `JOB_END_LIMIT_MS`. Not seen failing yet. Check: `npm run -s test:agent` at load average 35+. Done: waits for tickets or jobs that three agent jobs move use `JOB_END_LIMIT_MS`.'
+tags:
+- health
+custom_fields:
+  finding: test-flaky:agent_automation_integration_test-pipeline-template
+history:
+- at: 2026-11-22T06:13:41.054589+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-772"]}'
+- at: 2026-11-22T06:13:42.993439+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

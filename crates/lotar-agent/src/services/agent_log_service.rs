@@ -422,7 +422,7 @@ fn read_saved_job(path: &Path) -> Option<SavedJob> {
 }
 
 /// Resolve the logs directory path. Supports both relative and absolute paths.
-fn resolve_logs_dir(workspace_root: &Path, logs_dir: &str) -> PathBuf {
+pub fn resolve_logs_dir(workspace_root: &Path, logs_dir: &str) -> PathBuf {
     let logs_path = Path::new(logs_dir);
     let resolved = if logs_path.is_absolute() { logs_path.to_path_buf() } else { workspace_root.join(logs_dir) };
     // Never the workspace root itself: LoTaR writes a `*` .gitignore into
@@ -432,7 +432,7 @@ fn resolve_logs_dir(workspace_root: &Path, logs_dir: &str) -> PathBuf {
 }
 
 /// A job log LoTaR wrote: `job-<id>.jsonl`.
-fn is_job_log(path: &Path) -> bool {
+pub fn is_job_log(path: &Path) -> bool {
     path.extension().is_some_and(|ext| ext == "jsonl") && path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with("job-"))
 }
 

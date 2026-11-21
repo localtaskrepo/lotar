@@ -5,8 +5,10 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:03.411406+00:00
-modified: 2026-11-22T02:36:52.558808+00:00
+modified: 2026-11-22T07:16:24.788633+00:00
 relationships:
+  blocks:
+  - DEV-782
   related:
   - DEV-782
   - DEV-771
@@ -57,6 +59,18 @@ comments:
     - UI: read the fix agent's 12 before/after shots; took my own after shots (tasks + Agents, light/dark, 1920/1440/390) from this worktree's build with a log appended live: pill says **Asks**, goes away at the end, Agents page shows lines and the end without a reload. No visual problems
     - Minor, filed: DEV-782, after a reload the pill says Working instead of Asks, because `saved_job_dto` always sends `question: None`
     - The Agents counter showing "0 Running" for jobs of other processes is already DEV-771
+- date: 2026-11-22T07:16:24.788633+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n \e[32m✓\e[39m tests/cli.sprint-delete.smoke.spec.ts \e[2m(\e[22m\e[2m2 tests\e[22m\e[2m)\e[22m\e[33m 740\e[2mms\e[22m\e[39m\n   \e[32m✓\e[39m Sprint deletion confirmation \e[2m(2)\e[22m\n     \e[33m\e[2m✓\e[22m\e[39m requires explicit force in non-interactive text output\e[33m 471\e[2mms\e[22m\e[39m\n \e[32m✓\e[39m tests/mcp.tools-call-shape.smoke.spec.ts \e[2m(\e[22m\e[2m1 test\e[22m\e[2m)\e[22m\e[33m 361\e[2mms\e[22m\e[39m\n \e[32m✓\e[39m tests/ui.basic.smoke.spec.ts \e[2m(\e[22m\e[2m1 test\e[22m\e[2m)\e[22m\e[33m 7514\e[2mms\e[22m\e[39m\n   \e[32m✓\e[39m UI smoke harness \e[2m(1)\e[22m\n     \e[33m\e[2m✓\e[22m\e[39m renders tasks created via the CLI\e[33m 7478\e[2mms\e[22m\e[39m\n\n\e[31m⎯⎯⎯⎯⎯⎯⎯\e[39m\e[1m\e[41m Failed Tests 1 \e[49m\e[22m\e[31m⎯⎯⎯⎯⎯⎯⎯\e[39m\n\n\e[41m\e[1m FAIL \e[22m\e[49m tests/harness.agent-launcher.smoke.spec.ts\e[2m > \e[22magent wrapper batch-shim dispatch (DEV-101)\e[2m > \e[22mwrapper resolves an npm cmd shim and delivers the hostile prompt byte-exact\n\e[31m\e[1mError\e[22m: fixture child did not exit within 20000ms; stderr: \e[39m\n\e[36m \e[2m❯\e[22m Timeout.<anonymous> tests/harness.agent-launcher.smoke.spec.ts:\e[2m89:20\e[22m\e[39m\n    \e[90m 87|\e[39m     \e[35mreturn\e[39m \e[35mnew\e[39m \e[33mPromise\e[39m((resolve\e[33m,\e[39m reject) \e[33m=>\e[39m {\n    \e[90m 88|\e[39m         \e[35mconst\e[39m timer \e[33m=\e[39m \e[34msetTimeout\e[39m(() \e[33m=>\e[39m {\n    \e[90m 89|\e[39m             reject(new Error(`fixture child did not exit within ${boun…\n    \e[90m   |\e[39m                    \e[31m^\e[39m\n    \e[90m 90|\e[39m         }\e[33m,\e[39m boundMs)\e[33m;\e[39m\n    \e[90m 91|\e[39m         child\e[33m.\e[39m\e[34mon\e[39m(\e[32m'error'\e[39m\e[33m,\e[39m (error\e[33m:\e[39m \e[33mError\e[39m) \e[33m=>\e[39m {\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m1 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m117 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m1 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m406 passed\e[39m\e[22m\e[90m (407)\e[39m\n\e[2m   Start at \e[22m 23:08:34\n\e[2m   Duration \e[22m 470.14s\e[2m (tests 78%, import 19%, setup 2%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.10s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~16.96s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n```.\n\n- Rebased `agent/DEV-765` onto `main` (`4df8f767b5f7`): `c1e4373d0d06`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa97d4d8730d6d45978e856b83771013163009cd2a87b29d417a86cbb96891bcd
 - attachment: DEV-765-after-dark-1440.2b850162d89c3a871106acfa37b6c7e7.png
@@ -284,3 +298,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T06:37:21.067094+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-782","DEV-771"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771"]}'
+- at: 2026-11-22T07:16:24.788633+00:00
+  actor: automation
+  changes:
+  - field: comment_added

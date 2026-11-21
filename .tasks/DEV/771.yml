@@ -1,11 +1,11 @@
 title: Agents page shows Running 0, Queued 0 while the queue worker runs 2 jobs and 13 tickets wait
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-21T22:12:31.042289+00:00
-modified: 2026-11-22T02:36:32.525292+00:00
+modified: 2026-11-22T06:04:34.268824+00:00
 relationships:
   related:
   - DEV-279
@@ -54,6 +54,69 @@ comments:
       result: passed
       reason: both Running 1, Queued 3
     next: Review, then merge
+- date: 2026-11-22T06:00:17.183843+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T055932.343Z-150 failed again or on a rate limit (lotar agent logs job-20261122T055932.343Z-150). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T06:00:57.951480+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited with code 1 while the thread waited on background tests (job-20261122T055932.343Z-150)
+  answer:
+    to: 2026-11-22T06:00:17.183843+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited with code 1 while the thread waited on background tests (job-20261122T055932.343Z-150)'
+- date: 2026-11-22T06:04:34.268824+00:00
+  author: claude
+  text: |-
+    Verified: the retry ran the gates the first job didn't finish, and all of them pass on `3333807b1`.
+
+    - `npm run lint:agent`: passed
+    - `npm run test:agent`: 2446 Rust and 1564 UI tests passed. The first run stopped because a test binary was missing (`No such file or directory`), not because a test failed. The rerun passed.
+    - `npm run test:smoke:agent`: 406 passed
+    - The change is unchanged since the comment above (screenshots attached there)
+  report:
+    commits:
+    - hash: 3333807b1
+      what: queue overview shared by CLI, /api/jobs and the Agents page
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2446 Rust, 1564 UI; first run lost a test binary mid-run (os error 2), rerun passed
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1224931913f390b0667f0bc0e9b90bc806302a13aae24ec5e6fd5fc180d2b92e
 - attachment: DEV-771-after-dark-1440.ca37cea0ad6ab1dd3d749d4033f02bf0.png
@@ -68,6 +131,7 @@ references:
 - attachment: DEV-771-before-light-1440.3ad9b23a32995865533e8a894519a6ee.png
 - attachment: DEV-771-before-light-1920.e972f7ef9adeffa0fc92c53de015554c.png
 - attachment: DEV-771-before-light-390.e6541c9b68d12e2c85c9fa5b81f5772d.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac558615ba28039309b0d9402b5f5e0ca5252132f8bb651afd80575a159123a29
 description: |-
   Found (owner 2026-11-21: "I have no where to see what's queued up"): `GET /api/jobs` on the DEV server answers `queue_stats {running: 0, queued: 0}` while `lotar agent queue` shows Running 2, Queued 13 (DEV-725's release retry 9th). The route (crates/lotar-lib/src/routes/jobs.rs ~36) returns `AgentJobService::queue_stats()`, the serving process's own worker only. The CLI (cli/handlers/agent.rs ~454) adds jobs other processes run (DEV-279) and the on-disk queue (DEV-522). The page's Queued tab filters job logs with status queued, so tickets waiting in the on-disk queue never show.
 
@@ -77,6 +141,7 @@ description: |-
 tags:
 - fix-retried
 - ui
+- retry-fix
 history:
 - at: 2026-11-21T22:12:31.297982+00:00
   actor: claude
@@ -188,3 +253,41 @@ history:
   - field: relationships
     old: '{"related":["DEV-279","DEV-522","DEV-725"]}'
     new: '{"related":["DEV-279","DEV-522","DEV-725","DEV-765"]}'
+- at: 2026-11-22T05:59:45.694523+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac558615ba28039309b0d9402b5f5e0ca5252132f8bb651afd80575a159123a29
+- at: 2026-11-22T06:00:16.768420+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T06:00:17.183843+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T06:00:57.951480+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T06:00:57.951596+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T06:01:07.467297+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried, ui
+    new: fix-retried, ui, retry-fix
+- at: 2026-11-22T06:04:34.268824+00:00
+  actor: claude
+  changes:
+  - field: comment_added

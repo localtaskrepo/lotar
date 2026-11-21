@@ -127,7 +127,7 @@ fn note(tasks_dir: &Path, thread: &Thread, message: String) {
     let mut held = false;
     super::update_job(&thread.job_id, |state| {
         held = true;
-        super::push_event(state, "agent_job_progress", Some(message.clone()));
+        super::record_and_emit(state, "agent_job_progress", Some(message.clone()));
     });
     if held {
         return;

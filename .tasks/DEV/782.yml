@@ -1,30 +1,105 @@
 title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-22T02:36:08.788363+00:00
+modified: 2026-11-22T06:37:29.215014+00:00
 relationships:
+  depends_on:
+  - DEV-765
   related:
   - DEV-765
+comments:
+- date: 2026-11-22T06:37:21.509101+00:00
+  author: claude
+  text: |-
+    Waits for DEV-765: the **Asks** pill and the log follower this fixes are only on `agent/DEV-765` (status Merging), not on main.
+
+    - Plan: `saved_job_dto` fills `question` (title = last `agent_job_question` message, no options) while that is the log's last event and no end status follows
+    - `fromJob` on `agent/DEV-765` already reads `job.question.title`, so the fix is backend plus tests
+    - Done when refined in the description
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 description: |-
   Found while reviewing DEV-765.
 
   - Live: the `agent_job_question` event the log follower sends makes the activity pill say **Asks** (`view/composables/useAgentActivity.ts`, `applyAgentJobEvent`).
   - After a reload: `fromJob` takes the question from `GET /api/jobs`, and `saved_job_dto` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:950) always sets `question: None` for logged jobs. So a queue-worker job that still waits shows **Working** until its next event.
-  - Possible fix: when a logged job's last event is `agent_job_question` and no later event or status follows, report the question (title only, no answer options) in the DTO, or let `fromJob` use the last event's kind.
+  - Fix: `saved_job_dto` reports the question when a logged job's last event is `agent_job_question` and its log has no end status. Title = that event's message (what the live pill shows), no answer options, empty request id (only the job's own process can answer).
 
   ## Done when
-  - [ ] A reload while a job in another process waits on a question shows **Asks** on the pill, the same as the live view.
-  - [ ] A test covers it.
+  - [ ] `GET /api/jobs` and `GET /api/jobs/<id>` for a logged job whose last event is `agent_job_question` and that has no end status carry `question.title` = that event's message, `options` empty.
+  - [ ] Any later event (the answer's progress note, a message, a tool) or an end status wins: `question` is null.
+  - [ ] A reload while such a job waits shows **Asks** on the pill, the same as the live view; the Agents page shows no answer buttons for it.
+  - [ ] A Rust test covers the DTO cases above; the UI test of `fromJob` covers the pill after a reload.
 tags:
 - ui
 - agent
+- waits
 history:
 - at: 2026-11-22T02:36:08.788363+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T06:36:35.916298+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T06:36:39.521454+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
+- at: 2026-11-22T06:37:20.744436+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found while reviewing DEV-765.
+
+      - Live: the `agent_job_question` event the log follower sends makes the activity pill say **Asks** (`view/composables/useAgentActivity.ts`, `applyAgentJobEvent`).
+      - After a reload: `fromJob` takes the question from `GET /api/jobs`, and `saved_job_dto` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:950) always sets `question: None` for logged jobs. So a queue-worker job that still waits shows **Working** until its next event.
+      - Possible fix: when a logged job's last event is `agent_job_question` and no later event or status follows, report the question (title only, no answer options) in the DTO, or let `fromJob` use the last event's kind.
+
+      ## Done when
+      - [ ] A reload while a job in another process waits on a question shows **Asks** on the pill, the same as the live view.
+      - [ ] A test covers it.
+    new: |-
+      Found while reviewing DEV-765.
+
+      - Live: the `agent_job_question` event the log follower sends makes the activity pill say **Asks** (`view/composables/useAgentActivity.ts`, `applyAgentJobEvent`).
+      - After a reload: `fromJob` takes the question from `GET /api/jobs`, and `saved_job_dto` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:950) always sets `question: None` for logged jobs. So a queue-worker job that still waits shows **Working** until its next event.
+      - Fix: `saved_job_dto` reports the question when a logged job's last event is `agent_job_question` and its log has no end status. Title = that event's message (what the live pill shows), no answer options, empty request id (only the job's own process can answer).
+
+      ## Done when
+      - [ ] `GET /api/jobs` and `GET /api/jobs/<id>` for a logged job whose last event is `agent_job_question` and that has no end status carry `question.title` = that event's message, `options` empty.
+      - [ ] Any later event (the answer's progress note, a message, a tool) or an end status wins: `question` is null.
+      - [ ] A reload while such a job waits shows **Asks** on the pill, the same as the live view; the Agents page shows no answer buttons for it.
+      - [ ] A Rust test covers the DTO cases above; the UI test of `fromJob` covers the pill after a reload.
+- at: 2026-11-22T06:37:21.067656+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765"]}'
+    new: '{"depends_on":["DEV-765"],"related":["DEV-765"]}'
+- at: 2026-11-22T06:37:21.468905+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, agent
+    new: ui, agent, waits
+- at: 2026-11-22T06:37:21.509101+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T06:37:29.215014+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

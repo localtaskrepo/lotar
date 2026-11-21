@@ -1,11 +1,11 @@
 title: 'Flaky smoke under load: ui.theming and harness.agent-launcher time out in the full run, pass alone'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T01:07:08.443491+00:00
-modified: 2026-11-22T04:25:28.586291+00:00
+modified: 2026-11-22T05:58:43.702877+00:00
 relationships:
   related:
   - DEV-755
@@ -21,6 +21,35 @@ comments:
     - Run 1 (lotar's merge): `ui.theming.smoke.spec.ts:41` poll timeout, `ui.agent-jobs.smoke.spec.ts:777`, plus one more.
     - Run 2: `ui.agent-jobs.smoke.spec.ts:458` "streams log entries live" (`.job-card` wait 15 s, DEV-750's case again) and `ui.config-coverage.smoke.spec.ts:135` (120 s test timeout).
     - Alone: `npm run -s test:smoke:quick:agent -- tests/ui.agent-jobs.smoke.spec.ts tests/ui.theming.smoke.spec.ts` and the same with `tests/ui.config-coverage.smoke.spec.ts`: 14/14 passed each time.
+- date: 2026-11-22T05:58:33.690408+00:00
+  author: claude
+  text: |-
+    Smoke waits now sized for full-suite load, in the two named tests and the three from the newest comment.
+
+    - `smoke/tests/ui.theming.smoke.spec.ts`: it uses Playwright's own `expect`, whose default is 5 s (the smoke config's 15 s applies only to vitest's `expect`). It now uses `expect.configure({ timeout: 15_000 })` for the whole file.
+    - `smoke/tests/harness.agent-launcher.smoke.spec.ts`: the 12 waits on the spawned wrapper and gate agent went from 10 s to `FIXTURE_WAIT_MS = 45_000`. The `awaitExit` bound went from 20 s to 90 s so it outlasts those waits.
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts:458,780,784`: the `.job-card` and `.job-question` waits went from 15 s to the file's existing `WAIT_BUDGET_MS` (45 s).
+    - `smoke/tests/ui.config-coverage.smoke.spec.ts`: the describe timeout went from 120 s to 300 s, as DEV-755 did for the dialogs tests.
+    - I could not reproduce load average 36 here. The full smoke ran at 13–23.
+  report:
+    commits:
+    - hash: 4ecad949b
+      what: load-sized waits in four smoke files
+    checks:
+    - command: npm run -s lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2446 Rust, 1563 UI
+    - command: npm run -s smoke
+      result: passed
+      reason: 406/406, but at load average 13-23, not the ~36 the ticket saw
+    - command: npm run -s test:smoke:quick:agent -- the four files
+      result: passed
+      reason: 24/24
+    next: Review, then merge and rerun full smoke on main under load
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6772d03efc655b0f8a483efd2419777ae985b99abf44552d79e0eabff02f9b16
 description: |-
   Found: DEV-756's merge, `npm run -s smoke` at load average ~36 failed `smoke/tests/ui.theming.smoke.spec.ts:41` (5s expect.poll on rootState) and `smoke/tests/harness.agent-launcher.smoke.spec.ts:521` (10s gate.waitForStarted('conflict')). Both pass alone at load 33 (`npm run -s test:smoke:quick:agent -- <both files>`, 10/10). Like DEV-755.
   Check: full `npm run smoke` under parallel load passes these two.
@@ -51,3 +80,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-755","DEV-756"]}'
     new: '{"related":["DEV-755","DEV-756","DEV-750","DEV-762"]}'
+- at: 2026-11-22T05:52:54.701971+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T05:52:58.029409+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6772d03efc655b0f8a483efd2419777ae985b99abf44552d79e0eabff02f9b16
+- at: 2026-11-22T05:58:33.690408+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T05:58:43.702877+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

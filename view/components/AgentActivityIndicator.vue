@@ -1,14 +1,14 @@
 <template>
   <span
     v-if="activities.length"
-    :class="['agent-activity', { 'agent-activity--queued': !running }]"
+    :class="['agent-activity', { 'agent-activity--queued': !running, 'agent-activity--asks': asks }]"
     role="img"
     :aria-label="description"
     :title="description"
     data-testid="agent-activity"
   >
     <IconGlyph name="agent" class="agent-activity__icon" aria-hidden="true" />
-    <span v-if="label" class="agent-activity__label">{{ running ? 'Working' : 'Queued' }}</span>
+    <span v-if="label" class="agent-activity__label">{{ asks ? 'Asks' : running ? 'Working' : 'Queued' }}</span>
   </span>
 </template>
 
@@ -19,7 +19,7 @@ import IconGlyph from './IconGlyph.vue'
 
 /**
  * Shows that an agent is working on (or queued for) a task (DEV-249).
- * Hovering says which agent and what it reported last.
+ * Hovering says which agent and what it reported last, or what it asks.
  */
 const props = withDefaults(defineProps<{ taskId: string | null | undefined; label?: boolean }>(), {
   label: false,
@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<{ taskId: string | null | undefined; labe
 const { activityFor } = useAgentActivity()
 const activities = activityFor(() => props.taskId)
 const running = computed(() => activities.value.some((activity) => activity.status === 'running'))
+const asks = computed(() => activities.value.some((activity) => activity.question))
 const description = computed(() => describeAgentActivity(activities.value))
 </script>
 
@@ -58,6 +59,11 @@ const description = computed(() => describeAgentActivity(activities.value))
 .agent-activity--queued {
   color: var(--color-muted);
   background: color-mix(in oklab, var(--color-muted) 14%, transparent);
+}
+
+.agent-activity--asks {
+  color: var(--color-warning-strong, var(--color-warning));
+  background: color-mix(in oklab, var(--color-warning) 16%, transparent);
 }
 
 .agent-activity--queued .agent-activity__icon {

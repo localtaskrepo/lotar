@@ -792,4 +792,59 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
             await fs.remove(harnessmuxHome);
         }
     });
+
+    it('shows a job another process runs live from its log, without reload', async () => {
+        // DEV-765: the queue worker, `agent run --wait` and MCP sessions only
+        // append to the job log; `lotar serve` streams the new lines.
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-elsewhere-');
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml) },
+        });
+        try {
+            const task = await workspace.addTask('Job of another process', { args: ['-p', 'UIAG'] });
+            const server = await startLotarServer(workspace);
+            const log = path.join(workspace.root, '.logs', 'job-elsewhere-1.jsonl');
+            const at = new Date().toISOString();
+            const line = (value: Record<string, unknown>) => `${JSON.stringify(value)}\n`;
+            const event = (kind: string, sequence: number, message?: string) =>
+                line({ type: 'event', kind, at, sequence, ...(message ? { message } : {}) });
+            try {
+                await withPage(`${server.url}/agents`, async (page) => {
+                    await page.waitForSelector('.queue-stats-card', { timeout: 15_000 });
+                    await fs.outputFile(
+                        log,
+                        line({
+                            type: 'header',
+                            job_id: 'job-elsewhere-1',
+                            ticket_id: task.id,
+                            runner: 'command',
+                            created_at: at,
+                            agent_profile: 'mock',
+                        }) +
+                            event('agent_job_started', 1) +
+                            event('agent_job_message', 2, 'Reading the ticket'),
+                    );
+                    await waitForTicketChip(page, task.id);
+                    await page.click('button:has-text("Show logs")');
+                    await waitForText(page, '.log-panel', 'Reading the ticket');
+
+                    // Lines appended once the panel shows the log arrive only live.
+                    await fs.appendFile(log, event('agent_job_progress', 3, 'Bash: npm test'));
+                    await waitForText(page, '.log-panel', 'npm test');
+                    await fs.appendFile(
+                        log,
+                        line({ type: 'status', status: 'completed', at, exit_code: 0 }) +
+                            event('agent_job_completed', 4, 'Finished elsewhere'),
+                    );
+                    await waitForText(page, '.log-panel', 'Finished elsewhere');
+                    await waitForText(page, '.job-card', 'completed');
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+            await agents.dispose();
+        }
+    });
 });

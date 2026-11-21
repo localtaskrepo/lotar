@@ -3,9 +3,8 @@ status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-21T04:06:18.165648+00:00
-modified: 2026-11-22T00:32:41.001545+00:00
+modified: 2026-11-22T05:52:18.473226+00:00
 relationships:
   depends_on:
   - DEV-747
@@ -178,9 +177,13 @@ comments:
 
     - `6732fe799` DEV-754 is on main (`git branch --merged main` lists agent/DEV-754); `kept.rs` writes `link.unwrap_or(&thread.thread)` in the failed settle note. All three Done-when items were reviewed passed on 2026-11-21.
     - Both failed jobs (`job-20261121T211326.368Z-110`, `job-20261122T003045.021Z-125`): worktree setup, `.lotar-worktrees/lotar/DEV-754 already exists` (folder with only target/). Retrying would fail the same way; no work is left.
+- date: 2026-11-22T05:52:11.884663+00:00
+  author: claude
+  text: 'Done: `6732fe799` is on main (`git merge-base --is-ancestor 6732fe799 main`), and `kept.rs:118` writes `link.unwrap_or(&thread.thread)`. Nothing is left to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5fc406a534c860a0c3ee96a2a255475addda33482dff729cd1ca1219cd3a112f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16cbc593d074cf681cc0d8837e53fb2abfdc5d59b83930a078843db94ff3113b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A806c16e50eac60ac1d0a9708ba0abeb454f2d03429b897d1e91425d8c32dff91
 releases:
 - 11
 description: |-
@@ -415,3 +418,26 @@ history:
   - field: tags
     old: fix-retried
     new: ''
+- at: 2026-11-22T05:51:58.494654+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-11-22T05:52:01.859070+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A806c16e50eac60ac1d0a9708ba0abeb454f2d03429b897d1e91425d8c32dff91
+- at: 2026-11-22T05:52:11.884663+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T05:52:18.473226+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

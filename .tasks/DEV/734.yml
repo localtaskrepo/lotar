@@ -1,11 +1,11 @@
 title: A worker that adopts an orphaned Claude job can't resume its session (Resource not found sessionId) and fails the job
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T18:03:55.898155+00:00
-modified: 2026-11-22T03:06:52.563549+00:00
+modified: 2026-11-22T05:59:07.993182+00:00
 relationships:
   depends_on:
   - DEV-742
@@ -492,6 +492,10 @@ comments:
     - `git log main..HEAD` is empty, and `git log HEAD..agent/DEV-734` is empty too (no rework branch)
     - `git merge-base --is-ancestor HEAD main` succeeds: the DEV-734 commit is on `main` below `8f698d2e9` (DEV-761)
     - No checks rerun, no files changed, status and assignee left as they were
+- date: 2026-11-22T05:59:05.610198+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-734` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4551288540da697c0aa1df1dbeccd029ed1a6b5102ae0a721e3412307ab007c
@@ -503,7 +507,6 @@ releases:
 description: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on lotar''s worker pid 32048, which exited at 17:55:05 UTC (new workers 45178 for lotar and 45115 for standards started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
 tags:
 - health
-- merge-retried
 - automation-limit-reached
 custom_fields:
   finding: agent-job-adopt:resume-claude-session
@@ -956,3 +959,16 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-742","DEV-752"],"blocks":["DEV-738","DEV-739"],"related":["DEV-732","DEV-738","DEV-733","TEST-2","DEV-742","DEV-711","DEV-729","DEV-748","DEV-743","DEV-740","DEV-741","DEV-744","DEV-757","DEV-725","DEV-761"]}'
     new: '{"depends_on":["DEV-742","DEV-752"],"blocks":["DEV-738","DEV-739"],"related":["DEV-732","DEV-738","DEV-733","TEST-2","DEV-742","DEV-711","DEV-729","DEV-748","DEV-743","DEV-740","DEV-741","DEV-744","DEV-757","DEV-725","DEV-761","DEV-783"]}'
+- at: 2026-11-22T05:59:05.610198+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T05:59:07.993182+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, merge-retried, automation-limit-reached
+    new: health, automation-limit-reached

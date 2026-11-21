@@ -1,15 +1,19 @@
 title: 'A usage-limit pause has no upper bound: its queue worker stays in memory until the reset, also one in 2099'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T21:10:33.155601+00:00
-modified: 2026-11-22T00:29:46.198686+00:00
+modified: 2026-11-22T05:33:15.539320+00:00
 relationships:
   related:
   - DEV-763
   - TEST-1
+  - DEV-711
+  - DEV-740
+  - DEV-756
+  - DEV-757
 comments:
 - date: 2026-11-22T00:29:35.142441+00:00
   author: claude
@@ -34,6 +38,19 @@ comments:
       result: passed
       reason: '406'
     next: Review on another model, then merge
+- date: 2026-11-22T05:33:03.471458+00:00
+  author: claude
+  text: |-
+    Review: passed. `539a9cb37` does what "Done when" asks; no findings, no tickets filed.
+
+    - Read: the ticket, DEV-763, AGENTS.md, the diff `main...HEAD` (4 files), and the last commits on main to those files (DEV-740, DEV-711, DEV-757, DEV-756): nothing the fix relies on changed. Merges cleanly onto main `4df8f767b`.
+    - Cap: `UsageLimit::ignored_reset` (`crates/lotar-agent/src/services/usage_limit.rs:60`) ignores a `resets_at` past now + 7 days. It applies after the typed `resets_at` or text time has won, so both sources are capped. Exactly 7 days is kept, with the one-minute minimum still on.
+    - Note (`agent_job_service.rs:5478`): uses the same `now` as `resume_at`, so the wording and the time can't disagree. Text: `after the default wait (ignored the named reset <time>, more than 7 days away)`.
+    - Only caller: `usage_limit_pause`. No other code reads `resets_at`.
+    - Tests: new unit tests for past 7 days and exactly 7 days. A new integration test for 2099 checks the default wait, the note, and that the retry completes. On main they fail (`ignored_reset` is missing, and the pause waits until 2099). The two old 2099 tests now use a reset 3 days ahead, which keeps them meaningful.
+    - Docs: `docs/help/agent.md#usage-limits` updated.
+    - Reran: `npm ci` (ok), `cargo nextest run -p lotar-agent usage_limit` (15 passed), `cargo nextest run -p lotar-lib --test integration dev584` (5 passed), `npm run lint` (exit 0). Not rerun: full `npm test` and `npm run smoke` (the fix agent reports both passed).
+    - Not UI work, so no screenshots. Worktree unchanged.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A624acfd33bfac1adf31ec51122352a40df846c6308663862b5164f0916e606ec
 description: |-
@@ -133,3 +150,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T05:33:03.471458+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T05:33:05.362129+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-763","TEST-1"]}'
+    new: '{"related":["DEV-763","TEST-1","DEV-711","DEV-740","DEV-756","DEV-757"]}'
+- at: 2026-11-22T05:33:15.539320+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,11 +1,11 @@
 title: docs/help/automation.md's job_paused names two causes; a taken-over job that runs again in a new session (DEV-734) is a third
-status: Blocked
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@review'
 created: 2026-11-20T20:32:12.764651+00:00
-modified: 2026-11-20T22:25:04.377664+00:00
+modified: 2026-11-22T05:59:30.385626+00:00
 relationships:
   depends_on:
   - DEV-734
@@ -210,3 +210,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-22T05:59:30.385626+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Reviewing
