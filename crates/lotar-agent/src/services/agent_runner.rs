@@ -198,6 +198,24 @@ pub fn continuable_session(name: &str, agent: &str, tasks_dir: &std::path::Path)
     Ok(record)
 }
 
+/// Why a job's session didn't open.
+#[derive(Debug)]
+pub enum OpenSessionError {
+    /// The agent refused to resume or load the session, as Claude does when it never wrote the session's transcript:
+    /// a new session can take its place (DEV-757).
+    NotResumable(String),
+    /// Anything else: the agent's program, files, sockets.
+    Other(String),
+}
+
+impl std::fmt::Display for OpenSessionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotResumable(message) | Self::Other(message) => f.write_str(message),
+        }
+    }
+}
+
 /// Opens a job's session: the existing one for `resume` (still open in this process, else resumed), otherwise a new
 /// one under `name`, which replaces an earlier session of that name nobody runs.
 pub fn open_session(
@@ -207,7 +225,7 @@ pub fn open_session(
     table: &harnessmux::AgentTable,
     profile: harnessmux::Profile,
     resume: bool,
-) -> Result<harnessmux::Session, String> {
+) -> Result<harnessmux::Session, OpenSessionError> {
     let registry = registry();
     let owned = OWNED.lock().ok().and_then(|owned| owned.get(name).cloned());
     let session = block_on(async {
@@ -225,7 +243,7 @@ pub fn open_session(
                 && let Ok(mut record) = registry.load(name)
             {
                 record.state = harnessmux::SessionState::Idle;
-                registry.save(&record).map_err(|err| err.to_string())?;
+                registry.save(&record).map_err(|err| OpenSessionError::Other(err.to_string()))?;
             }
         }
         if resume {
@@ -239,17 +257,20 @@ pub fn open_session(
             // one of the job that started it: a merge that continues the review's session runs as the merge profile.
             if let Ok(mut record) = registry.load(name) {
                 record.profile.env = profile.env;
-                registry.save(&record).map_err(|err| err.to_string())?;
+                registry.save(&record).map_err(|err| OpenSessionError::Other(err.to_string()))?;
             }
-            return harnessmux::Session::resume(registry, table, name, Some(SESSION_IDLE_TTL)).await.map_err(|err| err.to_string());
+            return harnessmux::Session::resume(registry, table, name, Some(SESSION_IDLE_TTL)).await.map_err(|err| match err {
+                harnessmux::Error::Protocol(_) => OpenSessionError::NotResumable(err.to_string()),
+                err => OpenSessionError::Other(err.to_string()),
+            });
         }
         if let Ok(existing) = registry.load(name)
             && existing.state != harnessmux::SessionState::Ended
             && let Some(pid) = existing.owner_pid.filter(|pid| *pid != std::process::id() && crate::services::agent_active_jobs::process_alive(*pid))
         {
-            return Err(format!("the session {name} is in use by process {pid}; close it with `harnessmux close {name}`"));
+            return Err(OpenSessionError::Other(format!("the session {name} is in use by process {pid}; close it with `harnessmux close {name}`")));
         }
-        registry.remove(name).map_err(|err| err.to_string())?;
+        registry.remove(name).map_err(|err| OpenSessionError::Other(err.to_string()))?;
         let options = harnessmux::StartOptions {
             name: Some(name.to_string()),
             agent: agent.to_string(),
@@ -257,7 +278,7 @@ pub fn open_session(
             profile,
             idle_ttl: Some(SESSION_IDLE_TTL),
         };
-        harnessmux::Session::start(registry, table, options).await.map_err(|err| err.to_string())
+        harnessmux::Session::start(registry, table, options).await.map_err(|err| OpenSessionError::Other(err.to_string()))
     })?;
     if let Ok(mut owned) = OWNED.lock() {
         owned.insert(name.to_string(), session.clone());

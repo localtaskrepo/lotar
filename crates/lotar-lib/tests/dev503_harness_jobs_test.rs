@@ -21,7 +21,8 @@ use std::time::{Duration, Instant};
 /// and says which option it got; `$FAKE_HOLD` (a file it creates) keeps the first prompt running until a cancel;
 /// `$FAKE_SLOW` sleeps that many seconds before it answers; `$FAKE_RUN` is a shell command it runs in the session's
 /// working directory before it answers. `$FAKE_PREFACE` is a reply chunk it sends as soon as a prompt arrives;
-/// `$FAKE_COST` the cost of each turn, reported as the session's total so far. It offers one config option,
+/// `$FAKE_COST` the cost of each turn, reported as the session's total so far; `$FAKE_NO_RESUME` refuses resume and load
+/// as Claude does when the session's transcript is gone. It offers one config option,
 /// `reasoning_effort` (`high` or `ultra`).
 const FAKE_ACP_AGENT: &str = r#"#!/bin/sh
 turn=0
@@ -48,6 +49,10 @@ while IFS= read -r line; do
       cwd=$(printf '%s' "$line" | sed -nE 's/.*"cwd":"([^"]*)".*/\1/p')
       respond "$id" '{"sessionId":"fake-1","configOptions":[{"id":"reasoning_effort","name":"Reasoning","type":"select","currentValue":"high","options":[{"value":"high","name":"High"},{"value":"ultra","name":"Ultra"}]}]}' ;;
     *'"method":"session/resume"'*|*'"method":"session/load"'*)
+      if [ -n "$FAKE_NO_RESUME" ]; then
+        printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32002,"message":"Resource not found: sessionId fake-1"}}\n' "$id"
+        continue
+      fi
       cwd=$(printf '%s' "$line" | sed -nE 's/.*"cwd":"([^"]*)".*/\1/p')
       respond "$id" '{}' ;;
     *'"method":"session/set_config_option"'*)
@@ -298,6 +303,59 @@ fn session_continue_starts_a_new_session_with_a_handoff_after_the_time() {
     assert_eq!(log.matches("\"method\":\"session/new\"").count(), 2, "{log}");
     assert!(!log.contains("\"method\":\"session/resume\""), "{log}");
     assert!(log.contains("Handoff:") && log.contains("Review: blocking, the test is missing"), "the handoff reaches the agent: {log}");
+}
+
+/// DEV-757: the agent refuses to resume the session (Claude never wrote its transcript), so the continue job starts a
+/// new session with the handoff instead of failing, and its log names the session and the error.
+#[test]
+fn a_continue_job_whose_session_cant_be_resumed_starts_a_new_one_with_a_handoff() {
+    let harness = harness("", &[("FAKE_NO_RESUME", "1".into())]);
+    harness.run(&[]).success();
+    let mut storage = harness.fixtures.create_storage();
+    TaskService::add_comment(&mut storage, "TEST-1", "Review: blocking, the test is missing").unwrap();
+    let notes = continue_job(&harness);
+    let note = notes.iter().find(|note| note.contains("could not be resumed")).unwrap_or_else(|| panic!("{notes:?}"));
+    assert!(note.contains("-TEST-1-fixer") && note.contains("Resource not found: sessionId fake-1"), "{note}");
+    let log = harness.log();
+    assert!(log.contains("\"method\":\"session/resume\""), "it tried to resume first: {log}");
+    assert_eq!(log.matches("\"method\":\"session/new\"").count(), 2, "{log}");
+    assert!(log.contains("Handoff:") && log.contains("could not be resumed") && log.contains("Review: blocking, the test is missing"), "{log}");
+    let sessions = harness.root().join("harnessmux/state/sessions");
+    let kept = std::fs::read_dir(&sessions)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .any(|path| path.to_string_lossy().strip_suffix(".events.jsonl").is_some_and(|name| name.contains("-TEST-1-fixer.")));
+    assert!(kept, "the session it couldn't continue keeps its event log");
+}
+
+/// DEV-757: a session start that fails for another reason than the session (here the agent's program is gone) still
+/// fails the continue job, and no new session takes the old one's place.
+#[test]
+fn a_continue_job_whose_agent_cant_start_still_fails() {
+    let harness = harness("", &[]);
+    harness.run(&[]).success();
+    let agents = harness.root().join("harnessmux/config/agents.toml");
+    std::fs::write(&agents, format!("[agents.claude]\ncommand = [\"{}\"]\n", harness.root().join("missing-agent").display())).unwrap();
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let req = AgentJobCreateRequest {
+        ticket_id: "TEST-1".into(),
+        prompt: "Rework it".into(),
+        agent: Some("fixer".into()),
+        session: Some(lotar::config::types::AgentSession::Continue),
+        ..Default::default()
+    };
+    let job = AgentJobService::start_job_with_tasks_dir(req, harness.fixtures.tasks_root.as_path()).unwrap().id;
+    wait_for("the job's failure", || status(&job) == "failed");
+    let message = AgentJobService::get_job(&job).and_then(|job| job.last_message).unwrap_or_default();
+    assert!(message.starts_with("Could not start the claude session "), "{message}");
+    let notes: Vec<String> = AgentJobService::events_for(&job).into_iter().filter_map(|event| event.message).collect();
+    assert!(!notes.iter().any(|note| note.contains("could not be resumed")), "{notes:?}");
+    let sessions = harness.root().join("harnessmux/state/sessions");
+    let kept = std::fs::read_dir(&sessions).unwrap().any(|entry| {
+        let file = entry.unwrap().file_name().to_string_lossy().to_string();
+        file.strip_suffix(".events.jsonl").or_else(|| file.strip_suffix(".json")).is_some_and(|name| name.contains("-TEST-1-fixer."))
+    });
+    assert!(!kept, "the old session stays as it was");
 }
 
 /// DEV-611: the new session takes the skipped one's name, so the skipped round's event log is kept under

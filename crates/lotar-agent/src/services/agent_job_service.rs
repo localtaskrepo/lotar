@@ -2165,7 +2165,7 @@ fn resume_session_to_end(
         let env = crate::services::agent_runner::registry().load(name).map(|record| record.profile.env.into_iter().collect()).unwrap_or_default();
         let profile = crate::services::agent_runner::session_profile(profile, env)?;
         let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
-        crate::services::agent_runner::open_session(name, agent, &cwd, &table, profile, true).map_err(LoTaRError::ValidationError)
+        crate::services::agent_runner::open_session(name, agent, &cwd, &table, profile, true).map_err(|err| LoTaRError::ValidationError(err.to_string()))
     })();
     let session = match session {
         Ok(session) => session,
@@ -3478,6 +3478,7 @@ fn run_job(
     // A session idle past the agent's prompt cache costs a full cache write
     // to resume; a new one with a handoff is cheaper (DEV-603).
     let mut handoff_from = None;
+    let mut handoff_why = "it was idle too long";
     if let Some(record) = continued.as_ref()
         && let Some(idle) = idle_since(&record.last_used)
     {
@@ -3507,6 +3508,7 @@ fn run_job(
             record.name
         ));
         handoff_from = continued.take();
+        handoff_why = "its T3 Code thread runs in a worktree T3 Code made";
     }
     // A resumed session runs on the model and effort it started with, also
     // a merge that continues the reviewer's (DEV-672): the job shows those.
@@ -3621,7 +3623,7 @@ fn run_job(
         None => None,
     };
     let prompt = match handoff_from.as_ref() {
-        Some((record, events)) => format!("{prompt}{}", handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record, events)),
+        Some((record, events)) => format!("{prompt}{}", handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record, events, handoff_why)),
         None => prompt,
     };
     let env = job_env(&job_id, &tasks_dir, &ticket_id, &config);
@@ -3633,6 +3635,7 @@ fn run_job(
                 agent,
                 runner_kind,
                 name: &name,
+                ticket_ref: &ticket_ref,
                 resume: continued.is_some(),
                 cwd: &worktree_context.working_dir,
                 writable_dirs: extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job),
@@ -3655,15 +3658,23 @@ fn idle_since(last_used: &str) -> Option<SignedDuration> {
 }
 
 /// What a job that starts a new session instead of resuming an idle one
-/// (DEV-603) tells its agent: the session it didn't continue, the ticket's
-/// branch and newest commit, and the ticket's newest comments, where the
-/// earlier rounds' handoffs and reviews are. `events` is that session's
-/// event log, kept when the new session takes its name (DEV-611).
-fn handoff_text(tasks_dir: &std::path::Path, ticket_id: &str, ticket_ref: &str, record: &harnessmux::SessionRecord, events: &std::path::Path) -> String {
+/// (DEV-603) or one that can't be resumed (DEV-757) tells its agent: the
+/// session it didn't continue and `why`, the ticket's branch and newest
+/// commit, and the ticket's newest comments, where the earlier rounds'
+/// handoffs and reviews are. `events` is that session's event log, kept
+/// when the new session takes its name (DEV-611).
+fn handoff_text(
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    ticket_ref: &str,
+    record: &harnessmux::SessionRecord,
+    events: &std::path::Path,
+    why: &str,
+) -> String {
     const COMMENTS: usize = 3;
     const COMMENT_CHARS: usize = 1500;
     let mut out = format!(
-        "\nHandoff:\nThis job would have continued the session {} ({} agent, last used {}), but it was idle too long, so it starts a new one. Pick up from the earlier rounds below.\n",
+        "\nHandoff:\nThis job would have continued the session {} ({} agent, last used {}), but {why}, so it starts a new one. Pick up from the earlier rounds below.\n",
         record.name, record.agent, record.last_used
     );
     if events.is_file() {
@@ -4080,6 +4091,8 @@ struct SessionLaunch<'a> {
     agent: &'a str,
     runner_kind: AgentRunnerKind,
     name: &'a str,
+    /// The ticket's branch, for a handoff.
+    ticket_ref: &'a str,
     /// Continue the ticket's session instead of starting a new one.
     resume: bool,
     cwd: &'a std::path::Path,
@@ -4139,9 +4152,36 @@ fn run_session(
         Err(err) => return RunEnd::Failed(err.to_string()),
     };
     let t3_profile_env = session_profile.env.clone();
+    // A session the agent can't resume gets a new one with a handoff (DEV-757);
+    // not a t3 one, whose thread may still run in T3 Code (DEV-738).
+    let fallback_profile = (launch.resume && launch.runner_kind != AgentRunnerKind::T3).then(|| session_profile.clone());
+    let mut resumed = launch.resume;
+    let mut prompt = std::borrow::Cow::Borrowed(prompt);
+    let failed = |err: &dyn std::fmt::Display| RunEnd::Failed(format!("Could not start the {} session {}: {err}", launch.agent, launch.name));
     let session = match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, &table, session_profile, launch.resume) {
         Ok(session) => session,
-        Err(err) => return RunEnd::Failed(format!("Could not start the {} session {}: {err}", launch.agent, launch.name)),
+        Err(crate::services::agent_runner::OpenSessionError::NotResumable(err)) if fallback_profile.is_some() => {
+            let (record, events) = match crate::services::agent_runner::keep_session(launch.name) {
+                Ok(kept) => kept,
+                Err(keep_err) => return failed(&format!("{err}; keeping it for a new one failed: {keep_err}")),
+            };
+            let note = format!(
+                "This job would have continued the session {}, but it could not be resumed ({err}), so it starts a new one with a handoff.",
+                launch.name
+            );
+            update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+            let why = format!("it could not be resumed ({err})");
+            prompt = std::borrow::Cow::Owned(format!("{prompt}{}", handoff_text(tasks_dir, ticket_id, launch.ticket_ref, &record, &events, &why)));
+            resumed = false;
+            let profile = fallback_profile.unwrap_or_default();
+            match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, &table, profile, false) {
+                Ok(session) => session,
+                Err(err) => return failed(&err),
+            }
+        }
+        Err(err) => return failed(&err),
     };
     if !publish_session(job_id, &session) {
         let _ = block_on(session.cancel());
@@ -4155,12 +4195,12 @@ fn run_session(
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
     }
-    let how = if launch.resume { "Continuing the session" } else { "Session" };
+    let how = if resumed { "Continuing the session" } else { "Session" };
     update_job(job_id, |state| {
         let note = format!("{how} {} (`harnessmux attach {}` follows it).", launch.name, launch.name);
         record_and_emit(state, "agent_job_progress", Some(note));
     });
-    drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile, context_messages)
+    drive_session(job_id, tasks_dir, &session, &prompt, &working_dir_prefixes(launch.cwd), profile, context_messages)
 }
 
 /// Write the profile's `tools.disallowed` and `env` into the Claude settings
