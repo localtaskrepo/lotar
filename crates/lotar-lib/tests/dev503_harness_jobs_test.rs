@@ -498,8 +498,8 @@ fn a_message_runs_as_the_next_turn_of_the_same_job() {
     assert_eq!(job.usage.as_ref().and_then(|usage| usage.input_tokens), Some(24), "input counts cached tokens");
     let events = AgentJobService::events_for(&job.id);
     assert!(events.iter().any(|e| e.kind == "agent_job_input" && e.message.as_deref() == Some("pineapple")));
-    let tools: Vec<_> = events.iter().filter(|e| e.kind == "agent_job_progress").filter_map(|e| e.message.clone()).collect();
-    assert!(tools.iter().any(|message| message == "Tool: Read notes.md"), "tool paths are relative: {tools:?}");
+    let tools: Vec<_> = events.iter().filter(|e| e.kind == "agent_job_tool").filter_map(|e| e.tool.as_ref()).map(|tool| tool.title.clone()).collect();
+    assert!(tools.iter().any(|title| title == "Read notes.md"), "tool paths are relative: {tools:?}");
 }
 
 #[test]

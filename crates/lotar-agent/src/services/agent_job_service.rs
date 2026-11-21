@@ -28,6 +28,7 @@ mod follow;
 mod kept;
 mod merge;
 mod resumed;
+mod tools;
 mod watch;
 
 pub use follow::LogFollower;
@@ -910,6 +911,7 @@ fn saved_events(saved: &crate::services::agent_log_service::SavedJob) -> Vec<Age
             sequence: entry.sequence.unwrap_or(line),
             at: entry.at.clone(),
             message: entry.message.clone(),
+            tool: entry.tool.clone(),
         })
         .collect()
 }
@@ -4547,6 +4549,23 @@ fn drive_turns(
     use harnessmux::EventBody;
     let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, link } = settings;
     let mut reply = ReplyStream::default();
+    // The agent's thinking, by paragraph like its reply (DEV-766).
+    let mut thought = ReplyStream::default();
+    let mut tools = tools::ToolCalls::default();
+    let thought_part = |part: String| {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_thought", Some(part.clone()));
+        });
+    };
+    let tool_entry = |tool: crate::api_types::AgentJobTool| {
+        update_job(job_id, |state| {
+            let event = record_tool(state, tool.clone());
+            // What the agent does now, as before DEV-766: a tool's start, or its failure.
+            if tool.status != "completed" {
+                state.record.last_message = event.message;
+            }
+        });
+    };
     let progress = |message: String| {
         update_job(job_id, |state| {
             state.record.last_message = Some(message.clone());
@@ -4600,7 +4619,7 @@ fn drive_turns(
             session.cancel();
             return RunEnd::Stopped;
         }
-        let event = match events.next(Duration::from_millis(200)) {
+        let mut event = match events.next(Duration::from_millis(200)) {
             Ok(None) => continue,
             Err(why) => return RunEnd::Failed(format!("The session {} {why}", session.name())),
             Ok(Some(event)) => event,
@@ -4613,11 +4632,19 @@ fn drive_turns(
         if matches!(event.body, EventBody::TurnStarted { .. }) {
             in_turn = true;
         }
-        if matches!(event.body, EventBody::ToolStarted { .. } | EventBody::PermissionRequested { .. })
+        // Thinking ends where the agent acts or replies.
+        if !matches!(event.body, EventBody::ThoughtDelta { .. } | EventBody::Usage(_) | EventBody::ConfigChanged { .. })
+            && let Some(part) = thought.flush()
+        {
+            thought_part(part);
+        }
+        if matches!(event.body, EventBody::ToolStarted { .. } | EventBody::PermissionRequested { .. } | EventBody::ThoughtDelta { .. })
             && let Some(part) = reply.flush()
         {
             reply_part(part);
         }
+        let at = event.ts.clone();
+        let raw = event.raw.take();
         match event.body {
             EventBody::SessionStarted { agent, how, agent_session, link: session_link, .. } => {
                 meter.total = 0.0;
@@ -4656,10 +4683,13 @@ fn drive_turns(
                     state.record.last_message = Some(text.clone());
                 });
             }
-            EventBody::ToolStarted { title, .. } => progress(format!("Tool: {}", strip_prefixes(&title, prefixes))),
-            EventBody::ToolFinished { status, title, id } if status == "failed" => {
-                progress(format!("Failed: {}", strip_prefixes(title.as_deref().unwrap_or(&id), prefixes)));
+            EventBody::ThoughtDelta { text } => {
+                if let Some(part) = thought.push(&text) {
+                    thought_part(part);
+                }
             }
+            EventBody::ToolStarted { id, title, kind } => tool_entry(tools.started(id, &title, kind, raw.as_ref(), at, prefixes)),
+            EventBody::ToolFinished { id, status, title } => tool_entry(tools.finished(id, &status, title.as_deref(), raw.as_ref(), at, prefixes)),
             EventBody::PermissionRequested { request, title, options } => {
                 let question = crate::api_types::AgentJobQuestion {
                     request,
@@ -4686,6 +4716,10 @@ fn drive_turns(
                 record_and_emit(state, "agent_job_progress", Some(message));
             }),
             EventBody::Usage(usage) => {
+                if usage.context_used.is_some() || usage.context_size.is_some() {
+                    let context = crate::api_types::AgentJobUsage { context_used: usage.context_used, context_size: usage.context_size, ..Default::default() };
+                    update_job(job_id, |state| state.record.usage.get_or_insert_with(Default::default).add(&context));
+                }
                 if let Some(total) = usage.cost_usd {
                     reported_cost = true;
                     meter.report(total);
@@ -4751,6 +4785,7 @@ fn drive_turns(
             reply_part(part);
         }
         reply = ReplyStream::default();
+        thought = ReplyStream::default();
         in_turn = false;
         turns += 1;
         update_job(job_id, |state| state.record.question = None);
@@ -6026,9 +6061,14 @@ fn should_stop_job(job_id: &str) -> bool {
 }
 
 fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
+    push_entry(state, kind, message, None)
+}
+
+/// [`push_event`] with an entry's tool call (DEV-766).
+fn push_entry(state: &mut AgentJobState, kind: &str, message: Option<String>, tool: Option<crate::api_types::AgentJobTool>) -> AgentJobEvent {
     let at = time::now_rfc3339();
     state.next_sequence = state.next_sequence.saturating_add(1);
-    let event = AgentJobEvent { kind: kind.to_string(), sequence: state.next_sequence, at: at.clone(), message };
+    let event = AgentJobEvent { kind: kind.to_string(), sequence: state.next_sequence, at: at.clone(), message, tool };
     state.events.push(event.clone());
     if state.events.len() > EVENT_LOG_LIMIT {
         let start = state.events.len().saturating_sub(EVENT_LOG_LIMIT);
@@ -6047,6 +6087,7 @@ fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) ->
                 at: event.at.clone(),
                 message: event.message.clone(),
                 sequence: Some(event.sequence),
+                tool: event.tool.clone(),
             },
         });
     }
@@ -6086,6 +6127,7 @@ fn job_event_payload(job: &AgentJob, event: &AgentJobEvent) -> serde_json::Value
         "sequence": event.sequence,
         "at": event.at,
         "message": event.message,
+        "tool": event.tool,
         "worktree_path": job.worktree_path,
         "worktree_branch": job.worktree_branch,
         "model": job.model,
@@ -6125,6 +6167,13 @@ fn prune_finished_jobs(registry: &mut JobRegistry) {
 /// log would show it.
 fn record_and_emit(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
     let event = push_event(state, kind, message);
+    emit_job_event(&event, &state.record);
+    event
+}
+
+/// Record a tool call's entry and stream it (DEV-766).
+fn record_tool(state: &mut AgentJobState, tool: crate::api_types::AgentJobTool) -> AgentJobEvent {
+    let event = push_entry(state, "agent_job_tool", Some(tools::tool_line(&tool)), Some(tool));
     emit_job_event(&event, &state.record);
     event
 }
@@ -7613,9 +7662,9 @@ mod dev520_session_events_tests {
         EventBody::TurnFinished { stop_reason: StopReason::EndTurn, usage: Usage::default() }
     }
 
-    fn drive(events: &mut SessionEvents, tasks_dir: &Path) -> RunEnd {
+    fn drive(events: &mut SessionEvents, tasks_dir: &Path, job_id: &str) -> RunEnd {
         let settings = TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None };
-        drive_turns("dev520-test", tasks_dir, &Idle, events, settings, CostMeter::default(), &mut Vec::new())
+        drive_turns(job_id, tasks_dir, &Idle, events, settings, CostMeter::default(), &mut Vec::new())
     }
 
     #[test]
@@ -7636,11 +7685,11 @@ mod dev520_session_events_tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("finished.jsonl");
         let mut events = lagged(finished(), Ok(path.clone()), &path);
-        assert!(matches!(drive(&mut events, dir.path()), RunEnd::Exited(Some(0))));
+        assert!(matches!(drive(&mut events, dir.path(), "dev520-test"), RunEnd::Exited(Some(0))));
 
         let path = dir.path().join("failed.jsonl");
         let mut events = lagged(EventBody::failed("boom"), Ok(path.clone()), &path);
-        assert!(matches!(drive(&mut events, dir.path()), RunEnd::Exited(Some(1))));
+        assert!(matches!(drive(&mut events, dir.path(), "dev520-test"), RunEnd::Exited(Some(1))));
     }
 
     #[test]
@@ -7648,31 +7697,31 @@ mod dev520_session_events_tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("events.jsonl");
         let mut events = lagged(finished(), Err("no status".into()), &path);
-        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("an unknown log fails the job") };
+        let RunEnd::Failed(why) = drive(&mut events, dir.path(), "dev520-test") else { panic!("an unknown log fails the job") };
         assert!(why.contains("can't read back") && why.contains("no status"), "{why}");
 
         // A directory where the log should be: reading it fails.
         let unreadable = dir.path().join("unreadable");
         std::fs::create_dir(&unreadable).unwrap();
         let mut events = lagged(finished(), Ok(unreadable), &path);
-        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("an unreadable log fails the job") };
+        let RunEnd::Failed(why) = drive(&mut events, dir.path(), "dev520-test") else { panic!("an unreadable log fails the job") };
         assert!(why.contains("can't read back"), "{why}");
 
         // harnessmux hasn't created the log, or another one is written.
         let mut events = lagged(finished(), Ok(dir.path().join("missing.jsonl")), &path);
-        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("a missing log fails the job") };
+        let RunEnd::Failed(why) = drive(&mut events, dir.path(), "dev520-test") else { panic!("a missing log fails the job") };
         assert!(why.contains("doesn't have them"), "{why}");
 
         // A broken line where turn 1's end should be: the gap shows.
         let broken = dir.path().join("broken.jsonl");
         let mut events = lagged_with(finished(), Ok(broken.clone()), &broken, |seq| seq != 100);
-        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("a log with a gap fails the job") };
+        let RunEnd::Failed(why) = drive(&mut events, dir.path(), "dev520-test") else { panic!("a log with a gap fails the job") };
         assert!(why.contains("events 100 to 100"), "{why}");
 
         // Broken lines from the first event through turn 1's end: the gap before the first event lotar sees shows too.
         let broken = dir.path().join("broken-start.jsonl");
         let mut events = lagged_with(finished(), Ok(broken.clone()), &broken, |seq| seq > 100);
-        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("a log missing its first events fails the job") };
+        let RunEnd::Failed(why) = drive(&mut events, dir.path(), "dev520-test") else { panic!("a log missing its first events fails the job") };
         assert!(why.contains("events 1 to 100"), "{why}");
     }
 
@@ -7794,5 +7843,85 @@ mod dev520_session_events_tests {
         assert_eq!(state.record.last_message.as_deref(), Some(error));
         let messages = state.events.iter().filter_map(|entry| entry.message.as_deref()).collect::<Vec<_>>();
         assert_eq!(messages, [error, "The agent reported no cost, so the profile's max_budget_usd was not checked."]);
+    }
+    /// DEV-766: tool calls are `agent_job_tool` entries with what the raw ACP update holds, thinking is
+    /// `agent_job_thought` by paragraph, and the context window is the job's latest.
+    #[test]
+    fn tool_calls_thinking_and_the_context_window_reach_the_job_and_its_log() {
+        let dir = tempfile::tempdir().unwrap();
+        let job_id = "job-dev766-tools";
+        let mut state = super::tests::unit_job_state(job_id);
+        state.record.workspace_root = dir.path().to_path_buf();
+        state.record.agent_logs_dir = Some("logs".to_string());
+        let header = crate::services::agent_log_service::JobLogHeader {
+            job_id: job_id.to_string(),
+            ticket_id: "DEV-1".to_string(),
+            runner: "claude".to_string(),
+            created_at: "2026-11-21T00:00:00Z".to_string(),
+            worktree_path: None,
+            worktree_branch: None,
+            model: None,
+            effort: None,
+            agent_profile: None,
+        };
+        super::AgentLogService::init_log(dir.path(), Some("logs"), header).unwrap();
+        super::JOB_REGISTRY.lock().unwrap().jobs.insert(job_id.to_string(), state);
+
+        let usage = |used| EventBody::Usage(Usage { context_used: Some(used), context_size: Some(200_000), ..Usage::default() });
+        let mut bodies: Vec<(EventBody, Option<serde_json::Value>)> = vec![
+            (usage(29_310), None),
+            (EventBody::ThoughtDelta { text: "Look at the diff first.\n\nThen ".into() }, None),
+            (EventBody::ThoughtDelta { text: "the tests.".into() }, None),
+        ];
+        // 40 Claude Bash calls with long, coloured output.
+        let output = format!("```console\n\u{1b}[32m{}\u{1b}[0m\n```", "x".repeat(20_000));
+        for call in 0..40 {
+            let id = format!("toolu_{call}");
+            let start = serde_json::json!({"update": {"sessionUpdate": "tool_call", "toolCallId": id, "title": "Terminal", "kind": "execute", "rawInput": {}}});
+            let end = serde_json::json!({"update": {"sessionUpdate": "tool_call_update", "toolCallId": id, "status": "completed",
+                "content": [{"type": "content", "content": {"type": "text", "text": output}}]}});
+            bodies.push((EventBody::ToolStarted { id: id.clone(), title: "Terminal".into(), kind: Some("execute".into()) }, Some(start)));
+            bodies.push((EventBody::ToolFinished { id, status: "completed".into(), title: None }, Some(end)));
+        }
+        let failed = serde_json::json!({"update": {"toolCallId": "exec-1", "status": "failed", "rawOutput": "error: no such file"}});
+        let codex = serde_json::json!({"update": {"toolCallId": "exec-1", "kind": "execute", "rawInput": {"command": "cat nope", "cwd": "/w"}}});
+        bodies.push((EventBody::ToolStarted { id: "exec-1".into(), title: "cat nope".into(), kind: Some("execute".into()) }, Some(codex)));
+        bodies.push((EventBody::ToolFinished { id: "exec-1".into(), status: "failed".into(), title: None }, Some(failed)));
+        bodies.push((usage(31_000), None));
+        bodies.push((finished(), None));
+
+        let (tx, rx) = tokio::sync::broadcast::channel(256);
+        let (mut events, _) = SessionEvents::open(Err("no log".into()), || rx);
+        for (seq, (body, raw)) in (1..).zip(bodies) {
+            tx.send(Event { raw, ts: format!("2026-11-21T21:00:{:02}.000Z", seq % 60), ..event(seq, 1, body) }).unwrap();
+        }
+        let end = drive(&mut events, dir.path(), job_id);
+        let state = super::JOB_REGISTRY.lock().unwrap().jobs.remove(job_id).unwrap();
+        assert!(matches!(end, RunEnd::Exited(Some(0))));
+
+        let usage = state.record.usage.unwrap();
+        assert_eq!((usage.context_used, usage.context_size), (Some(31_000), Some(200_000)), "the latest report, not a sum");
+        let thoughts = state.events.iter().filter(|e| e.kind == "agent_job_thought").filter_map(|e| e.message.as_deref()).collect::<Vec<_>>();
+        assert_eq!(thoughts, ["Look at the diff first.", "Then the tests."], "by paragraph, the rest before the first tool");
+
+        let log = std::fs::read_to_string(dir.path().join("logs").join(format!("{job_id}.jsonl"))).unwrap();
+        assert!(log.len() < 200 * 1024, "40 tool calls with long output: {} bytes", log.len());
+        let entries: Vec<crate::services::agent_log_service::JobLogEntry> = log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .filter(|line| line["kind"] == "agent_job_tool")
+            .map(|line| serde_json::from_value(line).unwrap())
+            .collect();
+        assert_eq!(entries.len(), 82, "a start and an end per call");
+        let first_end = entries[1].tool.as_ref().unwrap();
+        assert_eq!((first_end.status.as_str(), first_end.title.as_str()), ("completed", "Terminal"));
+        assert_eq!(first_end.output.as_deref().map(str::len), Some(super::tools::OUTPUT_LIMIT));
+        assert!(!first_end.output.as_deref().unwrap().contains('\u{1b}') && !first_end.output.as_deref().unwrap().starts_with("```"));
+        assert_eq!(first_end.output_bytes, Some(20_000));
+        assert_eq!(first_end.started_at.as_deref(), Some("2026-11-21T21:00:04.000Z"));
+        let failed = entries.last().unwrap();
+        assert_eq!(failed.message.as_deref(), Some("Failed: cat nope"));
+        let tool = failed.tool.as_ref().unwrap();
+        assert_eq!((tool.input.as_deref(), tool.output.as_deref()), (Some("cat nope"), Some("error: no such file")));
     }
 }

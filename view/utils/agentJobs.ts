@@ -10,6 +10,59 @@ export interface LogEntryView {
     tone: LogTone
     /** Commands and raw output read better in a monospace font. */
     mono: boolean
+    /** Shown below the text in a monospace block: the start of a failed tool's output. */
+    detail?: string
+    /** Shown folded behind its label (the agent's thinking). */
+    folded?: boolean
+}
+
+const TOOL_LABELS: Record<string, string> = {
+    execute: 'Run',
+    read: 'Read',
+    edit: 'Edit',
+    delete: 'Delete',
+    move: 'Move',
+    search: 'Search',
+    fetch: 'Fetch',
+    think: 'Think',
+}
+
+/** Lines of a failed tool's output shown in the log. */
+const FAILED_OUTPUT_LINES = 8
+
+function describeTool(entry: AgentJobLogEntry, text: string): LogEntryView {
+    const tool = entry.tool
+    // An entry without its tool (written by hand, or cut) reads like an old tool line.
+    if (!tool) return { label: 'Tool', text, tone: 'tool', mono: true }
+    const label = (tool.kind && TOOL_LABELS[tool.kind]) || 'Tool'
+    const what = tool.input?.trim() || tool.paths?.[0] || tool.title
+    if (tool.status === 'failed') {
+        const lines = (tool.output ?? '').trimEnd().split('\n')
+        const excerpt = lines.slice(0, FAILED_OUTPUT_LINES).join('\n')
+        const more = lines.length > FAILED_OUTPUT_LINES || tool.output_bytes ? '\n…' : ''
+        return {
+            label,
+            text: `${what} · failed`,
+            tone: 'danger',
+            mono: true,
+            detail: excerpt ? excerpt + more : undefined,
+        }
+    }
+    return { label, text: tool.status === 'running' ? `${what} · running` : what, tone: 'tool', mono: true }
+}
+
+/**
+ * The entries a log shows: a tool's start is left out once its end is in the log, since the end
+ * entry holds all of it (DEV-766).
+ */
+export function visibleLogEntries(entries: AgentJobLogEntry[]): AgentJobLogEntry[] {
+    const ended = new Set<string>()
+    for (const entry of entries) {
+        if (entry.kind === 'agent_job_tool' && entry.tool && entry.tool.status !== 'running') ended.add(entry.tool.id)
+    }
+    return entries.filter(
+        (entry) => !(entry.kind === 'agent_job_tool' && entry.tool?.status === 'running' && ended.has(entry.tool.id)),
+    )
 }
 
 // Tool calls are logged as "Tool: <title>" (agent_job_service::drive_session).
@@ -28,6 +81,10 @@ export function describeLogEntry(entry: AgentJobLogEntry): LogEntryView {
             return { label: 'Ready', text, tone: 'neutral', mono: false }
         case 'agent_job_message':
             return { label: 'Agent', text, tone: 'agent', mono: false }
+        case 'agent_job_tool':
+            return describeTool(entry, text)
+        case 'agent_job_thought':
+            return { label: 'Thinking', text, tone: 'note', mono: false, folded: true }
         case 'agent_job_input':
             return { label: 'You', text, tone: 'user', mono: false }
         case 'agent_job_question':

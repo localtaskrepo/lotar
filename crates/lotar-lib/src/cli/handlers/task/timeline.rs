@@ -120,6 +120,7 @@ mod tests {
             sequence: 1,
             at: "2026-01-01T10:01:00Z".into(),
             message: Some("Looking".into()),
+            tool: None,
         }];
         let timeline = TaskTimeline {
             task_id: "T-1".into(),

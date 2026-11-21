@@ -26,6 +26,7 @@ const EVENTS = [
     'agent_job_input',
     'agent_job_question',
     'agent_job_result',
+    'agent_job_tool',
     'agent_job_completed',
     'agent_job_failed',
     'agent_job_cancelled',
@@ -97,7 +98,8 @@ export function applyAgentJobEvent(kind: string, payload: AgentJobEventPayload |
         const previous = next.get(payload.id)
         const text = typeof payload.message === 'string' ? payload.message.trim() || null : null
         const message =
-            (kind === 'agent_job_progress' || kind === 'agent_job_message') && typeof payload.message === 'string'
+            (kind === 'agent_job_progress' || kind === 'agent_job_message' || kind === 'agent_job_tool') &&
+            typeof payload.message === 'string'
                 ? text
                 : (previous?.message ?? null)
         // Only the job's own process holds the question; elsewhere its event is

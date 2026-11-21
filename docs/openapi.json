@@ -10525,6 +10525,8 @@
               "output_tokens": { "type": "integer" },
               "cost_usd": { "type": "number" },
               "turns": { "type": "integer" },
+              "context_used": { "type": "integer", "description": "Tokens of the context window in use, the latest the agent reported" },
+              "context_size": { "type": "integer", "description": "The context window's size in tokens" },
               "premium_requests": { "type": "number" },
               "lines_added": { "type": "integer" },
               "lines_removed": { "type": "integer" }
@@ -10700,6 +10702,10 @@
           "message": {
             "type": "string",
             "nullable": true
+          },
+          "tool": {
+            "$ref": "#/components/schemas/AgentJobTool",
+            "description": "The tool call of an agent_job_tool entry."
           }
         },
         "required": [
@@ -10707,6 +10713,24 @@
           "sequence",
           "at"
         ]
+      },
+      "AgentJobTool": {
+        "type": "object",
+        "description": "One tool call of an agent job: an agent_job_tool log entry at its start (running) and one at its end (completed or failed), with the same id. The end entry holds everything known about the call.",
+        "properties": {
+          "id": { "type": "string", "description": "The agent's tool call id." },
+          "kind": { "type": "string", "description": "ACP tool kind: execute, read, edit, delete, move, search, fetch, think, other." },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["running", "completed", "failed"] },
+          "input": { "type": "string", "description": "The input for people: the command, the path, the query." },
+          "raw_input": { "type": "string", "description": "The tool's arguments as JSON, cut at 1 KB; on the end entry only." },
+          "paths": { "type": "array", "items": { "type": "string" }, "description": "Files the call works on." },
+          "output": { "type": "string", "description": "The tool's text output, ANSI codes removed, cut at 4 KB." },
+          "output_bytes": { "type": "integer", "format": "int64", "description": "The output's full size in bytes, only when output was cut." },
+          "started_at": { "type": "string" },
+          "finished_at": { "type": "string" }
+        },
+        "required": ["id", "title", "status"]
       },
       "AgentJobLogsResponse": {
         "type": "object",

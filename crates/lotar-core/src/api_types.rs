@@ -658,6 +658,12 @@ pub struct AgentJobUsage {
     pub lines_added: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lines_removed: Option<u64>,
+    /// Tokens in the agent's context window, as it last reported (DEV-766): the latest replaces the earlier one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_used: Option<u64>,
+    /// The size of the agent's context window, as it last reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_size: Option<u64>,
 }
 
 impl AgentJobUsage {
@@ -677,6 +683,8 @@ impl AgentJobUsage {
         self.premium_requests = sum(self.premium_requests, other.premium_requests);
         self.lines_added = sum(self.lines_added, other.lines_added);
         self.lines_removed = sum(self.lines_removed, other.lines_removed);
+        self.context_used = other.context_used.or(self.context_used);
+        self.context_size = other.context_size.or(self.context_size);
     }
 
     /// One line for people: "106,028 tokens in (93,837 cached), 588 out · $0.0040 · 4 turns".
@@ -769,6 +777,40 @@ pub struct AgentJob {
     pub question: Option<AgentJobQuestion>,
 }
 
+/// One tool call of an agent job (DEV-766): an `agent_job_tool` log entry at its start (`running`) and one at its end
+/// (`completed` or `failed`), with the same `id`. The end entry holds everything known about the call.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobTool {
+    /// The agent's tool call id.
+    pub id: String,
+    /// ACP tool kind: execute, read, edit, search, fetch, think, other, …
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    pub title: String,
+    /// running, completed or failed.
+    pub status: String,
+    /// The input for people: the command, the path, the query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<String>,
+    /// The tool's arguments as JSON, cut at 1 KB; on the end entry only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_input: Option<String>,
+    /// Files the call works on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paths: Vec<String>,
+    /// The tool's text output, ANSI codes removed, cut at 4 KB.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    /// The output's full size in bytes, only when `output` was cut.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
+}
+
 /// One entry of a job's log; `sequence` numbers a job's events from 1.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
@@ -777,6 +819,9 @@ pub struct AgentJobEvent {
     pub sequence: u64,
     pub at: String,
     pub message: Option<String>,
+    /// The tool call of an `agent_job_tool` entry.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tool: Option<AgentJobTool>,
 }
 
 /// Everything that happened on a task, oldest first (DEV-518): field changes, comments, commits of the task
@@ -1132,6 +1177,9 @@ pub struct AgentJobLogEntry {
     pub at: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub message: Option<String>,
+    /// The tool call of an `agent_job_tool` entry (DEV-766).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tool: Option<AgentJobTool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

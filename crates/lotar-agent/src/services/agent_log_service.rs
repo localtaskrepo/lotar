@@ -24,6 +24,9 @@ pub struct JobLogEntry {
     /// older versions have none; their events count by line.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub sequence: Option<u64>,
+    /// The tool call of an `agent_job_tool` entry (DEV-766).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tool: Option<crate::api_types::AgentJobTool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -463,7 +466,7 @@ mod tests {
     use tempfile::tempdir;
 
     fn entry(kind: &str, at: &str, message: Option<&str>) -> JobLogEntry {
-        JobLogEntry { kind: kind.to_string(), at: at.to_string(), message: message.map(str::to_string), sequence: None }
+        JobLogEntry { kind: kind.to_string(), at: at.to_string(), message: message.map(str::to_string), sequence: None, tool: None }
     }
 
     #[test]

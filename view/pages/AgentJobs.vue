@@ -270,7 +270,7 @@ import PageHeader from '../components/PageHeader.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import { formatDateTime, formatRelativeTime } from '../utils/date'
-import type { AgentJob, AgentJobLogEntry, AgentProfileInfo, AgentQueueStats } from '../api/types'
+import type { AgentJob, AgentJobLogEntry, AgentJobTool, AgentProfileInfo, AgentQueueStats } from '../api/types'
 import AgentJobLog from '../components/AgentJobLog.vue'
 import AgentRunDialog from '../components/AgentRunDialog.vue'
 import AgentSetupPanel from '../components/AgentSetupPanel.vue'
@@ -503,6 +503,7 @@ async function refresh(options: { silent?: boolean } = {}) {
 /** An agent_job_* SSE payload: the job's fields plus the event's message, time and log sequence. */
 type AgentJobEventPayload = Partial<Omit<AgentJob, 'last_message'>> & {
   message?: string | null
+  tool?: AgentJobTool | null
   at: string
   sequence: number
 }
@@ -519,7 +520,8 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
     started_at: payload.started_at || null,
     finished_at: payload.finished_at || null,
     exit_code: payload.exit_code ?? null,
-    last_message: payload.message || null,
+    // Thinking is no status line: it stays in the log, folded (DEV-766).
+    last_message: (kind !== 'agent_job_thought' && payload.message) || null,
     summary: payload.summary || null,
     session_id: payload.session_id || null,
     worktree_path: payload.worktree_path || null,
@@ -537,6 +539,7 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
       at: payload.at,
       message: payload.message ?? null,
       sequence: payload.sequence,
+      tool: payload.tool ?? null,
     }
     updateLogEntries(next.id, [entry])
   }
@@ -746,6 +749,8 @@ function setupSse() {
       'agent_job_init',
       'agent_job_progress',
       'agent_job_message',
+      'agent_job_tool',
+      'agent_job_thought',
       'agent_job_input',
       'agent_job_question',
       'agent_job_result',
@@ -773,6 +778,8 @@ function setupSse() {
     'agent_job_init',
     'agent_job_progress',
     'agent_job_message',
+    'agent_job_tool',
+    'agent_job_thought',
     'agent_job_input',
     'agent_job_question',
     'agent_job_result',

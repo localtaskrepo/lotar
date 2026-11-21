@@ -41,6 +41,8 @@ harnessmux installs the pinned ACP adapters (Claude, Codex) with npm on first us
 
 The agent's reply shows in the job log while it writes it: each finished paragraph (outside a code block) as it arrives, the rest when a tool starts, the agent asks for permission or the turn ends.
 
+Its thinking shows the same way, as `agent_job_thought` entries, when the agent sends it (Claude, Codex). Each tool call is an `agent_job_tool` entry at its start and one at its end, with the same `tool.id` and what the agent reports: the kind (`execute`, `read`, `edit`, `search`, `fetch`, …), the title, the status (`running`, `completed`, `failed`), the input (the command, or the file path or search query), the paths it touches, and the output with ANSI escapes removed. The output keeps its first 4 KB; `output_bytes` holds the full size when it was cut, and `raw_input` the agent's raw arguments up to 1 KB. A call whose start never came gets one entry at its end. Claude's commands only reach LoTaR once it moves to harnessmux 0.3 ([DEV-774](https://lotar.pyxzl.net/task/DEV-774)); until then a Claude `Bash` call shows its title.
+
 A job ends when its session's last turn ends: completed for a normal end, failed when the turn fails, the agent sends a known error (a missing model, a sign-in failure) as its reply, or the job's cost passes the profile's [`max_budget_usd`](#usage-and-cost).
 
 ### Stalls and tickets that move on
@@ -142,7 +144,7 @@ Values may use letters, digits and `. _ - : / @ [ ]`. Jobs show their model and 
 
 ### Usage and cost
 
-At the end of each turn LoTaR adds what the agent reports to the job's usage: input tokens (with cached), output tokens, turns, and the cost in USD where the agent reports one (Claude). Agents report the session's cost so far; a job's cost is what its turns added to it. Turns are the job's turns in its session. Copilot's premium requests and changed lines and Claude's model round trips are not reported over ACP, so jobs no longer show them; jobs from before the switch to harnessmux keep theirs. The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
+At the end of each turn LoTaR adds what the agent reports to the job's usage: input tokens (with cached), output tokens, turns, and the cost in USD where the agent reports one (Claude), plus the context window: `context_used` of `context_size` tokens, the latest the agent reported. Agents report the session's cost so far; a job's cost is what its turns added to it. Turns are the job's turns in its session. Copilot's premium requests and changed lines and Claude's model round trips are not reported over ACP, so jobs no longer show them; jobs from before the switch to harnessmux keep theirs. The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
 
 With `max_budget_usd` in the profile, LoTaR cancels the agent's turn and fails the job as soon as the job's cost passes it, for every agent that reports cost. A job whose agent reports none logs that the budget was not checked.
 
@@ -356,7 +358,7 @@ The Agents page lists jobs grouped by ticket and updates live over SSE:
 
 - Each ticket shows its title, current status and assignee, and the order its jobs ran in (for example `@implement → @test`).
 - Each job shows its agent, runner, model and effort, when it started and how long it ran, its branch (hover for the worktree path), the exit code when it failed, and the agent's last message.
-- **Show logs** opens a timeline of the job: tool calls, the agent's messages, denied tools and notes from LoTaR (worktree, commits, fast-forwards).
+- **Show logs** opens a timeline of the job: tool calls (the command or path, `running` until the call ends, a failed call in red with the first lines of its output), the agent's messages, its thinking (folded, click to open), denied tools and notes from LoTaR (worktree, commits, fast-forwards).
 - **Run agent** (or **Run again** on a ticket) starts a job on a ticket without changing its assignee; pick the agent profile and optionally a model, effort and request. Clicking a profile in the profile list opens the same dialog.
 - You can stop a running job, remove a queued one, or stop all of them. While a job runs you can send it a message, its session's next turn (not for `command` jobs). An agent's permission question shows on its job's card with a button per option (profile `on_permission: ask`).
 

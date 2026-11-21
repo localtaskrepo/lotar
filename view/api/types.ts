@@ -1804,6 +1804,10 @@ export interface AgentJobUsage {
     premium_requests?: number
     lines_added?: number
     lines_removed?: number
+    /** Tokens in the agent's context window, as it last reported. */
+    context_used?: number
+    /** The context window's size, as the agent last reported. */
+    context_size?: number
 }
 
 export interface AgentJobCreateRequest {
@@ -1856,6 +1860,26 @@ export interface AgentJobCancelAllResponse {
     jobs: AgentJob[]
 }
 
+/** One tool call of a job: an `agent_job_tool` entry at its start (`running`) and one at its end, same `id`. */
+export interface AgentJobTool {
+    id: string
+    /** ACP tool kind: execute, read, edit, search, fetch, think, other, … */
+    kind?: string
+    title: string
+    status: 'running' | 'completed' | 'failed'
+    /** The input for people: the command, the path, the query. */
+    input?: string
+    /** The tool's arguments as JSON, cut at 1 KB; end entry only. */
+    raw_input?: string
+    paths?: string[]
+    /** Text output, ANSI codes removed, cut at 4 KB. */
+    output?: string
+    /** The output's full size in bytes, only when `output` was cut. */
+    output_bytes?: number
+    started_at?: string
+    finished_at?: string
+}
+
 export interface AgentJobLogEntry {
     kind: string
     /** Stable per-job identity: positive, starts at 1, strictly monotonic for the
@@ -1864,6 +1888,8 @@ export interface AgentJobLogEntry {
     sequence: number
     at: string
     message?: string | null
+    /** The tool call of an `agent_job_tool` entry. */
+    tool?: AgentJobTool | null
 }
 
 /** Everything that happened on a task, oldest first (DEV-518). */

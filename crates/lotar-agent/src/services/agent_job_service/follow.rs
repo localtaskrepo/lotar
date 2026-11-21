@@ -132,7 +132,13 @@ impl Followed {
                 if entry.kind == "agent_job_started" && self.started_at.is_none() {
                     self.started_at = Some(entry.at.clone());
                 }
-                Some(AgentJobEvent { kind: entry.kind, sequence: entry.sequence.unwrap_or(self.events), at: entry.at, message: entry.message })
+                Some(AgentJobEvent {
+                    kind: entry.kind,
+                    sequence: entry.sequence.unwrap_or(self.events),
+                    at: entry.at,
+                    message: entry.message,
+                    tool: entry.tool,
+                })
             }
         }
     }
@@ -229,6 +235,22 @@ mod tests {
         assert_eq!(events[0].data["message"], "later");
         assert_eq!(events[0].data["ticket_id"], "FOL-1");
         assert_eq!(events[0].data["started_at"], "2026-11-21T10:00:01Z");
+    }
+
+    /// DEV-766: a followed `agent_job_tool` line keeps its `tool` object.
+    #[test]
+    fn a_followed_tool_entry_keeps_its_tool() {
+        let (_dir, tasks) = tasks_dir();
+        let log = tasks.join("@agent-logs").join("job-follow-tool.jsonl");
+        let mut follower = LogFollower::new(&tasks);
+        let tool = r#"{"type":"event","kind":"agent_job_tool","at":"2026-11-21T10:00:02Z","message":"Terminal: ls","sequence":2,"tool":{"id":"toolu_1","kind":"execute","title":"Terminal","status":"completed","input":"ls"}}"#;
+        append(&log, &format!("{}\n{}\n{tool}\n", HEADER.replace("JOB", "job-follow-tool"), event("agent_job_started", 1, "")));
+        let events = follower.changed(&log);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1].kind, "agent_job_tool");
+        assert_eq!(events[1].data["tool"]["id"], "toolu_1");
+        assert_eq!(events[1].data["tool"]["input"], "ls");
+        assert!(events[0].data["tool"].is_null());
     }
 
     /// A log that shrank is read again; a deleted one is forgotten; files that are no job logs are not followed.

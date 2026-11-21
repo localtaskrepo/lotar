@@ -120,7 +120,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../../api/client'
-import type { AgentJob, AgentJobLogEntry, TaskHistoryChange, TaskTimelineEntry } from '../../api/types'
+import type { AgentJob, AgentJobLogEntry, AgentJobTool, TaskHistoryChange, TaskTimelineEntry } from '../../api/types'
 import { TIMELINE_FILTER_KEY, useActivityFilter } from '../../composables/task-panel/useActivityFilter'
 import { useSse } from '../../composables/useSse'
 import { formatCost, jobDuration, runSettings, usageDetail } from '../../utils/agentJobs'
@@ -307,6 +307,8 @@ const JOB_EVENTS = [
   'agent_job_init',
   'agent_job_progress',
   'agent_job_message',
+  'agent_job_tool',
+  'agent_job_thought',
   'agent_job_input',
   'agent_job_question',
   'agent_job_result',
@@ -334,7 +336,14 @@ onMounted(() => {
   sse = useSse('/api/events', { kinds: JOB_EVENTS.join(',') })
   for (const kind of JOB_EVENTS) {
     const handler = (ev: MessageEvent) => {
-      let payload: { id?: string; ticket_id?: string; sequence?: number; at?: string; message?: string | null }
+      let payload: {
+        id?: string
+        ticket_id?: string
+        sequence?: number
+        at?: string
+        message?: string | null
+        tool?: AgentJobTool | null
+      }
       try {
         payload = JSON.parse(String(ev.data || '{}'))
       } catch {
@@ -343,7 +352,13 @@ onMounted(() => {
       if (!payload.id || !isOwnJob(payload.ticket_id)) return
       if (threads.value[payload.id] && typeof payload.sequence === 'number' && payload.at) {
         mergeThread(payload.id, [
-          { kind, sequence: payload.sequence, at: payload.at, message: payload.message ?? null },
+          {
+            kind,
+            sequence: payload.sequence,
+            at: payload.at,
+            message: payload.message ?? null,
+            tool: payload.tool ?? null,
+          },
         ])
       }
       // A job starting or ending changes the run's status, summary and cost.
