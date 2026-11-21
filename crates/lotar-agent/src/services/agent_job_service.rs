@@ -1577,6 +1577,7 @@ fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
     let repo_common = verified_common_dir(&repo_root).map_err(LoTaRError::IoError)?;
 
     let worktree_root = resolve_worktree_root(&repo_root, config.agent_worktree.dir.as_deref())?;
+    let build_root = resolve_build_root(&repo_root, config.agent_worktree.build_root.as_deref())?;
     let ticket_token = sanitize_worktree_token(ticket_id);
     let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &ticket_token);
     // Worktree is per-ticket, not per-job. All phases for a ticket share the same worktree.
@@ -1628,7 +1629,8 @@ fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
     if verified_common_dir(&worktree_path).map_err(LoTaRError::IoError)? != repo_common {
         return Err(LoTaRError::ValidationError("Worktree belongs to a different repository".into()));
     }
-    let cloned = clone_build_output(&repo_root, &config.agent_worktree.branch_prefix, &branch, &worktree_path);
+    let build_dir = build_root.map(|root| root.join(repo_root.file_name().unwrap_or_default()).join(&ticket_token));
+    let cloned = clone_build_output(&repo_root, &config.agent_worktree.branch_prefix, &branch, &worktree_path, build_dir.as_deref());
     context.note = Some(match cleared {
         Some(cleared) => format!("{cleared} {cloned}"),
         None => cloned,
@@ -1659,14 +1661,50 @@ fn clear_leftover_build_output(worktree: &std::path::Path) -> LoTaRResult<Option
 /// build (DEV-635): `target/` of an earlier worktree of the ticket (its T3
 /// Code threads'), the one built last, else of the main checkout. Only
 /// `clonefile(2)` clones; a full copy would cost the disk the clone saves,
-/// so on failure the job builds cold. Returns the note for the job log.
-fn clone_build_output(repo_root: &std::path::Path, prefix: &str, branch: &str, worktree: &std::path::Path) -> String {
+/// so on failure the job builds cold. With `build_dir`, the build goes there
+/// and `target` links to it (DEV-762): a link, not `CARGO_TARGET_DIR`, as
+/// T3 Code threads don't get the job's environment and scripts name
+/// `target/`. Returns the note for the job log.
+fn clone_build_output(repo_root: &std::path::Path, prefix: &str, branch: &str, worktree: &std::path::Path, build_dir: Option<&std::path::Path>) -> String {
     let build = |dir: &std::path::Path| dir.join("target");
-    let has_build = |dir: &std::path::Path| fs::symlink_metadata(build(dir)).is_ok_and(|meta| meta.is_dir());
+    let has_build = |dir: &std::path::Path| fs::metadata(build(dir)).is_ok_and(|meta| meta.is_dir());
     // `target/` itself changes only when an entry is added; cargo rewrites
     // `.rustc_info.json` and the profile directories on every build.
     let built_at = |dir: &std::path::Path| {
         fs::read_dir(build(dir)).into_iter().flatten().flatten().filter_map(|entry| entry.metadata().and_then(|meta| meta.modified()).ok()).max()
+    };
+    let link = build(worktree);
+    if fs::symlink_metadata(&link).is_ok() {
+        return "The new worktree has a target/ already; nothing cloned.".to_string();
+    }
+    let mut note = String::new();
+    // Git ignores a link only by a pattern without the trailing slash.
+    let build_dir = build_dir.filter(|_| {
+        let ignored = git_command(worktree).args(["check-ignore", "--quiet", "target"]).current_dir(worktree).status().is_ok_and(|status| status.success());
+        if !ignored {
+            note = "agent.worktree.build_root needs `target` git-ignored as a link (`/target`, not `target/`); the build stays in the worktree. ".into();
+        }
+        ignored
+    });
+    let to = match build_dir {
+        Some(dir) => {
+            if let Err(err) = link_build_dir(&link, dir) {
+                return format!("Couldn't link target/ to {}: {err}; this job builds cold.", dir.display());
+            }
+            if fs::symlink_metadata(dir).is_ok() {
+                return format!("target/ links to {}, which holds a build already.", dir.display());
+            }
+            dir.to_path_buf()
+        }
+        None => link,
+    };
+    let into = build_dir.map(|dir| format!(" into {}", dir.display())).unwrap_or_default();
+    // A link to the build root always gets its folder, if only an empty one.
+    let cold = |message: String| {
+        if build_dir.is_some() {
+            let _ = fs::create_dir_all(&to);
+        }
+        format!("{note}{message}")
     };
     let new = fs::canonicalize(worktree).unwrap_or_else(|_| worktree.to_path_buf());
     let earlier = agent_worktrees(repo_root, prefix)
@@ -1676,19 +1714,94 @@ fn clone_build_output(repo_root: &std::path::Path, prefix: &str, branch: &str, w
         .max_by_key(|tree| built_at(&tree.path))
         .map(|tree| tree.path);
     let Some(source) = earlier.or_else(|| has_build(repo_root).then(|| repo_root.to_path_buf())) else {
-        return "No target/ to clone in an earlier worktree of the ticket or in the main checkout; this job builds cold.".to_string();
+        return cold("No target/ to clone in an earlier worktree of the ticket or in the main checkout; this job builds cold.".to_string());
     };
-    let to = build(worktree);
-    if fs::symlink_metadata(&to).is_ok() {
-        return "The new worktree has a target/ already; nothing cloned.".to_string();
+    // The source's own build root, if it links to one.
+    let from = fs::canonicalize(build(&source)).unwrap_or_else(|_| build(&source));
+    if build_dir.is_some() && !same_volume(&from, to.parent().unwrap_or(&to)) {
+        return cold(format!("{} and the build root are on different volumes, so nothing is cloned; this job builds cold{into}.", from.display()));
     }
-    match clonefile(&build(&source), &to) {
-        Ok(()) => format!("Cloned target/ from {} (copy-on-write).", source.display()),
+    match clonefile(&from, &to) {
+        Ok(()) => format!("{note}Cloned target/ from {}{into} (copy-on-write).", source.display()),
         Err(err) => {
             let _ = fs::remove_dir_all(&to);
-            format!("Couldn't clone target/ from {}: {err}; this job builds cold.", source.display())
+            cold(format!("Couldn't clone target/ from {}: {err}; this job builds cold.", source.display()))
         }
     }
+}
+
+/// `link` (a worktree's `target`) to `dir`, whose parent it makes.
+fn link_build_dir(link: &std::path::Path, dir: &std::path::Path) -> std::io::Result<()> {
+    if let Some(parent) = dir.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    symlink_dir(dir, link)
+}
+
+#[cfg(unix)]
+fn symlink_dir(dir: &std::path::Path, link: &std::path::Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(dir, link)
+}
+
+#[cfg(windows)]
+fn symlink_dir(dir: &std::path::Path, link: &std::path::Path) -> std::io::Result<()> {
+    std::os::windows::fs::symlink_dir(dir, link)
+}
+
+/// Whether both paths are on one file system, as a clone needs.
+#[cfg(unix)]
+fn same_volume(a: &std::path::Path, b: &std::path::Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    matches!((fs::metadata(a), fs::metadata(b)), (Ok(a), Ok(b)) if a.dev() == b.dev())
+}
+
+#[cfg(not(unix))]
+fn same_volume(_a: &std::path::Path, _b: &std::path::Path) -> bool {
+    false
+}
+
+/// `agent.worktree.build_root` (DEV-762) resolved as `agent.worktree.dir`:
+/// absolute, or relative to the main checkout's parent folder.
+fn resolve_build_root(repo_root: &std::path::Path, configured: Option<&str>) -> LoTaRResult<Option<std::path::PathBuf>> {
+    let Some(raw) = configured.map(str::trim).filter(|raw| !raw.is_empty()) else {
+        return Ok(None);
+    };
+    let path = std::path::Path::new(raw);
+    if path.components().any(|component| matches!(component, std::path::Component::ParentDir)) {
+        return Err(LoTaRError::ValidationError("agent.worktree.build_root cannot contain '..'".to_string()));
+    }
+    Ok(Some(if path.is_absolute() { path.to_path_buf() } else { repo_root.parent().unwrap_or(repo_root).join(path) }))
+}
+
+/// The folder in the build root a worktree's `target` links to (DEV-762):
+/// `<build_root>/<repo>/<worktree folder>`, as `clone_build_output` makes
+/// it. Found from the link, so it holds when the setting changed since.
+pub fn build_root_dir(repo_root: &std::path::Path, worktree: &std::path::Path) -> Option<std::path::PathBuf> {
+    let link = worktree.join("target");
+    if !fs::symlink_metadata(&link).ok()?.file_type().is_symlink() {
+        return None;
+    }
+    let dir = fs::read_link(&link).ok()?;
+    let folder = fs::symlink_metadata(&dir).ok()?;
+    (dir.is_absolute()
+        && folder.is_dir()
+        && dir.file_name() == worktree.file_name()
+        && dir.parent().and_then(std::path::Path::file_name) == repo_root.file_name()
+        && !dir.starts_with(repo_root)
+        && !dir.starts_with(worktree))
+    .then_some(dir)
+}
+
+/// A command (`cargo clean`) deleted the worktree's `target` link instead
+/// of what it points to: empty the build root folder and link it again.
+pub fn relink_build_root_dir(worktree: &std::path::Path, dir: &std::path::Path) -> std::io::Result<()> {
+    let link = worktree.join("target");
+    if fs::symlink_metadata(&link).is_ok() {
+        return Ok(());
+    }
+    fs::remove_dir_all(dir)?;
+    fs::create_dir(dir)?;
+    symlink_dir(dir, &link)
 }
 
 /// Clone a directory tree copy-on-write (APFS); other filesystems fail.
@@ -2732,13 +2845,19 @@ pub fn remove_worktree_dir(repo_root: &std::path::Path, path: &std::path::Path) 
             let _ = fs::remove_dir_all(entry.path());
         }
     }
+    let build = build_root_dir(repo_root, &target);
     let trash = parent.join(format!(".{}{REMOVED_WORKTREE_SUFFIX}", name.to_string_lossy()));
     fs::rename(&target, &trash).map_err(LoTaRError::IoError)?;
     if let Err(err) = fs::remove_dir_all(&git_dir) {
         let _ = fs::rename(&trash, &target);
         return Err(LoTaRError::IoError(err));
     }
-    fs::remove_dir_all(&trash).map_err(|err| LoTaRError::ValidationError(format!("git no longer lists it; deleting {} failed: {err}", trash.display())))
+    fs::remove_dir_all(&trash).map_err(|err| LoTaRError::ValidationError(format!("git no longer lists it; deleting {} failed: {err}", trash.display())))?;
+    // Its build in agent.worktree.build_root (DEV-762).
+    match build.map(fs::remove_dir_all) {
+        Some(Err(err)) => Err(LoTaRError::ValidationError(format!("the worktree is gone; deleting its build in the build root failed: {err}"))),
+        _ => Ok(()),
+    }
 }
 
 /// The git entry (`.git/worktrees/<id>`) of a linked worktree whose folder
@@ -3152,7 +3271,18 @@ fn remove_build_output(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
     }
     let mut moved = Vec::new();
     let mut removed = Vec::new();
+    let build_dir = build_root_dir(&root, &worktree);
     for (index, path) in paths.iter().enumerate() {
+        // `target` linked to the build root (DEV-762): its folder empties, the link stays.
+        if let Some(dir) = build_dir.as_ref().filter(|_| std::path::Path::new(path) == std::path::Path::new("target")) {
+            let parked = dir.with_file_name(format!(".{}.lotar-cleanup-{job_id}", dir.file_name().unwrap_or_default().to_string_lossy()));
+            if fs::rename(dir, &parked).is_ok() {
+                moved.push(parked);
+                removed.push(path.as_str());
+            }
+            let _ = fs::create_dir_all(dir);
+            continue;
+        }
         if crate::config::types::validate_cleanup_path(path).is_err() || !build_output_removable(&worktree, path) {
             continue;
         }
@@ -3253,7 +3383,12 @@ pub(crate) fn run_waiting_command(ticket_id: &str, tasks_dir: &std::path::Path, 
             command.args(args).current_dir(&wt.path).stdin(Stdio::null());
             clear_repository_env(&mut command);
             let place = wt.path.display();
-            match command.output() {
+            let build_dir = resolve_repo_root(tasks_dir).and_then(|root| build_root_dir(&root, &wt.path));
+            let output = command.output();
+            if let Some(dir) = build_dir {
+                let _ = relink_build_root_dir(&wt.path, &dir);
+            }
+            match output {
                 Ok(output) if output.status.success() => {
                     WaitingRunNote { failed: false, message: format!("{ticket_id} waits ({waiting}): ran `{command_line}` in {place}.") }
                 }

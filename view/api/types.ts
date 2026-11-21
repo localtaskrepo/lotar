@@ -1312,6 +1312,8 @@ export type AgentInstructionsValue = string | { file: string } | null | undefine
 export interface AgentWorktreeConfig {
     enabled: boolean
     dir?: string | null
+    /** Folder for the worktrees' build output: `target/` links to `<build_root>/<repo>/<ticket>` (DEV-762). */
+    build_root?: string | null
     branch_prefix: string
     max_parallel_jobs?: number | null
     cleanup_on_done?: boolean

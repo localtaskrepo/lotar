@@ -258,6 +258,7 @@ fn source_label_for_global(
         "agent_instructions" => scope_field!(agent_instructions),
         "agent_worktree_enabled" => scope_field!(agent_worktree),
         "agent_worktree_dir" => scope_field!(agent_worktree),
+        "agent_worktree_build_root" => scope_field!(agent_worktree),
         "agent_worktree_branch_prefix" => scope_field!(agent_worktree),
         "agent_worktree_max_parallel_jobs" => scope_field!(agent_worktree),
         "agent_worktree_cleanup_on_done" => scope_field!(agent_worktree),
@@ -359,6 +360,7 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
         "agent_instructions" => env_equal!(agent_instructions),
         "agent_worktree_enabled" => env_equal!(agent_worktree),
         "agent_worktree_dir" => env_equal!(agent_worktree),
+        "agent_worktree_build_root" => env_equal!(agent_worktree),
         "agent_worktree_branch_prefix" => env_equal!(agent_worktree),
         "agent_worktree_max_parallel_jobs" => env_equal!(agent_worktree),
         "agent_worktree_cleanup_on_done" => env_equal!(agent_worktree),
@@ -603,6 +605,7 @@ fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, projec
         }
         "agent_worktree_enabled"
         | "agent_worktree_dir"
+        | "agent_worktree_build_root"
         | "agent_worktree_branch_prefix"
         | "agent_worktree_max_parallel_jobs"
         | "agent_worktree_cleanup_on_done"

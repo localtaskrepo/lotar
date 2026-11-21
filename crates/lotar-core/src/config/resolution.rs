@@ -1170,6 +1170,9 @@ fn apply_agent_worktree_override(target: &mut crate::config::types::AgentWorktre
     if let Some(dir) = override_config.dir {
         target.dir = Some(dir);
     }
+    if let Some(build_root) = override_config.build_root {
+        target.build_root = Some(build_root);
+    }
     if let Some(prefix) = override_config.branch_prefix {
         target.branch_prefix = prefix;
     }

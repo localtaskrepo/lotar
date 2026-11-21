@@ -407,6 +407,11 @@ pub struct AgentWorktreeConfig {
     pub enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dir: Option<String>,
+    /// A folder for the job worktrees' build output (DEV-762), such as a
+    /// volume Time Machine skips: a worktree's `target/` is a symlink to
+    /// `<build_root>/<repo>/<ticket>`. Unset, `target/` stays in the worktree.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub build_root: Option<String>,
     #[serde(default = "default_agent_worktree_branch_prefix")]
     pub branch_prefix: String,
     /// Maximum number of agent jobs that can run in parallel.
@@ -478,6 +483,8 @@ pub struct AgentWorktreeConfigOverride {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub build_root: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub branch_prefix: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub max_parallel_jobs: Option<usize>,
@@ -502,6 +509,7 @@ impl Default for AgentWorktreeConfig {
         Self {
             enabled: false,
             dir: None,
+            build_root: None,
             branch_prefix: default_agent_worktree_branch_prefix(),
             max_parallel_jobs: None,
             cleanup_on_done: false,

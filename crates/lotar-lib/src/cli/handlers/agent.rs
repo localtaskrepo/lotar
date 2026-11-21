@@ -871,11 +871,20 @@ impl AgentHandler {
         }
         let mut ran_in = Vec::new();
         let mut errors = Vec::new();
+        let repo_root = crate::utils::git::find_repo_root(&resolver.path);
         for wt in &worktrees {
             let mut command = std::process::Command::new(program);
             command.args(program_args).current_dir(&wt.path).stdin(std::process::Stdio::null()).stdout(std::io::stderr());
             crate::utils::git::clear_repository_env(&mut command);
-            match command.status() {
+            let build_dir = repo_root.as_deref().and_then(|root| agent_job_service::build_root_dir(root, std::path::Path::new(&wt.path)));
+            let status = command.status();
+            // `cargo clean` deletes a build root link, not the build (DEV-762).
+            if let Some(dir) = build_dir
+                && let Err(err) = agent_job_service::relink_build_root_dir(std::path::Path::new(&wt.path), &dir)
+            {
+                errors.push(format!("{}: emptying {} failed: {err}", wt.path, dir.display()));
+            }
+            match status {
                 Ok(status) if status.success() => {
                     renderer.emit_success(format!("Ran `{}` in {}", args.command.join(" "), wt.path));
                     ran_in.push(wt.path.clone());

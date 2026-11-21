@@ -1551,6 +1551,7 @@ fn a_new_worktree_clones_the_main_checkouts_build() {
     if cfg!(target_os = "macos") {
         assert_eq!(cloned_app(&job).as_deref(), Some("main"));
         assert_eq!(job_note(&job, "Cloned target/"), Some(format!("Cloned target/ from {} (copy-on-write).", root.display())), "the job log names the source");
+        assert!(!fs::symlink_metadata(Path::new(job.worktree_path.as_deref().unwrap()).join("target")).unwrap().is_symlink(), "no build root, no link");
     } else {
         assert_eq!(cloned_app(&job), None, "no full copy without clonefile");
         assert!(job_note(&job, "clonefile(2) isn't available on this system; this job builds cold.").is_some());
@@ -1627,4 +1628,73 @@ fn a_leftover_folder_with_only_build_output_gives_way_to_the_worktree() {
     let job = AgentJobService::get_job(&job.id).unwrap();
     assert_eq!(job.status, "failed", "{:?}", job.last_message);
     assert_eq!(fs::read_to_string(leftover.join("notes.md")).unwrap(), "not build output", "other files stay");
+}
+
+/// DEV-762: `agent.worktree.build_root` set to a folder outside the
+/// repository, on the volume of the main checkout.
+fn with_build_root(fixture: &TestFixtures) -> tempfile::TempDir {
+    let builds = tempfile::tempdir().unwrap();
+    let config_path = fixture.tasks_root.join("config.yml");
+    let config = fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("    cleanup_delete_branches: true\n", &format!("    cleanup_delete_branches: true\n    build_root: '{}'\n", builds.path().display()));
+    fs::write(&config_path, config).unwrap();
+    builds
+}
+
+/// The worktree's `target` links to `<build_root>/<repo>/<ticket>`, which
+/// holds the clone of the main checkout's build; a command that deletes
+/// the link (plain `cargo clean`) empties the folder and the link comes
+/// back; removing the worktree removes the folder.
+#[test]
+fn a_build_root_holds_the_worktrees_build_until_the_worktree_goes() {
+    common::require_git();
+    let (fixture, ticket) = cloned_build_setup();
+    let root = fixture.get_temp_path();
+    fs::write(root.join(".gitignore"), "/target\n").unwrap();
+    git(root, &["commit", "-qam", "Ignore target links too"]);
+    let builds = with_build_root(&fixture);
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    let worktree = Path::new(job.worktree_path.as_deref().unwrap());
+    let dir = builds.path().join(root.file_name().unwrap()).join(&ticket);
+    assert_eq!(fs::read_link(worktree.join("target")).unwrap(), dir, "target/ links into the build root");
+    if cfg!(target_os = "macos") {
+        assert_eq!(fs::read_to_string(dir.join("debug/app")).unwrap(), "main", "cloned within one volume");
+        let cloned = format!("Cloned target/ from {} into {} (copy-on-write).", root.display(), dir.display());
+        assert_eq!(job_note(&job, "Cloned target/").as_deref(), Some(cloned.as_str()));
+    } else {
+        assert!(dir.is_dir() && !dir.join("debug/app").exists(), "no full copy without clonefile");
+    }
+    assert_eq!(fs::read_to_string(root.join("target/debug/app")).unwrap(), "main", "the source stays");
+
+    let output = Command::new(crate::common::lotar_bin())
+        .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "agent", "worktree", "run", &ticket, "--", "rm", "target"])
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(fs::read_link(worktree.join("target")).unwrap(), dir, "the link comes back");
+    assert_eq!(fs::read_dir(&dir).unwrap().count(), 0, "the build is gone");
+
+    fs::write(dir.join("app"), "built").unwrap();
+    lotar::services::agent_job_service::remove_worktree_dir(root, worktree).unwrap();
+    assert!(!worktree.exists() && !dir.exists(), "the worktree's build goes with it");
+    assert!(builds.path().join(root.file_name().unwrap()).exists(), "other tickets' builds stay");
+}
+
+/// Git ignores a link only by a pattern without the trailing slash: with
+/// `target/`, the build stays in the worktree, as without a build root.
+#[test]
+fn a_build_root_needs_target_ignored_as_a_link() {
+    common::require_git();
+    let (fixture, ticket) = cloned_build_setup();
+    let builds = with_build_root(&fixture);
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    let target = Path::new(job.worktree_path.as_deref().unwrap()).join("target");
+    assert!(!fs::symlink_metadata(&target).is_ok_and(|meta| meta.is_symlink()), "no link git would list as untracked");
+    assert_eq!(fs::read_dir(builds.path()).unwrap().count(), 0);
+    assert!(job_note(&job, "needs `target` git-ignored as a link").is_some());
 }

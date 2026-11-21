@@ -679,6 +679,10 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
             let trimmed = value.trim();
             config.agent_worktree.dir = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
         }
+        "agent_worktree_build_root" => {
+            let trimmed = value.trim();
+            config.agent_worktree.build_root = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
+        }
         "agent_worktree_branch_prefix" => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
@@ -1021,6 +1025,10 @@ pub fn apply_field_to_project_config(config: &mut ProjectConfig, field: &str, va
             let worktree = config.agent_worktree.get_or_insert_with(Default::default);
             worktree.dir = parse_optional_string(value);
         }
+        "agent_worktree_build_root" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.build_root = parse_optional_string(value);
+        }
         "agent_worktree_branch_prefix" => {
             let worktree = config.agent_worktree.get_or_insert_with(Default::default);
             worktree.branch_prefix = parse_optional_string(value);
@@ -1344,7 +1352,7 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "agent_worktree_enabled" => {
             let _ = parse_optional_bool_flag(value, field)?;
         }
-        "agent_worktree_dir" => {
+        "agent_worktree_dir" | "agent_worktree_build_root" => {
             let _ = parse_optional_string(value);
         }
         "agent_worktree_branch_prefix" => {
@@ -1535,6 +1543,7 @@ pub fn clear_project_override_field(config: &mut ProjectConfig, field: &str) -> 
         }
         "agent_worktree_enabled" => clear_agent_worktree_field(config, WorktreeSubfield::Enabled),
         "agent_worktree_dir" => clear_agent_worktree_field(config, WorktreeSubfield::Dir),
+        "agent_worktree_build_root" => clear_agent_worktree_field(config, WorktreeSubfield::BuildRoot),
         "agent_worktree_branch_prefix" => {
             clear_agent_worktree_field(config, WorktreeSubfield::BranchPrefix);
         }
@@ -1579,6 +1588,7 @@ pub fn clear_project_override_field(config: &mut ProjectConfig, field: &str) -> 
 enum WorktreeSubfield {
     Enabled,
     Dir,
+    BuildRoot,
     BranchPrefix,
     MaxParallelJobs,
     CleanupOnDone,
@@ -1597,6 +1607,7 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
     match subfield {
         WorktreeSubfield::Enabled => worktree.enabled = None,
         WorktreeSubfield::Dir => worktree.dir = None,
+        WorktreeSubfield::BuildRoot => worktree.build_root = None,
         WorktreeSubfield::BranchPrefix => worktree.branch_prefix = None,
         WorktreeSubfield::MaxParallelJobs => worktree.max_parallel_jobs = None,
         WorktreeSubfield::CleanupOnDone => worktree.cleanup_on_done = None,
@@ -1609,6 +1620,7 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
     }
     let empty = worktree.enabled.is_none()
         && worktree.dir.is_none()
+        && worktree.build_root.is_none()
         && worktree.branch_prefix.is_none()
         && worktree.max_parallel_jobs.is_none()
         && worktree.cleanup_on_done.is_none()

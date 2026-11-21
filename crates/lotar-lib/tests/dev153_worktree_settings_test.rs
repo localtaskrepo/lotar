@@ -89,3 +89,20 @@ fn cleanup_paths_are_settable() {
     assert!(run(dir, &["config", "set", "agent_worktree_cleanup_paths", "", "--global"]).0);
     assert!(!read(dir, "config.yml").contains("cleanup_paths"));
 }
+
+/// DEV-762: the build root is set and cleared globally and per project.
+#[test]
+fn build_root_is_settable() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    assert!(run(dir, &["add", "Seed", "-p", "WT"]).0);
+    let (ok, out) = run(dir, &["config", "set", "agent_worktree_build_root", "/Volumes/Builds", "--global"]);
+    assert!(ok, "{out}");
+    assert!(read(dir, "config.yml").contains("build_root: /Volumes/Builds"), "{}", read(dir, "config.yml"));
+    assert!(run(dir, &["config", "set", "agent_worktree_build_root", "builds", "-p", "WT"]).0);
+    assert!(read(dir, "WT/config.yml").contains("build_root: builds"), "{}", read(dir, "WT/config.yml"));
+    assert!(run(dir, &["config", "set", "agent_worktree_build_root", "", "-p", "WT"]).0);
+    assert!(!read(dir, "WT/config.yml").contains("build_root"));
+    assert!(run(dir, &["config", "set", "agent_worktree_build_root", "", "--global"]).0);
+    assert!(!read(dir, "config.yml").contains("build_root"));
+}
