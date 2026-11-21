@@ -1258,6 +1258,159 @@ pub struct AgentJobLogsResponse {
     pub events: Vec<AgentJobLogEntry>,
 }
 
+/// `GET /api/jobs/inputs`: what the job's run went in with, `null` when its log has no record (jobs from before
+/// DEV-767, logging off, a commit retry that didn't run the agent).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobInputsResponse {
+    pub inputs: Option<AgentJobRunInputs>,
+}
+
+/// The prompt and settings a job's run started with (DEV-767), written to its log as the first turn goes out.
+/// Secrets stay out: environment variables, MCP server env and HTTP headers are listed by name only.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobRunInputs {
+    pub at: String,
+    /// The first turn's prompt, exactly as the agent got it.
+    pub prompt: String,
+    /// The prompt's parts in order, covering all of it.
+    pub sections: Vec<AgentJobPromptSection>,
+    pub instructions_source: AgentJobInstructionsSource,
+    pub settings: AgentJobRunSettings,
+    /// The environment variables the agent's process got on top of the inherited ones: names only.
+    pub env: Vec<String>,
+}
+
+/// One part of a job's prompt, from its heading line.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobPromptSection {
+    pub heading: String,
+    /// Offset in the prompt, in Unicode code points.
+    pub start: usize,
+    /// Length in Unicode code points.
+    pub length: usize,
+}
+
+/// Where the prompt's agent instructions came from; `None` when there were none.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobInstructionsSource {
+    /// `agent.instructions`, or lotar's built-in text when it is unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<AgentJobInstructionsOrigin>,
+    /// The profile's own `instructions`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<AgentJobInstructionsOrigin>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobInstructionsOrigin {
+    /// `builtin` (lotar's docs/help/agent-instructions.md), `inline` (text in the config) or `file`.
+    pub kind: String,
+    /// The file `builtin` and `file` instructions were read from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+/// The settings a job's session (or `command` runner) started with.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobRunSettings {
+    pub runner: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_profile: Option<String>,
+    /// The harnessmux agent the session runs; `None` for the `command` runner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness_agent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// `read-only`, `workspace` or `full`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<String>,
+    /// `deny`, `allow-reads`, `allow` or `ask`: what happens when the agent asks for a permission.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_permission: Option<String>,
+    #[serde(default)]
+    pub rules: AgentJobRunRules,
+    /// The agent's own ACP config options.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub options: BTreeMap<String, String>,
+    /// Extra directories the agent may write to.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub add_dirs: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_servers: Vec<AgentJobMcpServer>,
+    /// The directory the agent runs in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    /// The T3 Code thread's title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The profile's `command` and `args`, as configured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<AgentJobRunSession>,
+}
+
+/// The permission rules a session ran with, decided before `on_permission`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobRunRules {
+    /// Commands refused, such as `git push`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deny_commands: Vec<String>,
+    /// Tools allowed without asking.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow_tools: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deny_tools: Vec<String>,
+    /// Edits outside the working directory and `add_dirs` are refused.
+    #[serde(default)]
+    pub confine_writes: bool,
+}
+
+/// An MCP server the session got; `env` and `headers` are names only.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobMcpServer {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub env: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub headers: Vec<String>,
+    /// The tools the server offers the job, when lotar limits them (its own `lotar` server).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<String>,
+}
+
+/// The harnessmux session a job ran in.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobRunSession {
+    pub name: String,
+    /// `new` or `resumed` (the next turn of an existing session).
+    pub mode: String,
+    /// The profile's `session`: `new`, `continue` or `fresh`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configured: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobMessageRequest {

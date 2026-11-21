@@ -439,6 +439,43 @@
         }
       }
     },
+    "/api/jobs/inputs": {
+      "get": {
+        "summary": "Get the prompt and settings an agent job's run started with",
+        "description": "The `run_inputs` line the job wrote to its log when it sent its first turn (DEV-767): the exact prompt split into its sections, where the instructions came from, the settings, and the names of the environment variables the agent got. Environment, MCP env and header values are never recorded. `inputs` is null for a job whose log has no such line (jobs from before this change, logging off, a commit retry that didn't run the agent).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobInputsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/jobs/cancel": {
       "post": {
         "summary": "Cancel agent job",
@@ -10923,6 +10960,297 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AgentJobLogsResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AgentJobInputsResponse": {
+        "type": "object",
+        "properties": {
+          "inputs": {
+            "$ref": "#/components/schemas/AgentJobRunInputs",
+            "nullable": true,
+            "description": "Null when the job's log has no record."
+          }
+        },
+        "required": [
+          "inputs"
+        ]
+      },
+      "AgentJobRunInputs": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The first turn's prompt, exactly as the agent got it."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentJobPromptSection"
+            },
+            "description": "The prompt's parts in order, covering all of it."
+          },
+          "instructions_source": {
+            "$ref": "#/components/schemas/AgentJobInstructionsSource"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/AgentJobRunSettings"
+          },
+          "env": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the environment variables the agent's process got; never their values."
+          }
+        },
+        "required": [
+          "at",
+          "prompt",
+          "sections",
+          "instructions_source",
+          "settings",
+          "env"
+        ]
+      },
+      "AgentJobPromptSection": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Offset in Unicode code points."
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Length in Unicode code points."
+          }
+        },
+        "required": [
+          "heading",
+          "start",
+          "length"
+        ]
+      },
+      "AgentJobInstructionsSource": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/AgentJobInstructionsOrigin"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/AgentJobInstructionsOrigin"
+          }
+        }
+      },
+      "AgentJobInstructionsOrigin": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "builtin",
+              "inline",
+              "file"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "The built-in instructions' doc, or the file the profile names, as resolved."
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "AgentJobRunSettings": {
+        "type": "object",
+        "properties": {
+          "runner": {
+            "type": "string",
+            "description": "`harnessmux` or `command`."
+          },
+          "agent_profile": {
+            "type": "string"
+          },
+          "harness_agent": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "effort": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "string"
+          },
+          "on_permission": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/AgentJobRunRules"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "add_dirs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mcp_servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentJobMcpServer"
+            }
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "session": {
+            "$ref": "#/components/schemas/AgentJobRunSession"
+          }
+        },
+        "required": [
+          "runner",
+          "rules"
+        ]
+      },
+      "AgentJobRunRules": {
+        "type": "object",
+        "properties": {
+          "deny_commands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allow_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confine_writes": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confine_writes"
+        ]
+      },
+      "AgentJobMcpServer": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          },
+          "env": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names only."
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names only."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "AgentJobRunSession": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "new",
+              "resumed"
+            ]
+          },
+          "configured": {
+            "type": "string",
+            "enum": [
+              "new",
+              "continue",
+              "fresh"
+            ],
+            "description": "The profile's `session` setting."
+          }
+        },
+        "required": [
+          "name",
+          "mode"
+        ]
+      },
+      "EnvelopeAgentJobInputsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobInputsResponse"
           }
         },
         "required": [

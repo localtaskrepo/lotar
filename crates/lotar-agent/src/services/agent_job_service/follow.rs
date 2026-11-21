@@ -127,6 +127,8 @@ impl Followed {
                 self.status = Some(status);
                 None
             }
+            // A run's inputs are read on demand, not sent with its events (DEV-767).
+            JobLogLine::RunInputs(_) => None,
             JobLogLine::Event(entry) => {
                 self.events += 1;
                 if entry.kind == "agent_job_started" && self.started_at.is_none() {

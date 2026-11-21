@@ -37,7 +37,8 @@ impl AgentHandler {
         match action {
             AgentAction::Run(args) => Self::run(args, resolver, renderer),
             AgentAction::Status { id } => Self::status(&id, resolver, renderer),
-            AgentAction::Logs { id } => Self::logs(&id, resolver, renderer),
+            AgentAction::Logs { id, inputs: true } => Self::run_inputs(&id, resolver, renderer),
+            AgentAction::Logs { id, inputs: false } => Self::logs(&id, resolver, renderer),
             AgentAction::Cancel { id } => Self::cancel(&id, resolver, renderer),
             AgentAction::Check(args) => Self::check(&args, project, resolver, renderer),
             AgentAction::ListRunning(args) => Self::list_running(&args, resolver, renderer),
@@ -247,6 +248,46 @@ impl AgentHandler {
                 renderer.emit_raw_stdout(format_args!("{} [{}]", entry.at, entry.kind));
             }
         }
+        Ok(())
+    }
+
+    /// `agent logs --inputs`: the prompt and settings the job's run started with (DEV-767).
+    fn run_inputs(id: &str, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        let inputs = AgentJobService::run_inputs_in(&resolver.path, id).ok_or_else(|| format!("Job '{id}' not found"))?;
+        if matches!(renderer.format, OutputFormat::Json) {
+            renderer.emit_json(&serde_json::json!({ "inputs": inputs }));
+            return Ok(());
+        }
+        let Some(inputs) = inputs else {
+            renderer.emit_notice("Not recorded for this job.");
+            return Ok(());
+        };
+        let mut out = format!("Recorded {}\n\nSettings:\n", inputs.at);
+        if let Ok(serde_json::Value::Object(settings)) = serde_json::to_value(&inputs.settings) {
+            for (key, value) in settings {
+                let value = match value {
+                    serde_json::Value::String(text) => text,
+                    serde_json::Value::Array(items) if items.iter().all(serde_json::Value::is_string) => {
+                        items.iter().filter_map(serde_json::Value::as_str).collect::<Vec<_>>().join(", ")
+                    }
+                    other => other.to_string(),
+                };
+                let _ = writeln!(out, "  {key}: {value}");
+            }
+        }
+        let origin = |origin: &crate::api_types::AgentJobInstructionsOrigin| match origin.path.as_deref() {
+            Some(path) => format!("{} ({path})", origin.kind),
+            None => origin.kind.clone(),
+        };
+        let source = &inputs.instructions_source;
+        let _ = writeln!(out, "  instructions: {}", source.base.as_ref().map_or_else(|| "none".to_string(), origin));
+        if let Some(profile) = source.profile.as_ref() {
+            let _ = writeln!(out, "  profile instructions: {}", origin(profile));
+        }
+        let _ = writeln!(out, "  env (names only): {}", if inputs.env.is_empty() { "none".to_string() } else { inputs.env.join(", ") });
+        let sections: Vec<String> = inputs.sections.iter().map(|section| format!("{} ({})", section.heading, section.length)).collect();
+        let _ = write!(out, "\nPrompt ({} characters; {}):\n{}", inputs.prompt.chars().count(), sections.join(", "), inputs.prompt);
+        renderer.emit_raw_stdout(format_args!("{}", out.trim_end()));
         Ok(())
     }
 

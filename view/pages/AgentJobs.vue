@@ -253,6 +253,7 @@
                 <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
                 <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
                 <AgentJobLog v-else :entries="logsByJob[job.id] || []" />
+                <AgentRunInputs :job-id="job.id" />
 
                 <form v-if="canMessage(job)" class="job-message" @submit.prevent="sendMessage(job.id)">
                   <UiInput
@@ -330,6 +331,7 @@ import type {
   AgentQueueStats,
 } from '../api/types'
 import AgentJobLog from '../components/AgentJobLog.vue'
+import AgentRunInputs from '../components/AgentRunInputs.vue'
 import AgentRunDialog from '../components/AgentRunDialog.vue'
 import AgentSetupPanel from '../components/AgentSetupPanel.vue'
 import MarkdownContent from '../components/MarkdownContent.vue'

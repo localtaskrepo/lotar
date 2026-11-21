@@ -20,7 +20,12 @@ pub enum AgentAction {
     /// Show job status
     Status { id: String },
     /// Show job log entries
-    Logs { id: String },
+    Logs {
+        id: String,
+        /// Show the prompt and settings the job's run started with instead
+        #[arg(long)]
+        inputs: bool,
+    },
     /// Cancel a job
     Cancel { id: String },
     /// Check for in-progress agent work (useful for git hooks)

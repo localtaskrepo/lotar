@@ -219,6 +219,11 @@ fn age_session(harness: &Harness, minutes: i64) {
 
 /// Runs a `session: continue` job in this process and returns its job log's progress notes.
 fn continue_job(harness: &Harness) -> Vec<String> {
+    continue_job_with_id(harness).1
+}
+
+/// [`continue_job`]'s job id and progress notes.
+fn continue_job_with_id(harness: &Harness) -> (String, Vec<String>) {
     AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
     let req = AgentJobCreateRequest {
         ticket_id: "TEST-1".into(),
@@ -231,7 +236,28 @@ fn continue_job(harness: &Harness) -> Vec<String> {
     wait_for("the job's end", || status(&job) == "completed");
     // The ticket's active job ends after its status reads completed; the next job on it would be refused until then.
     wait_for_jobs_to_end(&harness.fixtures.tasks_root);
-    AgentJobService::events_for(&job).into_iter().filter(|event| event.kind == "agent_job_progress").filter_map(|event| event.message).collect()
+    let notes = AgentJobService::events_for(&job).into_iter().filter(|event| event.kind == "agent_job_progress").filter_map(|event| event.message).collect();
+    (job, notes)
+}
+
+/// DEV-767: a job that starts a new session with a handoff records the prompt the agent got, ending in its
+/// "Handoff" section, and the session as new.
+fn assert_recorded_handoff(harness: &Harness, job: &str) {
+    let inputs = AgentJobService::run_inputs_in(&harness.fixtures.tasks_root, job).expect("a known job").expect("recorded");
+    let last_sent = harness
+        .log()
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|line| line["method"] == "session/prompt")
+        .filter_map(|line| line["params"]["prompt"][0]["text"].as_str().map(str::to_string))
+        .next_back();
+    assert_eq!(last_sent.as_deref(), Some(inputs.prompt.as_str()), "the recorded prompt is the one the agent got");
+    let last = inputs.sections.last().expect("sections");
+    assert_eq!(last.heading, "Handoff", "{:?}", inputs.sections);
+    let handoff: String = inputs.prompt.chars().skip(last.start).collect();
+    assert!(handoff.starts_with("Handoff:"), "{handoff}");
+    assert_eq!(inputs.sections.iter().map(|section| section.length).sum::<usize>(), inputs.prompt.chars().count());
+    assert_eq!(inputs.settings.session.as_ref().map(|session| session.mode.as_str()), Some("new"));
 }
 
 /// DEV-603: a session idle for less than `continue_within_minutes` (default 55) resumes, and the job log says so.
@@ -296,13 +322,14 @@ fn session_continue_starts_a_new_session_with_a_handoff_after_the_time() {
     let mut storage = harness.fixtures.create_storage();
     TaskService::add_comment(&mut storage, "TEST-1", "Review: blocking, the test is missing").unwrap();
     age_session(&harness, 31);
-    let notes = continue_job(&harness);
+    let (job, notes) = continue_job_with_id(&harness);
     let fresh = "last used 31 minutes ago, not within continue_within_minutes (30); this job starts a new one with a handoff";
     assert!(notes.iter().any(|note| note.contains(fresh)), "{notes:?}");
     let log = harness.log();
     assert_eq!(log.matches("\"method\":\"session/new\"").count(), 2, "{log}");
     assert!(!log.contains("\"method\":\"session/resume\""), "{log}");
     assert!(log.contains("Handoff:") && log.contains("Review: blocking, the test is missing"), "the handoff reaches the agent: {log}");
+    assert_recorded_handoff(&harness, &job);
 }
 
 /// DEV-757: the agent refuses to resume the session (Claude never wrote its transcript), so the continue job starts a
@@ -313,7 +340,7 @@ fn a_continue_job_whose_session_cant_be_resumed_starts_a_new_one_with_a_handoff(
     harness.run(&[]).success();
     let mut storage = harness.fixtures.create_storage();
     TaskService::add_comment(&mut storage, "TEST-1", "Review: blocking, the test is missing").unwrap();
-    let notes = continue_job(&harness);
+    let (job, notes) = continue_job_with_id(&harness);
     let note = notes.iter().find(|note| note.contains("could not be resumed")).unwrap_or_else(|| panic!("{notes:?}"));
     assert!(note.contains("-TEST-1-fixer") && note.contains("Resource not found: sessionId fake-1"), "{note}");
     let log = harness.log();
@@ -326,6 +353,7 @@ fn a_continue_job_whose_session_cant_be_resumed_starts_a_new_one_with_a_handoff(
         .map(|entry| entry.unwrap().path())
         .any(|path| path.to_string_lossy().strip_suffix(".events.jsonl").is_some_and(|name| name.contains("-TEST-1-fixer.")));
     assert!(kept, "the session it couldn't continue keeps its event log");
+    assert_recorded_handoff(&harness, &job);
 }
 
 /// DEV-734: lotar dies during a claude job's turn and the agent refuses to resume the session, so the job taken over
@@ -1829,4 +1857,66 @@ fn a_t3_job_that_loses_the_server_completes_from_its_thread_and_runs_its_end_rul
     assert_eq!(std::fs::read_to_string(&down).unwrap().trim(), "0", "the job read the thread through the outage");
     let task = TaskService::get(&fixtures.create_storage(), "TEST-1", None).unwrap();
     assert_eq!(task.status.as_str(), "Done", "the job_completed rule ran");
+}
+
+/// DEV-767: a job records the prompt and settings of its first turn in its log, and `agent logs --inputs` shows
+/// them: the prompt as the agent got it, split at its headings, and the environment by name only.
+#[test]
+fn a_job_records_the_prompt_and_settings_its_run_started_with() {
+    let secret = "very-secret-token-767";
+    let harness = harness("    model: sonnet\n", &[("FAKE_SECRET", secret.into())]);
+    let job = harness.start();
+    wait_for("the job's end", || status(&job) == "completed");
+
+    let inputs = AgentJobService::run_inputs_in(&harness.fixtures.tasks_root, &job).expect("a known job").expect("recorded");
+    let sent: Vec<String> = harness
+        .log()
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|line| line["method"] == "session/prompt")
+        .filter_map(|line| line["params"]["prompt"][0]["text"].as_str().map(str::to_string))
+        .collect();
+    assert_eq!(sent, std::slice::from_ref(&inputs.prompt), "the recorded prompt is the one the agent got");
+    let headings: Vec<&str> = inputs.sections.iter().map(|section| section.heading.as_str()).collect();
+    assert_eq!(headings.first(), Some(&"Agent instructions"), "{headings:?}");
+    assert_eq!(headings.last(), Some(&"User request"), "{headings:?}");
+    assert_eq!(inputs.sections.iter().map(|section| section.length).sum::<usize>(), inputs.prompt.chars().count());
+    assert_eq!(inputs.settings.model.as_deref(), Some("sonnet"));
+    assert_eq!(inputs.settings.rules.deny_commands, ["git push"], "workspace permissions refuse a push");
+    assert_eq!(inputs.settings.session.as_ref().map(|session| session.mode.as_str()), Some("new"));
+    assert_eq!(inputs.instructions_source.base.as_ref().map(|base| base.kind.as_str()), Some("builtin"));
+    assert!(inputs.env.iter().any(|name| name == "FAKE_SECRET"), "{:?}", inputs.env);
+
+    let logs = job_logs(&harness.fixtures);
+    assert!(logs.contains("\"type\":\"run_inputs\""), "{logs}");
+    assert!(!logs.contains(secret), "env values never reach the log");
+
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    let shown = cmd.current_dir(harness.root()).args(["agent", "logs", &job, "--inputs"]).assert().success();
+    let out = String::from_utf8_lossy(&shown.get_output().stdout).to_string();
+    assert!(out.contains("model: sonnet") && out.contains("FAKE_SECRET") && out.contains(&inputs.prompt), "{out}");
+    assert!(!out.contains(secret), "{out}");
+}
+
+/// DEV-767: a job whose log has no `run_inputs` line (from before it) says so; an unknown job is an error.
+#[test]
+fn a_job_from_before_says_its_inputs_were_not_recorded() {
+    let harness = harness("", &[]);
+    let logs = harness.fixtures.tasks_root.join("@agent-logs");
+    std::fs::create_dir_all(&logs).unwrap();
+    std::fs::write(
+        logs.join("job-old-1.jsonl"),
+        "{\"type\":\"header\",\"job_id\":\"job-old-1\",\"ticket_id\":\"TEST-1\",\"runner\":\"claude\",\"created_at\":\"2026-11-01T00:00:00Z\"}\n",
+    )
+    .unwrap();
+    assert_eq!(AgentJobService::run_inputs_in(&harness.fixtures.tasks_root, "job-old-1"), Some(None));
+    assert_eq!(AgentJobService::run_inputs_in(&harness.fixtures.tasks_root, "job-none-1"), None);
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(harness.root())
+        .args(["agent", "logs", "job-old-1", "--inputs"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Not recorded for this job"));
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(harness.root()).args(["agent", "logs", "job-none-1", "--inputs"]).assert().failure();
 }

@@ -11,6 +11,7 @@ import type {
     AgentJobCreateRequest,
     AgentJobCreateResponse,
     AgentJobListResponse,
+    AgentJobInputsResponse,
     AgentJobLogsResponse,
     AgentJobMessageRequest,
     AgentJobMessageResponse,
@@ -500,6 +501,10 @@ export const api = {
     },
     getAgentJobLogs(id: string): Promise<AgentJobLogsResponse> {
         return get('/api/jobs/logs', { id })
+    },
+    /** DEV-767: the prompt and settings the job's run started with. */
+    getAgentJobInputs(id: string): Promise<AgentJobInputsResponse> {
+        return get('/api/jobs/inputs', { id })
     },
     sendAgentJobMessage(payload: AgentJobMessageRequest): Promise<AgentJobMessageResponse> {
         return post('/api/jobs/message', payload)

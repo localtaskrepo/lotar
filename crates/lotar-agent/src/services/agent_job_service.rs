@@ -14,6 +14,7 @@ use crate::utils::time::{self, Rfc3339};
 use crate::workspace::TasksDirectoryResolver;
 use jiff::SignedDuration;
 use jiff::Timestamp;
+use run_inputs::JobPrompt;
 use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
@@ -29,6 +30,7 @@ mod follow;
 mod kept;
 mod merge;
 mod resumed;
+mod run_inputs;
 mod tools;
 mod watch;
 
@@ -172,7 +174,7 @@ struct PendingJob {
     profile: AgentProfileDetail,
     tasks_dir: std::path::PathBuf,
     ticket_id: String,
-    prompt: String,
+    prompt: JobPrompt,
     user_prompt: String,
     config: ResolvedConfig,
     is_merge_job: bool,
@@ -392,7 +394,8 @@ impl AgentJobService {
         }
         let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, &ticket_id, req.agent.as_deref()));
         let history = PromptHistory { full: profile.full_history.unwrap_or(false), entries: profile.context_entries.unwrap_or(DEFAULT_CONTEXT_ENTRIES) };
-        let prompt = build_prompt(&task, &user_prompt, context.as_ref(), history, earlier.as_deref(), instructions.as_deref(), Some(&notes));
+        let mut prompt = build_prompt(&task, &user_prompt, context.as_ref(), history, earlier.as_deref(), instructions.as_deref(), Some(&notes));
+        prompt.instructions_source = run_inputs::instructions_source(tasks_dir, &config, &profile);
 
         let created_at = time::now_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
@@ -586,6 +589,15 @@ impl AgentJobService {
         let saved = saved?;
         let running = crate::services::agent_active_jobs::find(tasks_dir, id).is_some();
         Some((saved_job_dto(&saved, running), saved_events(&saved)))
+    }
+
+    /// The prompt and settings the job's run started with (DEV-767): `None` for a job neither this process nor a log
+    /// knows, `Some(None)` when its log has no record of them.
+    pub fn run_inputs_in(tasks_dir: &std::path::Path, id: &str) -> Option<Option<crate::api_types::AgentJobRunInputs>> {
+        if get_job_dto(id).is_none() && saved_job(tasks_dir, id).is_none() {
+            return None;
+        }
+        Some(run_inputs::load(tasks_dir, id))
     }
 
     /// The job's whole thread for readers (DEV-518).
@@ -1423,21 +1435,24 @@ fn build_prompt(
     earlier_sessions: Option<&str>,
     instructions: Option<&str>,
     job_notes: Option<&str>,
-) -> String {
-    let mut out = String::new();
+) -> JobPrompt {
+    let mut out = JobPrompt::default();
     if let Some(instructions) = instructions {
         let trimmed = instructions.trim();
         if !trimmed.is_empty() {
+            out.section("Agent instructions");
             out.push_str("Agent instructions:\n");
             out.push_str(trimmed);
             out.push_str("\n\n");
         }
     }
     if let Some(notes) = job_notes.map(str::trim).filter(|notes| !notes.is_empty()) {
+        out.section("This job");
         out.push_str("This job:\n");
         out.push_str(notes);
         out.push_str("\n\n");
     }
+    out.section("Ticket context");
     out.push_str("Ticket context:\n");
     out.push_str(&format!("- ID: {}\n", task.id));
     out.push_str(&format!("- Title: {}\n", task.title));
@@ -1456,7 +1471,9 @@ fn build_prompt(
     }
 
     if !task.relationships.is_empty() {
-        out.push_str("\nRelationships:\n");
+        out.push('\n');
+        out.section("Relationships");
+        out.push_str("Relationships:\n");
         if !task.relationships.depends_on.is_empty() {
             out.push_str(&format!("- Depends on: {}\n", task.relationships.depends_on.join(", ")));
         }
@@ -1487,8 +1504,10 @@ fn build_prompt(
         } else {
             format!("; below the open question and the newest fix and review comments, each cut at {PROMPT_EXCERPT_CHARS} characters. ")
         };
+        out.push('\n');
+        out.section("Comments");
         out.push_str(&format!(
-            "\nComments ({} on the ticket{shown}All of them: `lotar show {id}`; the history: `lotar task timeline {id}`){}\n",
+            "Comments ({} on the ticket{shown}All of them: `lotar show {id}`; the history: `lotar task timeline {id}`){}\n",
             task.comments.len(),
             if picked.is_empty() { "" } else { ":" },
             id = task.id
@@ -1503,14 +1522,18 @@ fn build_prompt(
         && !ctx.messages.is_empty()
     {
         if history.full {
-            out.push_str("\nRecent context:\n");
+            out.push('\n');
+            out.section("Recent context");
+            out.push_str("Recent context:\n");
             for msg in &ctx.messages {
                 out.push_str(&format!("- {}: {}\n", msg.role, msg.content));
             }
         } else if history.entries > 0 {
             let start = ctx.messages.len().saturating_sub(history.entries);
+            out.push('\n');
+            out.section("Recent context");
             out.push_str(&format!(
-                "\nRecent context (the newest {} of {} prompts and replies, each cut at {PROMPT_EXCERPT_CHARS} characters):\n",
+                "Recent context (the newest {} of {} prompts and replies, each cut at {PROMPT_EXCERPT_CHARS} characters):\n",
                 ctx.messages.len() - start,
                 ctx.messages.len()
             ));
@@ -1520,11 +1543,15 @@ fn build_prompt(
         }
     }
     if let Some(sessions) = earlier_sessions {
-        out.push_str("\nEarlier agent sessions on this ticket:\n");
+        out.push('\n');
+        out.section("Earlier agent sessions on this ticket");
+        out.push_str("Earlier agent sessions on this ticket:\n");
         out.push_str(sessions);
     }
 
-    out.push_str("\nUser request:\n");
+    out.push('\n');
+    out.section("User request");
+    out.push_str("User request:\n");
     out.push_str(user_prompt.trim());
     out.push('\n');
 
@@ -3548,7 +3575,7 @@ fn run_job(
     mut profile: AgentProfileDetail,
     tasks_dir: std::path::PathBuf,
     ticket_id: String,
-    mut prompt: String,
+    mut prompt: JobPrompt,
     mut user_prompt: String,
     config: ResolvedConfig,
 ) {
@@ -3614,7 +3641,7 @@ fn run_job(
             };
             comment_merge(&job_id, &tasks_dir, &ticket_id, &summary);
             let hand_off = merge::hand_off_prompt(&summary);
-            prompt.insert_str(0, &hand_off);
+            prompt.prepend("Merge hand-off", &hand_off);
             user_prompt.insert_str(0, &hand_off);
             profile.session = Some(AgentSession::Fresh);
             merge_started_at = Some(started_at);
@@ -3790,10 +3817,9 @@ fn run_job(
         }
         None => None,
     };
-    let prompt = match handoff_from.as_ref() {
-        Some((record, events)) => format!("{prompt}{}", handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record, events, handoff_why)),
-        None => prompt,
-    };
+    if let Some((record, events)) = handoff_from.as_ref() {
+        prompt.append("Handoff", &handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record, events, handoff_why));
+    }
     let env = job_env(&job_id, &tasks_dir, &ticket_id, &config);
     let end = match agent {
         _ if commit_retry.is_some() => RunEnd::Exited(Some(0)),
@@ -4086,13 +4112,14 @@ fn job_env(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, config: &
 fn run_command(
     job_id: &str,
     profile: &AgentProfileDetail,
-    prompt: &str,
+    job_prompt: &JobPrompt,
     env: HashMap<String, String>,
     working_dir: &std::path::Path,
     tasks_dir: &std::path::Path,
     ticket_id: &str,
     mut active_record: Option<crate::services::agent_active_jobs::ActiveJob>,
 ) -> RunEnd {
+    let prompt = job_prompt.text.as_str();
     let prompt_file = match crate::services::agent_active_jobs::write_prompt(tasks_dir, job_id, prompt) {
         Ok(path) => path,
         Err(err) => return RunEnd::Failed(format!("Failed to write the prompt file: {err}")),
@@ -4102,6 +4129,7 @@ fn run_command(
         Err(err) => return RunEnd::Failed(err.to_string()),
     };
     command.env.extend(env);
+    run_inputs::record(job_id, run_inputs::command_inputs(job_prompt, run_inputs::agent_profile_of(job_id), profile, working_dir, command.env.keys().cloned()));
     let mut cmd = Command::new(&command.program);
     cmd.args(&command.args).envs(command.env).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     cmd.current_dir(working_dir);
@@ -4273,7 +4301,7 @@ fn run_session(
     job_id: &str,
     launch: &SessionLaunch<'_>,
     profile: &AgentProfileDetail,
-    prompt: &str,
+    prompt: &JobPrompt,
     env: HashMap<String, String>,
     tasks_dir: &std::path::Path,
     ticket_id: &str,
@@ -4326,6 +4354,9 @@ fn run_session(
     let mut resumed = launch.resume;
     let mut prompt = std::borrow::Cow::Borrowed(prompt);
     let failed = |err: &dyn std::fmt::Display| RunEnd::Failed(format!("Could not start the {} session {}: {err}", launch.agent, launch.name));
+    // The run's inputs are recorded once the session is open, with the prompt
+    // and session mode it really got (DEV-767).
+    let recorded_profile = session_profile.clone();
     let session = match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, &table, session_profile, launch.resume) {
         Ok(session) => session,
         Err(crate::services::agent_runner::OpenSessionError::NotResumable(err)) if fallback_profile.is_some() => {
@@ -4341,7 +4372,7 @@ fn run_session(
                 record_and_emit(state, "agent_job_progress", Some(note.clone()));
             });
             let why = format!("it could not be resumed ({err})");
-            prompt = std::borrow::Cow::Owned(format!("{prompt}{}", handoff_text(tasks_dir, ticket_id, launch.ticket_ref, &record, &events, &why)));
+            prompt.to_mut().append("Handoff", &handoff_text(tasks_dir, ticket_id, launch.ticket_ref, &record, &events, &why));
             resumed = false;
             let profile = fallback_profile.unwrap_or_default();
             match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, &table, profile, false) {
@@ -4351,6 +4382,17 @@ fn run_session(
         }
         Err(err) => return failed(&err),
     };
+    let start = run_inputs::SessionStart {
+        agent: launch.agent,
+        name: launch.name,
+        resume: resumed,
+        cwd: launch.cwd,
+        agent_env: table.get(launch.agent).map(|spec| spec.env.keys().cloned().collect()).unwrap_or_default(),
+    };
+    run_inputs::record(
+        job_id,
+        run_inputs::session_inputs(&prompt, launch.runner_kind, run_inputs::agent_profile_of(job_id), profile, &recorded_profile, &start),
+    );
     if !publish_session(job_id, &session) {
         let _ = block_on(session.cancel());
         return RunEnd::Stopped;
@@ -4368,7 +4410,7 @@ fn run_session(
         let note = format!("{how} {} (`harnessmux attach {}` follows it).", launch.name, launch.name);
         record_and_emit(state, "agent_job_progress", Some(note));
     });
-    drive_session(job_id, tasks_dir, &session, &prompt, &working_dir_prefixes(launch.cwd), profile, context_messages)
+    drive_session(job_id, tasks_dir, &session, &prompt.text, &working_dir_prefixes(launch.cwd), profile, context_messages)
 }
 
 /// Write the profile's `tools.disallowed` and `env` into the Claude settings
@@ -6497,7 +6539,7 @@ mod tests {
             ]
         );
 
-        let prompt = build_prompt(&task, "merge it", None, BRIEF, None, None, None);
+        let prompt = build_prompt(&task, "merge it", None, BRIEF, None, None, None).text;
         assert!(prompt.contains("Comments (7 on the ticket;"), "{prompt}");
         assert!(prompt.contains("`lotar show TEST-1`") && prompt.contains("`lotar task timeline TEST-1`"), "{prompt}");
         assert!(prompt.contains("- Question, by claude, 2026-11-16T02:00:00Z:\nQuestion: A or B?"), "{prompt}");
@@ -6543,7 +6585,7 @@ mod tests {
         task.history = vec![assigned("2026-11-16T02:00:00Z", None, "@fix")];
         assert!(prompt_comments(&task).is_empty());
 
-        let prompt = build_prompt(&task, "go", None, BRIEF, None, None, None);
+        let prompt = build_prompt(&task, "go", None, BRIEF, None, None, None).text;
         assert!(prompt.contains("\nComments (2 on the ticket. All of them: `lotar show TEST-1`; the history: `lotar task timeline TEST-1`)\n"), "{prompt}");
         assert!(!prompt.contains("below the") && !prompt.contains("Note before any job"), "{prompt}");
 
@@ -6568,15 +6610,15 @@ mod tests {
             ],
         };
 
-        let brief = build_prompt(&task, "go", Some(&context), BRIEF, None, None, None);
+        let brief = build_prompt(&task, "go", Some(&context), BRIEF, None, None, None).text;
         assert!(brief.contains("Recent context (the newest 2 of 4 prompts and replies"), "{brief}");
         assert!(!brief.contains("oldest prompt") && brief.contains("- user: newest prompt"), "{brief}");
         assert!(brief.contains(&format!("- assistant: {} …\n", "r".repeat(PROMPT_EXCERPT_CHARS))), "{brief}");
 
-        let none = build_prompt(&task, "go", Some(&context), PromptHistory { full: false, entries: 0 }, None, None, None);
+        let none = build_prompt(&task, "go", Some(&context), PromptHistory { full: false, entries: 0 }, None, None, None).text;
         assert!(!none.contains("Recent context"), "{none}");
 
-        let full = build_prompt(&task, "go", Some(&context), PromptHistory { full: true, entries: 0 }, None, None, None);
+        let full = build_prompt(&task, "go", Some(&context), PromptHistory { full: true, entries: 0 }, None, None, None).text;
         assert!(full.contains("\nRecent context:\n- user: oldest prompt\n"), "{full}");
         assert!(full.contains(&format!("- assistant: {}\n", "r".repeat(3000))), "uncut");
         assert!(!full.contains("Comments ("), "no comment excerpts: {full}");
@@ -6585,7 +6627,7 @@ mod tests {
     #[test]
     fn build_prompt_includes_ticket_and_request() {
         let task = sample_task();
-        let prompt = build_prompt(&task, "ship it", None, BRIEF, None, None, None);
+        let prompt = build_prompt(&task, "ship it", None, BRIEF, None, None, None).text;
         assert!(prompt.contains("TEST-1"));
         assert!(prompt.contains("ship it"));
     }
@@ -6593,11 +6635,34 @@ mod tests {
     #[test]
     fn build_prompt_includes_instructions() {
         let task = sample_task();
-        let prompt = build_prompt(&task, "ship it", None, BRIEF, None, Some("Use the tools"), Some("- Commit to the branch."));
+        let prompt = build_prompt(&task, "ship it", None, BRIEF, None, Some("Use the tools"), Some("- Commit to the branch.")).text;
         assert!(prompt.contains("Agent instructions:"));
         assert!(prompt.contains("Use the tools"));
         let notes_at = prompt.find("This job:\n- Commit to the branch.").unwrap();
         assert!(notes_at < prompt.find("Ticket context:").unwrap());
+    }
+
+    /// DEV-767: each part of the prompt starts at its heading, and together they are the whole prompt.
+    #[test]
+    fn build_prompt_splits_the_prompt_at_its_headings() {
+        let mut task = churned_task();
+        task.relationships.blocks = vec!["TEST-2".to_string()];
+        let prompt = build_prompt(&task, "ship it", None, BRIEF, Some("- a session\n"), Some("Use the tools"), Some("- Commit to the branch."));
+        let sections = prompt.sections();
+        let headings: Vec<&str> = sections.iter().map(|section| section.heading.as_str()).collect();
+        assert_eq!(
+            headings,
+            ["Agent instructions", "This job", "Ticket context", "Relationships", "Comments", "Earlier agent sessions on this ticket", "User request"]
+        );
+        let chars: Vec<char> = prompt.text.chars().collect();
+        let mut next = 0;
+        for section in &sections {
+            assert_eq!(section.start, next, "{} follows the part before it", section.heading);
+            let text: String = chars[section.start..section.start + section.length].iter().collect();
+            assert!(text.starts_with(&section.heading), "{text}");
+            next = section.start + section.length;
+        }
+        assert_eq!(next, chars.len());
     }
 
     #[test]

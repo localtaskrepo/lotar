@@ -61,6 +61,9 @@ pub enum JobLogLine {
     Event(JobLogEntry),
     #[serde(rename = "status")]
     Status(JobStatusLine),
+    /// The prompt and settings of the job's first turn (DEV-767).
+    #[serde(rename = "run_inputs")]
+    RunInputs(Box<crate::api_types::AgentJobRunInputs>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -283,6 +286,21 @@ impl AgentLogService {
         Ok(())
     }
 
+    /// Append the job's `run_inputs` line (DEV-767). Only writes if logs_dir is provided and the log exists.
+    pub fn append_run_inputs(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str, inputs: crate::api_types::AgentJobRunInputs) -> LoTaRResult<()> {
+        let Some(logs_dir) = logs_dir else {
+            return Ok(());
+        };
+        let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
+        if !path.exists() {
+            return Ok(());
+        }
+        let mut line = serde_json::to_string(&JobLogLine::RunInputs(Box::new(inputs))).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+        line.push('\n');
+        OpenOptions::new().append(true).open(&path)?.write_all(line.as_bytes())?;
+        Ok(())
+    }
+
     /// Load all events from a log file.
     pub fn load_events(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<Vec<JobLogEntry>> {
         let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
@@ -305,6 +323,23 @@ impl AgentLogService {
         }
 
         Ok(events)
+    }
+
+    /// The job's `run_inputs` line (DEV-767): `None` when the log is missing or has none, as logs from before it.
+    pub fn load_run_inputs(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<Option<crate::api_types::AgentJobRunInputs>> {
+        let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
+        if !path.exists() {
+            return Ok(None);
+        }
+        for line in BufReader::new(File::open(&path)?).lines() {
+            let line = line?;
+            if line.starts_with(r#"{"type":"run_inputs""#)
+                && let Ok(JobLogLine::RunInputs(inputs)) = serde_json::from_str::<JobLogLine>(&line)
+            {
+                return Ok(Some(*inputs));
+            }
+        }
+        Ok(None)
     }
 
     /// Load header from a log file.
@@ -480,6 +515,34 @@ mod tests {
         assert_eq!(effective_logs_dir(tasks, Some(".logs")).as_deref(), Some(".logs"));
         assert_eq!(effective_logs_dir(tasks, Some("off")), None);
         assert_eq!(effective_logs_dir(tasks, Some("None")), None);
+    }
+
+    /// DEV-767: the `run_inputs` line reads back as written; a log without one (older lotar) has none, and the
+    /// line doesn't disturb the header, events and status readers.
+    #[test]
+    fn run_inputs_round_trip_and_older_logs_have_none() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        AgentLogService::init_log(root, Some("logs"), header("job-1", "T-1")).unwrap();
+        AgentLogService::init_log(root, Some("logs"), header("job-2", "T-2")).unwrap();
+        assert_eq!(AgentLogService::load_run_inputs(root, "logs", "job-1").unwrap(), None);
+        let inputs = crate::api_types::AgentJobRunInputs {
+            at: "now".to_string(),
+            prompt: "User request:\ngo\n".to_string(),
+            sections: vec![crate::api_types::AgentJobPromptSection { heading: "User request".to_string(), start: 0, length: 17 }],
+            instructions_source: crate::api_types::AgentJobInstructionsSource::default(),
+            settings: crate::api_types::AgentJobRunSettings { runner: "claude".to_string(), ..Default::default() },
+            env: vec!["LOTAR_BIN".to_string()],
+        };
+        AgentLogService::append_event(root, Some("logs"), "job-1", entry("agent_job_progress", "now", Some("hi"))).unwrap();
+        AgentLogService::append_run_inputs(root, Some("logs"), "job-1", inputs.clone()).unwrap();
+        AgentLogService::append_event(root, Some("logs"), "job-1", entry("agent_job_message", "now", Some("done"))).unwrap();
+        assert_eq!(AgentLogService::load_run_inputs(root, "logs", "job-1").unwrap(), Some(inputs.clone()));
+        assert_eq!(AgentLogService::load_run_inputs(root, "logs", "job-2").unwrap(), None);
+        assert_eq!(AgentLogService::load_run_inputs(root, "logs", "job-3").unwrap(), None, "no log");
+        assert_eq!(AgentLogService::load_events(root, "logs", "job-1").unwrap().len(), 2);
+        assert_eq!(AgentLogService::load_job(root, "logs", "job-1").unwrap().unwrap().events.len(), 2);
+        AgentLogService::append_run_inputs(root, None, "job-1", inputs).unwrap();
     }
 
     fn header(job_id: &str, ticket_id: &str) -> JobLogHeader {

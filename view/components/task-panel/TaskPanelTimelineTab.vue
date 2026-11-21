@@ -105,6 +105,7 @@
                 <p v-else-if="threadErrors[item.entry.job.id]" class="error">{{ threadErrors[item.entry.job.id] }}</p>
                 <p v-else-if="!(threads[item.entry.job.id] || []).length" class="muted">The thread is empty.</p>
                 <AgentJobLog v-else :entries="threads[item.entry.job.id] || []" />
+                <AgentRunInputs :job-id="item.entry.job.id" />
               </div>
             </div>
           </li>
@@ -132,6 +133,7 @@ import { TIMELINE_FILTER_KEY, useActivityFilter } from '../../composables/task-p
 import { useSse } from '../../composables/useSse'
 import { formatCost, jobDuration, runSettings, usageDetail } from '../../utils/agentJobs'
 import AgentJobLog from '../AgentJobLog.vue'
+import AgentRunInputs from '../AgentRunInputs.vue'
 import MarkdownContent from '../MarkdownContent.vue'
 import ReloadButton from '../ReloadButton.vue'
 import UiLoader from '../UiLoader.vue'
@@ -490,5 +492,8 @@ onBeforeUnmount(() => {
 .timeline__thread {
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-2, 0.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
 }
 </style>

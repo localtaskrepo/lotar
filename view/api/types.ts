@@ -1950,6 +1950,90 @@ export interface AgentJobLogsResponse {
     events: AgentJobLogEntry[]
 }
 
+/** `GET /api/jobs/inputs` (DEV-767): `null` when the job's log has no record. */
+export interface AgentJobInputsResponse {
+    inputs: AgentJobRunInputs | null
+}
+
+/** The prompt and settings a job's run started with; env, MCP env and headers are names only. */
+export interface AgentJobRunInputs {
+    at: string
+    /** The first turn's prompt, exactly as the agent got it. */
+    prompt: string
+    /** The prompt's parts in order, covering all of it. */
+    sections: AgentJobPromptSection[]
+    instructions_source: AgentJobInstructionsSource
+    settings: AgentJobRunSettings
+    /** Environment variable names the agent's process got. */
+    env: string[]
+}
+
+export interface AgentJobPromptSection {
+    heading: string
+    /** Offset in Unicode code points. */
+    start: number
+    /** Length in Unicode code points. */
+    length: number
+}
+
+export interface AgentJobInstructionsSource {
+    base?: AgentJobInstructionsOrigin
+    profile?: AgentJobInstructionsOrigin
+}
+
+export interface AgentJobInstructionsOrigin {
+    /** `builtin`, `inline` or `file`. */
+    kind: string
+    path?: string
+}
+
+export interface AgentJobRunSettings {
+    runner: string
+    agent_profile?: string
+    harness_agent?: string
+    model?: string
+    effort?: string
+    provider?: string
+    permissions?: string
+    on_permission?: string
+    rules: AgentJobRunRules
+    options?: Record<string, string>
+    add_dirs?: string[]
+    mcp_servers?: AgentJobMcpServer[]
+    cwd?: string
+    title?: string
+    command?: string
+    args?: string[]
+    session?: AgentJobRunSession
+}
+
+export interface AgentJobRunRules {
+    deny_commands?: string[]
+    allow_tools?: string[]
+    deny_tools?: string[]
+    confine_writes: boolean
+}
+
+export interface AgentJobMcpServer {
+    name: string
+    command?: string
+    args?: string[]
+    url?: string
+    /** Names only. */
+    env?: string[]
+    /** Names only. */
+    headers?: string[]
+    tools?: string[]
+}
+
+export interface AgentJobRunSession {
+    name: string
+    /** `new` or `resumed`. */
+    mode: string
+    /** The profile's `session`: `new`, `continue` or `fresh`. */
+    configured?: string
+}
+
 export interface AgentJobMessageRequest {
     id: string
     message: string

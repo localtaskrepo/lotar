@@ -53,6 +53,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/jobs/cancel ({ id }) -> { data: AgentJobCancelResponse }
 - POST /api/jobs/cancel-all -> { data: AgentJobCancelAllResponse }
 - GET  /api/jobs/logs?id=JOB_ID -> { data: AgentJobLogsResponse }; the whole thread: the job's saved log (each event keeps its live `sequence`) joined with the events this server holds
+- GET  /api/jobs/inputs?id=JOB_ID -> { data: AgentJobInputsResponse }; the prompt and settings the job's run started with, `inputs: null` when its log has none ([run inputs](agent.md#run-inputs))
 - GET  /api/automation/show[?project=PREFIX] -> { data: AutomationInspectResponse }
 - POST /api/automation/set (AutomationSetRequest) -> { data: AutomationSetResponse }
 - POST /api/sprints/create (SprintCreateRequest) -> { data: SprintCreateResponse }; configured sprint defaults apply unless `skip_defaults: true` (see `applied_defaults`)

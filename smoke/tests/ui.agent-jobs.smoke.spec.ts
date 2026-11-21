@@ -286,6 +286,64 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
+    it('shows the prompt and settings a finished job ran with behind its Instructions button', async () => {
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-inputs-');
+
+        try {
+            const workspace = await SmokeWorkspace.create({
+                seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml) },
+            });
+
+            try {
+                const task = await workspace.addTask('Run inputs test', { args: ['-p', 'UIAG'] });
+                const server = await startLotarServer(workspace);
+                try {
+                    await startJobViaApi(server.url, task.id, 'mock', 'Inputs smoke request');
+                    await waitForJobStatusViaApi(server.url, task.id, 'completed');
+
+                    await withPage(`${server.url}/agents`, async (page) => {
+                        await page.waitForSelector('.job-card', { timeout: 15_000 });
+                        await page.getByRole('button', { name: 'Show logs', exact: true }).click();
+                        const toggle = page.getByRole('button', { name: 'Instructions', exact: true });
+                        expect(await toggle.getAttribute('aria-expanded')).toBe('false');
+
+                        const loaded = page.waitForResponse(
+                            (response) => new URL(response.url()).pathname === '/api/jobs/inputs',
+                        );
+                        await toggle.click();
+                        expect((await loaded).ok()).toBe(true);
+
+                        const settings = page.getByRole('table', { name: 'Settings' });
+                        await settings.waitFor({ state: 'visible', timeout: 15_000 });
+                        const setting = (name: string) =>
+                            settings
+                                .locator('tr')
+                                .filter({ has: page.locator('th', { hasText: new RegExp(`^${name}$`) }) })
+                                .locator('td')
+                                .textContent();
+                        expect(await setting('Runner')).toBe('command');
+                        expect(await setting('Agent profile')).toBe('mock');
+
+                        const request = page.locator('details', { hasText: 'User request' });
+                        await request.locator('summary').click();
+                        expect(await request.locator('pre').textContent()).toContain('Inputs smoke request');
+                        expect(await page.locator('.run-inputs details summary').allTextContents()).toEqual(
+                            expect.arrayContaining([expect.stringContaining('Agent instructions')]),
+                        );
+                        await page.getByRole('button', { name: 'Copy prompt', exact: true }).waitFor();
+                        await page.getByRole('button', { name: 'Copy all', exact: true }).waitFor();
+                    });
+                } finally {
+                    await server.stop();
+                }
+            } finally {
+                await workspace.dispose();
+            }
+        } finally {
+            await agents.dispose();
+        }
+    });
+
     it('guides setting up the first agent when none is configured', async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: { '.tasks/config.yml': configWithAgents('') },

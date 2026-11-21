@@ -8,7 +8,7 @@ LoTaR runs agent CLIs (Claude Code, Codex CLI, Copilot CLI, T3 Code and the othe
   - `<RUNNER>` is one of the [runners](#runners): `claude`, `codex`, `copilot`, `gemini`, `cursor`, `amp`, `droid`, `opencode`, `kilo`, `antigravity`, `t3` or `command`.
   - Without `--wait` or `--follow`, the job is checked (ticket, profile or runner, settings) and handed to the background queue worker, and the command returns at once with `Queued <TICKET> for <agent>`. Follow it with `lotar agent queue` and `lotar agent list-jobs`. With `--wait`, the job runs in this terminal and the command exits non-zero unless it completes; it returns once the job's end automation (the `job_completed`/`job_failed` rules), context and worktree cleanup are done. With `--format json` it prints the finished job.
 - `lotar agent status <JOB_ID>`
-- `lotar agent logs <JOB_ID>`
+- `lotar agent logs <JOB_ID> [--inputs]` — the job's thread; with `--inputs` the prompt and settings its run started with instead ([Run inputs](#run-inputs))
 - `lotar agent cancel <JOB_ID>` — stop a job that has started; a ticket still waiting in the queue has no job yet, so remove it with `lotar agent queue remove`
 - `lotar agent queue` — list the tickets waiting in the queue, the jobs waiting for their tickets' prerequisites ([Agent job queueing](automation.md#agent-job-queueing)), and the queue worker's state: `active` (a worker process runs; with tickets left it says what they wait for: a free slot under the global or their project's `agent.worktree.max_parallel_jobs`, their ticket's running job, or a [paused queue](#paused-queue)), `stopped` (tickets wait but no worker process runs) or `idle` (nothing queued). While the machine is short of memory the reason says so and since when ([memory gate](#memory-gate)). Each waiting ticket also says what it waits for (`waits_for`): a queue worker, memory, a usage limit's reset, the paused queue, a free slot, its ticket's running job, or `starting`. Running and Queued count the jobs every process runs for the tasks directory and the tickets in its queue; `GET /api/jobs` and the Agents page show the same. With `--format json` the state is in `worker_state`, the explanation in `reason`, a memory hold in `memory_hold` (`reason`, `since`) a failed memory reading in `memory_error`, an open pause in `pause` and the jobs waiting for prerequisites in `waiting_for_prerequisites`. Jobs waiting for prerequisites don't count as queued: they need no worker until their prerequisites are done
 - `lotar agent queue resume` — start the queue worker for the waiting tickets without queueing a job, for example after the worker was killed. With a worker running or nothing queued it changes nothing. A worker that can't start is reported (`error` in JSON, the state stays `stopped`); the command fails only when the queue can't be read. `lotar serve` does the same when it starts and prints a warning if the worker can't start
@@ -531,6 +531,17 @@ Both output readers are joined before final summaries, persisted status, and slo
 Agent lifecycle automation lives in the automation rules file. Without a rule, a finished job leaves the ticket's status and assignee as they are. See [Automation Rules](automation.md#agent-job-queueing) for a lifecycle example.
 
 A rule's [`tell_agent`](automation.md#telling-the-tickets-agent) action hands the ticket's agent a message, for example a person's comment: a running job gets it as its next turn, an idle ticket starts its agent with it.
+
+## Run inputs
+
+When a job's session has started and before its first turn goes out, it writes one `run_inputs` line to its log with what the agent got:
+
+- `prompt`: the first turn's prompt exactly as sent, including a merge hand-off put in front or a handoff appended (a session idle too long, or one the agent couldn't resume); `sections` splits it at its headings (Agent instructions, This job, Ticket context, Relationships, Comments, Recent context, Earlier agent sessions on this ticket, User request, plus Merge hand-off and Handoff when present), each with `start` and `length` in Unicode code points.
+- `instructions_source`: where the agent instructions came from (`builtin`, `inline` or a `file` with its path), for the base and for the profile's own.
+- `settings`: runner, agent profile, harness agent, model, effort, provider, permissions, permission answer, rules, options, extra directories, MCP servers, working directory, title, the command and its arguments (`command` runner) and the session (`new` or `resumed`; `new` when a session that couldn't be resumed was replaced).
+- `env`: the names of the environment variables the agent's process got. Values are never recorded, nor MCP server env values or HTTP header values; the prompt is recorded as sent.
+
+Read it with `lotar agent logs <job> --inputs` (`--format json`: `{inputs}`), `GET /api/jobs/inputs?id=<job>` or the **Instructions** button in a job's log panel on the Agents page and in the task panel's thread, which shows the settings as a table and the prompt as collapsible sections with Copy prompt and Copy all. It isn't part of `/api/jobs/logs` or the event stream. A job without the line, from before this version, with logging off, or a commit retry that didn't run the agent, says "Not recorded for this job".
 
 ## Notes
 
