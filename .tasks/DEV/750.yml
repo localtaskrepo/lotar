@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T01:26:53.918022+00:00
-modified: 2026-11-21T09:21:22.850954+00:00
+modified: 2026-11-21T21:12:05.655046+00:00
 relationships:
   related:
   - DEV-745
@@ -107,6 +107,8 @@ comments:
     - Rerunning `npm run -s test:agent` with Rust `--no-fail-fast`, as in DEV-741's merge.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac693e5fee67c786eb32a7a0481464c15b1fcacc084a3b4a5223c4203ae82ee8
+releases:
+- 11
 description: 'Found in DEV-745 (2026-11-20), load average 27: two full `npm run smoke` runs each failed one test, a different one each time: `ui.advanced.smoke.spec.ts` ''surfaces analytics on the insights dashboard'' (`expected 0 to be greater than or equal to 4`) and `ui.agent-jobs.smoke.spec.ts` ''streams log entries live while a job is running''. Each file passes alone. Check: `npm run smoke` under load. Done: both tests wait for their condition instead of a fixed time and pass in the full run.'
 tags:
 - health
@@ -193,3 +195,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-745","DEV-755","DEV-741","DEV-742","DEV-747","DEV-752"]}'
     new: '{"related":["DEV-745","DEV-755","DEV-741","DEV-742","DEV-747","DEV-752","DEV-751"]}'
+- at: 2026-11-21T21:12:05.655046+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

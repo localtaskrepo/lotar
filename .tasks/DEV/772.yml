@@ -1,0 +1,29 @@
+title: 'Flaky tests: merge_job_whose_branch_was_rebased_elsewhere_passes and merge_job_that_cannot_fast_forward_fails time out at the 30 s wait floor under full-suite load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T22:31:39.633028+00:00
+modified: 2026-11-21T22:31:50.905095+00:00
+relationships:
+  related:
+  - DEV-749
+  - DEV-760
+description: 'Found in the DEV-760 merge (2026-11-21), load average about 35: `npm run -s test:agent` failed twice, once at `crates/lotar-lib/tests/agent_automation_integration_test.rs:2785` (`merge_job_whose_branch_was_rebased_elsewhere_passes`, "the rebased branch counts as merged"), once at line 2494 (`merge_job_that_cannot_fast_forward_fails`, "unmerged merge should hand the ticket back"). Both wait 10_000 ms, raised to `WAIT_FLOOR_MS` (30 s), for a ticket that three agent jobs move; alone the first passes in 11 s. Check: `npm run -s test:agent` under load. Done: like DEV-749, the waits for a ticket that several jobs move use `JOB_END_LIMIT_MS`, so the limit only catches a hang.'
+tags:
+- health
+custom_fields:
+  finding: test:agent:merge-job-wait-floor
+history:
+- at: 2026-11-21T22:31:46.458859+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-749","DEV-760"]}'
+- at: 2026-11-21T22:31:50.905095+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

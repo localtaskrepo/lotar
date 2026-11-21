@@ -1,11 +1,11 @@
 title: Release v0.15.6
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix-retry'
 created: 2026-11-20T05:17:29.812031+00:00
-modified: 2026-11-21T15:01:57.531704+00:00
+modified: 2026-11-21T22:12:31.297668+00:00
 relationships:
   related:
   - DEV-702
@@ -13,6 +13,13 @@ relationships:
   - DEV-729
   - DEV-734
   - DEV-747
+  - DEV-711
+  - DEV-726
+  - DEV-740
+  - DEV-754
+  - DEV-755
+  - DEV-763
+  - DEV-771
 comments:
 - date: 2026-11-21T15:01:56.811998+00:00
   author: claude
@@ -29,12 +36,54 @@ comments:
     - key: wait
       label: Wait for DEV-734
     recommended: yes
+- date: 2026-11-21T20:26:57.015954+00:00
+  author: mallox
+  text: |-
+    Answer: yes (Release v0.15.6 now)
+
+    (answered in INBOX-614)
+  answer:
+    to: 2026-11-21T15:01:56.811998+00:00
+    choice:
+    - yes
+    note: (answered in INBOX-614)
+- date: 2026-11-21T21:13:16.846698+00:00
+  author: automation
+  text: The fix agent's job job-20261121T210916.429Z-109 failed (lotar agent logs job-20261121T210916.429Z-109); @fix-retry retries it on branch agent/DEV-725.
+- date: 2026-11-21T21:17:01.994528+00:00
+  author: claude
+  text: |-
+    Version bumped to v0.15.6 (owner: "yes, release now", INBOX-614); commit is ready for the merge.
+
+    - `aa64455e7` DEV-725 Release v0.15.6: `Cargo.toml` (workspace version and the five `=0.15.6` pins), `Cargo.lock`
+    - Release record 0.15.6 (`#11`): added the 26 tickets merged since `v0.15.5` (DEV-711, DEV-726–734, DEV-740–755)
+    - Still open in it (`lotar list 'release:0.15.6 -status:Done'`): DEV-734 (InProgress), DEV-754 and DEV-755 (Todo, though their commits are on main)
+    - No DEV ticket `depends-on` this one; STD-273 and STD-259 wait for it
+    - Lint, `npm test` and `npm run smoke` (406 tests) passed
+    - Not done yet: the tag. The owner said to release, and the release push comes after the merge and green QA
+  report:
+    commits:
+    - hash: aa64455e7
+      what: version 0.15.5 → 0.15.6 in Cargo.toml and Cargo.lock
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: 'After the merge to main and a green Quality Assurance run: git tag -s v0.15.6 -m v0.15.6, git push origin v0.15.6, lotar release release 0.15.6, then the release guide''s steps 5-8'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A580d32a8d87852253f1f686139c79390e4f085954cd9223ddd756b0e4d895c13
 releases:
 - 11
 description: |-
   Next lotar release, a patch bump to v0.15.6 unless the owner asks for a minor.
 
   Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
+tags:
+- fix-retried
 history:
 - at: 2026-11-20T05:17:40.026456+00:00
   actor: claude
@@ -69,3 +118,59 @@ history:
   - field: status
     old: Todo
     new: HelpNeeded
+- at: 2026-11-21T20:26:57.015954+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:26:57.743839+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-21T21:03:43.179894+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-21T21:11:35.327834+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A580d32a8d87852253f1f686139c79390e4f085954cd9223ddd756b0e4d895c13
+- at: 2026-11-21T21:13:11.684474+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-21T21:13:16.846698+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:17:01.994528+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:17:02.368571+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755"]}'
+- at: 2026-11-21T21:21:12.950755+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763"]}'
+- at: 2026-11-21T22:12:31.297668+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771"]}'

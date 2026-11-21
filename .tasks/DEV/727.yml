@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T05:28:46.710582+00:00
-modified: 2026-11-20T18:04:08.732325+00:00
+modified: 2026-11-21T21:12:04.858817+00:00
 relationships:
   related:
   - DEV-386
@@ -265,6 +265,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A64620dc6e0d4603e9f949b19e2e62ee3739b716525cefdb69bee8941c9afc17f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5e7fbe4d2514fd22e33ef7146522fa10f350d9c35d94d980ccf471a7f54e81e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87c4fed47c069df2c0f3af11bb18f4917fa1d1debfbe16535ea916e4a50d767e
+releases:
+- 11
 description: |-
   Found (standards STD-259, 2026-11-19): the fix job's step "It waits for another ticket: lotar task relationships add --kind depends-on STD-259 <ID>" fails when the blocker lives in another repo: `lotar --tasks-dir ~/Development/standards/.tasks task relationships add --kind depends-on STD-259 HARN-2` gives "Validation error: Relationship task 'HARN-2' is missing" (HARN-2 is in ~/Development/@localtaskrepo/harnessmux/.tasks).
 
@@ -513,3 +515,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661","DEV-731","DEV-730"]}'
     new: '{"related":["DEV-386","DEV-1","DEV-728","DEV-661","DEV-731","DEV-730","DEV-732"]}'
+- at: 2026-11-21T21:12:04.858817+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

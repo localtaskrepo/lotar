@@ -1,0 +1,58 @@
+title: 'Agent job log viewer: filters, search, folded tool calls, live status line, and jobs list filters'
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-21T20:47:12.959394+00:00
+modified: 2026-11-21T20:47:26.918055+00:00
+relationships:
+  depends_on:
+  - DEV-766
+  - DEV-767
+  related:
+  - harnessmux:HARN-15
+  - DEV-768
+description: |-
+  The job log viewer (`view/components/AgentJobLog.vue`, used by `view/pages/AgentJobs.vue` and the task panel thread in `view/components/task-panel/TaskPanelTimelineTab.vue`) is one flat list with no filter or search. The owner asked on 2026-11-21 to "look at some of the project logs to see what else could maybe be done to make it easier to understand what's going [on], how to filter down to the data you need, and be smart about the UI and UX".
+
+  ## What the logs show (sampled 651 logs, 2026-11-17 to 2026-11-21)
+
+  - Every job repeats the same setup notes: the session and `harnessmux attach` line, `Cloned target/ … (copy-on-write)`, `Wrote .claude/settings.local.json …`, continuing a session, check commands, long T3 links.
+  - Runs of up to 14 `Tool: Terminal` lines in a row between two replies.
+  - Check failures paste 3 KB of output with ANSI codes.
+  - The final reply appears twice (last message and summary), and so does the failure text.
+  - A permission question is the raw command plus options, with no tool or reason.
+  - The jobs list can only be filtered by status. There is no search and no profile or ticket filter.
+
+  ## Plan
+
+  - [ ] Filter chips with counts: **Conversation** (agent, you, questions), **Tools**, **Thinking** (off by default; owner 2026-11-21: "Collapsed, off by default"), **lotar** (setup and status notes), **Problems** (failed, denied, warnings, failed tools). Plus a text search that highlights matches. Remember the chips per viewer (`localStorage`, guarded).
+  - [ ] Tool calls between two messages fold into one summary row ("9 commands · 2 reads · 1 edit", with a failed count in red). Expanding it lists each call: kind glyph, command or path, status, duration. A call expands to its input and output (monospace, ANSI removed, long output clipped with "Show all"). Failed calls start expanded. Uses the `agent_job_tool` entries from DEV-766 and still reads old "Tool: …" lines.
+  - [ ] Setup notes before the first turn fold into one "Setup" row.
+  - [ ] While running: a live line on top or bottom, "Running `npm test` · 42 s" or "Thinking…", the context window used (from the job's usage), and a "Jump to latest" button when the reader has scrolled up.
+  - [ ] The summary is shown once, as the result card. The duplicate last message or failure text is hidden.
+  - [ ] A question shows the tool and its input, then the options.
+  - [ ] Place the Instructions button (from DEV-767) in the log header.
+  - [ ] A link for each job (`/agents?job=<id>`, opens its log), and an expand-to-full-height view. Today it is capped at 420 px.
+  - [ ] Jobs list: a text search (ticket, title, summary), profile and runner filter, ticket filter, next to the status tabs.
+  - [ ] Vitest for grouping and filters. Smoke tests for filters, the folded tools and the live line. Skill ui-review: themes, dark mode, phone width, before and after screenshots attached.
+
+  ## Done when
+
+  - [ ] On a real Claude review log you can jump to just the conversation or just the failures in one click, and see which commands ran without reading 40 rows.
+tags:
+- ui
+- web-ui
+history:
+- at: 2026-11-21T20:47:26.221887+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15"]}'
+- at: 2026-11-21T20:47:26.918055+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768"]}'

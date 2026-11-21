@@ -1,11 +1,11 @@
 title: A worker that adopts an orphaned Claude job can't resume its session (Resource not found sessionId) and fails the job
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-20T18:03:55.898155+00:00
-modified: 2026-11-21T19:40:21.036027+00:00
+modified: 2026-11-21T21:58:11.269219+00:00
 relationships:
   depends_on:
   - DEV-742
@@ -452,11 +452,44 @@ comments:
 - date: 2026-11-21T19:40:21.036027+00:00
   author: automation
   text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-734 yet. 10 agent jobs ended on DEV-734 in the last 24 hours, the limit (max_iterations) is 10; tagged automation-limit-reached.'
+- date: 2026-11-21T20:44:53.846418+00:00
+  author: claude
+  text: 'Stalled since 2026-11-21T19:40Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-21T21:58:00.354967+00:00
+  author: claude
+  text: |-
+    Ready to merge: the check that stopped the merge passes now that DEV-742 and DEV-752 are on `main`.
+
+    - `main` has DEV-742 (`d3040a8e3`) and DEV-752 (`32891539f`); `git merge-tree --write-tree main HEAD` is clean
+    - In a copy of that merged tree (scratchpad, removed): `npm run -s test:agent` passed, 2443/2443 Rust and 1563 UI tests, at load average 15–22; `dev604_queue_pauses_test` included
+    - Targeted set (`dev510|dev604|dev320|dev528|dev626|agent_active_jobs|orphan`): 39/39, including `a_taken_over_job_whose_session_cant_be_resumed_runs_again`
+    - No file changes; branch stays at `a8028b6ef`, nothing pushed, main checkout not touched
+  report:
+    commits:
+    - hash: a8028b6ef
+      what: adopted job whose session can't be resumed runs again in a new session
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: on the merged tree of main 050769e21 + a8028b6ef, 2443 Rust and 1563 UI tests
+    - command: cargo nextest run (DEV-734 targeted set)
+      result: passed
+      reason: 39/39
+    - command: npm run lint
+      result: not_run
+      reason: merge agent runs it after the rebase
+    - command: npm run smoke
+      result: not_run
+      reason: merge agent runs it after the rebase
+    next: 'Merge agent: rebase onto main and land'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d8da7fd037a300913db7c08ae89b6b2373ac31fad2c062d049fe61587cbb2b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4551288540da697c0aa1df1dbeccd029ed1a6b5102ae0a721e3412307ab007c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac0f794164fe3247154a7cd9153fa0a8041dd2d7b7155685d0444191d6c157f97
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5f5e1dbfc9396ed0026d188977a0cb0a165235474fdde7c2ad465527ba5b6a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6d2e166ba63f8f9910aafed258e9fe52c698fd6fc1dd0d5650e991323fe4658
+releases:
+- 11
 description: 'Found (DEV-732, 2026-11-20): review job-20261120T175119.822Z-2 ran on lotar''s worker pid 32048, which exited at 17:55:05 UTC (new workers 45178 for lotar and 45115 for standards started the same second). 45178 adopted the job and failed it: ''session lotar-95e687-DEV-732-review could not be resumed: Validation error: Resource not found: sessionId 7d15b17f-...''. Check: kill a worker while it runs a Claude job 3 minutes in; the adopting worker resumes the session, or re-queues the job instead of failing it. Done: an adopted job whose session can''t be resumed is re-run, not failed to HelpNeeded.'
 tags:
 - health
@@ -855,3 +888,36 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-21T20:44:40.376061+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-21T20:44:53.846418+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:12:05.185452+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
+- at: 2026-11-21T21:54:10.416628+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6d2e166ba63f8f9910aafed258e9fe52c698fd6fc1dd0d5650e991323fe4658
+- at: 2026-11-21T21:58:00.354967+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:58:11.269219+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

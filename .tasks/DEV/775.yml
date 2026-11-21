@@ -1,0 +1,29 @@
+title: 'Flaky smoke under load: two agent-jobs UI tests time out in the full run at load average 46, pass alone'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T23:03:37.168173+00:00
+modified: 2026-11-21T23:03:41.390077+00:00
+relationships:
+  related:
+  - DEV-755
+  - DEV-760
+description: 'Found in the DEV-760 merge (2026-11-21), load average 46: `npm run -s smoke` failed in `smoke/tests/ui.agent-jobs.smoke.spec.ts`: ''stops queued and running jobs only after accessible confirmation'' (line 739, ''Timed out after 20000ms waiting for stop-all to cancel every job'') and ''shows the agent''s permission question in the job view and answers it'' (line 784, locator.waitFor 15000ms). Alone the spec passes, 11/11 in 29 s. Check: `npm run -s smoke` under load. Done: like DEV-755, these waits allow for full-run load, so only a hang fails them.'
+tags:
+- health
+custom_fields:
+  finding: smoke:agent-jobs-under-load
+history:
+- at: 2026-11-21T23:03:39.405882+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-755","DEV-760"]}'
+- at: 2026-11-21T23:03:41.390077+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

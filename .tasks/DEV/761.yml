@@ -1,16 +1,56 @@
 title: 'Flaky test: a_ticket_hands_its_context_from_harness_to_harness_through_its_states times out waiting for the merged ticket under load'
-status: Todo
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-21T19:41:20.057266+00:00
-modified: 2026-11-21T19:41:59.486275+00:00
+modified: 2026-11-21T21:53:39.215+00:00
 relationships:
   related:
   - DEV-625
   - DEV-747
   - DEV-754
+comments:
+- date: 2026-11-21T20:43:23.208293+00:00
+  author: claude
+  text: |-
+    Fixed: the pipeline test now waits for each of its four jobs separately, so a load spike can't add up past one 60 s bound.
+
+    - Cause: one `wait_for("the merged ticket")` covered fix, review, rework and merge, four jobs run one after another. It takes 1.7 s alone and about 10 to 14 s at load 70 to 150.
+    - `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: it waits for each step's prompt in its fake agent's log (a count that only grows, so a status the poll misses can't fail it), then for Done. A stall names its step, e.g. `timed out waiting for the review`. The assertions are unchanged.
+    - 20 loaded runs: 4 rounds of 5 concurrent dev503 groups next to 30 `yes` processes, load 131 to 149. All passed.
+    - Side note: the ticket's repro command, `-p lotar-lib`, runs a stale `lotar` binary. With it, `a_failed_jobs_thread_is_settled_once_a_later_job_completes` failed every time (yesterday's build, before DEV-747). A workspace run passes it. `testing-strategy` already warns about this, so no guidance change.
+  report:
+    commits:
+    - hash: cc9974256
+      what: wait per pipeline step, each with its own 60 s bound
+    checks:
+    - command: cargo nextest run --test integration -E 'test(/dev503/)' x20 at load 131-149
+      result: passed
+      reason: 20 of 20, this test 11-14 s
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2443 Rust, 1563 UI
+    - command: npm run smoke
+      result: passed
+      reason: '406'
+    next: Review, then merge
+- date: 2026-11-21T21:53:31.780172+00:00
+  author: claude
+  text: |-
+    Review: passed. The pipeline test now waits for each step on its own, and that holds up under load.
+
+    - Read: the ticket's "Done when", the fix comment, `cc9974256` (test only, `crates/lotar-lib/tests/dev503_harness_jobs_test.rs:666-673`), and `wait_for`/`settle` (60 s bound per call, `:157`).
+    - Each step (fix, review, rework, merge) waits until its prompt appears in its fake agent's log. That log only grows, so the wait can't miss a step. Done then gets its own wait. A stall names its step (`timed out waiting for the review`). The assertions are unchanged, and nothing outside the ticket changed.
+    - `npm ci` passed; `rustfmt --check` on the file passed; `npm run -s lint` passed.
+    - `cargo nextest run --workspace --test integration -E 'test(/dev503/)'`: 47/47 passed alone, then 3 more runs passed with 24 `yes` processes running (load average 25 to 58).
+    - Not rerun: `npm test` and `npm run smoke` (the fix agent reports both passed; the change touches one test only), or the 20 loaded runs.
+    - No minor findings and no tickets filed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8f8b5fcc7c47b3238c4a8dbc117ea039dcaf1cbf443f4834940591edc9d186c5
 description: |-
   Found in the review of DEV-754, on the unchanged dev503 test.
 
@@ -19,7 +59,11 @@ description: |-
 
   Done when:
   - [ ] The test passes at a load average of 40, or its wait is bounded so that a load spike can't fail it.
-  - [ ] 20 runs under load pass.
+  - [ ] Each of the pipeline's steps (fix, review, rework, merge, then the ticket Done) gets its own wait with the file's 60 s bound, on something that only grows: the step's prompt in its fake agent's log. A transient status the poll misses can't fail it.
+  - [ ] A step that stalls fails with a message that names it, such as `timed out waiting for the review`.
+  - [ ] The assertions after the wait are unchanged.
+  - [ ] 20 runs under load pass: the dev503 group run alongside CPU stress at load average 40 or more.
+  - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
 tags:
 - test
 history:
@@ -34,3 +78,66 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-21T20:28:31.583767+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T20:28:36.121500+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8f8b5fcc7c47b3238c4a8dbc117ea039dcaf1cbf443f4834940591edc9d186c5
+- at: 2026-11-21T20:35:21.769466+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-754, on the unchanged dev503 test.
+
+      - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev503/)'` at load average about 40: this test failed with `timed out waiting for the merged ticket` (`dev503_harness_jobs_test.rs:158`, 64 s); a rerun passed all 47.
+      - The same timeout failed the DEV-747 merge check (`npm run -s test:agent`), and DEV-625 saw it too.
+
+      Done when:
+      - [ ] The test passes at a load average of 40, or its wait is bounded so that a load spike can't fail it.
+      - [ ] 20 runs under load pass.
+    new: |-
+      Found in the review of DEV-754, on the unchanged dev503 test.
+
+      - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev503/)'` at load average about 40: this test failed with `timed out waiting for the merged ticket` (`dev503_harness_jobs_test.rs:158`, 64 s); a rerun passed all 47.
+      - The same timeout failed the DEV-747 merge check (`npm run -s test:agent`), and DEV-625 saw it too.
+
+      Done when:
+      - [ ] The test passes at a load average of 40, or its wait is bounded so that a load spike can't fail it.
+      - [ ] Each of the pipeline's steps (fix, review, rework, merge, then the ticket Done) gets its own wait with the file's 60 s bound, on something that only grows: the step's prompt in its fake agent's log. A transient status the poll misses can't fail it.
+      - [ ] A step that stalls fails with a message that names it, such as `timed out waiting for the review`.
+      - [ ] The assertions after the wait are unchanged.
+      - [ ] 20 runs under load pass: the dev503 group run alongside CPU stress at load average 40 or more.
+      - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
+- at: 2026-11-21T20:43:23.208293+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:43:42.340758+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-21T21:53:31.780172+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:53:39.215+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

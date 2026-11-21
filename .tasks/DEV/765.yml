@@ -1,0 +1,245 @@
+title: 'Web UI: show live activity of agent jobs that run in other processes (queue worker, CLI, MCP)'
+status: Reviewing
+priority: High
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-21T20:47:03.411406+00:00
+modified: 2026-11-21T22:36:33.840868+00:00
+comments:
+- date: 2026-11-21T22:15:46.508688+00:00
+  author: claude
+  text: |-
+    Plan: a log follower in `lotar serve` turns new job-log lines into the same SSE events.
+
+    - New `agent_job_service/follow.rs`: per-file offset, header and latest status; skips jobs this process holds
+    - `web_server.rs` watcher hands log paths (`@agent-logs`, moved folders) to it instead of ignoring them
+    - Bare `push_event` notes become `record_and_emit`
+    - `useAgentActivity`: input/question/result, sequence dedupe, ended status removes
+    - No other T3 thread runs on these files
+- date: 2026-11-21T22:36:15.752181+00:00
+  author: claude
+  text: |-
+    Done: `lotar serve` now streams jobs of other processes (queue worker, `agent run --wait`, MCP) from their logs; the pill says **Asks** when the agent waits on a question.
+
+    - Follower: `crates/lotar-agent/src/services/agent_job_service/follow.rs`, wired into the watcher in `crates/lotar-lib/src/web_server.rs`; reads only appended lines, skips jobs this process runs, no replay of old logs
+    - Notes that skipped the log now go through `record_and_emit` (T3 settle, reassigned, ticket move, kept-job note)
+    - UI: `useAgentActivity.ts` dedupes by `sequence`, drops ended jobs, shows the open question; docs in `docs/help/agent.md`
+    - Tests: 6 unit tests, SSE integration test, vitest, smoke `shows a job another process runs live from its log` (fails with the follower off)
+    - Screenshots, task list with a job of another process that asks (before = release 0.15.5): [before light](attachment:DEV-765-before-light-1440.a2b95b70282572f7b9282a8938964318.png), [after light](attachment:DEV-765-after-light-1440.712623bf3d7a2a50a514d3f6ffc5a8d6.png), [before dark phone](attachment:DEV-765-before-dark-390.8bd5b5f835bfbe7752799dfb943d89e7.png), [after dark phone](attachment:DEV-765-after-dark-390.2699b400712034bb8ede611695862a67.png); 1920 px and the other sets are attached too
+  report:
+    commits:
+    - hash: 53040a7aa
+      what: DEV-765 log follower, live pill and docs
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2450 Rust, 1564 UI, release and hooks
+    - command: npm run smoke
+      result: passed
+      reason: 407 tests
+    next: 'review: an answer to a question from another process still needs that process (documented)'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa97d4d8730d6d45978e856b83771013163009cd2a87b29d417a86cbb96891bcd
+- attachment: DEV-765-after-dark-1440.2b850162d89c3a871106acfa37b6c7e7.png
+- attachment: DEV-765-after-dark-1920.44028f051fd122b49c0fa930dfe2d26f.png
+- attachment: DEV-765-after-dark-390.2699b400712034bb8ede611695862a67.png
+- attachment: DEV-765-after-light-1440.712623bf3d7a2a50a514d3f6ffc5a8d6.png
+- attachment: DEV-765-after-light-1920.a67fe501e89a113cd31db428323bebb7.png
+- attachment: DEV-765-after-light-390.3492414dc154d4f6d33b3256d9f577c6.png
+- attachment: DEV-765-before-dark-1440.17faf992805a33fa85d007ef125ed872.png
+- attachment: DEV-765-before-dark-1920.0b1bbf5327da0d23e4fd30d4b88a8737.png
+- attachment: DEV-765-before-dark-390.8bd5b5f835bfbe7752799dfb943d89e7.png
+- attachment: DEV-765-before-light-1440.a2b95b70282572f7b9282a8938964318.png
+- attachment: DEV-765-before-light-1920.87af7f5a16193c339978a7b1e22d430f.png
+- attachment: DEV-765-before-light-390.ee2fd2eeb9c8dba2b1d65e714e1512ca.png
+description: |-
+  The web UI shows a job's activity live only when the job runs inside the `lotar serve` process that serves the page. Jobs run by the queue worker, `lotar agent run --wait` or an MCP session only append to `.tasks/@agent-logs/<job>.jsonl`. The Agents page, the task panel's thread and the board's activity pills see those lines only after a reload or an SSE reconnect. Automation jobs (@fix, @review, @merge) usually run in the queue worker, so most jobs aren't live. The owner asked on 2026-11-21: "make sure that the Web UI properly represents the activity of any agents we're running through harnessmux … in real time".
+
+  ## Cause
+
+  - Events reach SSE only through `record_and_emit` → `emit_job_event` in the process that runs the job (`crates/lotar-agent/src/services/agent_job_service.rs`), over the in-process bus (`crates/lotar-core/src/api_events.rs`).
+  - The tasks watcher in `crates/lotar-lib/src/web_server.rs` (`start_tasks_watcher`, `process_watch_batch`) already watches `.tasks` recursively but ignores `@agent-logs`.
+  - A few entries are written with bare `push_event` and never go out over SSE even in-process (AJS about :5577, :5715, :5735, `agent_job_service/kept.rs` :130). Check whether they should.
+  - `view/composables/useAgentActivity.ts` doesn't subscribe to `agent_job_input`, `agent_job_question` or `agent_job_result`.
+
+  ## Plan
+
+  - [ ] `lotar serve` follows `@agent-logs/<job>.jsonl` for jobs it does not run itself (the active-job records next to the queue say which process runs a job). For each new `event` line, emit the same `agent_job_*` SSE event an in-process job would, built from the header and the latest `status` line. Emit a job's end from its `status` line. Read only appended bytes (keep an offset per file), and ignore partial last lines.
+  - [ ] Honour `agent_logs_dir` (moved or `off`) and the project filter.
+  - [ ] The UI already removes duplicates by `sequence` (`view/pages/AgentJobs.vue` ~:629). Check that the task panel thread and `useAgentActivity` do too.
+  - [ ] `useAgentActivity` handles input, question and result events, so a question shows on the board pill.
+  - [ ] Tests: an integration test where a second process (or a direct append to the log) adds lines and an SSE client receives them in order. A smoke test that a job written by another process updates the Agents page without reload.
+  - [ ] `docs/help/agent.md` says what is live from where.
+
+  ## Done when
+
+  - [ ] A queue-worker job's messages, tool lines, questions and end appear on the Agents page, in the task panel's thread and on the board's activity pill within about a second, without reload (owner: "properly represents the activity of any agents … in real time").
+  - [ ] `lotar serve` sends each new `event` line of a job log as the `agent_job_*` SSE event an in-process job sends: same kind, `sequence`, `at`, `message`, and the job fields from the header and the log's latest `status` line (no status line yet: `running`; `question` stays null, only the job's own process can answer it).
+  - [ ] Which wins: a job this server's process holds (it runs it, or took it over) goes out only from memory, as before; its log lines are not sent again. Every other job goes out from its log.
+  - [ ] Only appended bytes are read (an offset per file); a partial last line waits for its newline; a malformed line is skipped; a log that shrank or was replaced is read again from its start; a deleted log is forgotten. Logs that exist when the server starts are not replayed.
+  - [ ] Logs in a moved `agent_logs_dir` (also outside `.tasks`) are followed; `off` follows nothing. The folders are the ones configured when `lotar serve` starts. The SSE `project` filter applies as for in-process jobs (by `ticket_id`).
+  - [ ] The notes written with bare `push_event` (ticket moved / reassigned after the end rules, T3 thread settled or kept) go out over SSE too, so the live view matches a reload.
+  - [ ] `useAgentActivity` subscribes to input, question and result events, shows a question on the pill, drops events it saw already (by `sequence`), and removes a job whose event carries an ended status. The task panel and Agents page keep deduplicating by `sequence`.
+  - [ ] Tests: a Rust integration test appends lines to a log behind a running server and an SSE client gets them in order, the partial line only once complete, the end with its status. A smoke test appends to a log and the Agents page shows the lines without reload. `docs/help/agent.md` says what is live from where.
+tags:
+- agent
+- backend
+- ui
+history:
+- at: 2026-11-21T20:47:03.787450+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T22:13:21.896685+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T22:13:25.549905+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa97d4d8730d6d45978e856b83771013163009cd2a87b29d417a86cbb96891bcd
+- at: 2026-11-21T22:15:37.548015+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The web UI shows a job's activity live only when the job runs inside the `lotar serve` process that serves the page. Jobs run by the queue worker, `lotar agent run --wait` or an MCP session only append to `.tasks/@agent-logs/<job>.jsonl`. The Agents page, the task panel's thread and the board's activity pills see those lines only after a reload or an SSE reconnect. Automation jobs (@fix, @review, @merge) usually run in the queue worker, so most jobs aren't live. The owner asked on 2026-11-21: "make sure that the Web UI properly represents the activity of any agents we're running through harnessmux … in real time".
+
+      ## Cause
+
+      - Events reach SSE only through `record_and_emit` → `emit_job_event` in the process that runs the job (`crates/lotar-agent/src/services/agent_job_service.rs`), over the in-process bus (`crates/lotar-core/src/api_events.rs`).
+      - The tasks watcher in `crates/lotar-lib/src/web_server.rs` (`start_tasks_watcher`, `process_watch_batch`) already watches `.tasks` recursively but ignores `@agent-logs`.
+      - A few entries are written with bare `push_event` and never go out over SSE even in-process (AJS about :5577, :5715, :5735, `agent_job_service/kept.rs` :130). Check whether they should.
+      - `view/composables/useAgentActivity.ts` doesn't subscribe to `agent_job_input`, `agent_job_question` or `agent_job_result`.
+
+      ## Plan
+
+      - [ ] `lotar serve` follows `@agent-logs/<job>.jsonl` for jobs it does not run itself (the active-job records next to the queue say which process runs a job). For each new `event` line, emit the same `agent_job_*` SSE event an in-process job would, built from the header and the latest `status` line. Emit a job's end from its `status` line. Read only appended bytes (keep an offset per file), and ignore partial last lines.
+      - [ ] Honour `agent_logs_dir` (moved or `off`) and the project filter.
+      - [ ] The UI already removes duplicates by `sequence` (`view/pages/AgentJobs.vue` ~:629). Check that the task panel thread and `useAgentActivity` do too.
+      - [ ] `useAgentActivity` handles input, question and result events, so a question shows on the board pill.
+      - [ ] Tests: an integration test where a second process (or a direct append to the log) adds lines and an SSE client receives them in order. A smoke test that a job written by another process updates the Agents page without reload.
+      - [ ] `docs/help/agent.md` says what is live from where.
+
+      ## Done when
+
+      - [ ] A queue-worker job's messages, tool lines and end appear on the Agents page and in the task panel thread within about a second, without reload.
+    new: |-
+      The web UI shows a job's activity live only when the job runs inside the `lotar serve` process that serves the page. Jobs run by the queue worker, `lotar agent run --wait` or an MCP session only append to `.tasks/@agent-logs/<job>.jsonl`. The Agents page, the task panel's thread and the board's activity pills see those lines only after a reload or an SSE reconnect. Automation jobs (@fix, @review, @merge) usually run in the queue worker, so most jobs aren't live. The owner asked on 2026-11-21: "make sure that the Web UI properly represents the activity of any agents we're running through harnessmux … in real time".
+
+      ## Cause
+
+      - Events reach SSE only through `record_and_emit` → `emit_job_event` in the process that runs the job (`crates/lotar-agent/src/services/agent_job_service.rs`), over the in-process bus (`crates/lotar-core/src/api_events.rs`).
+      - The tasks watcher in `crates/lotar-lib/src/web_server.rs` (`start_tasks_watcher`, `process_watch_batch`) already watches `.tasks` recursively but ignores `@agent-logs`.
+      - A few entries are written with bare `push_event` and never go out over SSE even in-process (AJS about :5577, :5715, :5735, `agent_job_service/kept.rs` :130). Check whether they should.
+      - `view/composables/useAgentActivity.ts` doesn't subscribe to `agent_job_input`, `agent_job_question` or `agent_job_result`.
+
+      ## Plan
+
+      - [ ] `lotar serve` follows `@agent-logs/<job>.jsonl` for jobs it does not run itself (the active-job records next to the queue say which process runs a job). For each new `event` line, emit the same `agent_job_*` SSE event an in-process job would, built from the header and the latest `status` line. Emit a job's end from its `status` line. Read only appended bytes (keep an offset per file), and ignore partial last lines.
+      - [ ] Honour `agent_logs_dir` (moved or `off`) and the project filter.
+      - [ ] The UI already removes duplicates by `sequence` (`view/pages/AgentJobs.vue` ~:629). Check that the task panel thread and `useAgentActivity` do too.
+      - [ ] `useAgentActivity` handles input, question and result events, so a question shows on the board pill.
+      - [ ] Tests: an integration test where a second process (or a direct append to the log) adds lines and an SSE client receives them in order. A smoke test that a job written by another process updates the Agents page without reload.
+      - [ ] `docs/help/agent.md` says what is live from where.
+
+      ## Done when
+
+      - [ ] A queue-worker job's messages, tool lines, questions and end appear on the Agents page, in the task panel's thread and on the board's activity pill within about a second, without reload (owner: "properly represents the activity of any agents … in real time").
+      - [ ] `lotar serve` sends each new `event` line of a job log as the `agent_job_*` SSE event an in-process job sends: same kind, `sequence`, `at`, `message`, and the job fields from the header and the log's latest `status` line (no status line yet: `running`; `question` stays null, only the job's own process can answer it).
+      - [ ] Which wins: a job this server's process holds (it runs it, or took it over) goes out only from memory, as before; its log lines are not sent again. Every other job goes out from its log.
+      - [ ] Only appended bytes are read (an offset per file); a partial last line waits for its newline; a malformed line is skipped; a log that shrank or was replaced is read again from its start; a deleted log is forgotten. Logs that exist when the server starts are not replayed.
+      - [ ] Logs in a moved `agent_logs_dir` (also outside `.tasks`) are followed; `off` follows nothing. The folders are the ones configured when `lotar serve` starts. The SSE `project` filter applies as for in-process jobs (by `ticket_id`).
+      - [ ] The notes written with bare `push_event` (ticket moved / reassigned after the end rules, T3 thread settled or kept) go out over SSE too, so the live view matches a reload.
+      - [ ] `useAgentActivity` subscribes to input, question and result events, shows a question on the pill, drops events it saw already (by `sequence`), and removes a job whose event carries an ended status. The task panel and Agents page keep deduplicating by `sequence`.
+      - [ ] Tests: a Rust integration test appends lines to a log behind a running server and an SSE client gets them in order, the partial line only once complete, the end with its status. A smoke test appends to a log and the Agents page shows the lines without reload. `docs/help/agent.md` says what is live from where.
+- at: 2026-11-21T22:15:46.508688+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T22:35:59.868035+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, backend
+    new: agent, backend, ui
+- at: 2026-11-21T22:35:59.933395+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-after-dark-1440.2b850162d89c3a871106acfa37b6c7e7.png
+- at: 2026-11-21T22:35:59.984572+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-after-dark-1920.44028f051fd122b49c0fa930dfe2d26f.png
+- at: 2026-11-21T22:36:00.038788+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-after-dark-390.2699b400712034bb8ede611695862a67.png
+- at: 2026-11-21T22:36:00.106760+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-after-light-1440.712623bf3d7a2a50a514d3f6ffc5a8d6.png
+- at: 2026-11-21T22:36:00.154169+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-after-light-1920.a67fe501e89a113cd31db428323bebb7.png
+- at: 2026-11-21T22:36:00.213869+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-after-light-390.3492414dc154d4f6d33b3256d9f577c6.png
+- at: 2026-11-21T22:36:00.274958+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-before-dark-1440.17faf992805a33fa85d007ef125ed872.png
+- at: 2026-11-21T22:36:00.342212+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-before-dark-1920.0b1bbf5327da0d23e4fd30d4b88a8737.png
+- at: 2026-11-21T22:36:00.400873+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-before-dark-390.8bd5b5f835bfbe7752799dfb943d89e7.png
+- at: 2026-11-21T22:36:00.476519+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-before-light-1440.a2b95b70282572f7b9282a8938964318.png
+- at: 2026-11-21T22:36:00.595480+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-before-light-1920.87af7f5a16193c339978a7b1e22d430f.png
+- at: 2026-11-21T22:36:00.712326+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-765-before-light-390.ee2fd2eeb9c8dba2b1d65e714e1512ca.png
+- at: 2026-11-21T22:36:15.752181+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T22:36:33.840868+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

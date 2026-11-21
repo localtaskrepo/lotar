@@ -1,0 +1,26 @@
+title: Agents page shows Running 0, Queued 0 while the queue worker runs 2 jobs and 13 tickets wait
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T22:12:31.042289+00:00
+modified: 2026-11-21T22:12:31.297982+00:00
+relationships:
+  related:
+  - DEV-279
+  - DEV-522
+  - DEV-725
+description: |-
+  Found (owner 2026-11-21: "I have no where to see what's queued up"): `GET /api/jobs` on the DEV server answers `queue_stats {running: 0, queued: 0}` while `lotar agent queue` shows Running 2, Queued 13 (DEV-725's release retry 9th). The route (crates/lotar-lib/src/routes/jobs.rs ~36) returns `AgentJobService::queue_stats()`, the serving process's own worker only. The CLI (cli/handlers/agent.rs ~454) adds jobs other processes run (DEV-279) and the on-disk queue (DEV-522). The page's Queued tab filters job logs with status queued, so tickets waiting in the on-disk queue never show.
+
+  Check: with the queue worker in another process running jobs and tickets queued, the Agents page and `/api/jobs` show the same counts as `lotar agent queue`.
+
+  Done when: the counts match the CLI; the page lists the waiting tickets in queue order with agent, queued time and what they wait for (the worker's reason: free slot, the ticket's running job, memory hold, pause), and the jobs waiting for prerequisites; a test covers a queue entry from another process; docs/help updated.
+history:
+- at: 2026-11-21T22:12:31.297982+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-279","DEV-522","DEV-725"]}'

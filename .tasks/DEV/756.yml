@@ -1,11 +1,11 @@
 title: An owner's change while a job's pause fails is overwritten by the job's recorded change
-status: Blocked
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-21T10:31:53.742738+00:00
-modified: 2026-11-21T19:40:52.740469+00:00
+modified: 2026-11-21T21:35:26.853441+00:00
 relationships:
   depends_on:
   - DEV-752
@@ -20,8 +20,47 @@ comments:
     - `close_outcome` and its call in `carried_outcome_of` come from `8950b8383` (DEV-752), only on `agent/DEV-752` (status Merging).
     - This branch is on main (`a8028b6ef`); here `carried_outcome_of` only peeks the outcome, so the bug isn't present.
     - Next: once DEV-752 lands, close the guard only after `AgentQueueService::pause` / `requeue_after_limit` saved, or reopen it on failure; unit test as the ticket says.
+- date: 2026-11-21T20:36:27.873869+00:00
+  author: claude
+  text: |-
+    Fixed: a failed pause or retry no longer overwrites the owner's change.
+
+    - Rebased `agent/DEV-756` onto main (DEV-752 `32891539f` is in).
+    - `carried_outcome_of` is now `save_retry` (`agent_job_service.rs`): it reads the ticket, closes the guard, saves; when the save fails it calls the new `reopen_outcome` (`agent_active_jobs.rs`), which drops recorded fields the ticket changed in since the close.
+    - Covers all three callers: disk/signing pause, usage-limit requeue, new-session requeue.
+    - New test `an_owners_change_while_the_pause_fails_outlasts_the_failed_jobs_end`: the ticket's check. It failed with the reopen disabled (end kept assignee `claude`).
+  report:
+    commits:
+    - hash: 12a711d95
+      what: reopen the outcome guard when a pause or retry isn't saved
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(an_owners_change_while_the_pause_fails)'
+      result: passed
+      reason: fails without the fix
+    - command: npm run lint
+      result: passed
+      reason: as lint:agent
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Merge agent lands agent/DEV-756
+- date: 2026-11-21T21:35:12.638739+00:00
+  author: claude
+  text: |-
+    Review: passed. `12a711d95` does what the ticket asks; no findings, no tickets filed.
+
+    - Read: `git diff main..HEAD` (2 files, `agent_active_jobs.rs`, `agent_job_service.rs`), the ticket, DEV-752's guard (`close_outcome`, `record_outcome`, `end_and_take_outcome`), `task_hooks.rs`, `AgentQueueService::pause` / `requeue_first`, recent main commits to both files. The branch has no newer rework (`git log HEAD..agent/DEV-756` is empty).
+    - Done when: the guard is reopened when the save fails (`reopen_outcome`), on all three retry paths (disk/signing pause, usage-limit requeue, new-session requeue).
+    - Races hold: if the owner changes the ticket before the close, the change is recorded and kept. Between the close and the reopen it applies directly, and the field is dropped from the outcome. After the reopen it is recorded again (the field check runs under the outcome lock).
+    - Reading the ticket before the close (it was read after) also fixes the same race when the save succeeds. No behavior outside this ticket.
+    - The test `an_owners_change_while_the_pause_fails_outlasts_the_failed_jobs_end` would fail without the reopen: the `.ended` marker would stay and the end would apply assignee `claude`.
+    - No UI change, no stray files. `npm ci` passed.
+    - Reran: `cargo nextest run -p lotar-agent` for outcome/pause/usage_limit/new_session (28 passed); `cargo nextest run -p lotar-lib --test integration` for dev604/dev584/dev528/dev752/pause (11 passed); `cargo clippy -p lotar-agent --all-targets -D warnings` clean; `rustfmt --check` on both files clean.
+    - Not rerun: the full `npm test` and `npm run smoke`; the fix agent reports both passed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ade895137d0d6d42e15be596b34ae4d841d38618cdc3bbdef4171fb534b193749
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2c5fa7f1dceb1d11ca33a15c7a5217bc9b4fb9425570274f3a5397c8bf8692f8
 description: 'Found (review of DEV-752): `carried_outcome_of` (`crates/lotar-agent/src/services/agent_job_service.rs:5477`) closes the job''s outcome guard before `AgentQueueService::pause` / `requeue_after_limit` run. If those fail, the job ends as failed and `end_and_take_outcome` applies the agent''s recorded status/assignee (`automation_service.rs:679`). An owner''s change made between the close and that end applied directly and is now overwritten; before DEV-752 it merged into the outcome and won. Rare: only when writing the queue''s pause or retry fails. Check: a unit test where the pause write fails, the owner sets the assignee after close_outcome, and the failed job''s end keeps it. Done: close the guard only once the pause or retry is saved, or reopen it when that fails.'
 tags:
 - health
@@ -76,3 +115,40 @@ history:
   - field: tags
     old: health, waits
     new: health
+- at: 2026-11-21T20:27:50.360434+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-21T20:27:55.139165+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2c5fa7f1dceb1d11ca33a15c7a5217bc9b4fb9425570274f3a5397c8bf8692f8
+- at: 2026-11-21T20:36:27.873869+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:38:17.871578+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-21T21:35:12.638739+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:35:26.853441+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

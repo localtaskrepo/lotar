@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-21T02:50:31.682302+00:00
-modified: 2026-11-21T19:41:11.381640+00:00
+modified: 2026-11-21T21:12:05.745733+00:00
 relationships:
   blocks:
   - DEV-734
@@ -161,6 +161,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84224a0d0665499e34ba8c04f6cb7774ebb86cbcb1a9be05ffc6c1ff72583f55
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8c524a846c9b2752a5542704b5e3892ec1332b58e07e06877950d3c1bc499a02
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad6414dbef141ce5caede9483e21f01cd7387c5dcb74cb3713f5528ff2975b19d
+releases:
+- 11
 description: 'Found: failed at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:238 in the merges of DEV-742 and DEV-741 (2026-11-20, load avg ~10-30): (InProgress, mallox) instead of (InProgress, sam). The ticket history has only the job''s ''assignee mallox'' change, so the owner''s ''assignee sam'' during the pause was lost or the paused job ran its script after it. Check: npm run -s test:agent at load avg ~30. Done: the test passes under full-suite load, and the owner''s reassignment during a pause always stays.'
 tags:
 - health
@@ -327,3 +329,8 @@ history:
   - field: tags
     old: health, merge-retried, fix-retried
     new: health
+- at: 2026-11-21T21:12:05.745733+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

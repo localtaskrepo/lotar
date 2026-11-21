@@ -25,9 +25,10 @@ attachments:
   dir: DEV/@attachments
 agent:
   worktree:
-    # At most 2 jobs at a time in lotar, the rest queue: each runs Rust builds and the smoke suites. Only lotar has a
-    # limit (owner 2026-11-15, STD-170, standards docs/decisions/2026-11-15-job-limit.md).
-    max_parallel_jobs: 2
+    # At most 3 jobs at a time in lotar, the rest queue: each runs Rust builds and the smoke suites. Only lotar has a
+    # limit (owner 2026-11-15, STD-170, standards docs/decisions/2026-11-15-job-limit.md); raised from 2 to 3 with the
+    # memory gate in place (owner 2026-11-21, 13 jobs queued: "3 jobs at a time").
+    max_parallel_jobs: 3
     # A ticket a job's end or a held-back start leaves HelpNeeded or Blocked loses the workspace crates' build output,
     # also when a rule or lotar set the wait (owner 2026-11-18, DEV-712: "command (A command lotar runs: setting
     # agent.worktree.waiting_run (cargo clean --workspace), needs lotar trust)").

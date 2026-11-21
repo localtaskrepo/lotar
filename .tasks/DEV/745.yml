@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T22:28:14.806321+00:00
-modified: 2026-11-21T04:25:59.537393+00:00
+modified: 2026-11-21T21:12:05.435734+00:00
 relationships:
   depends_on:
   - DEV-731
@@ -113,6 +113,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2709f94f3ae56b54cec4da8792ab3483952368e9ccd6e48744e2ac87f76329d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ec83ebee8f9ccace0d1bb09bad2ebb675f0a1e8087a45adb272ac660c81f543
+releases:
+- 11
 description: |-
   The queue worker's login-shell PATH lookup (DEV-731) can hang the worker for good, although `docs/help/agent.md` says it gives up after 5 seconds. Found in the DEV-731 review, 2026-11-20.
 
@@ -275,3 +277,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-21T21:12:05.435734+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

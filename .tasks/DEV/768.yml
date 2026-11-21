@@ -1,0 +1,53 @@
+title: 'Assignee picker: searchable, grouped by people and agent roles, showing each profile''s runner, model and effort'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T20:47:05.414784+00:00
+modified: 2026-11-21T20:47:26.917646+00:00
+relationships:
+  related:
+  - DEV-769
+description: |-
+  The task panel's assignee menu is hard to read and pick from now that there are many agent profile variants. It's a native `<select>` (`view/components/task-panel/TaskPanelOwnershipSection.vue` :36-63 via `UiSelect`) with people and every `@fix`, `@fix-light`, `@fix-fable`, `@fix-retry`, `@review-claude`, `@merge`… in one alphabetical list (`view/composables/useTaskPanelOwnership.ts` :71-87). It shows no runner, model or effort and has no search. "Custom…" swaps in a text field. The owner asked on 2026-11-21 for this select to "be rebuilt in a better way".
+
+  Related pickers that should use the same component:
+
+  - Run agent dialog: raw `<select>` showing `@name · runner` (`view/components/AgentRunDialog.vue` :38-45).
+  - Bulk Assign dialog: free text with a "Use @me" button (`view/pages/TasksList.vue` :290-331).
+  - Automation rule editor: `<datalist>` (`view/components/automation/AutomationRuleDialog.vue` :564-580).
+  - Reporter field: the same select as assignee.
+
+  ## Plan
+
+  - [ ] A combobox component (for example `view/components/AssigneePicker.vue`): a button showing the current value (avatar or agent glyph, name, short detail) that opens a popover with a search field and a grouped listbox. Build on ThemeSelect's popover listbox and `useSuggestList` / `useListKeyNavigation`, with full ARIA combobox semantics. On a phone it is a sheet.
+  - [ ] Groups:
+    - **You** (whoami).
+    - **People** (members, task values).
+    - **Agents** grouped by role, as the owner chose on 2026-11-21: "By role". Base profile first, variants under it: `fix`, then `fix-light`, `fix-fable`, `fix-retry`, `fix-codex`; then `review`, `review-claude`, `review-light`; then `merge`.
+    - Each agent row shows runner · model · effort (· provider) and the profile's description as a second line, from `AgentProfileInfo` (`view/api/types.ts` :1905). The composable keeps only the name today.
+  - [ ] Role = the profile name up to its first `-`, unless a profile config says otherwise. Find out whether a `role`/`group` key is worth adding; ask before adding config.
+  - [ ] Search matches name, runner, model and description. Recent picks first (per viewer, `localStorage`, guarded). Typing a name that isn't listed offers "Assign to '<typed>'", replacing Custom…. "Unassigned" stays first.
+  - [ ] Use it in the task panel (assignee and reporter), the Run agent dialog, bulk Assign and the automation rule editor.
+  - [ ] Tests: vitest for grouping, search and keyboard. Update the smoke specs that call `selectOption` on `#task-panel-assignee-select` (`ui.agent-jobs.smoke.spec.ts` :589, `ui.members.smoke.spec.ts` :88) and add one that picks an agent variant by search.
+  - [ ] Skill ui-review: light and dark, every theme skin, phone width, before and after screenshots attached.
+
+  ## Done when
+
+  - [ ] With all of this repo's profiles, the right variant can be found and picked by typing or by keyboard in a few keystrokes, and each row says what it runs.
+tags:
+- ui
+- web-ui
+history:
+- at: 2026-11-21T20:47:05.720790+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T20:47:26.917646+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-769"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T13:33:39.558052+00:00
-modified: 2026-11-21T01:02:44.019550+00:00
+modified: 2026-11-21T21:12:05.049877+00:00
 relationships:
   depends_on:
   - DEV-732
@@ -277,6 +277,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa61a280256663cea82ad0e51ba83aae65afc2109e04181dc12cdc9dbf9f6b454
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8c749d7c445638d4e4d44b88a912146f0c96bd8688109c6afbb8888b90f26b51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af58b34d88ce5505bdf0d670149bfa011dcb7c56d48b34915c8720ac5c908d94f
+releases:
+- 11
 description: |-
   Found (DEV-730, 2026-11-20): `lotar agent worker` is spawned by whichever lotar process queues a job and inherits its environment. Workers started by the triage agent's `lotar assignee` ran without `~/.cargo/bin` on PATH (live harnessmux worker pid 94972, started 12:51 UTC: `PATH=/opt/homebrew/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`), and one such worker ran DEV jobs -1..-27 from 05:22 to 13:06 UTC, so every `agent.worktree.waiting_run` (`cargo clean --workspace`) in that time failed (DEV-726, DEV-727, DEV-728). The jobs' agents got the same short PATH. Where Claude Code's headless shell gets that PATH is not known yet; the standards service's own PATH is complete.
   Check: start the worker from a process with PATH=/usr/bin:/bin; a job's command runner and waiting_run still find a program in the service's PATH (or the job log says the PATH is short).
@@ -576,3 +578,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686","DEV-748","DEV-743"]}'
     new: '{"depends_on":["DEV-732"],"blocks":["DEV-745","DEV-746"],"related":["DEV-726","DEV-727","DEV-728","DEV-730","DEV-732","DEV-733","DEV-729","DEV-745","DEV-746","DEV-652","DEV-654","DEV-686","DEV-748","DEV-743","DEV-744"]}'
+- at: 2026-11-21T21:12:05.049877+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

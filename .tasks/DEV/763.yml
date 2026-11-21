@@ -1,0 +1,162 @@
+title: 'Agent jobs: check whether T3 and ACP jobs get stuck or leave processes behind'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T20:23:21.712446+00:00
+modified: 2026-11-21T21:21:12.951566+00:00
+relationships:
+  related:
+  - DEV-755
+  - DEV-770
+  - DEV-725
+  - DEV-729
+comments:
+- date: 2026-11-21T21:21:12.590813+00:00
+  author: claude
+  text: |-
+    ACP adapters don't leak. One T3 hang is real; harnessmux 0.2.0 fixes it, and it ships with [DEV-725](https://lotar.pyxzl.net/task/DEV-725).
+
+    - **ACP adapters:** every session ended at harnessmux's 60 s idle limit (STD-282/283 review and merge sessions). Every live adapter belonged to a running session. The 30-minute adapter was most likely a review that was still running.
+    - **T3 hang:** HARN-10 job `job-20261121T191353.644Z-5` (worker `59354`) has run since 19:14. T3 resumed its thread as a second run, which ended at 19:39. harnessmux 0.1.10's non-sticky run check never ends the job. lotar main has harnessmux 0.2.0 ([DEV-729](https://lotar.pyxzl.net/task/DEV-729), HARN-4), not released yet. I left the job running; its work is committed (`ecc1e9f` on `agent/HARN-10`).
+    - **What ends a stalled job:** only `stall_timeout_seconds`, and no profile in any repo sets it, so a hang lasts until someone cancels it. Setting it is your call.
+    - **Stray worker `36658`:** a debug worker on a deleted scratch TEST folder, held by a fake usage limit "until 2099". Stopped. Follow-up: [DEV-770](https://lotar.pyxzl.net/task/DEV-770) (no upper bound on usage-limit waits).
+    - **harnessmux** shows dead sessions as running: HARN-20.
+    - **New:** `lotar agent list-running --all` lists the jobs of every tasks folder (`tasks_dir` column, `-` for records from older builds). Every listing adds `owner_pid` and `started_at`. Docs: `docs/help/agent.md`. Test: `dev763_list_running_all_test.rs`.
+  report:
+    commits:
+    - hash: 4f1cd6ac8
+      what: list-running --all, owner_pid and started_at columns
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: 'Owner: decide whether profiles get a stall_timeout_seconds, and whether to cancel the stuck HARN-10 job (pid 59354)'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ac80fce578d49cd6af0680151dbd45f0fa3adbe1305fd23d0db8488ee866016
+description: |-
+  The owner asked (2026-11-21): can T3 jobs get stuck? About 3 should be active, and he doesn't know how many run through lotar on other harnesses.
+
+  ## Found 2026-11-21 ~20:30 PST (ps, `lotar agent list-running`, `list-jobs`)
+
+  - `list-running` shows 3 `t3` jobs (LOCA-535, DEV-755, HARN-10) and 1 `claude` job (STD-282, `unknown` in `list-jobs`).
+  - 4 `claude-agent-acp` processes are running: 3 under the standards `agent worker` (13, 14 and 30 min old) and 1 under the lotar worker. In standards, only STD-282 runs; STD-281 and STD-283 finished at about 20:08. The 30-minute-old session is older than every job still running there. Does lotar close the ACP session when a job ends?
+  - Orphaned since 2026-11-18 (ppid 1, almost 3 days): `~/.t3/worktrees/lotar/t3-5808df94-…/target/debug/lotar --tasks-dir /private/tmp/claude-501/…/scratchpad/ws/.tasks agent worker`. It is a debug build from a T3 worktree, working on a scratch `.tasks` folder, probably a test or manual run that never stopped.
+  - Job `job-20261121T201113.285Z-1` (LOCA-570, runner `t3`) shows `failed` with "the T3 Code thread's run ended with status 'waiting'" after the owner interrupted one long tool call. The thread finished the work later, and the ticket went Done. So a run the owner interrupts counts as a failed job.
+  - Earlier, about 15 `t3 thread list --project <repo> --json` calls ran at once, one per repo plus a `standards-tests-*` temp folder. They had all finished within minutes: short polls, not hung calls.
+  - The queue is holding new jobs because of memory pressure (`warn`, since 20:20:46Z).
+
+  ## Check
+
+  - For each running job, find its process tree (runner → ACP adapter → agent). Show processes with no job, and jobs with no process (`pid 0` in `list-running`).
+  - See whether a T3 job whose thread waits or stalls ever ends: a timeout, or how the owner sees it.
+  - Give one command or view that counts the active jobs on all harnesses and in all repos. Today it takes `list-running` per repo plus `ps`.
+
+  ## Done when
+
+  The owner has an answer with evidence on whether and how jobs get stuck. Each leak or hang found is filed as a bug with its fix, and the stray worker above is stopped (after confirming nothing still uses it).
+
+  - [x] A ticket comment answers, with evidence (session event logs, `ps`, job logs): do ACP adapters outlive their job, can a T3 job hang, and what ends a stalled job.
+  - [x] Each leak or hang found is a ticket in the repo that fixes it (lotar DEV, harnessmux HARN), or points to the ticket that already fixes it.
+  - [x] The stray debug worker from 2026-11-18 is stopped, after its tasks folder, binary and jobs show that nothing uses it.
+  - [x] `lotar agent list-running --all` lists the running jobs of every tasks folder on this machine (all repos, all runners) in one table: ticket, runner, the process that runs the job, and when it started. `--format json` gives the same as `jobs`. Without `--all` it stays as it is (this tasks folder).
+  - [x] `list-running` shows the process that runs each job (`owner_pid`) next to `pid`. Jobs on harnessmux runners have no own process, so `pid` is 0 there; `owner_pid` is the worker, server or `agent run` that holds them.
+  - [x] A record whose process is gone is not listed (as today). Records from before this change, which don't name their tasks folder, show `-` as folder.
+  - [x] `docs/help/agent.md` describes `--all` and `owner_pid`; a test covers `--all` with jobs of two tasks folders.
+history:
+- at: 2026-11-21T20:23:21.985847+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-755"]}'
+- at: 2026-11-21T20:23:22.242005+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T21:01:28.902693+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T21:01:33.235290+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ac80fce578d49cd6af0680151dbd45f0fa3adbe1305fd23d0db8488ee866016
+- at: 2026-11-21T21:10:23.597396+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The owner asked (2026-11-21): can T3 jobs get stuck? About 3 should be active, and he doesn't know how many run through lotar on other harnesses.
+
+      ## Found 2026-11-21 ~20:30 PST (ps, `lotar agent list-running`, `list-jobs`)
+
+      - `list-running` shows 3 `t3` jobs (LOCA-535, DEV-755, HARN-10) and 1 `claude` job (STD-282, `unknown` in `list-jobs`).
+      - 4 `claude-agent-acp` processes are running: 3 under the standards `agent worker` (13, 14 and 30 min old) and 1 under the lotar worker. In standards, only STD-282 runs; STD-281 and STD-283 finished at about 20:08. The 30-minute-old session is older than every job still running there. Does lotar close the ACP session when a job ends?
+      - Orphaned since 2026-11-18 (ppid 1, almost 3 days): `~/.t3/worktrees/lotar/t3-5808df94-…/target/debug/lotar --tasks-dir /private/tmp/claude-501/…/scratchpad/ws/.tasks agent worker`. It is a debug build from a T3 worktree, working on a scratch `.tasks` folder, probably a test or manual run that never stopped.
+      - Job `job-20261121T201113.285Z-1` (LOCA-570, runner `t3`) shows `failed` with "the T3 Code thread's run ended with status 'waiting'" after the owner interrupted one long tool call. The thread finished the work later, and the ticket went Done. So a run the owner interrupts counts as a failed job.
+      - Earlier, about 15 `t3 thread list --project <repo> --json` calls ran at once, one per repo plus a `standards-tests-*` temp folder. They had all finished within minutes: short polls, not hung calls.
+      - The queue is holding new jobs because of memory pressure (`warn`, since 20:20:46Z).
+
+      ## Check
+
+      - For each running job, find its process tree (runner → ACP adapter → agent). Show processes with no job, and jobs with no process (`pid 0` in `list-running`).
+      - See whether a T3 job whose thread waits or stalls ever ends: a timeout, or how the owner sees it.
+      - Give one command or view that counts the active jobs on all harnesses and in all repos. Today it takes `list-running` per repo plus `ps`.
+
+      ## Done when
+
+      The owner has an answer with evidence on whether and how jobs get stuck. Each leak or hang found is filed as a bug with its fix, and the stray worker above is stopped (after confirming nothing still uses it).
+    new: |-
+      The owner asked (2026-11-21): can T3 jobs get stuck? About 3 should be active, and he doesn't know how many run through lotar on other harnesses.
+
+      ## Found 2026-11-21 ~20:30 PST (ps, `lotar agent list-running`, `list-jobs`)
+
+      - `list-running` shows 3 `t3` jobs (LOCA-535, DEV-755, HARN-10) and 1 `claude` job (STD-282, `unknown` in `list-jobs`).
+      - 4 `claude-agent-acp` processes are running: 3 under the standards `agent worker` (13, 14 and 30 min old) and 1 under the lotar worker. In standards, only STD-282 runs; STD-281 and STD-283 finished at about 20:08. The 30-minute-old session is older than every job still running there. Does lotar close the ACP session when a job ends?
+      - Orphaned since 2026-11-18 (ppid 1, almost 3 days): `~/.t3/worktrees/lotar/t3-5808df94-…/target/debug/lotar --tasks-dir /private/tmp/claude-501/…/scratchpad/ws/.tasks agent worker`. It is a debug build from a T3 worktree, working on a scratch `.tasks` folder, probably a test or manual run that never stopped.
+      - Job `job-20261121T201113.285Z-1` (LOCA-570, runner `t3`) shows `failed` with "the T3 Code thread's run ended with status 'waiting'" after the owner interrupted one long tool call. The thread finished the work later, and the ticket went Done. So a run the owner interrupts counts as a failed job.
+      - Earlier, about 15 `t3 thread list --project <repo> --json` calls ran at once, one per repo plus a `standards-tests-*` temp folder. They had all finished within minutes: short polls, not hung calls.
+      - The queue is holding new jobs because of memory pressure (`warn`, since 20:20:46Z).
+
+      ## Check
+
+      - For each running job, find its process tree (runner → ACP adapter → agent). Show processes with no job, and jobs with no process (`pid 0` in `list-running`).
+      - See whether a T3 job whose thread waits or stalls ever ends: a timeout, or how the owner sees it.
+      - Give one command or view that counts the active jobs on all harnesses and in all repos. Today it takes `list-running` per repo plus `ps`.
+
+      ## Done when
+
+      The owner has an answer with evidence on whether and how jobs get stuck. Each leak or hang found is filed as a bug with its fix, and the stray worker above is stopped (after confirming nothing still uses it).
+
+      - [ ] A ticket comment answers, with evidence (session event logs, `ps`, job logs): do ACP adapters outlive their job, can a T3 job hang, and what ends a stalled job.
+      - [ ] Each leak or hang found is a ticket in the repo that fixes it (lotar DEV, harnessmux HARN), or points to the ticket that already fixes it.
+      - [ ] The stray debug worker from 2026-11-18 is stopped, after its tasks folder, binary and jobs show that nothing uses it.
+      - [ ] `lotar agent list-running --all` lists the running jobs of every tasks folder on this machine (all repos, all runners) in one table: ticket, runner, the process that runs the job, and when it started. `--format json` gives the same as `jobs`. Without `--all` it stays as it is (this tasks folder).
+      - [ ] `list-running` shows the process that runs each job (`owner_pid`) next to `pid`. Jobs on harnessmux runners have no own process, so `pid` is 0 there; `owner_pid` is the worker, server or `agent run` that holds them.
+      - [ ] A record whose process is gone is not listed (as today). Records from before this change, which don't name their tasks folder, show `-` as folder.
+      - [ ] `docs/help/agent.md` describes `--all` and `owner_pid`; a test covers `--all` with jobs of two tasks folders.
+- at: 2026-11-21T21:10:33.429062+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755"]}'
+    new: '{"related":["DEV-755","DEV-770"]}'
+- at: 2026-11-21T21:21:12.590813+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:21:12.951566+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-770"]}'
+    new: '{"related":["DEV-755","DEV-770","DEV-725","DEV-729"]}'

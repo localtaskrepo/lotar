@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-17T01:03:33.051382+00:00
-modified: 2026-11-17T09:16:17.389184+00:00
+modified: 2026-11-21T21:01:06.890600+00:00
 relationships:
   related:
   - DEV-579
@@ -24,6 +24,7 @@ relationships:
   - DEV-651
   - DEV-628
   - DEV-644
+  - DEV-762
 comments:
 - date: 2026-11-17T02:13:45.683800+00:00
   author: claude
@@ -368,3 +369,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-579","DEV-581","DEV-640","DEV-613","DEV-634","DEV-577","DEV-612","DEV-633","DEV-649","DEV-650","DEV-646","DEV-652","DEV-654","DEV-651","DEV-628"]}'
     new: '{"related":["DEV-579","DEV-581","DEV-640","DEV-613","DEV-634","DEV-577","DEV-612","DEV-633","DEV-649","DEV-650","DEV-646","DEV-652","DEV-654","DEV-651","DEV-628","DEV-644"]}'
+- at: 2026-11-21T21:01:06.890600+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-579","DEV-581","DEV-640","DEV-613","DEV-634","DEV-577","DEV-612","DEV-633","DEV-649","DEV-650","DEV-646","DEV-652","DEV-654","DEV-651","DEV-628","DEV-644"]}'
+    new: '{"related":["DEV-579","DEV-581","DEV-640","DEV-613","DEV-634","DEV-577","DEV-612","DEV-633","DEV-649","DEV-650","DEV-646","DEV-652","DEV-654","DEV-651","DEV-628","DEV-644","DEV-762"]}'

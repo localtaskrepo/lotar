@@ -1,0 +1,28 @@
+title: 'Flaky test: hanging_cat_file_fails_the_activity_feed_at_the_timeout finds no pid file under full-suite load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T22:34:04.252012+00:00
+modified: 2026-11-21T22:34:19.544494+00:00
+relationships:
+  related:
+  - DEV-760
+description: 'Found in the DEV-760 merge (2026-11-21), load average about 32: `npm run -s test:agent` failed at `crates/lotar-lib/src/services/audit_service.rs:1260`, `pid file: NotFound`. The stub `sh -c ''sleep 600 & echo $! > pid; wait''` gets a 300 ms timeout; under load it is killed before it writes the pid file. Check: `npm run -s test:agent` under load. Done: the test waits for the pid file before the timeout can start counting, or reads the child another way, so a slow start can''t fail it, while still asserting the child is gone.'
+tags:
+- health
+custom_fields:
+  finding: test:agent:hanging-cat-file-pid
+history:
+- at: 2026-11-21T22:34:13.913787+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-760"]}'
+- at: 2026-11-21T22:34:19.544494+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -5,12 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T03:54:19.663594+00:00
-modified: 2026-11-21T15:01:48.695218+00:00
+modified: 2026-11-21T21:12:05.787510+00:00
 relationships:
   related:
   - DEV-749
   - DEV-647
   - DEV-751
+  - DEV-764
+  - DEV-755
 comments:
 - date: 2026-11-21T04:52:00.573265+00:00
   author: claude
@@ -99,6 +101,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A735f45881c748e7917cbffc43ca0d0cdcdd49712456d5bbf694c70705681d850
+releases:
+- 11
 description: 'Found: failed in the review of DEV-749 (2026-11-20, load avg ~30-34): ''timed out waiting for agent'' at crates/lotar-lib/tests/agent_safety_test.rs:59 (wait_until, fixed 15 s deadline), test ran 45.9 s. Check: npm run -s test:rust:agent -- --no-fail-fast at load avg ~30. Done: the test passes under full-suite load without a fixed 15 s wall-clock deadline.'
 tags:
 - health
@@ -169,3 +173,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-749","DEV-647"]}'
     new: '{"related":["DEV-749","DEV-647","DEV-751"]}'
+- at: 2026-11-21T20:23:42.101382+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-749","DEV-647","DEV-751"]}'
+    new: '{"related":["DEV-749","DEV-647","DEV-751","DEV-764"]}'
+- at: 2026-11-21T20:25:19.385942+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-749","DEV-647","DEV-751","DEV-764"]}'
+    new: '{"related":["DEV-749","DEV-647","DEV-751","DEV-764","DEV-755"]}'
+- at: 2026-11-21T21:12:05.787510+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

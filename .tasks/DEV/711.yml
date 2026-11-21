@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-18T19:41:49.921653+00:00
-modified: 2026-11-20T22:32:21.571616+00:00
+modified: 2026-11-21T21:17:02.367983+00:00
 relationships:
   depends_on:
   - DEV-683
@@ -18,6 +18,7 @@ relationships:
   - DEV-740
   - DEV-730
   - DEV-734
+  - DEV-725
 comments:
 - date: 2026-11-18T20:20:17.510756+00:00
   author: claude
@@ -141,6 +142,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae609fe42-24d2-46b4-87e5-3638d6ec6c0d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610a9a82-cb42-47ba-9eea-09f109d6be60
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0aebad4f869d7aade0c4282dd8a0f6d9ca0f437e134a332ed8fdb7080fa445b6
+releases:
+- 11
 description: |-
   Follow-up of DEV-584, which pauses a job on a provider's usage limit by matching the failure text (`crates/lotar-agent/src/services/usage_limit.rs`). harnessmux 0.2.0 (DEV-683) is not released yet: crates.io has 0.1.10, which reports `TurnFailed { error }` with no kind or reset time.
 
@@ -362,3 +365,14 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740","DEV-730"]}'
     new: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740","DEV-730","DEV-734"]}'
+- at: 2026-11-21T21:12:04.768031+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
+- at: 2026-11-21T21:17:02.367983+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740","DEV-730","DEV-734"]}'
+    new: '{"depends_on":["DEV-683","standards:STD-257"],"blocks":["DEV-740"],"related":["DEV-584","DEV-729","DEV-740","DEV-730","DEV-734","DEV-725"]}'

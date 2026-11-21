@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T22:20:16.414328+00:00
-modified: 2026-11-21T04:12:16.338548+00:00
+modified: 2026-11-21T21:12:05.352791+00:00
 relationships:
   related:
   - DEV-741
@@ -124,6 +124,8 @@ comments:
       reason: 2428/2428 on the rerun at load ~20; the first run failed on the DEV-748 dev605 flake
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aec951db3e734b6e58489b043d966e72234745ad92b050bdf8068211860ea84d7
+releases:
+- 11
 description: 'Found: failed in the DEV-741 review run of npm run -s test:agent (2026-11-20, load avg ~38): job NRH-1 status ''running'' instead of finished, after 39.66 s (agent_automation_integration_test::git_required). The DEV-741 diff only touches an SSE test. Check: npm run -s test:agent at load avg ~30. Done: the test waits for the job''s end instead of a fixed budget and passes under full-suite load.'
 tags:
 - health
@@ -228,3 +230,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734","DEV-742","DEV-749","DEV-745"]}'
     new: '{"related":["DEV-741","DEV-748","DEV-731","DEV-734","DEV-742","DEV-749","DEV-745","DEV-751"]}'
+- at: 2026-11-21T21:12:05.352791+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

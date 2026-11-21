@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T21:09:13.348749+00:00
-modified: 2026-11-21T09:18:43.900645+00:00
+modified: 2026-11-21T21:12:05.271193+00:00
 relationships:
   related:
   - DEV-704
@@ -224,6 +224,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acf99943c821ddc87e00cedab3dccb0740e11d234dd55910d2fb22a12961df1f5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0cff3950f328479efe894b3ebb28fa56df7853acf0077e26735cfb482484c05b
+releases:
+- 11
 description: 'Found: fails ''nothing delivered while events kept coming'' (crates/lotar-lib/tests/web_api_integration_test.rs:1444) in merge runs of DEV-704, DEV-726 and DEV-732 (2026-11-20, 2 of 4 full runs, load avg 25-34); passes alone. Check: npm run -s test:agent at load avg ~30. Done: the test passes under full-suite load without a fixed 1.5 s wall-clock deadline.'
 tags:
 - health
@@ -398,3 +400,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748","DEV-740","DEV-734"]}'
     new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748","DEV-740","DEV-734","DEV-750"]}'
+- at: 2026-11-21T21:12:05.271193+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-21T02:41:28.724747+00:00
-modified: 2026-11-21T19:43:38.101521+00:00
+modified: 2026-11-21T21:12:05.695211+00:00
 relationships:
   related:
   - DEV-741
@@ -141,6 +141,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A09b5adf872460544c2c3bac6a7fbcbea0740a455fb81003f5e4fa24a7c515671
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9218554cebc1c8e23b9af1938e292761894fe8429525df74a91bf1cbd4c60e43
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84498b9b067284914c90dc6c43daae9da310d3f9326279590636f831fc4ed02e
+releases:
+- 11
 description: 'Found: failed in the DEV-741 merge''s `npm run -s smoke` (2026-11-20, load avg ~25-50): ''Timed out waiting for task UI reviewed workflow to include Review'' (smoke/tests/ui.agent-jobs.smoke.spec.ts:100, a fixed 80 x 250 ms = 20 s wait for an agent job). Passed 3/3 alone right after, in 10-13 s. Check: npm run -s smoke at load avg ~30. Done: the test passes under full-suite load without a fixed 20 s wall-clock deadline.'
 tags:
 - health
@@ -291,3 +293,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-741","DEV-743","DEV-750","DEV-752","DEV-753"]}'
     new: '{"related":["DEV-741","DEV-743","DEV-750","DEV-752","DEV-753","DEV-754"]}'
+- at: 2026-11-21T21:12:05.695211+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

@@ -1,0 +1,41 @@
+title: 'A usage-limit pause has no upper bound: its queue worker stays in memory until the reset, also one in 2099'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T21:10:33.155601+00:00
+modified: 2026-11-21T21:10:33.711208+00:00
+relationships:
+  related:
+  - DEV-763
+  - TEST-1
+description: |-
+  Found in DEV-763 (2026-11-21).
+
+  ## Found
+
+  - A debug `lotar agent worker` (pid 36658, from a deleted T3 worktree `~/.t3/worktrees/lotar/t3-5808df94-…`) ran for 3 days on a scratch `.tasks` (TEST project).
+  - Its only job, `job-20261118T192928.271Z-1` (TEST-1, runner `t3`), is `paused (until 2099-11-21T03:43:00+00:00)`: a fake t3 printed "try again at Nov 20th, 2099 7:43 PM".
+  - `usage_limit::UsageLimit::resume_at` takes any reset time in the future. The worker's loop (`run_worker_with` in `crates/lotar-agent/src/services/agent_queue_service.rs`) only exits when no job runs or waits in memory, so it would have waited until 2099. Its binary and worktree were gone; DEV-763 stopped it.
+
+  ## Fix
+
+  - A reset time further away than the longest real limit (7 days, the weekly limits) is not believed: the job waits the default wait instead, and the job log says the named time was ignored.
+
+  ## Done when
+
+  - [ ] A limit that names a reset more than 7 days away pauses the job for the default wait, and its log says so; a reset within 7 days is kept as today.
+  - [ ] A test covers both cases in `usage_limit.rs`.
+history:
+- at: 2026-11-21T21:10:33.429543+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-763","TEST-1"]}'
+- at: 2026-11-21T21:10:33.711208+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

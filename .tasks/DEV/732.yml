@@ -5,7 +5,7 @@ type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-20T13:45:47.182735+00:00
-modified: 2026-11-21T14:27:48.158067+00:00
+modified: 2026-11-21T21:12:05.099296+00:00
 relationships:
   blocks:
   - DEV-730
@@ -295,6 +295,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ff69d9e823c46361b80290297bde0df697d2f7a803af205ebbb9349999d9d1b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa6772f5477ebf7a14f906da60043bb22b03245cc02c61d3910f4c6f89ab6d890
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab0093b753225b1e3c06b2930fc2cd603a2bc9d2cac40b276a2b63f85df5f45d6
+releases:
+- 11
 description: 'Found (DEV-730, 2026-11-20): review jobs job-20261120T134401.077Z-8 and job-20261120T134519.998Z-10 failed with ''ENOENT: process.cwd failed ... current working directory was likely removed''. Live worker pid 8934 (started 05:23) has cwd .../.lotar-worktrees/lotar/.DEV-728.lotar-removed, so Claude sessions it starts can''t start. Same family as DEV-731 (worker inherits the queuing agent''s environment). Check: a worker started from a folder that is then removed still starts jobs (worker sets its cwd to the repo root or home). Done: a removed cwd doesn''t fail later jobs; the stuck worker 8934 is restarted.'
 tags:
 - health
@@ -607,3 +609,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735","DEV-741","DEV-747"]}'
     new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735","DEV-741","DEV-747","DEV-757"]}'
+- at: 2026-11-21T21:12:05.099296+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

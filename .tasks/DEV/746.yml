@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T22:28:17.130177+00:00
-modified: 2026-11-21T10:18:23.315373+00:00
+modified: 2026-11-21T21:12:05.478812+00:00
 relationships:
   depends_on:
   - DEV-731
@@ -80,6 +80,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A467e3597696cfa7e586c1f1ae1e3e395288f477ceba17561faac49b8bc7435e3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1d8fe712c58edf675df104394de0ca56956b683267b45e557525b88cf152d5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A923a7fd26069eddbf275a9e1d5b258dd70686f6fe1a0cfbb1cf46aa14b8b4b65
+releases:
+- 11
 description: |-
   Tests that call `AgentQueueService::run_worker` in process now run the developer's real login shell and change PATH with `std::env::set_var`, which can happen while other threads are running. Found in the DEV-731 review, 2026-11-20.
 
@@ -216,3 +218,8 @@ history:
   - field: tags
     old: fix-retried
     new: ''
+- at: 2026-11-21T21:12:05.478812+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

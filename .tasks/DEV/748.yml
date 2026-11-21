@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T00:38:44.586388+00:00
-modified: 2026-11-21T04:42:35.031016+00:00
+modified: 2026-11-21T21:12:05.570347+00:00
 relationships:
   related:
   - DEV-731
@@ -98,6 +98,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8a9c4b13d3a3970df6512b42b9484abe6fad7cbfaa9e2cfa9d0d94bb4bc69f14
+releases:
+- 11
 description: 'Found: failed in the DEV-743 review run of npm run -s test:agent (2026-11-20, load avg ~30): ''the merge waited for the background process: 21.13s'' at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451; also failed in DEV-731 and DEV-734 runs (load 21-22), passes alone. The test''s check is ''sleep 30 &'' against a 20 s wall-clock budget, so load alone can push it over. Check: npm run -s test:agent at load avg ~30. Done: the test tells a merge that waited for the background process from a slow one without a wall-clock budget load can exceed (e.g. a much longer sleep, or asserting the merge ended before the background process did), and passes under full-suite load.'
 tags:
 - health
@@ -174,3 +176,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-21T21:12:05.570347+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

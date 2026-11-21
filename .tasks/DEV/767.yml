@@ -1,0 +1,136 @@
+title: 'Agent job log: record the prompt and settings a run used, behind an Instructions button'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T20:47:04.852936+00:00
+modified: 2026-11-21T23:04:37.213848+00:00
+relationships:
+  blocks:
+  - DEV-769
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aed776696adfa64e7d73086504b56dd09ff7a27eb3c9cfa2fefdf085d577126a7
+description: |-
+  A job's log doesn't say what went into the run. The prompt lotar builds (8–12 KB: agent instructions, "This job", ticket context, relationships, comments, recent context, earlier sessions, user request) and the session settings are never written to lotar's log. The first turn is deliberately not logged (`drive_turns`, `agent_job_service.rs` ~:4592). The owner asked on 2026-11-21 for "the instruction set that a run used. As a button that you can expand … to reconstruct and fine tune it".
+
+  ## Today
+
+  - The prompt is built in `start_job` / `build_prompt` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:372-390, :1411-1525), from `resolve_agent_instructions` (:1170), `job_notes` (:1240), `earlier_sessions_text` and the merge hand-off prepended in `run_job` (:3450).
+  - Session settings come from `session_profile` (`crates/lotar-agent/src/services/agent_runner.rs` :320-348) plus `add_dirs`, the `lotar` MCP server and its tool list, T3 title and Claude settings (`run_session`, AJS :4100-4170).
+  - Only `model`, `effort` and `agent_profile` reach the log header. The full prompt is only in harnessmux's `turn.started` event, and those session files are pruned and restarted separately.
+
+  ## Plan
+
+  - [ ] When a job sends its first turn, write one `run_inputs` line to its log:
+    - `prompt`: the full text plus its sections (heading, start, length). Split it in `build_prompt`; don't parse it back afterwards.
+    - `instructions_source`: the built-in docs file, `agent.instructions` inline or a file path, plus the profile's own instructions.
+    - `settings`: runner, agent, model, effort, provider, permissions, `on_permission`, rules (allow/deny, `git push` deny, write confinement), ACP options, `add_dirs`, MCP servers and allowed tools, session mode (new, continue, fresh, resumed).
+    - `env`: names only, never values. Same for anything else that can hold a secret.
+  - [ ] Later turns already log `agent_job_input`.
+  - [ ] `GET /api/jobs/logs` (or a new `GET /api/jobs/inputs?id=`) returns it on demand. Don't send it over SSE.
+  - [ ] UI: a collapsed **Instructions** button in the job's log panel (Agents page and task panel thread). It opens the settings as a small table and the prompt as collapsible sections, one per heading, with Copy prompt and Copy all. Keep it separate (for example `view/components/AgentRunInputs.vue`) so the log viewer rebuild can place it.
+  - [ ] `lotar agent logs <job> --inputs` prints the same (or say why not).
+  - [ ] REST contract files agree (api_types.rs, view/api/types.ts, docs/openapi.json, docs/help/agent.md).
+  - [ ] Jobs from before this change say "Not recorded for this job".
+
+  ## Done when
+
+  - [ ] A job that sends its first turn (harnessmux session or `command` runner) writes exactly one `run_inputs` line to its log before the turn goes out; `prompt` is exactly the text the agent got, including a merge hand-off put in front and an idle-session handoff appended.
+  - [ ] `sections` cover the prompt in order without gaps (offsets in Unicode code points), one per heading `build_prompt` writes (Agent instructions, This job, Ticket context, Relationships, Comments, Recent context, Earlier agent sessions on this ticket, User request), plus Merge hand-off and Handoff when present.
+  - [ ] `env` lists variable names only; env values, MCP server env values and HTTP header values never appear in the line (a unit test checks with a secret value). The prompt itself is recorded as sent.
+  - [ ] A commit retry that doesn't run the agent writes no `run_inputs`. Writing the line fails or logging is off: the job runs on, and its inputs read as not recorded.
+  - [ ] `GET /api/jobs/inputs?id=` returns `{inputs}` (null when not recorded) for a job this server or a log knows, 404 for an unknown job; `/api/jobs/logs` and SSE don't carry it. api_types.rs, view/api/types.ts, docs/openapi.json and docs/help/agent.md agree.
+  - [ ] Web UI, Agents page and task panel thread: a collapsed **Instructions** button in the job's log panel loads the inputs when first opened; it shows the settings as a table and the prompt as collapsible sections, with Copy prompt (the exact prompt) and Copy all (settings and prompt as JSON). A job without the line says "Not recorded for this job"; a failed load shows the error and can retry.
+  - [ ] `lotar agent logs <job> --inputs` prints the settings and the prompt (`--format json`: the record); without a record it says "Not recorded for this job".
+  - [ ] Rust tests (sections, redaction, log round trip, a log without the line), a Vitest for the component, and a smoke test that opens the button on a real job.
+tags:
+- agent
+- ui
+history:
+- at: 2026-11-21T20:47:05.149544+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T20:47:13.251467+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"blocks":["DEV-769"]}'
+- at: 2026-11-21T23:01:31.589180+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T23:01:39.699138+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aed776696adfa64e7d73086504b56dd09ff7a27eb3c9cfa2fefdf085d577126a7
+- at: 2026-11-21T23:04:37.213848+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      A job's log doesn't say what went into the run. The prompt lotar builds (8–12 KB: agent instructions, "This job", ticket context, relationships, comments, recent context, earlier sessions, user request) and the session settings are never written to lotar's log. The first turn is deliberately not logged (`drive_turns`, `agent_job_service.rs` ~:4592). The owner asked on 2026-11-21 for "the instruction set that a run used. As a button that you can expand … to reconstruct and fine tune it".
+
+      ## Today
+
+      - The prompt is built in `start_job` / `build_prompt` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:372-390, :1411-1525), from `resolve_agent_instructions` (:1170), `job_notes` (:1240), `earlier_sessions_text` and the merge hand-off prepended in `run_job` (:3450).
+      - Session settings come from `session_profile` (`crates/lotar-agent/src/services/agent_runner.rs` :320-348) plus `add_dirs`, the `lotar` MCP server and its tool list, T3 title and Claude settings (`run_session`, AJS :4100-4170).
+      - Only `model`, `effort` and `agent_profile` reach the log header. The full prompt is only in harnessmux's `turn.started` event, and those session files are pruned and restarted separately.
+
+      ## Plan
+
+      - [ ] When a job sends its first turn, write one `run_inputs` line to its log:
+        - `prompt`: the full text plus its sections (heading, start, length). Split it in `build_prompt`; don't parse it back afterwards.
+        - `instructions_source`: the built-in docs file, `agent.instructions` inline or a file path, plus the profile's own instructions.
+        - `settings`: runner, agent, model, effort, provider, permissions, `on_permission`, rules (allow/deny, `git push` deny, write confinement), ACP options, `add_dirs`, MCP servers and allowed tools, session mode (new, continue, fresh, resumed).
+        - `env`: names only, never values. Same for anything else that can hold a secret.
+      - [ ] Later turns already log `agent_job_input`.
+      - [ ] `GET /api/jobs/logs` (or a new `GET /api/jobs/inputs?id=`) returns it on demand. Don't send it over SSE.
+      - [ ] UI: a collapsed **Instructions** button in the job's log panel (Agents page and task panel thread). It opens the settings as a small table and the prompt as collapsible sections, one per heading, with Copy prompt and Copy all. Keep it separate (for example `view/components/AgentRunInputs.vue`) so the log viewer rebuild can place it.
+      - [ ] `lotar agent logs <job> --inputs` prints the same (or say why not).
+      - [ ] REST contract files agree (api_types.rs, view/api/types.ts, docs/openapi.json, docs/help/agent.md).
+      - [ ] Jobs from before this change say "Not recorded for this job".
+
+      ## Done when
+
+      - [ ] From the web UI you can read and copy exactly the prompt and settings a job ran with.
+      - [ ] A test checks that env values never appear. A smoke test covers the button.
+    new: |-
+      A job's log doesn't say what went into the run. The prompt lotar builds (8–12 KB: agent instructions, "This job", ticket context, relationships, comments, recent context, earlier sessions, user request) and the session settings are never written to lotar's log. The first turn is deliberately not logged (`drive_turns`, `agent_job_service.rs` ~:4592). The owner asked on 2026-11-21 for "the instruction set that a run used. As a button that you can expand … to reconstruct and fine tune it".
+
+      ## Today
+
+      - The prompt is built in `start_job` / `build_prompt` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:372-390, :1411-1525), from `resolve_agent_instructions` (:1170), `job_notes` (:1240), `earlier_sessions_text` and the merge hand-off prepended in `run_job` (:3450).
+      - Session settings come from `session_profile` (`crates/lotar-agent/src/services/agent_runner.rs` :320-348) plus `add_dirs`, the `lotar` MCP server and its tool list, T3 title and Claude settings (`run_session`, AJS :4100-4170).
+      - Only `model`, `effort` and `agent_profile` reach the log header. The full prompt is only in harnessmux's `turn.started` event, and those session files are pruned and restarted separately.
+
+      ## Plan
+
+      - [ ] When a job sends its first turn, write one `run_inputs` line to its log:
+        - `prompt`: the full text plus its sections (heading, start, length). Split it in `build_prompt`; don't parse it back afterwards.
+        - `instructions_source`: the built-in docs file, `agent.instructions` inline or a file path, plus the profile's own instructions.
+        - `settings`: runner, agent, model, effort, provider, permissions, `on_permission`, rules (allow/deny, `git push` deny, write confinement), ACP options, `add_dirs`, MCP servers and allowed tools, session mode (new, continue, fresh, resumed).
+        - `env`: names only, never values. Same for anything else that can hold a secret.
+      - [ ] Later turns already log `agent_job_input`.
+      - [ ] `GET /api/jobs/logs` (or a new `GET /api/jobs/inputs?id=`) returns it on demand. Don't send it over SSE.
+      - [ ] UI: a collapsed **Instructions** button in the job's log panel (Agents page and task panel thread). It opens the settings as a small table and the prompt as collapsible sections, one per heading, with Copy prompt and Copy all. Keep it separate (for example `view/components/AgentRunInputs.vue`) so the log viewer rebuild can place it.
+      - [ ] `lotar agent logs <job> --inputs` prints the same (or say why not).
+      - [ ] REST contract files agree (api_types.rs, view/api/types.ts, docs/openapi.json, docs/help/agent.md).
+      - [ ] Jobs from before this change say "Not recorded for this job".
+
+      ## Done when
+
+      - [ ] A job that sends its first turn (harnessmux session or `command` runner) writes exactly one `run_inputs` line to its log before the turn goes out; `prompt` is exactly the text the agent got, including a merge hand-off put in front and an idle-session handoff appended.
+      - [ ] `sections` cover the prompt in order without gaps (offsets in Unicode code points), one per heading `build_prompt` writes (Agent instructions, This job, Ticket context, Relationships, Comments, Recent context, Earlier agent sessions on this ticket, User request), plus Merge hand-off and Handoff when present.
+      - [ ] `env` lists variable names only; env values, MCP server env values and HTTP header values never appear in the line (a unit test checks with a secret value). The prompt itself is recorded as sent.
+      - [ ] A commit retry that doesn't run the agent writes no `run_inputs`. Writing the line fails or logging is off: the job runs on, and its inputs read as not recorded.
+      - [ ] `GET /api/jobs/inputs?id=` returns `{inputs}` (null when not recorded) for a job this server or a log knows, 404 for an unknown job; `/api/jobs/logs` and SSE don't carry it. api_types.rs, view/api/types.ts, docs/openapi.json and docs/help/agent.md agree.
+      - [ ] Web UI, Agents page and task panel thread: a collapsed **Instructions** button in the job's log panel loads the inputs when first opened; it shows the settings as a table and the prompt as collapsible sections, with Copy prompt (the exact prompt) and Copy all (settings and prompt as JSON). A job without the line says "Not recorded for this job"; a failed load shows the error and can retry.
+      - [ ] `lotar agent logs <job> --inputs` prints the settings and the prompt (`--format json`: the record); without a record it says "Not recorded for this job".
+      - [ ] Rust tests (sections, redaction, log round trip, a log without the line), a Vitest for the component, and a smoke test that opens the button on a real job.

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T05:24:36.819620+00:00
-modified: 2026-11-20T22:24:52.231842+00:00
+modified: 2026-11-21T21:17:02.368854+00:00
 relationships:
   related:
   - DEV-714
@@ -16,6 +16,7 @@ relationships:
   - DEV-730
   - DEV-741
   - DEV-744
+  - DEV-725
 comments:
 - date: 2026-11-20T05:58:46.572700+00:00
   author: automation
@@ -288,6 +289,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae3261be557c00adfece3ae9d5ea4df28e9ccc38383cbbbada58be28ac164cbbb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af6167ecd6479455bca8c1b8aa09a2270524ccbfabe79cbb19351e0373c8bffe3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3543ef9cf23cef2418cb1ec0349073f1ab2a1126fb32b577c4522a2ddd99e2e0
+releases:
+- 11
 description: |-
   Found in DEV-714 (2026-11-20). Job `job-20261120T031431.355Z-3` ended at 05:20:18Z with DEV-714 handed back to HelpNeeded. At 05:20:21Z `cargo clean --workspace` ran in `t3-1728bf4d-70d1421059373328` (target/ 1.38 GB -> 551 MB, no lotar crates left in deps), but `lotar agent logs job-20261120T031431.355Z-3` shows no line for it.
 
@@ -571,3 +574,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-714","DEV-712","DEV-715","DEV-728","DEV-731","DEV-730","DEV-741"]}'
     new: '{"related":["DEV-714","DEV-712","DEV-715","DEV-728","DEV-731","DEV-730","DEV-741","DEV-744"]}'
+- at: 2026-11-21T21:12:04.815223+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
+- at: 2026-11-21T21:17:02.368854+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-714","DEV-712","DEV-715","DEV-728","DEV-731","DEV-730","DEV-741","DEV-744"]}'
+    new: '{"related":["DEV-714","DEV-712","DEV-715","DEV-728","DEV-731","DEV-730","DEV-741","DEV-744","DEV-725"]}'

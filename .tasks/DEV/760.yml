@@ -1,14 +1,18 @@
 title: 'Flaky test: hand_written_task_without_created_is_readable fails when a timestamp''s fraction contains 1970'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T18:41:12.412781+00:00
-modified: 2026-11-21T19:47:30.885048+00:00
+modified: 2026-11-21T23:03:39.404832+00:00
 relationships:
   related:
   - DEV-755
+  - DEV-497
+  - DEV-772
+  - DEV-773
+  - DEV-775
 comments:
 - date: 2026-11-21T19:47:23.816081+00:00
   author: claude
@@ -36,6 +40,63 @@ comments:
       result: not_run
       reason: no runtime change
     next: Review, then merge
+- date: 2026-11-21T20:45:00.954029+00:00
+  author: claude
+  text: |-
+    Review: passed. The test now checks only the `created:` value's year, as the ticket asks.
+
+    - Read: commit `995349afc` (one file, `crates/lotar-lib/tests/dev271_storage_robustness_test.rs:69-71`), the ticket, `AGENTS.md`. On main, the file's last change is `3ec533d60` (DEV-497), which this fix doesn't depend on.
+    - Logic: the test finds the top-level `created:` line, strips the quotes and asserts it doesn't start with `1970-`. A fraction such as `.751970` can't match. A missing `created:` still fails, through the `panic!`. An epoch date still fails.
+    - Scope: test-only, nothing outside the ticket, no stray files. The branch holds one commit.
+    - Reran: `cargo nextest run -p lotar-lib dev271_storage_robustness_test` (4 passed), `rustfmt --edition 2024 --check` on the file (clean), `cargo clippy -p lotar-lib --test integration -- -D warnings` (clean).
+    - No failing-before test: the old failure depended on the clock, so it couldn't be reproduced reliably. This is expected for a flaky-test fix.
+    - No UI change. No minor findings, no tickets filed.
+- date: 2026-11-21T22:20:26.170449+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [ 245.951s] 1743/2443 tests run: 1742 passed, 1 failed, 0 skipped
+            FAIL [  33.577s] (1730/2443) lotar-lib::integration agent_automation_integration_test::git_required::merge_job_whose_branch_was_rebased_elsewhere_passes
+      stdout ───
+
+        running 1 test
+        Initialized empty Git repository in /private/var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/lotar-rust-temp-FTGrk7/.lotar-test-scratch/76936-1795299587046206000/.tmpFD1sVs/.git/
+        [main (root-commit) bcacbc7] Initial commit
+         1 file changed, 1 insertion(+)
+         create mode 100644 README.md
+        test agent_automation_integration_test::git_required::merge_job_whose_branch_was_rebased_elsewhere_passes ... FAILED
+
+        failures:
+
+        failures:
+            agent_automation_integration_test::git_required::merge_job_whose_branch_was_rebased_elsewhere_passes
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1615 filtered out; finished in 33.40s
+
+      stderr ───
+
+        thread 'agent_automation_integration_test::git_required::merge_job_whose_branch_was_rebased_elsewhere_passes' (153038461) panicked at crates/lotar-lib/tests/agent_automation_integration_test.rs:2785:89:
+        the rebased branch counts as merged
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 700/2443 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-760` onto `main` (`050769e21273`): `3ceda0d027f4`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10f78536a6bc71ca3c50ba4771447f494bc69025d15433bdfba9156d8d571001
 description: 'Found in the DEV-755 merge (2026-11-21): `npm run -s test:agent` failed at `crates/lotar-lib/tests/dev271_storage_robustness_test.rs:70`, `assert!(!stored.contains("1970"))`. The stored file''s timestamp was `2026-11-21T18:24:50.751970+00:00`: the fraction `751970` contains 1970, no epoch date. Check: `cargo nextest run -p lotar-lib dev271_storage_robustness_test`. Done: the test checks the `created:` value''s year (for example parse it, or match `created: 1970-`), so it can''t hit a timestamp fraction.'
@@ -79,3 +140,44 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-21T20:45:00.954029+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:45:07.652074+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755"]}'
+    new: '{"related":["DEV-755","DEV-497"]}'
+- at: 2026-11-21T20:45:24.064159+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T22:20:26.170449+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T22:31:46.457268+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-497"]}'
+    new: '{"related":["DEV-755","DEV-497","DEV-772"]}'
+- at: 2026-11-21T22:34:13.877866+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-497","DEV-772"]}'
+    new: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773"]}'
+- at: 2026-11-21T23:03:39.404832+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773"]}'
+    new: '{"related":["DEV-755","DEV-497","DEV-772","DEV-773","DEV-775"]}'

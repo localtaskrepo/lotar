@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T13:25:13.774179+00:00
-modified: 2026-11-21T01:02:44.018001+00:00
+modified: 2026-11-21T21:12:04.998271+00:00
 relationships:
   depends_on:
   - DEV-732
@@ -275,6 +275,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c9ee95b11482e04538814920039b5a4ee670172959192857a1c0ac8a2c917ef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A29cd25318129945bdcdb838aebbbe9efa36ec5e84df2adbdfd848517aaa3b861
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7dd037d69ba738791fceb2aa7a80bfd9fc76444913ecb86794bdc0e232b2529a
+releases:
+- 11
 description: |-
   Found (DEV-729, 2026-11-20): `lotar agent logs job-20261120T130633.048Z-1` at 13:07:12 logged "agent.worktree.waiting_run (`cargo clean --workspace`) could not start in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-728: No such file or directory (os error 2)". The folder exists now, and the lotar service's PATH (launchd plist) has ~/.cargo/bin, so either the worktree was briefly gone (another job's cleanup while retries ran) or the spawn failed for another reason; the message doesn't say which (program or folder).
   Check: a waiting_run whose program or folder is missing names which one in the log; a test covers both.
@@ -547,3 +549,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732","DEV-710","DEV-711","DEV-733","DEV-740"]}'
     new: '{"depends_on":["DEV-732"],"related":["DEV-728","DEV-729","DEV-731","DEV-726","DEV-727","DEV-732","DEV-710","DEV-711","DEV-733","DEV-740","DEV-744"]}'
+- at: 2026-11-21T21:12:04.998271+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

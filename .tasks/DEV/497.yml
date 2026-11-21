@@ -4,7 +4,7 @@ priority: High
 type: Chore
 reporter: claude
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-15T01:28:23.007835+00:00
+modified: 2026-11-21T20:45:07.638514+00:00
 relationships:
   blocks:
   - DEV-499
@@ -19,6 +19,7 @@ relationships:
   - DEV-532
   - DEV-467
   - DEV-481
+  - DEV-760
 comments:
 - date: 2026-11-13T22:48:06.295902+00:00
   author: claude
@@ -523,3 +524,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507","DEV-508","DEV-489","DEV-503","DEV-532","DEV-467"]}'
     new: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507","DEV-508","DEV-489","DEV-503","DEV-532","DEV-467","DEV-481"]}'
+- at: 2026-11-21T20:45:07.638514+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507","DEV-508","DEV-489","DEV-503","DEV-532","DEV-467","DEV-481"]}'
+    new: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507","DEV-508","DEV-489","DEV-503","DEV-532","DEV-467","DEV-481","DEV-760"]}'

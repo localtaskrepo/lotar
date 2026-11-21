@@ -66,8 +66,9 @@ fn hand_written_task_without_created_is_readable() {
     assert!(ok(root, &["show", "DEMO-7"]).contains("Minimal hand-written"));
     ok(root, &["comment", "DEMO-7", "-m", "seen"]);
     let stored = std::fs::read_to_string(root.join(".tasks/DEMO/7.yml")).unwrap();
-    assert!(stored.contains("created:"), "{stored}");
-    assert!(!stored.contains("1970"), "{stored}");
+    let created = stored.lines().find_map(|line| line.strip_prefix("created:")).unwrap_or_else(|| panic!("{stored}"));
+    let created = created.trim().trim_matches(['\'', '"']);
+    assert!(!created.starts_with("1970-"), "{stored}");
 }
 
 #[test]

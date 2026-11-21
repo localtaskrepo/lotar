@@ -1,11 +1,11 @@
 title: A kept T3 Code thread whose settle fails is named by its id, not its link as DEV-747 asks
-status: Done
+status: Todo
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@fix-retry'
 created: 2026-11-21T04:06:18.165648+00:00
-modified: 2026-11-21T20:20:14.907853+00:00
+modified: 2026-11-21T21:17:02.370098+00:00
 relationships:
   depends_on:
   - DEV-747
@@ -13,6 +13,8 @@ relationships:
   - DEV-747
   - DEV-761
   - DEV-751
+  - DEV-755
+  - DEV-725
 comments:
 - date: 2026-11-21T05:14:56.710646+00:00
   author: claude
@@ -108,9 +110,42 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-21T20:22:22.102982+00:00
+  author: claude
+  text: |-
+    Landed on main but not pushed: the checks never finished a clean run.
+
+    - lotar's `test:agent` failure was a stale build-script output in `target/` pointing at the reviewer's deleted scratch copy `/private/tmp/rev-DEV-754-old`; I removed `target/debug/build/lotar-agent-a79fb64095bfe456`.
+    - 1st rerun: only `a_ticket_hands_its_context_from_harness_to_harness_through_its_states` timed out, the known flake [DEV-761](https://lotar.pyxzl.net/task/DEV-761). It passed 3 of 3 runs alone, and the reviewer saw the same timeout.
+    - 2nd rerun: while it was running, main was fast-forwarded to `8c30acc5b`, the ticket went Merging → Done (20:20Z) and this worktree was removed. Tests then failed with `target/debug/lotar is missing`.
+    - I amended main's `.tasks` changes into the commit. Main is clean, the commit isn't pushed, and no trust is needed (no rules or config changed).
+    - Question: should I push main as is, or run `test:agent` and `smoke` on main first?
+  report:
+    commits:
+    - hash: 6732fe799
+      what: DEV-754 kept thread's failed settle note names its link (+ .tasks amended in)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: failed
+      reason: 1st run timed out in a_ticket_hands_its_context_from_harness_to_harness_through_its_states (DEV-761 flake, passes 3/3 alone); 2nd run cut off when the worktree was removed mid-run (target/debug/lotar missing)
+    - command: npm run -s smoke
+      result: not_run
+      reason: worktree removed before it
+    next: 'Owner: OK to push main as is, or run test:agent and smoke on main first?'
+- date: 2026-11-21T20:28:31.820202+00:00
+  author: triage
+  text: 'Push it: lotar has "push": true in repos.json (docs/decisions/2026-11-12-push-finished-work.md, docs/decisions/2026-11-11-formatting.md). Main is already level with origin/main (6732fe799 is on it), so nothing is left to push. Run test:agent and smoke on main if you want them green, then set the ticket Done; the DEV-761 flake is its own ticket.'
+- date: 2026-11-21T21:14:47.296220+00:00
+  author: automation
+  text: The fix agent's job job-20261121T211326.368Z-110 failed (lotar agent logs job-20261121T211326.368Z-110); @fix-retry retries it on branch .
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5fc406a534c860a0c3ee96a2a255475addda33482dff729cd1ca1219cd3a112f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16cbc593d074cf681cc0d8837e53fb2abfdc5d59b83930a078843db94ff3113b
+releases:
+- 11
 description: |-
   Found in the review of DEV-747 (commit eafd1cc49). Its Done when says a failed settle logs `The T3 Code thread <link> was not settled: <reason>`. `crates/lotar-agent/src/services/agent_job_service/kept.rs` (`settle_ticket`, the `Err` arm) writes `thread.thread`, the bare thread id. docs/help/agent.md says `<thread>` to match the code.
 
@@ -118,6 +153,8 @@ description: |-
   - [ ] The note uses the link from `t3 thread list` (`Listed.link`), and the thread id only when no link is listed.
   - [ ] docs/help/agent.md (T3 Code threads) says `<link>`.
   - [ ] A dev503 test with `organize-error` checks the note's text.
+tags:
+- fix-retried
 history:
 - at: 2026-11-21T04:06:26.363905+00:00
   actor: claude
@@ -240,3 +277,65 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-21T20:22:22.102982+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:22:24.784660+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: HelpNeeded
+- at: 2026-11-21T20:22:28.545782+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-21T20:25:19.386303+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751"]}'
+    new: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751","DEV-755"]}'
+- at: 2026-11-21T20:28:31.820202+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:28:36.409135+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-21T20:28:54.895023+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-21T21:12:05.827527+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
+- at: 2026-11-21T21:14:37.029323+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-21T21:14:47.296220+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:17:02.370098+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751","DEV-755"]}'
+    new: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751","DEV-755","DEV-725"]}'

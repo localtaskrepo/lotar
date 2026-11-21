@@ -1,10 +1,54 @@
 title: Job worktree builds in a configurable build root (agent.worktree.build_root), clone and cleanup included
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T20:21:04.802424+00:00
+modified: 2026-11-21T21:01:20.393658+00:00
+relationships:
+  related:
+  - DEV-635
+comments:
+- date: 2026-11-21T20:55:35.079582+00:00
+  author: claude
+  text: |-
+    Progress: build_root implemented and tested; running lint, test and smoke now.
+
+    - `target/` becomes a symlink to `<build_root>/<repo>/<ticket>`, not `CARGO_TARGET_DIR`: T3 threads don't get the job's env, and `crates/lotar-web-assets/build.rs` and scripts name `target/`
+    - Tried: `cargo clean --workspace` cleans through the link; plain `cargo clean` deletes only the link, so `agent worktree run` and `waiting_run` empty the folder and relink
+    - A link is git-ignored only by `/target`, not `target/`: with `target/` the build stays in the worktree and the job log says why
+- date: 2026-11-21T21:01:06.498914+00:00
+  author: claude
+  text: |-
+    Done: `agent.worktree.build_root` puts a new job worktree's build in `<build_root>/<repo>/<ticket>`, with `target` as a symlink to it.
+
+    - Config: global and per project, `config set agent_worktree_build_root`; relative paths resolve like `dir`. Unset: nothing changes
+    - Clone: `clonefile(2)` from the source's resolved build (the main checkout's or an earlier worktree's) into the build root; different volumes: cold build, one job-log line. Never a full copy
+    - Cleanup: `remove_worktree_dir` (Done cleanup, `lotar agent worktree cleanup`) deletes the folder; `cleanup_paths: [target]` empties it; `agent worktree run` and `waiting_run` relink and empty it when a command deleted the link (plain `cargo clean`). The folder is found from the link, so it still goes after the setting changes
+    - Needs `/target` in `.gitignore`: `target/` doesn't ignore a link. lotar has `/target`; autospec has `target/` and would keep its builds in the worktree until that changes
+    - Docs: `docs/help/agent.md` (Worktrees), `docs/help/config-reference.md`; also removed a duplicated `job_history` pair there
+    - Tests: `agent_safety_test` (link plus clone, relink after `rm target`, removal; `target/` fallback), `dev153_worktree_settings_test` (config set); the existing DEV-635 test checks that an unset build root makes no link
+    - No guidance correction
+  report:
+    commits:
+    - hash: 4e32e4ff3
+      what: agent.worktree.build_root (config, clone into the build root, cleanup, docs, tests)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2446 Rust, 1563 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '406'
+    - command: different-volume clone path
+      result: not_run
+      reason: no second volume in tests; only the note path, untested end to end
+    next: 'Review, merge, release; then LOCA-571 step 4 sets build_root: /Volumes/Builds'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A554b4ea9c0d8ed6283d447223332845ede88e3fc4c30c0320f2860da1f2baf4b
 description: |-
   Owner 2026-11-21: "alright, file the work and kick it off. You have convinced me." The Mac gets an APFS volume for builds (/Volumes/Builds, 250 GB quota, excluded from Time Machine). The setup is local LOCA-571. This ticket is lotar's side.
 
@@ -26,3 +70,38 @@ description: |-
 
   - [ ] `build_root` works as above, with tests, and is documented
   - [ ] Merged and in a release; LOCA-571 turns it on
+history:
+- at: 2026-11-21T20:47:08.691784+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T20:47:16.093873+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A554b4ea9c0d8ed6283d447223332845ede88e3fc4c30c0320f2860da1f2baf4b
+- at: 2026-11-21T20:55:35.079582+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:01:06.498914+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:01:06.891264+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-635"]}'
+- at: 2026-11-21T21:01:20.393658+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

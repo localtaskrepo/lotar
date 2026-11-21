@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T13:23:02.862143+00:00
-modified: 2026-11-21T15:01:57.077636+00:00
+modified: 2026-11-21T21:21:12.951088+00:00
 relationships:
   depends_on:
   - standards:STD-257
@@ -19,6 +19,7 @@ relationships:
   - DEV-734
   - DEV-747
   - DEV-725
+  - DEV-763
 comments:
 - date: 2026-11-20T13:25:23.500075+00:00
   author: claude
@@ -139,6 +140,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9d34bbb50316ad91176ff5be8c7892813a138026f11a871fe6075b20c39b4608
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92d4e898c9ff947fbbb09b4adf75c16342a423093bca3abb7e045dbdc683d7da
+releases:
+- 11
 description: |-
   Found (DEV-728 fix, 2026-11-20): three fix jobs in a row (job-20261120T130111.184Z-26, job-20261120T130512.436Z-27, job-20261120T130633.048Z-1) were recorded as failed seconds after they started a long check (3x `npm run -s test:agent`) as a background command and marked it with T3's `t3_background_wait`. `lotar agent logs job-20261120T130633.048Z-1`: "the T3 Code thread's run ended with status 'waiting'", then "[agent_job_failed] The t3 runner exited with code 1". The threads kept working: all three later finished the checks, and commit 969484160 and three hand-off comments landed on a ticket already moved to HelpNeeded with a retry question. So each retry started another agent on the same worktree while the earlier ones still ran.
   Also in that log: "agent.worktree.waiting_run (`cargo clean --workspace`) could not start in <worktree>: No such file or directory (os error 2)".
@@ -296,3 +299,14 @@ history:
   - field: relationships
     old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731","DEV-734","DEV-747"]}'
     new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731","DEV-734","DEV-747","DEV-725"]}'
+- at: 2026-11-21T21:12:04.953080+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
+- at: 2026-11-21T21:21:12.951088+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731","DEV-734","DEV-747","DEV-725"]}'
+    new: '{"depends_on":["standards:STD-257"],"related":["DEV-728","DEV-730","DEV-711","DEV-732","DEV-683","DEV-731","DEV-734","DEV-747","DEV-725","DEV-763"]}'

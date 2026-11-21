@@ -1,15 +1,20 @@
 title: 'Flaky smoke under load: four more tests time out in the full run at load average 36, pass alone'
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-21T04:06:49.168672+00:00
-modified: 2026-11-21T19:47:42.933318+00:00
+modified: 2026-11-21T23:03:39.397483+00:00
 relationships:
   related:
   - DEV-750
   - DEV-760
+  - DEV-763
+  - DEV-764
+  - DEV-753
+  - DEV-754
+  - DEV-725
+  - DEV-775
 comments:
 - date: 2026-11-21T07:34:52.575806+00:00
   author: automation
@@ -69,14 +74,123 @@ comments:
 - date: 2026-11-21T19:39:07.213938+00:00
   author: automation
   text: The merge agent's job job-20261121T145834.510Z-92 failed (lotar agent logs job-20261121T145834.510Z-92); the fix agent retries it on branch agent/DEV-755.
+- date: 2026-11-21T20:22:45.348558+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+        267|     })
+        268|
+        269|     it('applies persisted manual backlog order before paging without r…
+           |     ^
+        270|         sprintsRef.value = [makeSprint(1)]
+        271|         const { api } = await import('../api/client')
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+     FAIL  __tests__/SprintsList.backlogPagination.spec.ts > SprintsList pagination > resets offsets when filters change or the sort order flips
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ __tests__/SprintsList.backlogPagination.spec.ts:1042:5
+        1040|     })
+        1041|
+        1042|     it('resets offsets when filters change or the sort order flips', a…
+           |     ^
+        1043|         sprintsRef.value = [makeSprint(1)]
+        1044|         const { api } = await import('../api/client')
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+     Test Files  2 failed | 137 passed (139)
+          Tests  3 failed | 1560 passed (1563)
+       Start at  12:16:31
+       Duration  373.33s (environment 41%, tests 40%, transform 10%, import 8%, setup 1%, worker 1%)
+
+        Isolate  139 workers spawned · ~14.40s startup each (spawn + environment, per file)
+                 at least ~139.54s faster with isolate: false — reuses workers across files instead of one per file
+    ```.
+
+    - Rebased `agent/DEV-755` onto `main` (`32891539f764`): `cda2660f12cb`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T20:23:58.146106+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261121T194733.631Z-101 failed again or on a rate limit (lotar agent logs job-20261121T194733.631Z-101). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-21T20:25:19.058641+00:00
+  author: claude
+  text: |-
+    Merged: `050769e21` is on main and pushed to origin.
+
+    - The `test:agent` failure was a machine stall (load 34; 373 s run, ~14 s startup per worker), not this branch. The branch only touches `smoke/tests/`, and the tests that timed out are in `view/__tests__/SprintsList.backlogPagination.spec.ts`.
+    - Rerun: that file alone 36/36 in 3.3 s, full `npm run -s test:ui:agent` 1563/1563 in 8.7 s, `test:release` and `test:hooks` pass.
+    - The same file timed out in the DEV-753 merge: filed as [DEV-764](https://lotar.pyxzl.net/task/DEV-764).
+    - Rebased onto DEV-754 (`6732fe799`), then `npm run -s smoke` passed 406/406 in 44 s. Main fast-forwarded, `git push origin main` (`32891539f..050769e21`).
+  report:
+    commits:
+    - hash: '050769e21'
+      what: load-proof waits in 4 smoke files, merged to main and pushed
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: LoTaR's run before the rebase
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust in LoTaR's run; test:ui:agent, test:release, test:hooks rerun after the load stall
+    - command: npm run -s smoke
+      result: passed
+      reason: 406/406 on the rebased branch
+- date: 2026-11-21T20:28:33.949679+00:00
+  author: triage
+  text: |-
+    No retry needed: the work is merged and pushed. Close this ticket as Done.
+
+    - `050769e21` is on main (merged and pushed per the 20:25 comment). The Done criteria are met: the 4 smoke files wait with load-proof budgets, and `npm run -s smoke` passed 406/406.
+    - The failed job `job-20261121T194733.631Z-101` was only the `test:agent` load stall, filed as DEV-764. It is not a reason to retry DEV-755.
+- date: 2026-11-21T21:17:07.362288+00:00
+  author: claude
+  text: 'Done: `050769e21` is on `origin/main`, and `npm run -s smoke` passed 406/406 on it. The `test:agent` stall is tracked in DEV-764.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac74e36e8416ff8cd36399dd4537351459e0315b205ec21be04c9ecc5d2fe5c64
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A528b0d622eaf4b439ce0be9ef5d946a6e3f7f483a6400457defc9445bb0e1e0b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af90816924278d480e7783e5a8ae8e6487a5c42934efe2a131e923bda769a5213
+releases:
+- 11
 description: 'Found in the review of DEV-750 (2026-11-20): full `npm run test:smoke:agent` at load average up to 36 failed 5 tests in 4 files the DEV-750 diff doesn''t touch: `api.automation.smoke.spec.ts` ''server async run drains a chatty stderr child without wedging the monitor'' (10 s marker wait), `api.review-policy.smoke.spec.ts` ''holds an authorized reviewer change until the running agent job ends'' (10 s `waitForStarted`), `ui.dialogs.smoke.spec.ts` ''contains focus and safely dismisses scoped dialogs on desktop'' and `ui.filter-autocomplete.smoke.spec.ts` desktop and mobile (120 s test timeout). All 4 files pass alone (rerun at load 21). Check: `npm run smoke` under load. Done: these tests wait for their condition with a load-proof budget and pass in the full run.'
 tags:
 - health
-- fix-retried
-- merge-retried
 custom_fields:
   finding: smoke:full-run-under-load
 history:
@@ -169,3 +283,104 @@ history:
   - field: status
     old: Merging
     new: InProgress
+- at: 2026-11-21T20:22:45.348558+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:22:45.953180+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af90816924278d480e7783e5a8ae8e6487a5c42934efe2a131e923bda769a5213
+- at: 2026-11-21T20:23:21.985201+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763"]}'
+- at: 2026-11-21T20:23:42.101930+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764"]}'
+- at: 2026-11-21T20:23:56.015805+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-21T20:23:58.146106+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:25:19.058641+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:25:19.386756+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754"]}'
+- at: 2026-11-21T20:28:33.949679+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:28:39.339436+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-21T20:28:42.286246+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-21T21:12:05.877476+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
+- at: 2026-11-21T21:16:00.722175+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T21:17:02.370563+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725"]}'
+- at: 2026-11-21T21:17:07.362288+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:17:18.566787+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-21T21:17:22.046484+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried, merge-retried
+    new: health
+- at: 2026-11-21T23:03:39.397483+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775"]}'

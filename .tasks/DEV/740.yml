@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T21:07:30.522875+00:00
-modified: 2026-11-21T09:25:06.453847+00:00
+modified: 2026-11-21T21:17:02.369567+00:00
 relationships:
   depends_on:
   - DEV-711
@@ -14,6 +14,7 @@ relationships:
   - DEV-730
   - DEV-741
   - DEV-734
+  - DEV-725
 comments:
 - date: 2026-11-20T21:28:29.221996+00:00
   author: claude
@@ -191,6 +192,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab243cb4cc26f9d7a16831b9f3da94be5b82dcf3a6e620526a8c67a7ba1ad246f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aad0962db015d694a8baaaef13f597357cdcda7a02959f6934b6c0a88d6a7cfac
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa846ffb57385ab7a8d5c1c43f990e2224a8fe43b73144892ecbff959e5c97f82
+releases:
+- 11
 description: |-
   Found in the DEV-711 review (2026-11-20). harnessmux 0.2.0 sorts a failure by its text with sign-in first (`kind_of_text`, `harnessmux-0.2.0/src/failure.rs`: `unauthorized`, `failed to authenticate` … before `usage limit`). So a t3 failure text (`t3 exited with …: <T3's error output>`) that names both comes back as `auth_required`, and `usage_limit::of_failures_in` (`crates/lotar-agent/src/services/usage_limit.rs`) gives no pause. Before DEV-711 the line-by-line text match paused it. `docs/help/agent.md` (Usage limits, What counts) still says 'A limit wins over any other failure in the same output, a full disk or a signing failure included'.
   Check: a TurnFailed of kind auth_required (or overloaded) from text alone whose text has a usage-limit line: either pause on it (e.g. also run the text match for kinds harnessmux took from text) or reword the doc sentence; a unit test covers the choice.
@@ -404,3 +407,14 @@ history:
   - field: tags
     old: merge-retried
     new: ''
+- at: 2026-11-21T21:12:05.229087+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
+- at: 2026-11-21T21:17:02.369567+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734"]}'
+    new: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734","DEV-725"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T14:04:05.906098+00:00
-modified: 2026-11-20T22:04:30.051584+00:00
+modified: 2026-11-21T21:12:05.141858+00:00
 relationships:
   related:
   - DEV-728
@@ -82,6 +82,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85a1af63d2b7077c8fe1b7d0d379788afbc559e3c82d0fe3b7c656e4db3d066e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae006afd0a1c62a22eefe39cc4b44c8b06c41d4bc595dcc3a2cfe8719d9e5d6a2
+releases:
+- 11
 description: |-
   Found (DEV-731, 2026-11-20): worker pid 8934 (`lotar agent worker` for the DEV tasks dir, started 05:23) has the env of the DEV-728 Claude thread that queued it: `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_MESSAGING_SOCKET`/`_TOKEN`, `CLAUDE_PID`, `T3CODE_THREAD_ID`, `CLAUDECODE=1`. Every later job's agent inherits them unless `job_env` overrides them (`ps eww -o command= -p <worker pid>`).
   Check: start the worker from a process with `T3CODE_THREAD_ID=x CLAUDE_CODE_SESSION_ID=y`; a command runner job's env has neither.
@@ -188,3 +190,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-728","DEV-731","DEV-732","DEV-734"]}'
     new: '{"related":["DEV-728","DEV-731","DEV-732","DEV-734","DEV-730"]}'
+- at: 2026-11-21T21:12:05.141858+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

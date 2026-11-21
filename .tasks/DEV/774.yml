@@ -1,0 +1,43 @@
+title: 'Bump harnessmux to 0.3: Claude tool commands from tool.updated, and plans in the job log'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T22:42:33.887526+00:00
+modified: 2026-11-21T22:42:51.833592+00:00
+relationships:
+  depends_on:
+  - harnessmux:HARN-13
+  related:
+  - DEV-766
+description: |-
+  DEV-766 builds tool entries from harnessmux 0.2.0's `Event.raw`. claude-agent-acp sends a Bash command or Read path only in an in-progress `tool_call_update`, which 0.2.0 drops, so Claude tool rows show only "Terminal" and the output. harnessmux 0.3.0 (HARN-14) emits it as `tool.updated` and adds `input`, `locations`, `output` and `plan`, but is not on crates.io (HARN-13 waits for the owner).
+
+  ## Done when
+
+  - [ ] lotar depends on the published harnessmux 0.3.x.
+  - [ ] `tool.updated` fills the running tool's title, input and paths; the end entry carries them. A Claude job's log names each Bash command and Read/Edit path.
+  - [ ] `input`, `locations` and `output` come from the event fields, not `raw`; Codex output is the joined terminal output.
+  - [ ] `plan` events become `agent_job_plan` entries with their entries; REST, types, OpenAPI and help agree.
+  - [ ] Tests with Claude- and Codex-shaped 0.3 events.
+tags:
+- agent
+history:
+- at: 2026-11-21T22:42:34.148060+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-766"]}'
+- at: 2026-11-21T22:42:34.402741+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T22:42:51.833592+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-766"]}'
+    new: '{"depends_on":["harnessmux:HARN-13"],"related":["DEV-766"]}'

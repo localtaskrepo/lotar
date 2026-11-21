@@ -1,11 +1,11 @@
 title: 'Proposal: a continue job whose session can''t be resumed starts a new one with the handoff, instead of failing'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T14:27:47.932717+00:00
-modified: 2026-11-21T20:14:24.158346+00:00
+modified: 2026-11-21T21:00:02.647815+00:00
 relationships:
   related:
   - DEV-603
@@ -39,6 +39,33 @@ comments:
     choice:
     - yes
     note: (answered in INBOX-613)
+- date: 2026-11-21T20:59:39.546260+00:00
+  author: claude
+  text: |-
+    Built: a continue job whose session the agent can't resume now starts a new session with the DEV-603 handoff instead of failing.
+
+    - `open_session` (`crates/lotar-agent/src/services/agent_runner.rs`) now tells a refused resume/load (harnessmux `Protocol` error, e.g. `Resource not found: sessionId`) apart from other errors (`OpenSessionError::NotResumable` vs `Other`)
+    - `run_session` (`agent_job_service.rs`) keeps the old session as `<name>.<last used>`, logs `This job would have continued the session <name>, but it could not be resumed (<error>), so it starts a new one with a handoff.`, and starts a new session with the handoff
+    - Other start errors (missing agent program, files, sockets) still fail. A `t3` session also still fails, as DEV-738 decides (its thread may still run)
+    - The handoff now says why it starts a new session (idle too long, couldn't be resumed, or a T3 thread in a T3-made worktree), not always "idle too long"
+    - Tests in `dev503_harness_jobs_test.rs`: `a_continue_job_whose_session_cant_be_resumed_starts_a_new_one_with_a_handoff` (failed first: the job failed) and `a_continue_job_whose_agent_cant_start_still_fails`
+    - `docs/help/agent.md` (Sessions) describes the fallback next to the idle case
+  report:
+    commits:
+    - hash: 2ba76fc00
+      what: resume fallback to a new session with handoff, tests, docs
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2445 Rust, 1563 UI
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Merge agent lands agent/DEV-757
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85739529f08a807d68f7a4c82772fd89eed8a4bce5c902f2a4b228907f4ed9ac
 description: |-
   A job that continues a ticket's session (a review, a merge, a rework, or the turn your comment starts) fails outright when the agent can't resume that session. lotar then reports "Could not start the claude session ...", and every retry continues the same broken session, so it fails again. DEV-734 fixed this for one case: a worker that takes over an orphaned job now runs it again in a new session. A plain continue job still has no fallback. DEV-734 also found how this happens: Claude never wrote the session's transcript, so `session/load` can never succeed. Sortie fixed the same bug last week. Found in the daily outside look (lotar and harnessmux, 2026-11-21).
 
@@ -88,3 +115,27 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-21T20:47:06.748575+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-21T20:47:12.650708+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85739529f08a807d68f7a4c82772fd89eed8a4bce5c902f2a4b228907f4ed9ac
+- at: 2026-11-21T20:59:39.546260+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T21:00:02.647815+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

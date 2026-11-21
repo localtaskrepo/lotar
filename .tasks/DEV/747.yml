@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-20T23:08:35.010019+00:00
-modified: 2026-11-21T19:41:40.257811+00:00
+modified: 2026-11-21T21:12:05.522924+00:00
 relationships:
   blocks:
   - DEV-754
@@ -326,6 +326,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac5af945f0aa031fe5013f35f34d2616f9a34f0e8ce5b5367c14578ba5fd111c4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4b4bcc92b1f1f48844822ef4578fd546c0defb2976565edd25215a5cc619eb2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae311c156ad0134a789516f74d33426f200044eefec7f579df2f5c816564bb0ad
+releases:
+- 11
 description: |-
   A T3 Code job thread that lotar leaves active is never settled later. On 2026-11-20 the owner saw 43 unsettled threads and asked whether they needed him. 33 of them were leftovers: 21 from failed or cancelled jobs, 2 from jobs that ended while the ticket was HelpNeeded, and the rest from jobs that ran before auto-settle existed. Most of those tickets are Done by now. The owner chose this fix on 2026-11-20 ("Settle + file lotar fix").
 
@@ -657,3 +659,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725"]}'
     new: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725","DEV-761"]}'
+- at: 2026-11-21T21:12:05.522924+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'

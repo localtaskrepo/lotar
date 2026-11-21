@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T22:24:52.009642+00:00
-modified: 2026-11-21T03:48:35.110282+00:00
+modified: 2026-11-21T21:12:05.395397+00:00
 relationships:
   related:
   - DEV-726
@@ -105,6 +105,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afcac4c32621b06e3af47986ebaa016611f886cf96d34c2870bda623f33e0394a
+releases:
+- 11
 description: |-
   Found in STD-276 (standards). Job job-20261120T222210.199Z-25 (DEV-739, fix) ran the rule 'Jobs: set up the worktree' (job_started, `run` of `node .../scripts/worktree.ts create`, timeout 20m, ignore_failure). It ran: node_modules and the stamp `standards-install` in the worktree's git dir appeared at 22:24, before the session started. The job log shows nothing between `agent_job_started` (22:22:31) and the next progress line (22:24:14), so a reader can't tell that the rule ran, how long it took, or whether it failed (ignore_failure hides a failure too). DEV-726 fixed the same gap for the end-of-job waiting cleanup.
 
@@ -224,3 +226,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-726","DEV-739","DEV-730","DEV-731","DEV-745","DEV-741"]}'
     new: '{"related":["DEV-726","DEV-739","DEV-730","DEV-731","DEV-745","DEV-741","DEV-734"]}'
+- at: 2026-11-21T21:12:05.395397+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#11'
