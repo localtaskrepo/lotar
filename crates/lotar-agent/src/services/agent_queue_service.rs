@@ -1134,7 +1134,8 @@ fn complete_path_from_login_shell() {
             let merged = merge_paths(&current, &login);
             if merged != current {
                 // SAFETY: the worker has started no thread yet, and the
-                // login shell's reader thread has ended.
+                // login shell's reader thread has sent its output and only
+                // ends now; it doesn't read the environment.
                 unsafe { std::env::set_var("PATH", merged) };
             }
         }
@@ -1152,10 +1153,13 @@ fn login_shell_path(shell: &std::ffi::OsStr) -> Option<String> {
         .spawn()
         .ok()?;
     let mut stdout = child.stdout.take()?;
-    let reader = thread::spawn(move || {
+    // The pipe stays open while anything the profile started in the
+    // background holds it (DEV-745), so the read gets the same deadline.
+    let (sender, output) = std::sync::mpsc::channel();
+    thread::spawn(move || {
         let mut out = String::new();
         let _ = stdout.read_to_string(&mut out);
-        out
+        let _ = sender.send(out);
     });
     let deadline = std::time::Instant::now() + LOGIN_SHELL_TIMEOUT;
     let status = loop {
@@ -1169,7 +1173,7 @@ fn login_shell_path(shell: &std::ffi::OsStr) -> Option<String> {
         }
         thread::sleep(Duration::from_millis(10));
     };
-    let out = reader.join().ok()?;
+    let out = output.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now())).ok()?;
     let path = out.rsplit_once(LOGIN_PATH_MARKER)?.1.trim();
     (status.success() && !path.is_empty()).then(|| path.to_string())
 }

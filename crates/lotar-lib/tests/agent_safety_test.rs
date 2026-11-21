@@ -140,6 +140,24 @@ fn worker_started_with_short_path_runs_jobs_with_login_path() {
     assert_eq!(fs::read_to_string(root.join("probe-marker")).unwrap(), "found");
 }
 
+/// A login shell whose profile leaves a background process holding its
+/// stdout doesn't hang the worker: after 5 s it keeps its own PATH (DEV-745).
+#[test]
+fn worker_keeps_its_path_when_login_shell_output_stays_open() {
+    let (fixture, ticket) = setup("printf '%s' \"$PATH\" > \"$LOTAR_TASKS_DIR/../path-marker\"", false);
+    let root = fixture.get_temp_path();
+    let shell = root.join("login-shell");
+    fs::write(&shell, "#!/bin/sh\nsleep 30 &\nPATH=\"/login-only:$PATH\" exec /bin/sh \"$2\" \"$3\"\n").unwrap();
+    fs::set_permissions(&shell, fs::Permissions::from_mode(0o755)).unwrap();
+    let mut worker = worker_command(&fixture, &ticket);
+    worker.env("PATH", "/usr/bin:/bin").env("SHELL", &shell);
+    let started = Instant::now();
+    wait_worker(worker.spawn().unwrap());
+    assert!(started.elapsed() < Duration::from_secs(12), "worker took {:?}", started.elapsed());
+    let path = fs::read_to_string(root.join("path-marker")).unwrap();
+    assert!(path.ends_with(":/usr/bin:/bin") && !path.contains("/login-only"), "job PATH {path}");
+}
+
 #[test]
 fn enabled_worktree_without_repository_fails_closed() {
     let (fixture, ticket) = setup("touch \"$LOTAR_TASKS_DIR/../executed-in-main\"", false);
