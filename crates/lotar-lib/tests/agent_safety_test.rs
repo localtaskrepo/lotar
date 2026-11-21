@@ -53,8 +53,10 @@ fn request(ticket: &str) -> AgentJobCreateRequest {
     AgentJobCreateRequest { ticket_id: ticket.into(), prompt: "Run safety regression".into(), agent: Some("safety".into()), runner: None, ..Default::default() }
 }
 
+/// Waits for something the test sets off. The deadline only stops a hang:
+/// at a load average of 30 a single wait took over 15 s (DEV-753).
 fn wait_until(mut predicate: impl FnMut() -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(15);
+    let deadline = Instant::now() + Duration::from_secs(120);
     while !predicate() {
         assert!(Instant::now() < deadline, "timed out waiting for agent");
         sleep(Duration::from_millis(25));
@@ -1172,10 +1174,12 @@ mod git_required {
                 .unwrap();
             })
         };
-        wait_until(|| root.join("removing").exists());
+        wait_until(|| root.join("removing").exists() || done.is_finished());
+        assert!(root.join("removing").exists(), "Done deletes the agent branch");
         let (sender, receiver) = std::sync::mpsc::channel();
         std::thread::spawn(move || sender.send(AgentJobService::queue_stats()).unwrap());
-        let stats = receiver.recv_timeout(Duration::from_secs(5));
+        // A held registry blocks until `release`, which comes after this.
+        let stats = receiver.recv_timeout(Duration::from_secs(60));
         let start = {
             let tasks_root = fixture.tasks_root.clone();
             let ticket = ticket.clone();
