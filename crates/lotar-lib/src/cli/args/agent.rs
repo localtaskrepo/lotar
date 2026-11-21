@@ -1,5 +1,12 @@
 use clap::{Args, Subcommand};
 
+#[derive(Args, Debug)]
+pub struct AgentListRunningArgs {
+    /// Running jobs of every tasks folder on this machine, not only this one
+    #[arg(long)]
+    pub all: bool,
+}
+
 #[derive(Args)]
 pub struct AgentArgs {
     #[command(subcommand)]
@@ -18,9 +25,9 @@ pub enum AgentAction {
     Cancel { id: String },
     /// Check for in-progress agent work (useful for git hooks)
     Check(AgentCheckArgs),
-    /// List running agent jobs (requires wrapper processes)
+    /// List running agent jobs
     #[command(name = "list-running", alias = "ls")]
-    ListRunning,
+    ListRunning(AgentListRunningArgs),
     /// List all job logs from disk
     #[command(name = "list-jobs")]
     ListJobs(AgentListJobsArgs),

@@ -14,7 +14,7 @@ LoTaR runs agent CLIs (Claude Code, Codex CLI, Copilot CLI, T3 Code and the othe
 - `lotar agent queue resume` — start the queue worker for the waiting tickets without queueing a job, for example after the worker was killed. With a worker running or nothing queued it changes nothing. A worker that can't start is reported (`error` in JSON, the state stays `stopped`); the command fails only when the queue can't be read. `lotar serve` does the same when it starts and prints a warning if the worker can't start
 - `lotar agent queue remove <TICKET>` — take one ticket out of the queue before its job starts, also a job that waits for prerequisites, for example `lotar agent queue remove DEV-501`
 - `lotar agent queue flush` — take every waiting ticket out of the queue, also jobs that wait for prerequisites; running jobs go on
-- `lotar agent list-running`
+- `lotar agent list-running [--all]` — list the running jobs of this tasks directory, or with `--all` those of every tasks directory on this machine (see [Jobs in other processes](#jobs-in-other-processes))
 - `lotar agent list-jobs [-n <LIMIT>]` — list job logs from disk. A [paused queue](#paused-queue) is named first (`pause` in JSON)
 - `lotar agent check [--status <value>] [--assignee <handle>]`
 - `lotar agent worktree list` — list agent worktrees
@@ -219,6 +219,10 @@ A job runs inside the process that started it: `lotar serve`, the background que
 - cancel it with `lotar agent cancel <JOB_ID>`; the owning process stops the agent and finishes the job as cancelled, so `job_cancelled` automation runs
 - hold back `lotar status` and `lotar assignee` changes on its ticket until it ends (see [Status and assignee during a job](#status-and-assignee-during-a-job)), and skip its worktree in `lotar agent worktree cleanup`
 
+`list-running` prints one row per job: `pid` (the runner process; `0` for runners that harnessmux runs), `owner_pid` (the `lotar` process that runs the job: a queue worker, `lotar serve`, an MCP session or `agent run --wait`), `job_id`, `ticket`, `runner` and `started_at`. With `--all` it lists the running jobs of every tasks directory on this machine, oldest first, and adds `tasks_dir`; a job an older build recorded shows `-` there. `--format json` gives the same fields under `jobs`. A job whose `owner_pid` exited is not listed: it waits to be [taken over](#jobs-whose-process-died).
+
+`list-running` also lists the `lotar-agent-wrapper` processes (which run `command` jobs) of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
+
 When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
 
 `lotar serve` shows every job live, whichever process runs it. A job it runs itself streams its events from memory. For the others it follows the job logs (see [Notes](#notes)): each new complete line becomes the same `agent_job_*` SSE event the job's own process sends, with the same `sequence` and the job's fields from the log's header and latest status line, within about a second. So the Agents page, the task panel's Timeline tab and the board's activity pill show the messages, tool lines, questions and end of a queue-worker, `agent run --wait` or MCP job without a reload. Lines already in a log when the server starts are not sent again. The log folders followed are the ones configured when the server starts; with logging `off` the server doesn't see other processes' jobs at all. A question of such a job shows (the activity pill says **Asks**), but only the job's own process can answer it: its card has no buttons.
@@ -257,8 +261,6 @@ A job that stops on its provider's usage limit doesn't fail either: it pauses un
 - **Again.** A retry that hits the limit again pauses again, as often as it happens. One that completes or fails runs its `job_completed` or `job_failed` rules.
 - **T3 Code resumes the turn.** When T3 Code itself resumes the paused job's thread after the reset, and the ticket's only queued entries are such retries, the thread is [taken over](#t3-code-threads) as a job (with the status and assignee change the retry carried) and the retries leave the queue, so the work doesn't run twice. Any other queued job still waits for the thread.
 - `lotar agent list-jobs` shows the job as `paused (until <time>)` (JSON: `resumes_at`); `lotar agent queue` shows the entry's `not_before` and, while every entry waits for a reset, `waiting for a provider's usage limit to reset`. `lotar agent queue remove <ID>` drops the retry.
-
-`list-running` also lists the `lotar-agent-wrapper` processes (which run `command` jobs) of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
 
 ## Status and assignee during a job
 

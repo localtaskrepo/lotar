@@ -57,6 +57,29 @@ fn dir(tasks_dir: &Path) -> PathBuf {
     crate::services::agent_queue_service::queue_dir().join(format!("active-{}", crate::services::agent_queue_service::queue_hash(&canonical)))
 }
 
+/// A record as written: the job and the tasks folder it belongs to, so
+/// `agent list-running --all` can name it (DEV-763). Records written
+/// before have no folder.
+#[derive(Serialize)]
+struct StampedRef<'a> {
+    #[serde(flatten)]
+    job: &'a ActiveJob,
+    tasks_dir: String,
+}
+
+#[derive(Deserialize)]
+struct Stamped {
+    #[serde(flatten)]
+    job: ActiveJob,
+    #[serde(default)]
+    tasks_dir: Option<String>,
+}
+
+fn record_json(tasks_dir: &Path, job: &ActiveJob) -> serde_json::Result<String> {
+    let canonical = tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf());
+    serde_json::to_string(&StampedRef { job, tasks_dir: canonical.to_string_lossy().into_owned() })
+}
+
 fn safe_name(job_id: &str) -> Option<&str> {
     (!job_id.is_empty() && job_id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))).then_some(job_id)
 }
@@ -92,7 +115,7 @@ pub fn register(tasks_dir: &Path, job: &ActiveJob) {
     if std::fs::create_dir_all(&dir).is_err() {
         return;
     }
-    if let Ok(json) = serde_json::to_string(job) {
+    if let Ok(json) = record_json(tasks_dir, job) {
         let _ = crate::storage::safety::atomic_write_file(&dir.join(format!("{name}.json")), &json);
     }
 }
@@ -323,8 +346,11 @@ fn read_outcome(path: &Path) -> Option<JobOutcome> {
 
 /// Every record, live or orphaned; expired end markers are removed on the way.
 fn records(tasks_dir: &Path) -> Vec<ActiveJob> {
-    let dir = dir(tasks_dir);
-    let Ok(entries) = std::fs::read_dir(&dir) else {
+    records_in(&dir(tasks_dir)).into_iter().map(|record| record.job).collect()
+}
+
+fn records_in(dir: &Path) -> Vec<Stamped> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
     let mut jobs = Vec::new();
@@ -337,11 +363,11 @@ fn records(tasks_dir: &Path) -> Vec<ActiveJob> {
             }
             continue;
         }
-        if let Some(job) = read_record(&path) {
-            jobs.push(job);
+        if let Some(record) = read_stamped(&path) {
+            jobs.push(record);
         }
     }
-    jobs.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+    jobs.sort_by(|a, b| a.job.started_at.cmp(&b.job.started_at));
     jobs
 }
 
@@ -364,17 +390,38 @@ pub fn first_look_at_run(tasks_dir: &Path, thread: &str, run: &str) -> bool {
 }
 
 fn read_record(path: &Path) -> Option<ActiveJob> {
+    read_stamped(path).map(|record| record.job)
+}
+
+fn read_stamped(path: &Path) -> Option<Stamped> {
     let is_record =
         path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json") && !n.ends_with(".pending.json"));
     if !is_record {
         return None;
     }
-    std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str::<ActiveJob>(&text).ok())
+    std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str::<Stamped>(&text).ok())
 }
 
 /// Records of running jobs: their owning process is alive.
 pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
     records(tasks_dir).into_iter().filter(|job| process_alive(job.owner_pid)).collect()
+}
+
+/// Running jobs of every tasks folder on this machine, oldest first, each
+/// with its tasks folder (`None`: written before DEV-763).
+pub fn list_all() -> Vec<(Option<PathBuf>, ActiveJob)> {
+    let Ok(entries) = std::fs::read_dir(crate::services::agent_queue_service::queue_dir()) else {
+        return Vec::new();
+    };
+    let mut jobs: Vec<(Option<PathBuf>, ActiveJob)> = entries
+        .flatten()
+        .filter(|entry| entry.file_name().to_str().is_some_and(|name| name.starts_with("active-")) && entry.path().is_dir())
+        .flat_map(|entry| records_in(&entry.path()))
+        .filter(|record| process_alive(record.job.owner_pid))
+        .map(|record| (record.tasks_dir.map(PathBuf::from), record.job))
+        .collect();
+    jobs.sort_by(|a, b| a.1.started_at.cmp(&b.1.started_at));
+    jobs
 }
 
 /// Jobs whose owning process exited before they ended (DEV-378).
@@ -394,7 +441,7 @@ pub fn claim(tasks_dir: &Path, job_id: &str) -> Option<ActiveJob> {
         return None;
     }
     job.owner_pid = std::process::id();
-    let json = serde_json::to_string(&job).ok()?;
+    let json = record_json(tasks_dir, &job).ok()?;
     crate::storage::safety::atomic_write_file(&dir.join(format!("{name}.json")), &json).ok()?;
     Some(job)
 }

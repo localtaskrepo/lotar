@@ -1,8 +1,8 @@
 use crate::api_types::AgentJobCreateRequest;
 use crate::automation::types::AutomationFile;
 use crate::cli::args::{
-    AgentAction, AgentCheckArgs, AgentListJobsArgs, AgentQueueAction, AgentQueueArgs, AgentRunArgs, AgentWorkerArgs, WorktreeAction, WorktreeCleanupArgs,
-    WorktreeRunArgs,
+    AgentAction, AgentCheckArgs, AgentListJobsArgs, AgentListRunningArgs, AgentQueueAction, AgentQueueArgs, AgentRunArgs, AgentWorkerArgs, WorktreeAction,
+    WorktreeCleanupArgs, WorktreeRunArgs,
 };
 use crate::config::manager::ConfigManager;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -40,7 +40,7 @@ impl AgentHandler {
             AgentAction::Logs { id } => Self::logs(&id, resolver, renderer),
             AgentAction::Cancel { id } => Self::cancel(&id, resolver, renderer),
             AgentAction::Check(args) => Self::check(&args, project, resolver, renderer),
-            AgentAction::ListRunning => Self::list_running(resolver, renderer),
+            AgentAction::ListRunning(args) => Self::list_running(&args, resolver, renderer),
             AgentAction::ListJobs(args) => Self::list_jobs(&args, resolver, renderer),
             AgentAction::Queue(args) => Self::queue(args, resolver, renderer),
             AgentAction::Worktree(args) => match args.action {
@@ -284,8 +284,8 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn list_running(resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
-        let jobs = list_running_jobs(Some(&resolver.path));
+    fn list_running(args: &AgentListRunningArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        let jobs = if args.all { list_running_jobs_everywhere() } else { list_running_jobs(Some(&resolver.path)) };
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({ "jobs": jobs }));
             return Ok(());
@@ -296,14 +296,18 @@ impl AgentHandler {
             return Ok(());
         }
 
-        renderer.emit_raw_stdout(format_args!("pid\tjob_id\tticket\trunner"));
+        let tasks_header = if args.all { "\ttasks_dir" } else { "" };
+        renderer.emit_raw_stdout(format_args!("pid\towner_pid\tjob_id\tticket\trunner\tstarted_at{tasks_header}"));
         for job in jobs {
+            let tasks_dir = if args.all { format!("\t{}", job.tasks_dir.as_deref().unwrap_or("-")) } else { String::new() };
             renderer.emit_raw_stdout(format_args!(
-                "{}\t{}\t{}\t{}",
+                "{}\t{}\t{}\t{}\t{}\t{}{tasks_dir}",
                 job.pid,
+                job.owner_pid.map_or_else(|| "-".to_string(), |pid| pid.to_string()),
                 job.job_id.as_deref().unwrap_or("-"),
                 job.ticket_id.as_deref().unwrap_or("-"),
-                job.runner.as_deref().unwrap_or("-")
+                job.runner.as_deref().unwrap_or("-"),
+                job.started_at.as_deref().unwrap_or("-")
             ));
         }
         Ok(())
@@ -928,13 +932,32 @@ fn extract_ticket_from_branch(branch: &str, prefix: &str) -> String {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct RunningAgentJob {
+    /// The runner process; 0 for runners that harnessmux runs.
     pub pid: u32,
+    /// The lotar process that runs the job (queue worker, server, MCP
+    /// session); `None` for a bare `lotar-agent-wrapper` process.
+    pub owner_pid: Option<u32>,
     pub job_id: Option<String>,
     pub ticket_id: Option<String>,
     pub runner: Option<String>,
+    pub started_at: Option<String>,
+    /// The tasks folder the job belongs to (DEV-763); `None` when unknown.
+    pub tasks_dir: Option<String>,
 }
 
 impl RunningAgentJob {
+    fn from_record(job: crate::services::agent_active_jobs::ActiveJob, tasks_dir: Option<String>) -> Self {
+        Self {
+            pid: job.child_pid,
+            owner_pid: Some(job.owner_pid),
+            job_id: Some(job.job_id),
+            ticket_id: Some(job.ticket_id),
+            runner: Some(job.runner),
+            started_at: Some(job.started_at),
+            tasks_dir,
+        }
+    }
+
     /// Whether a status/assignee change for this job's ticket can wait for
     /// its end (DEV-320) or is part of its lifecycle. Only a
     /// lotar-agent-wrapper process without a job record can do neither.
@@ -964,12 +987,26 @@ pub(crate) fn running_job_for_ticket(tasks_dir: &std::path::Path, ticket_id: &st
 /// no wrapper needed; DEV-279) plus the `lotar-agent-wrapper` processes
 /// running for it (DEV-349).
 fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob> {
-    let mut jobs: Vec<RunningAgentJob> = tasks_dir
+    let shown = tasks_dir.map(|dir| dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf()).to_string_lossy().into_owned());
+    let jobs = tasks_dir
         .map(crate::services::agent_active_jobs::list)
         .unwrap_or_default()
         .into_iter()
-        .map(|job| RunningAgentJob { pid: job.child_pid, job_id: Some(job.job_id), ticket_id: Some(job.ticket_id), runner: Some(job.runner) })
+        .map(|job| RunningAgentJob::from_record(job, shown.clone()))
         .collect();
+    with_wrapper_processes(jobs, tasks_dir)
+}
+
+/// Running jobs of every tasks folder on this machine (DEV-763).
+fn list_running_jobs_everywhere() -> Vec<RunningAgentJob> {
+    let jobs = crate::services::agent_active_jobs::list_all()
+        .into_iter()
+        .map(|(tasks_dir, job)| RunningAgentJob::from_record(job, tasks_dir.map(|dir| dir.to_string_lossy().into_owned())))
+        .collect();
+    with_wrapper_processes(jobs, None)
+}
+
+fn with_wrapper_processes(mut jobs: Vec<RunningAgentJob>, tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob> {
     for wrapper in list_wrapper_processes(tasks_dir) {
         let known = wrapper.job_id.is_some() && jobs.iter().any(|job| job.job_id == wrapper.job_id);
         if !known {
@@ -1008,7 +1045,7 @@ fn list_wrapper_processes(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAge
                 return None;
             }
             let (job_id, ticket_id, runner) = parse_wrapper_metadata(&cmd);
-            Some(RunningAgentJob { pid: pid.as_u32(), job_id, ticket_id, runner })
+            Some(RunningAgentJob { pid: pid.as_u32(), owner_pid: None, job_id, ticket_id, runner, started_at: None, tasks_dir: None })
         })
         .collect()
 }

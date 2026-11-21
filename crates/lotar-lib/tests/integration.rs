@@ -185,6 +185,7 @@ mod dev732_worker_leaves_its_launchers_folder_test;
 mod dev733_worker_drops_agent_session_env_test;
 mod dev744_job_started_run_notes_test;
 mod dev75_cli_list_contract_test;
+mod dev763_list_running_all_test;
 mod dev80_env_ownership_test;
 mod dev82_contract_semantics_test;
 mod dev89_cli_add_transaction_test;
