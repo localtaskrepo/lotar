@@ -7,7 +7,7 @@ import { ACP_AGENT_SCRIPT, createFixtureAgents, createGateFixture, nodeExecutabl
 import { gitAvailable } from '../helpers/git.js';
 import { parse, stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
-import { withPage } from '../helpers/ui.js';
+import { assigneePickerValues, pickAssignee, withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 const reviewedTemplatePath = path.resolve(
@@ -386,7 +386,9 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         await page.getByRole('button', { name: 'Run agent', exact: true }).click();
                         const dialog = page.getByTestId('agent-run-dialog');
                         await dialog.locator('#agent-run-ticket').fill(task.id);
-                        await expect.poll(() => dialog.locator('#agent-run-agent').inputValue()).toBe('mock');
+                        await expect
+                            .poll(() => dialog.locator('#agent-run-agent').getAttribute('data-value'))
+                            .toBe('@mock');
                         await dialog.getByRole('button', { name: 'Start job', exact: true }).click();
 
                         await page.waitForSelector('.job-card.job-completed', { timeout: 20_000 });
@@ -630,8 +632,11 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
-    it('starts an agent job when the task panel assigns an agent profile', async () => {
-        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-panel-assign-');
+    it('starts an agent job when the task panel picker assigns an agent profile found by typing', async () => {
+        const agents = await createFixtureAgents(
+            { fix: {}, 'fix-light': { description: 'Small fixes on a cheaper model' } },
+            'lotar-smoke-agents-panel-assign-',
+        );
 
         try {
             const workspace = await SmokeWorkspace.create({
@@ -644,10 +649,25 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
                 try {
                     await withPage(`${server.url}/?project=UIAG&taskPanel=${task.id}`, async (page) => {
-                        const select = page.locator('#task-panel-assignee-select');
-                        await select.locator('option[value="@mock"]').waitFor({ state: 'attached' });
-                        expect(await select.locator('option[value="mock"]').count()).toBe(0);
-                        await select.selectOption('@mock');
+                        // DEV-768: agents are grouped by role, base profile first, each with its runner.
+                        const picker = '#task-panel-assignee-select';
+                        await page.locator(picker).waitFor();
+                        await expect
+                            .poll(() => assigneePickerValues(page, picker))
+                            .toEqual(expect.arrayContaining(['', '@fix', '@fix-light']));
+                        const values = await assigneePickerValues(page, picker);
+                        expect(values).not.toContain('fix');
+                        expect(values.indexOf('@fix')).toBe(values.indexOf('@fix-light') - 1);
+                        await page.locator(picker).click();
+                        const row = page.locator('[role="option"][data-value="@fix-light"]');
+                        expect(await row.locator('.assignee-picker__detail').textContent()).toBe('command');
+                        expect(await row.locator('.assignee-picker__description').textContent()).toBe(
+                            'Small fixes on a cheaper model',
+                        );
+                        expect(await page.locator('[role="group"][aria-label="fix"]').count()).toBe(1);
+                        await page.getByTestId('assignee-picker-search').press('Escape');
+
+                        await pickAssignee(page, picker, 'light', '@fix-light');
                         expect(await waitForJobCountViaApi(server.url, task.id, 1)).toBeGreaterThanOrEqual(1);
                     });
                 } finally {

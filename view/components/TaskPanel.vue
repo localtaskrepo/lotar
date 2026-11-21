@@ -555,20 +555,8 @@
                     :form="form"
                     :ordered-known-users="orderedKnownUsers"
                     :whoami="whoami"
-                    :reporter-selection="reporterSelection"
-                    :assignee-selection="assigneeSelection"
-                    :reporter-mode="reporterMode"
-                    :assignee-mode="assigneeMode"
-                    :reporter-custom="reporterCustom"
-                    :assignee-custom="assigneeCustom"
-                    @update:reporterSelection="setReporterSelection"
-                    @update:assigneeSelection="setAssigneeSelection"
-                    @update:reporterCustom="setReporterCustom"
-                    @update:assigneeCustom="setAssigneeCustom"
-                    @commitReporterCustom="commitReporterCustom"
-                    @commitAssigneeCustom="commitAssigneeCustom"
-                    @resetReporterSelection="resetReporterSelection"
-                    @resetAssigneeSelection="resetAssigneeSelection"
+                    :profiles="agentProfileInfos"
+                    @setOwner="setOwner"
                     @fieldBlur="handleFieldBlur"
                   />
                   <div v-if="splitLayout" class="task-panel__group">
@@ -1160,21 +1148,9 @@ const {
   saveCommentEdit,
   answeringQuestion,
   answerQuestion,
-  reporterMode,
-  assigneeMode,
-  reporterCustom,
-  assigneeCustom,
   orderedKnownUsers,
-  reporterSelection,
-  assigneeSelection,
-  setReporterSelection,
-  setAssigneeSelection,
-  setReporterCustom,
-  setAssigneeCustom,
-  commitReporterCustom,
-  commitAssigneeCustom,
-  resetReporterSelection,
-  resetAssigneeSelection,
+  agentProfileInfos,
+  setOwner,
   whoami,
   refreshSprints,
   attachmentsDir,
@@ -2924,21 +2900,6 @@ details.task-panel__group:not([open]) {
   font-size: var(--text-xs, 0.75rem);
   font-weight: 500;
   color: var(--color-muted, var(--muted));
-}
-
-.task-panel__ownership-custom {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2, 0.5rem);
-}
-
-.task-panel__ownership-custom .input {
-  flex: 1;
-}
-
-.task-panel__ownership-reset {
-  flex: 0 0 auto;
-  white-space: nowrap;
 }
 
 textarea {

@@ -124,3 +124,37 @@ export async function chooseClassicLayout(page: Page): Promise<void> {
     await page.evaluate(() => localStorage.setItem('lotar.preferences.layout.narrow', 'classic'));
     await page.reload();
 }
+
+/** The values an assignee picker (DEV-768) offers, in list order; it is closed again afterwards. */
+export async function assigneePickerValues(page: Page, triggerSelector: string): Promise<string[]> {
+    await page.locator(triggerSelector).click();
+    const popover = page.getByTestId('assignee-picker-popover');
+    await popover.waitFor({ state: 'visible' });
+    const values = await popover
+        .locator('[role="option"]')
+        .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-value') ?? ''));
+    await page.getByTestId('assignee-picker-search').press('Escape');
+    await popover.waitFor({ state: 'detached' });
+    return values;
+}
+
+/** Types into an assignee picker (DEV-768) and takes the first row, as Enter does; checks the value it set. */
+export async function pickAssignee(
+    page: Page,
+    triggerSelector: string,
+    search: string,
+    expected = search,
+): Promise<void> {
+    const trigger = page.locator(triggerSelector);
+    await trigger.click();
+    const input = page.getByTestId('assignee-picker-search');
+    await input.fill(search);
+    await input.press('Enter');
+    await page.getByTestId('assignee-picker-popover').waitFor({ state: 'detached' });
+    // A plain wait, not expect.poll: tests that run concurrently take `expect` from their context.
+    await page.waitForFunction(
+        ([selector, value]) => document.querySelector(selector)?.getAttribute('data-value') === value,
+        [triggerSelector, expected] as const,
+        { timeout: 10_000 },
+    );
+}

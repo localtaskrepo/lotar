@@ -3311,7 +3311,7 @@
         "summary": "List agent profiles",
         "responses": {
           "200": {
-            "description": "Configured agent profiles, sorted by name",
+            "description": "Configured agent profiles, in config order",
             "content": {
               "application/json": {
                 "schema": {

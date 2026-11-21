@@ -31,6 +31,8 @@ regex = { version = "1.13.1", default-features = false, features = ["std", "unic
 jiff = "1.0.0"
 serde = { version = "1.0.229", features = ["derive"], default-features = false }
 serde_yaml_ng = "0.10.0"
+# Agent profiles keep their config order (DEV-768).
+indexmap = { version = "2.14.2", features = ["serde"] }
 dirs = "7.0.0"
 ignore = { version = "0.4.33" }
 blake3 = { version = "1.8.7", default-features = false, features = ["std"] }

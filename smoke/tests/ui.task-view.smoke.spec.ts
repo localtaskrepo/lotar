@@ -78,7 +78,9 @@ describe('DEV-239 large task view (actual backend/browser)', () => {
                         ]);
                         expect(await sideColumn.locator('.task-panel__tags-section').count()).toBe(1);
                         expect(await panel.locator('.task-panel__main .task-panel__tags-section').count()).toBe(0);
-                        await expect.poll(() => sideColumn.locator('.task-panel__ownership-custom').count()).toBe(0);
+                        await expect
+                            .poll(() => sideColumn.locator('#task-panel-reporter-select').getAttribute('data-value'))
+                            .toBe('Smoke');
                         await page.waitForTimeout(300);
                         await page.screenshot({ path: path.join(ARTIFACTS, 'large-1440.png'), animations: 'disabled' });
 

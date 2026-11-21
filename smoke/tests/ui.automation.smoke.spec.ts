@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { startLotarServer } from '../helpers/server.js';
-import { withPage } from '../helpers/ui.js';
+import { pickAssignee, withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 const BASE_CONFIG = `default:
@@ -261,6 +261,14 @@ describe.concurrent('UI Automation page smoke tests', () => {
                         .locator(`#${listId} option`)
                         .evaluateAll((els) => els.map((el) => el.getAttribute('value')));
                     expect(options).toEqual(expect.arrayContaining(['Todo', 'InProgress', 'Review', 'Done']));
+                    // DEV-768: the assignee is picked from people, agents and special values, found by their description.
+                    await dialog.getByTestId('automation-add-action-complete').selectOption('set:assignee');
+                    await pickAssignee(
+                        page,
+                        '[data-testid="automation-set-assignee"] > button',
+                        'the reporter',
+                        '@reporter',
+                    );
                     await dialog.getByTestId('automation-add-action-complete').selectOption('comment');
                     await dialog.getByTestId('automation-comment').fill('Shipped ${{ticket.title}}');
 
@@ -287,11 +295,12 @@ describe.concurrent('UI Automation page smoke tests', () => {
                     const summary = (await page.getByTestId('automation-rule-0').textContent()) ?? '';
                     expect(summary).toContain('Deploy complete');
                     expect(summary.replace(/\s+/g, ' ')).toContain(
-                        'When an agent job finishes: then set status to Done, comment',
+                        'When an agent job finishes: then set status to Done, set assignee to @reporter, comment',
                     );
                     const saved = await workspace.read('.tasks/automation.yml');
                     expect(saved).toContain('job_completed:');
                     expect(saved).toContain('status: Done');
+                    expect(saved).toMatch(/assignee: ['"]?@reporter/);
                 });
             } finally {
                 await server.stop();

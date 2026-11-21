@@ -47,8 +47,6 @@ interface UseTaskPanelFormLifecycleOptions {
     resetCustomFields: () => void
     ensureConfiguredCustomFields: () => void
     applyDefaultsFromConfig: (defaults: Record<string, unknown>) => void
-    syncOwnershipControls: () => void
-    resetOwnership: () => void
     preloadPeople: (project: string) => Promise<void>
     resetReferencePreviews: () => void
     resetRelationships: () => void
@@ -102,7 +100,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.form.tags = []
         options.form.releases = []
         options.resetSprintsState()
-        options.resetOwnership()
         options.activityTab.value = 'comments'
         options.resetCustomFields()
         options.resetRelationships()
@@ -133,7 +130,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.resetCustomFields()
         options.ensureConfiguredCustomFields()
         options.applyDefaultsFromConfig(defaults.customFields || {})
-        options.syncOwnershipControls()
         void options.preloadPeople(options.form.project)
         void nextTick(() => (options.suppressWatch.value = false))
     }
@@ -203,7 +199,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
               }))
             : []
 
-        options.syncOwnershipControls()
         void options.preloadPeople(options.form.project)
         options.applyTaskCustomFields(data.custom_fields)
         options.applyRelationshipsFromTask(data)

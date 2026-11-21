@@ -58,12 +58,10 @@ interface UseTaskPanelExternalSyncOptions {
     task: TaskDTO
     form: TaskPanelFormState
     suppressWatch: Ref<boolean>
-    /** Text typed into a custom reporter/assignee input but not yet committed. */
-    pendingOwner: (field: 'reporter' | 'assignee') => string | undefined
     customFieldsDirty: () => boolean
     applyCustomFields: (values: Record<string, unknown>) => void
     applySprints: (task: TaskDTO) => void
-    /** Refresh derived panel state (ownership controls, history, known tags). */
+    /** Refresh derived panel state (history, known tags). */
     afterApply: (task: TaskDTO) => void
     /** Save the user's value for `field` (used by "keep mine"). */
     save: (field: ExternalSyncField) => Promise<void>
@@ -154,7 +152,7 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
                 return form.description || ''
             case 'reporter':
             case 'assignee':
-                return options.pendingOwner(field) ?? form[field].trim()
+                return form[field].trim()
             case 'tags':
                 return form.tags.map((tag) => (tag || '').trim()).filter((tag) => tag.length > 0)
             case 'sprints':

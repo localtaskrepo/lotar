@@ -19,13 +19,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let mut profiles: Vec<crate::api_types::AgentProfileInfo> = config
+        // In config order: the assignee picker groups and lists them as
+        // written (DEV-768).
+        let profiles: Vec<crate::api_types::AgentProfileInfo> = config
             .agent_profiles
             .iter()
             .map(|(name, profile)| crate::api_types::AgentProfileInfo {
                 name: name.clone(),
                 runner: profile.runner.clone(),
-                description: None,
+                description: profile.description.as_deref().map(str::trim).filter(|d| !d.is_empty()).map(str::to_string),
                 model: profile.model.clone(),
                 effort: profile.effort.clone(),
                 provider: profile.provider.clone(),
@@ -37,7 +39,6 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 .to_string(),
             })
             .collect();
-        profiles.sort_by(|a, b| a.name.cmp(&b.name));
         let installed = crate::services::agent_runner::installed_agent_clis();
 
         ok_json(200, json!({"data": {"profiles": profiles, "installed_runners": installed, "project": project}}))

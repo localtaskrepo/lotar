@@ -4,63 +4,30 @@
     <div class="task-panel__row task-panel__row--ownership">
       <div class="task-panel__ownership-column">
         <label class="task-panel__ownership-label" for="task-panel-reporter-select">Reporter</label>
-        <UiSelect
+        <AssigneePicker
           id="task-panel-reporter-select"
-          :model-value="reporterSelection"
-          @update:modelValue="(value) => emit('update:reporterSelection', value as string)"
-        >
-          <option value="">Unassigned</option>
-          <option v-for="user in orderedKnownUsers" :key="`reporter-${user}`" :value="user">
-            {{ user === whoami ? `${user} (you)` : user }}
-          </option>
-          <option value="__custom">Custom…</option>
-        </UiSelect>
-        <div v-if="reporterMode === 'custom'" class="task-panel__ownership-custom">
-          <UiInput
-            :model-value="reporterCustom"
-            placeholder="Type reporter"
-            @update:modelValue="(value) => emit('update:reporterCustom', value)"
-            @blur="emit('commitReporterCustom')"
-            @keyup.enter.prevent="emit('commitReporterCustom')"
-          />
-          <UiButton
-            variant="ghost"
-            type="button"
-            class="task-panel__ownership-reset"
-            @click="emit('resetReporterSelection')"
-            >Use list</UiButton
-          >
-        </div>
+          :model-value="form.reporter"
+          aria-label="Reporter"
+          empty-label="Unassigned"
+          custom-verb="Set reporter to"
+          :people="orderedKnownUsers"
+          :profiles="profiles"
+          :whoami="whoami"
+          @update:model-value="(value) => emit('setOwner', 'reporter', value)"
+        />
       </div>
       <div class="task-panel__ownership-column">
         <label class="task-panel__ownership-label" for="task-panel-assignee-select">Assignee</label>
-        <UiSelect
+        <AssigneePicker
           id="task-panel-assignee-select"
-          :model-value="assigneeSelection"
-          @update:modelValue="(value) => emit('update:assigneeSelection', value as string)"
-        >
-          <option value="">Unassigned</option>
-          <option v-for="user in orderedKnownUsers" :key="`assignee-${user}`" :value="user">
-            {{ user === whoami ? `${user} (you)` : user }}
-          </option>
-          <option value="__custom">Custom…</option>
-        </UiSelect>
-        <div v-if="assigneeMode === 'custom'" class="task-panel__ownership-custom">
-          <UiInput
-            :model-value="assigneeCustom"
-            placeholder="Type assignee"
-            @update:modelValue="(value) => emit('update:assigneeCustom', value)"
-            @blur="emit('commitAssigneeCustom')"
-            @keyup.enter.prevent="emit('commitAssigneeCustom')"
-          />
-          <UiButton
-            variant="ghost"
-            type="button"
-            class="task-panel__ownership-reset"
-            @click="emit('resetAssigneeSelection')"
-            >Use list</UiButton
-          >
-        </div>
+          :model-value="form.assignee"
+          aria-label="Assignee"
+          empty-label="Unassigned"
+          :people="orderedKnownUsers"
+          :profiles="profiles"
+          :whoami="whoami"
+          @update:model-value="(value) => emit('setOwner', 'assignee', value)"
+        />
       </div>
     </div>
     <div class="task-panel__row">
@@ -88,34 +55,22 @@
 </template>
 
 <script setup lang="ts">
+import type { AgentProfileInfo } from '../../api/types'
 import type { TaskPanelFormState } from '../../composables/task-panel/useTaskPanelPersistence'
-import UiButton from '../UiButton.vue'
+import AssigneePicker from '../AssigneePicker.vue'
 import UiInput from '../UiInput.vue'
-import UiSelect from '../UiSelect.vue'
 
 defineProps<{
   form: TaskPanelFormState
   orderedKnownUsers: string[]
+  profiles: AgentProfileInfo[]
   whoami: string | null
-  reporterSelection: string
-  assigneeSelection: string
-  reporterMode: 'select' | 'custom'
-  assigneeMode: 'select' | 'custom'
-  reporterCustom: string
-  assigneeCustom: string
   /** Show visible labels for due date and effort (large view). */
   labelled?: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:reporterSelection', value: string): void
-  (e: 'update:assigneeSelection', value: string): void
-  (e: 'update:reporterCustom', value: string): void
-  (e: 'update:assigneeCustom', value: string): void
-  (e: 'commitReporterCustom'): void
-  (e: 'commitAssigneeCustom'): void
-  (e: 'resetReporterSelection'): void
-  (e: 'resetAssigneeSelection'): void
+  (e: 'setOwner', field: 'reporter' | 'assignee', value: string): void
   (e: 'fieldBlur', field: string): void
 }>()
 

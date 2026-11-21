@@ -22,39 +22,42 @@ function setup(mergeKnownTags: (tags: Array<string | null | undefined>) => void 
         members: ref([]),
         mergeKnownTags,
         updateField: () => {},
-        onFieldBlur: () => {},
     })
     return { form, ownership }
 }
 
-describe('task panel ownership controls', () => {
-    it('leaves the custom input once the people list loads and knows the name', async () => {
+describe('task panel ownership', () => {
+    it('sets the picked owner on the form and trims it', async () => {
         const { form, ownership } = setup()
-        form.reporter = 'priya'
-        form.assignee = 'marco'
-        await nextTick()
-        expect(ownership.reporterMode.value).toBe('custom')
-        expect(ownership.assigneeMode.value).toBe('custom')
-
-        await ownership.preloadPeople('A')
-        await nextTick()
-        expect(ownership.reporterMode.value).toBe('select')
-        expect(ownership.reporterSelection.value).toBe('priya')
-        expect(ownership.assigneeMode.value).toBe('select')
-        expect(ownership.assigneeSelection.value).toBe('marco')
+        ownership.setOwner('assignee', ' @fix-light ')
+        ownership.setOwner('reporter', 'priya')
+        expect(form.assignee).toBe('@fix-light')
+        expect(form.reporter).toBe('priya')
+        ownership.setOwner('assignee', '')
+        expect(form.assignee).toBe('')
     })
 
-    it('keeps a custom input the user chose', async () => {
-        const { form, ownership } = setup()
-        await ownership.preloadPeople('A')
-        form.reporter = 'priya'
+    it('saves a pick right away when editing a task', async () => {
+        const updateField = vi.fn()
+        const form = reactive<Record<string, any>>({ reporter: '', assignee: 'marco' })
+        const ownership = useTaskPanelOwnership({
+            form,
+            mode: computed(() => 'edit' as const),
+            ready: ref(true),
+            suppressWatch: ref(false),
+            defaults: ref({}),
+            members: ref([]),
+            mergeKnownTags: () => {},
+            updateField,
+        })
+        ownership.setOwner('assignee', '@review')
         await nextTick()
-        ownership.setReporterSelection('__custom')
-        expect(ownership.reporterMode.value).toBe('custom')
-
-        ownership.knownUsers.value = [...ownership.knownUsers.value, 'sam']
         await nextTick()
-        expect(ownership.reporterMode.value).toBe('custom')
+        expect(updateField).toHaveBeenCalledExactlyOnceWith('assignee')
+        ownership.setOwner('assignee', '@review')
+        await nextTick()
+        await nextTick()
+        expect(updateField).toHaveBeenCalledTimes(1)
     })
 
     it('offers agent profiles with their @ and keeps an @profile assignee', async () => {
@@ -74,12 +77,11 @@ describe('task panel ownership controls', () => {
         expect(api.listAgentProfiles).toHaveBeenCalledWith('A')
         expect(ownership.orderedKnownUsers.value).toEqual(['@fix', '@review', 'marco', 'priya'])
 
-        form.assignee = '@fix'
-        await nextTick()
-        expect(ownership.assigneeMode.value).toBe('select')
-        expect(ownership.assigneeSelection.value).toBe('@fix')
-
-        ownership.setAssigneeSelection('@review')
+        expect(ownership.agentProfileInfos.value.map((profile) => [profile.name, profile.runner])).toEqual([
+            ['fix', 'claude'],
+            ['review', 'codex'],
+        ])
+        ownership.setOwner('assignee', '@review')
         expect(form.assignee).toBe('@review')
     })
 
@@ -88,6 +90,7 @@ describe('task panel ownership controls', () => {
         const { ownership } = setup()
         await ownership.preloadPeople('A')
         expect(ownership.orderedKnownUsers.value).toEqual(['marco', 'priya'])
+        expect(ownership.agentProfileInfos.value).toEqual([])
     })
 
     it('offers the people, tags and field values of the project without loading its tasks', async () => {
@@ -120,7 +123,6 @@ describe('task panel ownership controls', () => {
             members: ref(['sam']),
             mergeKnownTags: () => {},
             updateField: () => {},
-            onFieldBlur: () => {},
         })
         await ownership.preloadPeople('A')
         expect(ownership.orderedKnownUsers.value).toEqual(['@fix', 'lead', 'sam'])

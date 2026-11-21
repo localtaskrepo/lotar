@@ -1003,7 +1003,7 @@ describe('AgentJobs page context and actions', () => {
             const dialog = wrapper.find('[data-testid="agent-run-dialog"]')
             expect(dialog.exists()).toBe(true)
             expect((dialog.find('#agent-run-ticket').element as HTMLInputElement).value).toBe('DEV-1')
-            expect((dialog.find('#agent-run-agent').element as HTMLSelectElement).value).toBe('reviewer')
+            expect(dialog.find('#agent-run-agent').attributes('data-value')).toBe('@reviewer')
 
             await dialog.find('#agent-run-effort').setValue('low')
             await dialog.trigger('submit')

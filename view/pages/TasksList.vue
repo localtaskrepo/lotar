@@ -292,7 +292,7 @@
         <header class="row tasks-modal__header">
           <div class="col" style="gap: 4px">
             <h2>{{ assignDialogTitle }}</h2>
-            <p class="muted tasks-modal__hint">Use <code>@me</code> to assign the tasks to yourself.</p>
+            <p class="muted tasks-modal__hint">Pick a person or agent, or type a name.</p>
           </div>
           <UiButton
             variant="ghost"
@@ -306,18 +306,18 @@
             <IconGlyph name="close" />
           </UiButton>
         </header>
-        <label class="col" style="gap: 4px">
-          <span class="muted">Assignee</span>
-          <input
-            ref="assignInputRef"
-            class="input"
+        <div class="col" style="gap: 4px">
+          <label class="muted" for="tasks-assign-picker">Assignee</label>
+          <AssigneePicker
+            id="tasks-assign-picker"
+            ref="assignPickerRef"
             v-model="assignInputValue"
-            placeholder="username or @me"
-            autocomplete="off"
+            aria-label="Assignee"
+            placeholder="Choose a person or agent"
+            :people="assignPeople"
+            :profiles="assignProfiles"
+            :whoami="assignWhoami"
           />
-        </label>
-        <div class="row" style="gap: 8px; flex-wrap: wrap">
-          <UiButton variant="ghost" type="button" @click="useAssignShortcut('@me')">Use @me</UiButton>
         </div>
         <footer class="row tasks-modal__footer">
           <UiButton variant="primary" type="submit" :disabled="assignDialogSubmitting || !assignInputValue.trim()">
@@ -566,7 +566,8 @@ import {
 } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
-import type { SprintAssignmentRequest, TaskDTO } from '../api/types'
+import type { AgentProfileInfo, SprintAssignmentRequest, TaskDTO } from '../api/types'
+import AssigneePicker from '../components/AssigneePicker.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -1191,7 +1192,7 @@ function setSelectedIds(value: string[]) {
 }
 
 const ASSIGNEE_STORAGE_KEY = 'lotar.tasks.assign.last'
-const lastAssignee = ref('@me')
+const lastAssignee = ref('')
 {
   const stored = storageGet(ASSIGNEE_STORAGE_KEY)
   if (stored) lastAssignee.value = stored
@@ -1202,7 +1203,28 @@ const assignDialogSubmitting = ref(false)
 const assignDialogIds = ref<string[]>([])
 const assignDialogMode = ref<'single' | 'bulk'>('bulk')
 const assignInputValue = ref('')
-const assignInputRef = ref<HTMLInputElement | null>(null)
+const assignPickerRef = ref<InstanceType<typeof AssigneePicker> | null>(null)
+const assignProfiles = ref<AgentProfileInfo[]>([])
+const assignWhoami = ref('')
+const assignTaskPeople = ref<string[]>([])
+const assignPeople = computed(() =>
+  [...new Set([...members.value, ...assignTaskPeople.value])].filter((name) => name && name !== '*'),
+)
+
+// The picker's people and agents; one that fails to load leaves its group empty.
+async function loadAssignDirectory() {
+  const scope = configScope.value || undefined
+  const [profiles, identity, values] = await Promise.allSettled([
+    (async () => api.listAgentProfiles(scope))(),
+    (async () => api.whoami())(),
+    (async () => api.taskValues(scope))(),
+  ])
+  assignProfiles.value = profiles.status === 'fulfilled' ? (profiles.value?.profiles ?? []) : []
+  assignWhoami.value =
+    identity.status === 'fulfilled' && typeof identity.value === 'string' ? identity.value.trim() : ''
+  assignTaskPeople.value = values.status === 'fulfilled' ? (values.value?.people ?? []) : []
+  if (!assignInputValue.value && assignWhoami.value) assignInputValue.value = assignWhoami.value
+}
 
 const assignDialogCount = computed(() => assignDialogIds.value.length)
 const assignDialogTitle = computed(() =>
@@ -1220,12 +1242,10 @@ function openAssignDialog(ids: string[], mode: 'single' | 'bulk') {
   }
   assignDialogIds.value = unique
   assignDialogMode.value = mode
-  assignInputValue.value = lastAssignee.value || '@me'
+  assignInputValue.value = lastAssignee.value
   assignDialogOpen.value = true
-  nextTick(() => {
-    assignInputRef.value?.focus()
-    assignInputRef.value?.select()
-  })
+  void loadAssignDirectory()
+  nextTick(() => assignPickerRef.value?.focus())
 }
 
 function closeAssignDialog(force?: boolean | Event) {
@@ -1233,11 +1253,6 @@ function closeAssignDialog(force?: boolean | Event) {
   if (assignDialogSubmitting.value && !forced) return
   assignDialogOpen.value = false
   assignDialogIds.value = []
-}
-
-function useAssignShortcut(value: string) {
-  assignInputValue.value = value
-  nextTick(() => assignInputRef.value?.focus())
 }
 
 async function applyAssignment(ids: string[], assignee: string) {
@@ -1270,7 +1285,7 @@ async function submitAssignDialog() {
   if (assignDialogSubmitting.value || !assignDialogOpen.value || !assignDialogIds.value.length) return
   const input = (assignInputValue.value || '').trim()
   if (!input) {
-    showToast('Enter an assignee or use @me')
+    showToast('Choose an assignee')
     return
   }
   assignDialogSubmitting.value = true

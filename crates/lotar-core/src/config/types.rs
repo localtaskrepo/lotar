@@ -1,4 +1,5 @@
 use crate::types::{Priority, TaskStatus, TaskType};
+use indexmap::IndexMap;
 #[cfg(feature = "schema")]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -279,6 +280,10 @@ impl std::str::FromStr for AgentRunnerKind {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentProfileDetail {
     pub runner: String,
+    /// What the profile is for, shown under its name in the assignee picker
+    /// and matched by its search (DEV-768).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
     /// Defaults to `workspace` when omitted.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub permissions: Option<AgentPermissions>,
@@ -909,7 +914,7 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_instructions: Option<AgentInstructionsConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub agents: Option<BTreeMap<String, AgentProfileConfig>>,
+    pub agents: Option<IndexMap<String, AgentProfileConfig>>,
     /// Retired `agent.automation` block (DEV-152): still read and kept as
     /// written, but ignored; agent job lifecycle comes from automation rules.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -1127,8 +1132,8 @@ pub struct GlobalConfig {
     pub agent_logs_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_instructions: Option<AgentInstructionsConfig>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub agents: BTreeMap<String, AgentProfileConfig>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub agents: IndexMap<String, AgentProfileConfig>,
     /// Retired `agent.automation` block (DEV-152): still read and kept as
     /// written, but ignored; agent job lifecycle comes from automation rules.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -1248,8 +1253,9 @@ pub struct ResolvedConfig {
     pub agent_logs_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_instructions: Option<AgentInstructionsConfig>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
-    pub agent_profiles: BTreeMap<String, AgentProfileDetail>,
+    /// In config order: the web UI lists profiles as written (DEV-768).
+    #[serde(skip_serializing_if = "IndexMap::is_empty", default)]
+    pub agent_profiles: IndexMap<String, AgentProfileDetail>,
     pub agent_worktree: AgentWorktreeConfig,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_merge: Option<AgentMergeConfig>,
@@ -1513,7 +1519,7 @@ impl Default for GlobalConfig {
             agent_context_extension: default_agent_context_extension(),
             agent_logs_dir: None,
             agent_instructions: None,
-            agents: BTreeMap::new(),
+            agents: IndexMap::new(),
             agent_automation: None,
             agent_worktree: AgentWorktreeConfig::default(),
             agent_merge: None,

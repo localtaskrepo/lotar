@@ -123,7 +123,6 @@ describe('frontend scope safety', () => {
                 resetCustomFields: vi.fn(),
                 ensureConfiguredCustomFields: vi.fn(),
                 applyDefaultsFromConfig: vi.fn(),
-                syncOwnershipControls: vi.fn(),
                 preloadPeople: vi.fn(),
             } as any),
         )!

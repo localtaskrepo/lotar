@@ -35,14 +35,18 @@
               <option v-for="id in ticketSuggestions" :key="id" :value="id" />
             </datalist>
           </label>
-          <label class="field">
-            <span class="field-label">Agent</span>
-            <select id="agent-run-agent" v-model="agent" class="input">
-              <option v-for="profile in choices" :key="profile.name" :value="profile.name">
-                @{{ profile.name }} · {{ profile.runner }}
-              </option>
-            </select>
-          </label>
+          <div class="field">
+            <label class="field-label" for="agent-run-agent">Agent</label>
+            <AssigneePicker
+              id="agent-run-agent"
+              v-model="agentHandle"
+              aria-label="Agent"
+              :profiles="choices"
+              :include-people="false"
+              :custom-verb="null"
+              search-placeholder="Search agent, runner, model…"
+            />
+          </div>
           <label class="field">
             <span class="field-label">Model</span>
             <input
@@ -95,6 +99,7 @@
 import { computed, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import type { AgentJob, AgentProfileInfo } from '../api/types'
+import AssigneePicker from './AssigneePicker.vue'
 import UiButton from './UiButton.vue'
 import UiModal from './UiModal.vue'
 import { DEFAULT_RUN_PROMPT } from '../utils/agentJobs'
@@ -123,6 +128,13 @@ const error = ref('')
 const projectProfiles = ref<AgentProfileInfo[] | null>(null)
 const choices = computed(() => projectProfiles.value ?? props.profiles)
 const selected = computed(() => choices.value.find((profile) => profile.name === agent.value))
+// The picker lists agents as `@<profile>`; the job takes the bare profile name.
+const agentHandle = computed({
+  get: () => (agent.value ? `@${agent.value}` : ''),
+  set: (value: string) => {
+    agent.value = value.replace(/^@/, '')
+  },
+})
 
 let profileRequest = 0
 watch(

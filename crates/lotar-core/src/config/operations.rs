@@ -78,12 +78,12 @@ fn parse_sync_remotes(value: &str) -> Result<BTreeMap<String, SyncRemoteConfig>,
 
 /// Agent profiles as a YAML/JSON mapping of name to profile (a runner name
 /// or a detailed profile). Names must work as `@name` assignees.
-fn parse_agent_profiles(value: &str) -> Result<BTreeMap<String, crate::config::types::AgentProfileConfig>, ConfigError> {
+fn parse_agent_profiles(value: &str) -> Result<indexmap::IndexMap<String, crate::config::types::AgentProfileConfig>, ConfigError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Ok(BTreeMap::new());
+        return Ok(indexmap::IndexMap::new());
     }
-    let profiles: BTreeMap<String, crate::config::types::AgentProfileConfig> =
+    let profiles: indexmap::IndexMap<String, crate::config::types::AgentProfileConfig> =
         serde_yaml_ng::from_str(trimmed).map_err(|err| ConfigError::ParseError(format!("Invalid agents value: {}", err)))?;
     for (name, profile) in &profiles {
         let valid_name = !name.is_empty() && name.len() <= 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));

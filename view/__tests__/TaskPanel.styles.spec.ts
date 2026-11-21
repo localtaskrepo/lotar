@@ -119,24 +119,11 @@ vi.mock('../composables/useTaskPanelOwnership', () => {
     return {
         useTaskPanelOwnership: () => ({
             whoami: ref('tester'),
-            reporterMode: ref('select'),
-            assigneeMode: ref('select'),
-            reporterCustom: ref(''),
-            assigneeCustom: ref(''),
             orderedKnownUsers: ref(['tester']),
-            reporterSelection: ref(''),
-            assigneeSelection: ref(''),
-            setReporterSelection: vi.fn(),
-            setAssigneeSelection: vi.fn(),
-            setReporterCustom: vi.fn(),
-            setAssigneeCustom: vi.fn(),
-            commitReporterCustom: vi.fn(),
-            commitAssigneeCustom: vi.fn(),
-            resetReporterSelection: vi.fn(),
-            resetAssigneeSelection: vi.fn(),
+            agentProfileInfos: ref([]),
+            knownFieldValues: ref({}),
+            setOwner: vi.fn(),
             preloadPeople: vi.fn(async () => {}),
-            resetOwnership: vi.fn(),
-            syncOwnershipControls: vi.fn(),
         }),
     }
 })

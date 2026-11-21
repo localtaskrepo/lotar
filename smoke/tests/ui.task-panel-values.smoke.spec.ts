@@ -1,6 +1,6 @@
 import { describe, it } from 'vitest';
 import { startLotarServer } from '../helpers/server.js';
-import { withPage } from '../helpers/ui.js';
+import { assigneePickerValues, withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 // DEV-545: the task panel suggests the people of the project's tasks from
@@ -20,9 +20,9 @@ describe('UI task panel suggestions', () => {
                         if (url.pathname.startsWith('/api/tasks/')) requests.push(url.pathname + url.search);
                     });
                     await page.goto(`${server.url}/task/${opened.id}`);
-                    const assignee = page.locator('#task-panel-assignee-select');
+                    await page.locator('#task-panel-assignee-select').waitFor();
                     await expect
-                        .poll(() => assignee.locator('option').allTextContents())
+                        .poll(() => assigneePickerValues(page, '#task-panel-assignee-select'))
                         .toContain('elsewhere@example.com');
                     expect(requests.some((entry) => entry.startsWith('/api/tasks/values'))).toBe(true);
                     expect(requests.filter((entry) => entry.includes('limit=200'))).toEqual([]);

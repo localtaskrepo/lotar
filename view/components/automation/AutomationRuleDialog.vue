@@ -130,11 +130,23 @@
                 {{ option.label }}
               </option>
             </select>
+            <AssigneePicker
+              v-if="row.operator !== 'exists' && usesPersonPicker(row.field, row.operator)"
+              v-model="row.value"
+              class="rule-dialog__value-input"
+              aria-label="Value"
+              placeholder="Choose a person or agent"
+              :people="people"
+              :profiles="agentProfiles"
+              :specials="CONDITION_SPECIALS"
+              custom-verb="Match"
+              data-testid="automation-condition-value"
+            />
             <input
-              v-if="row.operator !== 'exists'"
+              v-else-if="row.operator !== 'exists'"
               v-model="row.value"
               class="input rule-dialog__value-input"
-              :list="valueListFor(row.field, 'condition')"
+              :list="valueListFor(row.field)"
               :placeholder="valuePlaceholder(row)"
               aria-label="Value"
               data-testid="automation-condition-value"
@@ -156,18 +168,44 @@
               </option>
             </select>
             <span class="rule-dialog__word">changes from</span>
+            <AssigneePicker
+              v-if="usesPersonPicker(row.field)"
+              v-model="row.from"
+              class="rule-dialog__value-input"
+              aria-label="From"
+              placeholder="anything"
+              empty-label="anything"
+              :people="people"
+              :profiles="agentProfiles"
+              :specials="CONDITION_SPECIALS"
+              custom-verb="Match"
+            />
             <input
+              v-else
               v-model="row.from"
               class="input rule-dialog__value-input"
-              :list="valueListFor(row.field, 'condition')"
+              :list="valueListFor(row.field)"
               placeholder="anything"
               aria-label="From"
             />
             <span class="rule-dialog__word">to</span>
+            <AssigneePicker
+              v-if="usesPersonPicker(row.field)"
+              v-model="row.to"
+              class="rule-dialog__value-input"
+              aria-label="To"
+              placeholder="anything"
+              empty-label="anything"
+              :people="people"
+              :profiles="agentProfiles"
+              :specials="CONDITION_SPECIALS"
+              custom-verb="Match"
+            />
             <input
+              v-else
               v-model="row.to"
               class="input rule-dialog__value-input"
-              :list="valueListFor(row.field, 'condition')"
+              :list="valueListFor(row.field)"
               placeholder="anything"
               aria-label="To"
             />
@@ -238,11 +276,23 @@
                 :preview-task="previewTask"
                 :testid="`automation-set-${row.field}`"
               />
+              <AssigneePicker
+                v-else-if="usesPersonPicker(row.field)"
+                v-model="row.value"
+                class="rule-dialog__value-input"
+                placeholder="Choose a person or agent"
+                :aria-label="`Value for ${row.field}`"
+                :people="people"
+                :profiles="agentProfiles"
+                :specials="SET_SPECIALS"
+                :custom-verb="row.field === 'reporter' ? 'Set reporter to' : 'Assign to'"
+                :data-testid="`automation-set-${row.field}`"
+              />
               <input
                 v-else
                 v-model="row.value"
                 class="input rule-dialog__value-input"
-                :list="valueListFor(row.field, 'set')"
+                :list="valueListFor(row.field)"
                 :placeholder="setPlaceholder(row.field)"
                 :aria-label="`Value for ${row.field}`"
                 :data-testid="`automation-set-${row.field}`"
@@ -562,22 +612,6 @@
       <datalist id="automation-tag-values">
         <option v-for="value in tags" :key="value" :value="value" />
       </datalist>
-      <datalist id="automation-person-conditions">
-        <option value="@agent">any agent profile</option>
-        <option value="@user">any person (not an agent)</option>
-        <option value="@any">anyone</option>
-        <option v-for="value in people" :key="value" :value="value" />
-      </datalist>
-      <datalist id="automation-person-values">
-        <option value="@assignee">the current assignee</option>
-        <option value="@reporter">the reporter</option>
-        <option value="@assignee_or_reporter">assignee, else reporter</option>
-        <option value="@me">whoever triggered it</option>
-        <option value="@least_busy">the member with the least open work</option>
-        <option value="@round_robin">members in turn</option>
-        <option value="@random">a random member</option>
-        <option v-for="value in people" :key="value" :value="value" />
-      </datalist>
       <datalist id="automation-custom-fields">
         <option v-for="value in customFields" :key="value" :value="value" />
       </datalist>
@@ -597,7 +631,7 @@
 import { computed, ref, useId, watch } from 'vue'
 import { stringify as stringifyYaml } from 'yaml'
 import { api } from '../../api/client'
-import type { AutomationSimulateResponse, TaskDTO } from '../../api/types'
+import type { AgentProfileInfo, AutomationSimulateResponse, TaskDTO } from '../../api/types'
 import {
   automationEventOptions,
   buildAutomationRuleFromDraft,
@@ -616,6 +650,7 @@ import {
 } from '../../utils/automationRules'
 import { describeAutomationRule, templateVariables, triggerText } from '../../utils/automationText'
 import { required } from '../../utils/lookup'
+import AssigneePicker from '../AssigneePicker.vue'
 import IconGlyph from '../IconGlyph.vue'
 import UiButton from '../UiButton.vue'
 import UiModal from '../UiModal.vue'
@@ -864,15 +899,34 @@ function valuePlaceholder(row: AutomationConditionDraft) {
   return 'value'
 }
 
-function valueListFor(field: string, use: 'condition' | 'set') {
+function valueListFor(field: string) {
   if (field === 'status') return 'automation-status-values'
   if (field === 'priority') return 'automation-priority-values'
   if (field === 'type') return 'automation-type-values'
   if (field === 'tags' || field === 'labels') return 'automation-tag-values'
-  if (field === 'assignee' || field === 'reporter') {
-    return use === 'condition' ? 'automation-person-conditions' : 'automation-person-values'
-  }
   return undefined
+}
+
+const CONDITION_SPECIALS = [
+  { value: '@agent', description: 'any agent profile' },
+  { value: '@user', description: 'any person (not an agent)' },
+  { value: '@any', description: 'anyone' },
+]
+
+const SET_SPECIALS = [
+  { value: '@assignee', description: 'the current assignee' },
+  { value: '@reporter', description: 'the reporter' },
+  { value: '@assignee_or_reporter', description: 'assignee, else reporter' },
+  { value: '@me', description: 'whoever triggered it' },
+  { value: '@least_busy', description: 'the member with the least open work' },
+  { value: '@round_robin', description: 'members in turn' },
+  { value: '@random', description: 'a random member' },
+]
+
+/** Assignee and reporter values pick from people and agents; lists and patterns stay typed. */
+function usesPersonPicker(field: string, operator?: string) {
+  if (field !== 'assignee' && field !== 'reporter') return false
+  return operator !== 'in' && operator !== 'matches'
 }
 
 function addCondition() {
@@ -1185,11 +1239,21 @@ function load(rule: AutomationRecord | null) {
   tryError.value = ''
 }
 
+const agentProfiles = ref<AgentProfileInfo[]>([])
+async function loadAgentProfiles() {
+  try {
+    agentProfiles.value = (await api.listAgentProfiles(props.project || undefined)).profiles ?? []
+  } catch {
+    agentProfiles.value = []
+  }
+}
+
 watch(
   () => [props.open, props.rule] as const,
   ([isOpen]) => {
     if (!isOpen) return
     recipeId.value = ''
+    void loadAgentProfiles()
     load(props.rule)
   },
   { immediate: true },

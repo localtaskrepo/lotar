@@ -27,6 +27,7 @@ jiff.workspace = true
 clap.workspace = true
 dirs.workspace = true
 fs2.workspace = true
+indexmap.workspace = true
 ignore.workspace = true
 libc.workspace = true
 rayon = { version = "1.12.0", default-features = false, optional = true }
@@ -43,5 +44,5 @@ tempfile.workspace = true
 
 [features]
 default = ["parallel"]
-schema = ["schemars"]
+schema = ["schemars", "schemars/indexmap2"]
 parallel = ["dep:rayon"]

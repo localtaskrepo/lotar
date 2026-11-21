@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
-import { withPage } from '../helpers/ui.js';
+import { assigneePickerValues, pickAssignee, withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 const STRICT_MEMBERS_CONFIG = `default:
@@ -82,43 +82,17 @@ describe('UI strict member smoke scenarios', () => {
 
                     const reporterSelect = page.locator('#task-panel-reporter-select');
                     await reporterSelect.waitFor({ state: 'attached', timeout: 10_000 });
-                    const reporterOptions = await reporterSelect.locator('option').allTextContents();
-                    expect(reporterOptions.some((opt) => opt.includes('allowed@example.com'))).toBe(true);
-                    expect(reporterOptions.some((opt) => opt.includes('reviewer@example.com'))).toBe(true);
-                    await reporterSelect.selectOption({ value: 'allowed@example.com' });
+                    const reporterOptions = await assigneePickerValues(page, '#task-panel-reporter-select');
+                    expect(reporterOptions).toContain('allowed@example.com');
+                    expect(reporterOptions).toContain('reviewer@example.com');
+                    await pickAssignee(page, '#task-panel-reporter-select', 'allowed@example.com');
 
-                    const assigneeSelect = page.locator('#task-panel-assignee-select');
-                    const assigneeOptions = await assigneeSelect.locator('option').allTextContents();
-                    expect(assigneeOptions.some((opt) => opt.includes('allowed@example.com'))).toBe(true);
-                    expect(assigneeOptions.some((opt) => opt.includes('reviewer@example.com'))).toBe(true);
+                    const assigneeOptions = await assigneePickerValues(page, '#task-panel-assignee-select');
+                    expect(assigneeOptions).toContain('allowed@example.com');
+                    expect(assigneeOptions).toContain('reviewer@example.com');
 
-                    await assigneeSelect.selectOption({ value: '__custom' });
-
-                    const assigneeInput = page.getByPlaceholder('Type assignee');
-                    let filled = false;
-                    let attempts = 0;
-                    let lastError: unknown = null;
-
-                    while (!filled && attempts < 5) {
-                        attempts += 1;
-                        try {
-                            await assigneeInput.waitFor({ state: 'visible', timeout: 5_000 });
-                            await assigneeInput.fill('intruder@example.com');
-                            filled = true;
-                        } catch (error) {
-                            lastError = error;
-                            await assigneeSelect.selectOption({ value: '__custom' });
-                            await page.waitForTimeout(200);
-                        }
-                    }
-
-                    if (!filled) {
-                        throw lastError instanceof Error
-                            ? lastError
-                            : new Error(`Failed to enter custom assignee: ${String(lastError)}`);
-                    }
-
-                    await assigneeInput.press('Enter');
+                    // A name the list doesn't know is offered as "Assign to …".
+                    await pickAssignee(page, '#task-panel-assignee-select', 'intruder@example.com');
 
                     await page.getByPlaceholder('Title').fill('UI Strict Members Smoke Task');
 
@@ -131,8 +105,7 @@ describe('UI strict member smoke scenarios', () => {
                         },
                     );
 
-                    await page.getByRole('button', { name: 'Use list' }).click();
-                    await assigneeSelect.selectOption({ value: 'allowed@example.com' });
+                    await pickAssignee(page, '#task-panel-assignee-select', 'allowed@example.com');
 
                     await page.getByRole('button', { name: 'Create task' }).click();
 
@@ -201,11 +174,7 @@ describe('UI strict member smoke scenarios', () => {
                     await summarySelects.nth(2).selectOption({ label: 'Todo' });
                     await summarySelects.nth(3).selectOption({ label: 'Medium' });
 
-                    await page.selectOption('#task-panel-reporter-select', '__custom');
-                    const reporterInput = page.locator('input[placeholder="Type reporter"]');
-                    await reporterInput.waitFor({ state: 'visible', timeout: 15_000 });
-                    await reporterInput.fill(newReporter);
-                    await reporterInput.press('Enter');
+                    await pickAssignee(page, '#task-panel-reporter-select', newReporter);
 
                     await page.getByPlaceholder('Title').fill('UI Auto-Pop Members Smoke Task');
 

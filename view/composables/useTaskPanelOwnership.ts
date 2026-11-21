@@ -1,7 +1,6 @@
 import { computed, nextTick, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { api } from '../api/client'
-
-export type OwnershipMode = 'select' | 'custom'
+import type { AgentProfileInfo } from '../api/types'
 
 export interface TaskPanelFormShape {
     id?: string
@@ -24,7 +23,6 @@ interface UseTaskPanelOwnershipOptions {
     members: Ref<string[]>
     mergeKnownTags: (tags: Array<string | null | undefined>) => void
     updateField: (field: 'reporter' | 'assignee') => Promise<void> | void
-    onFieldBlur: (field: 'reporter' | 'assignee') => void
 }
 
 export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
@@ -33,17 +31,9 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     // version input suggests them (DEV-395).
     const knownFieldValues = ref<Record<string, string[]>>({})
     const whoami = ref('')
-    // Agent profile names; an assignee `@<profile>` starts that agent, so these keep their `@`.
-    const agentProfiles = ref<string[]>([])
-
-    const reporterMode = ref<OwnershipMode>('select')
-    const assigneeMode = ref<OwnershipMode>('select')
-    const reporterCustom = ref('')
-    const assigneeCustom = ref('')
-    // Custom mode turned on because the name was not (yet) in the people list,
-    // rather than picked by the user; it reverts once the list knows the name.
-    let reporterAutoCustom = false
-    let assigneeAutoCustom = false
+    // Agent profiles; an assignee `@<profile>` starts that agent. The picker shows their runner, model and effort.
+    const agentProfileInfos = ref<AgentProfileInfo[]>([])
+    const agentProfiles = computed(() => agentProfileInfos.value.map((profile) => profile.name).filter(Boolean))
 
     const orderedKnownUsers = computed(() => {
         const base = knownUsers.value.slice().filter(Boolean)
@@ -86,141 +76,17 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         return baseline
     }
 
-    const reporterSelection = computed<string>({
-        get() {
-            const value = options.form.reporter?.trim() || ''
-            if (!value) return ''
-            return orderedKnownUsers.value.includes(value) ? value : '__custom'
-        },
-        set(value) {
-            if (value === '__custom') {
-                reporterAutoCustom = false
-                reporterMode.value = 'custom'
-                reporterCustom.value = options.form.reporter || reporterCustom.value || ''
-                return
-            }
-            reporterMode.value = 'select'
-            reporterCustom.value = ''
-            if (options.form.reporter !== value) {
-                options.form.reporter = value
-                syncReporterControl()
-            }
-        },
-    })
-
-    const assigneeSelection = computed<string>({
-        get() {
-            const value = options.form.assignee?.trim() || ''
-            if (!value) return ''
-            return orderedKnownUsers.value.includes(value) ? value : '__custom'
-        },
-        set(value) {
-            if (value === '__custom') {
-                assigneeAutoCustom = false
-                assigneeMode.value = 'custom'
-                assigneeCustom.value = options.form.assignee || assigneeCustom.value || ''
-                return
-            }
-            assigneeMode.value = 'select'
-            assigneeCustom.value = ''
-            if (options.form.assignee !== value) {
-                options.form.assignee = value
-                syncAssigneeControl()
-            }
-        },
-    })
-
-    function setReporterSelection(value: string) {
-        reporterSelection.value = value
-    }
-
-    function setAssigneeSelection(value: string) {
-        assigneeSelection.value = value
-    }
-
-    function setReporterCustom(value: string) {
-        reporterCustom.value = value
-    }
-
-    function setAssigneeCustom(value: string) {
-        assigneeCustom.value = value
-    }
-
-    function commitReporterCustom() {
-        options.form.reporter = reporterCustom.value.trim()
-        syncReporterControl()
-        options.onFieldBlur('reporter')
-    }
-
-    function commitAssigneeCustom() {
-        options.form.assignee = assigneeCustom.value.trim()
-        syncAssigneeControl()
-        options.onFieldBlur('assignee')
-    }
-
-    function resetReporterSelection() {
-        reporterSelection.value = ''
-        options.onFieldBlur('reporter')
-    }
-
-    function resetAssigneeSelection() {
-        assigneeSelection.value = ''
-        options.onFieldBlur('assignee')
-    }
-
-    function syncAssigneeControl() {
-        const value = options.form.assignee?.trim() || ''
-        if (!value) {
-            if (assigneeMode.value !== 'custom') {
-                assigneeMode.value = 'select'
-                assigneeCustom.value = ''
-            }
-            return
-        }
-        if (orderedKnownUsers.value.includes(value)) {
-            if (assigneeMode.value !== 'custom' || assigneeAutoCustom) {
-                assigneeAutoCustom = false
-                assigneeMode.value = 'select'
-                assigneeCustom.value = ''
-            }
-        } else {
-            if (assigneeMode.value !== 'custom') assigneeAutoCustom = true
-            assigneeMode.value = 'custom'
-            assigneeCustom.value = value
-        }
-    }
-
-    function syncReporterControl() {
-        const value = options.form.reporter?.trim() || ''
-        if (!value) {
-            if (reporterMode.value !== 'custom') {
-                reporterMode.value = 'select'
-                reporterCustom.value = ''
-            }
-            return
-        }
-        if (orderedKnownUsers.value.includes(value)) {
-            if (reporterMode.value !== 'custom' || reporterAutoCustom) {
-                reporterAutoCustom = false
-                reporterMode.value = 'select'
-                reporterCustom.value = ''
-            }
-        } else {
-            if (reporterMode.value !== 'custom') reporterAutoCustom = true
-            reporterMode.value = 'custom'
-            reporterCustom.value = value
-        }
-    }
-
-    function syncOwnershipControls() {
-        syncAssigneeControl()
-        syncReporterControl()
+    /** A pick in the assignee or reporter picker; in edit mode the field watch saves it. */
+    function setOwner(field: 'reporter' | 'assignee', value: string) {
+        const next = value.trim()
+        if ((options.form[field] ?? '') === next) return
+        options.form[field] = next
     }
 
     async function loadAgentProfiles(scope?: string) {
         try {
             const response = await api.listAgentProfiles(scope)
-            return response.profiles.map((profile) => profile.name).filter(Boolean)
+            return response.profiles.filter((profile) => !!profile.name)
         } catch {
             return []
         }
@@ -238,7 +104,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         const scope = project && project.trim() ? project.trim() : undefined
         // The distinct values only, not whole tasks (DEV-545).
         const [profiles, values] = await Promise.all([loadAgentProfiles(scope), loadTaskValues(scope)])
-        agentProfiles.value = profiles
+        agentProfileInfos.value = profiles
         const baseline = seedKnownUsers()
         if (values) {
             const seen = new Set<string>()
@@ -253,15 +119,6 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         } else {
             assignKnownUsersFrom(baseline)
         }
-    }
-
-    function resetOwnership() {
-        reporterAutoCustom = false
-        assigneeAutoCustom = false
-        reporterMode.value = 'select'
-        assigneeMode.value = 'select'
-        reporterCustom.value = ''
-        assigneeCustom.value = ''
     }
 
     function applyWhoamiShortcut(field: 'reporter' | 'assignee', value: string | undefined | null) {
@@ -306,25 +163,13 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
 
     watch(
         () => options.form.assignee,
-        (value) => {
-            if (!applyWhoamiShortcut('assignee', value)) {
-                syncAssigneeControl()
-            }
-        },
+        (value) => applyWhoamiShortcut('assignee', value),
     )
 
     watch(
         () => options.form.reporter,
-        (value) => {
-            if (!applyWhoamiShortcut('reporter', value)) {
-                syncReporterControl()
-            }
-        },
+        (value) => applyWhoamiShortcut('reporter', value),
     )
-
-    watch([knownUsers, whoami], () => {
-        syncOwnershipControls()
-    })
 
     // Fetch whoami once per panel lifecycle
     api.whoami()
@@ -334,14 +179,8 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
                 return
             }
             whoami.value = identity
-            const reporterResolved = applyWhoamiShortcut('reporter', options.form.reporter)
-            const assigneeResolved = applyWhoamiShortcut('assignee', options.form.assignee)
-            if (!reporterResolved) {
-                syncReporterControl()
-            }
-            if (!assigneeResolved) {
-                syncAssigneeControl()
-            }
+            applyWhoamiShortcut('reporter', options.form.reporter)
+            applyWhoamiShortcut('assignee', options.form.assignee)
         })
         .catch(() => {})
 
@@ -349,23 +188,9 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         knownUsers,
         knownFieldValues,
         whoami,
-        reporterMode,
-        assigneeMode,
-        reporterCustom,
-        assigneeCustom,
+        agentProfileInfos,
         orderedKnownUsers,
-        reporterSelection,
-        assigneeSelection,
-        setReporterSelection,
-        setAssigneeSelection,
-        setReporterCustom,
-        setAssigneeCustom,
-        commitReporterCustom,
-        commitAssigneeCustom,
-        resetReporterSelection,
-        resetAssigneeSelection,
+        setOwner,
         preloadPeople,
-        resetOwnership,
-        syncOwnershipControls,
     }
 }

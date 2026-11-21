@@ -394,38 +394,17 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             },
         })
 
-    const {
-        whoami,
-        reporterMode,
-        assigneeMode,
-        reporterCustom,
-        assigneeCustom,
-        orderedKnownUsers,
-        reporterSelection,
-        assigneeSelection,
-        setReporterSelection,
-        setAssigneeSelection,
-        setReporterCustom,
-        setAssigneeCustom,
-        commitReporterCustom,
-        commitAssigneeCustom,
-        resetReporterSelection,
-        resetAssigneeSelection,
-        preloadPeople,
-        resetOwnership,
-        syncOwnershipControls,
-        knownFieldValues,
-    } = useTaskPanelOwnership({
-        form,
-        mode,
-        ready,
-        suppressWatch,
-        defaults,
-        members,
-        mergeKnownTags,
-        updateField: (field) => updateField(field),
-        onFieldBlur: (field) => handleFieldBlur(field),
-    })
+    const { whoami, agentProfileInfos, orderedKnownUsers, setOwner, preloadPeople, knownFieldValues } =
+        useTaskPanelOwnership({
+            form,
+            mode,
+            ready,
+            suppressWatch,
+            defaults,
+            members,
+            mergeKnownTags,
+            updateField: (field) => updateField(field),
+        })
 
     const {
         resetErrors,
@@ -457,8 +436,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         resetCustomFields,
         ensureConfiguredCustomFields,
         applyDefaultsFromConfig,
-        syncOwnershipControls,
-        resetOwnership,
         preloadPeople,
         resetReferencePreviews,
         resetRelationships,
@@ -657,17 +634,11 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         task,
         form,
         suppressWatch,
-        pendingOwner: (field) => {
-            const ownerMode = field === 'reporter' ? reporterMode : assigneeMode
-            const custom = field === 'reporter' ? reporterCustom : assigneeCustom
-            return ownerMode.value === 'custom' ? custom.value.trim() : undefined
-        },
         customFieldsDirty,
         applyCustomFields: applyTaskCustomFields,
         applySprints: applyTaskSprints,
         afterApply: (source) => {
             mergeKnownTags(source.tags)
-            syncOwnershipControls()
         },
         save: async (field) => {
             if (field === 'status') return updateStatus(form.status)
@@ -826,24 +797,10 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         saveCommentEdit,
         answeringQuestion,
         answerQuestion,
-        reporterMode,
-        assigneeMode,
-        reporterCustom,
-        assigneeCustom,
         orderedKnownUsers,
-        reporterSelection,
-        assigneeSelection,
-        setReporterSelection,
-        setAssigneeSelection,
-        setReporterCustom,
-        setAssigneeCustom,
-        commitReporterCustom,
-        commitAssigneeCustom,
-        resetReporterSelection,
-        resetAssigneeSelection,
+        agentProfileInfos,
+        setOwner,
         preloadPeople,
-        resetOwnership,
-        syncOwnershipControls,
         whoami,
     }
 }

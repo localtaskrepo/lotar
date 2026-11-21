@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref, shallowRef } from 'vue'
 
@@ -276,6 +276,18 @@ describe('TasksList no-op mutation guards (DEV-102)', () => {
         vi.useRealTimers()
     })
 
+    /** Types into the assign dialog's picker and takes the first row, as Enter does. */
+    async function pickAssignee(wrapper: VueWrapper, value: string) {
+        const trigger = wrapper.find('#tasks-assign-picker')
+        expect(trigger.exists()).toBe(true)
+        await trigger.trigger('click')
+        const search = wrapper.find('[data-testid="assignee-picker-search"]')
+        await search.setValue(value)
+        await search.trigger('keydown', { key: 'Enter' })
+        await flushPromises()
+        expect(wrapper.find('#tasks-assign-picker').attributes('data-value')).toBe(value)
+    }
+
     it('submitting the assign dialog with the identical assignee sends no request', async () => {
         seedTask({ assignee: 'alice' })
         const wrapper = await mountSettled()
@@ -283,9 +295,7 @@ describe('TasksList no-op mutation guards (DEV-102)', () => {
 
         vm.openSingleAssign('PRJ-1')
         await flushPromises()
-        const input = wrapper.find('input[placeholder="username or @me"]')
-        expect(input.exists()).toBe(true)
-        await input.setValue('alice')
+        await pickAssignee(wrapper, 'alice')
         await wrapper.find('form.tasks-modal__form button[type="submit"]').trigger('submit')
         await flushPromises()
 
@@ -302,8 +312,7 @@ describe('TasksList no-op mutation guards (DEV-102)', () => {
 
         vm.openSingleAssign('PRJ-1')
         await flushPromises()
-        const input = wrapper.find('input[placeholder="username or @me"]')
-        await input.setValue('bob')
+        await pickAssignee(wrapper, 'bob')
         await wrapper.find('form.tasks-modal__form button[type="submit"]').trigger('submit')
         await flushPromises()
 
@@ -320,8 +329,7 @@ describe('TasksList no-op mutation guards (DEV-102)', () => {
 
         vm.openSingleAssign('PRJ-1')
         await flushPromises()
-        const input = wrapper.find('input[placeholder="username or @me"]')
-        await input.setValue('@me')
+        await pickAssignee(wrapper, '@me')
         await wrapper.find('form.tasks-modal__form button[type="submit"]').trigger('submit')
         await flushPromises()
 
