@@ -2580,7 +2580,10 @@ exit 0
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
             .expect("assign implementation agent");
 
-        let task = wait_for_task_state(&storage, &created.id, status, None, 10_000)
+        // Three agent jobs run before the ticket settles; under full-suite load
+        // they outlast the wait floor, so wait for the state and let the limit
+        // only catch a hang (DEV-749).
+        let task = wait_for_task_state(&storage, &created.id, status, None, JOB_END_LIMIT_MS)
             .unwrap_or_else(|| panic!("{} did not reach {status}: {:?}", created.id, TaskService::get(&storage, &created.id, None)));
         let log = fs::read_to_string(&check_log).unwrap_or_default();
         (fixtures, task, log)
@@ -2611,7 +2614,8 @@ exit 0
         enable_server_mode();
         let (fixtures, task, log) = run_merge_with_sandboxed_check("SBF", "broken", "HelpNeeded");
         assert_eq!(log, "sandbox blocked; retry with RUSTC_WRAPPER=\ncheck failed on the work\n");
-        let jobs = wait_for_ticket_jobs(&task.id, 10_000, |jobs| jobs.iter().any(|job| job.agent.as_deref() == Some("merge") && job.finished_at.is_some()));
+        let jobs =
+            wait_for_ticket_jobs(&task.id, JOB_END_LIMIT_MS, |jobs| jobs.iter().any(|job| job.agent.as_deref() == Some("merge") && job.finished_at.is_some()));
         let merge_job = jobs.iter().find(|job| job.agent.as_deref() == Some("merge")).expect("merge job");
         assert_eq!(merge_job.status, "completed", "handing back is the agent's result, not a failure to retry: {merge_job:?}");
         let task = TaskService::get(&fixtures.create_storage(), &task.id, None).expect("get task");
