@@ -144,7 +144,10 @@ function appliedListQuery(
     return undefined;
 }
 
-describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
+// The suite's longest UI scenarios (3-7 s alone, up to 18 s at load average
+// 90): when the machine stalls they hit the shared 120 s cap first, though no
+// single step waits too long (DEV-755).
+describe.concurrent('Filter autocomplete and search help (DEV-103)', { timeout: 300_000 }, () => {
     for (const viewport of [
         { label: 'desktop', width: 1600, height: 1000 },
         { label: 'mobile', width: 390, height: 844 },

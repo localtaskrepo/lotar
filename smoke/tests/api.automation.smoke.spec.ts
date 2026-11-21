@@ -772,7 +772,7 @@ describe.concurrent('REST API automation endpoints', () => {
       on:
         created:
 ${indentBlock(
-    nodeRunActionYaml(['fixtures/chatty-stderr.mjs', ...chattyArgs('chatty-markers', 'server', 327_680, 15_000)], {
+    nodeRunActionYaml(['fixtures/chatty-stderr.mjs', ...chattyArgs('chatty-markers', 'server', 327_680, 45_000)], {
         wait: false,
     }),
     10,
@@ -793,17 +793,24 @@ ${indentBlock(
                 expect(createRes.status).toBe(201);
 
                 const markers = path.join(workspace.root, 'chatty-markers');
-                await waitForMarker(path.join(markers, 'completed-server.marker'), 10_000);
-
+                // The child settles with one of two markers: completed, or
+                // aborted at its own 45 s bound if the monitor wedges. Under
+                // full-suite load the server can take well over 10 s to spawn
+                // it, so wait for either marker; the assertions below tell
+                // which one (DEV-755).
+                const completed = path.join(markers, 'completed-server.marker');
+                const abortedMarker = path.join(markers, 'aborted-server.marker');
+                const deadline = Date.now() + 90_000;
+                while (!fs.pathExistsSync(completed) && !fs.pathExistsSync(abortedMarker)) {
+                    if (Date.now() > deadline) throw new Error(`Timed out after 90000ms waiting for ${completed}`);
+                    await new Promise((resolve) => setTimeout(resolve, 25));
+                }
+                expect(await fs.readFile(abortedMarker, 'utf8').catch(() => null)).toBeNull();
                 const drained = Number.parseInt(
                     await fs.readFile(path.join(markers, 'bytes-server.marker'), 'utf8'),
                     10,
                 );
                 expect(drained).toBeGreaterThanOrEqual(262_144);
-                const aborted = await fs
-                    .readFile(path.join(markers, 'aborted-server.marker'), 'utf8')
-                    .catch(() => null);
-                expect(aborted).toBeNull();
             } finally {
                 await server.stop();
             }

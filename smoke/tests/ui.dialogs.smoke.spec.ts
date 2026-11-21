@@ -6,7 +6,10 @@ import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
-describe.concurrent('Accessible shared dialogs (DEV-69)', () => {
+// The suite's longest UI scenarios (3-7 s alone, up to 18 s at load average
+// 90): when the machine stalls they hit the shared 120 s cap first, though no
+// single step waits too long (DEV-755).
+describe.concurrent('Accessible shared dialogs (DEV-69)', { timeout: 300_000 }, () => {
     for (const viewport of [
         { label: 'desktop', width: 1280, height: 900 },
         { label: 'mobile', width: 390, height: 844 },

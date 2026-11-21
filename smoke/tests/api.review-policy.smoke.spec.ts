@@ -268,7 +268,13 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
         const gate = await createGateFixture('lotar-smoke-review-gate-');
         try {
             const agents = await createFixtureAgents({
-                gated: { script: gate.script, args: gate.agentArgs({ mode: 'lines', label: 'review' }) },
+                // Under full-suite load the job can take over 10 s to start; the gate
+                // holds past the 20 s default so the job is still running when
+                // the updates arrive. The `finally` releases it (DEV-755).
+                gated: {
+                    script: gate.script,
+                    args: gate.agentArgs({ mode: 'lines', label: 'review', holdMs: 90_000 }),
+                },
             });
             try {
                 const workspace = await SmokeWorkspace.create({
@@ -293,7 +299,7 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
                         });
                         expect(started.ok).toBe(true);
                         const payload = (await started.json()) as { data: { job: { id: string } } };
-                        await gate.waitForStarted('review');
+                        await gate.waitForStarted('review', 45_000);
                         await expect
                             .poll(
                                 async () => {
@@ -304,7 +310,7 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
                                     };
                                     return jobs.data.jobs.find((job) => job.id === payload.data.job.id)?.status;
                                 },
-                                { timeout: 10_000 },
+                                { timeout: 30_000 },
                             )
                             .toBe('running');
                         const before = await snapshot(workspace, 'REVIEW-1');
