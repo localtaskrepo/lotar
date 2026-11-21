@@ -1,15 +1,166 @@
 title: 'Flaky test: a_full_disk_pauses_every_job_until_one_completes ends with assignee mallox, not sam, under full-suite load'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-21T02:50:31.682302+00:00
-modified: 2026-11-21T02:50:33.971962+00:00
+modified: 2026-11-21T19:41:11.381640+00:00
 relationships:
+  blocks:
+  - DEV-734
+  - DEV-756
   related:
   - DEV-741
   - DEV-742
+  - DEV-749
+  - DEV-750
+  - DEV-756
+  - DEV-751
+comments:
+- date: 2026-11-21T04:11:32.549937+00:00
+  author: claude
+  text: |-
+    Cause found: a paused job kept recording the owner's changes as its outcome until its end finished, then dropped them.
+
+    - The queue reads paused before the job ends (its `job_paused` rules, log, cleanup); in that window `lotar assignee TEST-1 sam` was held as the paused job's outcome ("sam will be assigned when job … ends") and deleted at `unregister`. The retry then applied the carried `mallox`.
+    - Repro without load: a `job_paused` rule in the test holds the job's end until the owner reassigns; failed at `dev604_queue_pauses_test.rs:253` before the fix.
+    - Fix: `close_outcome` in `agent_active_jobs.rs` ends the job's outcome guard when it pauses (`carried_outcome_of`), so later changes apply directly and the retry's change gives way.
+- date: 2026-11-21T04:15:51.543540+00:00
+  author: claude
+  text: |-
+    Fixed: an owner's change while a paused job still ends now applies and stays.
+
+    - `carried_outcome_of` (`agent_job_service.rs`) now calls the new `close_outcome` (`agent_active_jobs.rs`): it marks the job ended, so `record_outcome` refuses later changes and they apply directly; the outcome file stays for the job's end if the pause itself fails.
+    - Covers both pause paths: full disk / signing (`pause_queue`) and usage limits (`usage_limit_pause`).
+    - Test: `a_full_disk_pauses_every_job_until_one_completes` holds the paused job's end in a `job_paused` rule until the owner reassigns; it failed before the fix, without load. Unit test in `an_outcome_recorded_after_the_job_ended_is_refused`.
+    - Note: `npm run smoke:agent` doesn't exist; ran `test:smoke:agent`.
+  report:
+    commits:
+    - hash: 8950b8383
+      what: a pausing job closes its outcome guard; deterministic repro in the test
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: load avg 10-22
+    - command: npm run -s lint
+      result: passed
+    - command: npm run -s test:smoke:agent
+      result: passed
+      reason: 406 tests
+    - command: cargo nextest dev604_ + an_outcome_recorded_after_the_job_ended_is_refused
+      result: passed
+    next: Review, then merge; the merge agent reruns npm run -s test:agent
+- date: 2026-11-21T10:33:00.681516+00:00
+  author: claude
+  text: |-
+    Review: passed. Once a job pauses, it takes no more changes, so the owner's reassignment during the pause stays. One minor finding, filed as DEV-756.
+
+    - Reviewed `8950b8383` (the only commit on `main..HEAD`; the ticket branch has nothing newer). It merges into current main `0595ed4cf` without conflicts, and no commit on main since the base touches these files.
+    - Cause and fix hold up: `JobPaused` isn't an outcome-applying event (`automation_service.rs:618`), so the paused job's `unregister` dropped what was recorded during its end. `close_outcome` (`agent_active_jobs.rs:198`) now marks the job ended from `carried_outcome_of`, on all three call paths (`usage_limit_pause`, `pause_queue` from the run end and from `update_job_failure`). Then `task_hooks.rs:44` applies the owner's change directly, and `carry_outcome` drops the retry's assignee because the ticket changed.
+    - The test fails before the fix (checked by reading the code, no extra build): the held `job_paused` rule runs before `RunningJobSlot` unregisters the job, so `assignee sam` was recorded as the job's change and then dropped.
+    - Rerun: `npm ci` ok; `cargo nextest run -p lotar-lib --test integration -E 'test(dev604_)'` 4/4 passed (load avg ~20); `cargo nextest run -p lotar-agent --lib -E 'test(an_outcome_recorded_after_the_job_ended_is_refused) | test(carry) | test(pause)'` 4/4 passed; `rustfmt --check` on the 3 files ok; `npm run -s lint:backend` ok.
+    - Not rerun: full `npm run -s test:agent`, `npm run -s lint` and `npm run -s test:smoke:agent` (the fix agent ran them; the merge agent reruns `test:agent`).
+    - Minor, DEV-756: the guard closes before the pause or retry is saved. If saving fails, the job ends as failed and its recorded change overwrites an owner's change made in that short window (`agent_job_service.rs:5477`). Rare: only when writing the queue file fails.
+    - No UI changes, no stray files, no second branch.
+- date: 2026-11-21T14:37:24.811084+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\nVitest caught 1 unhandled error during the test run.\nThis might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.\e[22m\e[39m\n\n\e[31m⎯⎯⎯⎯\e[39m\e[1m\e[41m Unhandled Rejection \e[49m\e[22m\e[31m⎯⎯⎯⎯⎯\e[39m\n\e[31m\e[1mError\e[22m: fixture child did not exit within 20000ms; stderr: \e[39m\n\e[36m \e[2m❯\e[22m Timeout._onTimeout tests/harness.agent-launcher.smoke.spec.ts:\e[2m89:20\e[22m\e[39m\n    \e[90m 87|\e[39m     \e[35mreturn\e[39m \e[35mnew\e[39m \e[33mPromise\e[39m((resolve\e[33m,\e[39m reject) \e[33m=>\e[39m {\n    \e[90m 88|\e[39m         \e[35mconst\e[39m timer \e[33m=\e[39m \e[34msetTimeout\e[39m(() \e[33m=>\e[39m {\n    \e[90m 89|\e[39m             reject(new Error(`fixture child did not exit within ${boun…\n    \e[90m   |\e[39m                    \e[31m^\e[39m\n    \e[90m 90|\e[39m         }\e[33m,\e[39m boundMs)\e[33m;\e[39m\n    \e[90m 91|\e[39m         child\e[33m.\e[39m\e[34mon\e[39m(\e[32m'error'\e[39m\e[33m,\e[39m (error\e[33m:\e[39m \e[33mError\e[39m) \e[33m=>\e[39m {\n\e[90m \e[2m❯\e[22m listOnTimeout ../node:internal/timers:\e[2m685:17\e[22m\e[39m\n\e[90m \e[2m❯\e[22m process.processTimers ../node:internal/timers:\e[2m618:7\e[22m\e[39m\n\n\e[31mThis error originated in \"\e[1mtests/harness.agent-launcher.smoke.spec.ts\e[22m\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\e[39m\n\e[31mThe last test to run before this error was \"\e[1mlauncher keeps the gate reachable through runner-shaped flags and a spaced gate dir\e[22m\". This means either:\n- the error was thrown while Vitest was running this test, or\n- the error was thrown after the test completed, and this was the most recent test at that point.\e[39m\n\e[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m4 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m114 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m9 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m397 passed\e[39m\e[22m\e[90m (406)\e[39m\n\e[2m     Errors \e[22m \e[1m\e[31m1 error\e[39m\e[22m\n\e[2m   Start at \e[22m 06:28:32\n\e[2m   Duration \e[22m 531.54s\e[2m (tests 76%, import 21%, setup 1%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.55s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~20.57s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n```.\n\n- Rebased `agent/DEV-752` onto `main` (`a8028b6ef931`): `5fdb3f2a7a27`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T14:55:43.399038+00:00
+  author: automation
+  text: The merge agent's job job-20261121T121754.498Z-86 failed (lotar agent logs job-20261121T121754.498Z-86); the fix agent retries it on branch agent/DEV-752.
+- date: 2026-11-21T18:15:40.461024+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+    Caused by: Error: [vitest-pool-runner]: Timeout waiting for worker to respond
+     ❯ Timeout.<anonymous> ../node_modules/vitest/dist/chunks/index.Di8au7q4.js:5429:58
+     ❯ listOnTimeout ../node:internal/timers:685:17
+     ❯ process.processTimers ../node:internal/timers:618:7
+
+
+    ⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+    Error: [vitest-pool]: Failed to start threads worker for test files /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-752/view/__tests__/TasksList.noopMutations.spec.ts.
+     ❯ ../node_modules/vitest/dist/chunks/index.Di8au7q4.js:5932:94
+     ❯ runNextTicks ../node:internal/process/task_queues:65:5
+     ❯ process.processTimers ../node:internal/timers:615:9
+     ❯ Pool.schedule ../node_modules/vitest/dist/chunks/index.Di8au7q4.js:5932:5
+
+    Caused by: Error: [vitest-pool-runner]: Timeout waiting for worker to respond
+     ❯ Timeout.<anonymous> ../node_modules/vitest/dist/chunks/index.Di8au7q4.js:5429:58
+     ❯ listOnTimeout ../node:internal/timers:685:17
+     ❯ process.processTimers ../node:internal/timers:618:7
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+     Test Files  13 failed | 116 passed (129)
+          Tests  41 failed | 1441 passed (1482)
+         Errors  11 errors
+       Start at  09:05:19
+       Duration  4220.14s (tests 78%, environment 13%, transform 5%, import 4%)
+
+        Isolate  129 workers spawned · ~53.35s startup each (spawn + environment, per file)
+                 at least ~476.08s faster with isolate: false — reuses workers across files instead of one per file
+    ```.
+
+    - Rebased `agent/DEV-752` onto `main` (`791da28d83e9`): `32891539f764`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T18:16:14.790192+00:00
+  author: automation
+  text: The fix agent's job job-20261121T150656.327Z-93 failed (lotar agent logs job-20261121T150656.327Z-93); @fix-retry retries it on branch agent/DEV-752.
+- date: 2026-11-21T18:20:19.799042+00:00
+  author: claude
+  text: |-
+    Merged: `32891539f` fast-forwarded onto `main` and pushed.
+
+    - The failed `test:agent` was load, not the change: vitest workers took ~53 s each to start (load ~35) and timed out. The branch changes no frontend files.
+    - Rerun at load ~22-35 passed: Rust 2442/2442, UI 1563/1563, release and hooks tests ok. `npm run -s smoke` 406/406.
+    - `git push origin main`: `791da28d8..32891539f`.
+  report:
+    commits:
+    - hash: 32891539f
+      what: owner's change during a pause stays (close_outcome)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: passed
+      reason: rerun, Rust 2442/2442, UI 1563/1563
+    - command: npm run -s smoke
+      result: passed
+      reason: 406/406
+    next: 'none: landed on main and pushed'
+- date: 2026-11-21T19:39:40.622485+00:00
+  author: claude
+  text: |-
+    Already fixed on main: nothing left to change.
+
+    - The fix `32891539f` is on `main` and pushed; this branch has no commits beyond `main`.
+    - Rerun at load ~49: `cargo nextest run -p lotar-lib --test integration -E 'test(dev604_)'` 4/4 passed.
+    - The merge agent's full `npm run -s test:agent` at load ~22-35 passed (Rust 2442/2442, UI 1563/1563).
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84224a0d0665499e34ba8c04f6cb7774ebb86cbcb1a9be05ffc6c1ff72583f55
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8c524a846c9b2752a5542704b5e3892ec1332b58e07e06877950d3c1bc499a02
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad6414dbef141ce5caede9483e21f01cd7387c5dcb74cb3713f5528ff2975b19d
 description: 'Found: failed at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:238 in the merges of DEV-742 and DEV-741 (2026-11-20, load avg ~10-30): (InProgress, mallox) instead of (InProgress, sam). The ticket history has only the job''s ''assignee mallox'' change, so the owner''s ''assignee sam'' during the pause was lost or the paused job ran its script after it. Check: npm run -s test:agent at load avg ~30. Done: the test passes under full-suite load, and the owner''s reassignment during a pause always stays.'
 tags:
 - health
@@ -27,3 +178,152 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-21T03:54:37.874909+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-742"]}'
+    new: '{"related":["DEV-741","DEV-742","DEV-749"]}'
+- at: 2026-11-21T04:07:30.878901+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T04:07:32.839128+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84224a0d0665499e34ba8c04f6cb7774ebb86cbcb1a9be05ffc6c1ff72583f55
+- at: 2026-11-21T04:11:32.549937+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T04:15:51.543540+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T04:16:02.946133+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-21T09:18:43.908897+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-742","DEV-749"]}'
+    new: '{"related":["DEV-741","DEV-742","DEV-749","DEV-750"]}'
+- at: 2026-11-21T10:31:58.698195+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-742","DEV-749","DEV-750"]}'
+    new: '{"related":["DEV-741","DEV-742","DEV-749","DEV-750","DEV-756"]}'
+- at: 2026-11-21T10:33:00.681516+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T10:33:17.865393+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T10:59:01.993813+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-742","DEV-749","DEV-750","DEV-756"]}'
+    new: '{"blocks":["DEV-734"],"related":["DEV-741","DEV-742","DEV-749","DEV-750","DEV-756"]}'
+- at: 2026-11-21T12:17:45.078132+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-734"],"related":["DEV-741","DEV-742","DEV-749","DEV-750","DEV-756"]}'
+    new: '{"blocks":["DEV-734","DEV-756"],"related":["DEV-741","DEV-742","DEV-749","DEV-750","DEV-756"]}'
+- at: 2026-11-21T14:37:24.811084+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T14:55:32.306527+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-21T14:55:43.399038+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T15:01:48.694808+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-734","DEV-756"],"related":["DEV-741","DEV-742","DEV-749","DEV-750","DEV-756"]}'
+    new: '{"blocks":["DEV-734","DEV-756"],"related":["DEV-741","DEV-742","DEV-749","DEV-750","DEV-756","DEV-751"]}'
+- at: 2026-11-21T15:07:04.626357+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-21T18:15:40.461024+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T18:15:40.986246+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8c524a846c9b2752a5542704b5e3892ec1332b58e07e06877950d3c1bc499a02
+- at: 2026-11-21T18:16:13.154760+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, merge-retried
+    new: health, merge-retried, fix-retried
+- at: 2026-11-21T18:16:14.790192+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T18:20:19.799042+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T19:33:59.249307+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad6414dbef141ce5caede9483e21f01cd7387c5dcb74cb3713f5528ff2975b19d
+- at: 2026-11-21T19:39:40.622485+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T19:39:55.108278+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-retry'
+- at: 2026-11-21T19:41:11.381640+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried, fix-retried
+    new: health

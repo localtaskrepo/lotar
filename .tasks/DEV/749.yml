@@ -1,16 +1,19 @@
 title: 'Flaky test: merge_job_retries_a_sandbox_blocked_check_and_lands stops at Merging within its 10 s wait under load'
-status: Reviewing
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T01:03:26.149609+00:00
-modified: 2026-11-21T01:57:06.448465+00:00
+modified: 2026-11-21T05:14:13.587938+00:00
 relationships:
   related:
   - DEV-741
   - DEV-516
   - DEV-743
+  - DEV-753
+  - DEV-748
+  - DEV-752
 comments:
 - date: 2026-11-21T01:56:55.124064+00:00
   author: claude
@@ -39,6 +42,63 @@ comments:
       result: not_run
       reason: no UI or server change
     next: Review, then merge
+- date: 2026-11-21T03:54:36.849894+00:00
+  author: claude
+  text: |-
+    Review: passed. `e128a27b5` waits for the end state, not a fixed deadline, and both sandboxed-check merge tests passed in a full run at load ~30.
+
+    - Read: the diff (`crates/lotar-lib/tests/agent_automation_integration_test.rs:2583-2618`), the ticket, DEV-743 (the `JOB_END_LIMIT_MS` pattern this reuses), the wait helpers (`:111-232`). `wait_for_task_state` and `wait_for_ticket_jobs` poll every 50 ms and return when the state is reached, so 300 s only catches a hang. Main has no newer commits to the file than the branch base `9e20d3a3c`
+    - Done when: met. The 10 s (in effect 30 s floor) wait is gone. The SBF sibling's merge-job wait got the same change, which is in scope
+    - Reran: `npm ci` ok; `cargo nextest run -p lotar-lib --test integration merge_job_` 7/7 passed; `npm run -s test:rust:agent -- --no-fail-fast` (load 14-34): 2425/2428 passed, including `merge_job_retries_a_sandbox_blocked_check_and_lands` and `merge_job_whose_check_fails_on_the_work_does_not_land`
+    - The 3 failures are in files this change doesn't touch: `a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge` (DEV-748); `sse_delivers_during_a_steady_stream_of_events` (fixed on main in `eff138b6f`, which is newer than this branch's base); `done_cleanup_leaves_the_job_registry_free_while_git_removes_the_worktree` (new ticket DEV-753). An earlier fail-fast run stopped at `a_full_disk_pauses_every_job_until_one_completes` (DEV-752)
+    - No stray files, no second copy of the fix. No UI change, so no screenshots needed
+    - Filed: DEV-753
+- date: 2026-11-21T05:00:51.511814+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ Created task: TEST-2
+          Title: second
+          Status: Todo
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ TEST-1: sam will be assigned when job job-20261121T050028.255Z-2 ends
+        test dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes ... FAILED
+
+        failures:
+
+        failures:
+            dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1609 filtered out; finished in 13.64s
+
+      stderr ───
+
+        thread 'dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes' (135926733) panicked at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:238:5:
+        assertion `left == right` failed: the paused job's status applies, its assignee gave way to the owner's: {"id":"TEST-1","title":"first","status":"InProgress","priority":"Medium","task_type":"Feature","task_state":{"is_done":false,"done_states":["Done"],"due_bucket":null,"calendar_day":"2026-11-20"},"reporter":"tester","assignee":"mallox","created":"2026-11-21T05:00:22.504179+00:00","modified":"2026-11-21T05:00:33.572839+00:00","tags":[],"relationships":{},"comments":[],"references":[],"sprints":[],"releases":[],"history":[{"at":"2026-11-21T05:00:33.572839+00:00","actor":"tester","changes":[{"field":"status","old":"Todo","new":"InProgress"},{"field":"assignee","new":"mallox"}]}],"custom_fields":{}}
+          left: (String("InProgress"), String("mallox"))
+         right: (String("InProgress"), String("sam"))
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 833/2437 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-749` onto `main` (`616b294a1144`): `f4791f704d68`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b5fd86ad90af43c01e1d84fdd0b3dd42996f26e8e83e2ae11814313e433dd
 description: 'Found: failed in the review of DEV-741 (2026-11-20, load avg ~42): ''SBX-1 did not reach Done'', ticket still Merging, assigned @merge (crates/lotar-lib/tests/agent_automation_integration_test.rs:2579, wait_for_task_state with a fixed 10_000 ms). Passed in a later full run at load ~7-18. Check: npm run -s test:rust:agent at load avg ~30-40. Done: the test passes under full-suite load without a fixed 10 s wall-clock deadline.'
@@ -88,3 +148,38 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-21T03:54:21.658233+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-516","DEV-743"]}'
+    new: '{"related":["DEV-741","DEV-516","DEV-743","DEV-753"]}'
+- at: 2026-11-21T03:54:36.849894+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T03:54:37.873394+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-516","DEV-743","DEV-753"]}'
+    new: '{"related":["DEV-741","DEV-516","DEV-743","DEV-753","DEV-748","DEV-752"]}'
+- at: 2026-11-21T03:54:46.962179+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T05:00:51.511814+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T05:14:13.587938+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

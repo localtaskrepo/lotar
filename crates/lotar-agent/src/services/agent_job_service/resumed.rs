@@ -130,7 +130,7 @@ fn ended_threads(tasks_dir: &Path) -> Vec<Resumed> {
 pub(super) struct Listed {
     pub(super) status: String,
     run: String,
-    link: Option<String>,
+    pub(super) link: Option<String>,
     /// Settled in T3 Code's sidebar (DEV-747).
     pub(super) settled: bool,
 }

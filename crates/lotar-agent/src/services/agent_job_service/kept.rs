@@ -87,20 +87,21 @@ pub(super) fn settle(tasks_dir: &Path, threads: BTreeMap<String, Vec<Thread>>, l
         } else {
             threads.iter().rposition(|thread| listed.get(&thread.thread).is_some_and(|shown| shown.settled)).unwrap_or(0)
         };
-        let due: Vec<&Thread> = threads[..upto].iter().filter(kept).collect();
+        let due: Vec<(&Thread, Option<&str>)> =
+            threads[..upto].iter().filter(kept).map(|thread| (thread, listed.get(&thread.thread).and_then(|shown| shown.link.as_deref()))).collect();
         if !due.is_empty() {
             settle_ticket(tasks_dir, &ticket_id, &due);
         }
     }
 }
 
-/// Settle `threads` of the ticket, under its lock, so one process at a time settles them; each one's newest job says
-/// how it went.
-fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[&Thread]) {
+/// Settle `threads` of the ticket, each with the link `t3 thread list` shows, under its lock, so one process at a time
+/// settles them; each one's newest job says how it went.
+fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[(&Thread, Option<&str>)]) {
     let Some(_lock) = crate::services::agent_active_jobs::lock_resumed_threads(tasks_dir, ticket_id) else { return };
     let prefix = crate::storage::TaskId::parse(ticket_id).ok().map(|parsed| parsed.project);
     let config = crate::config::resolution::config_for_project(tasks_dir, prefix.as_deref()).ok();
-    for thread in threads {
+    for &(thread, link) in threads {
         // A session a process follows runs the thread now.
         let record = resumed::session_of(&thread.thread);
         if record.as_ref().is_some_and(resumed::followed) {
@@ -112,9 +113,9 @@ fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[&Thread]) {
             (_, None) => Err(format!("{ticket_id}'s configuration can't be read")),
         };
         match settled {
-            Ok(link) => note(tasks_dir, thread, format!("Settled the T3 Code thread {link}")),
+            Ok(settled_link) => note(tasks_dir, thread, format!("Settled the T3 Code thread {settled_link}")),
             Err(err) if FAILED.lock().is_ok_and(|mut failed| failed.insert(thread.thread.clone())) => {
-                note(tasks_dir, thread, format!("The T3 Code thread {} was not settled: {err}", thread.thread));
+                note(tasks_dir, thread, format!("The T3 Code thread {} was not settled: {err}", link.unwrap_or(&thread.thread)));
             }
             Err(_) => {}
         }

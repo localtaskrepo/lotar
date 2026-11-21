@@ -1,0 +1,28 @@
+title: Job worktree builds in a configurable build root (agent.worktree.build_root), clone and cleanup included
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T20:21:04.802424+00:00
+description: |-
+  Owner 2026-11-21: "alright, file the work and kick it off. You have convinced me." The Mac gets an APFS volume for builds (/Volumes/Builds, 250 GB quota, excluded from Time Machine). The setup is local LOCA-571. This ticket is lotar's side.
+
+  ## Why
+
+  Time Machine's local snapshots of the Data volume keep every deleted job build for 24 h (228 GB on 2026-11-21). Builds on a volume Time Machine skips free their space at once, and the quota keeps a full disk away from the rest of the Mac.
+
+  ## Change
+
+  - New config `agent.worktree.build_root` (global and per project). Unset: no change. Set: a job worktree's build output goes to `<build_root>/<repo>/<TICKET>`. For Rust that is `target/` as a symlink (or `CARGO_TARGET_DIR` in the job's environment: pick whichever keeps `cargo` and the repos' scripts working, and say why).
+  - The warm-build clone (clonefile(2), agent_job_service.rs around line 1635) clones from the main checkout's resolved build directory into the build root. Both are on the same volume, so it stays a clone. If they are on different volumes, it builds cold and logs that once. Never a full copy.
+  - Every place that removes a job's build (Done cleanup, STD-95's rules, `lotar agent worktree cleanup`, `worktree run ... cargo clean`) also removes or cleans the build root directory, and a worktree without one still works.
+  - Docs: docs/help (agent worktrees) and the config reference.
+  - Tests with temporary directories: unset build root unchanged; set build root builds there; clone within one volume; cleanup removes it.
+
+  The new option is off by default and gets turned on on the Mac with LOCA-571 step 4, after a lotar release (the owner OKs each release).
+
+  ## Done when
+
+  - [ ] `build_root` works as above, with tests, and is documented
+  - [ ] Merged and in a release; LOCA-571 turns it on

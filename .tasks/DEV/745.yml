@@ -1,11 +1,11 @@
 title: Queue worker hangs at start when the login shell's profile leaves a background process holding its stdout
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T22:28:14.806321+00:00
-modified: 2026-11-21T02:59:14.366908+00:00
+modified: 2026-11-21T04:25:59.537393+00:00
 relationships:
   depends_on:
   - DEV-731
@@ -64,6 +64,52 @@ comments:
     - Docs: `docs/help/agent.md` now says the 5 s limit also covers output a background process keeps open, which matches the code.
     - Not rerun: full `npm run lint`, `npm test`, `npm run smoke` (too long). The fix agent's smoke flakes are DEV-750, which is in Reviewing with its own fix.
     - Not UI work, so no screenshots. No stray files, one commit, no second branch. No findings, no tickets filed.
+- date: 2026-11-21T04:14:53.436880+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/AgentJobs-BoDuHAt0.js                  25.75 kB │ gzip:   8.74 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-jgHFM05K.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-C0pcPdI2.js                      47.85 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-1Q6rAlbF.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-BzjkYbwT.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-BGXTKadC.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-DcB4vzZL.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-CMykOnUu.js                     414.08 kB │ gzip: 125.64 kB
+
+    ✓ built in 2.14s
+    compressed 1927KiB -> 579KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-agent v0.15.5 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-745/crates/lotar-agent)
+       Compiling lotar-web-assets v0.15.5 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-745/crates/lotar-web-assets)
+       Compiling lotar-tasks v0.15.5 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-745/crates/lotar-tasks)
+       Compiling lotar-lib v0.15.5 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-745/crates/lotar-lib)
+    error: couldn't read `/private/tmp/dev745-review-before/crates/lotar-agent/../../docs/help/agent-instructions.md`: No such file or directory (os error 2)
+      --> crates/lotar-agent/src/services/agent_job_service.rs:34:42
+       |
+    34 | const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!(concat!(env!("LOTAR_DOCS_DIR"), "/help/agent-instructions.md"));
+       |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    error: could not compile `lotar-agent` (lib) due to 1 previous error
+    warning: build failed, waiting for other jobs to finish...
+    error: could not compile `lotar-agent` (lib test) due to 1 previous error
+    error: command `/Users/mallox/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/cargo '--color=never' test --no-run --message-format json-render-diagnostics --profile dev` exited with code 101
+    ```.
+
+    - Rebased `agent/DEV-745` onto `main` (`39d30bff1d4f`): `d832f422c44b`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2709f94f3ae56b54cec4da8792ab3483952368e9ccd6e48744e2ac87f76329d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ec83ebee8f9ccace0d1bb09bad2ebb675f0a1e8087a45adb272ac660c81f543
@@ -219,3 +265,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-21T04:14:53.436880+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T04:25:59.537393+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -1,11 +1,11 @@
 title: 'Flaky test: sse_delivers_during_a_steady_stream_of_events delivers nothing within 1.5 s under full-suite load'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T21:09:13.348749+00:00
-modified: 2026-11-21T02:50:32.926645+00:00
+modified: 2026-11-21T09:18:43.900645+00:00
 relationships:
   related:
   - DEV-704
@@ -17,6 +17,11 @@ relationships:
   - DEV-742
   - DEV-751
   - DEV-752
+  - DEV-744
+  - DEV-748
+  - DEV-740
+  - DEV-734
+  - DEV-750
 comments:
 - date: 2026-11-20T21:36:18.504677+00:00
   author: claude
@@ -181,13 +186,47 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-21T03:17:34.294888+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `eff138b6f` is on main and on origin.
+
+    - Rebased twice: first onto `9e20d3a3c` (lotar), then onto `4b56e5eb3` once DEV-744 landed. No conflicts: DEV-744 touches only agent-queue files and docs.
+    - Every check failure was in a test this branch doesn't touch, and each one passed when rerun alone. They are load timeouts (load avg 25–50):
+      - `a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge`: already [DEV-748](https://lotar.pyxzl.net/task/DEV-748)
+      - `merge_job_retries_a_sandbox_blocked_check_and_lands`: already [DEV-749](https://lotar.pyxzl.net/task/DEV-749)
+      - `a_full_disk_pauses_every_job_until_one_completes`: new [DEV-752](https://lotar.pyxzl.net/task/DEV-752). It also failed in DEV-742's merge.
+      - smoke `advances the reviewed template workflow live without reloads` (fixed 20 s wait): new [DEV-751](https://lotar.pyxzl.net/task/DEV-751). Six other UI smoke timeouts from one run at load ~38 passed when rerun.
+    - The SSE test passed in every full run.
+    - Amended the `.tasks` changes into `eff138b6f`. No rule or config files changed, so no `lotar trust`.
+    - Pushed `9e20d3a3c..eff138b6f`, which includes the finished DEV-744.
+  report:
+    commits:
+    - hash: eff138b6f
+      what: SSE flush deadline in flush_deadline() with unit test; SSE test without fixed 1.5 s wait (on main, pushed)
+    checks:
+    - command: npm ci
+      result: passed
+      reason: after the rebase onto 4b56e5eb3
+    - command: npm run -s lint:agent
+      result: passed
+      reason: on d5916ddec
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2430/2432 with --no-fail-fast; the 2 failures (DEV-748, DEV-752) are load flakes that pass alone (4/4); UI 1563, release, hooks passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 399/406 at load ~38; the 7 failures were timeouts and their 4 files passed 19/19 rerun alone (flake filed DEV-751)
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: lists no finding for this ticket
+    next: none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acf99943c821ddc87e00cedab3dccb0740e11d234dd55910d2fb22a12961df1f5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0cff3950f328479efe894b3ebb28fa56df7853acf0077e26735cfb482484c05b
 description: 'Found: fails ''nothing delivered while events kept coming'' (crates/lotar-lib/tests/web_api_integration_test.rs:1444) in merge runs of DEV-704, DEV-726 and DEV-732 (2026-11-20, 2 of 4 full runs, load avg 25-34); passes alone. Check: npm run -s test:agent at load avg ~30. Done: the test passes under full-suite load without a fixed 1.5 s wall-clock deadline.'
 tags:
 - health
-- review-returned
 custom_fields:
   finding: npm run -s test:agent:sse_delivers_during_a_steady_stream_of_events
 history:
@@ -322,3 +361,40 @@ history:
   - field: relationships
     old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751"]}'
     new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752"]}'
+- at: 2026-11-21T03:17:34.294888+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T03:17:35.255651+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748"]}'
+- at: 2026-11-21T03:17:45.395744+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health
+- at: 2026-11-21T03:21:06.390250+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748","DEV-740"]}'
+- at: 2026-11-21T03:48:35.107387+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748","DEV-740"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748","DEV-740","DEV-734"]}'
+- at: 2026-11-21T09:18:43.900645+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748","DEV-740","DEV-734"]}'
+    new: '{"related":["DEV-704","DEV-726","DEV-732","DEV-273","DEV-743","DEV-749","DEV-742","DEV-751","DEV-752","DEV-744","DEV-748","DEV-740","DEV-734","DEV-750"]}'

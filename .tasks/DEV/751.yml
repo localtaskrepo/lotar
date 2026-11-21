@@ -1,14 +1,146 @@
 title: 'Flaky test: advances the reviewed template workflow live without reloads times out waiting for Review under full smoke load'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-21T02:41:28.724747+00:00
-modified: 2026-11-21T02:41:30.857759+00:00
+modified: 2026-11-21T19:43:38.101521+00:00
 relationships:
   related:
   - DEV-741
+  - DEV-743
+  - DEV-750
+  - DEV-752
+  - DEV-753
+  - DEV-754
+comments:
+- date: 2026-11-21T04:12:15.986776+00:00
+  author: claude
+  text: |-
+    Fixed: the reviewed-workflow test now waits for its jobs to end instead of a fixed 20 s.
+
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts`: `waitForTaskRowText` (used only by this test) polls until `JOB_END_LIMIT_MS` = 240 s instead of 80 × 250 ms, the same pattern as DEV-743
+    - the test's own timeout is `2 * JOB_END_LIMIT_MS + 60_000`, so the vitest default of 120 s doesn't cut the two waits short
+    - the diff reindents the test because Prettier wraps the `it(...)` call; `git diff -w` shows 15 lines
+    - full smoke ran at load avg ~30 and passed
+  report:
+    commits:
+    - hash: a77c8069d
+      what: reviewed-workflow row waits end when the jobs do; 240 s limit only catches a hang
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:smoke:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'reviewed template'
+      result: passed
+      reason: 3 s alone
+    - command: npm run -s test:smoke:quick:agent
+      result: passed
+      reason: 406/406, load avg rose to 30
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2436 Rust, 1563 UI, release and hook tests
+    next: Review, then merge and rerun npm run -s smoke on main
+- date: 2026-11-21T09:21:21.836133+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix waits for the jobs to end and fits the DEV-743 pattern; it conflicts with DEV-750 on main, and the conflict is easy to resolve.
+
+    - Read: the ticket, DEV-741, DEV-743, DEV-750, `AGENTS.md`, and the commit `a77c8069d` (only `smoke/tests/ui.agent-jobs.smoke.spec.ts` changed; `git diff -w` adds 15 lines and removes 4).
+    - Done when: the test no longer has a fixed 20 s deadline. `waitForTaskRowText` polls up to `JOB_END_LIMIT_MS` = 240 s, which only catches a hang. The test's own timeout is `2 * JOB_END_LIMIT_MS + 60_000`, above vitest's 120 s default (`smoke/vitest.config.ts:15`). The helper is used only at lines 616 and 626 of this test.
+    - Rebase: main's `0595ed4cf` (DEV-750) changed the same helper to `WAIT_BUDGET_MS` = 45 s, and `git merge-tree main HEAD` shows a conflict in `smoke/tests/ui.agent-jobs.smoke.spec.ts`. To resolve it, keep main's `WAIT_BUDGET_MS` and its use in the other helpers. Add `JOB_END_LIMIT_MS`, and only `waitForTaskRowText` uses it, together with the new error text and the test's timeout.
+    - Reran: `npm ci` passed. `npx prettier --check` and `npx oxlint` on the file passed (ESLint ignores `smoke/`). `npm run -s test:smoke:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t "reviewed template workflow"` passed in 11 s, at a 15-minute load average of 34.
+    - Not rerun: the full `npm run smoke` under load, which takes too long for a review. The fix agent reports 406/406 at load avg ~30.
+    - No test failed before the fix: the flake can't be reproduced on demand, which is the same limit as DEV-743.
+    - Not UI work: no screenshots needed. No stray files or second branch. Nothing for the owner to decide. No tickets filed.
+- date: 2026-11-21T10:42:02.670888+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-751` onto `main` conflicts in `smoke/tests/ui.agent-jobs.smoke.spec.ts`; lotar aborted the rebase, `agent/DEV-751` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T12:00:18.755834+00:00
+  author: automation
+  text: The merge agent's job job-20261121T104157.884Z-83 failed (lotar agent logs job-20261121T104157.884Z-83); the fix agent retries it on branch agent/DEV-751.
+- date: 2026-11-21T14:57:44.354056+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ Created task: TEST-2
+          Title: second
+          Status: Todo
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ TEST-1: sam will be assigned when job job-20261121T145720.363Z-2 ends
+        test dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes ... FAILED
+
+        failures:
+
+        failures:
+            dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1614 filtered out; finished in 15.30s
+
+      stderr ───
+
+        thread 'dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes' (140653953) panicked at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:238:5:
+        assertion `left == right` failed: the paused job's status applies, its assignee gave way to the owner's: {"id":"TEST-1","title":"first","status":"InProgress","priority":"Medium","task_type":"Feature","task_state":{"is_done":false,"done_states":["Done"],"due_bucket":null,"calendar_day":"2026-11-21"},"reporter":"tester","assignee":"mallox","created":"2026-11-21T14:57:13.439989+00:00","modified":"2026-11-21T14:57:26.074078+00:00","tags":[],"relationships":{},"comments":[],"references":[],"sprints":[],"releases":[],"history":[{"at":"2026-11-21T14:57:26.074078+00:00","actor":"tester","changes":[{"field":"status","old":"Todo","new":"InProgress"},{"field":"assignee","new":"mallox"}]}],"custom_fields":{}}
+          left: (String("InProgress"), String("mallox"))
+         right: (String("InProgress"), String("sam"))
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 832/2442 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-751` onto `main` (`f2a2f6811219`): `791da28d83e9`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T14:58:27.803553+00:00
+  author: automation
+  text: The fix agent's job job-20261121T144435.144Z-89 failed (lotar agent logs job-20261121T144435.144Z-89); @fix-retry retries it on branch agent/DEV-751.
+- date: 2026-11-21T15:01:48.322550+00:00
+  author: claude
+  text: |-
+    Landed: `main` fast-forwarded to `791da28d8` and pushed to `origin`.
+
+    - The first `npm run -s test:agent` failed in `dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes` (assignee `mallox`, not `sam`). That is the known flake in DEV-752. This branch only changes `smoke/tests/ui.agent-jobs.smoke.spec.ts`.
+    - Rerun at load avg ~23: passed.
+    - `git push origin main`: `1ec62d48d..791da28d8`, which also carries DEV-753's `f2a2f6811`.
+  report:
+    commits:
+    - hash: 791da28d8
+      what: reviewed-workflow test waits for its jobs to end (JOB_END_LIMIT_MS) instead of a fixed 20 s
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: second run; the first failed on the DEV-752 flake
+    - command: npm run -s smoke
+      result: not_run
+      reason: the merge's checks are lint:agent and test:agent
+- date: 2026-11-21T18:16:35.249034+00:00
+  author: claude
+  text: |-
+    Nothing left to fix: the fix `791da28d8` is already on `main` and pushed to `origin/main`.
+
+    - `git log main..HEAD` on `agent/DEV-751` is empty.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A09b5adf872460544c2c3bac6a7fbcbea0740a455fb81003f5e4fa24a7c515671
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9218554cebc1c8e23b9af1938e292761894fe8429525df74a91bf1cbd4c60e43
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84498b9b067284914c90dc6c43daae9da310d3f9326279590636f831fc4ed02e
 description: 'Found: failed in the DEV-741 merge''s `npm run -s smoke` (2026-11-20, load avg ~25-50): ''Timed out waiting for task UI reviewed workflow to include Review'' (smoke/tests/ui.agent-jobs.smoke.spec.ts:100, a fixed 80 x 250 ms = 20 s wait for an agent job). Passed 3/3 alone right after, in 10-13 s. Check: npm run -s smoke at load avg ~30. Done: the test passes under full-suite load without a fixed 20 s wall-clock deadline.'
 tags:
 - health
@@ -26,3 +158,136 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-21T04:07:07.872744+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T04:07:09.414038+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A09b5adf872460544c2c3bac6a7fbcbea0740a455fb81003f5e4fa24a7c515671
+- at: 2026-11-21T04:12:15.986776+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T04:12:16.338942+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741"]}'
+    new: '{"related":["DEV-741","DEV-743"]}'
+- at: 2026-11-21T04:12:24.611236+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-21T09:21:21.836133+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T09:21:22.852713+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-743"]}'
+    new: '{"related":["DEV-741","DEV-743","DEV-750"]}'
+- at: 2026-11-21T09:21:30.415764+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T10:42:02.670888+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T12:00:17.186676+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-21T12:00:18.755834+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T14:44:40.651232+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-21T14:57:44.354056+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T14:57:45.979119+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9218554cebc1c8e23b9af1938e292761894fe8429525df74a91bf1cbd4c60e43
+- at: 2026-11-21T14:58:24.329874+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, merge-retried
+    new: health, merge-retried, fix-retried
+- at: 2026-11-21T14:58:27.803553+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T15:01:48.322550+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T15:01:48.694331+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-743","DEV-750"]}'
+    new: '{"related":["DEV-741","DEV-743","DEV-750","DEV-752","DEV-753"]}'
+- at: 2026-11-21T18:16:24.139454+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84498b9b067284914c90dc6c43daae9da310d3f9326279590636f831fc4ed02e
+- at: 2026-11-21T18:16:35.249034+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T18:16:40.308033+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-retry'
+- at: 2026-11-21T18:16:45.527977+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried, fix-retried
+    new: health
+- at: 2026-11-21T19:43:38.101521+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-741","DEV-743","DEV-750","DEV-752","DEV-753"]}'
+    new: '{"related":["DEV-741","DEV-743","DEV-750","DEV-752","DEV-753","DEV-754"]}'

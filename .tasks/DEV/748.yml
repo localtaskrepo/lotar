@@ -1,16 +1,18 @@
 title: 'Flaky test: a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge takes over its 20 s budget under full-suite load'
-status: Reviewing
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T00:38:44.586388+00:00
-modified: 2026-11-21T01:43:46.190691+00:00
+modified: 2026-11-21T04:42:35.031016+00:00
 relationships:
   related:
   - DEV-731
   - DEV-734
   - DEV-743
+  - DEV-741
+  - DEV-749
 comments:
 - date: 2026-11-21T01:43:37.241399+00:00
   author: claude
@@ -37,6 +39,63 @@ comments:
       result: not_run
       reason: test-only change to one Rust test file
     next: Review, then merge
+- date: 2026-11-21T03:38:14.417975+00:00
+  author: claude
+  text: |-
+    Review: passed. The test checks that lotar stopped the check's background process, not how long the merge took.
+
+    - Read: `136acb93b` (one file, `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:442`), the ticket, [DEV-741](https://lotar.pyxzl.net/task/DEV-741), and the code the test relies on: `merge.rs:596` waits `OUTPUT_DRAIN_LIMIT` (5 s), then `terminate_child` kills the check's process group (`process_group(0)` at `merge.rs:556`)
+    - Covers "Done when": `sleep 600` outlives the 60 s limit in `merge()` (line 113), so a merge that waits for it fails there; a slow merge doesn't. No other changes, no stray files
+    - Reran: `npm ci` ok; the test alone 3× at load average 25–28: passed in 10 s, 15 s and 26 s. The 26 s run would have failed the old 20 s limit; no `sleep 600` left running afterwards
+    - `npm run -s lint`: passed
+    - `npm run -s test:agent` at load average ~36: 2299 passed, 1 failed: `sse_delivers_during_a_steady_stream_of_events`. That is DEV-741's flaky test; its fix `eff138b6f` is on main but not on this branch, which the merge's rebase brings in. Nextest stopped at 2300/2428, so the rest of the run (UI, release, hooks) didn't run here
+    - No tickets filed
+- date: 2026-11-21T04:41:50.961621+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ Created task: TEST-2
+          Title: second
+          Status: Todo
+          Priority: Medium
+          Type: Feature
+          Reporter: tester
+        ✅ TEST-1: sam will be assigned when job job-20261121T044125.792Z-2 ends
+        test dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes ... FAILED
+
+        failures:
+
+        failures:
+            dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1609 filtered out; finished in 15.86s
+
+      stderr ───
+
+        thread 'dev604_queue_pauses_test::a_full_disk_pauses_every_job_until_one_completes' (135132342) panicked at crates/lotar-lib/tests/dev604_queue_pauses_test.rs:238:5:
+        assertion `left == right` failed: the paused job's status applies, its assignee gave way to the owner's: {"id":"TEST-1","title":"first","status":"InProgress","priority":"Medium","task_type":"Feature","task_state":{"is_done":false,"done_states":["Done"],"due_bucket":null,"calendar_day":"2026-11-20"},"reporter":"tester","assignee":"mallox","created":"2026-11-21T04:41:18.860661+00:00","modified":"2026-11-21T04:41:31.945460+00:00","tags":[],"relationships":{},"comments":[],"references":[],"sprints":[],"releases":[],"history":[{"at":"2026-11-21T04:41:31.945460+00:00","actor":"tester","changes":[{"field":"status","old":"Todo","new":"InProgress"},{"field":"assignee","new":"mallox"}]}],"custom_fields":{}}
+          left: (String("InProgress"), String("mallox"))
+         right: (String("InProgress"), String("sam"))
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 832/2437 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-748` onto `main` (`d832f422c44b`): `616b294a1144`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8a9c4b13d3a3970df6512b42b9484abe6fad7cbfaa9e2cfa9d0d94bb4bc69f14
 description: 'Found: failed in the DEV-743 review run of npm run -s test:agent (2026-11-20, load avg ~30): ''the merge waited for the background process: 21.13s'' at crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:451; also failed in DEV-731 and DEV-734 runs (load 21-22), passes alone. The test''s check is ''sleep 30 &'' against a 20 s wall-clock budget, so load alone can push it over. Check: npm run -s test:agent at load avg ~30. Done: the test tells a merge that waited for the background process from a slow one without a wall-clock budget load can exceed (e.g. a much longer sleep, or asserting the merge ended before the background process did), and passes under full-suite load.'
@@ -80,3 +139,38 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-21T03:17:35.260022+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-731","DEV-734","DEV-743"]}'
+    new: '{"related":["DEV-731","DEV-734","DEV-743","DEV-741"]}'
+- at: 2026-11-21T03:38:14.417975+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T03:38:22.034957+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T03:54:37.871746+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-731","DEV-734","DEV-743","DEV-741"]}'
+    new: '{"related":["DEV-731","DEV-734","DEV-743","DEV-741","DEV-749"]}'
+- at: 2026-11-21T04:41:50.961621+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T04:42:35.031016+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

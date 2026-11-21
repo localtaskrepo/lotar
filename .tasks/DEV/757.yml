@@ -1,0 +1,90 @@
+title: 'Proposal: a continue job whose session can''t be resumed starts a new one with the handoff, instead of failing'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T14:27:47.932717+00:00
+modified: 2026-11-21T20:14:24.158346+00:00
+relationships:
+  related:
+  - DEV-603
+  - DEV-732
+  - DEV-734
+  - DEV-738
+comments:
+- date: 2026-11-21T14:27:54.794086+00:00
+  author: claude
+  text: |-
+    Should a continue job start a new session with the handoff when its old session can't be resumed?
+
+    Options:
+    - yes: Build it (recommended)
+    - no: Not now
+  question:
+    options:
+    - key: yes
+      label: Build it
+    - key: no
+      label: Not now
+    recommended: yes
+- date: 2026-11-21T20:14:23.416288+00:00
+  author: mallox
+  text: |-
+    Answer: yes (Build it)
+
+    (answered in INBOX-613)
+  answer:
+    to: 2026-11-21T14:27:54.794086+00:00
+    choice:
+    - yes
+    note: (answered in INBOX-613)
+description: |-
+  A job that continues a ticket's session (a review, a merge, a rework, or the turn your comment starts) fails outright when the agent can't resume that session. lotar then reports "Could not start the claude session ...", and every retry continues the same broken session, so it fails again. DEV-734 fixed this for one case: a worker that takes over an orphaned job now runs it again in a new session. A plain continue job still has no fallback. DEV-734 also found how this happens: Claude never wrote the session's transcript, so `session/load` can never succeed. Sortie fixed the same bug last week. Found in the daily outside look (lotar and harnessmux, 2026-11-21).
+
+  ## Evidence
+  - Sortie v1.32.0 release notes (docs, not code; Apache-2.0): "Claude Code and Copilot CLI runs no longer fail on every retry when the earlier session was deleted or expired; the agent starts a new session instead." https://github.com/sortie-ai/sortie/releases/tag/v1.32.0
+  - Ours, the plain continue path: `crates/lotar-agent/src/services/agent_job_service.rs:4142-4144` calls `open_session(..., launch.resume)`. When `harnessmux::Session::resume` errors (`agent_runner.rs:244`), the job ends `RunEnd::Failed("Could not start the ... session ...")`.
+  - Ours, the takeover path, already fixed: `agent_job_service.rs:2174` calls `run_again_in_new_session` when the resume fails (DEV-734).
+  - Ours, the handoff a new session already gets: `handoff_text` (`agent_job_service.rs:3657`, DEV-603) gives a round that was idle too long a new session with the earlier session's event log, branch and newest comments.
+  - Seen on 2026-11-20: job-20261120T175119.822Z-2 on DEV-732 failed with "Resource not found: sessionId 7d15b17f-…", no transcript in `~/.claude/projects`. That was the takeover case. The review and the merge that continue the same session would hit the plain path.
+  - No plain continue job has failed this way yet: the 1,500 newest jobs in standards, lotar and local show none.
+
+  ## Proposal
+  - When a continue job's resume fails, start a new session with the DEV-603 handoff (the session it couldn't continue, the error, the branch, the newest comments), instead of failing the job.
+  - Note this in the job log, like "This job would have continued the session X, but it could not be resumed (<error>), so it starts a new one".
+  - Only resume errors fall back. A failure that isn't about the session (a removed cwd, a socket error) still fails as now.
+
+  ## Cost
+  - About 1 to 2 hours of agent work in lotar-agent, with one test that fails first. No new dependency.
+  - Saves a failed job, an inbox triage and a retry that fails again, each time a session's transcript or thread is gone.
+  - Risk: a new session that starts while the old thread still runs. DEV-738 is about the same risk for takeovers, so the fix should follow what DEV-738 decides.
+
+  ## Done when
+  - [ ] A test fails first: a continue job whose session can't be resumed runs in a new session with the handoff, and doesn't fail
+  - [ ] The job log names the session it couldn't continue and the error
+  - [ ] Other session start errors still fail the job
+  - [ ] docs/help/agent.md describes the fallback next to DEV-603's idle case
+tags:
+- proposal
+history:
+- at: 2026-11-21T14:27:48.159906+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-603","DEV-732","DEV-734","DEV-738"]}'
+- at: 2026-11-21T14:27:54.794086+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:14:23.416288+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:14:24.158346+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

@@ -1,0 +1,36 @@
+title: 'Flaky test: a_ticket_hands_its_context_from_harness_to_harness_through_its_states times out waiting for the merged ticket under load'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T19:41:20.057266+00:00
+modified: 2026-11-21T19:41:59.486275+00:00
+relationships:
+  related:
+  - DEV-625
+  - DEV-747
+  - DEV-754
+description: |-
+  Found in the review of DEV-754, on the unchanged dev503 test.
+
+  - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev503/)'` at load average about 40: this test failed with `timed out waiting for the merged ticket` (`dev503_harness_jobs_test.rs:158`, 64 s); a rerun passed all 47.
+  - The same timeout failed the DEV-747 merge check (`npm run -s test:agent`), and DEV-625 saw it too.
+
+  Done when:
+  - [ ] The test passes at a load average of 40, or its wait is bounded so that a load spike can't fail it.
+  - [ ] 20 runs under load pass.
+tags:
+- test
+history:
+- at: 2026-11-21T19:41:40.397843+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-625","DEV-747","DEV-754"]}'
+- at: 2026-11-21T19:41:59.486275+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,0 +1,171 @@
+title: 'Flaky smoke under load: four more tests time out in the full run at load average 36, pass alone'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T04:06:49.168672+00:00
+modified: 2026-11-21T19:47:42.933318+00:00
+relationships:
+  related:
+  - DEV-750
+  - DEV-760
+comments:
+- date: 2026-11-21T07:34:52.575806+00:00
+  author: automation
+  text: The fix agent's job job-20261121T072610.054Z-74 failed (lotar agent logs job-20261121T072610.054Z-74); @fix-retry retries it on branch agent/DEV-755.
+- date: 2026-11-21T09:14:31.641598+00:00
+  author: claude
+  text: |-
+    The four flaky smoke files now wait with budgets that hold up under load. Full smoke passes.
+
+    - `api.automation.smoke.spec.ts` chatty stderr: the 10 s wait for `completed-server.marker` is now a wait for the completed **or** aborted marker (up to 90 s). The aborted check runs first. The child's leak-guard bound goes from 15 s to 45 s, so a slow monitor under load doesn't trip it. A wedged monitor still fails, at the bound.
+    - `api.review-policy.smoke.spec.ts`: `waitForStarted` 10 s → 45 s, the `running` poll 10 s → 30 s, and the gate holds for 90 s (`holdMs`) instead of the 20 s default, as in DEV-750. The `finally` still releases the gate.
+    - `ui.dialogs` and `ui.filter-autocomplete`: no single step timed out; they hit the shared 120 s test cap. They are the suite's four longest tests: 3–7 s alone, 13–18 s in full runs at load 70–95. Their `describe` now gets `{ timeout: 300_000 }`, a one-line change; the per-test option would have re-indented each whole test body.
+    - Not reproduced: three full smoke runs at load 45–95 passed before the fix, so the 120 s failures were likely a machine stall in the DEV-750 review run. The before state can't be shown failing.
+  report:
+    commits:
+    - hash: 8a3d78b35
+      what: load-proof waits and budgets for the 4 smoke files
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2437 Rust + 1563 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 406/406 at load average up to 64
+    - command: full smoke before the fix
+      result: passed
+      reason: 3 runs at load 45-95, the UI timeouts did not reproduce
+    next: Review, then merge
+- date: 2026-11-21T14:44:23.379518+00:00
+  author: claude
+  text: |-
+    Review: passed. `8a3d78b35` gives the four flaky smoke tests time budgets that hold up under load, without weakening what they check.
+
+    - Read: the diff (4 files under `smoke/tests/`, +31/−12), the ticket and fix comment, [DEV-750](https://lotar.pyxzl.net/task/DEV-750), AGENTS.md, and the last 5 main commits to each file. No newer main commit changes what the fix relies on. The branch merges cleanly onto main (`f2a2f6811`) and the commit is signed.
+    - Chatty stderr (`api.automation.smoke.spec.ts:775,796-813`): the child's own timeout (`--bound-ms`, set in `chattyArgs`) was 15 s, but the test gave up after 10 s, so a slow spawn failed before the guard could ever fire. Now the guard is 45 s and the test waits up to 90 s for either marker, then asserts that `aborted-server.marker` is missing. A wedged monitor still fails, either at the bound or because the aborted marker is there.
+    - Review policy (`api.review-policy.smoke.spec.ts:271-277,302,313`): `holdMs: 90_000` exists in `gate-agent.mjs:53` and `agent-fixtures.ts:344`. Starting the job (45 s) plus the poll (30 s) fits inside the 90 s hold, and the `finally` still releases the gate.
+    - UI dialogs / filter autocomplete: `describe.concurrent(name, { timeout: 300_000 }, fn)` is a valid vitest 5 option and overrides the 120 s cap in `smoke/vitest.config.ts:15` for those two describes only.
+    - No test that failed before the fix: these are timing fixes, and the fix agent says three full runs at load 45–95 did not reproduce the failure. That's acceptable for flaky-timeout work.
+    - No stray files, no second copy of the fix.
+    - Reran: `npm ci` passed. `npm run test:smoke:agent -- <the 4 files>`: 24/24 passed in 39 s, load 13–31. `npm run lint:frontend` passed. `npx prettier --check <4 files>` passed.
+    - Not rerun: full `npm run smoke`, `npm test` and `npm run lint`. The fix agent reports they passed, the full smoke run at load up to 64.
+    - No findings, no tickets filed.
+- date: 2026-11-21T17:12:57.393760+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n\n\e[31m⎯⎯⎯⎯⎯⎯\e[39m\e[1m\e[41m Unhandled Error \e[49m\e[22m\e[31m⎯⎯⎯⎯⎯⎯⎯\e[39m\n\e[31m\e[1mError\e[22m: [vitest-pool]: Failed to start threads worker for test files /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-755/smoke/tests/api.basic.smoke.spec.ts.\e[39m\n\e[90m \e[2m❯\e[22m ../node_modules/vitest/dist/chunks/index.Di8au7q4.js:\e[2m5932:94\e[22m\e[39m\n\e[90m \e[2m❯\e[22m runNextTicks ../node:internal/process/task_queues:\e[2m65:5\e[22m\e[39m\n\e[90m \e[2m❯\e[22m process.processTimers ../node:internal/timers:\e[2m615:9\e[22m\e[39m\n\e[90m \e[2m❯\e[22m Pool.schedule ../node_modules/vitest/dist/chunks/index.Di8au7q4.js:\e[2m5932:5\e[22m\e[39m\n\n\e[31m\e[1mCaused by: Error\e[22m: [vitest-pool-runner]: Timeout waiting for worker to respond\e[39m\n\e[90m \e[2m❯\e[22m Timeout.<anonymous> ../node_modules/vitest/dist/chunks/index.Di8au7q4.js:\e[2m5429:58\e[22m\e[39m\n\e[90m \e[2m❯\e[22m listOnTimeout ../node:internal/timers:\e[2m685:17\e[22m\e[39m\n\e[90m \e[2m❯\e[22m process.processTimers ../node:internal/timers:\e[2m618:7\e[22m\e[39m\n\n\e[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m42 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m70 passed\e[39m\e[22m\e[90m (112)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m66 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m315 passed\e[39m\e[22m\e[90m (381)\e[39m\n\e[2m     Errors \e[22m \e[1m\e[31m6 errors\e[39m\e[22m\n\e[2m   Start at \e[22m 08:11:17\n\e[2m   Duration \e[22m 3698.60s\e[2m (tests 64%, import 35%)\e[22m\n\n\e[2m     Import \e[22m \e[33m131 modules were evaluated 900 times\e[39m\e[2m · 15667.76s total, 35% of tracked time\e[22m\n\e[2m            \e[22m \e[2m~787.41s faster with \e[22m\e[33misolate: false\e[39m\e[2m — shared modules are evaluated once per worker instead of once per file\e[22m\n\e[2m            \e[22m \e[2mlearn more: https://vitest.dev/guide/improving-performance#test-isolation\e[22m\n\nerror during close Error: Tests left 23 entries in the temp folder; remove them where they are created: lotar-smoke--12555-RRB3boe3VpEJ, lotar-smoke--12555-kIriZLzgjYxp, lotar-smoke--12555-wP2P5AURXX4A, lotar-smoke-worktrees-LlPqOv, playwright-artifacts-4JMQ6O, playwright-artifacts-6FySr4, playwright-artifacts-7Y0yGK, playwright-artifacts-AFFlEM, playwright-artifacts-EfxU3v, playwright-artifacts-Qdve5L, playwright-artifacts-WACCzz, playwright-artifacts-XjbShn, playwright-artifacts-ezRvLM, playwright_chromiumdev_profile-B11AE3, playwright_chromiumdev_profile-JGsYXL, playwright_chromiumdev_profile-KUnDVJ, playwright_chromiumdev_profile-MGTGsW, playwright_chromiumdev_profile-afDnV0, playwright_chromiumdev_profile-cmps6f, playwright_chromiumdev_profile-lbTi4Y, playwright_chromiumdev_profile-qVOcXH, playwright_chromiumdev_profile-t3hvYp, playwright_chromiumdev_profile-tsa5Ud\n    at Object.teardown (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-755/scripts/vitest-temp-guard.mjs:29:19)\n    at TestProject._teardownGlobalSetup (file:///Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-755/node_modules/vitest/dist/chunks/index.Di8au7q4.js:6614:100)\n    at file:///Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-755/node_modules/vitest/dist/chunks/cli-api.COfZo8lK.js:13778:73\n```.\n\n- Rebased `agent/DEV-755` onto `main` (`f2a2f6811219`): `bdb8ec01323c`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T19:39:07.213938+00:00
+  author: automation
+  text: The merge agent's job job-20261121T145834.510Z-92 failed (lotar agent logs job-20261121T145834.510Z-92); the fix agent retries it on branch agent/DEV-755.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac74e36e8416ff8cd36399dd4537351459e0315b205ec21be04c9ecc5d2fe5c64
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A528b0d622eaf4b439ce0be9ef5d946a6e3f7f483a6400457defc9445bb0e1e0b
+description: 'Found in the review of DEV-750 (2026-11-20): full `npm run test:smoke:agent` at load average up to 36 failed 5 tests in 4 files the DEV-750 diff doesn''t touch: `api.automation.smoke.spec.ts` ''server async run drains a chatty stderr child without wedging the monitor'' (10 s marker wait), `api.review-policy.smoke.spec.ts` ''holds an authorized reviewer change until the running agent job ends'' (10 s `waitForStarted`), `ui.dialogs.smoke.spec.ts` ''contains focus and safely dismisses scoped dialogs on desktop'' and `ui.filter-autocomplete.smoke.spec.ts` desktop and mobile (120 s test timeout). All 4 files pass alone (rerun at load 21). Check: `npm run smoke` under load. Done: these tests wait for their condition with a load-proof budget and pass in the full run.'
+tags:
+- health
+- fix-retried
+- merge-retried
+custom_fields:
+  finding: smoke:full-run-under-load
+history:
+- at: 2026-11-21T04:06:53.135629+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T07:29:41.295559+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T07:30:03.195611+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac74e36e8416ff8cd36399dd4537351459e0315b205ec21be04c9ecc5d2fe5c64
+- at: 2026-11-21T07:34:11.352234+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-21T07:34:52.575806+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T09:14:31.641598+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T10:41:34.779770+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A528b0d622eaf4b439ce0be9ef5d946a6e3f7f483a6400457defc9445bb0e1e0b
+- at: 2026-11-21T10:41:55.986058+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-21T14:44:23.379518+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T14:44:32.845924+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'
+- at: 2026-11-21T17:12:57.393760+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T18:41:17.975613+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750"]}'
+    new: '{"related":["DEV-750","DEV-760"]}'
+- at: 2026-11-21T19:34:12.689501+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, merge-retried
+- at: 2026-11-21T19:39:07.213938+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T19:47:42.933318+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress

@@ -1,0 +1,81 @@
+title: 'Flaky test: hand_written_task_without_created_is_readable fails when a timestamp''s fraction contains 1970'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-21T18:41:12.412781+00:00
+modified: 2026-11-21T19:47:30.885048+00:00
+relationships:
+  related:
+  - DEV-755
+comments:
+- date: 2026-11-21T19:47:23.816081+00:00
+  author: claude
+  text: |-
+    The test now checks only the `created:` value's year, so a timestamp fraction like `.751970` can't fail it.
+
+    - `crates/lotar-lib/tests/dev271_storage_robustness_test.rs`: finds the `created:` line, strips quotes, asserts it doesn't start with `1970-`
+    - `cargo nextest run -p lotar-lib dev271_storage_robustness_test`: 4 passed
+  report:
+    commits:
+    - hash: 995349afc
+      what: 'test checks the created: value starts with 1970-, not the whole file'
+    checks:
+    - command: cargo nextest run -p lotar-lib dev271_storage_robustness_test
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests -- -D warnings
+      result: passed
+      reason: reran with RUSTC_WRAPPER= after the sandbox blocked sccache
+    - command: cargo fmt --all --check
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: one test assertion changed, merge agent reruns the check
+    - command: npm run smoke
+      result: not_run
+      reason: no runtime change
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10f78536a6bc71ca3c50ba4771447f494bc69025d15433bdfba9156d8d571001
+description: 'Found in the DEV-755 merge (2026-11-21): `npm run -s test:agent` failed at `crates/lotar-lib/tests/dev271_storage_robustness_test.rs:70`, `assert!(!stored.contains("1970"))`. The stored file''s timestamp was `2026-11-21T18:24:50.751970+00:00`: the fraction `751970` contains 1970, no epoch date. Check: `cargo nextest run -p lotar-lib dev271_storage_robustness_test`. Done: the test checks the `created:` value''s year (for example parse it, or match `created: 1970-`), so it can''t hit a timestamp fraction.'
+tags:
+- health
+custom_fields:
+  finding: cargo nextest:dev271_storage_robustness_test::hand_written_task_without_created_is_readable
+history:
+- at: 2026-11-21T18:41:17.984109+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-755"]}'
+- at: 2026-11-21T18:41:21.795845+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T19:45:55.326804+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T19:45:57.250512+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10f78536a6bc71ca3c50ba4771447f494bc69025d15433bdfba9156d8d571001
+- at: 2026-11-21T19:47:23.816081+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T19:47:30.885048+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,11 +1,11 @@
 title: In-process run_worker in tests runs the real login shell and calls set_var while other threads run
-status: InProgress
+status: Done
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@merge'
 created: 2026-11-20T22:28:17.130177+00:00
-modified: 2026-11-21T01:36:32.353593+00:00
+modified: 2026-11-21T10:18:23.315373+00:00
 relationships:
   depends_on:
   - DEV-731
@@ -48,9 +48,38 @@ comments:
     - command: cargo nextest run --test integration worker_started_with_short_path_runs_jobs_with_login_path
       result: passed
     next: Merge agent lands agent/DEV-746
+- date: 2026-11-21T03:21:46.586194+00:00
+  author: claude
+  text: |-
+    Checks pass on `57b109011`; ready for review.
+
+    - The retried job had ended while checks ran in the background; this run reran them in the foreground
+    - `npm run lint`, `npm run test:agent` (2429 Rust incl. `an_in_process_worker_starts_no_login_shell` and `worker_started_with_short_path_runs_jobs_with_login_path`, 1563 UI) and `npm run smoke` (406) all pass
+    - No new file changes; `git log main..HEAD` holds only `57b109011`
+  report:
+    commits:
+    - hash: 57b109011
+      what: only the lotar agent worker process completes PATH; in-process run_worker starts no login shell
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2429 Rust, 1563 UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Review on another model, then merge
+- date: 2026-11-21T09:25:29.865633+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-746` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-746` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A467e3597696cfa7e586c1f1ae1e3e395288f477ceba17561faac49b8bc7435e3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1d8fe712c58edf675df104394de0ca56956b683267b45e557525b88cf152d5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A923a7fd26069eddbf275a9e1d5b258dd70686f6fe1a0cfbb1cf46aa14b8b4b65
 description: |-
   Tests that call `AgentQueueService::run_worker` in process now run the developer's real login shell and change PATH with `std::env::set_var`, which can happen while other threads are running. Found in the DEV-731 review, 2026-11-20.
 
@@ -68,8 +97,6 @@ description: |-
 
   - [ ] An in-process `run_worker` never calls `set_var` and starts no login shell
   - [ ] `worker_started_with_short_path_runs_jobs_with_login_path` still passes
-tags:
-- fix-retried
 history:
 - at: 2026-11-20T22:28:17.929863+00:00
   actor: claude
@@ -149,3 +176,43 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-21T03:17:52.661764+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A923a7fd26069eddbf275a9e1d5b258dd70686f6fe1a0cfbb1cf46aa14b8b4b65
+- at: 2026-11-21T03:21:46.586194+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T03:21:52.014739+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
+- at: 2026-11-21T04:37:42.627890+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'
+- at: 2026-11-21T09:25:29.865633+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T10:18:23.315373+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''

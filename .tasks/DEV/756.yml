@@ -1,0 +1,78 @@
+title: An owner's change while a job's pause fails is overwritten by the job's recorded change
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-21T10:31:53.742738+00:00
+modified: 2026-11-21T19:40:52.740469+00:00
+relationships:
+  depends_on:
+  - DEV-752
+  related:
+  - DEV-752
+comments:
+- date: 2026-11-21T12:17:45.511865+00:00
+  author: claude
+  text: |-
+    Waits for DEV-752: the code this ticket fixes isn't on main yet.
+
+    - `close_outcome` and its call in `carried_outcome_of` come from `8950b8383` (DEV-752), only on `agent/DEV-752` (status Merging).
+    - This branch is on main (`a8028b6ef`); here `carried_outcome_of` only peeks the outcome, so the bug isn't present.
+    - Next: once DEV-752 lands, close the guard only after `AgentQueueService::pause` / `requeue_after_limit` saved, or reopen it on failure; unit test as the ticket says.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ade895137d0d6d42e15be596b34ae4d841d38618cdc3bbdef4171fb534b193749
+description: 'Found (review of DEV-752): `carried_outcome_of` (`crates/lotar-agent/src/services/agent_job_service.rs:5477`) closes the job''s outcome guard before `AgentQueueService::pause` / `requeue_after_limit` run. If those fail, the job ends as failed and `end_and_take_outcome` applies the agent''s recorded status/assignee (`automation_service.rs:679`). An owner''s change made between the close and that end applied directly and is now overwritten; before DEV-752 it merged into the outcome and won. Rare: only when writing the queue''s pause or retry fails. Check: a unit test where the pause write fails, the owner sets the assignee after close_outcome, and the failed job''s end keeps it. Done: close the guard only once the pause or retry is saved, or reopen it when that fails.'
+tags:
+- health
+history:
+- at: 2026-11-21T10:31:58.701109+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-752"]}'
+- at: 2026-11-21T10:32:02.575394+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T12:17:20.211596+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T12:17:22.597252+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ade895137d0d6d42e15be596b34ae4d841d38618cdc3bbdef4171fb534b193749
+- at: 2026-11-21T12:17:45.078536+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-752"]}'
+    new: '{"depends_on":["DEV-752"],"related":["DEV-752"]}'
+- at: 2026-11-21T12:17:45.463534+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-21T12:17:45.511865+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T12:17:53.120425+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-21T19:40:52.740469+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, waits
+    new: health

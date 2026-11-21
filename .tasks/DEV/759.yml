@@ -1,0 +1,85 @@
+title: 'Done with an open step no ticket tracks: DEV-652'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-21T18:20:52.420642+00:00
+modified: 2026-11-21T19:45:10.831034+00:00
+relationships:
+  related:
+  - DEV-652
+  - DEV-702
+comments:
+- date: 2026-11-21T19:44:47.782106+00:00
+  author: claude
+  text: |-
+    Fixed: the open step already had a ticket, standards STD-225; DEV-652 now links to it. No file change.
+
+    - The step (rewrite lines 4-6 of `configs/lotar/agents.yml`, which still say T3 Code makes the worktree) lives in the standards repo. STD-225 (Blocked) tracks it but DEV-652 didn't link to it.
+    - Ran `lotar task relationships add DEV-652 standards:STD-225 --kind related`.
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[untracked:DEV-652]`.
+    - Note for STD-225: one of the tickets it waits on, lotar DEV-652, is Done now. It still waits on DEV-702 and STD-259.
+  report:
+    checks:
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no [untracked:DEV-652]
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc8791e08bbbaf674a4b7e07dc0632eb44d148f97e5be8b2b6a98a89a3b3e512
+description: |-
+  DEV-652 (A t3 job runs in lotar's own worktree for the ticket; T3 Code only shows the thread) is Done, but a comment names a step still open and no open ticket is linked: "- **Not done in this repo:** the standards comment in `configs/lotar/agents.yml` (lines 4-6) still says T3 Code makes t…" (lotar show DEV-652)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-652`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-652]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-652
+history:
+- at: 2026-11-21T18:20:57.601841+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-652"]}'
+- at: 2026-11-21T18:21:01.174441+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T19:43:22.032220+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T19:43:42.438424+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc8791e08bbbaf674a4b7e07dc0632eb44d148f97e5be8b2b6a98a89a3b3e512
+- at: 2026-11-21T19:44:47.782106+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T19:44:47.977597+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-652"]}'
+    new: '{"related":["DEV-652","DEV-702"]}'
+- at: 2026-11-21T19:45:10.831034+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

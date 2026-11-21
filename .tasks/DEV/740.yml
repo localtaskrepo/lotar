@@ -1,17 +1,19 @@
 title: A runner failure that names both a sign-in error and a usage limit fails instead of pausing, though docs/help/agent.md says a limit wins
-status: InProgress
+status: Done
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-20T21:07:30.522875+00:00
-modified: 2026-11-21T02:59:50.935707+00:00
+modified: 2026-11-21T09:25:06.453847+00:00
 relationships:
   depends_on:
   - DEV-711
   related:
   - DEV-711
   - DEV-730
+  - DEV-741
+  - DEV-734
 comments:
 - date: 2026-11-20T21:28:29.221996+00:00
   author: claude
@@ -108,9 +110,87 @@ comments:
 - date: 2026-11-21T01:30:17.445805+00:00
   author: automation
   text: The merge agent's job job-20261121T010254.510Z-43 failed (lotar agent logs job-20261121T010254.510Z-43); the fix agent retries it on branch agent/DEV-740.
+- date: 2026-11-21T03:17:11.315184+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (133339955) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [ 224.460s] 2311/2435 tests run: 2310 passed, 1 failed, 0 skipped
+            FAIL [  10.519s] (2298/2435) lotar-lib::integration web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+      stdout ───
+
+        running 1 test
+        test web_api_integration_test::sse_delivers_during_a_steady_stream_of_events ... FAILED
+
+        failures:
+
+        failures:
+            web_api_integration_test::sse_delivers_during_a_steady_stream_of_events
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1608 filtered out; finished in 10.38s
+
+      stderr ───
+
+        thread 'web_api_integration_test::sse_delivers_during_a_steady_stream_of_events' (133339955) panicked at crates/lotar-lib/tests/web_api_integration_test.rs:1444:5:
+        nothing delivered while events kept coming
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 124/2435 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-740` onto `main` (`4b56e5eb33bb`): `88cda57fac88`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-21T03:21:06.019442+00:00
+  author: claude
+  text: |-
+    Merged: `agent/DEV-740` fast-forwarded onto `main` at `39d30bff1`.
+
+    - The failing `sse_delivers_during_a_steady_stream_of_events` is the flake DEV-741 fixed; its fix `eff138b6f` landed on main after LoTaR's rebase.
+    - Rebased onto `eff138b6f`, then `npm run -s test:agent` passed (2436/2436) and `npm run -s lint:agent` passed, at load average ~30.
+  report:
+    commits:
+    - hash: 39d30bff1
+      what: usage-limit text match for every failure kind, doc
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2436/2436 after rebase
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or JS change
+- date: 2026-11-21T04:16:44.993756+00:00
+  author: claude
+  text: |-
+    Review: nothing to review. `agent/DEV-740` has no commits beyond `main`.
+
+    - `git log main..HEAD` and `git log HEAD..agent/DEV-740` are both empty. `HEAD`, `agent/DEV-740` and `main` are all at `39d30bff1`.
+    - The fix is already on `main`: the merge agent fast-forwarded it there (see the merge comment). It was reviewed and passed earlier as `a89ee06f5`.
+- date: 2026-11-21T09:25:05.157978+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-740` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab243cb4cc26f9d7a16831b9f3da94be5b82dcf3a6e620526a8c67a7ba1ad246f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aad0962db015d694a8baaaef13f597357cdcda7a02959f6934b6c0a88d6a7cfac
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa846ffb57385ab7a8d5c1c43f990e2224a8fe43b73144892ecbff959e5c97f82
 description: |-
   Found in the DEV-711 review (2026-11-20). harnessmux 0.2.0 sorts a failure by its text with sign-in first (`kind_of_text`, `harnessmux-0.2.0/src/failure.rs`: `unauthorized`, `failed to authenticate` … before `usage limit`). So a t3 failure text (`t3 exited with …: <T3's error output>`) that names both comes back as `auth_required`, and `usage_limit::of_failures_in` (`crates/lotar-agent/src/services/usage_limit.rs`) gives no pause. Before DEV-711 the line-by-line text match paused it. `docs/help/agent.md` (Usage limits, What counts) still says 'A limit wins over any other failure in the same output, a full disk or a signing failure included'.
   Check: a TurnFailed of kind auth_required (or overloaded) from text alone whose text has a usage-limit line: either pause on it (e.g. also run the text match for kinds harnessmux took from text) or reword the doc sentence; a unit test covers the choice.
@@ -125,8 +205,6 @@ description: |-
   - [ ] Unit tests in `usage_limit.rs` cover an `auth_required` failure and an `overloaded` failure that both name a limit, and an `auth_required` failure that names none.
   - [ ] `docs/help/agent.md` (Usage limits, What counts) says a limit line in the text counts whatever kind harnessmux gave; "A limit wins…" stays true.
   - [ ] Runs on DEV-711's code (`of_failures_in`); it waits until DEV-711 is on main.
-tags:
-- merge-retried
 history:
 - at: 2026-11-20T21:07:31.702841+00:00
   actor: claude
@@ -266,3 +344,63 @@ history:
   - field: status
     old: Merging
     new: InProgress
+- at: 2026-11-21T03:17:11.315184+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T03:17:11.932821+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa846ffb57385ab7a8d5c1c43f990e2224a8fe43b73144892ecbff959e5c97f82
+- at: 2026-11-21T03:21:06.019442+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T03:21:06.389716+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730"]}'
+    new: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741"]}'
+- at: 2026-11-21T03:21:17.605146+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-21T03:48:35.104924+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741"]}'
+    new: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734"]}'
+- at: 2026-11-21T04:16:44.993756+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T04:16:49.052052+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T09:25:05.157978+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T09:25:06.453847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: merge-retried
+    new: ''

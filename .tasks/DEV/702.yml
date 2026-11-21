@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-18T05:10:18.248830+00:00
-modified: 2026-11-20T05:17:40.455718+00:00
+modified: 2026-11-21T19:44:47.977117+00:00
 relationships:
   blocks:
   - DEV-700
@@ -16,6 +16,7 @@ relationships:
   - DEV-652
   - DEV-653
   - DEV-725
+  - DEV-759
 comments:
 - date: 2026-11-20T00:04:50.490910+00:00
   author: claude
@@ -322,3 +323,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-21T19:44:47.977117+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-700","DEV-714"],"related":["DEV-658","DEV-710","DEV-652","DEV-653","DEV-725"]}'
+    new: '{"blocks":["DEV-700","DEV-714"],"related":["DEV-658","DEV-710","DEV-652","DEV-653","DEV-725","DEV-759"]}'

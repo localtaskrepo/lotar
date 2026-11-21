@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-11T19:27:16.036194+00:00
-modified: 2026-11-18T18:55:56.734953+00:00
+modified: 2026-11-21T14:57:51.622057+00:00
 relationships:
   related:
   - DEV-663
@@ -22,8 +22,36 @@ comments:
 - date: 2026-11-17T17:33:27.222822+00:00
   author: claude
   text: 'T3 Code status 2026-11-17 (chief of staff): the `--option` PR is #23932, merged 2026-11-17 04:51Z as 84d34d4: repeatable `--option id=value` on `t3 thread start` (e.g. `effort=high` for Claude, `reasoningEffort=high` for Codex), needs `--provider` and `--model`, not on `send`. In nightlies (.4825, .4838), not in v0.1.10 (installed). Waits for the next stable release.'
+- date: 2026-11-21T14:04:42.674625+00:00
+  author: claude
+  text: T3 Code v0.1.11 is installed (2026-11-21) and `t3 thread start --help` lists `--option string  Model option as id=value, such as effort=high. Repeat for more. Needs --provider and --model.` Starting the fix agent (communication review STD-17).
+- date: 2026-11-21T14:57:51.622057+00:00
+  author: claude
+  text: |-
+    Still blocked, now on harnessmux (HARN-8), not on T3.
+
+    - T3 Code 0.1.11 has it: `t3 thread start --option effort=high` (needs --provider and --model). Upstream PR 27189 was closed; the option came another way.
+    - lotar already passes the profile's, rule's and run's effort and options into `harnessmux::Profile` (`crates/lotar-agent/src/services/agent_runner.rs` `session_profile`).
+    - The drop is in harnessmux 0.2.0 `src/backend/t3.rs:55`: it logs "T3's CLI has no effort setting" and never adds `--option`.
+    - Filed HARN-8 in harnessmux (a fix agent took it). Once it ships, the lotar side is a harnessmux version bump plus the end-to-end check.
+  report:
+    checks:
+    - command: t3 thread start --help
+      result: passed
+      reason: T3 Code 0.1.11 has --option effort=high
+    - command: npm run lint
+      result: not_run
+      reason: no lotar change
+    - command: npm test
+      result: not_run
+      reason: no lotar change
+    - command: npm run smoke
+      result: not_run
+      reason: no lotar change
+    next: 'Once harnessmux releases HARN-8: bump harnessmux in Cargo.toml, run a t3 job with effort high, check the thread''s effort in T3 and that no ignored-effort note is logged'
 references:
 - link: https://github.com/pingdotgg/t3code/pull/27189
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9500abe5c51135573b149b9b294f094d11389f3b80e94f45fd49bbfbc2e6f8a8
 description: |-
   Profiles and runs can set effort, but the t3 runner drops it (job note), so T3 threads run at T3's default (Opus 5.5: medium). The owner wants effort settable per profile, rule and ticket, like model and provider (2026-11-11).
 
@@ -79,3 +107,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-663"]}'
     new: '{"related":["DEV-663","DEV-709"]}'
+- at: 2026-11-21T14:04:42.674625+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T14:56:36.400366+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9500abe5c51135573b149b9b294f094d11389f3b80e94f45fd49bbfbc2e6f8a8
+- at: 2026-11-21T14:57:51.622057+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,15 +1,34 @@
 title: Release v0.15.6
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-20T05:17:29.812031+00:00
-modified: 2026-11-20T05:19:58.044247+00:00
+modified: 2026-11-21T15:01:57.531704+00:00
 relationships:
   related:
   - DEV-702
   - DEV-714
+  - DEV-729
+  - DEV-734
+  - DEV-747
+comments:
+- date: 2026-11-21T15:01:56.811998+00:00
+  author: claude
+  text: |-
+    Release lotar v0.15.6 now? 23 commits since v0.15.5, including DEV-747 (settles kept T3 threads) and DEV-729 (harnessmux 0.2.0); STD-273 and STD-259 wait for it. DEV-734 (adopted Claude jobs) is Blocked and would come in the next release.
+
+    Options:
+    - yes: Release v0.15.6 now (recommended)
+    - wait: Wait for DEV-734
+  question:
+    options:
+    - key: yes
+      label: Release v0.15.6 now
+    - key: wait
+      label: Wait for DEV-734
+    recommended: yes
 releases:
 - 11
 description: |-
@@ -34,3 +53,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-702"]}'
     new: '{"related":["DEV-702","DEV-714"]}'
+- at: 2026-11-21T15:01:56.811998+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T15:01:57.077294+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747"]}'
+- at: 2026-11-21T15:01:57.531704+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: HelpNeeded

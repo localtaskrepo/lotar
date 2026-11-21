@@ -1,0 +1,65 @@
+title: 'Repo is no T3 Code project: project'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-21T18:20:45.389483+00:00
+modified: 2026-11-21T19:43:59.219219+00:00
+comments:
+- date: 2026-11-21T19:43:43.189465+00:00
+  author: claude
+  text: |-
+    No fix in this repo: lotar already is a T3 Code project, the check misreads it. Filed STD-282.
+
+    - The project exists: `t3 project list` shows `lotar` at `/Users/mallox/Development/@localtaskrepo/lotar`, and `t3 thread list --project <dir> --json` exits 0 (the "Done when" holds).
+    - Cause: that output is 1,080,266 bytes, over the 1 MiB `spawnSync` default in `scripts/repos.ts` (`t3` helper, ~line 2977), so it fails with `ENOBUFS` and the check reports a missing project.
+    - Every repo will show this as threads pile up; `t3 project add` would not help.
+    - Nothing to commit here.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1bb98f4dc783b94487e4d0b50ed4231d2d35c13143c994d80d6be1dc543cd838
+description: |-
+  /Users/mallox/Development/@localtaskrepo/lotar is no T3 Code project, so fix agents can't start there (--fix: t3 project add)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `t3:project`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[t3:project]` while the problem is there.
+
+  ## Done when
+
+  t3 thread list --project <repo dir> works: the repo is a T3 Code project, so its fix agents can start.
+tags:
+- health
+- light
+custom_fields:
+  finding: t3:project
+history:
+- at: 2026-11-21T18:20:47.037135+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-21T19:41:57.931349+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T19:42:18.692994+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1bb98f4dc783b94487e4d0b50ed4231d2d35c13143c994d80d6be1dc543cd838
+- at: 2026-11-21T19:43:43.189465+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T19:43:59.219219+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

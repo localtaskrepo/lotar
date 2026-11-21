@@ -5,12 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-20T20:32:05.812565+00:00
-modified: 2026-11-20T21:09:52.021377+00:00
+modified: 2026-11-21T14:27:48.159678+00:00
 relationships:
   depends_on:
   - DEV-734
   related:
   - DEV-734
+  - DEV-757
 comments:
 - date: 2026-11-20T21:09:43.252329+00:00
   author: claude
@@ -93,3 +94,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-21T14:27:48.159678+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-734"],"related":["DEV-734"]}'
+    new: '{"depends_on":["DEV-734"],"related":["DEV-734","DEV-757"]}'

@@ -1,0 +1,242 @@
+title: A kept T3 Code thread whose settle fails is named by its id, not its link as DEV-747 asks
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-21T04:06:18.165648+00:00
+modified: 2026-11-21T20:20:14.907853+00:00
+relationships:
+  depends_on:
+  - DEV-747
+  related:
+  - DEV-747
+  - DEV-761
+  - DEV-751
+comments:
+- date: 2026-11-21T05:14:56.710646+00:00
+  author: claude
+  text: |-
+    Waits for DEV-747 to land on main.
+
+    - The code to fix (`crates/lotar-agent/src/services/agent_job_service/kept.rs`, `settle_ticket`) exists only on `agent/DEV-747` (`eafd1cc49`), which is in Merging.
+    - This branch is on main (`f4791f704`), where `kept.rs` doesn't exist yet.
+    - Next: once DEV-747 is on main, rebase `agent/DEV-754` onto it, use `Listed.link` in the note (id when no link), update docs/help/agent.md, add the dev503 `organize-error` text check.
+- date: 2026-11-21T15:06:41.599804+00:00
+  author: claude
+  text: |-
+    The failed settle note of a kept thread now names its link.
+
+    - Rebased `agent/DEV-754` onto main, which has DEV-747 (`1ec62d48d`).
+    - `kept.rs` `settle`: passes each due thread's `Listed.link` to `settle_ticket`; the note says `The T3 Code thread <link> was not settled: <reason>`, the thread id only when no link is listed (`Listed.link` made `pub(super)` in `resumed.rs`).
+    - `docs/help/agent.md` (T3 Code threads) says `<link>`, id when no link is listed.
+    - New dev503 test `a_kept_thread_that_isnt_settled_is_named_by_its_link` (`organize-error`, ticket set Done) checks the note's text; on the old code it logs `thread-0 was not settled` and fails.
+  report:
+    commits:
+    - hash: d0ded5c40
+      what: failed kept-thread settle note names the listed link, id as fallback; docs; dev503 test
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent variant
+    - command: npm test
+      result: passed
+      reason: 2443 Rust + 1563 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    - command: cargo nextest run --workspace -E 'test(named_by_its_link)'
+      result: passed
+      reason: fails on the old code (thread-0 was not settled)
+    next: Merge agent/DEV-754 onto main
+- date: 2026-11-21T19:43:22.666312+00:00
+  author: claude
+  text: |-
+    Review: passed. `d0ded5c40` does all three "Done when" items and nothing more.
+
+    - Read: `git log main..HEAD` (one commit on top of `f2a2f6811`; main has since gained only DEV-751, which doesn't touch these files), the diff, the ticket, DEV-747's "Done when" (`<link>` in the failed settle note) and the latest commits to `kept.rs`/`resumed.rs`/`agent.md` on main (DEV-747 `1ec62d48d`).
+    - `kept.rs` `settle`: each due thread now carries `Listed.link` from `t3 thread list`. The `Err` arm writes `link.unwrap_or(&thread.thread)`, so the id appears only when no link is listed. `Listed.link` is now `pub(super)`. The success note's variable was renamed `settled_link`. That rename is only naming, and the success note still comes from organize's reply.
+    - `docs/help/agent.md` says `<link>`, and the id when no link is listed. Prettier passes.
+    - New dev503 test `a_kept_thread_that_isnt_settled_is_named_by_its_link`: it passes. The fake `thread list` gives the link `https://t3.test/<id>` (`dev503_harness_jobs_test.rs:741`), and the old code wrote `thread-0`, so the assert can't pass on the old code. I started the test against the old code in a detached copy, but at a load average of about 40 it didn't finish compiling within 30 min. I stopped it and removed the copy, so that claim is checked from the code, not by a run.
+    - Reran `cargo nextest run -p lotar-lib --test integration -E 'test(/dev503/)'`. The first run had 1 failure, `a_ticket_hands_its_context_from_harness_to_harness_through_its_states` (`timed out waiting for the merged ticket`), a known flaky test under load that this change doesn't touch. The rerun passed 47/47. Filed as [DEV-761](https://lotar.pyxzl.net/task/DEV-761), related.
+    - `rustfmt --edition 2024 --check` on the three Rust files passes.
+    - Not rerun because of the machine's load (about 40): `npm run lint`, `npm test`, `npm run smoke`. The fix agent reported all three passed.
+    - Not UI work, no stray files, `git status` is clean, no other branch with this fix.
+- date: 2026-11-21T19:52:07.992772+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/ReleasesList-BeHGyvto.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BoDuHAt0.js                  25.75 kB │ gzip:   8.74 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-jgHFM05K.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-C0pcPdI2.js                      47.85 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-1Q6rAlbF.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-BzjkYbwT.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-BGXTKadC.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-DcB4vzZL.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-CMykOnUu.js                     414.08 kB │ gzip: 125.64 kB
+
+    ✓ built in 8.32s
+    compressed 1927KiB -> 579KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-agent v0.15.5 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-754/crates/lotar-agent)
+       Compiling lotar-web-assets v0.15.5 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-754/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.5 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-754/crates/lotar-lib)
+    error: couldn't read `/private/tmp/rev-DEV-754-old/crates/lotar-agent/../../docs/help/agent-instructions.md`: No such file or directory (os error 2)
+      --> crates/lotar-agent/src/services/agent_job_service.rs:35:42
+       |
+    35 | const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!(concat!(env!("LOTAR_DOCS_DIR"), "/help/agent-instructions.md"));
+       |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    error: could not compile `lotar-agent` (lib) due to 1 previous error
+    warning: build failed, waiting for other jobs to finish...
+    error: could not compile `lotar-agent` (lib test) due to 1 previous error
+    error: command `/Users/mallox/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/cargo '--color=never' test --no-run --message-format json-render-diagnostics --profile dev` exited with code 101
+    ```.
+
+    - Rebased `agent/DEV-754` onto `main` (`32891539f764`): `8c30acc5bd74`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5fc406a534c860a0c3ee96a2a255475addda33482dff729cd1ca1219cd3a112f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16cbc593d074cf681cc0d8837e53fb2abfdc5d59b83930a078843db94ff3113b
+description: |-
+  Found in the review of DEV-747 (commit eafd1cc49). Its Done when says a failed settle logs `The T3 Code thread <link> was not settled: <reason>`. `crates/lotar-agent/src/services/agent_job_service/kept.rs` (`settle_ticket`, the `Err` arm) writes `thread.thread`, the bare thread id. docs/help/agent.md says `<thread>` to match the code.
+
+  Done when:
+  - [ ] The note uses the link from `t3 thread list` (`Listed.link`), and the thread id only when no link is listed.
+  - [ ] docs/help/agent.md (T3 Code threads) says `<link>`.
+  - [ ] A dev503 test with `organize-error` checks the note's text.
+history:
+- at: 2026-11-21T04:06:26.363905+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-21T04:06:41.689692+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-747 (commit eafd1cc49). Its Done when says a failed settle logs `The T3 Code thread <link> was not settled: <reason>`. `crates/lotar-agent/src/services/agent_job_service/agent_job_service/kept.rs` (`settle_ticket`, the `Err` arm) writes `thread.thread`, the bare thread id. docs/help/agent.md says `<thread>` to match the code.
+
+      Done when:
+      - [ ] The note uses the link from `t3 thread list` (`Listed.link`), and the thread id only when no link is listed.
+      - [ ] docs/help/agent.md (T3 Code threads) says `<link>`.
+      - [ ] A dev503 test with `organize-error` checks the note's text.
+    new: |-
+      Found in the review of DEV-747 (commit eafd1cc49). Its Done when says a failed settle logs `The T3 Code thread <link> was not settled: <reason>`. `crates/lotar-agent/src/services/agent_job_service/kept.rs` (`settle_ticket`, the `Err` arm) writes `thread.thread`, the bare thread id. docs/help/agent.md says `<thread>` to match the code.
+
+      Done when:
+      - [ ] The note uses the link from `t3 thread list` (`Listed.link`), and the thread id only when no link is listed.
+      - [ ] docs/help/agent.md (T3 Code threads) says `<link>`.
+      - [ ] A dev503 test with `organize-error` checks the note's text.
+- at: 2026-11-21T05:14:35.335697+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-21T05:14:37.401201+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5fc406a534c860a0c3ee96a2a255475addda33482dff729cd1ca1219cd3a112f
+- at: 2026-11-21T05:14:56.271306+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-747"]}'
+    new: '{"depends_on":["DEV-747"],"related":["DEV-747"]}'
+- at: 2026-11-21T05:14:56.663245+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-21T05:14:56.710646+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T05:15:03.343104+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-21T14:17:48.423821+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-21T14:58:07.760789+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-21T14:58:11.737690+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16cbc593d074cf681cc0d8837e53fb2abfdc5d59b83930a078843db94ff3113b
+- at: 2026-11-21T15:06:41.599804+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T15:06:53.660142+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-21T18:41:26.351728+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-21T19:41:40.394911+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-747"],"related":["DEV-747"]}'
+    new: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761"]}'
+- at: 2026-11-21T19:43:22.666312+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-21T19:43:38.134495+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761"]}'
+    new: '{"depends_on":["DEV-747"],"related":["DEV-747","DEV-761","DEV-751"]}'
+- at: 2026-11-21T19:52:07.992772+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-21T20:20:14.907853+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

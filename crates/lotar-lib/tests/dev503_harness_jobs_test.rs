@@ -1160,6 +1160,23 @@ fn a_helpneeded_jobs_thread_is_settled_once_the_ticket_is_done() {
     assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"), "the job's log says so");
 }
 
+/// DEV-754: a kept thread T3 Code refuses to settle is named by the link `t3 thread list` shows, not by its id.
+#[test]
+fn a_kept_thread_that_isnt_settled_is_named_by_its_link() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    run_t3(&fixtures, "fix").failure();
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    std::fs::write(root.join("organize-error"), "T3 Code refuses").unwrap();
+    let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+    TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    let logs = job_logs(&fixtures);
+    assert!(logs.contains("The T3 Code thread https://t3.test/thread-0 was not settled: "), "{logs}");
+}
+
 /// DEV-747: a kept thread whose run still goes is left alone, also on a done ticket.
 #[test]
 fn a_kept_thread_that_still_runs_is_left_alone() {
