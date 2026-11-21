@@ -663,9 +663,14 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
     .unwrap();
     TaskService::update(&mut storage, &task.id, lotar::api_types::TaskUpdate { assignee: Some("@fix".into()), ..Default::default() }).unwrap();
 
-    wait_for("the merged ticket", || TaskService::get(&storage, &task.id, None).is_ok_and(|task| task.status.to_string() == "Done"));
     let read = |profile: &str| std::fs::read_to_string(log(profile)).unwrap_or_default();
     let prompts = |profile: &str| read(profile).lines().filter(|line| line.contains("\"method\":\"session/prompt\"")).map(str::to_string).collect::<Vec<_>>();
+    // Four jobs run one after another; each step has its own bound, so a busy machine doesn't add them up (DEV-761).
+    // A step's prompt stays in its agent's log, where a status the ticket only passes through could be missed.
+    for (what, profile, count) in [("the fix", "fix", 1), ("the review", "review", 1), ("the rework", "fix", 2), ("the merge", "merge", 1)] {
+        wait_for(what, || prompts(profile).len() >= count);
+    }
+    wait_for("the merged ticket", || TaskService::get(&storage, &task.id, None).is_ok_and(|task| task.status.to_string() == "Done"));
     let (fix, review, merge) = (prompts("fix"), prompts("review"), prompts("merge"));
     assert_eq!((fix.len(), review.len(), merge.len()), (2, 1, 1), "fix twice, review and merge once");
     assert!(review[0].contains("Fixed: fix.txt holds the fix 1"), "the reviewer gets the fix agent's reply: {}", review[0]);
