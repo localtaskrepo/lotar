@@ -217,6 +217,19 @@ fn a_full_disk_pauses_every_job_until_one_completes() {
             ws.broken.display()
         ),
     );
+    // The paused job's end waits in a `job_paused` rule until the owner's
+    // change is in: the queue reads paused while the job still ends, the
+    // window full-suite load opened (DEV-752).
+    let (held, release) = (ws.root.join("held"), ws.root.join("release"));
+    std::fs::write(
+        ws._fixtures.tasks_root.join("automation.yml"),
+        format!(
+            "automation:\n  rules:\n    - name: Slow pause\n      on:\n        job_paused:\n          run:\n            command: sh\n            args: ['-c', 'touch \"{}\"; i=0; while [ ! -f \"{}\" ] && [ $i -lt 300 ]; do sleep 0.1; i=$((i+1)); done']\n            wait: true\n",
+            held.display(),
+            release.display()
+        ),
+    )
+    .unwrap();
     std::fs::write(&ws.broken, "").unwrap();
 
     run(&ws, "TEST-1");
@@ -228,7 +241,9 @@ fn a_full_disk_pauses_every_job_until_one_completes() {
     assert!(!runs(&ws).contains(&"TEST-2".to_string()), "the held job didn't run: {:?}", runs(&ws));
     assert!(jobs(&ws, "TEST-1", "failed").is_empty(), "no job failed");
     // The owner reassigns the ticket during the pause: that stays.
+    wait_for(&ws, "the job_paused rule didn't run", |_| held.exists());
     assert!(lotar(&ws).args(["assignee", "TEST-1", "sam"]).status().unwrap().success());
+    std::fs::write(&release, "").unwrap();
 
     std::fs::remove_file(&ws.broken).unwrap();
     wait_for(&ws, "the queue didn't resume", |queue| queue["pause"].is_null() && !queued(queue, "TEST-2") && queue["running_jobs"] == 0);

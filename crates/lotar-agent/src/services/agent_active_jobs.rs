@@ -195,6 +195,18 @@ pub fn peek_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
     read_outcome(&dir(tasks_dir).join(format!("{name}.outcome.json")))
 }
 
+/// End the job's guard and read its recorded outcome, which stays for the
+/// job's end: a paused job's retry carries the outcome, and a change made
+/// from now on, while the paused job still ends, applies directly instead
+/// of being recorded for a job that no longer reads it (DEV-752).
+pub fn close_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
+    let name = safe_name(job_id)?;
+    let dir = dir(tasks_dir);
+    let _lock = lock_outcome(&dir, name);
+    mark_ended(&dir, name);
+    read_outcome(&dir.join(format!("{name}.outcome.json")))
+}
+
 /// End the job's guard and hand back its recorded outcome. The record goes
 /// first, so a change made from now on applies directly instead of being
 /// recorded for a job that no longer reads it. A change that checked for
@@ -453,6 +465,13 @@ mod tests {
         unregister(tasks.path(), "job-2");
         assert_eq!(record_outcome(tasks.path(), &outcome("job-2")).unwrap(), None, "after the job was unregistered");
         assert!(peek_outcome(tasks.path(), "job-2").is_none());
+
+        // A pausing job closes its outcome for the retry; its end still reads it.
+        record_outcome(tasks.path(), &outcome("job-3")).unwrap();
+        assert_eq!(close_outcome(tasks.path(), "job-3"), Some(outcome("job-3")));
+        assert_eq!(record_outcome(tasks.path(), &outcome("job-3")).unwrap(), None, "after the pause closed the outcome");
+        assert_eq!(end_and_take_outcome(tasks.path(), "job-3", "T-1", Some), Some(outcome("job-3")));
+        settle_outcome(tasks.path(), "job-3");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 

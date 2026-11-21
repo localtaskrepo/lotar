@@ -5480,9 +5480,11 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
 }
 
 /// The status and assignee change the agent recorded during the job (a
-/// hand-back), with the ticket's state now, for the job's retry.
+/// hand-back), with the ticket's state now, for the job's retry. The job
+/// records no change after this: one made while it still ends is the
+/// ticket's, which the retry's carried change gives way to (DEV-752).
 fn carried_outcome_of(tasks_dir: &std::path::Path, job_id: &str, ticket_id: &str) -> Option<CarriedOutcome> {
-    crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id).filter(|outcome| !outcome.is_empty()).and_then(|outcome| {
+    crate::services::agent_active_jobs::close_outcome(tasks_dir, job_id).filter(|outcome| !outcome.is_empty()).and_then(|outcome| {
         let (status_at_pause, assignee_at_pause) = ticket_state(tasks_dir, ticket_id)?;
         Some(CarriedOutcome { outcome, status_at_pause, assignee_at_pause })
     })
