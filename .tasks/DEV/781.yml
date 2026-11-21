@@ -5,11 +5,22 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T01:07:08.443491+00:00
-modified: 2026-11-22T01:07:13.699391+00:00
+modified: 2026-11-22T04:25:28.586291+00:00
 relationships:
   related:
   - DEV-755
   - DEV-756
+  - DEV-750
+  - DEV-762
+comments:
+- date: 2026-11-22T04:25:26.768046+00:00
+  author: claude
+  text: |-
+    Seen again in DEV-762's merge, 2026-11-21, under load average 30–46: a different set fails on each full run, and each passes alone.
+
+    - Run 1 (lotar's merge): `ui.theming.smoke.spec.ts:41` poll timeout, `ui.agent-jobs.smoke.spec.ts:777`, plus one more.
+    - Run 2: `ui.agent-jobs.smoke.spec.ts:458` "streams log entries live" (`.job-card` wait 15 s, DEV-750's case again) and `ui.config-coverage.smoke.spec.ts:135` (120 s test timeout).
+    - Alone: `npm run -s test:smoke:quick:agent -- tests/ui.agent-jobs.smoke.spec.ts tests/ui.theming.smoke.spec.ts` and the same with `tests/ui.config-coverage.smoke.spec.ts`: 14/14 passed each time.
 description: |-
   Found: DEV-756's merge, `npm run -s smoke` at load average ~36 failed `smoke/tests/ui.theming.smoke.spec.ts:41` (5s expect.poll on rootState) and `smoke/tests/harness.agent-launcher.smoke.spec.ts:521` (10s gate.waitForStarted('conflict')). Both pass alone at load 33 (`npm run -s test:smoke:quick:agent -- <both files>`, 10/10). Like DEV-755.
   Check: full `npm run smoke` under parallel load passes these two.
@@ -30,3 +41,13 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T04:25:26.768046+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T04:25:28.586291+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-756"]}'
+    new: '{"related":["DEV-755","DEV-756","DEV-750","DEV-762"]}'

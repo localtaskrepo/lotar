@@ -1,11 +1,15 @@
 title: 'Web UI: show live activity of agent jobs that run in other processes (queue worker, CLI, MCP)'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T20:47:03.411406+00:00
-modified: 2026-11-21T22:36:33.840868+00:00
+modified: 2026-11-22T02:36:52.558808+00:00
+relationships:
+  related:
+  - DEV-782
+  - DEV-771
 comments:
 - date: 2026-11-21T22:15:46.508688+00:00
   author: claude
@@ -41,6 +45,18 @@ comments:
       result: passed
       reason: 407 tests
     next: 'review: an answer to a question from another process still needs that process (documented)'
+- date: 2026-11-22T02:36:30.232882+00:00
+  author: claude
+  text: |-
+    Review: passed. `lotar serve` streams jobs of other processes live from their logs; one minor issue filed as DEV-782.
+
+    - Reviewed `53040a7aa` (only commit in `main..HEAD`, no newer ticket branch); it merges cleanly onto main `8f698d2e9` (`git merge-tree`)
+    - Done when: offsets per file, partial lines wait, malformed skipped, shrink re-reads, delete forgets, no replay at start, held jobs skipped via `JOB_REGISTRY` (also taken-over jobs), moved/`off` log folder, project filter, bare `push_event` notes now `record_and_emit` (none left outside tests), `useAgentActivity` input/question/result + `sequence` dedupe + ended status; task panel and Agents page dedupe by `sequence` already
+    - Reran: `npm ci` ok, `npm run lint:agent` passed, `cargo nextest run -p lotar-agent` 214 passed (6 new `follow::` tests), `-p lotar-lib --test integration sse_` 9 passed, watcher tests 17 passed, vitest `AgentActivityIndicator.spec.ts` passed, smoke `ui.agent-jobs.smoke.spec.ts` 12 passed
+    - Not rerun: full `npm test` and `npm run smoke` (the fix agent ran both)
+    - UI: read the fix agent's 12 before/after shots; took my own after shots (tasks + Agents, light/dark, 1920/1440/390) from this worktree's build with a log appended live: pill says **Asks**, goes away at the end, Agents page shows lines and the end without a reload. No visual problems
+    - Minor, filed: DEV-782, after a reload the pill says Working instead of Asks, because `saved_job_dto` always sends `question: None`
+    - The Agents counter showing "0 Running" for jobs of other processes is already DEV-771
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa97d4d8730d6d45978e856b83771013163009cd2a87b29d417a86cbb96891bcd
 - attachment: DEV-765-after-dark-1440.2b850162d89c3a871106acfa37b6c7e7.png
@@ -243,3 +259,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T02:36:03.418822+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-782"]}'
+- at: 2026-11-22T02:36:30.232882+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:36:32.521694+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-782"]}'
+    new: '{"related":["DEV-782","DEV-771"]}'
+- at: 2026-11-22T02:36:52.558808+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

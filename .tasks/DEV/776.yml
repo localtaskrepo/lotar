@@ -1,14 +1,45 @@
 title: lotar comment saves a lone - as the comment text instead of reading stdin
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T23:39:20.858113+00:00
-modified: 2026-11-21T23:39:21.371705+00:00
+modified: 2026-11-22T02:53:20.915575+00:00
 relationships:
   related:
   - DEV-768
+comments:
+- date: 2026-11-22T02:53:13.779728+00:00
+  author: claude
+  text: |-
+    A lone `-` as the comment text now reads stdin, like `-F -`.
+
+    - `resolve_comment_text` in `crates/lotar-lib/src/cli/handlers/comment.rs` treats positional `-` as `-F -`; covers `lotar comment` and `lotar task comment`
+    - New test `a_lone_dash_reads_the_comment_from_stdin` (with `--commit`, as in DEV-768) failed before, passes now
+    - `docs/help/comment.md` says so
+    - No guidance correction needed
+  report:
+    commits:
+    - hash: 3968c82a1
+      what: a lone - as TEXT reads stdin like -F -
+    checks:
+    - command: cargo nextest run --test integration dev282
+      result: passed
+    - command: lotar comment CHK-1 - < c.txt
+      result: passed
+      reason: saved the file's text
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2445 Rust, 1563 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '406'
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa8aed42de28a4aafdd4ad3d8ff4a47cd7e7c19faf1b1f7b425aa0f3d7109a0b9
 description: 'Found: lotar comment DEV-768 --commit … - <<EOF saved the text ''-'' and dropped the heredoc; only -F - reads stdin (DEV-768 hand-off). Check: lotar comment <ID> - < file. Done: a lone - reads stdin like -F -, or is refused with a hint to use -F -.'
 tags:
 - health
@@ -26,3 +57,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T02:46:28.629776+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T02:46:42.101932+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa8aed42de28a4aafdd4ad3d8ff4a47cd7e7c19faf1b1f7b425aa0f3d7109a0b9
+- at: 2026-11-22T02:53:13.779728+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:53:20.915575+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

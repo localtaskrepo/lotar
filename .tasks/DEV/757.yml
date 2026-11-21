@@ -1,12 +1,14 @@
 title: 'Proposal: a continue job whose session can''t be resumed starts a new one with the handoff, instead of failing'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T14:27:47.932717+00:00
-modified: 2026-11-21T23:47:34.377126+00:00
+modified: 2026-11-22T03:32:33.494833+00:00
 relationships:
+  blocks:
+  - DEV-777
   related:
   - DEV-603
   - DEV-732
@@ -93,6 +95,18 @@ comments:
     - command: npm test / npm run smoke
       result: not_run
       reason: review reran targeted checks only
+- date: 2026-11-22T03:30:13.009665+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n\e[31m\e[1mError\e[22m: Timeout 5000ms exceeded while waiting on the predicate\e[39m\n\e[90m \e[2m❯\e[22m captureRawStack ../node_modules/playwright-core/lib/coreBundle.js:\e[2m9551:17\e[22m\e[39m\n\e[90m \e[2m❯\e[22m callMatcherAsStep ../node_modules/playwright/lib/matchers/expect.js:\e[2m13342:57\e[22m\e[39m\n\e[90m \e[2m❯\e[22m Object.toBe ../node_modules/playwright/lib/matchers/expect.js:\e[2m13334:23\e[22m\e[39m\n\e[36m \e[2m❯\e[22m tests/ui.theming.smoke.spec.ts:\e[2m41:82\e[22m\e[39m\n    \e[90m 39|\e[39m                 await withPage(`${server.url}/preferences`, async (pag…\n    \e[90m 40|\e[39m                     \e[90m// Built-in default until someone picks a theme.\e[39m\n    \e[90m 41|\e[39m                     await expect.poll(async () => (await rootState(pag…\n    \e[90m   |\e[39m                                                                                  \e[31m^\e[39m\n    \e[90m 42|\e[39m\n    \e[90m 43|\e[39m                     // DEV-220: a palette of the current skin, from th…\n\e[90m \e[2m❯\e[22m helpers/ui.ts:\e[2m104:26\e[22m\e[39m\n\e[90m \e[2m❯\e[22m withBrowser helpers/ui.ts:\e[2m84:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.theming.smoke.spec.ts:\e[2m39:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/18]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m12 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m106 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m18 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m388 passed\e[39m\e[22m\e[90m (406)\e[39m\n\e[2m   Start at \e[22m 19:19:42\n\e[2m   Duration \e[22m 629.68s\e[2m (tests 80%, import 18%, setup 1%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.58s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~20.81s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n\nerror during close Error: Tests left 1 entries in the temp folder; remove them where they are created: lotar-vitest-temp-GMV6fW\n    at Object.teardown (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-757/scripts/vitest-temp-guard.mjs:29:19)\n    at TestProject._teardownGlobalSetup (file:///Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-757/node_modules/vitest/dist/chunks/index.Di8au7q4.js:6614:100)\n    at file:///Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-757/node_modules/vitest/dist/chunks/cli-api.COfZo8lK.js:13778:73\n```.\n\n- Rebased `agent/DEV-757` onto `main` (`8f698d2e97ec`): `89fe192f86b1`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85739529f08a807d68f7a4c82772fd89eed8a4bce5c902f2a4b228907f4ed9ac
 description: |-
@@ -193,3 +207,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T02:54:18.654240+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611"]}'
+    new: '{"blocks":["DEV-777"],"related":["DEV-603","DEV-732","DEV-734","DEV-738","DEV-777","DEV-611"]}'
+- at: 2026-11-22T03:30:13.009665+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T03:32:33.494833+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

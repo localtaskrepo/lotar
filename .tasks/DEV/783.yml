@@ -1,0 +1,36 @@
+title: 'Merge without agent: rerun a failed check once on its own before handing the merge to @merge'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T03:06:52.324630+00:00
+modified: 2026-11-22T05:07:00.128047+00:00
+relationships:
+  related:
+  - DEV-726
+  - DEV-734
+  - DEV-748
+  - DEV-752
+  - DEV-755
+  - DEV-756
+  - DEV-786
+description: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Nearly every merge-agent job came from lotar''s own merge failing a check that passes alone: sse_delivers_during_a_steady_stream_of_events (DEV-726, 730, 740, 744), the ''Created task'' test (DEV-734, 742, 748-751), vitest worker timeouts (DEV-752), smoke timeouts (DEV-756, 761). Do: when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts. Done when: a test shows a check that fails once then passes lands without a merge agent; the job log names the rerun.'
+history:
+- at: 2026-11-22T03:06:52.566170+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756"]}'
+- at: 2026-11-22T03:06:52.840483+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T05:07:00.128047+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756"]}'
+    new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786"]}'

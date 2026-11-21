@@ -1,0 +1,26 @@
+title: 'Tests: timing-sensitive tests in a serial nextest group (and vitest/smoke equivalent), not a ticket per flake'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T03:06:53.746513+00:00
+modified: 2026-11-22T03:06:54.243836+00:00
+relationships:
+  related:
+  - DEV-748
+  - DEV-750
+  - DEV-755
+description: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). DEV-748..761 were one ticket per timing test that failed under load, each with fix, review and merge jobs rerunning the suite. Do: put tests that wait on wall-clock budgets (SSE stream, merge-without-agent, queue/worker timing, the smoke specs named in DEV-750/755) in a nextest test-group with max-threads 1 and the UI/smoke equivalents; the rule for new ones in AGENTS.md; a flaky timing test joins the group instead of getting its own ticket. Done when: the group exists, the known flakes are in it, the full suite passes at load average 30.'
+history:
+- at: 2026-11-22T03:06:53.985562+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-748","DEV-750","DEV-755"]}'
+- at: 2026-11-22T03:06:54.243836+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

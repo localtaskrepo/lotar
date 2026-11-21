@@ -1,11 +1,11 @@
 title: 't3 runner: pass the profile''s effort to T3 Code'
-status: Blocked
+status: Todo
 priority: Low
 type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-11T19:27:16.036194+00:00
-modified: 2026-11-21T14:57:51.622057+00:00
+modified: 2026-11-22T01:33:12.584695+00:00
 relationships:
   related:
   - DEV-663
@@ -49,6 +49,15 @@ comments:
       result: not_run
       reason: no lotar change
     next: 'Once harnessmux releases HARN-8: bump harnessmux in Cargo.toml, run a t3 job with effort high, check the thread''s effort in T3 and that no ignored-effort note is logged'
+- date: 2026-11-22T01:33:12.251587+00:00
+  author: claude
+  text: |-
+    Unblocked: harnessmux 0.2.1 (with HARN-8, t3 effort) is on crates.io.
+
+    - Signed tag `v0.2.1` on `8466cba`; release.yml run `44971568053` passed (ci, 6 builds, release, publish)
+    - `cargo search harnessmux` lists `0.2.1`; GitHub release v0.2.1 has the 6 binaries and `SHA256SUMS`
+    - Next here: bump `harnessmux = "0.2.0"` to `"0.2.1"` in lotar `Cargo.toml`, then the t3 runner gets effort through `--option effort=<level>`
+    - Status back to Todo (it was Todo before the 2026-11-15 block)
 references:
 - link: https://github.com/pingdotgg/t3code/pull/27189
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9500abe5c51135573b149b9b294f094d11389f3b80e94f45fd49bbfbc2e6f8a8
@@ -120,3 +129,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T01:33:12.251587+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T01:33:12.584695+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Todo

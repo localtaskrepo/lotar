@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:23:41.822989+00:00
-modified: 2026-11-22T00:22:09.993795+00:00
+modified: 2026-11-22T05:06:50.141219+00:00
 relationships:
   related:
   - DEV-753
@@ -70,6 +70,18 @@ comments:
     - command: rust lint/tests
       result: not_run
       reason: no Rust change
+- date: 2026-11-22T05:06:50.141219+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n\n\e[31m⎯⎯⎯⎯⎯⎯⎯\e[39m\e[1m\e[41m Failed Tests 1 \e[49m\e[22m\e[31m⎯⎯⎯⎯⎯⎯⎯\e[39m\n\n\e[41m\e[1m FAIL \e[22m\e[49m tests/ui.agent-jobs.smoke.spec.ts\e[2m > \e[22mUI Agent Jobs page smoke tests\e[2m > \e[22mshows the agent's permission question in the job view and answers it\n\e[31m\e[1mTimeoutError\e[22m: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator('.job-question') to be detached\n    33 × locator resolved to visible <div role=\"group\" data-v-71082d96=\"\" class=\"job-question\" aria-label=\"The agent asks: Edit notes.md\">…</div>\n\e[39m\n\e[36m \e[2m❯\e[22m tests/ui.agent-jobs.smoke.spec.ts:\e[2m784:57\e[22m\e[39m\n    \e[90m782|\e[39m                     await question.getByRole('button', { name: 'Allow'…\n    \e[90m783|\e[39m                     await waitForJobStatusViaApi(server.url, task.id, …\n    \e[90m784|\e[39m                     await page.locator('.job-question').waitFor({ stat…\n    \e[90m   |\e[39m                                                         \e[31m^\e[39m\n    \e[90m785|\e[39m                     await waitForText(page, '.job-card', 'Permission: …\n    \e[90m786|\e[39m                 })\e[33m;\e[39m\n\e[90m \e[2m❯\e[22m helpers/ui.ts:\e[2m104:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m withBrowser helpers/ui.ts:\e[2m84:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.agent-jobs.smoke.spec.ts:\e[2m777:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m1 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m117 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m1 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m405 passed\e[39m\e[22m\e[90m (406)\e[39m\n\e[2m   Start at \e[22m 20:59:06\n\e[2m   Duration \e[22m 463.62s\e[2m (tests 78%, import 19%, setup 2%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.04s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~16.44s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n```.\n\n- Rebased `agent/DEV-764` onto `main` (`89fe192f86b1`): `a45cd9dc50fd`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5c2eac6eeaf3d0bc48c9f2bbef63b271b0aca5a525c6fdcb620588061b616d1e
 description: 'Found: merge of DEV-755 (2026-11-21, load 34): `npm run -s test:agent` failed 3 tests in 2 files, two in `view/__tests__/SprintsList.backlogPagination.spec.ts` (''applies persisted manual backlog order before paging…'', ''resets offsets when filters change or the sort order flips'') at the 30 s testTimeout. The DEV-753 merge hit the same file (''drops before a row using a server-relative anchor''). That run took 373 s with ~14 s worker startup per file; rerun right after: file alone 36/36 in 3.3 s, full `npm run -s test:ui:agent` 1563/1563 in 8.7 s. Check: `npm run -s test:ui:agent` under load (load average 30+). Done: the file''s tests pass in full runs under load, or the cause (machine stall vs. a slow step in the file) is shown.'
@@ -132,3 +144,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T05:06:50.141219+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,0 +1,66 @@
+title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T03:06:54.457789+00:00
+modified: 2026-11-22T05:07:00.362925+00:00
+relationships:
+  related:
+  - DEV-725
+  - DEV-748
+  - DEV-755
+  - DEV-783
+comments:
+- date: 2026-11-22T05:07:00.362925+00:00
+  author: claude
+  text: 'Scope widened by the owner 2026-11-21 19:20 PST (quote in the description): queue management (move entries, keep their prompt) and categories next to priority.'
+description: |-
+  Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
+
+  Owner 2026-11-21 19:20 PST, widening this ticket: "maybe that's part of the feature request to add so that the queue can be managed if needed along with priorities and categorization, etc."
+  Why: moving DEV-783..786 up the queue was not possible: an entry holds only ticket and profile, the prompt comes from the rule that queued it, so a removed review or merge can't be put back as it was.
+  Also do:
+  - Manage: move a queued entry to the front, up, down or to the back (CLI `lotar agent queue move <TICKET> --first|--up|--down|--last`, the Agents page, REST); a moved entry keeps its rule, prompt and settings.
+  - Categories: show each entry's kind (fix, review, merge, release ...) in `lotar agent queue` and the Agents page, and let the order take the kind into account (e.g. merges and reviews before new fixes, since they finish work). Propose the default order in a comment before building it if unsure.
+  Done when (in addition): a test moves an entry to the front and it starts next with its original prompt; the queue lists show the kind.
+history:
+- at: 2026-11-22T03:06:54.686868+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755"]}'
+- at: 2026-11-22T03:06:54.929067+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T05:06:59.814096+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: 'Agent queue: start tickets by priority (then arrival), so a release or blocker doesn''t wait behind fixes'
+    new: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
+  - field: description
+    old: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job''s retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket''s priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.'
+    new: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
+
+      Owner 2026-11-21 19:20 PST, widening this ticket: "maybe that's part of the feature request to add so that the queue can be managed if needed along with priorities and categorization, etc."
+      Why: moving DEV-783..786 up the queue was not possible: an entry holds only ticket and profile, the prompt comes from the rule that queued it, so a removed review or merge can't be put back as it was.
+      Also do:
+      - Manage: move a queued entry to the front, up, down or to the back (CLI `lotar agent queue move <TICKET> --first|--up|--down|--last`, the Agents page, REST); a moved entry keeps its rule, prompt and settings.
+      - Categories: show each entry's kind (fix, review, merge, release ...) in `lotar agent queue` and the Agents page, and let the order take the kind into account (e.g. merges and reviews before new fixes, since they finish work). Propose the default order in a comment before building it if unsure.
+      Done when (in addition): a test moves an entry to the front and it starts next with its original prompt; the queue lists show the kind.
+- at: 2026-11-22T05:07:00.128243+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783"]}'
+- at: 2026-11-22T05:07:00.362925+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: 'Assignee picker: searchable, grouped by people and agent roles, showing each profile''s runner, model and effort'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-21T20:47:05.414784+00:00
-modified: 2026-11-21T23:39:21.126331+00:00
+modified: 2026-11-22T02:49:38.931836+00:00
 relationships:
   related:
   - DEV-769
@@ -55,6 +55,70 @@ comments:
       result: passed
       reason: 406 tests
     next: review agent checks the UI and the Done-when differences in this comment
+- date: 2026-11-22T02:45:42.514372+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T024455.173Z-136 failed again or on a rate limit (lotar agent logs job-20261122T024455.173Z-136). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T02:46:49.705798+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited with code 1 while the thread was waiting on the gates, no work error; disk is fine.
+  answer:
+    to: 2026-11-22T02:45:42.514372+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited with code 1 while the thread was waiting on the gates, no work error; disk is fine.'
+- date: 2026-11-22T02:49:38.931836+00:00
+  author: claude
+  text: |-
+    Retry: all three gates pass on `a7cd6024f`. The first job ended before its tests finished.
+
+    - No code changes in this retry. The feature, the screenshots and the Done-when deviations are as in the previous comment.
+    - `npm run lint` passed.
+    - `npm test` passed: 2443 Rust and 1581 UI tests, plus the release and hook tests. Its first run stopped because `target/debug/lotar` wasn't built yet. It passed once the smoke build had made the binary.
+    - `npm run smoke` passed: 406 tests in 118 files.
+    - Checked: the profile API sorts by name (`crates/lotar-lib/src/routes/agents.rs`), so variants can't follow config order without a backend change.
+  report:
+    commits:
+    - hash: a7cd6024f
+      what: assignee picker in task panel, Run agent, bulk assign and rule editor
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2443 Rust, 1581 UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa12f0aa7aa7c3a5663ff7f38b51ea73b9a85fabf949074533a44458e86ad9e8a
 - attachment: after-automation-dark.e4a61bebbc5bfd235e640881d2e978ed.png
@@ -79,6 +143,7 @@ references:
 - attachment: before-run-light-1440.81f1ae1b67ff5b035084c94d4fef02df.png
 - attachment: before-skin-paper-light.dd80f00eb36689bc8765889a7c737a52.png
 - attachment: before-skin-terminal-dark.2ef242d9e50d1173084d926cbe9f31c2.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1bb1fcdff94f91020e5bf7b95f70e58162cb618ef15a77598e61842dc0f018
 description: |-
   The task panel's assignee menu is hard to read and pick from now that there are many agent profile variants. It's a native `<select>` (`view/components/task-panel/TaskPanelOwnershipSection.vue` :36-63 via `UiSelect`) with people and every `@fix`, `@fix-light`, `@fix-fable`, `@fix-retry`, `@review-claude`, `@merge`… in one alphabetical list (`view/composables/useTaskPanelOwnership.ts` :71-87). It shows no runner, model or effort and has no search. "Custom…" swaps in a text field. The owner asked on 2026-11-21 for this select to "be rebuilt in a better way".
 
@@ -127,6 +192,7 @@ tags:
 - ui
 - web-ui
 - fix-retried
+- retry-fix
 history:
 - at: 2026-11-21T20:47:05.720790+00:00
   actor: claude
@@ -358,3 +424,41 @@ history:
   - field: relationships
     old: '{"related":["DEV-769"]}'
     new: '{"related":["DEV-769","DEV-776"]}'
+- at: 2026-11-22T02:45:07.522037+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1bb1fcdff94f91020e5bf7b95f70e58162cb618ef15a77598e61842dc0f018
+- at: 2026-11-22T02:45:42.044861+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T02:45:42.514372+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:46:49.705798+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:46:49.705890+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T02:47:16.662281+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: ui, web-ui, fix-retried
+    new: ui, web-ui, fix-retried, retry-fix
+- at: 2026-11-22T02:49:38.931836+00:00
+  actor: claude
+  changes:
+  - field: comment_added

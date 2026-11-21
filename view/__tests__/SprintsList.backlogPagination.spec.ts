@@ -267,15 +267,17 @@ describe('SprintsList pagination', () => {
     })
 
     it('applies persisted manual backlog order before paging without resetting sprint pages', async () => {
+        // The smallest page size keeps this two-mount test cheap under load (DEV-764).
+        localStorage.setItem('lotar.preferences.tasks.pageSize', '25')
         sprintsRef.value = [makeSprint(1)]
         const { api } = await import('../api/client')
         const tasks: TaskDTO[] = [
-            ...Array.from({ length: 120 }, (_, index) => makeTask(index + 1)),
-            ...Array.from({ length: 60 }, (_, index) => makeTask(200 + index, [1])),
+            ...Array.from({ length: 60 }, (_, index) => makeTask(index + 1)),
+            ...Array.from({ length: 30 }, (_, index) => makeTask(200 + index, [1])),
         ]
         vi.mocked(api.getBacklogOrder).mockResolvedValue({
             status: 'ok',
-            tasks: ['PRJ-120', 'PRJ-118', 'PRJ-119'],
+            tasks: ['PRJ-060', 'PRJ-058', 'PRJ-059'],
             changed: false,
         })
         ;(api.listTasks as any).mockResolvedValue({
@@ -292,30 +294,30 @@ describe('SprintsList pagination', () => {
             await sprintPager(wrapper, 1).find('button[aria-label="Page 2"]').trigger('click')
             await wrapper.find('#backlog button[aria-label="Page 2"]').trigger('click')
             await flushPromises()
-            expect(sprintTable(wrapper, 1)[0]!.attributes('data-task-id')).toBe('PRJ-250')
-            expect(wrapper.find('#backlog tbody tr').attributes('data-task-id')).toBe('PRJ-051')
+            expect(sprintTable(wrapper, 1)[0]!.attributes('data-task-id')).toBe('PRJ-225')
+            expect(wrapper.find('#backlog tbody tr').attributes('data-task-id')).toBe('PRJ-026')
 
             await wrapper.find('[data-testid="backlog-manual-order"]').trigger('click')
             await flushPromises()
             const rows = wrapper.findAll('#backlog tbody tr')
-            expect(rows).toHaveLength(50)
+            expect(rows).toHaveLength(25)
             expect(rows.slice(0, 4).map((row) => row.attributes('data-task-id'))).toEqual([
-                'PRJ-120',
-                'PRJ-118',
-                'PRJ-119',
+                'PRJ-060',
+                'PRJ-058',
+                'PRJ-059',
                 'PRJ-001',
             ])
-            expect(sprintTable(wrapper, 1)[0]!.attributes('data-task-id')).toBe('PRJ-250')
+            expect(sprintTable(wrapper, 1)[0]!.attributes('data-task-id')).toBe('PRJ-225')
             expect(wrapper.find('#backlog th[data-column="id"]').attributes('aria-sort')).toBe('none')
             await wrapper.find('#backlog button[aria-label="Page 2"]').trigger('click')
             await flushPromises()
-            expect(wrapper.find('#backlog tbody tr').attributes('data-task-id')).toBe('PRJ-048')
+            expect(wrapper.find('#backlog tbody tr').attributes('data-task-id')).toBe('PRJ-023')
 
             wrapper.unmount()
             wrapper = mount(SprintsList)
             await flushPromises()
             expect(wrapper.find('[data-testid="backlog-manual-order"]').attributes('aria-pressed')).toBe('true')
-            expect(wrapper.find('#backlog tbody tr').attributes('data-task-id')).toBe('PRJ-120')
+            expect(wrapper.find('#backlog tbody tr').attributes('data-task-id')).toBe('PRJ-060')
             await wrapper.find('#backlog th[data-column="title"] button').trigger('click')
             await flushPromises()
             expect(wrapper.find('[data-testid="backlog-manual-order"]').attributes('aria-pressed')).toBe('false')
@@ -1040,11 +1042,13 @@ describe('SprintsList pagination', () => {
     })
 
     it('resets offsets when filters change or the sort order flips', async () => {
+        // The smallest page size keeps this test cheap under load (DEV-764).
+        localStorage.setItem('lotar.preferences.tasks.pageSize', '25')
         sprintsRef.value = [makeSprint(1)]
         const { api } = await import('../api/client')
         const tasks = [
-            ...Array.from({ length: 120 }, (_, idx) => makeTask(idx + 1, [1])),
-            ...Array.from({ length: 120 }, (_, idx) => makeTask(900 + idx, [])),
+            ...Array.from({ length: 60 }, (_, idx) => makeTask(idx + 1, [1])),
+            ...Array.from({ length: 60 }, (_, idx) => makeTask(900 + idx, [])),
         ]
         ;(api.listTasks as any).mockResolvedValue({
             status: 'ok',
@@ -1062,8 +1066,8 @@ describe('SprintsList pagination', () => {
         await wrapper.find('#backlog nav[aria-label="Backlog pagination"] button[aria-label="Page 2"]').trigger('click')
         await flushPromises()
         const vm = wrapper.vm as any
-        expect(vm.backlogOffset).toBe(50)
-        expect(vm.sprintTaskOffsets[1]).toBe(50)
+        expect(vm.backlogOffset).toBe(25)
+        expect(vm.sprintTaskOffsets[1]).toBe(25)
 
         vm.filter = { status: 'open' }
         await flushPromises()
@@ -1072,7 +1076,7 @@ describe('SprintsList pagination', () => {
 
         await sprintPager(wrapper, 1).find('button[aria-label="Page 3"]').trigger('click')
         await flushPromises()
-        expect(vm.sprintTaskOffsets[1]).toBe(100)
+        expect(vm.sprintTaskOffsets[1]).toBe(50)
 
         vm.sort.key = 'title'
         await flushPromises()

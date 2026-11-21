@@ -1,14 +1,42 @@
 title: 'Flaky test: hanging_cat_file_fails_the_activity_feed_at_the_timeout finds no pid file under full-suite load'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T22:34:04.252012+00:00
-modified: 2026-11-21T22:34:19.544494+00:00
+modified: 2026-11-22T02:10:45.560346+00:00
 relationships:
   related:
   - DEV-760
+comments:
+- date: 2026-11-22T02:10:38.217886+00:00
+  author: claude
+  text: |-
+    Fixed: the test now waits for the pid file before the timeout can start.
+
+    - The 300 ms timeout in `BlobBatch` counts per read (`recv_timeout`), not from spawn. So the test now polls for the pid file (up to 60 s) before it calls `build_tracked_activity_feed`.
+    - The stub writes the pid atomically (`echo $! > pid.tmp && mv pid.tmp pid`), so the test can't read a partly written file.
+    - The assertion that the child is gone (`kill -0`) is unchanged.
+    - File: `crates/lotar-lib/src/services/audit_service.rs`.
+  report:
+    commits:
+    - hash: daaf39a00
+      what: test waits for the stub's pid file before the per-read timeout starts
+    checks:
+    - command: npm run -s lint
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2444 tests
+    - command: npm run -s smoke
+      result: passed
+    - command: stub with an extra 1 s start delay
+      result: passed
+      reason: would have exceeded the old 300 ms window
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a70d716e6faac36b93ca68c2990aa6670a0e16c0269ebbd0e09e9800e6d96c1
 description: 'Found in the DEV-760 merge (2026-11-21), load average about 32: `npm run -s test:agent` failed at `crates/lotar-lib/src/services/audit_service.rs:1260`, `pid file: NotFound`. The stub `sh -c ''sleep 600 & echo $! > pid; wait''` gets a 300 ms timeout; under load it is killed before it writes the pid file. Check: `npm run -s test:agent` under load. Done: the test waits for the pid file before the timeout can start counting, or reads the child another way, so a slow start can''t fail it, while still asserting the child is gone.'
 tags:
 - health
@@ -26,3 +54,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T02:03:28.381081+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T02:03:31.407767+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a70d716e6faac36b93ca68c2990aa6670a0e16c0269ebbd0e09e9800e6d96c1
+- at: 2026-11-22T02:10:38.217886+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:10:45.560346+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

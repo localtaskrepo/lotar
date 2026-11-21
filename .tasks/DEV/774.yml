@@ -1,16 +1,29 @@
 title: 'Bump harnessmux to 0.3: Claude tool commands from tool.updated, and plans in the job log'
-status: Todo
+status: Blocked
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-21T22:42:33.887526+00:00
-modified: 2026-11-21T22:42:51.833592+00:00
+modified: 2026-11-22T02:38:10.655061+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-13
+  - harnessmux:HARN-16
   related:
   - DEV-766
+comments:
+- date: 2026-11-22T02:38:02.077636+00:00
+  author: claude
+  text: |-
+    Waits for harnessmux 0.3.0 on crates.io: harnessmux HARN-16 releases it.
+
+    - crates.io lists harnessmux up to `0.2.1` only (`cargo search harnessmux`); HARN-13 was the 0.2.1 release, so it didn't unblock this
+    - HARN-14 (`19ef602`, version 0.3.0: `tool.updated`, `input`, `locations`, `output`, `plan`) is on harnessmux main, untagged
+    - HARN-16 (Blocked) tags and publishes it, after HARN-15 (InProgress) lands; each harnessmux release needs the owner's OK
+    - Added depends-on `harnessmux:HARN-16` and tag `waits`; no code change, nothing committed
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6331f86331214fb16e5f95218a7af2feca6938bae968e0bb650aafa789a84b43
 description: |-
   DEV-766 builds tool entries from harnessmux 0.2.0's `Event.raw`. claude-agent-acp sends a Bash command or Read path only in an in-progress `tool_call_update`, which 0.2.0 drops, so Claude tool rows show only "Terminal" and the output. harnessmux 0.3.0 (HARN-14) emits it as `tool.updated` and adds `input`, `locations`, `output` and `plan`, but is not on crates.io (HARN-13 waits for the owner).
 
@@ -23,6 +36,7 @@ description: |-
   - [ ] Tests with Claude- and Codex-shaped 0.3 events.
 tags:
 - agent
+- waits
 history:
 - at: 2026-11-21T22:42:34.148060+00:00
   actor: claude
@@ -41,3 +55,36 @@ history:
   - field: relationships
     old: '{"related":["DEV-766"]}'
     new: '{"depends_on":["harnessmux:HARN-13"],"related":["DEV-766"]}'
+- at: 2026-11-22T02:37:31.402962+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T02:37:35.509876+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6331f86331214fb16e5f95218a7af2feca6938bae968e0bb650aafa789a84b43
+- at: 2026-11-22T02:38:01.637982+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13"],"related":["DEV-766"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766"]}'
+- at: 2026-11-22T02:38:02.034499+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent
+    new: agent, waits
+- at: 2026-11-22T02:38:02.077636+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:38:10.655061+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

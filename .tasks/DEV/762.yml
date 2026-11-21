@@ -1,16 +1,19 @@
 title: Job worktree builds in a configurable build root (agent.worktree.build_root), clone and cleanup included
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-21T20:21:04.802424+00:00
-modified: 2026-11-22T00:05:59.669533+00:00
+modified: 2026-11-22T04:25:45.090215+00:00
 relationships:
+  blocks:
+  - DEV-778
   related:
   - DEV-635
   - DEV-778
   - DEV-760
+  - DEV-781
 comments:
 - date: 2026-11-21T20:55:35.079582+00:00
   author: claude
@@ -69,6 +72,43 @@ comments:
     - No two repos in `repos.json` share a folder name, so `<build_root>/<repo>/<ticket>` can't collide today.
     - Not covered by a test: the `cleanup_paths: [target]` and `waiting_run` relink paths, and the different-volume path (the fix agent said so too).
     - Minor, filed: [DEV-778](https://lotar.pyxzl.net/task/DEV-778). A build root folder outlives its worktree when a removal or cleanup is cut off in the middle (`agent_job_service.rs` ~2816, ~3243).
+- date: 2026-11-22T04:11:47.274234+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n\e[90m \e[2m❯\e[22m tests/ui.agent-jobs.smoke.spec.ts:\e[2m777:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\e[22m\e[39m\n\n\e[41m\e[1m FAIL \e[22m\e[49m tests/ui.theming.smoke.spec.ts\e[2m > \e[22mUI theming and repository branding (DEV-218)\e[2m > \e[22mapplies personal and repository themes, logo, name and icon\n\e[31m\e[1mError\e[22m: Timeout 5000ms exceeded while waiting on the predicate\e[39m\n\e[90m \e[2m❯\e[22m captureRawStack ../node_modules/playwright-core/lib/coreBundle.js:\e[2m9551:17\e[22m\e[39m\n\e[90m \e[2m❯\e[22m callMatcherAsStep ../node_modules/playwright/lib/matchers/expect.js:\e[2m13342:57\e[22m\e[39m\n\e[90m \e[2m❯\e[22m Object.toBe ../node_modules/playwright/lib/matchers/expect.js:\e[2m13334:23\e[22m\e[39m\n\e[36m \e[2m❯\e[22m tests/ui.theming.smoke.spec.ts:\e[2m41:82\e[22m\e[39m\n    \e[90m 39|\e[39m                 await withPage(`${server.url}/preferences`, async (pag…\n    \e[90m 40|\e[39m                     \e[90m// Built-in default until someone picks a theme.\e[39m\n    \e[90m 41|\e[39m                     await expect.poll(async () => (await rootState(pag…\n    \e[90m   |\e[39m                                                                                  \e[31m^\e[39m\n    \e[90m 42|\e[39m\n    \e[90m 43|\e[39m                     // DEV-220: a palette of the current skin, from th…\n\e[90m \e[2m❯\e[22m helpers/ui.ts:\e[2m104:26\e[22m\e[39m\n\e[90m \e[2m❯\e[22m withBrowser helpers/ui.ts:\e[2m84:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.theming.smoke.spec.ts:\e[2m39:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m3 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m115 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m3 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m403 passed\e[39m\e[22m\e[90m (406)\e[39m\n\e[2m   Start at \e[22m 20:04:07\n\e[2m   Duration \e[22m 459.20s\e[2m (tests 77%, import 20%, setup 2%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.14s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~17.27s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n```.\n\n- Rebased `agent/DEV-762` onto `main` (`89fe192f86b1`): `e098a475f8f2`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-22T04:25:30.681706+00:00
+  author: claude
+  text: |-
+    Not merged: full smoke fails under load, though not on this change. Land it anyway?
+
+    - Main hasn't moved (`89fe192f8`), the branch is still rebased (`e098a475f`), and lint and tests passed in lotar's merge.
+    - Full smoke failed twice, with a different set of tests each time. Run 1: `ui.theming:41`, `ui.agent-jobs:777` +1. Run 2: `ui.agent-jobs:458` (live log), `ui.config-coverage:135`. All of them are timeouts, at load average 30–46.
+    - Each failing file passes alone: `npm run -s test:smoke:quick:agent -- tests/ui.agent-jobs.smoke.spec.ts tests/ui.theming.smoke.spec.ts` and the same with `tests/ui.config-coverage.smoke.spec.ts`, 14/14 each time.
+    - The diff touches no UI code (Rust config/worktree, docs, one optional field in `view/api/types.ts`). The theming flake is already DEV-781; I added this run's evidence there.
+    - Question: merge with these load flakes, or wait for a green full smoke when the Mac is quieter?
+  report:
+    commits:
+    - hash: e098a475f
+      what: build_root, rebased onto main 89fe192f8 (unchanged since lotar's rebase)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge
+    - command: npm run -s smoke
+      result: failed
+      reason: 2 full runs, different UI timeouts each (load 30–46); every failing file passes alone
+    next: 'Owner: land despite the load flakes (DEV-781), or wait for a green full smoke'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A554b4ea9c0d8ed6283d447223332845ede88e3fc4c30c0320f2860da1f2baf4b
 description: |-
@@ -152,3 +192,32 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T03:35:48.807724+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-635","DEV-778","DEV-760"]}'
+    new: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760"]}'
+- at: 2026-11-22T04:11:47.274234+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T04:25:28.582971+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760"]}'
+    new: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781"]}'
+- at: 2026-11-22T04:25:30.681706+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T04:25:45.090215+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

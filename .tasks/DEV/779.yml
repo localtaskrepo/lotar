@@ -1,18 +1,57 @@
 title: UI test workers take 8-14 s each to start while the machine stalls, pushing heavy vitest tests toward the 30 s timeout
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-22T00:21:29.120752+00:00
-modified: 2026-11-22T00:21:34.502665+00:00
+modified: 2026-11-22T04:35:12.000932+00:00
 relationships:
   related:
   - DEV-753
   - DEV-764
+  - DEV-755
+comments:
+- date: 2026-11-22T04:31:39.604238+00:00
+  author: automation
+  text: The fix agent's job job-20261122T042547.620Z-142 failed (lotar agent logs job-20261122T042547.620Z-142); @fix-retry retries it on branch agent/DEV-779.
+- date: 2026-11-22T04:35:11.791856+00:00
+  author: claude
+  text: |-
+    The suite now tolerates the stall: the UI test timeout is 120 s, a hang guard instead of a speed budget.
+
+    - Cause: the machine stalls, not vitest. The check run is normal now (7.7 s, ~0.29 s startup per worker at load 19-37), and the suite peaks at only 2.3 GB RSS (`/usr/bin/time -l`).
+    - Hourly Time Machine backups to Nyx overlap two of the three stalls. The DEV-755 merge run started at 12:16 during the 12:15-12:36 backup, and the DEV-764 review run at ~16:15 during the 16:15-16:32 one. `diskimagesiod` wrote 2.1 GB in each window (`/Library/Logs/DiagnosticReports/diskimagesiod_*.diag`). Every backup logs `Failed event collection`, so each one does a full scan of the Data volume.
+    - Memory pressure: a JetsamEvent at 11:54 shows ~240 MB free, about 9 GB compressed and rustc/clippy running. The DEV-753 stall at 06:30 matches no backup, so the stalls have more than one cause.
+    - Reproduced: freezing vitest for 45 s mid-run made 2 tests time out at 30 s, the same error as in the merges. With 120 s the same run passes 94/94.
+    - Fix in `view/vitest.config.ts`: `testTimeout` and `hookTimeout` go from 30 s to 120 s, the same bound as the Rust waits (DEV-753). A truly hung test still fails, after 2 minutes.
+    - Not done: the TM full-scan error (`Failed to collect events`) is a machine matter for the owner, not lotar's.
+  report:
+    commits:
+    - hash: a76e155e7
+      what: UI vitest testTimeout/hookTimeout 30 s -> 120 s (hang guard)
+    checks:
+    - command: npm run -s test:ui:agent
+      result: passed
+      reason: 1563/1563, 7.7 s, ~0.29 s startup
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2446/2446, UI 1563/1563
+    - command: npm run -s smoke
+      result: passed
+      reason: 406/406
+    - command: 45 s freeze of vitest (kill -STOP/-CONT) on SprintsList.backlogPagination + Board specs
+      result: passed
+      reason: failed 2 tests at 30 s before, 94/94 after
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa9d927ee729fe344be319f20082fda7be034d97f7c6b9d43a5404db4c68cee15
 description: 'Found: reviewing DEV-764 (2026-11-21, load ~10): `npm run -s test:ui:agent` passed 1563/1563 but took 221 s with ~8.4 s startup per worker (139 files); DEV-753/755 merges saw ~14 s; normal is ~0.27 s and ~9 s total. SprintsList.backlogPagination.spec.ts alone took 31-45 s instead of 3 s, on main and on the DEV-764 branch alike. The stall hit at load 10 too, so it is not CPU load alone (T3 Code processes were at 40-100% CPU). Check: `npm run -s test:ui:agent` reports worker startup per file; find what makes spawn+environment slow (vitest isolate/pool, jsdom setup, machine state). Done: the cause is shown and the full run stays near its normal time, or the suite tolerates the stall.'
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: test:ui:agent:worker-startup
 history:
@@ -27,3 +66,37 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T04:26:39.769874+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T04:26:44.196075+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa9d927ee729fe344be319f20082fda7be034d97f7c6b9d43a5404db4c68cee15
+- at: 2026-11-22T04:31:37.638786+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-22T04:31:39.604238+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T04:35:11.791856+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T04:35:12.000932+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-753","DEV-764"]}'
+    new: '{"related":["DEV-753","DEV-764","DEV-755"]}'

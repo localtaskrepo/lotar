@@ -1,15 +1,42 @@
 title: 'Flaky smoke under load: two agent-jobs UI tests time out in the full run at load average 46, pass alone'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T23:03:37.168173+00:00
-modified: 2026-11-21T23:03:41.390077+00:00
+modified: 2026-11-22T02:44:52.196585+00:00
 relationships:
   related:
   - DEV-755
   - DEV-760
+comments:
+- date: 2026-11-22T02:44:44.140146+00:00
+  author: claude
+  text: |-
+    Both agent-jobs tests now wait out full-run load; the stop-all one also had a real race.
+
+    - Stop-all: the held gate agent exited by itself after the gate's 20 s default (`smoke/helpers/gate-agent.mjs`). Under load the dialog walk takes longer, so the running job *completed* before Stop all and "every job cancelled" could never come true. It now holds for `JOB_END_LIMIT_MS`; the `finally` still releases it.
+    - Both tests: the 15-20 s waits now use the file's `WAIT_BUDGET_MS` (45 s), and each test gets `{ timeout: 300_000 }` instead of the shared 120 s cap, as DEV-755 did.
+    - Only `smoke/tests/ui.agent-jobs.smoke.spec.ts` changed.
+  report:
+    commits:
+    - hash: a608c74df
+      what: hold the stop-all agent past the run, wait budgets and 300 s caps for both tests
+    checks:
+    - command: npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts
+      result: passed
+      reason: 11/11
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 406/406 at load average up to 32; load 46 not reproduced
+    next: Review, then merge and rerun npm run -s smoke on main
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad485dc0a8b158d70bd91376263ff6604b4338a79008fe1f0f757bb0583ac0ca8
 description: 'Found in the DEV-760 merge (2026-11-21), load average 46: `npm run -s smoke` failed in `smoke/tests/ui.agent-jobs.smoke.spec.ts`: ''stops queued and running jobs only after accessible confirmation'' (line 739, ''Timed out after 20000ms waiting for stop-all to cancel every job'') and ''shows the agent''s permission question in the job view and answers it'' (line 784, locator.waitFor 15000ms). Alone the spec passes, 11/11 in 29 s. Check: `npm run -s smoke` under load. Done: like DEV-755, these waits allow for full-run load, so only a hang fails them.'
 tags:
 - health
@@ -27,3 +54,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T02:39:32.154076+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T02:39:35.756796+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad485dc0a8b158d70bd91376263ff6604b4338a79008fe1f0f757bb0583ac0ca8
+- at: 2026-11-22T02:44:44.140146+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:44:52.196585+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

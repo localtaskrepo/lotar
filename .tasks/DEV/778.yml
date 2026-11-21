@@ -1,20 +1,48 @@
 title: A job's build root folder outlives its worktree when the removal or cleanup is cut off
-status: Todo
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T00:05:08.801449+00:00
-modified: 2026-11-22T00:05:12.444626+00:00
+modified: 2026-11-22T03:36:01.074217+00:00
 relationships:
+  depends_on:
+  - DEV-762
   related:
   - DEV-762
+comments:
+- date: 2026-11-22T03:35:49.249990+00:00
+  author: claude
+  text: |-
+    Waiting for DEV-762: the code this ticket fixes isn't on main yet.
+
+    - `build_root_dir`, the build delete in `remove_worktree_dir` and the parked `.<ticket>.lotar-cleanup-<job>` folders exist only in `4e32e4ff3` on `agent/DEV-762`, which is in Merging
+    - Added "Done when" to the description; the sweep's callers are only in lotar (`crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-lib/src/cli/handlers/agent.rs`, `crates/lotar-lib/tests/agent_safety_test.rs`)
+    - No code changed; next: once DEV-762 is on main, rebase `agent/DEV-778` and do the work
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A282711a46030edc51d136dceb5c1716c2f6ab065a6408c803b5f8995e2d5510c
 description: |-
   Found in the DEV-762 review. `remove_worktree_dir` (crates/lotar-agent/src/services/agent_job_service.rs ~2816) finds the build root folder before the rename, but deletes it only after the trash folder is gone. A removal cut off in between, or a failed delete of that folder, leaves `<build_root>/<repo>/<ticket>` with no link pointing at it. The next removal sweeps leftover `.<name>.lotar-removed` folders but not the build root. `remove_build_output` (~3243) has the same gap for its parked `.<ticket>.lotar-cleanup-<job>` folders in the build root. Those builds then take quota on /Volumes/Builds until someone deletes them by hand.
 
   Check: interrupt between the rename and the build delete (or make the build folder undeletable), then run `lotar agent worktree cleanup`: the folder stays.
 
   Done: a later removal or cleanup also deletes orphaned build root folders and parked cleanup folders of that repo, with a test.
+
+  ## Done when
+
+  The build root folder of a repo is `<build_root>/<repo>` (DEV-762). It is found from the configured `agent.worktree.build_root` and from the `target` link of the worktree being removed or cleaned; when both apply and differ, both are swept.
+
+  - [ ] `remove_worktree_dir` (Done cleanup, `lotar agent worktree cleanup`, cleanup rules) also deletes, in that repo's build root folder, every `.<name>.lotar-cleanup-<job>` folder and every `<name>` folder that no worktree of the repo (`git worktree list`, the main checkout included) is named after or links `target` to
+  - [ ] `prune_missing_worktree` and `lotar agent worktree cleanup` sweep the configured build root the same way, so the last worktree's leftover goes too
+  - [ ] `remove_build_output` sweeps leftover `.<ticket>.lotar-cleanup-<job>` folders of that repo before it parks its own
+  - [ ] A live worktree's build is never deleted: a folder whose worktree exists or is being added stays
+  - [ ] A failed delete in the sweep is logged as a warning; the removal itself still succeeds or fails as today
+  - [ ] Unset build root: nothing changes
+  - [ ] Test: a removal cut off after the rename (or a build folder that can't be deleted) leaves the folder; the next removal or cleanup deletes it, and a live worktree's build stays
+  - [ ] Docs (`docs/help/agent.md`) say leftovers are swept
+tags:
+- waits
 history:
 - at: 2026-11-22T00:05:10.705262+00:00
   actor: claude
@@ -27,3 +55,65 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T03:34:30.328350+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T03:34:34.805816+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A282711a46030edc51d136dceb5c1716c2f6ab065a6408c803b5f8995e2d5510c
+- at: 2026-11-22T03:35:48.581642+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-762 review. `remove_worktree_dir` (crates/lotar-agent/src/services/agent_job_service.rs ~2816) finds the build root folder before the rename, but deletes it only after the trash folder is gone. A removal cut off in between, or a failed delete of that folder, leaves `<build_root>/<repo>/<ticket>` with no link pointing at it. The next removal sweeps leftover `.<name>.lotar-removed` folders but not the build root. `remove_build_output` (~3243) has the same gap for its parked `.<ticket>.lotar-cleanup-<job>` folders in the build root. Those builds then take quota on /Volumes/Builds until someone deletes them by hand.
+
+      Check: interrupt between the rename and the build delete (or make the build folder undeletable), then run `lotar agent worktree cleanup`: the folder stays.
+
+      Done: a later removal or cleanup also deletes orphaned build root folders and parked cleanup folders of that repo, with a test.
+    new: |-
+      Found in the DEV-762 review. `remove_worktree_dir` (crates/lotar-agent/src/services/agent_job_service.rs ~2816) finds the build root folder before the rename, but deletes it only after the trash folder is gone. A removal cut off in between, or a failed delete of that folder, leaves `<build_root>/<repo>/<ticket>` with no link pointing at it. The next removal sweeps leftover `.<name>.lotar-removed` folders but not the build root. `remove_build_output` (~3243) has the same gap for its parked `.<ticket>.lotar-cleanup-<job>` folders in the build root. Those builds then take quota on /Volumes/Builds until someone deletes them by hand.
+
+      Check: interrupt between the rename and the build delete (or make the build folder undeletable), then run `lotar agent worktree cleanup`: the folder stays.
+
+      Done: a later removal or cleanup also deletes orphaned build root folders and parked cleanup folders of that repo, with a test.
+
+      ## Done when
+
+      The build root folder of a repo is `<build_root>/<repo>` (DEV-762). It is found from the configured `agent.worktree.build_root` and from the `target` link of the worktree being removed or cleaned; when both apply and differ, both are swept.
+
+      - [ ] `remove_worktree_dir` (Done cleanup, `lotar agent worktree cleanup`, cleanup rules) also deletes, in that repo's build root folder, every `.<name>.lotar-cleanup-<job>` folder and every `<name>` folder that no worktree of the repo (`git worktree list`, the main checkout included) is named after or links `target` to
+      - [ ] `prune_missing_worktree` and `lotar agent worktree cleanup` sweep the configured build root the same way, so the last worktree's leftover goes too
+      - [ ] `remove_build_output` sweeps leftover `.<ticket>.lotar-cleanup-<job>` folders of that repo before it parks its own
+      - [ ] A live worktree's build is never deleted: a folder whose worktree exists or is being added stays
+      - [ ] A failed delete in the sweep is logged as a warning; the removal itself still succeeds or fails as today
+      - [ ] Unset build root: nothing changes
+      - [ ] Test: a removal cut off after the rename (or a build folder that can't be deleted) leaves the folder; the next removal or cleanup deletes it, and a live worktree's build stays
+      - [ ] Docs (`docs/help/agent.md`) say leftovers are swept
+- at: 2026-11-22T03:35:48.808182+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-762"]}'
+    new: '{"depends_on":["DEV-762"],"related":["DEV-762"]}'
+- at: 2026-11-22T03:35:49.206922+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-22T03:35:49.249990+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T03:36:01.074217+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

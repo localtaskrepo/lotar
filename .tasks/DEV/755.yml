@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-21T04:06:49.168672+00:00
-modified: 2026-11-22T01:07:11.406890+00:00
+modified: 2026-11-22T04:35:12.000282+00:00
 relationships:
   related:
   - DEV-750
@@ -16,6 +16,11 @@ relationships:
   - DEV-725
   - DEV-775
   - DEV-781
+  - DEV-783
+  - DEV-784
+  - DEV-785
+  - DEV-786
+  - DEV-779
 comments:
 - date: 2026-11-21T07:34:52.575806+00:00
   author: automation
@@ -391,3 +396,33 @@ history:
   - field: relationships
     old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775"]}'
     new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781"]}'
+- at: 2026-11-22T03:06:52.565332+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783"]}'
+- at: 2026-11-22T03:06:53.284674+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783","DEV-784"]}'
+- at: 2026-11-22T03:06:53.985031+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783","DEV-784"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783","DEV-784","DEV-785"]}'
+- at: 2026-11-22T03:06:54.686329+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783","DEV-784","DEV-785"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783","DEV-784","DEV-785","DEV-786"]}'
+- at: 2026-11-22T04:35:12.000282+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783","DEV-784","DEV-785","DEV-786"]}'
+    new: '{"related":["DEV-750","DEV-760","DEV-763","DEV-764","DEV-753","DEV-754","DEV-725","DEV-775","DEV-781","DEV-783","DEV-784","DEV-785","DEV-786","DEV-779"]}'

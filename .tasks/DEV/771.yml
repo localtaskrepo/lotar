@@ -1,22 +1,82 @@
 title: Agents page shows Running 0, Queued 0 while the queue worker runs 2 jobs and 13 tickets wait
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-21T22:12:31.042289+00:00
-modified: 2026-11-21T22:12:31.297982+00:00
+modified: 2026-11-22T02:36:32.525292+00:00
 relationships:
   related:
   - DEV-279
   - DEV-522
   - DEV-725
+  - DEV-765
+comments:
+- date: 2026-11-22T01:51:54.505440+00:00
+  author: claude
+  text: |-
+    Fix in progress: `/api/jobs` and the Agents page now read the queue of every process.
+
+    - New `AgentQueueService::overview` (counts as `lotar agent queue`, plus per-ticket `waits_for`), used by the CLI and `GET /api/jobs` (`queue` field)
+    - Agents page: "Waiting in the queue" card on All/Queued tabs, prerequisites below; polls every 15 s
+    - Next: lint, tests, smoke, screenshots
+- date: 2026-11-22T01:54:48.550641+00:00
+  author: automation
+  text: The fix agent's job job-20261122T014418.036Z-129 failed (lotar agent logs job-20261122T014418.036Z-129); @fix-retry retries it on branch agent/DEV-771.
+- date: 2026-11-22T01:58:29.692575+00:00
+  author: claude
+  text: |-
+    Fixed: `GET /api/jobs` and the Agents page show the same counts as `lotar agent queue`, and list the waiting tickets.
+
+    - New `AgentQueueService::overview` (`crates/lotar-agent/src/services/agent_queue_service.rs`): counts jobs other processes run and the on-disk queue, falls back to the configured `max_parallel_jobs`, and gives each waiting ticket `waits_for` (queue worker, memory, usage-limit reset, paused queue, free slot, its ticket's running job, `starting`)
+    - `lotar agent queue` and `GET /api/jobs` share it; the route adds a `queue` field (`api_types.rs`, `view/api/types.ts`, `docs/openapi.json` updated)
+    - Agents page: **Waiting in the queue** card on All/Queued tabs in queue order (agent, queued time, what it waits for), jobs waiting for prerequisites below; reads the queue again every 15 s
+    - Repro: old build's server answered `running 0, queued 0` while the CLI said Running 1, Queued 3; the new build answers 1/3 and lists the 3 tickets
+    - Tests: `dev771_jobs_route_shows_the_queue_test` (entries queued by another CLI process, job record of another process), unit test `each_waiting_entry_says_what_it_waits_for`, Vitest for the card
+    - Screenshots before/after, light and dark, 1920/1440/390: `DEV-771-before-*.png`, `DEV-771-after-*.png` on https://lotar.pyxzl.net/task/DEV-771
+    - Not changed: the MCP `agent_list_jobs` still counts only its own process
+    - Docs: `docs/help/agent.md`, `docs/help/api-quick-reference.md`
+  report:
+    commits:
+    - hash: 3333807b1
+      what: /api/jobs and the Agents page show the queue of every process
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2446 Rust, 1564 UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests
+    - command: ticket check (server vs lotar agent queue, other process queued 3, runs 1)
+      result: passed
+      reason: both Running 1, Queued 3
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1224931913f390b0667f0bc0e9b90bc806302a13aae24ec5e6fd5fc180d2b92e
+- attachment: DEV-771-after-dark-1440.ca37cea0ad6ab1dd3d749d4033f02bf0.png
+- attachment: DEV-771-after-dark-1920.0ad9b9c4357bc00db91d1b7982094407.png
+- attachment: DEV-771-after-dark-390.1b2c32f65c3babf204f7dda3ecd8609d.png
+- attachment: DEV-771-after-light-1440.55b9c7b6525eafd6676e4819a8a2178e.png
+- attachment: DEV-771-after-light-1920.3793a2392c482b8a81413141b00734a6.png
+- attachment: DEV-771-after-light-390.c42a04f082ca2142253059353b5071bb.png
+- attachment: DEV-771-before-dark-1440.355db9422d1eeeaa841f6090ec1c692a.png
+- attachment: DEV-771-before-dark-1920.3071afc15cf72fc5e1fc9f8d9baf8fcf.png
+- attachment: DEV-771-before-dark-390.9a86dcd8bd021fb8bfb7bebe8ce92287.png
+- attachment: DEV-771-before-light-1440.3ad9b23a32995865533e8a894519a6ee.png
+- attachment: DEV-771-before-light-1920.e972f7ef9adeffa0fc92c53de015554c.png
+- attachment: DEV-771-before-light-390.e6541c9b68d12e2c85c9fa5b81f5772d.png
 description: |-
   Found (owner 2026-11-21: "I have no where to see what's queued up"): `GET /api/jobs` on the DEV server answers `queue_stats {running: 0, queued: 0}` while `lotar agent queue` shows Running 2, Queued 13 (DEV-725's release retry 9th). The route (crates/lotar-lib/src/routes/jobs.rs ~36) returns `AgentJobService::queue_stats()`, the serving process's own worker only. The CLI (cli/handlers/agent.rs ~454) adds jobs other processes run (DEV-279) and the on-disk queue (DEV-522). The page's Queued tab filters job logs with status queued, so tickets waiting in the on-disk queue never show.
 
   Check: with the queue worker in another process running jobs and tickets queued, the Agents page and `/api/jobs` show the same counts as `lotar agent queue`.
 
   Done when: the counts match the CLI; the page lists the waiting tickets in queue order with agent, queued time and what they wait for (the worker's reason: free slot, the ticket's running job, memory hold, pause), and the jobs waiting for prerequisites; a test covers a queue entry from another process; docs/help updated.
+tags:
+- fix-retried
+- ui
 history:
 - at: 2026-11-21T22:12:31.297982+00:00
   actor: claude
@@ -24,3 +84,107 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-279","DEV-522","DEV-725"]}'
+- at: 2026-11-22T01:44:56.823603+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T01:44:59.981969+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1224931913f390b0667f0bc0e9b90bc806302a13aae24ec5e6fd5fc180d2b92e
+- at: 2026-11-22T01:51:54.505440+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T01:54:46.522166+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-22T01:54:48.550641+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T01:57:40.715025+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-after-dark-1440.ca37cea0ad6ab1dd3d749d4033f02bf0.png
+- at: 2026-11-22T01:57:40.877309+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-after-dark-1920.0ad9b9c4357bc00db91d1b7982094407.png
+- at: 2026-11-22T01:57:41.189438+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-after-dark-390.1b2c32f65c3babf204f7dda3ecd8609d.png
+- at: 2026-11-22T01:57:41.570092+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-after-light-1440.55b9c7b6525eafd6676e4819a8a2178e.png
+- at: 2026-11-22T01:57:42.070476+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-after-light-1920.3793a2392c482b8a81413141b00734a6.png
+- at: 2026-11-22T01:57:42.303362+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-after-light-390.c42a04f082ca2142253059353b5071bb.png
+- at: 2026-11-22T01:57:42.465910+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-before-dark-1440.355db9422d1eeeaa841f6090ec1c692a.png
+- at: 2026-11-22T01:57:42.728396+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-before-dark-1920.3071afc15cf72fc5e1fc9f8d9baf8fcf.png
+- at: 2026-11-22T01:57:42.894983+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-before-dark-390.9a86dcd8bd021fb8bfb7bebe8ce92287.png
+- at: 2026-11-22T01:57:43.071961+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-before-light-1440.3ad9b23a32995865533e8a894519a6ee.png
+- at: 2026-11-22T01:57:43.238724+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-before-light-1920.e972f7ef9adeffa0fc92c53de015554c.png
+- at: 2026-11-22T01:57:43.471836+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-771-before-light-390.e6541c9b68d12e2c85c9fa5b81f5772d.png
+- at: 2026-11-22T01:57:47.577586+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, ui
+- at: 2026-11-22T01:58:29.692575+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T02:36:32.525292+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-279","DEV-522","DEV-725"]}'
+    new: '{"related":["DEV-279","DEV-522","DEV-725","DEV-765"]}'

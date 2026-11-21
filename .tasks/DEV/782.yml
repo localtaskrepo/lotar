@@ -1,0 +1,30 @@
+title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T02:36:00.735704+00:00
+modified: 2026-11-22T02:36:08.788363+00:00
+relationships:
+  related:
+  - DEV-765
+description: |-
+  Found while reviewing DEV-765.
+
+  - Live: the `agent_job_question` event the log follower sends makes the activity pill say **Asks** (`view/composables/useAgentActivity.ts`, `applyAgentJobEvent`).
+  - After a reload: `fromJob` takes the question from `GET /api/jobs`, and `saved_job_dto` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:950) always sets `question: None` for logged jobs. So a queue-worker job that still waits shows **Working** until its next event.
+  - Possible fix: when a logged job's last event is `agent_job_question` and no later event or status follows, report the question (title only, no answer options) in the DTO, or let `fromJob` use the last event's kind.
+
+  ## Done when
+  - [ ] A reload while a job in another process waits on a question shows **Asks** on the pill, the same as the live view.
+  - [ ] A test covers it.
+tags:
+- ui
+- agent
+history:
+- at: 2026-11-22T02:36:08.788363+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

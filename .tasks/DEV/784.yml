@@ -1,0 +1,25 @@
+title: 'Agent jobs: one full test run at a time across jobs, agents keep working in parallel'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T03:06:53.057587+00:00
+modified: 2026-11-22T03:06:53.523555+00:00
+relationships:
+  related:
+  - DEV-748
+  - DEV-755
+description: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar''s merge checks, and the repo''s test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs'' check runs never overlap (test), load during a full queue stays near the core count.'
+history:
+- at: 2026-11-22T03:06:53.285183+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-748","DEV-755"]}'
+- at: 2026-11-22T03:06:53.523555+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
