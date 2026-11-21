@@ -594,7 +594,20 @@ impl AgentQueueService {
         Ok(())
     }
 
+    /// The queue worker run in process, as tests do: it keeps PATH as it is.
     pub fn run_worker(tasks_dir: &Path) -> LoTaRResult<()> {
+        Self::run_worker_with(tasks_dir, false)
+    }
+
+    /// The `lotar agent worker` process: before it starts any thread it adds
+    /// the login shell's PATH entries, which its jobs inherit (DEV-731). In
+    /// process, other threads may run, so `run_worker` leaves PATH alone
+    /// (DEV-746).
+    pub fn run_worker_process(tasks_dir: &Path) -> LoTaRResult<()> {
+        Self::run_worker_with(tasks_dir, true)
+    }
+
+    fn run_worker_with(tasks_dir: &Path, login_path: bool) -> LoTaRResult<()> {
         let Some(lock_path) = worker_lock_path(tasks_dir) else {
             return Ok(());
         };
@@ -606,8 +619,9 @@ impl AgentQueueService {
         if lock_file.try_lock_exclusive().is_err() {
             return Ok(());
         }
-        // Before the worker starts threads: its jobs inherit this PATH.
-        complete_path_from_login_shell();
+        if login_path {
+            complete_path_from_login_shell();
+        }
         // Entries a worker that died took: this worker starts them.
         restore_taken(tasks_dir)?;
 
@@ -1133,9 +1147,10 @@ fn complete_path_from_login_shell() {
         Some(login) => {
             let merged = merge_paths(&current, &login);
             if merged != current {
-                // SAFETY: the worker has started no thread yet, and the
-                // login shell's reader thread has sent its output and only
-                // ends now; it doesn't read the environment.
+                // SAFETY: only the `lotar agent worker` process gets here,
+                // before it starts a thread; the login shell's reader thread
+                // has sent its output and only ends now; it doesn't read the
+                // environment.
                 unsafe { std::env::set_var("PATH", merged) };
             }
         }

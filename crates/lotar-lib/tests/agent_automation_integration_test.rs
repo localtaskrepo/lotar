@@ -3390,6 +3390,27 @@ fn agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done
     assert_eq!(TaskService::get(&storage, &waiting.id, None).unwrap().status.as_str(), "Todo");
 }
 
+/// DEV-746: only the `lotar agent worker` process takes the login shell's
+/// PATH (DEV-731). A worker run in process starts no login shell and leaves
+/// PATH alone while other threads run.
+#[cfg(unix)]
+#[test]
+fn an_in_process_worker_starts_no_login_shell() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _queue = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let marker = root.join("login-shell-ran");
+    let shell = write_stub_agent_script(root, "login-shell", &format!("#!/bin/sh\ntouch '{}'\nprintf '__LOTAR_LOGIN_PATH__/login-only'\n", marker.display()));
+    let _shell = common::env_mutex::EnvVarGuard::set("SHELL", shell.to_str().unwrap());
+    let path = std::env::var("PATH").unwrap_or_default();
+    AgentQueueService::run_worker(&fixtures.tasks_root).expect("run worker");
+    assert!(!marker.exists(), "the in-process worker ran the login shell");
+    assert_eq!(std::env::var("PATH").unwrap_or_default(), path);
+}
+
 /// DEV-524: a dependency check that fails (here an unreadable task file
 /// makes the graph incomplete) never parks the ticket: the job waits in the
 /// queue, which checks again before it starts it, and says so on the ticket

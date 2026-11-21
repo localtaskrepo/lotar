@@ -531,7 +531,7 @@ impl AgentHandler {
 
     fn worker(_args: AgentWorkerArgs, resolver: &TasksDirectoryResolver) -> Result<(), String> {
         AgentJobService::set_orchestrator_mode(crate::services::agent_job_service::AgentOrchestratorMode::Worker);
-        AgentQueueService::run_worker(resolver.path.as_path()).map_err(|e| e.to_string())
+        AgentQueueService::run_worker_process(resolver.path.as_path()).map_err(|e| e.to_string())
     }
 
     fn check(args: &AgentCheckArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
