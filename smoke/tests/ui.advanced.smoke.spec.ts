@@ -141,7 +141,7 @@ describe.skipIf(!gitAvailable())('UI advanced smoke scenarios', () => {
                             .locator('.stat-tile__value');
                     await expect.poll(async () => (await tile('Open').textContent())?.trim()).toBe('2');
                     await expect.poll(async () => (await tile('Completed').textContent())?.trim()).toBe('1');
-                    expect(await page.locator('.chart-card').count()).toBeGreaterThanOrEqual(4);
+                    await expect.poll(() => page.locator('.chart-card').count()).toBeGreaterThanOrEqual(4);
 
                     const waitForRefreshData = waitForInsightsData(page);
                     await page.locator('button[aria-label="Refresh insights"]').click();

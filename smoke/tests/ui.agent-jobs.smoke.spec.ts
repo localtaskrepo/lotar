@@ -88,9 +88,14 @@ async function waitUntil(description: string, timeoutMs: number, condition: () =
     throw new Error(`Timed out after ${timeoutMs}ms waiting for ${description}`);
 }
 
+// Waits are bounded by time, not by attempts: under full-suite load a single
+// round-trip can take seconds, and a fixed attempt count then gives up early.
+const WAIT_BUDGET_MS = 45_000;
+
 async function waitForTaskRowText(page: import('@playwright/test').Page, taskLabel: string, expected: string) {
     const row = page.locator('tr', { hasText: taskLabel }).first();
-    for (let attempt = 0; attempt < 80; attempt += 1) {
+    const deadline = Date.now() + WAIT_BUDGET_MS;
+    while (Date.now() < deadline) {
         const text = await row.textContent();
         if (text?.includes(expected)) {
             return text;
@@ -107,7 +112,8 @@ async function waitForTicketChip(page: import('@playwright/test').Page, taskId: 
 }
 
 async function waitForText(page: import('@playwright/test').Page, selector: string, expected: string) {
-    for (let attempt = 0; attempt < 80; attempt += 1) {
+    const deadline = Date.now() + WAIT_BUDGET_MS;
+    while (Date.now() < deadline) {
         const text = await page.textContent(selector).catch(() => null);
         if (text?.includes(expected)) {
             return text;
@@ -141,7 +147,8 @@ async function fetchJobsViaApi(serverUrl: string, ticketId?: string): Promise<Jo
 }
 
 async function waitForJobStatusViaApi(serverUrl: string, ticketId: string, expected: string): Promise<JobRecord> {
-    for (let attempt = 0; attempt < 80; attempt += 1) {
+    const deadline = Date.now() + WAIT_BUDGET_MS;
+    while (Date.now() < deadline) {
         const job = (await fetchJobsViaApi(serverUrl, ticketId))[0];
         if (job && job.status === expected) {
             return job;
@@ -179,7 +186,8 @@ async function updateTaskViaApi(serverUrl: string, patch: Record<string, unknown
 }
 
 async function waitForJobCountViaApi(serverUrl: string, ticketId: string, expected: number) {
-    for (let attempt = 0; attempt < 80; attempt += 1) {
+    const deadline = Date.now() + WAIT_BUDGET_MS;
+    while (Date.now() < deadline) {
         const jobs = await fetchJobsViaApi(serverUrl, ticketId);
         if (jobs.length >= expected) {
             return jobs.length;
@@ -190,7 +198,8 @@ async function waitForJobCountViaApi(serverUrl: string, ticketId: string, expect
 }
 
 async function waitForCompletedJobCountViaApi(serverUrl: string, ticketId: string, expected: number) {
-    for (let attempt = 0; attempt < 80; attempt += 1) {
+    const deadline = Date.now() + WAIT_BUDGET_MS;
+    while (Date.now() < deadline) {
         const jobs = await fetchJobsViaApi(serverUrl, ticketId);
         if (jobs.length >= expected && jobs.every((job) => job.status === 'completed')) {
             return jobs.length;
@@ -418,7 +427,10 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
             {
                 slow: {
                     script: gate.script,
-                    args: gate.agentArgs({ mode: 'lines', label: 'stream' }),
+                    // The job must still be held when the test asserts its
+                    // running state; the default 20 s self-release can pass
+                    // first under load. The finally block releases the gate.
+                    args: gate.agentArgs({ mode: 'lines', label: 'stream', holdMs: 90_000 }),
                 },
             },
             'lotar-smoke-agents-stream-',
