@@ -92,9 +92,15 @@ async function waitUntil(description: string, timeoutMs: number, condition: () =
 // round-trip can take seconds, and a fixed attempt count then gives up early.
 const WAIT_BUDGET_MS = 45_000;
 
+/**
+ * For a wait that must see agent jobs end however busy the machine is: it ends when the jobs do and the limit only
+ * catches a hang (DEV-751: the reviewed workflow's jobs outlasted 20 s at a load average of 25 to 50).
+ */
+const JOB_END_LIMIT_MS = 240_000;
+
 async function waitForTaskRowText(page: import('@playwright/test').Page, taskLabel: string, expected: string) {
     const row = page.locator('tr', { hasText: taskLabel }).first();
-    const deadline = Date.now() + WAIT_BUDGET_MS;
+    const deadline = Date.now() + JOB_END_LIMIT_MS;
     while (Date.now() < deadline) {
         const text = await row.textContent();
         if (text?.includes(expected)) {
@@ -102,7 +108,7 @@ async function waitForTaskRowText(page: import('@playwright/test').Page, taskLab
         }
         await page.waitForTimeout(250);
     }
-    throw new Error(`Timed out waiting for task ${taskLabel} to include ${expected}`);
+    throw new Error(`Timed out after ${JOB_END_LIMIT_MS}ms waiting for task ${taskLabel} to include ${expected}`);
 }
 
 async function waitForTicketChip(page: import('@playwright/test').Page, taskId: string) {
@@ -597,50 +603,54 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
-    it.skipIf(!gitAvailable())('advances the reviewed template workflow live without reloads', async () => {
-        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-reviewed-');
-        const worktreeDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-worktrees-'));
-
-        try {
-            const workspace = await SmokeWorkspace.create();
+    it.skipIf(!gitAvailable())(
+        'advances the reviewed template workflow live without reloads',
+        async () => {
+            const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-reviewed-');
+            const worktreeDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-worktrees-'));
 
             try {
-                await workspace.initGit({ name: 'tester', email: 'tester@example.com' });
-                await writeReviewedTemplateWorkflow(workspace, agents.command('mock'), worktreeDir);
-
-                const taskTitle = 'UI reviewed workflow';
-                const server = await startLotarServer(workspace);
+                const workspace = await SmokeWorkspace.create();
 
                 try {
-                    await withPage(`${server.url}/`, async (tasksPage) => {
-                        const taskId = await createTaskViaApi(server.url, taskTitle, 'UIAG', 'tester');
-                        await tasksPage.waitForSelector(`text=${taskTitle}`, { timeout: 15_000 });
-                        await updateTaskViaApi(server.url, { id: taskId, assignee: '@implement' });
-                        const reviewRowText = await waitForTaskRowText(tasksPage, taskTitle, 'Review');
-                        expect(reviewRowText).toContain(taskTitle);
-                        expect(reviewRowText).toContain('ready-for-review');
+                    await workspace.initGit({ name: 'tester', email: 'tester@example.com' });
+                    await writeReviewedTemplateWorkflow(workspace, agents.command('mock'), worktreeDir);
 
-                        expect(await waitForJobCountViaApi(server.url, taskId, 2)).toBeGreaterThanOrEqual(2);
+                    const taskTitle = 'UI reviewed workflow';
+                    const server = await startLotarServer(workspace);
 
-                        // The mock agent writes nothing: the ticket's work lands on main
-                        // here, or the merge fails as nothing was built (DEV-680).
-                        await workspace.runGit(['commit', '-q', '--allow-empty', '-m', `${taskId} work`]);
-                        await updateTaskViaApi(server.url, { id: taskId, assignee: '@merge' });
-                        const doneRowText = await waitForTaskRowText(tasksPage, taskTitle, 'Done');
-                        expect(doneRowText).toContain(taskTitle);
-                        expect(await waitForJobCountViaApi(server.url, taskId, 3)).toBeGreaterThanOrEqual(3);
-                    });
+                    try {
+                        await withPage(`${server.url}/`, async (tasksPage) => {
+                            const taskId = await createTaskViaApi(server.url, taskTitle, 'UIAG', 'tester');
+                            await tasksPage.waitForSelector(`text=${taskTitle}`, { timeout: 15_000 });
+                            await updateTaskViaApi(server.url, { id: taskId, assignee: '@implement' });
+                            const reviewRowText = await waitForTaskRowText(tasksPage, taskTitle, 'Review');
+                            expect(reviewRowText).toContain(taskTitle);
+                            expect(reviewRowText).toContain('ready-for-review');
+
+                            expect(await waitForJobCountViaApi(server.url, taskId, 2)).toBeGreaterThanOrEqual(2);
+
+                            // The mock agent writes nothing: the ticket's work lands on main
+                            // here, or the merge fails as nothing was built (DEV-680).
+                            await workspace.runGit(['commit', '-q', '--allow-empty', '-m', `${taskId} work`]);
+                            await updateTaskViaApi(server.url, { id: taskId, assignee: '@merge' });
+                            const doneRowText = await waitForTaskRowText(tasksPage, taskTitle, 'Done');
+                            expect(doneRowText).toContain(taskTitle);
+                            expect(await waitForJobCountViaApi(server.url, taskId, 3)).toBeGreaterThanOrEqual(3);
+                        });
+                    } finally {
+                        await server.stop();
+                    }
                 } finally {
-                    await server.stop();
+                    await workspace.dispose();
                 }
             } finally {
-                await workspace.dispose();
+                await agents.dispose();
+                await fs.remove(worktreeDir);
             }
-        } finally {
-            await agents.dispose();
-            await fs.remove(worktreeDir);
-        }
-    });
+        },
+        2 * JOB_END_LIMIT_MS + 60_000,
+    );
 
     it('stops queued and running jobs only after accessible confirmation', async ({ expect }) => {
         const gate = await createGateFixture('lotar-smoke-gate-stopall-');
