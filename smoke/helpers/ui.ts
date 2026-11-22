@@ -73,11 +73,19 @@ export async function withBrowser<T>(
     options: BrowserSessionOptions,
     callback: (context: BrowserContext, browser: Browser) => Promise<T>,
 ): Promise<T> {
-    const browser = await chromium.launch({
+    const launching = chromium.launch({
         headless: options.headless ?? true,
         args: extraLaunchArgs(),
     });
-    const release = oweCleanup(() => browser.close());
+    // Owed from the launch on: a test that times out while Chromium starts (DEV-788) still closes it.
+    const release = oweCleanup(() => launching.then((browser) => browser.close()));
+    let browser: Browser;
+    try {
+        browser = await launching;
+    } catch (error) {
+        release();
+        throw error;
+    }
     try {
         const context = await browser.newContext(options.context);
         try {

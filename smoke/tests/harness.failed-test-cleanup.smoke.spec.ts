@@ -22,6 +22,7 @@ describe('a timed-out test', () => {
             { cwd: repo, reject: false, all: true, env: { NO_COLOR: '1', FORCE_COLOR: '0' } },
         );
         expect(result.all).toContain('Test timed out in 5000ms');
+        expect(result.all).toContain('Test timed out in 50ms');
         expect(result.all).not.toContain('Tests left');
         expect(result.exitCode).toBe(1);
     });

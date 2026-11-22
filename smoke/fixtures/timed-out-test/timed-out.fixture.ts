@@ -1,6 +1,6 @@
 import { it } from 'vitest';
 import { startLotarServer } from '../../helpers/server.js';
-import { withPage } from '../../helpers/ui.js';
+import { withBrowser, withPage } from '../../helpers/ui.js';
 import { SmokeWorkspace } from '../../helpers/workspace.js';
 
 it('times out with its browser, server and workspace open', async () => {
@@ -18,3 +18,11 @@ it('times out with its browser, server and workspace open', async () => {
         await workspace.dispose();
     }
 });
+
+// DEV-788: under machine load the timeout can fire while Chromium is still starting.
+it('times out while its browser is still launching', async () => {
+    await withBrowser({}, async (context) => {
+        const page = await context.newPage();
+        await page.waitForSelector('#never-rendered', { timeout: 0 });
+    });
+}, 50);

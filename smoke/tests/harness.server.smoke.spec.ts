@@ -193,6 +193,31 @@ describe('server launch readiness against real child processes', () => {
         }
     });
 
+    it('reports the whole stderr of a child that exits before ready', async () => {
+        // DEV-788: 'exit' can come before the child's last stderr is read, which lost "Failed to bind" under load.
+        const cwd = tempCwd();
+        try {
+            const launch = launchAndWaitReady(
+                process.execPath,
+                ['-e', "process.stderr.write('last stderr line'); process.exitCode = 3;"],
+                { cwd, env: { ...process.env }, readyTimeoutMs: HANG_GUARD_MS },
+            ).then(
+                () => undefined,
+                (failure: unknown) => failure as Error,
+            );
+            // A busy machine: the child's exit and its last output are all pending when the event loop gets to them.
+            const busyUntil = Date.now() + 1_000;
+            while (Date.now() < busyUntil) {
+                // Block the event loop.
+            }
+            const error = await launch;
+            expect(error?.message).toMatch(/exited before becoming ready: code=3/);
+            expect(error?.message.endsWith('last stderr line')).toBe(true);
+        } finally {
+            rmSync(cwd, { recursive: true, force: true });
+        }
+    });
+
     it('fails when stdout ends after only a partial marker', async () => {
         const cwd = tempCwd();
         try {

@@ -14,7 +14,7 @@ export interface LotarServerOptions {
     readonly port?: number;
     readonly open?: boolean;
     readonly env?: NodeJS.ProcessEnv;
-    /** Bounded readiness wait in milliseconds (default 15s). */
+    /** Bounded readiness wait in milliseconds (default 60s). */
     readonly readyTimeoutMs?: number;
 }
 
@@ -26,8 +26,11 @@ export interface LotarServer {
     stop(): Promise<void>;
 }
 
-/** Default bound on how long a spawned server may take to advertise readiness. */
-const DEFAULT_READY_TIMEOUT_MS = 15_000;
+/** Default bound on how long a spawned server may take to advertise readiness: a hang guard, also under load. */
+const DEFAULT_READY_TIMEOUT_MS = 60_000;
+
+/** Bound on reading an exited server's last stderr. */
+const STDERR_DRAIN_MS = 5_000;
 
 /**
  * Matches the `   URL: http://host:port` readiness banner.
@@ -259,6 +262,10 @@ export async function launchAndWaitReady(
         // Always clean the child up before reporting failure. Cleanup must
         // never mask the readiness failure itself (e.g. execa surfaces the
         // child's non-zero exit as a promise rejection while we reap it).
+        if (failure.kind === 'exit') {
+            // 'exit' can come before the last stderr is read (DEV-788); that is where the cause ("Failed to bind") is.
+            await stderrClosed(child.stderr);
+        }
         await stopChildProcess(child, node).catch(() => undefined);
         if (failure.kind === 'exit') {
             throw annotate(
@@ -358,14 +365,29 @@ export async function startLotarServer(
     };
 }
 
-/**
- * Graceful teardown: SIGINT, bounded wait, SIGKILL fallback, then await the
- * exit so the child is reaped before returning (joined teardown).
- */
+/** Wait until an exited child's stderr pipe has closed, bounded by `STDERR_DRAIN_MS`. */
+async function stderrClosed(stderr: NodeJS.ReadableStream & { closed?: boolean }): Promise<void> {
+    if (stderr.closed) {
+        return;
+    }
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+        once(stderr, 'close').catch(() => undefined),
+        new Promise((resolve) => {
+            timer = setTimeout(resolve, STDERR_DRAIN_MS);
+        }),
+    ]);
+    clearTimeout(timer);
+}
+
 function isRunning(node: ChildProcess): boolean {
     return node.exitCode === null && !node.killed;
 }
 
+/**
+ * Graceful teardown: SIGINT, bounded wait, SIGKILL fallback, then await the
+ * exit so the child is reaped before returning (joined teardown).
+ */
 async function stopChildProcess(child: ResultPromise, node: ChildProcess): Promise<void> {
     if (node.exitCode !== null || node.signalCode !== null) {
         // Already exited (by code or signal): attach a rejection handler so
