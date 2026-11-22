@@ -1,14 +1,16 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: Merging
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-25T12:41:44.072805+00:00
+modified: 2026-11-25T18:02:29.257885+00:00
 relationships:
   blocks:
   - DEV-801
+  - DEV-867
+  - DEV-868
   related:
   - DEV-763
   - DEV-780
@@ -17,6 +19,7 @@ relationships:
   - DEV-867
   - DEV-868
   - DEV-832
+  - DEV-784
 comments:
 - date: 2026-11-22T21:30:02.840094+00:00
   author: claude
@@ -124,6 +127,23 @@ comments:
     Filed (minor):
     - [DEV-867](https://lotar.pyxzl.net/task/DEV-867): a merge job taken over after lotar exits (`adopt_orphaned_job` → `finish_orphaned_job`) resumes its merge agent without the checks lock.
     - [DEV-868](https://lotar.pyxzl.net/task/DEV-868): `comment_checks_lock` was inserted under `comment_merge`'s doc comment (`agent_job_service.rs:3808`).
+- date: 2026-11-25T18:00:54.970083+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-797` onto `main` conflicts in `.tasks/DEV/automation.yml`, `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-agent/src/services/agent_job_service/merge.rs`, `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-797` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-25T18:02:18.875527+00:00
+  author: claude
+  text: |-
+    Merge stopped: main already has a different machine-wide check lock (DEV-784, `425fe5664`). Which lock should stay?
+
+    - **Main (DEV-784):** `check_lock.rs`, a TCP socket on `127.0.0.1:47586`. It is held only while a merge round's checks run, and the repo's test scripts (`scripts/check-lock.mjs`, `rust-test-runner.mjs`) take it too. It sets `LOTAR_CHECK_LOCK_HELD=1` and is described in `docs/help/agent.md`.
+    - **This branch (DEV-797):** `checks_lock.rs`, a file lock on `checks.lock` in the queue folder. It is held from the checks until the job ends, the hand-off to the merge agent keeps it, and the merge agent also takes it. It comments the wait on the ticket.
+    - Keeping both would put two locks around the same checks. Picking one, or folding DEV-797's extras (the merge agent takes it, the hand-off keeps it, the wait comment) into DEV-784's socket lock, is a design choice, so I didn't resolve it.
+    - The other conflicts were mechanical: main already has the prompt text in `.tasks/DEV/automation.yml` (from the standards sync), and `integration.rs` only needed both test modules listed.
+    - `git rebase --abort` ran, `agent/DEV-797` is unchanged at `3c444f069`, and no checks ran.
+    - Options: (a) rework DEV-797 on top of DEV-784's socket lock, adding only the merge-agent hold, the hand-off and the wait comment, then drop `checks_lock.rs`; (b) replace DEV-784's lock with the file lock; (c) close DEV-797 as covered by DEV-784 and keep only its prompt and doc changes.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
@@ -150,8 +170,6 @@ description: |-
   - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline (a follow-up after the release, not this job).
 tags:
 - agent
-- review-returned
-- job-paused
 history:
 - at: 2026-11-22T19:02:57.524782+00:00
   actor: claude
@@ -330,3 +348,44 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868"]}'
     new: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832"]}'
+- at: 2026-11-25T18:00:54.970083+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T18:01:05.096242+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832"]}'
+    new: '{"blocks":["DEV-801","DEV-867"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832"]}'
+- at: 2026-11-25T18:01:15.472717+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801","DEV-867"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832"]}'
+    new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832"]}'
+- at: 2026-11-25T18:02:18.875527+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T18:02:19.124382+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832"]}'
+    new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784"]}'
+- at: 2026-11-25T18:02:29.201019+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent, review-returned, job-paused
+    new: agent
+- at: 2026-11-25T18:02:29.257885+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

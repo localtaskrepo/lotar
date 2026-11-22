@@ -1,0 +1,33 @@
+title: 'Flaky smoke on main: preserves plot height and page/plot scroll through a delayed root reload shifts the plot by 262 px'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T17:59:45.630098+00:00
+modified: 2026-11-25T17:59:46.453503+00:00
+relationships:
+  related:
+  - DEV-799
+description: |-
+  Found during the DEV-799 merge on main `c0fe875d6` (server and UI as on main): `tests/ui.relationships.smoke.spec.ts` > preserves plot height and page/plot scroll through a delayed root reload failed 1 of 8 runs of its file alone (load 5 to 13). Each failure is identical: `documentHeight` 1370 -> 1517, `plotTop` 79.9 -> 341.9, `scrollTop` 2196 -> 0. Something 147 px tall appears above the plot while the root graph request is held. The same file's 'exposes Dependencies in navigation and persists its Preferences visibility' test failed 5 of 14 runs on main too. Passes as a single test (`-t`), so it is a race between tests of the file, not wall-clock load (the wall-clock group would not help).
+
+  Check: `for i in 1 2 3 4 5 6 7 8; do npx vitest run --config smoke/vitest.config.ts tests/ui.relationships.smoke.spec.ts; done` after `npm run build:smoke`.
+
+  Done: the file passes 8 of 8 runs alone and the full `npm run smoke` passes.
+tags:
+- health
+custom_fields:
+  finding: smoke:ui.relationships-plot-height
+history:
+- at: 2026-11-25T17:59:46.044442+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-799"]}'
+- at: 2026-11-25T17:59:46.453503+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

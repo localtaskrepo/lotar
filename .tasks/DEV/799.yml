@@ -1,17 +1,20 @@
 title: 'Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-25T17:40:28.634890+00:00
+modified: 2026-11-25T18:12:59.784811+00:00
 relationships:
   related:
   - DEV-464
   - DEV-615
   - DEV-725
   - DEV-801
+  - DEV-873
+  - DEV-811
+  - DEV-874
 comments:
 - date: 2026-11-22T21:39:08.887960+00:00
   author: claude
@@ -151,6 +154,34 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-25T17:59:58.914718+00:00
+  author: claude
+  text: |-
+    Not merged: smoke fails in 2 specs. The relationships one fails the same way on main, but the task-view one I could not show on main. Should I land DEV-799 anyway?
+
+    - Rebased again onto main `c0fe875d6` (DEV-811): `3c6bf76e6`, no conflicts.
+    - `ui.relationships` "preserves plot height…": fails on true main too (main's `web_server.rs` and `useReleases.ts`), 1 of 8 runs of the file alone, with the same numbers (`documentHeight` 1370→1517, `plotTop` +262). On the branch it failed 1 of 8. It passes as a single test, so the `wall-clock` group won't help. Filed [DEV-873](https://lotar.pyxzl.net/task/DEV-873).
+    - The same file's "exposes Dependencies in navigation…" fails on main 5 of 14 runs (0 of 8 on the branch).
+    - `ui.task-view` "switches between the side panel and the large view": the large panel is 80 px off-center. It failed in lotar's full run and 1 of 4 file-alone runs on the branch, 0 of 6 on main. The task panel uses `useReleases`, which this branch makes reload on stream `open`/`ready`, so a link is possible but not shown. It looks like a timing race (it measures right after the width passes 1200).
+    - Options: land now (main is already red in the relationships spec), or hold until the task-view race is understood.
+  report:
+    commits:
+    - hash: 3c6bf76e6
+      what: the fix, rebased onto main c0fe875d6 (not merged)
+    checks:
+    - command: npm ci
+      result: passed
+      reason: lotar's merge; lockfile unchanged by the second rebase
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge, on 281beb870
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge, on 281beb870
+    - command: npm run -s smoke
+      result: failed
+      reason: ui.relationships and ui.task-view, see comment
+    next: 'Owner: land as is, or wait for DEV-873 / a task-view fix'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adfb741c2086c10a924409cd5752026c76392856e3a908ac33e047e23a887365e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9da4fd47475753f0b0d0c8242fb2ad47f1fc665533f5957bcb491c2b3c787e4
@@ -162,8 +193,6 @@ description: |-
   Done: the test waits for what enables the item (the release list refresh after release_changed), or the row menu enables the item once the release appears, and the test passes repeatedly in the full suite.
 tags:
 - health
-- review-returned
-- job-paused
 history:
 - at: 2026-11-22T19:16:18.587645+00:00
   actor: claude
@@ -280,3 +309,40 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T17:59:46.043746+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801"]}'
+    new: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801","DEV-873"]}'
+- at: 2026-11-25T17:59:58.914718+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:59:59.195771+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801","DEV-873"]}'
+    new: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801","DEV-873","DEV-811"]}'
+- at: 2026-11-25T18:00:15.434051+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, review-returned, job-paused
+    new: health
+- at: 2026-11-25T18:00:15.483693+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-25T18:12:59.784811+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801","DEV-873","DEV-811"]}'
+    new: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801","DEV-873","DEV-811","DEV-874"]}'

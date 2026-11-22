@@ -1,14 +1,30 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-25T07:45:42.255522+00:00
+modified: 2026-11-25T18:01:05.737931+00:00
 relationships:
+  depends_on:
+  - DEV-797
   related:
   - DEV-797
+comments:
+- date: 2026-11-25T18:00:31.503924+00:00
+  author: automation
+  text: The fix agent's job job-20261125T180021.869Z-170 failed (lotar agent logs job-20261125T180021.869Z-170); @fix-retry retries it on branch agent/DEV-867.
+- date: 2026-11-25T18:01:05.737931+00:00
+  author: claude
+  text: |-
+    Waits for DEV-797: the checks lock this fix has to take isn't on `main` yet.
+
+    - `main` (`ede5d109f`) has no `checks_lock.rs` and no `checks.lock`; they're only on `agent/DEV-797` (`3c444f069`), which is in Merging (the merge agent is rebasing it).
+    - Building on `agent/DEV-797` would carry DEV-797's commit into this merge, so I'm not doing that.
+    - Once DEV-797 lands: `finish_orphaned_job` takes the lock (with the same wait and comment as `comment_checks_lock`) before it resumes a merge job's session, plus a test that holds the lock from outside and sees the takeover wait.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 description: |-
   Found in the DEV-797 review: `adopt_orphaned_job` → `finish_orphaned_job` (`crates/lotar-agent/src/services/agent_job_service.rs:2002`, `:2121`) resumes a merge job's agent session (a t3 thread may still run its full suites) but never takes `checks.lock`. The OS freed the lock when the old lotar exited, so a second merge can run its suites beside the adopted one, which DEV-797 forbids ("holds it until the job ends").
 
@@ -16,9 +32,51 @@ description: |-
   Done when: a taken-over merge job takes the checks lock before its session goes on (waiting as in DEV-797), or the docs say why it doesn't.
 tags:
 - agent
+- fix-retried
+- waits
 history:
 - at: 2026-11-25T07:45:42.255522+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T18:00:24.910209+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T18:00:25.544328+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
+- at: 2026-11-25T18:00:30.966910+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: agent
+    new: agent, fix-retried
+- at: 2026-11-25T18:00:31.503924+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T18:01:05.097128+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-797"]}'
+    new: '{"depends_on":["DEV-797"],"related":["DEV-797"]}'
+- at: 2026-11-25T18:01:05.676340+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, fix-retried
+    new: agent, fix-retried, waits
+- at: 2026-11-25T18:01:05.737931+00:00
+  actor: claude
+  changes:
+  - field: comment_added

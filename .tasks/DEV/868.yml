@@ -1,22 +1,80 @@
 title: comment_checks_lock took comment_merge's doc comment
-status: Todo
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-25T07:45:42.688933+00:00
-modified: 2026-11-25T07:45:44.138837+00:00
+modified: 2026-11-25T18:01:16.100555+00:00
 relationships:
+  depends_on:
+  - DEV-797
   related:
   - DEV-797
+comments:
+- date: 2026-11-25T18:00:41.004402+00:00
+  author: automation
+  text: The fix agent's job job-20261125T180032.092Z-171 failed (lotar agent logs job-20261125T180032.092Z-171); @fix-retry retries it on branch agent/DEV-868.
+- date: 2026-11-25T18:01:16.100555+00:00
+  author: claude
+  text: |-
+    Waits for DEV-797: the misplaced doc comment exists only on its unmerged branch.
+
+    - `main` (`ede5d109f`) has no `comment_checks_lock`; `comment_merge` keeps its doc comment there (`crates/lotar-agent/src/services/agent_job_service.rs:3985`).
+    - The bug is on `agent/DEV-797` (`3c444f069`, status Merging), lines 3808-3824: `git grep -n "fn comment_checks_lock" agent/DEV-797`.
+    - Next: once DEV-797 is on `main`, move "Comment lotar's merge outcome on the ticket, and keep it as the job's last message." down onto `fn comment_merge`.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aababe399e8f28fe918ab7c772959aac66cb5d87c9e24f9b62ef54f413e8cd232
 description: |-
   Found in the DEV-797 review: `fn comment_checks_lock` was inserted between `comment_merge`'s doc comment and its fn (`crates/lotar-agent/src/services/agent_job_service.rs:3808-3824`). Now `comment_checks_lock` has both doc paragraphs and `comment_merge` none.
   Done when: "Comment lotar's merge outcome on the ticket, and keep it as the job's last message." sits on `comment_merge` again.
 tags:
 - agent
+- fix-retried
+- waits
 history:
 - at: 2026-11-25T07:45:44.138837+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T18:00:34.803431+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T18:00:35.384394+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aababe399e8f28fe918ab7c772959aac66cb5d87c9e24f9b62ef54f413e8cd232
+- at: 2026-11-25T18:00:40.466263+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: agent
+    new: agent, fix-retried
+- at: 2026-11-25T18:00:41.004402+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T18:01:15.473505+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-797"]}'
+    new: '{"depends_on":["DEV-797"],"related":["DEV-797"]}'
+- at: 2026-11-25T18:01:16.051074+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, fix-retried
+    new: agent, fix-retried, waits
+- at: 2026-11-25T18:01:16.100555+00:00
+  actor: claude
+  changes:
+  - field: comment_added

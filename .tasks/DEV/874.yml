@@ -1,0 +1,55 @@
+title: 'Repo health 2026-11-25: Repo is no T3 Code project: project and 2 more'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T18:12:57.249115+00:00
+modified: 2026-11-25T18:13:03.117505+00:00
+relationships:
+  related:
+  - DEV-464
+  - DEV-786
+  - DEV-799
+description: |-
+  3 findings of the daily repo-health run on 2026-11-25 (`repos.ts --report`), in one ticket (owner 2026-11-22, STD-299). Fix each the way its section says; the ticket is done when no check command below lists its finding any more.
+
+  ## Repo is no T3 Code project: project
+
+  /Users/mallox/Development/@localtaskrepo/lotar is no T3 Code project, so fix agents can't start there (--fix: t3 project add)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[t3:project]` while the problem is there.
+
+  Done when: t3 thread list --project <repo dir> works: the repo is a T3 Code project, so its fix agents can start.
+
+  ## Waiting for the owner without a question: DEV-786
+
+  DEV-786 (Agent queue: order by priority, manage the queue (move up/down, keep each entry's prompt), categories) is HelpNeeded, but its last comment asks no question: "Review finding fixed: the full before/after screenshot set of the current queue card is attached. No code change, so no…" (lotar show DEV-786)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-786]` while the problem is there.
+
+  Done when: The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+
+  ## Waiting for the owner, not in his inbox: DEV-799
+
+  DEV-799 (Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item) waits for the owner (HelpNeeded, assigned to mallox) but has no open ticket in his inbox, so the briefing doesn't list it (lotar show DEV-799)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[inbox:DEV-799]` while the problem is there.
+
+  Done when: Each listed ticket is in the owner's inbox (an open INBOX ticket in standards with its ID as source: run `node ~/Development/standards/scripts/repos.ts --inbox <ID>` in its repo), or it moved on because nothing needs him: back to its agent with what his answer said, or Done. Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+custom_fields:
+  finding: health:2026-11-25
+history:
+- at: 2026-11-25T18:12:59.786162+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-464","DEV-786","DEV-799"]}'
+- at: 2026-11-25T18:13:03.117505+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

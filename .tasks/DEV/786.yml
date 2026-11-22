@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix-fable'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-25T17:11:04.198417+00:00
+modified: 2026-11-25T18:12:59.776851+00:00
 relationships:
   related:
   - DEV-725
@@ -19,6 +19,7 @@ relationships:
   - DEV-843
   - DEV-771
   - DEV-856
+  - DEV-874
 comments:
 - date: 2026-11-22T05:07:00.362925+00:00
   author: claude
@@ -1108,3 +1109,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T18:12:59.776851+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856","DEV-874"]}'

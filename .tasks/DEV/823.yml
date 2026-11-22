@@ -1,11 +1,11 @@
 title: A write in one project refuses while another process's transaction in another project is in flight (workspace-wide journal, per-project lock)
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T02:40:59.050764+00:00
-modified: 2026-11-25T07:39:34.368982+00:00
+modified: 2026-11-25T18:00:15.359877+00:00
 relationships:
   related:
   - DEV-808
@@ -52,12 +52,38 @@ comments:
     - The test failed before the fix: reverting only `safety.rs` in a detached scratch copy fails `a_journal_for_another_project_does_not_block_writers_here` with `PendingJournalRefusal`. With the fix it passes.
     - Reran: `npm ci` (ok), `cargo nextest run -p lotar-tasks -p lotar-core -E 'test(/dev55|journal|transaction|pending/)'` (31/31 passed), `cargo clippy -p lotar-core -p lotar-tasks --all-targets -D warnings` (clean), `rustfmt --check` on the changed files (ok). All ran with `RUSTC_WRAPPER=`. The full `npm test`, `npm run smoke` and `npm run lint` were not rerun: the fix agent reported them passing, and the change is limited to storage.
     - No UI changes. No stray files and no second copy of the fix. No owner decision involved. No minor tickets filed.
+- date: 2026-11-25T18:00:15.163399+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-823` is in `main`.
+
+    - Rebased `agent/DEV-823` onto `main` (`c0fe875d6bd8`): `d368066d2947`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `d368066d2947`
+    - Amended the pending `.tasks` changes into the merged commit: `ede5d109f863`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[storage:journal-lock-scope]`
+  report:
+    commits:
+    - hash: ede5d109f
+      what: DEV-823 A write in one project refuses while another process's transaction in another project is in flight (workspace-wide journal, per-project lock)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad6d87720ac3c91fa1b717273d8d97acda5d66e2be7041353e7ba424919e7f577
 description: 'Found 2026-11-22 (DEV-808): 5 inbox answers posted at once to a `lotar serve` with standards'' INBOX/STD rules. One relay''s `lotar comment STD-1` failed at once with "A pending task/sprint transaction journal exists at <root>/.txn-pending.json; a crashed multi-file mutation is waiting to be rolled back", while the other relays ran. Nothing had crashed. refuse_under_pending_transaction (crates/lotar-core/src/storage/safety.rs) assumes "journals are only created by writers that hold this same lock", but the task lock is per project folder (STD/.task.lock) and the journal is per workspace, so a live transaction from another project''s writer (here INBOX, `lotar status INBOX-n Done`) looks like a crashed one. Check: two processes, one holding a transaction in project A, the other commenting in project B, must both succeed. Done: a live journal makes other writers wait (or doesn''t apply), and only a crashed one is refused.'
 tags:
 - health
-- job-paused
 custom_fields:
   finding: storage:journal-lock-scope
 history:
@@ -119,3 +145,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T18:00:15.163399+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T18:00:15.359877+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health
