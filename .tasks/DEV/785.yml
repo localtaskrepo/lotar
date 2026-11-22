@@ -1,17 +1,69 @@
 title: 'Tests: timing-sensitive tests in a serial nextest group (and vitest/smoke equivalent), not a ticket per flake'
-status: Todo
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T03:06:53.746513+00:00
-modified: 2026-11-22T03:06:54.243836+00:00
+modified: 2026-11-22T09:10:54.049672+00:00
 relationships:
   related:
   - DEV-748
   - DEV-750
   - DEV-755
-description: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). DEV-748..761 were one ticket per timing test that failed under load, each with fix, review and merge jobs rerunning the suite. Do: put tests that wait on wall-clock budgets (SSE stream, merge-without-agent, queue/worker timing, the smoke specs named in DEV-750/755) in a nextest test-group with max-threads 1 and the UI/smoke equivalents; the rule for new ones in AGENTS.md; a flaky timing test joins the group instead of getting its own ticket. Done when: the group exists, the known flakes are in it, the full suite passes at load average 30.'
+  - DEV-741
+  - DEV-751
+  - DEV-760
+  - DEV-764
+  - DEV-775
+  - DEV-781
+  - DEV-761
+  - DEV-773
+  - DEV-784
+comments:
+- date: 2026-11-22T09:10:40.200018+00:00
+  author: claude
+  text: |-
+    Timing tests now run in a serial `wall-clock` group in nextest, UI and smoke; full suites pass at load average 33+.
+
+    - Rust `.config/nextest.toml`: group `agent-processes` became `wall-clock` (`max-threads = 1`, `priority = 50` so it starts first, `retries = 2` as before). 132 tests: agent automation + safety (already in it), `dev604_queue_pauses_test`, `dev605_merge_without_agent_test`, `web_api_integration_test::sse_*`, the DEV-761 dev503 test and the DEV-773 audit test. DEV-760 stays out (date bug)
+    - UI `view/vitest.config.ts`, smoke `smoke/vitest.config.ts`: `WALL_CLOCK_SPECS` lists, run as a `wall-clock` project after the parallel files, one file at a time. Smoke: 8 files from DEV-750/751/755/775/781; UI: `SprintsList.backlogPagination.spec.ts` (DEV-764). Each file runs exactly once (139 UI, 118 smoke, checked with `vitest list`)
+    - Rule in `AGENTS.md`, lists named in the `testing-strategy` skill and `smoke/README.md`
+    - Cost: `test:rust:agent` 122 s → 164 s (load ~15); smoke 39 s → 65 s (the second run started at load 32, so partly load)
+    - Told the DEV-784 thread: it edits the same two vitest configs (`globalSetup` line only), so the rebase should be easy
+  report:
+    commits:
+    - hash: bfc44b466
+      what: wall-clock test group in nextest, UI and smoke; AGENTS.md rule
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2453 Rust + 1564 UI, release, hooks; load average 33-141 (median 59, 16 busy loops added)
+    - command: npm run -s test:smoke:agent
+      result: passed
+      reason: 407/407 at the same load
+    - command: npm run -s lint:agent
+      result: passed
+    - command: temp-leak probe
+      result: passed
+      reason: a spec leaving a temp file still fails the run with the two projects
+    next: 'Review, then merge. Optional trim if the extra time hurts: keep only the flaky dev605 test in the group instead of the whole module'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5c8d6340739f46b0d7639fb411a4783a3b4b64b5e4a2c44a360165f04868dca7
+description: |-
+  Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). DEV-748..761 were one ticket per timing test that failed under load, each with fix, review and merge jobs rerunning the suite.
+
+  Owner's words: "put tests that wait on wall-clock budgets (SSE stream, merge-without-agent, queue/worker timing, the smoke specs named in DEV-750/755) in a nextest test-group with max-threads 1 and the UI/smoke equivalents; the rule for new ones in AGENTS.md; a flaky timing test joins the group instead of getting its own ticket."
+
+  ## Done when
+
+  - [ ] Rust: `.config/nextest.toml` has one test-group with `max-threads = 1` for wall-clock tests. It holds the agent automation and agent safety suites (already serial), the SSE tests of `web_api_integration_test`, `dev604_queue_pauses_test`, `dev605_merge_without_agent_test`, and the other Rust tests named in DEV-741..773 flake tickets (dev503 harness hand-off, audit hanging cat-file). `cargo nextest show-config test-groups` lists them. DEV-760 (a date bug, not timing) stays out.
+  - [ ] Group tests keep `retries = 2` in plain `test:rust`; `test:agent` still runs them with `--retries 0`, so they must pass on scheduling alone.
+  - [ ] UI (`view/vitest.config.ts`) and smoke (`smoke/vitest.config.ts`): timing spec files run in a separate project, one file at a time, after the parallel files finish. Smoke: the files of DEV-750, DEV-751, DEV-755, DEV-775, DEV-781; UI: `SprintsList.backlogPagination.spec.ts` (DEV-764). Every other file still runs in parallel; each spec file runs exactly once (none dropped, none twice); a file filter on the command line (`npm run test:smoke:agent -- <file>`) still works for files of both projects.
+  - [ ] The global setups (smoke run lock, server guard, temp guard) still work with the projects: a run leaves no server or temp file and fails as before when one leaks.
+  - [ ] AGENTS.md says: a test that waits on a wall-clock budget, or fails under load and passes alone, goes in the serial group (nextest override or the vitest timing list) in the change that finds it, named in the hand-off comment, instead of a ticket of its own. A test that fails alone too is a real bug and still gets a ticket. The testing-strategy skill says where the lists are.
+  - [ ] When the group makes the suite slower: the wall time of `npm run -s test:rust:agent` and full smoke before and after is in the hand-off comment.
+  - [ ] `npm run -s test:agent` and `npm run -s test:smoke:agent` pass at load average >= 30 (raised with busy loops if the machine is quieter), `npm run -s lint:agent` passes.
 history:
 - at: 2026-11-22T03:06:53.985562+00:00
   actor: claude
@@ -24,3 +76,58 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T08:51:09.452400+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T08:51:12.352358+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5c8d6340739f46b0d7639fb411a4783a3b4b64b5e4a2c44a360165f04868dca7
+- at: 2026-11-22T08:53:33.865868+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). DEV-748..761 were one ticket per timing test that failed under load, each with fix, review and merge jobs rerunning the suite. Do: put tests that wait on wall-clock budgets (SSE stream, merge-without-agent, queue/worker timing, the smoke specs named in DEV-750/755) in a nextest test-group with max-threads 1 and the UI/smoke equivalents; the rule for new ones in AGENTS.md; a flaky timing test joins the group instead of getting its own ticket. Done when: the group exists, the known flakes are in it, the full suite passes at load average 30.'
+    new: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). DEV-748..761 were one ticket per timing test that failed under load, each with fix, review and merge jobs rerunning the suite.
+
+      Owner's words: "put tests that wait on wall-clock budgets (SSE stream, merge-without-agent, queue/worker timing, the smoke specs named in DEV-750/755) in a nextest test-group with max-threads 1 and the UI/smoke equivalents; the rule for new ones in AGENTS.md; a flaky timing test joins the group instead of getting its own ticket."
+
+      ## Done when
+
+      - [ ] Rust: `.config/nextest.toml` has one test-group with `max-threads = 1` for wall-clock tests. It holds the agent automation and agent safety suites (already serial), the SSE tests of `web_api_integration_test`, `dev604_queue_pauses_test`, `dev605_merge_without_agent_test`, and the other Rust tests named in DEV-741..773 flake tickets (dev503 harness hand-off, audit hanging cat-file). `cargo nextest show-config test-groups` lists them. DEV-760 (a date bug, not timing) stays out.
+      - [ ] Group tests keep `retries = 2` in plain `test:rust`; `test:agent` still runs them with `--retries 0`, so they must pass on scheduling alone.
+      - [ ] UI (`view/vitest.config.ts`) and smoke (`smoke/vitest.config.ts`): timing spec files run in a separate project, one file at a time, after the parallel files finish. Smoke: the files of DEV-750, DEV-751, DEV-755, DEV-775, DEV-781; UI: `SprintsList.backlogPagination.spec.ts` (DEV-764). Every other file still runs in parallel; each spec file runs exactly once (none dropped, none twice); a file filter on the command line (`npm run test:smoke:agent -- <file>`) still works for files of both projects.
+      - [ ] The global setups (smoke run lock, server guard, temp guard) still work with the projects: a run leaves no server or temp file and fails as before when one leaks.
+      - [ ] AGENTS.md says: a test that waits on a wall-clock budget, or fails under load and passes alone, goes in the serial group (nextest override or the vitest timing list) in the change that finds it, named in the hand-off comment, instead of a ticket of its own. A test that fails alone too is a real bug and still gets a ticket. The testing-strategy skill says where the lists are.
+      - [ ] When the group makes the suite slower: the wall time of `npm run -s test:rust:agent` and full smoke before and after is in the hand-off comment.
+      - [ ] `npm run -s test:agent` and `npm run -s test:smoke:agent` pass at load average >= 30 (raised with busy loops if the machine is quieter), `npm run -s lint:agent` passes.
+- at: 2026-11-22T08:53:34.104957+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-750","DEV-755"]}'
+    new: '{"related":["DEV-748","DEV-750","DEV-755","DEV-741","DEV-751","DEV-760","DEV-764","DEV-775","DEV-781"]}'
+- at: 2026-11-22T09:10:40.200018+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T09:10:40.415165+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-750","DEV-755","DEV-741","DEV-751","DEV-760","DEV-764","DEV-775","DEV-781"]}'
+    new: '{"related":["DEV-748","DEV-750","DEV-755","DEV-741","DEV-751","DEV-760","DEV-764","DEV-775","DEV-781","DEV-761","DEV-773","DEV-784"]}'
+- at: 2026-11-22T09:10:54.049672+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

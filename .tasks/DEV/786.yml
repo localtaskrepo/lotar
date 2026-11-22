@@ -1,11 +1,11 @@
 title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-22T05:07:00.362925+00:00
+modified: 2026-11-22T09:30:44.926217+00:00
 relationships:
   related:
   - DEV-725
@@ -16,6 +16,53 @@ comments:
 - date: 2026-11-22T05:07:00.362925+00:00
   author: claude
   text: 'Scope widened by the owner 2026-11-21 19:20 PST (quote in the description): queue management (move entries, keep their prompt) and categories next to priority.'
+- date: 2026-11-22T09:26:56.184906+00:00
+  author: automation
+  text: The fix agent's job job-20261122T091056.965Z-162 failed (lotar agent logs job-20261122T091056.965Z-162); @fix-retry retries it on branch agent/DEV-786.
+- date: 2026-11-22T09:30:44.926217+00:00
+  author: claude
+  text: |-
+    The queue now starts tickets by priority, then kind, then arrival. You can move entries in the CLI, over REST and on the Agents page.
+
+    - Order: paused retries first, then higher priority, then kind (`release` → `merge` → `review` → fix and others), then arrival. The priority is stored when the ticket is queued.
+    - Kind comes from the profile name (`review-light` counts as review). A bare runner is `run`.
+    - Move: `lotar agent queue move <TICKET> --first|--up|--down|--last [--agent P]`. A moved entry keeps its prompt and settings and isn't sorted again (`kept`).
+    - REST: `GET /api/agent-queue`, `POST /api/agent-queue/move`, also in `docs/openapi.json`, `api_types.rs` and `types.ts`.
+    - Agents page: a new **Queue** panel shows kind, priority, profile and age, with top/up/down/bottom buttons and an error with Retry. Component: `view/components/AgentQueuePanel.vue`.
+    - Tests:
+      - `agent_queue_service` unit tests: Low then High, the High starts first; a moved entry starts next with its prompt
+      - `dev786_queue_order_test`: CLI kind column and move
+      - `AgentQueuePanel.spec.ts`
+      - Playwright smoke test in `ui.agent-jobs.smoke.spec.ts`
+    - Docs: `docs/help/agent.md` (new "Queue order" section) and `api-quick-reference.md`.
+    - Screenshots on the ticket: `dev786-before-*` and `dev786-after-*` (light and dark, 1920/1440/390). Before: the queue wasn't visible on the page at all.
+    - Follow-up idea: the page's **Queued** count only counts this server's in-process jobs, so it shows 0 next to a full queue panel.
+  report:
+    commits:
+    - hash: bc0c7d822
+      what: queue order by priority, kind and arrival; queue move in CLI, REST and on the Agents page; kind column
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review the commit on agent/DEV-786 and the before/after screenshots; merge when happy
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
+- attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
+- attachment: dev786-after-dark-1920.5002839aa92d7da6e1a8dc1094ad25ce.png
+- attachment: dev786-after-dark-390.a0e616ba21b7b8ccb77f99fbdee4f24a.png
+- attachment: dev786-after-light-1440.ed7edbb0eaa10ed281e57afce35484d1.png
+- attachment: dev786-after-light-1920.c11e5d2c1bf73e3e15fa3c202fac916f.png
+- attachment: dev786-after-light-390.c1b4bc8526c787c8516c93d2d0151b9e.png
+- attachment: dev786-before-dark-1440.508b2a0fce61c15555de7fe9aa0e7b31.png
+- attachment: dev786-before-dark-1920.54b59d980bc6763164a2a4e8feaa8ff6.png
+- attachment: dev786-before-dark-390.ef24087fe53fb14a45b8566bd5d266e9.png
+- attachment: dev786-before-light-1440.8329d4499145190f39bbde9f005ae8e6.png
+- attachment: dev786-before-light-1920.132623d68127332a387e3b674cf854bd.png
+- attachment: dev786-before-light-390.3bfc4a73ef913a0431f941cd72692dc2.png
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
 
@@ -25,6 +72,28 @@ description: |-
   - Manage: move a queued entry to the front, up, down or to the back (CLI `lotar agent queue move <TICKET> --first|--up|--down|--last`, the Agents page, REST); a moved entry keeps its rule, prompt and settings.
   - Categories: show each entry's kind (fix, review, merge, release ...) in `lotar agent queue` and the Agents page, and let the order take the kind into account (e.g. merges and reviews before new fixes, since they finish work). Propose the default order in a comment before building it if unsure.
   Done when (in addition): a test moves an entry to the front and it starts next with its original prompt; the queue lists show the kind.
+
+  ## Done when
+
+  Order (the owner: "order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at"; "e.g. merges and reviews before new fixes, since they finish work"):
+  - [ ] A new entry goes by its ticket's priority (the project's configured order, highest first), then its kind (release, merge, review, then fix and every other profile), then arrival. Priority wins over kind: a High fix goes before a Medium merge.
+  - [ ] The kind comes from the entry's profile name: one that contains `release`, `merge`, `review` is that kind; `fix-retry` and other names with `fix` are `fix`; other profiles show their own name and rank as `fix`; a bare runner is `run`.
+  - [ ] The priority is read from the ticket when the entry is queued and stored on it; a ticket that can't be read gets the project's default priority. A priority change later doesn't move a queued entry (move it by hand).
+  - [ ] Paused retries (paused queue, usage limit, unresumable session) still go first; an entry put back because its ticket is busy, or after a failed start, goes back to its place by rank, not to the end.
+  - [ ] Test: queue a Low then a High ticket; the High starts first.
+
+  Manage:
+  - [ ] `lotar agent queue move <TICKET> --first|--up|--down|--last` (exactly one; `--agent <PROFILE>` when the ticket has entries for several profiles) moves the entry; text and JSON say where it is now. Not queued, or already starting: error naming it, nothing changes.
+  - [ ] A moved entry keeps its prompt, profile, model, effort and settings, and keeps its place: later entries are placed among the entries not moved by hand. Paused retries stay first only until someone moves an entry ahead of them.
+  - [ ] REST `GET /api/agent-queue` lists the entries in start order; `POST /api/agent-queue/move` `{ticket_id, agent?, to: first|up|down|last}` moves one. `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` and `docs/help` agree.
+  - [ ] The Agents page shows the queue in start order with each entry's kind, priority and buttons to move it to the top, up, down and to the bottom; a failed move shows the error.
+  - [ ] Test: move an entry to the front; it starts next with its original prompt.
+
+  Categories:
+  - [ ] `lotar agent queue` (text and JSON `kind`, `priority`) and the Agents page show each entry's kind.
+tags:
+- ui
+- fix-retried
 history:
 - at: 2026-11-22T03:06:54.686868+00:00
   actor: claude
@@ -61,6 +130,141 @@ history:
     old: '{"related":["DEV-725","DEV-748","DEV-755"]}'
     new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783"]}'
 - at: 2026-11-22T05:07:00.362925+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T09:11:29.844203+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T09:11:32.372029+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
+- at: 2026-11-22T09:15:29.360098+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
+
+      Owner 2026-11-21 19:20 PST, widening this ticket: "maybe that's part of the feature request to add so that the queue can be managed if needed along with priorities and categorization, etc."
+      Why: moving DEV-783..786 up the queue was not possible: an entry holds only ticket and profile, the prompt comes from the rule that queued it, so a removed review or merge can't be put back as it was.
+      Also do:
+      - Manage: move a queued entry to the front, up, down or to the back (CLI `lotar agent queue move <TICKET> --first|--up|--down|--last`, the Agents page, REST); a moved entry keeps its rule, prompt and settings.
+      - Categories: show each entry's kind (fix, review, merge, release ...) in `lotar agent queue` and the Agents page, and let the order take the kind into account (e.g. merges and reviews before new fixes, since they finish work). Propose the default order in a comment before building it if unsure.
+      Done when (in addition): a test moves an entry to the front and it starts next with its original prompt; the queue lists show the kind.
+    new: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
+
+      Owner 2026-11-21 19:20 PST, widening this ticket: "maybe that's part of the feature request to add so that the queue can be managed if needed along with priorities and categorization, etc."
+      Why: moving DEV-783..786 up the queue was not possible: an entry holds only ticket and profile, the prompt comes from the rule that queued it, so a removed review or merge can't be put back as it was.
+      Also do:
+      - Manage: move a queued entry to the front, up, down or to the back (CLI `lotar agent queue move <TICKET> --first|--up|--down|--last`, the Agents page, REST); a moved entry keeps its rule, prompt and settings.
+      - Categories: show each entry's kind (fix, review, merge, release ...) in `lotar agent queue` and the Agents page, and let the order take the kind into account (e.g. merges and reviews before new fixes, since they finish work). Propose the default order in a comment before building it if unsure.
+      Done when (in addition): a test moves an entry to the front and it starts next with its original prompt; the queue lists show the kind.
+
+      ## Done when
+
+      Order (the owner: "order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at"; "e.g. merges and reviews before new fixes, since they finish work"):
+      - [ ] A new entry goes by its ticket's priority (the project's configured order, highest first), then its kind (release, merge, review, then fix and every other profile), then arrival. Priority wins over kind: a High fix goes before a Medium merge.
+      - [ ] The kind comes from the entry's profile name: one that contains `release`, `merge`, `review` is that kind; `fix-retry` and other names with `fix` are `fix`; other profiles show their own name and rank as `fix`; a bare runner is `run`.
+      - [ ] The priority is read from the ticket when the entry is queued and stored on it; a ticket that can't be read gets the project's default priority. A priority change later doesn't move a queued entry (move it by hand).
+      - [ ] Paused retries (paused queue, usage limit, unresumable session) still go first; an entry put back because its ticket is busy, or after a failed start, goes back to its place by rank, not to the end.
+      - [ ] Test: queue a Low then a High ticket; the High starts first.
+
+      Manage:
+      - [ ] `lotar agent queue move <TICKET> --first|--up|--down|--last` (exactly one; `--agent <PROFILE>` when the ticket has entries for several profiles) moves the entry; text and JSON say where it is now. Not queued, or already starting: error naming it, nothing changes.
+      - [ ] A moved entry keeps its prompt, profile, model, effort and settings, and keeps its place: later entries are placed among the entries not moved by hand. Paused retries stay first only until someone moves an entry ahead of them.
+      - [ ] REST `GET /api/agent-queue` lists the entries in start order; `POST /api/agent-queue/move` `{ticket_id, agent?, to: first|up|down|last}` moves one. `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` and `docs/help` agree.
+      - [ ] The Agents page shows the queue in start order with each entry's kind, priority and buttons to move it to the top, up, down and to the bottom; a failed move shows the error.
+      - [ ] Test: move an entry to the front; it starts next with its original prompt.
+
+      Categories:
+      - [ ] `lotar agent queue` (text and JSON `kind`, `priority`) and the Agents page show each entry's kind.
+- at: 2026-11-22T09:26:35.500822+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: ui
+- at: 2026-11-22T09:26:43.334210+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
+- at: 2026-11-22T09:26:43.384630+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-after-dark-1920.5002839aa92d7da6e1a8dc1094ad25ce.png
+- at: 2026-11-22T09:26:43.432463+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-after-dark-390.a0e616ba21b7b8ccb77f99fbdee4f24a.png
+- at: 2026-11-22T09:26:43.481412+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-after-light-1440.ed7edbb0eaa10ed281e57afce35484d1.png
+- at: 2026-11-22T09:26:43.529351+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-after-light-1920.c11e5d2c1bf73e3e15fa3c202fac916f.png
+- at: 2026-11-22T09:26:43.577701+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-after-light-390.c1b4bc8526c787c8516c93d2d0151b9e.png
+- at: 2026-11-22T09:26:43.624850+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-before-dark-1440.508b2a0fce61c15555de7fe9aa0e7b31.png
+- at: 2026-11-22T09:26:43.673564+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-before-dark-1920.54b59d980bc6763164a2a4e8feaa8ff6.png
+- at: 2026-11-22T09:26:43.722370+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-before-dark-390.ef24087fe53fb14a45b8566bd5d266e9.png
+- at: 2026-11-22T09:26:43.770932+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-before-light-1440.8329d4499145190f39bbde9f005ae8e6.png
+- at: 2026-11-22T09:26:43.818716+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-before-light-1920.132623d68127332a387e3b674cf854bd.png
+- at: 2026-11-22T09:26:43.866009+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-before-light-390.3bfc4a73ef913a0431f941cd72692dc2.png
+- at: 2026-11-22T09:26:54.516978+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ui
+    new: ui, fix-retried
+- at: 2026-11-22T09:26:56.184906+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T09:30:44.926217+00:00
   actor: claude
   changes:
   - field: comment_added

@@ -1,16 +1,18 @@
 title: 'Flaky smoke under load: two agent-jobs UI tests time out in the full run at load average 46, pass alone'
-status: Reviewing
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T23:03:37.168173+00:00
-modified: 2026-11-22T05:18:27.359426+00:00
+modified: 2026-11-22T15:21:36.469551+00:00
 relationships:
   related:
   - DEV-755
   - DEV-760
   - DEV-764
+  - DEV-765
+  - DEV-785
 comments:
 - date: 2026-11-22T02:44:44.140146+00:00
   author: claude
@@ -36,6 +38,30 @@ comments:
       result: passed
       reason: 406/406 at load average up to 32; load 46 not reproduced
     next: Review, then merge and rerun npm run -s smoke on main
+- date: 2026-11-22T08:11:46.098441+00:00
+  author: claude
+  text: |-
+    Review: passed. `a608c74df` is a test-only fix that does what the ticket asks; no findings, no tickets filed.
+
+    - Read the diff (only `smoke/tests/ui.agent-jobs.smoke.spec.ts`), the ticket, the fix comment, DEV-755's pattern and `smoke/helpers/gate-agent.mjs` / `agent-fixtures.ts`
+    - The race claim holds: in hold mode `gate-agent.mjs:52,106-123` exits by itself after `--hold-ms` (20 s default) and the job completes, so "every job cancelled" could never come true once the dialog walk ran longer. `holdMs: JOB_END_LIMIT_MS` (240 s) is passed through `agentArgs` (`agent-fixtures.ts:344`), and `gate.dispose()` in the `finally` still releases the child
+    - Waits now use `WAIT_BUDGET_MS` (45 s), and both tests get `{ timeout: 300_000 }`, matching DEV-755. A hang still fails them
+    - Main moved on (`f7733872c` DEV-765 adds a test at line 792 of the same file). `git merge-tree main HEAD` merges cleanly, with no overlap
+    - Reran: `npm ci` passed; `npm run build:smoke` and then the spec alone passed, 11/11 in 46 s (load average about 12); `prettier --check`, `oxlint` and smoke `tsc --noEmit` on the file are clean
+    - Not rerun: the full `npm run smoke` under load 46. The fix agent's full run passed 406/406 at load 32
+    - No UI change (tag health, smoke test only), so I skipped ui-review
+- date: 2026-11-22T15:19:25.974008+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n    \e[90m 60|\e[39m         { label\e[33m:\e[39m \e[32m'mobile'\e[39m\e[33m,\e[39m width\e[33m:\e[39m \e[34m390\e[39m\e[33m,\e[39m height\e[33m:\e[39m \e[34m844\e[39m }\e[33m,\e[39m\n    \e[90m 61|\e[39m     ]) {\n    \e[90m 62|\e[39m         it(`uses one search input and preserves scoped filters on ${vi…\n    \e[90m   |\e[39m         \e[31m^\e[39m\n    \e[90m 63|\e[39m             const workspace = await SmokeWorkspace.create({ seedFiles:…\n    \e[90m 64|\e[39m             \e[35mconst\e[39m before \e[33m=\e[39m \e[35mawait\e[39m workspace\e[33m.\e[39m\e[34mreadTaskYaml\e[39m(\e[32m'FIL-2'\e[39m)\e[33m;\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\e[22m\e[39m\n\n\e[41m\e[1m FAIL \e[22m\e[49m tests/ui.sprints-responsive.smoke.spec.ts\e[2m > \e[22mResponsive sprint controls and standardized pagination (DEV-105)\e[2m > \e[22mfits controls and dialogs at 1440px\n\e[31m\e[1mError\e[22m: Test timed out in 120000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\e[39m\n\e[36m \e[2m❯\e[22m tests/ui.sprints-responsive.smoke.spec.ts:\e[2m96:9\e[22m\e[39m\n    \e[90m 94|\e[39m         { width\e[33m:\e[39m \e[34m320\e[39m\e[33m,\e[39m height\e[33m:\e[39m \e[34m640\e[39m }\e[33m,\e[39m\n    \e[90m 95|\e[39m     ]) {\n    \e[90m 96|\e[39m         it(`fits controls and dialogs at ${viewport.width}px`, async (…\n    \e[90m   |\e[39m         \e[31m^\e[39m\n    \e[90m 97|\e[39m             const workspace = await SmokeWorkspace.create({ name: 'res…\n    \e[90m 98|\e[39m             \e[35mtry\e[39m {\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m2 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m116 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m3 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m404 passed\e[39m\e[22m\e[90m (407)\e[39m\n\e[2m   Start at \e[22m 07:10:44\n\e[2m   Duration \e[22m 520.70s\e[2m (tests 80%, import 18%, setup 1%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.30s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~18.60s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n```.\n\n- Rebased `agent/DEV-775` onto `main` (`0c9725d5d56b`): `878c80d5fae3`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad485dc0a8b158d70bd91376263ff6604b4338a79008fe1f0f757bb0583ac0ca8
 description: 'Found in the DEV-760 merge (2026-11-21), load average 46: `npm run -s smoke` failed in `smoke/tests/ui.agent-jobs.smoke.spec.ts`: ''stops queued and running jobs only after accessible confirmation'' (line 739, ''Timed out after 20000ms waiting for stop-all to cancel every job'') and ''shows the agent''s permission question in the job view and answers it'' (line 784, locator.waitFor 15000ms). Alone the spec passes, 11/11 in 29 s. Check: `npm run -s smoke` under load. Done: like DEV-755, these waits allow for full-run load, so only a hang fails them.'
@@ -85,3 +111,38 @@ history:
   - field: relationships
     old: '{"related":["DEV-755","DEV-760"]}'
     new: '{"related":["DEV-755","DEV-760","DEV-764"]}'
+- at: 2026-11-22T08:11:46.098441+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T08:11:47.767042+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-760","DEV-764"]}'
+    new: '{"related":["DEV-755","DEV-760","DEV-764","DEV-765"]}'
+- at: 2026-11-22T08:11:59.482496+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-22T08:53:34.104449+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-760","DEV-764","DEV-765"]}'
+    new: '{"related":["DEV-755","DEV-760","DEV-764","DEV-765","DEV-785"]}'
+- at: 2026-11-22T15:19:25.974008+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T15:21:36.469551+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

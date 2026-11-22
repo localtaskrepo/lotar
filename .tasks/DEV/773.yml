@@ -1,14 +1,15 @@
 title: 'Flaky test: hanging_cat_file_fails_the_activity_feed_at_the_timeout finds no pid file under full-suite load'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T22:34:04.252012+00:00
-modified: 2026-11-22T06:35:56.263157+00:00
+modified: 2026-11-22T13:37:54.460106+00:00
 relationships:
   related:
   - DEV-760
+  - DEV-785
 comments:
 - date: 2026-11-22T02:10:38.217886+00:00
   author: claude
@@ -35,6 +36,42 @@ comments:
       result: passed
       reason: would have exceeded the old 300 ms window
     next: Review, then merge
+- date: 2026-11-22T13:34:58.377415+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n\e[90m \e[2m❯\e[22m tests/ui.theming.smoke.spec.ts:\e[2m39:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯\e[22m\e[39m\n\n\e[41m\e[1m FAIL \e[22m\e[49m tests/ui.theming.smoke.spec.ts\e[2m > \e[22mUI theming and repository branding (DEV-218)\e[2m > \e[22mshows the logo that contrasts with each theme's top bar\n\e[31m\e[1mError\e[22m: Timeout 5000ms exceeded while waiting on the predicate\e[39m\n\e[90m \e[2m❯\e[22m captureRawStack ../node_modules/playwright-core/lib/coreBundle.js:\e[2m9551:17\e[22m\e[39m\n\e[90m \e[2m❯\e[22m callMatcherAsStep ../node_modules/playwright/lib/matchers/expect.js:\e[2m13342:57\e[22m\e[39m\n\e[90m \e[2m❯\e[22m Object.toEqual ../node_modules/playwright/lib/matchers/expect.js:\e[2m13334:23\e[22m\e[39m\n\e[36m \e[2m❯\e[22m tests/ui.theming.smoke.spec.ts:\e[2m229:68\e[22m\e[39m\n    \e[90m227|\e[39m                         \e[35mawait\e[39m page\e[33m.\e[39m\e[34mreload\e[39m()\e[33m;\e[39m\n    \e[90m228|\e[39m                         await page.locator('.brand__logo').first().wai…\n    \e[90m229|\e[39m                         await expect.poll(() => visibleLogo(page)).toE…\n    \e[90m   |\e[39m                                                                    \e[31m^\e[39m\n    \e[90m230|\e[39m                     })\e[33m;\e[39m\n    \e[90m231|\e[39m                 }\n\e[90m \e[2m❯\e[22m helpers/ui.ts:\e[2m104:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m withBrowser helpers/ui.ts:\e[2m84:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.theming.smoke.spec.ts:\e[2m224:21\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m6 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m112 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m8 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m399 passed\e[39m\e[22m\e[90m (407)\e[39m\n\e[2m   Start at \e[22m 05:25:04\n\e[2m   Duration \e[22m 592.83s\e[2m (tests 78%, import 19%, setup 1%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.55s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~20.56s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n```.\n\n- Rebased `agent/DEV-773` onto `main` (`60a9cf1c546b`): `fc82f726e72c`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-22T13:37:54.460106+00:00
+  author: claude
+  text: |-
+    Merged by another process while this merge job ran: `fc82f726e` is on `main`, the ticket was set Done at 13:35 UTC, and the worktree and `agent/DEV-773` are removed.
+
+    - I didn't merge it myself, so I didn't amend `.tasks` into `fc82f726e`.
+    - Smoke never passed on this commit. lotar's run had 8 UI failures (`ui.theming.smoke.spec.ts` and others) at load ~45. The diff touches only a Rust unit test (`crates/lotar-lib/src/services/audit_service.rs`), which smoke doesn't run.
+    - Not pushed: the main checkout has uncommitted `.tasks` changes, and `@{u}..` holds 4 commits.
+    - No rules or config changed, so `lotar trust` wasn't needed.
+  report:
+    commits:
+    - hash: fc82f726e
+      what: test waits for the pid file before the timeout starts
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge run, the health check
+    - command: npm run -s smoke
+      result: not_run
+      reason: lotar's run failed 8 UI tests at load ~45; my rerun died in a web build race, the second when the worktree was removed
+    next: 'none: merged; push waits for a clean main checkout'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a70d716e6faac36b93ca68c2990aa6670a0e16c0269ebbd0e09e9800e6d96c1
 description: 'Found in the DEV-760 merge (2026-11-21), load average about 32: `npm run -s test:agent` failed at `crates/lotar-lib/src/services/audit_service.rs:1260`, `pid file: NotFound`. The stub `sh -c ''sleep 600 & echo $! > pid; wait''` gets a 300 ms timeout; under load it is killed before it writes the pid file. Check: `npm run -s test:agent` under load. Done: the test waits for the pid file before the timeout can start counting, or reads the child another way, so a slow start can''t fail it, while still asserting the child is gone.'
@@ -87,3 +124,23 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T09:10:40.414578+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-760"]}'
+    new: '{"related":["DEV-760","DEV-785"]}'
+- at: 2026-11-22T13:34:58.377415+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T13:35:51.351013+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-22T13:37:54.460106+00:00
+  actor: claude
+  changes:
+  - field: comment_added

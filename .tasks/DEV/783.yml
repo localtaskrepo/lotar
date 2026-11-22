@@ -1,11 +1,11 @@
 title: 'Merge without agent: rerun a failed check once on its own before handing the merge to @merge'
-status: Todo
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T03:06:52.324630+00:00
-modified: 2026-11-22T05:07:00.128047+00:00
+modified: 2026-11-22T08:38:41.477517+00:00
 relationships:
   related:
   - DEV-726
@@ -15,7 +15,50 @@ relationships:
   - DEV-755
   - DEV-756
   - DEV-786
-description: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Nearly every merge-agent job came from lotar''s own merge failing a check that passes alone: sse_delivers_during_a_steady_stream_of_events (DEV-726, 730, 740, 744), the ''Created task'' test (DEV-734, 742, 748-751), vitest worker timeouts (DEV-752), smoke timeouts (DEV-756, 761). Do: when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts. Done when: a test shows a check that fails once then passes lands without a merge agent; the job log names the rerun.'
+  - DEV-761
+comments:
+- date: 2026-11-22T08:38:28.396704+00:00
+  author: claude
+  text: |-
+    A failed merge check now reruns once on its own; it lands without @merge when the rerun passes.
+
+    - `crates/lotar-agent/src/services/agent_job_service/merge.rs`: new `check()` reruns a failed check right away, before the next one starts. The checks already run one at a time, so no other check of this merge runs beside it. Only a second failure hands off to @merge.
+    - The job log says `Rerunning the check <cmd> once on its own: its first run failed`. The report lists both runs (`failed`/"first run; the rerun passed", then `passed`/"rerun"). The comment quotes the first run's output.
+    - Not rerun: `install`, `finding_check`, a check that couldn't start. Rebase conflicts hand off as before.
+    - Tests in `dev605_merge_without_agent_test.rs`: `a_check_that_fails_once_then_passes_lands_without_an_agent` (new); `a_failed_check_hands_off_with_its_output` now expects two failed runs.
+    - Docs: `docs/help/agent.md`, `agent.merge` steps.
+    - Side note: `-p lotar-lib` fails `a_failed_jobs_thread_is_settled_once_a_later_job_completes` on HEAD too, because it runs a stale binary (known, DEV-761). It passes with `--workspace`.
+  report:
+    commits:
+    - hash: 029efdbb7
+      what: lotar's merge reruns a failed check once before handing off
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: cargo nextest run --workspace -E 'test(/dev605_/)'
+      result: passed
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1924bde0bfa0885fd85e4266862a953a8495f52ea6d26e813016d1eae3ce1bd9
+description: |-
+  Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Nearly every merge-agent job came from lotar's own merge failing a check that passes alone: sse_delivers_during_a_steady_stream_of_events (DEV-726, 730, 740, 744), the 'Created task' test (DEV-734, 742, 748-751), vitest worker timeouts (DEV-752), smoke timeouts (DEV-756, 761). Do: when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts. Done when: a test shows a check that fails once then passes lands without a merge agent; the job log names the rerun.
+
+  ## Done when
+
+  Owner's words: "when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts."
+
+  - [ ] lotar's merge (`crates/lotar-agent/src/services/agent_job_service/merge.rs`): a check in `agent.merge.checks` that exits nonzero runs once more right away, before the next check starts (the checks run one at a time, so no other check of this merge runs beside it).
+  - [ ] Rerun passes: the merge goes on with the next check and lands without the merge agent. The outcome comment's report lists both runs (`failed`, reason "first run; the rerun passed", then `passed`, reason "rerun"), and its steps say the first run failed, with its output's tail.
+  - [ ] Rerun fails too: lotar hands off to @merge as today; the hand-off text and report name both failed runs, with the rerun's output.
+  - [ ] Each check gets one rerun per rebase round (when main moves on and lotar checks again, a check may again fail once and rerun once).
+  - [ ] The job log has a progress line naming the rerun (`Rerunning the check ... once on its own: its first run failed`).
+  - [ ] Not rerun: a check that couldn't start, `install`, `finding_check` (it fails on its output, not by flaking): they hand off as today. A rebase conflict hands off as today.
+  - [ ] Test in `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs`: a check that fails on its first run and passes on its second lands without a merge agent, the comment and job log name the rerun; a check that always fails still hands off after two runs.
+  - [ ] `docs/help/agent.md` (`agent.merge` steps) describes the rerun.
 history:
 - at: 2026-11-22T03:06:52.566170+00:00
   actor: claude
@@ -34,3 +77,53 @@ history:
   - field: relationships
     old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756"]}'
     new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786"]}'
+- at: 2026-11-22T08:27:47.444835+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T08:27:51.327660+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1924bde0bfa0885fd85e4266862a953a8495f52ea6d26e813016d1eae3ce1bd9
+- at: 2026-11-22T08:28:38.458821+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Nearly every merge-agent job came from lotar''s own merge failing a check that passes alone: sse_delivers_during_a_steady_stream_of_events (DEV-726, 730, 740, 744), the ''Created task'' test (DEV-734, 742, 748-751), vitest worker timeouts (DEV-752), smoke timeouts (DEV-756, 761). Do: when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts. Done when: a test shows a check that fails once then passes lands without a merge agent; the job log names the rerun.'
+    new: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Nearly every merge-agent job came from lotar's own merge failing a check that passes alone: sse_delivers_during_a_steady_stream_of_events (DEV-726, 730, 740, 744), the 'Created task' test (DEV-734, 742, 748-751), vitest worker timeouts (DEV-752), smoke timeouts (DEV-756, 761). Do: when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts. Done when: a test shows a check that fails once then passes lands without a merge agent; the job log names the rerun.
+
+      ## Done when
+
+      Owner's words: "when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts."
+
+      - [ ] lotar's merge (`crates/lotar-agent/src/services/agent_job_service/merge.rs`): a check in `agent.merge.checks` that exits nonzero runs once more right away, before the next check starts (the checks run one at a time, so no other check of this merge runs beside it).
+      - [ ] Rerun passes: the merge goes on with the next check and lands without the merge agent. The outcome comment's report lists both runs (`failed`, reason "first run; the rerun passed", then `passed`, reason "rerun"), and its steps say the first run failed, with its output's tail.
+      - [ ] Rerun fails too: lotar hands off to @merge as today; the hand-off text and report name both failed runs, with the rerun's output.
+      - [ ] Each check gets one rerun per rebase round (when main moves on and lotar checks again, a check may again fail once and rerun once).
+      - [ ] The job log has a progress line naming the rerun (`Rerunning the check ... once on its own: its first run failed`).
+      - [ ] Not rerun: a check that couldn't start, `install`, `finding_check` (it fails on its output, not by flaking): they hand off as today. A rebase conflict hands off as today.
+      - [ ] Test in `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs`: a check that fails on its first run and passes on its second lands without a merge agent, the comment and job log name the rerun; a check that always fails still hands off after two runs.
+      - [ ] `docs/help/agent.md` (`agent.merge` steps) describes the rerun.
+- at: 2026-11-22T08:38:28.396704+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T08:38:28.712064+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786"]}'
+    new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761"]}'
+- at: 2026-11-22T08:38:41.477517+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

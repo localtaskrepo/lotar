@@ -1,14 +1,16 @@
 title: Leftover worktree folder DEV-754 (only target/) makes every job on DEV-754 fail at worktree setup
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T00:32:24.998213+00:00
-modified: 2026-11-22T05:51:20.453396+00:00
+modified: 2026-11-22T11:01:37.206988+00:00
 relationships:
   related:
   - DEV-754
+  - DEV-765
+  - DEV-770
 comments:
 - date: 2026-11-22T05:51:11.110659+00:00
   author: claude
@@ -34,6 +36,18 @@ comments:
       result: passed
       reason: added and removed again
     next: Review, then merge
+- date: 2026-11-22T11:01:23.750363+00:00
+  author: claude
+  text: |-
+    Review: passed. `f73d907da` does what "Done" asks: the DEV-754 folder is gone, and worktree setup now clears a folder that holds only `target/`.
+
+    - Read: the diff of `main..HEAD` (one commit), the ticket and the fix comment, [DEV-754](https://lotar.pyxzl.net/task/DEV-754), AGENTS.md, and the recent main commits to `agent_job_service.rs`. `git merge-tree main HEAD` merges cleanly over main's 3 newer commits (DEV-765, DEV-770, v0.15.6).
+    - Folder: `.lotar-worktrees/lotar/DEV-754` no longer exists, and `git worktree list` has no entry for it.
+    - Code: `clear_leftover_build_output` (`crates/lotar-agent/src/services/agent_job_service.rs:1642`) runs only when there is no reusable worktree at the path and no worktree has the branch checked out. It removes the folder only if its single entry is a real `target/` directory (`symlink_metadata`). Anything else stays, and git's `already exists` failure stands. Nothing beyond what the ticket asked.
+    - Test: `a_leftover_folder_with_only_build_output_gives_way_to_the_worktree` covers both cases. Without the fix, `git worktree add` fails and the job doesn't complete, so the test is a real regression test. The docs line in `docs/help/agent.md:393` matches the code.
+    - Reran: `npm ci` passed. `cargo nextest run -p lotar-lib --test integration -E 'test(agent_safety_test::)'`: 40/40 passed. `cargo clippy -p lotar-agent -p lotar-lib --tests`: clean. `rustfmt --edition 2024 --check` on both files: clean. The tree is clean afterwards.
+    - Not rerun: full `npm run lint`, `npm test`, `npm run smoke` (they take too long for a review). No UI change, so no screenshots needed.
+    - Findings: none. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4daf3b5b2d12896a61a7f9fca80a3131f0ea4b09b3f1277a7366a2ee06bf4c7c
 description: 'Found: .lotar-worktrees/lotar/DEV-754 holds only target/ and git worktree list doesn''t show it; jobs job-20261121T211326.368Z-110 and job-20261122T003045.021Z-125 failed with ''already exists''. Check: git worktree add succeeds for a ticket whose folder has no worktree. Done: leftover folder removed, or worktree setup clears an empty leftover folder.'
@@ -77,3 +91,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T11:01:23.750363+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T11:01:26.055976+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-754"]}'
+    new: '{"related":["DEV-754","DEV-765","DEV-770"]}'
+- at: 2026-11-22T11:01:37.206988+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

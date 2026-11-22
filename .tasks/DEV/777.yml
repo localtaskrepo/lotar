@@ -1,11 +1,11 @@
 title: A continue job treats any ACP error on resume as a session that can't be resumed, not only a refused session/resume or session/load
-status: Blocked
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-22T03:33:13.596946+00:00
+modified: 2026-11-22T09:28:23.409956+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -20,8 +20,19 @@ comments:
     - `OpenSessionError::NotResumable` and the resume fallback in `open_session` (`crates/lotar-agent/src/services/agent_runner.rs`) only exist on `agent/DEV-757` (`2ba76fc00`), which is in Merging
     - `main` (`8f698d2e9`) has no `NotResumable`; building on the unmerged branch would conflict with its merge
     - Next: once DEV-757 is on main, rebase `agent/DEV-777`, tell refused `session/resume`/`session/load` apart from `initialize`/`authenticate` errors, add the fake-ACP `initialize`-refusal test
+- date: 2026-11-22T09:28:12.457189+00:00
+  author: claude
+  text: |-
+    Question: should harnessmux report a refused resume as its own error? lotar can't tell the steps apart without it.
+
+    - DEV-757 is on main (`89fe192f8`); `agent/DEV-777` is rebased onto `f7733872c`. Nothing changed or committed yet
+    - In harnessmux 0.2.0 (and its main, `b589ce1`), `initialize`, `authenticate`, `session/resume`, `session/load` and `set_config_option` all go through `?` into `Error::Protocol(<agent's message>)` (`src/error.rs:54`, `src/backend/acp.rs:154-330`). The message doesn't name the step, and no event comes before the session starts, so lotar's `open_session` (`crates/lotar-agent/src/services/agent_runner.rs:263`) has nothing to check
+    - The only way to tell them apart from lotar is to read harnessmux's `HARNESSMUX_RECORD` wire log, which would mean setting a process-wide env var while the server runs other jobs. I don't recommend that
+    - Proposal: add `Error::NotResumable(String)` to harnessmux for a refused `session/resume`/`session/load`, release it, then bump lotar and match only that variant in `open_session`, plus a fake-ACP test that refuses `initialize`. Changing harnessmux's public API and publishing a release is your decision
+    - Next: on your yes, file the HARN ticket, wait for the release, then finish DEV-777 here
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0a7852970afa0266056fb48bf89fa0fd177b850a6e9b43958fbb0a2c9930ee39
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75a6d2ce35fd6bba59cd70aa8ab5c6579794cbcc6a508ad1ea655ac420701bf
 description: |-
   Found in the DEV-757 review (2026-11-21).
 
@@ -79,3 +90,27 @@ history:
   - field: tags
     old: backend, waits
     new: backend
+- at: 2026-11-22T09:27:07.474927+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-22T09:27:10.736979+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75a6d2ce35fd6bba59cd70aa8ab5c6579794cbcc6a508ad1ea655ac420701bf
+- at: 2026-11-22T09:28:12.457189+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T09:28:23.409956+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

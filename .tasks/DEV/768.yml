@@ -1,15 +1,17 @@
 title: 'Assignee picker: searchable, grouped by people and agent roles, showing each profile''s runner, model and effort'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-21T20:47:05.414784+00:00
-modified: 2026-11-22T02:49:38.931836+00:00
+modified: 2026-11-22T15:41:16.596713+00:00
 relationships:
   related:
   - DEV-769
   - DEV-776
+  - DEV-756
+  - DEV-765
 comments:
 - date: 2026-11-21T23:36:23.239354+00:00
   author: automation
@@ -119,6 +121,59 @@ comments:
       result: passed
       reason: 406 tests
     next: Review on another model, then merge
+- date: 2026-11-22T08:12:49.341559+00:00
+  author: claude
+  text: |-
+    Ready for review: the feature is in `a7cd6024f`, and lint, tests and smoke all passed on it.
+
+    - The `fix-retry` job was marked failed only because its thread was still waiting on the gates. The gates passed at 02:49Z.
+    - No code changes in this job. Main has moved on by 5 commits (DEV-756 … DEV-765); `git merge-tree --write-tree main HEAD` shows no conflicts.
+    - The Done-when deviations and screenshots are in the 2026-11-21 23:38Z comment: variants after the base profile are sorted by name (the API sorts them); descriptions only show when a profile has one.
+  report:
+    commits:
+    - hash: a7cd6024f
+      what: assignee picker in task panel, Run agent, bulk assign, rule editor
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: 02:49Z run on a7cd6024f
+    - command: npm test
+      result: passed
+      reason: 02:49Z run on a7cd6024f
+    - command: npm run smoke
+      result: passed
+      reason: 02:49Z run on a7cd6024f, 406 tests
+    - command: git merge-tree main HEAD
+      result: passed
+      reason: no conflicts with main f7733872c
+    next: Review on another model, then merge (rebase onto main, rerun the gates)
+- date: 2026-11-22T15:41:01.500671+00:00
+  author: claude
+  text: |-
+    Review: blocking. The picker itself works well, but two "Done when" items aren't met and the screenshot set is incomplete.
+
+    **What I read and reran on `a7cd6024f`**
+    - Read the diff (25 files), the ticket, and the 23:38Z and 02:49Z comments.
+    - `npm ci` passed. Frontend lint (vue-tsc, oxlint, eslint, prettier) passed.
+    - `npm run test:ui:agent`: 1581/1581 passed.
+    - `npm run build:smoke`, then the 5 touched smoke specs (`test:smoke:quick`): 22/22 passed.
+    - I didn't rerun the Rust tests, clippy or the full smoke suite: the diff touches no Rust code.
+    - My own screenshots (1920/1440/390 px, light and dark) of the task panel, the search and the Run dialog look right. Typing "light" + Enter picks `@fix-light`. Escape closes only the picker, and focus goes back to the button. The phone sheet and "No match" work.
+
+    **Blocking**
+    1. **Agent order doesn't match "Done when".** "Done when" asks for roles in the order of their first profile (`fix`, `review`, `merge`) and variants in config order. The build shows roles alphabetically (`fix`, `merge`, `review`, `triage`) and variants by name (`fix-codex` before `fix-light`).
+       - Where: `view/utils/assigneeOptions.ts:88-104`. The server sorts by name (`crates/lotar-lib/src/routes/agents.rs:40`), and the config is a `BTreeMap` (`crates/lotar-core/src/config/types.rs:1244`), so the config order is lost.
+       - The fix agent decided to deviate on its own and only mentioned it in a comment. Either keep config order (an order-preserving map, and drop the sort), or ask the owner to accept name order and update "Done when".
+    2. **Agent descriptions never show.** The API always sends `description: None` (`crates/lotar-lib/src/routes/agents.rs:28`), so no agent row ever has the second line that "Done when" asks for.
+       - The smoke fixture sets a `description` for `fix-light` (`smoke/tests/ui.agent-jobs.smoke.spec.ts:579`), but no test checks that it shows.
+       - Adding a description key to the config needs the owner's decision. Ask him, or have him drop the item from "Done when".
+    3. **Screenshots are missing.** None are at 1920 px. The Run dialog has no 1440 dark shot, bulk Assign has no dark or phone shot, and the rule editor has only one width.
+       - Fix: attach the missing before and after shots.
+
+    **Not blocking**
+    - Search, keyboard, Recent, Special group, Run dialog (agents only) and bulk Assign match "Done when". I found no stray files and no second branch.
+    - I filed no minor tickets.
+    - Note: my first `lotar add` in a scratch folder used the job's `LOTAR_TASKS_DIR`. It created an untracked `.tasks/PICK` in the main checkout, which I deleted right away. Nothing tracked was touched.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa12f0aa7aa7c3a5663ff7f38b51ea73b9a85fabf949074533a44458e86ad9e8a
 - attachment: after-automation-dark.e4a61bebbc5bfd235e640881d2e978ed.png
@@ -144,6 +199,7 @@ references:
 - attachment: before-skin-paper-light.dd80f00eb36689bc8765889a7c737a52.png
 - attachment: before-skin-terminal-dark.2ef242d9e50d1173084d926cbe9f31c2.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1bb1fcdff94f91020e5bf7b95f70e58162cb618ef15a77598e61842dc0f018
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8da63ddbf16a5a338e7f86bbedce3e9c648052fcecf38395ddaccf8aadcf1cb0
 description: |-
   The task panel's assignee menu is hard to read and pick from now that there are many agent profile variants. It's a native `<select>` (`view/components/task-panel/TaskPanelOwnershipSection.vue` :36-63 via `UiSelect`) with people and every `@fix`, `@fix-light`, `@fix-fable`, `@fix-retry`, `@review-claude`, `@merge`… in one alphabetical list (`view/composables/useTaskPanelOwnership.ts` :71-87). It shows no runner, model or effort and has no search. "Custom…" swaps in a text field. The owner asked on 2026-11-21 for this select to "be rebuilt in a better way".
 
@@ -193,6 +249,7 @@ tags:
 - web-ui
 - fix-retried
 - retry-fix
+- review-returned
 history:
 - at: 2026-11-21T20:47:05.720790+00:00
   actor: claude
@@ -462,3 +519,52 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T08:12:13.846358+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T08:12:17.422490+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8da63ddbf16a5a338e7f86bbedce3e9c648052fcecf38395ddaccf8aadcf1cb0
+- at: 2026-11-22T08:12:49.341559+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T08:12:49.530411+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-769","DEV-776"]}'
+    new: '{"related":["DEV-769","DEV-776","DEV-756","DEV-765"]}'
+- at: 2026-11-22T08:12:59.663753+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-22T15:41:01.500671+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T15:41:01.961515+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, web-ui, fix-retried, retry-fix
+    new: ui, web-ui, fix-retried, retry-fix, review-blocked
+- at: 2026-11-22T15:41:16.596713+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, web-ui, fix-retried, retry-fix, review-blocked
+    new: ui, web-ui, fix-retried, retry-fix, review-returned

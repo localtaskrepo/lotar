@@ -1,16 +1,18 @@
 title: UI test workers take 8-14 s each to start while the machine stalls, pushing heavy vitest tests toward the 30 s timeout
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-22T00:21:29.120752+00:00
-modified: 2026-11-22T04:35:12.000932+00:00
+modified: 2026-11-22T09:29:19.138138+00:00
 relationships:
   related:
   - DEV-753
   - DEV-764
   - DEV-755
+  - DEV-788
+  - DEV-765
 comments:
 - date: 2026-11-22T04:31:39.604238+00:00
   author: automation
@@ -46,8 +48,35 @@ comments:
       result: passed
       reason: failed 2 tests at 30 s before, 94/94 after
     next: Review, then merge
+- date: 2026-11-22T09:29:10.478949+00:00
+  author: claude
+  text: |-
+    Retry: the fix from the earlier run stands; nothing new to change.
+
+    - Branch holds `a76e155e7` (UI test timeout 30 s -> 120 s in `view/vitest.config.ts`); cause and evidence are in the 04:35 comment.
+    - Main gained `4df8f767b` (DEV-764) and `f7733872c` (DEV-765) since; neither touches `view/vitest.config.ts`, and `git merge-tree` merges cleanly.
+    - Reran `npm run -s test:ui:agent`: 1563/1563 in 7.5 s at load 16.
+  report:
+    commits:
+    - hash: a76e155e7
+      what: UI vitest testTimeout/hookTimeout 30 s -> 120 s (hang guard)
+    checks:
+    - command: npm run -s test:ui:agent
+      result: passed
+      reason: 1563/1563, 7.5 s, ~0.30 s startup at load 16
+    - command: npm run -s lint:agent
+      result: passed
+      reason: in the earlier run, config unchanged since
+    - command: npm run -s test:agent
+      result: passed
+      reason: in the earlier run (Rust 2446, UI 1563)
+    - command: npm run -s smoke
+      result: passed
+      reason: in the earlier run (406/406)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa9d927ee729fe344be319f20082fda7be034d97f7c6b9d43a5404db4c68cee15
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6d88bdfb76931ef8468d0770bd854c62c3b4d12e47c5fafc83f64d303b0b4cc
 description: 'Found: reviewing DEV-764 (2026-11-21, load ~10): `npm run -s test:ui:agent` passed 1563/1563 but took 221 s with ~8.4 s startup per worker (139 files); DEV-753/755 merges saw ~14 s; normal is ~0.27 s and ~9 s total. SprintsList.backlogPagination.spec.ts alone took 31-45 s instead of 3 s, on main and on the DEV-764 branch alike. The stall hit at load 10 too, so it is not CPU load alone (T3 Code processes were at 40-100% CPU). Check: `npm run -s test:ui:agent` reports worker startup per file; find what makes spawn+environment slow (vitest isolate/pool, jsdom setup, machine state). Done: the cause is shown and the full run stays near its normal time, or the suite tolerates the stall.'
 tags:
 - health
@@ -100,3 +129,33 @@ history:
   - field: relationships
     old: '{"related":["DEV-753","DEV-764"]}'
     new: '{"related":["DEV-753","DEV-764","DEV-755"]}'
+- at: 2026-11-22T07:34:07.290976+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-753","DEV-764","DEV-755"]}'
+    new: '{"related":["DEV-753","DEV-764","DEV-755","DEV-788"]}'
+- at: 2026-11-22T09:28:40.792750+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6d88bdfb76931ef8468d0770bd854c62c3b4d12e47c5fafc83f64d303b0b4cc
+- at: 2026-11-22T09:29:10.478949+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T09:29:10.810527+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-753","DEV-764","DEV-755","DEV-788"]}'
+    new: '{"related":["DEV-753","DEV-764","DEV-755","DEV-788","DEV-765"]}'
+- at: 2026-11-22T09:29:19.138138+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

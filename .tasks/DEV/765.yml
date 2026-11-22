@@ -1,17 +1,24 @@
 title: 'Web UI: show live activity of agent jobs that run in other processes (queue worker, CLI, MCP)'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:03.411406+00:00
-modified: 2026-11-22T07:16:24.788633+00:00
+modified: 2026-11-22T14:20:28.286686+00:00
 relationships:
   blocks:
   - DEV-782
   related:
   - DEV-782
   - DEV-771
+  - DEV-788
+  - DEV-775
+  - DEV-768
+  - DEV-779
+  - DEV-780
+  - DEV-781
+  - DEV-766
 comments:
 - date: 2026-11-21T22:15:46.508688+00:00
   author: claude
@@ -71,6 +78,33 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-22T07:34:23.050755+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `f7733872c` is on `main` and `origin/main`.
+
+    - Kept lotar's rebase onto `4df8f767b`; no conflicts. `lint:agent` and `test:agent` had already passed
+    - Smoke: lotar's full run failed one test, `harness.agent-launcher` (batch-shim child hit the 20 s timeout). That file passes alone, the test in 0.8 s
+    - My full rerun failed 9 other tests (timeouts in `ui.theming`, `ui.backlog-order`, `ui.filter-panel`, `ui.global-actions`, `ui.config-coverage`; plus `harness.server` occupied port and `harness.failed-test-cleanup`). Load average was 40-48 on 14 cores
+    - Rerun alone, all 7 of those files pass (32/32). None of them touch files this change edits, so I counted smoke as passed. Filed the flakes as DEV-788
+    - Fast-forwarded `main`, then amended the pending `.tasks` files into the commit
+    - No rule or config files changed, so `lotar trust` was not needed
+    - Pushed `4df8f767b..f7733872c`. The pre-push lint passed
+  report:
+    commits:
+    - hash: f7733872c
+      what: DEV-765 live activity of agent jobs from other processes (with pending .tasks files)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s smoke
+      result: passed
+      reason: failures only under load 40-48, each failed file passes alone, filed DEV-788
+    next: none; DEV-782 follows up
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa97d4d8730d6d45978e856b83771013163009cd2a87b29d417a86cbb96891bcd
 - attachment: DEV-765-after-dark-1440.2b850162d89c3a871106acfa37b6c7e7.png
@@ -308,3 +342,55 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-22T07:34:07.279821+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788"]}'
+- at: 2026-11-22T07:34:23.050755+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T07:34:33.832991+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-22T08:11:47.762534+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775"]}'
+- at: 2026-11-22T08:12:49.529903+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768"]}'
+- at: 2026-11-22T09:29:10.809876+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779"]}'
+- at: 2026-11-22T11:01:26.037103+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779","DEV-780"]}'
+- at: 2026-11-22T11:09:37.653447+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779","DEV-780"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779","DEV-780","DEV-781"]}'
+- at: 2026-11-22T14:20:28.286686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779","DEV-780","DEV-781"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-782","DEV-771","DEV-788","DEV-775","DEV-768","DEV-779","DEV-780","DEV-781","DEV-766"]}'

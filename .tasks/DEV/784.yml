@@ -1,16 +1,81 @@
 title: 'Agent jobs: one full test run at a time across jobs, agents keep working in parallel'
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-22T03:06:53.057587+00:00
-modified: 2026-11-22T03:06:53.523555+00:00
+modified: 2026-11-22T09:10:40.414804+00:00
 relationships:
   related:
   - DEV-748
   - DEV-755
-description: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar''s merge checks, and the repo''s test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs'' check runs never overlap (test), load during a full queue stays near the core count.'
+  - DEV-586
+  - DEV-605
+  - DEV-785
+comments:
+- date: 2026-11-22T08:49:27.438495+00:00
+  author: claude
+  text: |-
+    Plan in "Done when"; lock built, full checks running.
+
+    - One lock for everything: port `47586` (DEV-586's smoke port), held by lotar's merge checks (`check_lock.rs`) and the repo's full runs (`scripts/check-lock.mjs`)
+    - Targeted runs (a file, `-t`, nextest filter) don't wait, so agent turns stay parallel; a targeted smoke run no longer waits either
+    - Checked by hand: a full `vitest run` waits for a held lock, a filtered one doesn't; a merge test waited ~11 s for a Node holder
+- date: 2026-11-22T08:49:35.563387+00:00
+  author: automation
+  text: The fix agent's job job-20261122T083844.753Z-160 failed (lotar agent logs job-20261122T083844.753Z-160); @fix-retry retries it on branch agent/DEV-784.
+- date: 2026-11-22T08:54:34.003349+00:00
+  author: claude
+  text: |-
+    Done: one full check run per machine at a time; agents' edits and targeted runs stay parallel.
+
+    - Lock: listening socket `127.0.0.1:47586` (DEV-586's smoke port); the OS frees it when the holder dies
+    - lotar's merge (any repo with `agent.merge`): a round's checks run under it, `crates/lotar-agent/src/services/agent_job_service/check_lock.rs`. Job log: `Waiting for the machine's check lock (port 47586), held by <holder>`, then `Took the check lock after N min`; cancel ends the wait
+    - Repo scripts: `scripts/check-lock.mjs` for full Rust (`rust-test-runner.mjs`), UI and smoke runs; runs filtered by file, `-t` or nextest filter don't wait (smoke's old `helpers/run-lock.ts` removed)
+    - No self-deadlock: holders and test runs set `LOTAR_CHECK_LOCK_HELD=1` for their processes
+    - Tests: Rust and Node no-overlap tests, DEV-605 merge test; by hand a merge waited ~11 s for a Node holder
+    - Docs: `docs/help/agent.md`, `config-reference.md`, `smoke/README.md`, testing-strategy skill
+    - Guidance: no durable finding
+  report:
+    commits:
+    - hash: ff83b472e
+      what: machine-wide check lock for lotar's merge checks and the repo's full test runs
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2458 Rust, 1564 UI
+    - command: npm run -s test:smoke:agent
+      result: passed
+      reason: 407; ran before two lint-only edits in scripts/check-lock.mjs and its test
+    - command: node --test scripts/tests/check-lock.test.mjs
+      result: passed
+    - command: load near the core count during a full queue
+      result: not_run
+      reason: needs the new build installed and a full queue
+    next: Review; after install, watch load average while 3 jobs run checks
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74696b7a2d960572c6a68d1078f63f25eba1e0fcbc23d815d4b9c4cc6b8c50bf
+description: |-
+  Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar's merge checks, and the repo's test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs' check runs never overlap (test), load during a full queue stays near the core count.
+
+  ## Done when
+
+  The lock: a listening socket on `127.0.0.1:47586`, the port DEV-586's smoke lock used, so the OS frees it when its holder ends or is killed. A run that holds it sets `LOTAR_CHECK_LOCK_HELD=1` for its children.
+
+  - [ ] **lotar's merge** (`agent.merge`, any repository): a round's checks run under the lock, from the first check to the last (`install` runs before, outside it). The checks get `LOTAR_CHECK_LOCK_HELD=1`, so the repo's scripts inside them don't wait for their own merge.
+  - [ ] **Waiting shows in the job log**: `Waiting for the machine's check lock (port 47586), held by <holder>` once, then `Took the check lock after <N> min`. A cancelled job stops waiting.
+  - [ ] **The repo's scripts**: a full Rust run (`scripts/rust-test-runner.mjs` without a test filter: `npm test`, `npm run test:agent`), a full UI run and a full smoke run (Vitest without file or `-t` filters; the owner's "one full test run at a time", so a targeted smoke run no longer waits as under DEV-586) take the lock; they print the same waiting line on stderr, which the agent's tool output and so the job log show.
+  - [ ] **Agents keep working in parallel**: editing, agent turns, lint and targeted runs (a file, a test name, a nextest filter) don't take the lock.
+  - [ ] **Which wins**: under `LOTAR_CHECK_LOCK_HELD=1` a run never takes the lock again (no self-deadlock); otherwise every full run waits. A test run's own processes (nextest, Vitest workers) always get `LOTAR_CHECK_LOCK_HELD=1`, also in a targeted run, so tests of lotar's merge never wait for the machine's lock.
+  - [ ] **When a step fails**: the port can't be opened for another reason than "in use" (a sandbox forbids listening): the run goes on without the lock and says so. A script waits at most 90 min, then fails naming the holder and `lsof -i :47586`; lotar's merge waits until the holder ends or the job is cancelled. A holder that crashes frees the lock with its process.
+  - [ ] **Test**: two holders' runs never overlap (Rust unit test and Node test), and merge checks run with `LOTAR_CHECK_LOCK_HELD=1` (DEV-605 test).
+  - [ ] **Docs**: `docs/help/agent.md` (lotar's own merge), `docs/help/config-reference.md`, `smoke/README.md`, testing-strategy skill.
+  - [ ] Load during a full queue stays near the core count: checked on the queue after the new build is installed (not testable in CI).
+tags:
+- fix-retried
 history:
 - at: 2026-11-22T03:06:53.285183+00:00
   actor: claude
@@ -23,3 +88,104 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T08:39:11.291870+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T08:39:14.647356+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74696b7a2d960572c6a68d1078f63f25eba1e0fcbc23d815d4b9c4cc6b8c50bf
+- at: 2026-11-22T08:42:55.636416+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar''s merge checks, and the repo''s test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs'' check runs never overlap (test), load during a full queue stays near the core count.'
+    new: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar's merge checks, and the repo's test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs' check runs never overlap (test), load during a full queue stays near the core count.
+
+      ## Done when
+
+      The lock: a listening socket on `127.0.0.1:47586`, the port DEV-586's smoke lock used, so the OS frees it when its holder ends or is killed. A run that holds it sets `LOTAR_CHECK_LOCK_HELD=1` for its children.
+
+      - [ ] **lotar's merge** (`agent.merge`, any repository): a round's checks run under the lock, from the first check to the last (`install` runs before, outside it). The checks get `LOTAR_CHECK_LOCK_HELD=1`, so the repo's scripts inside them don't wait for their own merge.
+      - [ ] **Waiting shows in the job log**: `Waiting for the machine's check lock (port 47586), held by <holder>` once, then `Took the check lock after <N> min`. A cancelled job stops waiting.
+      - [ ] **The repo's scripts**: a full Rust run (`scripts/rust-test-runner.mjs` without a test filter: `npm test`, `npm run test:agent`), a full UI run (Vitest of `view/` without file or `-t` filters) and every smoke run (as DEV-586) take the lock; they print the same waiting line on stderr, which the agent's tool output and so the job log show.
+      - [ ] **Agents keep working in parallel**: editing, agent turns, lint and targeted runs (a file, a test name, a nextest filter) don't take the lock.
+      - [ ] **Which wins**: under `LOTAR_CHECK_LOCK_HELD=1` a run never takes the lock again (no self-deadlock); otherwise every full run waits.
+      - [ ] **When a step fails**: the port can't be opened for another reason than "in use" (a sandbox forbids listening): the run goes on without the lock and says so. A script waits at most 90 min, then fails naming the holder and `lsof -i :47586`; lotar's merge waits until the holder ends or the job is cancelled. A holder that crashes frees the lock with its process.
+      - [ ] **Test**: two holders' runs never overlap (Rust unit test and Node test), and merge checks run with `LOTAR_CHECK_LOCK_HELD=1` (DEV-605 test).
+      - [ ] **Docs**: `docs/help/agent.md` (lotar's own merge), `smoke/README.md`, testing-strategy skill.
+      - [ ] Load during a full queue stays near the core count: checked on the queue after the new build is installed (not testable in CI).
+- at: 2026-11-22T08:42:55.844480+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-755"]}'
+    new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605"]}'
+- at: 2026-11-22T08:49:12.130101+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar's merge checks, and the repo's test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs' check runs never overlap (test), load during a full queue stays near the core count.
+
+      ## Done when
+
+      The lock: a listening socket on `127.0.0.1:47586`, the port DEV-586's smoke lock used, so the OS frees it when its holder ends or is killed. A run that holds it sets `LOTAR_CHECK_LOCK_HELD=1` for its children.
+
+      - [ ] **lotar's merge** (`agent.merge`, any repository): a round's checks run under the lock, from the first check to the last (`install` runs before, outside it). The checks get `LOTAR_CHECK_LOCK_HELD=1`, so the repo's scripts inside them don't wait for their own merge.
+      - [ ] **Waiting shows in the job log**: `Waiting for the machine's check lock (port 47586), held by <holder>` once, then `Took the check lock after <N> min`. A cancelled job stops waiting.
+      - [ ] **The repo's scripts**: a full Rust run (`scripts/rust-test-runner.mjs` without a test filter: `npm test`, `npm run test:agent`), a full UI run (Vitest of `view/` without file or `-t` filters) and every smoke run (as DEV-586) take the lock; they print the same waiting line on stderr, which the agent's tool output and so the job log show.
+      - [ ] **Agents keep working in parallel**: editing, agent turns, lint and targeted runs (a file, a test name, a nextest filter) don't take the lock.
+      - [ ] **Which wins**: under `LOTAR_CHECK_LOCK_HELD=1` a run never takes the lock again (no self-deadlock); otherwise every full run waits.
+      - [ ] **When a step fails**: the port can't be opened for another reason than "in use" (a sandbox forbids listening): the run goes on without the lock and says so. A script waits at most 90 min, then fails naming the holder and `lsof -i :47586`; lotar's merge waits until the holder ends or the job is cancelled. A holder that crashes frees the lock with its process.
+      - [ ] **Test**: two holders' runs never overlap (Rust unit test and Node test), and merge checks run with `LOTAR_CHECK_LOCK_HELD=1` (DEV-605 test).
+      - [ ] **Docs**: `docs/help/agent.md` (lotar's own merge), `smoke/README.md`, testing-strategy skill.
+      - [ ] Load during a full queue stays near the core count: checked on the queue after the new build is installed (not testable in CI).
+    new: |-
+      Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar's merge checks, and the repo's test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs' check runs never overlap (test), load during a full queue stays near the core count.
+
+      ## Done when
+
+      The lock: a listening socket on `127.0.0.1:47586`, the port DEV-586's smoke lock used, so the OS frees it when its holder ends or is killed. A run that holds it sets `LOTAR_CHECK_LOCK_HELD=1` for its children.
+
+      - [ ] **lotar's merge** (`agent.merge`, any repository): a round's checks run under the lock, from the first check to the last (`install` runs before, outside it). The checks get `LOTAR_CHECK_LOCK_HELD=1`, so the repo's scripts inside them don't wait for their own merge.
+      - [ ] **Waiting shows in the job log**: `Waiting for the machine's check lock (port 47586), held by <holder>` once, then `Took the check lock after <N> min`. A cancelled job stops waiting.
+      - [ ] **The repo's scripts**: a full Rust run (`scripts/rust-test-runner.mjs` without a test filter: `npm test`, `npm run test:agent`), a full UI run and a full smoke run (Vitest without file or `-t` filters; the owner's "one full test run at a time", so a targeted smoke run no longer waits as under DEV-586) take the lock; they print the same waiting line on stderr, which the agent's tool output and so the job log show.
+      - [ ] **Agents keep working in parallel**: editing, agent turns, lint and targeted runs (a file, a test name, a nextest filter) don't take the lock.
+      - [ ] **Which wins**: under `LOTAR_CHECK_LOCK_HELD=1` a run never takes the lock again (no self-deadlock); otherwise every full run waits. A test run's own processes (nextest, Vitest workers) always get `LOTAR_CHECK_LOCK_HELD=1`, also in a targeted run, so tests of lotar's merge never wait for the machine's lock.
+      - [ ] **When a step fails**: the port can't be opened for another reason than "in use" (a sandbox forbids listening): the run goes on without the lock and says so. A script waits at most 90 min, then fails naming the holder and `lsof -i :47586`; lotar's merge waits until the holder ends or the job is cancelled. A holder that crashes frees the lock with its process.
+      - [ ] **Test**: two holders' runs never overlap (Rust unit test and Node test), and merge checks run with `LOTAR_CHECK_LOCK_HELD=1` (DEV-605 test).
+      - [ ] **Docs**: `docs/help/agent.md` (lotar's own merge), `docs/help/config-reference.md`, `smoke/README.md`, testing-strategy skill.
+      - [ ] Load during a full queue stays near the core count: checked on the queue after the new build is installed (not testable in CI).
+- at: 2026-11-22T08:49:27.438495+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T08:49:33.945191+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-22T08:49:35.563387+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T08:54:34.003349+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T09:10:40.414804+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605"]}'
+    new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785"]}'

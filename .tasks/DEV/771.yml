@@ -1,11 +1,11 @@
 title: Agents page shows Running 0, Queued 0 while the queue worker runs 2 jobs and 13 tickets wait
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T22:12:31.042289+00:00
-modified: 2026-11-22T06:04:34.268824+00:00
+modified: 2026-11-22T11:21:26.910792+00:00
 relationships:
   related:
   - DEV-279
@@ -117,6 +117,33 @@ comments:
       result: passed
       reason: 406 tests
     next: Review on another model, then merge
+- date: 2026-11-22T11:21:13.578618+00:00
+  author: claude
+  text: |-
+    Already done: no new change in this retry; the fix in `3333807b1` passed all gates at 06:04.
+
+    - This retry came from the 05:59 job's thread ending while it waited on tests; the 06:04 job then finished and verified, so nothing was left to fix
+    - Main moved 5 commits since (`b18be094a`), including DEV-765 (live activity of other processes' jobs)
+    - `git merge-tree main HEAD` merges clean; the only file both changed is `docs/help/agent.md`
+    - No rebase here (not authorized); the merge agent rebases and reruns the checks
+  report:
+    commits:
+    - hash: 3333807b1
+      what: queue overview shared by CLI, /api/jobs and the Agents page
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: on 3333807b1, 06:04 job
+    - command: npm test
+      result: passed
+      reason: on 3333807b1, 06:04 job
+    - command: npm run smoke
+      result: passed
+      reason: on 3333807b1, 06:04 job
+    - command: rerun on rebased branch
+      result: not_run
+      reason: the merge agent rebases and reruns
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1224931913f390b0667f0bc0e9b90bc806302a13aae24ec5e6fd5fc180d2b92e
 - attachment: DEV-771-after-dark-1440.ca37cea0ad6ab1dd3d749d4033f02bf0.png
@@ -132,6 +159,7 @@ references:
 - attachment: DEV-771-before-light-1920.e972f7ef9adeffa0fc92c53de015554c.png
 - attachment: DEV-771-before-light-390.e6541c9b68d12e2c85c9fa5b81f5772d.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac558615ba28039309b0d9402b5f5e0ca5252132f8bb651afd80575a159123a29
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A776ae64ff3c0d61b3a6f1ed0e24451a7de8ba5b7ac1b3be17909f0050a116710
 description: |-
   Found (owner 2026-11-21: "I have no where to see what's queued up"): `GET /api/jobs` on the DEV server answers `queue_stats {running: 0, queued: 0}` while `lotar agent queue` shows Running 2, Queued 13 (DEV-725's release retry 9th). The route (crates/lotar-lib/src/routes/jobs.rs ~36) returns `AgentJobService::queue_stats()`, the serving process's own worker only. The CLI (cli/handlers/agent.rs ~454) adds jobs other processes run (DEV-279) and the on-disk queue (DEV-522). The page's Queued tab filters job logs with status queued, so tickets waiting in the on-disk queue never show.
 
@@ -291,3 +319,27 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T11:20:35.259117+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T11:20:39.391621+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A776ae64ff3c0d61b3a6f1ed0e24451a7de8ba5b7ac1b3be17909f0050a116710
+- at: 2026-11-22T11:21:13.578618+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T11:21:26.910792+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

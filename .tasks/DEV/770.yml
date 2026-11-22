@@ -1,11 +1,11 @@
 title: 'A usage-limit pause has no upper bound: its queue worker stays in memory until the reset, also one in 2099'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T21:10:33.155601+00:00
-modified: 2026-11-22T05:33:15.539320+00:00
+modified: 2026-11-22T11:01:26.049538+00:00
 relationships:
   related:
   - DEV-763
@@ -14,6 +14,7 @@ relationships:
   - DEV-740
   - DEV-756
   - DEV-757
+  - DEV-780
 comments:
 - date: 2026-11-22T00:29:35.142441+00:00
   author: claude
@@ -51,6 +52,12 @@ comments:
     - Docs: `docs/help/agent.md#usage-limits` updated.
     - Reran: `npm ci` (ok), `cargo nextest run -p lotar-agent usage_limit` (15 passed), `cargo nextest run -p lotar-lib --test integration dev584` (5 passed), `npm run lint` (exit 0). Not rerun: full `npm test` and `npm run smoke` (the fix agent reports both passed).
     - Not UI work, so no screenshots. Worktree unchanged.
+- date: 2026-11-22T09:29:42.643636+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-770` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-770` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A624acfd33bfac1adf31ec51122352a40df846c6308663862b5164f0916e606ec
 description: |-
@@ -169,3 +176,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T09:29:42.643636+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T09:47:49.427007+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-22T11:01:26.049538+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-763","TEST-1","DEV-711","DEV-740","DEV-756","DEV-757"]}'
+    new: '{"related":["DEV-763","TEST-1","DEV-711","DEV-740","DEV-756","DEV-757","DEV-780"]}'

@@ -1,0 +1,91 @@
+title: 'Flaky smoke: full npm run smoke fails with timeouts under machine load, the failing tests pass alone'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix-retry'
+created: 2026-11-22T07:34:05.012147+00:00
+modified: 2026-11-22T13:45:10.453875+00:00
+relationships:
+  related:
+  - DEV-765
+  - DEV-779
+comments:
+- date: 2026-11-22T13:42:25.866501+00:00
+  author: automation
+  text: The fix agent's job job-20261122T133557.188Z-175 failed (lotar agent logs job-20261122T133557.188Z-175); @fix-retry retries it on branch agent/DEV-788.
+- date: 2026-11-22T13:45:10.453875+00:00
+  author: claude
+  text: |-
+    Fixed: a smoke test that times out under load no longer leaks its browser, and the server and launcher hang guards hold up under load.
+
+    - Cause 1, reproduced: `withBrowser` (`smoke/helpers/ui.ts`) registered its owed cleanup only after `chromium.launch` returned. A test that timed out while Chromium was still starting leaked it, which gave the `Tests left ... playwright-artifacts` failure in `harness.failed-test-cleanup`. The cleanup is now owed from the launch on. New fixture test `times out while its browser is still launching` (50 ms timeout): fails without the fix with exactly that error, passes with it
+    - `harness.server` occupied port: the error said "exited before becoming ready" but had no "Failed to bind", so stderr was missing. `startLotarServer` now waits (5 s max) for the exited server's stderr to close before it reports. I couldn't make the race fail locally, also not with a blocked event loop; the new test `reports the whole stderr of a child that exits before ready` guards it. The default readiness bound goes from 15 s to 60 s (a hang guard)
+    - `harness.agent-launcher`: `awaitExit` counted 20 s from spawn, across a 10 s start wait. Now 60 s, still under the 120 s test timeout
+    - The UI timeouts (`ui.theming`, `ui.filter-panel` and 3 more): those tests take 1-5 s at load ~30, so a 120 s timeout means the machine stalled 25-100x, as in DEV-779 (Time Machine, memory pressure). I left `testTimeout` at 120 s
+  report:
+    commits:
+    - hash: a9bc39a7a
+      what: owed browser cleanup from launch, stderr drain, hang-guard bounds
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2456 Rust, 1564 UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 408/408 at load 15-41; first run 406/407 at load ~35, only fail was my half-done fixture
+    next: Review, then merge; rerun npm run smoke on main
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A00eba8331e1b4442199bd2736f308391518047db59474cfa0c61a0898113a84c
+description: |-
+  Found: merging DEV-765 on 2026-11-21, two full `npm run smoke` runs failed on different tests while load average was 40-48 on 14 cores: run 1 `harness.agent-launcher.smoke.spec.ts` (batch-shim test, 'fixture child did not exit within 20000ms'); run 2 nine tests in `ui.theming`, `harness.server` (occupied port, expected /Failed to bind/), `ui.config-coverage`, `ui.backlog-order`, `ui.filter-panel`, `ui.global-actions` (120 s timeouts) and `harness.failed-test-cleanup` (Tests left playwright temp entries). Each file passes alone (32/32, launcher test in 0.8 s). Related: DEV-779 (same for test:ui).
+  Check: `npm run smoke` while the machine is busy.
+  Done: the full suite passes under load, or its timeouts and port handling hold up under it.
+tags:
+- health
+- fix-retried
+custom_fields:
+  finding: npm run smoke:flaky-under-load
+history:
+- at: 2026-11-22T07:34:07.294880+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-765","DEV-779"]}'
+- at: 2026-11-22T07:34:09.122349+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T13:36:37.203212+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T13:36:40.828123+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A00eba8331e1b4442199bd2736f308391518047db59474cfa0c61a0898113a84c
+- at: 2026-11-22T13:42:18.392674+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-22T13:42:25.866501+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T13:45:10.453875+00:00
+  actor: claude
+  changes:
+  - field: comment_added

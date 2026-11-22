@@ -1,0 +1,94 @@
+title: 'Agents page: a finished tool call replaces the job card''s last message, unlike the server'
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T08:06:40.134808+00:00
+modified: 2026-11-22T14:18:48.639564+00:00
+relationships:
+  depends_on:
+  - DEV-766
+  related:
+  - DEV-766
+comments:
+- date: 2026-11-22T13:46:52.546394+00:00
+  author: claude
+  text: |-
+    Waits for DEV-766: the code this ticket fixes isn't on main yet.
+
+    - `agent_job_tool` and the server's `tool_entry` exist only on `agent/DEV-766` (`15f30d2f4`, status Merging); `main` (`fc82f726e`) has neither.
+    - On main, `view/composables/useAgentActivity.ts` still sets the message only from `agent_job_progress`/`agent_job_message`; the `agent_job_tool` case is added by DEV-766.
+    - Next: once DEV-766 is on main, rebase `agent/DEV-789` onto it, then change `updateFromEvent` (`view/pages/AgentJobs.vue`) and `applyAgentJobEvent` so that only a tool's start (`running`) or `failed` event sets the message, and add the two vitests.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbec1b9366a3e727602217837d75843415ce7d4c239dc0ded79a4911ff97aad0
+description: |-
+  Found in the review of DEV-766.
+
+  ## Found
+
+  The server sets a job's `last_message` only from a tool call's start or failure (`crates/lotar-agent/src/services/agent_job_service.rs:4521`, `tool_entry`). The web UI sets it from every `agent_job_tool` event, also a completed one:
+
+  - `view/pages/AgentJobs.vue:524` (`updateFromEvent`)
+  - `view/composables/useAgentActivity.ts:80`
+
+  So while a job runs, the job card shows the line of the last finished tool (for Claude usually just "Terminal"). After a reload it shows the server's line, which can differ.
+
+  ## Done when
+
+  - [ ] A completed `agent_job_tool` event doesn't change the card's last message in either place; a start and a failure still do, matching the server.
+  - [ ] A vitest covers it for `applyAgentJobEvent` and for the Agents page.
+tags:
+- agent
+- ui
+history:
+- at: 2026-11-22T08:06:42.114577+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-766"]}'
+- at: 2026-11-22T08:06:44.097457+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T13:46:17.938243+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T13:46:22.186704+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbec1b9366a3e727602217837d75843415ce7d4c239dc0ded79a4911ff97aad0
+- at: 2026-11-22T13:46:51.834939+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-766"]}'
+    new: '{"depends_on":["DEV-766"],"related":["DEV-766"]}'
+- at: 2026-11-22T13:46:52.432906+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, waits
+- at: 2026-11-22T13:46:52.546394+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T13:46:58.700855+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-22T14:18:48.639564+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui, waits
+    new: agent, ui

@@ -1,11 +1,11 @@
 title: docs/help/automation.md's job_paused names two causes; a taken-over job that runs again in a new session (DEV-734) is a third
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-20T20:32:12.764651+00:00
-modified: 2026-11-22T05:59:30.385626+00:00
+modified: 2026-11-22T11:19:57.058363+00:00
 relationships:
   depends_on:
   - DEV-734
@@ -82,6 +82,18 @@ comments:
 - date: 2026-11-20T22:25:04.377664+00:00
   author: automation
   text: 'The @review job waits for its open prerequisites: DEV-734. It starts once they are done.'
+- date: 2026-11-22T11:19:44.322510+00:00
+  author: claude
+  text: |-
+    Review: passed. The docs for the third `job_paused` cause match main, where DEV-734 has now landed.
+
+    - Read: `223ec1dc4` (HEAD, the only commit on `main..HEAD`, 3 docs lines), the ticket's Done when, the fix and review comments, and main's `docs/help/agent.md`
+    - Reran: `npm ci` (passed) and `npx prettier --check` on the 3 files (passed). `git merge-tree main HEAD` merges cleanly onto main `b18be094a`
+    - Blocking 1 from the last review is resolved: DEV-734 is Done and on main (`a8028b6ef`). Main's `docs/help/agent.md:228` says a taken-over job whose session can't be resumed ends paused, runs again in a new session, runs `job_paused` rules and not `job_failed`, and a job taken over from a T3 Code thread or started by an older build fails. `automation.md:230` agrees with that, and the `#jobs-whose-process-died` anchor resolves to the heading at `agent.md:224`
+    - Blocking 2 is resolved: the pause notes in main's `agent_job_service.rs` say what `automation.md:230` claims. The usage-limit note names the provider and the time (line 5527). The paused-queue note names the cause, its line and when the queue tries again (line 5584). The takeover note is `"{why}, and its session {name} could not be resumed: {err}. Paused, not failed: …"` (line 2176)
+    - Grepping `job_paused` in `docs/` finds no page that still lists only two causes. Both `sse.md` pages now name all three
+    - Nothing outside the ticket's scope changed. No UI work, so no screenshots were needed
+    - No minor findings, so no tickets were filed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1bed5233326b43586d924cbfc83666f08ba6833a4325145d33153a12707c0c5e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0d2421313df406ec3d391335287bfcb3e9436bed646cb2c6e9744c9636e0c6bc
@@ -216,3 +228,16 @@ history:
   - field: status
     old: Blocked
     new: Reviewing
+- at: 2026-11-22T11:19:44.322510+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T11:19:57.058363+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,14 +1,17 @@
 title: lotar comment saves a lone - as the comment text instead of reading stdin
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T23:39:20.858113+00:00
-modified: 2026-11-22T02:53:20.915575+00:00
+modified: 2026-11-22T16:25:31.527534+00:00
 relationships:
+  blocks:
+  - DEV-791
   related:
   - DEV-768
+  - DEV-791
 comments:
 - date: 2026-11-22T02:53:13.779728+00:00
   author: claude
@@ -38,6 +41,36 @@ comments:
       result: passed
       reason: '406'
     next: Review, then merge
+- date: 2026-11-22T08:26:50.310192+00:00
+  author: claude
+  text: |-
+    Review passed at 3968c82a1.
+
+    Review: passed. A lone `-` now reads stdin like `-F -`, as the ticket asks.
+
+    - Read: `git log main..HEAD` (one commit, `3968c82a1`), its diff, the ticket, DEV-768, AGENTS.md, `git log -5 main` for `comment.rs` and `docs/help/comment.md` (nothing the fix depends on changed)
+    - `resolve_comment_text` (`crates/lotar-lib/src/cli/handlers/comment.rs:362`) maps a positional `-` to `-F -`; it is the only path for both `lotar comment` and `lotar task comment`
+    - The test `a_lone_dash_reads_the_comment_from_stdin` failed before the fix: the old code returned the text `-`, which the test refuses
+    - Reran: `npm ci` passed, `npm run lint` passed, `cargo nextest run -E 'test(/dev282|lone_dash|comments_fail/)'` passed (6 tests)
+    - Manual check with the branch build: `lotar comment <ID> - < file` and `--commit … - <<EOF` saved the stdin text. My scratch ticket SAFE-1 went to the main checkout's `.tasks` (through `LOTAR_TASKS_DIR`), and I removed it
+    - Not rerun: full `npm test` and `npm run smoke`. The fix agent reports both passed, and the change is limited to this one function
+    - Minor, filed: [DEV-791](https://lotar.pyxzl.net/task/DEV-791). `-m msg -` now reads stdin and drops the `-m` text without a word
+    - No stray files, no second branch
+  review:
+    verdict: pass
+    commit: 3968c82a1
+- date: 2026-11-22T16:25:31.527534+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed:\n```\n    \e[90m   |\e[39m                                                         \e[31m^\e[39m\n    \e[90m791|\e[39m                     await waitForText(page, '.job-card', 'Permission: …\n    \e[90m792|\e[39m                 })\e[33m;\e[39m\n\e[90m \e[2m❯\e[22m helpers/ui.ts:\e[2m104:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m withBrowser helpers/ui.ts:\e[2m84:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.agent-jobs.smoke.spec.ts:\e[2m783:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\e[22m\e[39m\n\n\e[41m\e[1m FAIL \e[22m\e[49m tests/ui.sprints-responsive.smoke.spec.ts\e[2m > \e[22mResponsive sprint controls and standardized pagination (DEV-105)\e[2m > \e[22mfits controls and dialogs at 1440px\n\e[31m\e[1mError\e[22m: Test timed out in 120000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\e[39m\n\e[36m \e[2m❯\e[22m tests/ui.sprints-responsive.smoke.spec.ts:\e[2m96:9\e[22m\e[39m\n    \e[90m 94|\e[39m         { width\e[33m:\e[39m \e[34m320\e[39m\e[33m,\e[39m height\e[33m:\e[39m \e[34m640\e[39m }\e[33m,\e[39m\n    \e[90m 95|\e[39m     ]) {\n    \e[90m 96|\e[39m         it(`fits controls and dialogs at ${viewport.width}px`, async (…\n    \e[90m   |\e[39m         \e[31m^\e[39m\n    \e[90m 97|\e[39m             const workspace = await SmokeWorkspace.create({ name: 'res…\n    \e[90m 98|\e[39m             \e[35mtry\e[39m {\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m2 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m116 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m2 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m405 passed\e[39m\e[22m\e[90m (407)\e[39m\n\e[2m   Start at \e[22m 08:17:12\n\e[2m   Duration \e[22m 498.37s\e[2m (tests 78%, import 19%, setup 1%, transform 1%)\e[22m\n\n\e[2m    Isolate \e[22m \e[33m118 workers spawned\e[39m\e[2m · ~2.16s startup each (spawn + environment, per file)\e[22m\n\e[2m            \e[22m \e[2mat least ~17.44s faster with \e[22m\e[33misolate: false\e[39m\e[2m — reuses workers across files instead of one per file\e[22m\n```.\n\n- Rebased `agent/DEV-776` onto `main` (`878c80d5fae3`): `64038271f2bd`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa8aed42de28a4aafdd4ad3d8ff4a47cd7e7c19faf1b1f7b425aa0f3d7109a0b9
 description: 'Found: lotar comment DEV-768 --commit … - <<EOF saved the text ''-'' and dropped the heredoc; only -F - reads stdin (DEV-768 hand-off). Check: lotar comment <ID> - < file. Done: a lone - reads stdin like -F -, or is refused with a hint to use -F -.'
@@ -81,3 +114,32 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T08:26:32.137655+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-768"]}'
+    new: '{"related":["DEV-768","DEV-791"]}'
+- at: 2026-11-22T08:26:50.310192+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T08:27:03.982264+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-22T15:42:43.818241+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-768","DEV-791"]}'
+    new: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791"]}'
+- at: 2026-11-22T16:25:31.527534+00:00
+  actor: automation
+  changes:
+  - field: comment_added

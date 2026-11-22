@@ -54,6 +54,17 @@ fn comments_fail_loudly_and_never_hang() {
     assert!(shown.contains("from stdin"), "{shown}");
 }
 
+/// DEV-776: a lone `-` as the text reads stdin like `-F -`, also with a report.
+#[test]
+fn a_lone_dash_reads_the_comment_from_stdin() {
+    let fixtures = workspace();
+    let out = run(&fixtures, &["comment", "SAFE-1", "--commit", "abc1234: the fix", "-"], "heredoc text\n");
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let yaml = std::fs::read_to_string(fixtures.tasks_root.join("SAFE").join("1.yml")).unwrap();
+    assert!(yaml.contains("heredoc text"), "{yaml}");
+    assert!(!yaml.contains("text: '-'") && !yaml.contains("text: -\n"), "{yaml}");
+}
+
 #[test]
 fn delete_without_force_fails_when_it_cannot_ask() {
     let fixtures = workspace();

@@ -1,0 +1,44 @@
+title: 'A merge job that ends while its agent waits on a check still lands: DEV-725 (v0.15.6) went to main with smoke failed, and is Done without push or tag'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T14:05:11.563685+00:00
+modified: 2026-11-22T14:05:12.046894+00:00
+relationships:
+  related:
+  - DEV-725
+description: |-
+  Found by the standards communication review (STD-17), 2026-11-22.
+
+  ## What happened
+  - DEV-725's merge job `job-20261122T094758.874Z-166` (runner claude): lotar's own merge found `npm run -s smoke` failing (8 of 407 at load ~39), then handed it to the merge agent.
+  - The agent said "I'll rerun smoke", started it under Monitor and ended its turn with "Smoke is rerunning; waiting for the result." (10:26:40Z).
+  - Two seconds later lotar logged "Fast-forwarded the main checkout to agent/DEV-725" and set DEV-725 Done (10:26:43-48Z). No passing smoke run was ever recorded.
+  - DEV-725's Done-when list is mostly unmet: smoke didn't pass, the commit `b18be094a` is only on local main (main is 4 ahead of origin), no QA run, no `v0.15.6` tag, and the installed lotar is still 0.15.5.
+  - Closing it handed its dependants on (STD-259's review found "no v0.15.6 tag" at 10:41Z). The 18 t3 jobs that failed with "run ended with status 'waiting'" in the last day wait on this release (harnessmux 0.2.0), and the chief of staff told the owner at 01:26Z that the release was "moving without you".
+
+  ## How to check
+  - `lotar agent logs job-20261122T094758.874Z-166 | tail -15`
+  - `git log --oneline origin/main..main`, `git ls-remote --tags origin | grep 0.15.6`, `lotar --version`
+
+  ## Done when
+  - A merge (or any) agent turn that ends with its own check still running doesn't count as a passed merge: lotar waits for it, fails the job, or reruns the check itself before landing (a test for it).
+  - A release ticket isn't set Done before its tag is pushed; DEV-725 is reopened or finished (smoke green, pushed, tagged, installed), and the owner or chief of staff is told its real state.
+tags:
+- health
+custom_fields:
+  finding: comms:merge-lands-while-agent-waits
+history:
+- at: 2026-11-22T14:05:11.816542+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-725"]}'
+- at: 2026-11-22T14:05:12.046894+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

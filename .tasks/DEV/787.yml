@@ -1,14 +1,42 @@
 title: 'Flaky test risk: the shipped agent-pipeline template test waits for three agent jobs within the 30 s wait floor'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T06:13:38.957747+00:00
-modified: 2026-11-22T06:13:42.993439+00:00
+modified: 2026-11-22T11:29:40.477619+00:00
 relationships:
   related:
   - DEV-772
+comments:
+- date: 2026-11-22T11:29:27.723430+00:00
+  author: claude
+  text: |-
+    The shipped pipeline template test now waits up to `JOB_END_LIMIT_MS` for its three jobs and for Done.
+
+    - `crates/lotar-lib/tests/agent_automation_integration_test.rs:2376`: `wait_for_completed_jobs(.., 3, 6000)` → `JOB_END_LIMIT_MS`
+    - Line 2379: the Done wait goes from `10_000` → `JOB_END_LIMIT_MS`
+    - Both waits still stop as soon as the state is reached. The limit only catches a hang.
+    - Not changed: the two-job wait at line 456 is outside this ticket's scope (it covers three-job waits only)
+    - The check ran at load average 17 to 25, not 35+
+  report:
+    commits:
+    - hash: 6ec1ebf01
+      what: pipeline template test waits use JOB_END_LIMIT_MS
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: load average 17-25
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5f4408af6858c3a0bb37fa97e5f4fd3186eac9d65a094f00a7885b3a0f55baa6
 description: 'Found in the review of DEV-772 (2026-11-21): `crates/lotar-lib/tests/agent_automation_integration_test.rs:2376` waits `wait_for_completed_jobs(&created.id, 3, 6000)` (raised to the 30 s `WAIT_FLOOR_MS`) and then 10 s for Done, for the same implement, test, merge pipeline whose waits DEV-772 moved to `JOB_END_LIMIT_MS`. Not seen failing yet. Check: `npm run -s test:agent` at load average 35+. Done: waits for tickets or jobs that three agent jobs move use `JOB_END_LIMIT_MS`.'
 tags:
 - health
@@ -26,3 +54,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T11:22:13.910798+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T11:22:18.156550+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5f4408af6858c3a0bb37fa97e5f4fd3186eac9d65a094f00a7885b3a0f55baa6
+- at: 2026-11-22T11:29:27.723430+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T11:29:40.477619+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

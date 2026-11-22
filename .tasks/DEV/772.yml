@@ -1,11 +1,11 @@
 title: 'Flaky tests: merge_job_whose_branch_was_rebased_elsewhere_passes and merge_job_that_cannot_fast_forward_fails time out at the 30 s wait floor under full-suite load'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T22:31:39.633028+00:00
-modified: 2026-11-22T06:21:34.445803+00:00
+modified: 2026-11-22T12:25:49.324610+00:00
 relationships:
   related:
   - DEV-749
@@ -51,6 +51,52 @@ comments:
     - Not rerun: `npm run lint`, `npm test`, `npm run smoke`. The change is three timeout constants and `test:agent` compiles it.
     - Not a UI change, so no UI review.
     - Minor follow-up filed: [DEV-787](https://lotar.pyxzl.net/task/DEV-787). `shipped_agent_pipeline_template_runs_end_to_end` (line 2376) still waits for three agent jobs within the 30 s floor.
+- date: 2026-11-22T12:18:31.532569+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+        1433|     })
+        1434|
+        1435|     it('paginates the synthetic Other column like normal columns', asy…
+           |     ^
+        1436|         const tasks: TaskDTO[] = []
+        1437|         for (let i = 1; i <= 32; i++) {
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+     FAIL  __tests__/SprintsList.backlogPagination.spec.ts > SprintsList pagination > blocks automatic same-list ordering without changing page or membership in container 1
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ __tests__/SprintsList.backlogPagination.spec.ts:388:23
+        386|     })
+        387|
+        388|     it.each([null, 1])(
+           |                       ^
+        389|         'blocks automatic same-list ordering without changing page or …
+        390|         async (sprint) => {
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+     Test Files  2 failed | 137 passed (139)
+          Tests  2 failed | 1562 passed (1564)
+       Start at  04:10:05
+       Duration  503.05s (environment 42%, tests 41%, transform 10%, import 6%, setup 1%, worker 1%)
+
+        Isolate  139 workers spawned · ~14.73s startup each (spawn + environment, per file)
+                 at least ~142.82s faster with isolate: false — reuses workers across files instead of one per file
+    ```.
+
+    - Rebased `agent/DEV-772` onto `main` (`b18be094abc9`): `60a9cf1c546b`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3d50435ac4b95a33a40b7a036d38d49370d6e05cd443fc57bd69e2fd72d10c7f
 description: 'Found in the DEV-760 merge (2026-11-21), load average about 35: `npm run -s test:agent` failed twice, once at `crates/lotar-lib/tests/agent_automation_integration_test.rs:2785` (`merge_job_whose_branch_was_rebased_elsewhere_passes`, "the rebased branch counts as merged"), once at line 2494 (`merge_job_that_cannot_fast_forward_fails`, "unmerged merge should hand the ticket back"). Both wait 10_000 ms, raised to `WAIT_FLOOR_MS` (30 s), for a ticket that three agent jobs move; alone the first passes in 11 s. Check: `npm run -s test:agent` under load. Done: like DEV-749, the waits for a ticket that several jobs move use `JOB_END_LIMIT_MS`, so the limit only catches a hang.'
@@ -119,3 +165,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T12:18:31.532569+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T12:25:49.324610+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

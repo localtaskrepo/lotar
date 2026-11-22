@@ -350,7 +350,8 @@ fn insert_optional_string(payload: &mut Map<String, Value>, key: &str, value: Op
 }
 
 /// The comment text from `-F <file>` (`-F -` reads stdin), `-m`, the
-/// positional text, or piped stdin, in that order. An unreadable file is an
+/// positional text (a lone `-` reads stdin too, DEV-776), or piped stdin, in
+/// that order. An unreadable file is an
 /// error with its path (DEV-282: it used to fall back to listing comments
 /// with exit 0). Piped stdin is only read when data shows up promptly, so
 /// listing comments never hangs on a pipe that stays open with nothing in
@@ -358,6 +359,10 @@ fn insert_optional_string(payload: &mut Map<String, Value>, key: &str, value: Op
 pub fn resolve_comment_text(file: Option<String>, message: Option<String>, text: Option<String>) -> Result<String, String> {
     use std::io::Read;
     let trim = |s: String| s.trim_end_matches(['\n', '\r']).to_string();
+    let (file, text) = match (file, text) {
+        (None, Some(text)) if text == "-" => (Some(text), None),
+        other => other,
+    };
     if let Some(path) = file {
         if path == "-" {
             let mut buffer = String::new();

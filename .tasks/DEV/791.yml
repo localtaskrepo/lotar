@@ -1,0 +1,69 @@
+title: lotar comment -m <text> - reads stdin and silently drops the -m text
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T08:26:27.727612+00:00
+modified: 2026-11-22T15:42:58.610904+00:00
+relationships:
+  depends_on:
+  - DEV-776
+  related:
+  - DEV-776
+comments:
+- date: 2026-11-22T15:42:44.277575+00:00
+  author: claude
+  text: |-
+    Waits for DEV-776 to land on main: the bug comes from its change, which isn't on main yet.
+
+    - DEV-776 (status Merging) added the lone `-` → stdin branch in `resolve_comment_text` (`crates/lotar-lib/src/cli/handlers/comment.rs`); commit `3968c82a1` is only on `agent/DEV-776`
+    - `main` (`878c80d5f`) doesn't have it, so the check can't reproduce here, and a fix now would edit the same lines and conflict
+    - Plan once DEV-776 is in: refuse more than one of `-m`, `-F` and TEXT (a lone `-` counts as `-F -`) with a hint, in `resolve_comment_text`; tests in `crates/lotar-lib/tests/dev282_cli_safety_test.rs`; update `docs/help/comment.md`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab0f4d5f17a66f33db4ed35ffaf7aa830bbe9872437d49c9bc5a4ef36fcbd364
+description: 'Found (DEV-776 review): since DEV-776 a lone `-` as TEXT means `-F -`, which comes before `-m` in `resolve_comment_text` (crates/lotar-lib/src/cli/handlers/comment.rs:362). So `lotar comment <ID> -m msg - <<EOF` saves the stdin text and drops msg without a word; before DEV-776 the `-` was dropped instead. Check: `lotar comment <ID> -m msg - <<<''other''`. Done: giving more than one of -m, -F and TEXT is refused with a hint (or -m and a lone - is), never one silently dropped.'
+tags:
+- health
+- waits
+custom_fields:
+  finding: review:comment-message-and-lone-dash
+history:
+- at: 2026-11-22T08:26:36.791359+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T15:42:00.847531+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T15:42:06.869085+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab0f4d5f17a66f33db4ed35ffaf7aa830bbe9872437d49c9bc5a4ef36fcbd364
+- at: 2026-11-22T15:42:43.818702+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-776"]}'
+    new: '{"depends_on":["DEV-776"],"related":["DEV-776"]}'
+- at: 2026-11-22T15:42:44.236012+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-22T15:42:44.277575+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T15:42:58.610904+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
