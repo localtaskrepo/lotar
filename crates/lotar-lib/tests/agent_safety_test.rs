@@ -1602,3 +1602,29 @@ fn a_failed_or_missing_clone_leaves_a_cold_build() {
     assert_eq!(cloned_app(&job), None);
     assert!(job_note(&job, "No target/ to clone in an earlier worktree of the ticket or in the main checkout; this job builds cold.").is_some());
 }
+
+/// DEV-780: the ticket's folder left with only `target/` (a test run's
+/// report written after its worktree was removed) is cleared, so the job
+/// gets its worktree; a folder holding anything else stays and fails setup.
+#[test]
+fn a_leftover_folder_with_only_build_output_gives_way_to_the_worktree() {
+    common::require_git();
+    let (fixture, ticket) = setup("exit 0", true);
+    let leftover = fixture.get_temp_path().join("worktrees").join(&ticket);
+    fs::create_dir_all(leftover.join("target/nextest/default")).unwrap();
+    fs::write(leftover.join("target/nextest/default/junit.xml"), "<testsuites/>").unwrap();
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    assert!(!leftover.join("target/nextest").exists(), "the leftover report is gone");
+    assert!(job_note(&job, "Removed the leftover folder ").is_some_and(|note| note.contains("(only target/, no worktree).")));
+
+    let (fixture, ticket) = setup("exit 0", true);
+    let leftover = fixture.get_temp_path().join("worktrees").join(&ticket);
+    fs::create_dir_all(leftover.join("target")).unwrap();
+    fs::write(leftover.join("notes.md"), "not build output").unwrap();
+    let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+    wait_idle();
+    let job = AgentJobService::get_job(&job.id).unwrap();
+    assert_eq!(job.status, "failed", "{:?}", job.last_message);
+    assert_eq!(fs::read_to_string(leftover.join("notes.md")).unwrap(), "not build output", "other files stay");
+}

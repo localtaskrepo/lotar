@@ -1,11 +1,11 @@
 title: 'Agent jobs: one full test run at a time across jobs, agents keep working in parallel'
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T03:06:53.057587+00:00
-modified: 2026-11-22T18:10:02.826878+00:00
+modified: 2026-11-22T19:45:11.462864+00:00
 relationships:
   related:
   - DEV-748
@@ -14,6 +14,7 @@ relationships:
   - DEV-605
   - DEV-785
   - DEV-795
+  - DEV-783
 comments:
 - date: 2026-11-22T08:49:27.438495+00:00
   author: claude
@@ -123,9 +124,37 @@ comments:
       result: not_run
       reason: needs the new build installed on the queue
     next: Review, then merge agent lands ff83b472e (branch is 7 commits behind main)
+- date: 2026-11-22T19:44:55.398046+00:00
+  author: claude
+  text: |-
+    Work done and checked: `ff83b472e` is unchanged since its 16:49 passing run; ready for review and merge.
+
+    - No new commit: nothing left to fix on the branch
+    - Rebase onto main conflicts in `crates/lotar-agent/src/services/agent_job_service/merge.rs` with DEV-783 (`1bf8ee672`, rerun a failed check once). Resolution: keep DEV-783's `install()` (no env) and `check()`, give `check()` the `env` from the lock and pass it to both `run_shell` calls, so the rerun also runs under the lock with `LOTAR_CHECK_LOCK_HELD=1`
+    - `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs` and `docs/help/agent.md` merge cleanly
+    - Guidance: no durable finding
+  report:
+    commits:
+    - hash: ff83b472e
+      what: check lock for merge checks and full test runs
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: 16:49 run on ff83b472e, unchanged since
+    - command: npm run test:agent
+      result: passed
+      reason: 16:49 run on ff83b472e, unchanged since
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 16:49 run on ff83b472e, unchanged since
+    - command: load near core count on a full queue
+      result: not_run
+      reason: needs the installed build
+    next: Review, then merge agent rebases onto main and resolves the merge.rs conflict with DEV-783
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74696b7a2d960572c6a68d1078f63f25eba1e0fcbc23d815d4b9c4cc6b8c50bf
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A127f32860f776708e00d865e74409e5ba45f8df03a998ccfaee2a641b9d5ce92
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa7f03dce4602a272c33f2742b91dad0415a563cc732c4d89b8576cde1beaa60f
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar's merge checks, and the repo's test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs' check runs never overlap (test), load during a full queue stays near the core count.
 
@@ -302,3 +331,33 @@ history:
   - field: relationships
     old: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785"]}'
     new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795"]}'
+- at: 2026-11-22T19:44:19.393332+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T19:44:23.468006+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa7f03dce4602a272c33f2742b91dad0415a563cc732c4d89b8576cde1beaa60f
+- at: 2026-11-22T19:44:55.398046+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:44:56.316875+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795"]}'
+    new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795","DEV-783"]}'
+- at: 2026-11-22T19:45:11.462864+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,14 +1,25 @@
 title: 'Waiting for the owner without a question: DEV-786'
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-light'
 created: 2026-11-22T18:09:32.776838+00:00
-modified: 2026-11-22T18:09:45.856368+00:00
+modified: 2026-11-22T19:59:54.866114+00:00
 relationships:
   related:
   - DEV-786
+comments:
+- date: 2026-11-22T19:59:49.792552+00:00
+  author: claude
+  text: |-
+    Already resolved: DEV-786 moved on, so no change was needed.
+
+    - DEV-786 is now `Reviewing`, assigned `@review`, so it no longer waits on the owner.
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[question:DEV-786]`.
+    - The same check lists `[question:DEV-788]` and `[question:DEV-782]`, which are other tickets and not part of this one.
+    - No commits past `main` and no file changes.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53d8bbf5bb05722c8416f4c277dbbe20b90cb0573b1e410276d8f11cb805c2bd
 description: |-
   DEV-786 (Agent queue: order by priority, manage the queue (move up/down, keep each entry's prompt), categories) is HelpNeeded, but its last comment asks no question: "Retry job: the work from the first run is complete and every check passes. No new changes were needed. - I checked the …" (lotar show DEV-786)
 
@@ -38,3 +49,26 @@ history:
   changes:
   - field: assignee
     new: '@fix-light'
+- at: 2026-11-22T19:59:24.764989+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T19:59:30.375577+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53d8bbf5bb05722c8416f4c277dbbe20b90cb0573b1e410276d8f11cb805c2bd
+- at: 2026-11-22T19:59:49.792552+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:59:54.866114+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

@@ -1,11 +1,11 @@
 title: UI test workers take 8-14 s each to start while the machine stalls, pushing heavy vitest tests toward the 30 s timeout
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T00:21:29.120752+00:00
-modified: 2026-11-22T19:22:33.956516+00:00
+modified: 2026-11-22T20:25:23.088756+00:00
 relationships:
   related:
   - DEV-753
@@ -109,13 +109,58 @@ comments:
     Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
 
     - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
+- date: 2026-11-22T20:14:22.973950+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+        2026-11-22T20:13:21.658959+00:00 [agent_job_started]
+        2026-11-22T20:13:21.668841+00:00 [agent_job_progress] Retries only the commit job job-20261122T201316.561Z-3 couldn't make: its work waits in /var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/lotar-rust-temp-gqnGrW/.lotar-test-scratch/61829-1795378386902375000/.tmpfhPmFK/worktrees/TEST-1, and the agent doesn't run again.
+        2026-11-22T20:13:22.774571+00:00 [agent_job_progress] Committed changes the agent left uncommitted: TEST-1: changes from the writer agent
+        2026-11-22T20:13:22.776385+00:00 [agent_job_progress] This job completed, so the queue's pause (commit signing fails, since 2026-11-22T20:13:13.384844+00:00) ended: the jobs it held start.
+        2026-11-22T20:13:23.308798+00:00 [agent_job_completed]
+        2026-11-22T20:13:27.187324+00:00 [agent_job_progress] TEST-1 is now InProgress, assigned to mallox
+
+        --- {"id":"job-20261122T201316.561Z-3","ticket_id":"TEST-1","runner":"command","model":null,"effort":null,"created_at":"2026-11-22T20:13:17.713225+00:00","status":"paused","exit_code":0,"summary":"Paused, not failed: commit signing fails (error: Couldn't find key in agent). The queue holds the jobs that commit and tries one again at 2026-11-22T20:13:19.105202+00:00; this job retries only its commit (the work stays in its worktree) first. The first of them that completes ends the pause.","resumes_at":null}
+        2026-11-22T20:13:17.726716+00:00 [agent_job_started]
+        2026-11-22T20:13:17.733629+00:00 [agent_job_progress] Retries only the commit job job-20261122T201314.140Z-2 couldn't make: its work waits in /var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/lotar-rust-temp-gqnGrW/.lotar-test-scratch/61829-1795378386902375000/.tmpfhPmFK/worktrees/TEST-1, and the agent doesn't run again.
+        2026-11-22T20:13:19.494999+00:00 [agent_job_paused] Paused, not failed: commit signing fails (error: Couldn't find key in agent). The queue holds the jobs that commit and tries one again at 2026-11-22T20:13:19.105202+00:00; this job retries only its commit (the work stays in its worktree) first. The first of them that completes ends the pause.
+
+        --- {"id":"job-20261122T201314.140Z-2","ticket_id":"TEST-1","runner":"command","model":null,"effort":null,"created_at":"2026-11-22T20:13:14.731716+00:00","status":"paused","exit_code":0,"summary":"Paused, not failed: commit signing fails (error: Couldn't find key in agent). The queue holds the jobs that commit and tries one again at 2026-11-22T20:13:15.287373+00:00; this job retries only its commit (the work stays in its worktree) first. The first of them that completes ends the pause.","resumes_at":null}
+        2026-11-22T20:13:14.738529+00:00 [agent_job_started]
+        2026-11-22T20:13:14.755240+00:00 [agent_job_progress] Retries only the commit job job-20261122T201308.808Z-1 couldn't make: its work waits in /var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/lotar-rust-temp-gqnGrW/.lotar-test-scratch/61829-1795378386902375000/.tmpfhPmFK/worktrees/TEST-1, and the agent doesn't run again.
+        2026-11-22T20:13:15.444293+00:00 [agent_job_paused] Paused, not failed: commit signing fails (error: Couldn't find key in agent). The queue holds the jobs that commit and tries one again at 2026-11-22T20:13:15.287373+00:00; this job retries only its commit (the work stays in its worktree) first. The first of them that completes ends the pause.
+
+        --- {"id":"job-20261122T201308.808Z-1","ticket_id":"TEST-1","runner":"command","model":null,"effort":null,"created_at":"2026-11-22T20:13:10.701072+00:00","status":"paused","exit_code":0,"summary":"Paused, not failed: commit signing fails (error: Couldn't find key in agent). The queue holds the jobs that commit and tries one again at 2026-11-22T20:13:13.384844+00:00; this job retries only its commit (the work stays in its worktree) first. The first of them that completes ends the pause.","resumes_at":null}
+        2026-11-22T20:13:10.711745+00:00 [agent_job_started]
+        2026-11-22T20:13:10.723677+00:00 [agent_job_progress] No target/ to clone in an earlier worktree of the ticket or in the main checkout; this job builds cold.
+        2026-11-22T20:13:11.599215+00:00 [agent_job_progress] ✅ TEST-1: InProgress will be set when job job-20261122T201308.808Z-1 ends
+        2026-11-22T20:13:12.477764+00:00 [agent_job_progress] ✅ TEST-1: mallox will be assigned when job job-20261122T201308.808Z-1 ends
+        2026-11-22T20:13:13.624560+00:00 [agent_job_paused] Paused, not failed: commit signing fails (error: Couldn't find key in agent). The queue holds the jobs that commit and tries one again at 2026-11-22T20:13:13.384844+00:00; this job retries only its commit (the work stays in its worktree) first. The first of them that completes ends the pause.
+
+
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 823/2468 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 2 entries in the temp folder; remove them where they are created: .lotar-test-scratch, .tmpO6yboG
+    ```.
+
+    - Rebased `agent/DEV-779` onto `main` (`1bf8ee67259c`): `83043eacf8be`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa9d927ee729fe344be319f20082fda7be034d97f7c6b9d43a5404db4c68cee15
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6d88bdfb76931ef8468d0770bd854c62c3b4d12e47c5fafc83f64d303b0b4cc
 description: 'Found: reviewing DEV-764 (2026-11-21, load ~10): `npm run -s test:ui:agent` passed 1563/1563 but took 221 s with ~8.4 s startup per worker (139 files); DEV-753/755 merges saw ~14 s; normal is ~0.27 s and ~9 s total. SprintsList.backlogPagination.spec.ts alone took 31-45 s instead of 3 s, on main and on the DEV-764 branch alike. The stall hit at load 10 too, so it is not CPU load alone (T3 Code processes were at 40-100% CPU). Check: `npm run -s test:ui:agent` reports worker startup per file; find what makes spawn+environment slow (vitest isolate/pool, jsdom setup, machine state). Done: the cause is shown and the full run stays near its normal time, or the suite tolerates the stall.'
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: test:ui:agent:worker-startup
 history:
@@ -229,3 +274,16 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T20:14:22.973950+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T20:25:23.088756+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried
+    new: health

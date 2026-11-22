@@ -1,11 +1,11 @@
 title: Job worktree builds in a configurable build root (agent.worktree.build_root), clone and cleanup included
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T20:21:04.802424+00:00
-modified: 2026-11-22T18:08:14.189962+00:00
+modified: 2026-11-22T19:57:59.813395+00:00
 relationships:
   blocks:
   - DEV-778
@@ -15,6 +15,8 @@ relationships:
   - DEV-760
   - DEV-781
   - DEV-725
+  - DEV-750
+  - DEV-783
 comments:
 - date: 2026-11-21T20:55:35.079582+00:00
   author: claude
@@ -113,8 +115,17 @@ comments:
 - date: 2026-11-22T18:08:11.458415+00:00
   author: mallox
   text: 'Merge. (Owner 2026-11-22 10:05 PST, relayed by the chief of staff from his answer "Marge" to "merge now or wait": merge with the load flakes.)'
+- date: 2026-11-22T19:57:49.422915+00:00
+  author: claude
+  text: |-
+    Owner said merge with the load flakes: the branch is ready, nothing left to change.
+
+    - Branch `agent/DEV-762` at `e098a475f`, worktree clean. The fix, review and earlier checks stand: lint and tests passed; full smoke failed only on load timeouts, and each failing file passed when run alone.
+    - Main moved on to `1bf8ee672` (DEV-783), so the merge rebases first. I didn't rebase: merging is the merge agent's job.
+    - Smoke flakes are tracked in DEV-781 and DEV-750.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A554b4ea9c0d8ed6283d447223332845ede88e3fc4c30c0320f2860da1f2baf4b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af0b6c51dd8a69092ea4dc318cbe5ec4cc7a5a615cf20396821e9f4d924576f11
 description: |-
   Owner 2026-11-21: "alright, file the work and kick it off. You have convinced me." The Mac gets an APFS volume for builds (/Volumes/Builds, 250 GB quota, excluded from Time Machine). The setup is local LOCA-571. This ticket is lotar's side.
 
@@ -241,3 +252,33 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781"]}'
     new: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781","DEV-725"]}'
+- at: 2026-11-22T19:57:29.656851+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T19:57:38.551111+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af0b6c51dd8a69092ea4dc318cbe5ec4cc7a5a615cf20396821e9f4d924576f11
+- at: 2026-11-22T19:57:49.422915+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:57:49.734406+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781","DEV-725"]}'
+    new: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781","DEV-725","DEV-750","DEV-783"]}'
+- at: 2026-11-22T19:57:59.813395+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

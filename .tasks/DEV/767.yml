@@ -3,12 +3,16 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-21T20:47:04.852936+00:00
-modified: 2026-11-22T18:45:20.814874+00:00
+modified: 2026-11-22T20:47:13.430584+00:00
 relationships:
   blocks:
   - DEV-769
+  related:
+  - DEV-807
+  - DEV-757
+  - DEV-766
 comments:
 - date: 2026-11-21T23:27:56.757332+00:00
   author: claude
@@ -46,6 +50,30 @@ comments:
       result: passed
       reason: 118 files, 407 tests
     next: Review f384ce022 on agent/DEV-767 and integrate
+- date: 2026-11-22T20:47:00.624562+00:00
+  author: claude
+  text: |-
+    Review: blocking. `f384ce022` works on its base, but it conflicts with main, and rebasing it as is would record the wrong prompt. Two task panel screenshots are missing.
+
+    **Blocking**
+    - **Conflict with main, wrong prompt after rebase.** `git merge-tree main HEAD` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs` (4 hunks). The cause is DEV-757 (`89fe192f8`) on main. When `run_session` can't resume a session, it now keeps it, appends a handoff to `prompt` and opens a new session, all after `open_session` fails. This branch calls `run_inputs::record` before `open_session` (`agent_job_service.rs:4177`). After a rebase the line would miss that handoff, so `prompt` is not what the agent got, and the session would say `resumed` when it is `new`. That breaks Done when 1 and 2.
+      - Fix: rebase onto main. Record once the session has opened, or in the DEV-757 fallback, with the final prompt (`prompt.append("Handoff", …)` on the `JobPrompt`) and `resumed`. Pass the new `handoff_why` argument through `run_job`'s `prompt.append`. Add a test where a resume fails, like DEV-757's test, that checks the recorded prompt ends with a "Handoff" section and the mode is `new`. Also keep `mod tools;` (DEV-766) next to `mod run_inputs;`.
+    - **Screenshots missing.** The task panel thread changed (`TaskPanelTimelineTab.vue`), but the ticket has it only at 1440. The 1920 and 390 widths are missing, in light and dark, before and after. Agents page: all 12 are there and look fine.
+
+    **Checked and passing (on `f384ce022`)**
+    - `npm ci` passed. `npm run lint:agent` passed.
+    - `cargo nextest run -p lotar-agent run_inputs build_prompt`: 6/6 passed. The two new `dev503` integration tests: 2/2 passed.
+    - `view/__tests__/AgentRunInputs.spec.ts`: 4/4 passed.
+    - `npm run build:smoke`, then `test:smoke:quick -- smoke/tests/ui.agent-jobs.smoke.spec.ts`: 12/12 passed, including the new test.
+    - I ran the branch build on a throwaway workspace with a `command` mock agent and an env value `SECRET_TOKEN`:
+      - `run_inputs` was written once, and the value appears nowhere in the log.
+      - `agent logs <job> --inputs` prints the settings and the prompt. A job that failed in setup says "Not recorded for this job".
+      - `GET /api/jobs/inputs` returns 200 with the record, and 404 for an unknown id.
+    - My own screenshots: Agents page and task panel thread, light and dark, at 1920, 1440 and 390, plus "Not recorded". I saw no visual problems. They are in `/tmp/dev767-review-shots/out`.
+    - `api_types.rs`, `types.ts`, `openapi.json` and `agent.md` agree. Nothing beyond the ticket was added. No stray files.
+
+    **Minor, filed**
+    - [DEV-807](https://lotar.pyxzl.net/task/DEV-807): the button keeps showing "Not recorded" when it was opened before the job's first turn.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aed776696adfa64e7d73086504b56dd09ff7a27eb3c9cfa2fefdf085d577126a7
 - attachment: after-agents-dark-1440.ef7d6d6319287dbced766ff6ebad4561.png
@@ -100,6 +128,7 @@ description: |-
 tags:
 - agent
 - ui
+- review-returned
 history:
 - at: 2026-11-21T20:47:05.149544+00:00
   actor: claude
@@ -354,3 +383,34 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T20:45:51.717866+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-769"]}'
+    new: '{"blocks":["DEV-769"],"related":["DEV-807"]}'
+- at: 2026-11-22T20:47:00.624562+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T20:47:02.094838+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-769"],"related":["DEV-807"]}'
+    new: '{"blocks":["DEV-769"],"related":["DEV-807","DEV-757","DEV-766"]}'
+- at: 2026-11-22T20:47:03.431912+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, review-blocked
+- at: 2026-11-22T20:47:13.430584+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, ui, review-blocked
+    new: agent, ui, review-returned

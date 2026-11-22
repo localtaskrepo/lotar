@@ -1,11 +1,11 @@
 title: Release v0.15.6
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-20T05:17:29.812031+00:00
-modified: 2026-11-22T19:20:39.176239+00:00
+modified: 2026-11-22T19:39:31.259681+00:00
 relationships:
   related:
   - DEV-702
@@ -42,6 +42,7 @@ relationships:
   - DEV-776
   - DEV-799
   - DEV-464
+  - DEV-804
 comments:
 - date: 2026-11-21T15:01:56.811998+00:00
   author: claude
@@ -166,6 +167,24 @@ comments:
     - Quality Assurance 45057966596, first attempt: 1 smoke test failed on the GitHub runner, `ui.releases` > offers Add to release in the row menu (DEV-464). It passes alone locally. Filed [DEV-799](https://lotar.pyxzl.net/task/DEV-799). Rerunning the failed job passed, so QA is green
     - Signed tag pushed; `lotar release release 0.15.6` done
     - `c8ea61a59` (DEV-739, docs) landed on main after the checks and isn't in 0.15.6
+- date: 2026-11-22T19:38:41.862191+00:00
+  author: claude
+  text: |-
+    Released: lotar v0.15.6 is published and installed here (`lotar --version`: `lotar 0.15.6`).
+
+    - Tag `v0.15.6` (signed) on `78c006d4b` (DEV-781), which has the bump `b18be094a` and DEV-772, DEV-773, DEV-766, DEV-775, DEV-776, DEV-781
+    - Checks on `78c006d4b`: `npm run lint:agent`, `npm run test:agent` and `npm run test:smoke:agent` (407 of 407) passed locally. Quality Assurance 45057966596 is green after one rerun of its smoke job (one flaky test, [DEV-799](https://lotar.pyxzl.net/task/DEV-799))
+    - Release run 45060142456: all 20 jobs succeeded. GitHub marks v0.15.6 Latest; npm, crates, Docker, Homebrew tap and Scoop are published
+    - Install: `brew upgrade lotar` installed 0.15.6. `codesign` shows Developer ID Ravi Gairola (3HKD37M482), `net.pyxzl.lotar`. All six lotar servers restarted on the new binary by themselves (`--exit-on-upgrade`)
+    - Release record 0.15.6 is marked released. `c8ea61a59` (DEV-739, docs) landed after the checks and goes in the next release
+    - No DEV ticket depends on DEV-725. STD-259 is already Done. STD-273 waited by hand (no depends-on), so I start its check by hand
+- date: 2026-11-22T19:39:31.036611+00:00
+  author: claude
+  text: |-
+    Release steps 7 and 8 done, except handing on STD-273.
+
+    - Next release: [DEV-804](https://lotar.pyxzl.net/task/DEV-804) Release v0.15.7 (assigned to mallox), record 0.15.7 (#12) with DEV-804 and DEV-739
+    - STD-273 now depends on `lotar:DEV-725`. I didn't start its check: starting an agent in standards was outside what this release session may do. The daily `repos.ts --fix` run of "Prerequisites done" will continue it, or start it now with `lotar automation run "Prerequisites done: continue the waiting ticket" --select id:STD-273` in standards
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A580d32a8d87852253f1f686139c79390e4f085954cd9223ddd756b0e4d895c13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afa80554ec24afa8bc5ca6b66e5d3652d9b9239eea26c371b20b250ada1399828
@@ -417,3 +436,23 @@ history:
   - field: relationships
     old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799"]}'
     new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464"]}'
+- at: 2026-11-22T19:38:41.862191+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:38:42.125369+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-22T19:39:31.036611+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:39:31.259681+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464","DEV-804"]}'

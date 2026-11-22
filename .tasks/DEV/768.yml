@@ -1,17 +1,18 @@
 title: 'Assignee picker: searchable, grouped by people and agent roles, showing each profile''s runner, model and effort'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-21T20:47:05.414784+00:00
-modified: 2026-11-22T19:29:36.118016+00:00
+modified: 2026-11-22T20:41:42.029924+00:00
 relationships:
   related:
   - DEV-769
   - DEV-776
   - DEV-756
   - DEV-765
+  - DEV-806
 comments:
 - date: 2026-11-21T23:36:23.239354+00:00
   author: automation
@@ -174,6 +175,54 @@ comments:
     - Search, keyboard, Recent, Special group, Run dialog (agents only) and bulk Assign match "Done when". I found no stray files and no second branch.
     - I filed no minor tickets.
     - Note: my first `lotar add` in a scratch folder used the job's `LOTAR_TASKS_DIR`. It created an untracked `.tasks/PICK` in the main checkout, which I deleted right away. Nothing tracked was touched.
+- date: 2026-11-22T19:54:19.950816+00:00
+  author: claude
+  text: |-
+    Review fixes: agents now show in config order and the screenshot set is complete. Descriptions need your decision (next comment).
+
+    **1. Agent order: fixed**
+    - Agent profiles now keep their config order: `indexmap` 2.14.2 (latest; already in `Cargo.lock`) replaces `BTreeMap` for `agents` and `agent_profiles` (`crates/lotar-core/src/config/types.rs`, `operations.rs`).
+    - `/api/agents/profiles` no longer sorts by name (`crates/lotar-lib/src/routes/agents.rs`). The picker already grouped in the order it gets, so with this repo's profiles it now shows `fix`, `fix-light`, `fix-fable`, `fix-retry`; `review`, `review-claude`, `review-light`; `triage`, `triage-codex`; `merge`.
+    - Test `dev209_agent_profiles_rest_test.rs` now asserts config order. `docs/openapi.json` and `docs/help/api-quick-reference.md` say "in config order".
+
+    **2. Descriptions: open.** Profiles have no description key, so no agent row has a second line. That's a config decision for you (question below).
+
+    **3. Screenshots: complete.** Every changed surface, before → after, light and dark at 1920, 1440 and 390 px, plus all 9 skins. Workspace: seeded with `scripts/generate-test-tasks.mjs` and this repo's 10 profiles; "before" is the installed `lotar` 0.15.5 (main).
+    - Task panel: 1920 light: [before](attachment:before-panel-light-1920.c5c5c4bd89ae5b541a6d8c73e012e04a.png) → [after](attachment:after-panel-light-1920.44d8046da75e74a28a0433b02984952a.png); 1920 dark: [before](attachment:before-panel-dark-1920.34a319f57f4b23e4a3c266efcf7489e5.png) → [after](attachment:after-panel-dark-1920.75c2f59127d87cf2349d31e17aed4974.png); 1440 light: [before](attachment:before-panel-light-1440.3a8e4a1919ed02376dfb7bf6c0c93aab.png) → [after](attachment:after-panel-light-1440.209592f2a021213b3e8ef4fac55c791a.png); 1440 dark: [before](attachment:before-panel-dark-1440.9f4d382f6cc06db6cdb40e48062c0f9e.png) → [after](attachment:after-panel-dark-1440.59c8eb837af1a1bcfeb9a5a1a0fabb84.png); 390 light: [before](attachment:before-panel-light-390.25b93bff6430f1a496ca78beaefa3c96.png) → [after](attachment:after-panel-light-390.a515c9262292bceb1aeff3a235bee9e0.png); 390 dark: [before](attachment:before-panel-dark-390.bbbef6fc06bf334e0a15bbd0a635c2e2.png) → [after](attachment:after-panel-dark-390.8b9a6c4e98a8d415cf6ef16f5b5ec848.png)
+    - Search "light": 1920 light: [after](attachment:after-search-light-1920.7b16e33fe4eec47ed603a5014a028836.png); 1920 dark: [after](attachment:after-search-dark-1920.8b3862625c72a8218bec9d667b348b88.png); 1440 light: [after](attachment:after-search-light-1440.30f2e62c36013ab16c319207632c9bf1.png); 1440 dark: [after](attachment:after-search-dark-1440.cbf29e4582a4b7e349697b59cd2ae507.png); 390 light: [after](attachment:after-search-light-390.839788b179fe735af94a8089010873d8.png); 390 dark: [after](attachment:after-search-dark-390.684852b2bad9e7739eb3a81a214a6358.png)
+    - Run dialog: 1920 light: [before](attachment:before-run-light-1920.531885b6cba9ec5fc4122ccb236c0308.png) → [after](attachment:after-run-light-1920.f491e30475fed8ef122a7d29b3e780a0.png); 1920 dark: [before](attachment:before-run-dark-1920.149624d2f716251107e84f3b4f6ce1b5.png) → [after](attachment:after-run-dark-1920.d1a9fd6618a966b3329d821620878e2e.png); 1440 light: [before](attachment:before-run-light-1440.bba8e674c534b10763b9d9550f6902f5.png) → [after](attachment:after-run-light-1440.992de6f070bd4d852615870ec5f2e987.png); 1440 dark: [before](attachment:before-run-dark-1440.6236e8f5de84f1c3305e62a2e24f1e36.png) → [after](attachment:after-run-dark-1440.78ed62c8683eebdd7856ab471de743ee.png); 390 light: [before](attachment:before-run-light-390.b661e377470c9feb3906a2afa99c38cd.png) → [after](attachment:after-run-light-390.5aee47736cabc32e0f09678e09204c7f.png); 390 dark: [before](attachment:before-run-dark-390.3038e255e2613029e9dd9acb736cc5bf.png) → [after](attachment:after-run-dark-390.2c701e3dc2ef7227711b7845e1ef81c9.png)
+    - Assign dialog (phone: row menu): 1920 light: [before](attachment:before-bulk-light-1920.5b86d8379cc6b388f3c93f96e02df63a.png) → [after](attachment:after-bulk-light-1920.c790ca892b339b89bb7d6557c2f97987.png); 1920 dark: [before](attachment:before-bulk-dark-1920.0fc1071fe7e4485be3fe3a890f03cdca.png) → [after](attachment:after-bulk-dark-1920.ac6f738a9a8ff56b5609d7e32bc6b3c5.png); 1440 light: [before](attachment:before-bulk-light-1440.456c6be294f392b98a3f74c694c0922b.png) → [after](attachment:after-bulk-light-1440.b7ecce60e673097cd7948b89a995c3dc.png); 1440 dark: [before](attachment:before-bulk-dark-1440.d2e051395299d2132c9f72e0e33186a6.png) → [after](attachment:after-bulk-dark-1440.c0df42b1cc92b043282dc737ad529ed4.png); 390 light: [before](attachment:before-bulk-light-390.48609f511f36257bfbe466490a7d0b1e.png) → [after](attachment:after-bulk-light-390.54fb1a453ee61d8bad89dacf017f1618.png); 390 dark: [before](attachment:before-bulk-dark-390.93d440d354b286a482c61e41eef98cec.png) → [after](attachment:after-bulk-dark-390.febd5bbb18acf9a3789b183228420791.png)
+    - Rule editor (Set assignee): 1920 light: [before](attachment:before-rule-light-1920.0c560562931225316f7ff1c0eafc3325.png) → [after](attachment:after-rule-light-1920.948336caecc6627596ce8360273ae70f.png); 1920 dark: [before](attachment:before-rule-dark-1920.5f098ecdd54cd8959dd66c24498d0008.png) → [after](attachment:after-rule-dark-1920.ceacd3ff64d8b95b8aea8b6a3b474f9e.png); 1440 light: [before](attachment:before-rule-light-1440.40b070d8948986af1f5fcb86e6a6702b.png) → [after](attachment:after-rule-light-1440.38ce77dbbc6f84cf6bcc2ddcc59db208.png); 1440 dark: [before](attachment:before-rule-dark-1440.ea595ebb50556e56006b62436e600156.png) → [after](attachment:after-rule-dark-1440.97f7bb493ebe3c89bb6af595b9f8d400.png); 390 light: [before](attachment:before-rule-light-390.b3309809fa596f47b936121f21655b01.png) → [after](attachment:after-rule-light-390.7ac7d98c48611c8da59416f53455102c.png); 390 dark: [before](attachment:before-rule-dark-390.a55688129bb7234abef5a5443c48e06e.png) → [after](attachment:after-rule-dark-390.3764b697010be992824880c75b420419.png)
+    - Skins, task panel 1440: classic light [before](attachment:before-skin-classic-light.4cf6e0f63ca551c9e16a1c0580fc0fac.png) → [after](attachment:after-skin-classic-light.1fa3ae064ff2de374812d4c328dc9504.png); classic dark [before](attachment:before-skin-classic-dark.67e25bb5602e459a2aad7f28cd3861e6.png) → [after](attachment:after-panel-dark-1440.59c8eb837af1a1bcfeb9a5a1a0fabb84.png); contrast light [before](attachment:before-skin-contrast-light.1a38f6153fd5343a52d3e3f89bf3fbdd.png) → [after](attachment:after-skin-contrast-light.347adc005afc4dd85164f3822a1c46e1.png); contrast dark [before](attachment:before-skin-contrast-dark.cdce5d6a8b56ddc3791c3feae8f24a21.png) → [after](attachment:after-skin-contrast-dark.c1db5633d32c0f265e1dec534ecd2655.png); terminal light [before](attachment:before-skin-terminal-light.9ea9ab346cfcbd5682378dc10103740c.png) → [after](attachment:after-skin-terminal-light.67e533558a419710149d570bed7eed30.png); terminal dark [before](attachment:before-skin-terminal-dark.7b0be2a68e7da6f51cae5ff264fe61c7.png) → [after](attachment:after-skin-terminal-dark.cfc44789de468bce07c9a1e28137c8a7.png); matrix light [before](attachment:before-skin-matrix-light.966dd7d2e463889b077a0f69e0c30044.png) → [after](attachment:after-skin-matrix-light.de1de781fbbbd493736b6075650823b0.png); matrix dark [before](attachment:before-skin-matrix-dark.78a53f4214dda2083e8c5e4de86ab040.png) → [after](attachment:after-skin-matrix-dark.6dce5f131986ff41a38adcb490ca7f48.png); synthwave light [before](attachment:before-skin-synthwave-light.1f3bdcd11a59f2bf3888947e436fb277.png) → [after](attachment:after-skin-synthwave-light.125e7d0fddf5f2632d6e2e334b35f9b1.png); synthwave dark [before](attachment:before-skin-synthwave-dark.4aa8a237eac6d41b2671f8ceaa766925.png) → [after](attachment:after-skin-synthwave-dark.6bad5705993a88449e72c4a836762ae9.png); blueprint light [before](attachment:before-skin-blueprint-light.472ace9d961f4108fda5bf4b8d44f86f.png) → [after](attachment:after-skin-blueprint-light.762df40cf4b96c61c66fc426365d8e34.png); blueprint dark [before](attachment:before-skin-blueprint-dark.814c93afd87062aa3321b03bde859ca6.png) → [after](attachment:after-skin-blueprint-dark.89b9b51967a10075364cf18ff0019816.png); paper light [before](attachment:before-skin-paper-light.3772bfcda7a4219c11f84401af48435e.png) → [after](attachment:after-skin-paper-light.74219e8d5e1b39a28da9b65feb7966ae.png); paper dark [before](attachment:before-skin-paper-dark.9623dba5c76ea70cd7bc1ead2e756e09.png) → [after](attachment:after-skin-paper-dark.b9cf0cbfeb4a7126e659071c54b8264d.png); retro light [before](attachment:before-skin-retro-light.b95a3fad4717ae5bfb1f80eae9b9d957.png) → [after](attachment:after-skin-retro-light.17df3ba9c5cdee38705ce0d2d32aa231.png); retro dark [before](attachment:before-skin-retro-dark.f0154740d39c45ce2f9e596cd4527e15.png) → [after](attachment:after-skin-retro-dark.4545f0dd84a272ecb59e77a10de8209a.png); candy light [before](attachment:before-skin-candy-light.820753a302cc368221793b274b13364e.png) → [after](attachment:after-skin-candy-light.71bad6e54ba8a421d9c7a31be30969a7.png); candy dark [before](attachment:before-skin-candy-dark.7fc162180a1a6c97f830eb6b816b73e4.png) → [after](attachment:after-skin-candy-dark.339367141addaf5d11e3645eab2b33e6.png)
+  report:
+    commits:
+    - hash: e04fdc2bb
+      what: assignee picker; agent profiles keep config order
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: Rust, UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 406 tests in 118 files
+    next: 'Owner: answer the description question; then review again'
+- date: 2026-11-22T19:54:26.623129+00:00
+  author: claude
+  text: |-
+    Agent rows have no description line: profiles have no description key. Add an optional 'description' key to agent profiles (shown under the name, searchable), or drop that line from Done when?
+
+    Options:
+    - add: Add an optional description key to agent profiles (recommended)
+    - drop: Drop the description line from Done when
+  question:
+    options:
+    - key: add
+      label: Add an optional description key to agent profiles
+    - key: drop
+      label: Drop the description line from Done when
+    recommended: add
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa12f0aa7aa7c3a5663ff7f38b51ea73b9a85fabf949074533a44458e86ad9e8a
 - attachment: after-automation-dark.e4a61bebbc5bfd235e640881d2e978ed.png
@@ -201,6 +250,95 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a1bb1fcdff94f91020e5bf7b95f70e58162cb618ef15a77598e61842dc0f018
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8da63ddbf16a5a338e7f86bbedce3e9c648052fcecf38395ddaccf8aadcf1cb0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A570dbc668791b4aa05234aa3c79ea292e84b7ca51baddf113f6129ad5648b61c
+- attachment: after-bulk-dark-1440.c0df42b1cc92b043282dc737ad529ed4.png
+- attachment: after-bulk-dark-1920.ac6f738a9a8ff56b5609d7e32bc6b3c5.png
+- attachment: after-bulk-dark-390.febd5bbb18acf9a3789b183228420791.png
+- attachment: after-bulk-light-1440.b7ecce60e673097cd7948b89a995c3dc.png
+- attachment: after-bulk-light-1920.c790ca892b339b89bb7d6557c2f97987.png
+- attachment: after-bulk-light-390.54fb1a453ee61d8bad89dacf017f1618.png
+- attachment: after-panel-dark-1440.59c8eb837af1a1bcfeb9a5a1a0fabb84.png
+- attachment: after-panel-dark-1920.75c2f59127d87cf2349d31e17aed4974.png
+- attachment: after-panel-dark-390.8b9a6c4e98a8d415cf6ef16f5b5ec848.png
+- attachment: after-panel-light-1440.209592f2a021213b3e8ef4fac55c791a.png
+- attachment: after-panel-light-1920.44d8046da75e74a28a0433b02984952a.png
+- attachment: after-panel-light-390.a515c9262292bceb1aeff3a235bee9e0.png
+- attachment: after-rule-dark-1440.97f7bb493ebe3c89bb6af595b9f8d400.png
+- attachment: after-rule-dark-1920.ceacd3ff64d8b95b8aea8b6a3b474f9e.png
+- attachment: after-rule-dark-390.3764b697010be992824880c75b420419.png
+- attachment: after-rule-light-1440.38ce77dbbc6f84cf6bcc2ddcc59db208.png
+- attachment: after-rule-light-1920.948336caecc6627596ce8360273ae70f.png
+- attachment: after-rule-light-390.7ac7d98c48611c8da59416f53455102c.png
+- attachment: after-run-dark-1440.78ed62c8683eebdd7856ab471de743ee.png
+- attachment: after-run-dark-1920.d1a9fd6618a966b3329d821620878e2e.png
+- attachment: after-run-dark-390.2c701e3dc2ef7227711b7845e1ef81c9.png
+- attachment: after-run-light-1440.992de6f070bd4d852615870ec5f2e987.png
+- attachment: after-run-light-1920.f491e30475fed8ef122a7d29b3e780a0.png
+- attachment: after-run-light-390.5aee47736cabc32e0f09678e09204c7f.png
+- attachment: after-search-dark-1440.cbf29e4582a4b7e349697b59cd2ae507.png
+- attachment: after-search-dark-1920.8b3862625c72a8218bec9d667b348b88.png
+- attachment: after-search-dark-390.684852b2bad9e7739eb3a81a214a6358.png
+- attachment: after-search-light-1440.30f2e62c36013ab16c319207632c9bf1.png
+- attachment: after-search-light-1920.7b16e33fe4eec47ed603a5014a028836.png
+- attachment: after-search-light-390.839788b179fe735af94a8089010873d8.png
+- attachment: after-skin-blueprint-dark.89b9b51967a10075364cf18ff0019816.png
+- attachment: after-skin-blueprint-light.762df40cf4b96c61c66fc426365d8e34.png
+- attachment: after-skin-candy-dark.339367141addaf5d11e3645eab2b33e6.png
+- attachment: after-skin-candy-light.71bad6e54ba8a421d9c7a31be30969a7.png
+- attachment: after-skin-classic-light.1fa3ae064ff2de374812d4c328dc9504.png
+- attachment: after-skin-contrast-dark.c1db5633d32c0f265e1dec534ecd2655.png
+- attachment: after-skin-contrast-light.347adc005afc4dd85164f3822a1c46e1.png
+- attachment: after-skin-matrix-dark.6dce5f131986ff41a38adcb490ca7f48.png
+- attachment: after-skin-matrix-light.de1de781fbbbd493736b6075650823b0.png
+- attachment: after-skin-paper-dark.b9cf0cbfeb4a7126e659071c54b8264d.png
+- attachment: after-skin-paper-light.74219e8d5e1b39a28da9b65feb7966ae.png
+- attachment: after-skin-retro-dark.4545f0dd84a272ecb59e77a10de8209a.png
+- attachment: after-skin-retro-light.17df3ba9c5cdee38705ce0d2d32aa231.png
+- attachment: after-skin-synthwave-dark.6bad5705993a88449e72c4a836762ae9.png
+- attachment: after-skin-synthwave-light.125e7d0fddf5f2632d6e2e334b35f9b1.png
+- attachment: after-skin-terminal-dark.cfc44789de468bce07c9a1e28137c8a7.png
+- attachment: after-skin-terminal-light.67e533558a419710149d570bed7eed30.png
+- attachment: before-bulk-dark-1440.d2e051395299d2132c9f72e0e33186a6.png
+- attachment: before-bulk-dark-1920.0fc1071fe7e4485be3fe3a890f03cdca.png
+- attachment: before-bulk-dark-390.93d440d354b286a482c61e41eef98cec.png
+- attachment: before-bulk-light-1440.456c6be294f392b98a3f74c694c0922b.png
+- attachment: before-bulk-light-1920.5b86d8379cc6b388f3c93f96e02df63a.png
+- attachment: before-bulk-light-390.48609f511f36257bfbe466490a7d0b1e.png
+- attachment: before-panel-dark-1440.9f4d382f6cc06db6cdb40e48062c0f9e.png
+- attachment: before-panel-dark-1920.34a319f57f4b23e4a3c266efcf7489e5.png
+- attachment: before-panel-dark-390.bbbef6fc06bf334e0a15bbd0a635c2e2.png
+- attachment: before-panel-light-1440.3a8e4a1919ed02376dfb7bf6c0c93aab.png
+- attachment: before-panel-light-1920.c5c5c4bd89ae5b541a6d8c73e012e04a.png
+- attachment: before-panel-light-390.25b93bff6430f1a496ca78beaefa3c96.png
+- attachment: before-rule-dark-1440.ea595ebb50556e56006b62436e600156.png
+- attachment: before-rule-dark-1920.5f098ecdd54cd8959dd66c24498d0008.png
+- attachment: before-rule-dark-390.a55688129bb7234abef5a5443c48e06e.png
+- attachment: before-rule-light-1440.40b070d8948986af1f5fcb86e6a6702b.png
+- attachment: before-rule-light-1920.0c560562931225316f7ff1c0eafc3325.png
+- attachment: before-rule-light-390.b3309809fa596f47b936121f21655b01.png
+- attachment: before-run-dark-1440.6236e8f5de84f1c3305e62a2e24f1e36.png
+- attachment: before-run-dark-1920.149624d2f716251107e84f3b4f6ce1b5.png
+- attachment: before-run-dark-390.3038e255e2613029e9dd9acb736cc5bf.png
+- attachment: before-run-light-1440.bba8e674c534b10763b9d9550f6902f5.png
+- attachment: before-run-light-1920.531885b6cba9ec5fc4122ccb236c0308.png
+- attachment: before-run-light-390.b661e377470c9feb3906a2afa99c38cd.png
+- attachment: before-skin-blueprint-dark.814c93afd87062aa3321b03bde859ca6.png
+- attachment: before-skin-blueprint-light.472ace9d961f4108fda5bf4b8d44f86f.png
+- attachment: before-skin-candy-dark.7fc162180a1a6c97f830eb6b816b73e4.png
+- attachment: before-skin-candy-light.820753a302cc368221793b274b13364e.png
+- attachment: before-skin-classic-dark.67e25bb5602e459a2aad7f28cd3861e6.png
+- attachment: before-skin-classic-light.4cf6e0f63ca551c9e16a1c0580fc0fac.png
+- attachment: before-skin-contrast-dark.cdce5d6a8b56ddc3791c3feae8f24a21.png
+- attachment: before-skin-contrast-light.1a38f6153fd5343a52d3e3f89bf3fbdd.png
+- attachment: before-skin-matrix-dark.78a53f4214dda2083e8c5e4de86ab040.png
+- attachment: before-skin-matrix-light.966dd7d2e463889b077a0f69e0c30044.png
+- attachment: before-skin-paper-dark.9623dba5c76ea70cd7bc1ead2e756e09.png
+- attachment: before-skin-paper-light.3772bfcda7a4219c11f84401af48435e.png
+- attachment: before-skin-retro-dark.f0154740d39c45ce2f9e596cd4527e15.png
+- attachment: before-skin-retro-light.b95a3fad4717ae5bfb1f80eae9b9d957.png
+- attachment: before-skin-synthwave-dark.4aa8a237eac6d41b2671f8ceaa766925.png
+- attachment: before-skin-synthwave-light.1f3bdcd11a59f2bf3888947e436fb277.png
+- attachment: before-skin-terminal-dark.7b0be2a68e7da6f51cae5ff264fe61c7.png
+- attachment: before-skin-terminal-light.9ea9ab346cfcbd5682378dc10103740c.png
 description: |-
   The task panel's assignee menu is hard to read and pick from now that there are many agent profile variants. It's a native `<select>` (`view/components/task-panel/TaskPanelOwnershipSection.vue` :36-63 via `UiSelect`) with people and every `@fix`, `@fix-light`, `@fix-fable`, `@fix-retry`, `@review-claude`, `@merge`… in one alphabetical list (`view/composables/useTaskPanelOwnership.ts` :71-87). It shows no runner, model or effort and has no search. "Custom…" swaps in a text field. The owner asked on 2026-11-21 for this select to "be rebuilt in a better way".
 
@@ -580,3 +718,471 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A570dbc668791b4aa05234aa3c79ea292e84b7ca51baddf113f6129ad5648b61c
+- at: 2026-11-22T19:53:33.338543+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-bulk-dark-1440.c0df42b1cc92b043282dc737ad529ed4.png
+- at: 2026-11-22T19:53:33.388978+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-bulk-dark-1920.ac6f738a9a8ff56b5609d7e32bc6b3c5.png
+- at: 2026-11-22T19:53:33.430867+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-bulk-dark-390.febd5bbb18acf9a3789b183228420791.png
+- at: 2026-11-22T19:53:33.472999+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-bulk-light-1440.b7ecce60e673097cd7948b89a995c3dc.png
+- at: 2026-11-22T19:53:33.519889+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-bulk-light-1920.c790ca892b339b89bb7d6557c2f97987.png
+- at: 2026-11-22T19:53:33.566392+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-bulk-light-390.54fb1a453ee61d8bad89dacf017f1618.png
+- at: 2026-11-22T19:53:33.611340+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-dark-1440.59c8eb837af1a1bcfeb9a5a1a0fabb84.png
+- at: 2026-11-22T19:53:33.651419+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-dark-1920.75c2f59127d87cf2349d31e17aed4974.png
+- at: 2026-11-22T19:53:33.696493+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-dark-390.8b9a6c4e98a8d415cf6ef16f5b5ec848.png
+- at: 2026-11-22T19:53:33.737467+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-light-1440.209592f2a021213b3e8ef4fac55c791a.png
+- at: 2026-11-22T19:53:33.783592+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-light-1920.44d8046da75e74a28a0433b02984952a.png
+- at: 2026-11-22T19:53:33.827831+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-panel-light-390.a515c9262292bceb1aeff3a235bee9e0.png
+- at: 2026-11-22T19:53:33.871805+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-rule-dark-1440.97f7bb493ebe3c89bb6af595b9f8d400.png
+- at: 2026-11-22T19:53:33.917913+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-rule-dark-1920.ceacd3ff64d8b95b8aea8b6a3b474f9e.png
+- at: 2026-11-22T19:53:33.960729+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-rule-dark-390.3764b697010be992824880c75b420419.png
+- at: 2026-11-22T19:53:34.011220+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-rule-light-1440.38ce77dbbc6f84cf6bcc2ddcc59db208.png
+- at: 2026-11-22T19:53:34.051761+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-rule-light-1920.948336caecc6627596ce8360273ae70f.png
+- at: 2026-11-22T19:53:34.094078+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-rule-light-390.7ac7d98c48611c8da59416f53455102c.png
+- at: 2026-11-22T19:53:34.133945+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-dark-1440.78ed62c8683eebdd7856ab471de743ee.png
+- at: 2026-11-22T19:53:34.175884+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-dark-1920.d1a9fd6618a966b3329d821620878e2e.png
+- at: 2026-11-22T19:53:34.220280+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-dark-390.2c701e3dc2ef7227711b7845e1ef81c9.png
+- at: 2026-11-22T19:53:34.262974+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-light-1440.992de6f070bd4d852615870ec5f2e987.png
+- at: 2026-11-22T19:53:34.309014+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-light-1920.f491e30475fed8ef122a7d29b3e780a0.png
+- at: 2026-11-22T19:53:34.348201+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-run-light-390.5aee47736cabc32e0f09678e09204c7f.png
+- at: 2026-11-22T19:53:34.389979+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-search-dark-1440.cbf29e4582a4b7e349697b59cd2ae507.png
+- at: 2026-11-22T19:53:34.430997+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-search-dark-1920.8b3862625c72a8218bec9d667b348b88.png
+- at: 2026-11-22T19:53:34.473446+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-search-dark-390.684852b2bad9e7739eb3a81a214a6358.png
+- at: 2026-11-22T19:53:34.515623+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-search-light-1440.30f2e62c36013ab16c319207632c9bf1.png
+- at: 2026-11-22T19:53:34.555636+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-search-light-1920.7b16e33fe4eec47ed603a5014a028836.png
+- at: 2026-11-22T19:53:34.595807+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-search-light-390.839788b179fe735af94a8089010873d8.png
+- at: 2026-11-22T19:53:34.635293+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-blueprint-dark.89b9b51967a10075364cf18ff0019816.png
+- at: 2026-11-22T19:53:34.680430+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-blueprint-light.762df40cf4b96c61c66fc426365d8e34.png
+- at: 2026-11-22T19:53:34.721803+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-candy-dark.339367141addaf5d11e3645eab2b33e6.png
+- at: 2026-11-22T19:53:34.764292+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-candy-light.71bad6e54ba8a421d9c7a31be30969a7.png
+- at: 2026-11-22T19:53:34.823656+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-classic-light.1fa3ae064ff2de374812d4c328dc9504.png
+- at: 2026-11-22T19:53:34.865013+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-contrast-dark.c1db5633d32c0f265e1dec534ecd2655.png
+- at: 2026-11-22T19:53:34.908149+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-contrast-light.347adc005afc4dd85164f3822a1c46e1.png
+- at: 2026-11-22T19:53:34.952658+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-matrix-dark.6dce5f131986ff41a38adcb490ca7f48.png
+- at: 2026-11-22T19:53:34.995488+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-matrix-light.de1de781fbbbd493736b6075650823b0.png
+- at: 2026-11-22T19:53:35.035997+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-paper-dark.b9cf0cbfeb4a7126e659071c54b8264d.png
+- at: 2026-11-22T19:53:35.076245+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-paper-light.74219e8d5e1b39a28da9b65feb7966ae.png
+- at: 2026-11-22T19:53:35.118710+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-retro-dark.4545f0dd84a272ecb59e77a10de8209a.png
+- at: 2026-11-22T19:53:35.157679+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-retro-light.17df3ba9c5cdee38705ce0d2d32aa231.png
+- at: 2026-11-22T19:53:35.199905+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-synthwave-dark.6bad5705993a88449e72c4a836762ae9.png
+- at: 2026-11-22T19:53:35.240918+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-synthwave-light.125e7d0fddf5f2632d6e2e334b35f9b1.png
+- at: 2026-11-22T19:53:35.279904+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-terminal-dark.cfc44789de468bce07c9a1e28137c8a7.png
+- at: 2026-11-22T19:53:35.318961+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-skin-terminal-light.67e533558a419710149d570bed7eed30.png
+- at: 2026-11-22T19:53:35.358981+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-bulk-dark-1440.d2e051395299d2132c9f72e0e33186a6.png
+- at: 2026-11-22T19:53:35.398843+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-bulk-dark-1920.0fc1071fe7e4485be3fe3a890f03cdca.png
+- at: 2026-11-22T19:53:35.437790+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-bulk-dark-390.93d440d354b286a482c61e41eef98cec.png
+- at: 2026-11-22T19:53:35.477863+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-bulk-light-1440.456c6be294f392b98a3f74c694c0922b.png
+- at: 2026-11-22T19:53:35.517593+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-bulk-light-1920.5b86d8379cc6b388f3c93f96e02df63a.png
+- at: 2026-11-22T19:53:35.555611+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-bulk-light-390.48609f511f36257bfbe466490a7d0b1e.png
+- at: 2026-11-22T19:53:35.594861+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-dark-1440.9f4d382f6cc06db6cdb40e48062c0f9e.png
+- at: 2026-11-22T19:53:35.634810+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-dark-1920.34a319f57f4b23e4a3c266efcf7489e5.png
+- at: 2026-11-22T19:53:35.676361+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-dark-390.bbbef6fc06bf334e0a15bbd0a635c2e2.png
+- at: 2026-11-22T19:53:35.718652+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-light-1440.3a8e4a1919ed02376dfb7bf6c0c93aab.png
+- at: 2026-11-22T19:53:35.763613+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-light-1920.c5c5c4bd89ae5b541a6d8c73e012e04a.png
+- at: 2026-11-22T19:53:35.806304+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-panel-light-390.25b93bff6430f1a496ca78beaefa3c96.png
+- at: 2026-11-22T19:53:35.849758+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-rule-dark-1440.ea595ebb50556e56006b62436e600156.png
+- at: 2026-11-22T19:53:35.891565+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-rule-dark-1920.5f098ecdd54cd8959dd66c24498d0008.png
+- at: 2026-11-22T19:53:35.936162+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-rule-dark-390.a55688129bb7234abef5a5443c48e06e.png
+- at: 2026-11-22T19:53:35.979349+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-rule-light-1440.40b070d8948986af1f5fcb86e6a6702b.png
+- at: 2026-11-22T19:53:36.020876+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-rule-light-1920.0c560562931225316f7ff1c0eafc3325.png
+- at: 2026-11-22T19:53:36.061846+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-rule-light-390.b3309809fa596f47b936121f21655b01.png
+- at: 2026-11-22T19:53:36.100815+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-dark-1440.6236e8f5de84f1c3305e62a2e24f1e36.png
+- at: 2026-11-22T19:53:36.139760+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-dark-1920.149624d2f716251107e84f3b4f6ce1b5.png
+- at: 2026-11-22T19:53:36.178978+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-dark-390.3038e255e2613029e9dd9acb736cc5bf.png
+- at: 2026-11-22T19:53:36.218150+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-light-1440.bba8e674c534b10763b9d9550f6902f5.png
+- at: 2026-11-22T19:53:36.260046+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-light-1920.531885b6cba9ec5fc4122ccb236c0308.png
+- at: 2026-11-22T19:53:36.300288+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-run-light-390.b661e377470c9feb3906a2afa99c38cd.png
+- at: 2026-11-22T19:53:36.340115+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-blueprint-dark.814c93afd87062aa3321b03bde859ca6.png
+- at: 2026-11-22T19:53:36.380889+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-blueprint-light.472ace9d961f4108fda5bf4b8d44f86f.png
+- at: 2026-11-22T19:53:36.419068+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-candy-dark.7fc162180a1a6c97f830eb6b816b73e4.png
+- at: 2026-11-22T19:53:36.459256+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-candy-light.820753a302cc368221793b274b13364e.png
+- at: 2026-11-22T19:53:36.499177+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-classic-dark.67e25bb5602e459a2aad7f28cd3861e6.png
+- at: 2026-11-22T19:53:36.539793+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-classic-light.4cf6e0f63ca551c9e16a1c0580fc0fac.png
+- at: 2026-11-22T19:53:36.578796+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-contrast-dark.cdce5d6a8b56ddc3791c3feae8f24a21.png
+- at: 2026-11-22T19:53:36.617993+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-contrast-light.1a38f6153fd5343a52d3e3f89bf3fbdd.png
+- at: 2026-11-22T19:53:36.657867+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-matrix-dark.78a53f4214dda2083e8c5e4de86ab040.png
+- at: 2026-11-22T19:53:36.699614+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-matrix-light.966dd7d2e463889b077a0f69e0c30044.png
+- at: 2026-11-22T19:53:36.739190+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-paper-dark.9623dba5c76ea70cd7bc1ead2e756e09.png
+- at: 2026-11-22T19:53:36.778881+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-paper-light.3772bfcda7a4219c11f84401af48435e.png
+- at: 2026-11-22T19:53:36.818031+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-retro-dark.f0154740d39c45ce2f9e596cd4527e15.png
+- at: 2026-11-22T19:53:36.858052+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-retro-light.b95a3fad4717ae5bfb1f80eae9b9d957.png
+- at: 2026-11-22T19:53:36.900694+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-synthwave-dark.4aa8a237eac6d41b2671f8ceaa766925.png
+- at: 2026-11-22T19:53:36.941853+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-synthwave-light.1f3bdcd11a59f2bf3888947e436fb277.png
+- at: 2026-11-22T19:53:36.986971+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-terminal-dark.7b0be2a68e7da6f51cae5ff264fe61c7.png
+- at: 2026-11-22T19:53:37.028195+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-skin-terminal-light.9ea9ab346cfcbd5682378dc10103740c.png
+- at: 2026-11-22T19:54:19.950816+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:54:26.623129+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:54:52.141113+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-22T20:41:42.029924+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-769","DEV-776","DEV-756","DEV-765"]}'
+    new: '{"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806"]}'

@@ -1620,18 +1620,38 @@ fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
         return Ok(context);
     }
 
+    let cleared = clear_leftover_build_output(&worktree_path)?;
     std::fs::create_dir_all(&worktree_root).map_err(LoTaRError::IoError)?;
     let worktree_arg = worktree_path.to_string_lossy().to_string();
     run_git_command(&repo_root, &["worktree", "add", &worktree_arg, &branch])?;
     if verified_common_dir(&worktree_path).map_err(LoTaRError::IoError)? != repo_common {
         return Err(LoTaRError::ValidationError("Worktree belongs to a different repository".into()));
     }
-    context.note = Some(clone_build_output(&repo_root, &config.agent_worktree.branch_prefix, &branch, &worktree_path));
+    let cloned = clone_build_output(&repo_root, &config.agent_worktree.branch_prefix, &branch, &worktree_path);
+    context.note = Some(match cleared {
+        Some(cleared) => format!("{cleared} {cloned}"),
+        None => cloned,
+    });
 
     context.working_dir = worktree_path.clone();
     context.worktree_path = Some(worktree_path);
     context.worktree_branch = Some(branch);
     Ok(context)
+}
+
+/// The ticket's folder without a worktree in it, left by a removed one,
+/// fails `git worktree add` ("already exists") on every job of the ticket
+/// (DEV-780). One holding nothing but `target/` is build output written
+/// after the removal (a test run's `junit.xml`), so it goes; anything else
+/// in it stays for git to refuse. Returns the note for the job log.
+fn clear_leftover_build_output(worktree: &std::path::Path) -> LoTaRResult<Option<String>> {
+    let Ok(entries) = fs::read_dir(worktree) else { return Ok(None) };
+    let names: Vec<_> = entries.flatten().map(|entry| entry.file_name()).collect();
+    if names.len() != 1 || names[0] != "target" || !fs::symlink_metadata(worktree.join("target")).is_ok_and(|meta| meta.is_dir()) {
+        return Ok(None);
+    }
+    fs::remove_dir_all(worktree).map_err(LoTaRError::IoError)?;
+    Ok(Some(format!("Removed the leftover folder {} (only target/, no worktree).", worktree.display())))
 }
 
 /// A new worktree starts from a copy-on-write clone of the ticket's newest

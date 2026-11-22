@@ -1,0 +1,32 @@
+title: Instructions button keeps 'Not recorded for this job' when opened before the job's first turn
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T20:45:46.748448+00:00
+modified: 2026-11-22T20:45:59.734042+00:00
+relationships:
+  related:
+  - DEV-767
+description: |-
+  Found in the DEV-767 review (f384ce022).
+
+  `view/components/AgentRunInputs.vue` sets `loaded = true` after a load that returns `inputs: null`, so `toggle()` never loads again. Open the button on a queued job, or a running job still in its worktree setup: it says "Not recorded for this job" until the page reloads, also after the first turn has written its `run_inputs` line.
+
+  Fix: count a `null` result as not loaded while the job hasn't ended (or reload on every open while it runs). Add a Vitest that opens it with `null`, then with a record.
+tags:
+- agent
+- ui
+history:
+- at: 2026-11-22T20:45:51.763263+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-767"]}'
+- at: 2026-11-22T20:45:59.734042+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

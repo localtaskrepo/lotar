@@ -1,11 +1,11 @@
 title: 'harness.agent-launcher smoke: a failed 45 s start wait loses its wrapper stderr to the 120 s test timeout'
-status: Reviewing
+status: Merging
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T11:07:54.938084+00:00
-modified: 2026-11-22T19:22:42.029921+00:00
+modified: 2026-11-22T20:39:30.950834+00:00
 relationships:
   related:
   - DEV-781
@@ -44,6 +44,17 @@ comments:
     Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
 
     - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
+- date: 2026-11-22T20:39:16.919624+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix does what the ticket asks; the rebase onto main has one conflict with an obvious resolution.
+
+    - Read: `1d7885621` (only `smoke/tests/harness.agent-launcher.smoke.spec.ts`), the ticket, DEV-781 (now Done, `78c006d4b` on main), AGENTS.md.
+    - Done when: the shim and fwd catch blocks (and conflict) now go through `exitDetail`, which races the exit against 1 s. A hung wrapper still reports `stderrSoFar()`. The later 90 s reject from `awaitExit` is handled by `exitDetail`'s `.then` handler, so there is no unhandled rejection. With 45 s waits a failure now reports within ~46 s, under the 120 s `testTimeout`.
+    - Wrong claim: "combine without conflict" does not hold. `git rebase main` conflicts at the `awaitExit` signature (line ~86), where DEV-781 changed the default bound. Resolution: keep main's `FIXTURE_WAIT_MS` comment and const, and use `function awaitExit(child: ChildProcess, boundMs = 2 * FIXTURE_WAIT_MS): ExitWait` with the `ExitWait` type above it. The three catch blocks merge cleanly.
+    - Reran: `npm ci` ok; `npm run lint:frontend` (smoke tsc) passed; `npx prettier --check` on the file passed; `npm run test:smoke:quick:agent -- smoke/tests/harness.agent-launcher.smoke.spec.ts` passed: 7/7 in 10 s.
+    - Not rerun: the full lint, test and smoke gates, and the forced hung-wrapper check (the fix agent reported it; the code path reads correct).
+    - No UI change, no stray files, no second branch. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3a5b702f4f0841a6f3112eafa0efcf6e0ff29db5b01c7ccf1a8355cbacaadde
 description: |-
@@ -98,3 +109,16 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T20:39:16.919624+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T20:39:30.950834+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

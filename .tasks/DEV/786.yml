@@ -1,11 +1,11 @@
 title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-22T18:09:38.364865+00:00
+modified: 2026-11-22T19:46:53.716476+00:00
 relationships:
   related:
   - DEV-725
@@ -114,6 +114,30 @@ comments:
       result: passed
       reason: 408 tests
     next: Review on another model, then merge
+- date: 2026-11-22T19:46:37.487518+00:00
+  author: claude
+  text: |-
+    Second retry: nothing new to do. The work in `bc0c7d822` is complete, so I made no changes.
+
+    - The branch still has only `bc0c7d822` past `main`, and the working tree is clean
+    - `main` is now 11 commits ahead. `git merge-tree main HEAD` shows no conflicts, so the merge agent's rebase should apply cleanly
+    - I didn't rerun the checks: nothing changed since the 17:48Z run, where lint, test and smoke all passed
+    - The earlier job ended only because the t3 runner exited while waiting on checks. The code was not the problem
+  report:
+    commits:
+    - hash: bc0c7d822
+      what: priority/kind queue order, queue move (CLI, REST, Agents page), kind column
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: 17:48Z run, no edits since
+    - command: npm run test:agent
+      result: passed
+      reason: 17:48Z run, no edits since
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 17:48Z run, no edits since
+    next: Review on another model, then the merge agent rebases onto main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -129,6 +153,7 @@ references:
 - attachment: dev786-before-light-1920.132623d68127332a387e3b674cf854bd.png
 - attachment: dev786-before-light-390.3bfc4a73ef913a0431f941cd72692dc2.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A67fc5720ba826219716ea277a59b751ba1d4296682edd17a9af20cdf991f4882
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7b0c29c6eb398eded8136199727a23f429bb79edb665a2f629e7ce5f2f08b42a
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
 
@@ -379,3 +404,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783"]}'
     new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794"]}'
+- at: 2026-11-22T19:45:58.428934+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T19:46:19.187221+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7b0c29c6eb398eded8136199727a23f429bb79edb665a2f629e7ce5f2f08b42a
+- at: 2026-11-22T19:46:37.487518+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:46:53.716476+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

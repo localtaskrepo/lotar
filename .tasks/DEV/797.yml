@@ -1,14 +1,16 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-22T19:22:15.481974+00:00
+modified: 2026-11-22T20:46:08.262949+00:00
 relationships:
   blocks:
   - DEV-801
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 description: |-
   Owner decision 2026-11-22 (chief of staff's options picker, after a 72 h pipeline measurement): picked "Full suites once, one at a time": fix and review jobs run only the tests for what changed; only the merge runs the full suites; one full suite runs on the machine at a time (a shared lock in lotar). Not picked: the lock alone, or 2 parallel jobs instead of 3.
 
@@ -19,11 +21,17 @@ description: |-
   - The fix and review prompts in .tasks/DEV/automation.yml (and the other repos' automation, standards' shared prompts if they hold the same text) ask for targeted tests only; the merge runs the full suites once.
   - The git hooks (pre-commit, pre-push) of lotar must not run the full suites again in a job's worktree if that defeats this; say what they run and propose, don't widen or skip hooks.
 
-  Done when:
-  - [ ] Two jobs that reach a full suite at the same time run them one after the other (a test shows it).
-  - [ ] Fix and review prompts ask for targeted tests; only the merge runs full suites.
+
+  ## Done when
+
+  - [ ] The lock: every merge job (lotar's own merge with `agent.merge`, and the merge agent, in any repo lotar runs) takes one machine-wide lock before its checks and holds it until the job ends. A second merge job waits, then runs. lotar's own merge takes it only when it gets to the checks (not for "nothing to merge" or a hand-off before them); a hand-off keeps it held while the merge agent runs. Fix, review and rework jobs never take it.
+  - [ ] The lock is a file lock (`checks.lock` in lotar's queue folder, `LOTAR_AGENT_QUEUE_DIR` when set); the OS frees it when lotar exits or crashes, so a dead holder never blocks. The waiting job says in its progress whose checks it waits for (ticket, job, since when) and comments the wait time. A lock file lotar can't open or lock: the merge runs without it and says so (a fix of the lock must not stop merges).
+  - [ ] Waiting is no stall and no timeout: the job runs (live check sees it), no agent is started yet, so no `stall_timeout_seconds` applies; cancelling the job while it waits ends the wait.
+  - [ ] A test shows two merge jobs that reach their checks at the same time run them one after the other, and one says it waited.
+  - [ ] Fix, work, rework and review prompts in `.tasks/DEV/automation.yml` and standards' `configs/lotar/automation.yml` (the source of every repo's copy; repos.ts `--fix` copies it on) ask for targeted tests for what changed, not the full suites; the merge prompt says the merge runs them once, under the lock. lotar's AGENTS.md and skill testing-strategy say the same (owner 2026-11-22: "fix and review jobs run only the tests for what changed; only the merge runs the full suites").
+  - [ ] Git hooks: unchanged. pre-commit checks only staged files (format, oxlint, ESLint, secrets); pre-push runs fmt + clippy (lib, bins) and the frontend typecheck/lint for what the push changes; neither runs test or smoke suites, so neither defeats this.
   - [ ] docs/help/agent.md describes the lock and the check rule.
-  - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline.
+  - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline (a follow-up after the release, not this job).
 tags:
 - agent
 history:
@@ -38,3 +46,54 @@ history:
   - field: relationships
     old: '{}'
     new: '{"blocks":["DEV-801"]}'
+- at: 2026-11-22T20:40:16.593737+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T20:40:19.626839+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
+- at: 2026-11-22T20:46:08.262949+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner decision 2026-11-22 (chief of staff's options picker, after a 72 h pipeline measurement): picked "Full suites once, one at a time": fix and review jobs run only the tests for what changed; only the merge runs the full suites; one full suite runs on the machine at a time (a shared lock in lotar). Not picked: the lock alone, or 2 parallel jobs instead of 3.
+
+      Why (measured 2026-11-20..22, 657 jobs): load average 50-60 on 14 cores; 37 of 44 lotar merge check rounds failed (84%), about 24 of 43 analysed failures were load timeouts that passed alone; each DEV ticket ran the full suites 3-4 times (fix, review, merge, merge-agent reruns); one full round (lint + test:agent + smoke) took a median 34.7 min under load vs 4-12 min on a quiet machine; checks plus merge-agent cleanup after failed checks: 43.8 slot-h; flaky-test tickets another 35 slot-h.
+
+      Scope:
+      - A machine-wide lock (or queue) so only one full suite (lotar's test:agent, smoke; and the same for other repos' full checks run by lotar's merge) runs at a time; others wait for it instead of running side by side. Waiting must not count as a stall or a timeout.
+      - The fix and review prompts in .tasks/DEV/automation.yml (and the other repos' automation, standards' shared prompts if they hold the same text) ask for targeted tests only; the merge runs the full suites once.
+      - The git hooks (pre-commit, pre-push) of lotar must not run the full suites again in a job's worktree if that defeats this; say what they run and propose, don't widen or skip hooks.
+
+      Done when:
+      - [ ] Two jobs that reach a full suite at the same time run them one after the other (a test shows it).
+      - [ ] Fix and review prompts ask for targeted tests; only the merge runs full suites.
+      - [ ] docs/help/agent.md describes the lock and the check rule.
+      - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline.
+    new: |-
+      Owner decision 2026-11-22 (chief of staff's options picker, after a 72 h pipeline measurement): picked "Full suites once, one at a time": fix and review jobs run only the tests for what changed; only the merge runs the full suites; one full suite runs on the machine at a time (a shared lock in lotar). Not picked: the lock alone, or 2 parallel jobs instead of 3.
+
+      Why (measured 2026-11-20..22, 657 jobs): load average 50-60 on 14 cores; 37 of 44 lotar merge check rounds failed (84%), about 24 of 43 analysed failures were load timeouts that passed alone; each DEV ticket ran the full suites 3-4 times (fix, review, merge, merge-agent reruns); one full round (lint + test:agent + smoke) took a median 34.7 min under load vs 4-12 min on a quiet machine; checks plus merge-agent cleanup after failed checks: 43.8 slot-h; flaky-test tickets another 35 slot-h.
+
+      Scope:
+      - A machine-wide lock (or queue) so only one full suite (lotar's test:agent, smoke; and the same for other repos' full checks run by lotar's merge) runs at a time; others wait for it instead of running side by side. Waiting must not count as a stall or a timeout.
+      - The fix and review prompts in .tasks/DEV/automation.yml (and the other repos' automation, standards' shared prompts if they hold the same text) ask for targeted tests only; the merge runs the full suites once.
+      - The git hooks (pre-commit, pre-push) of lotar must not run the full suites again in a job's worktree if that defeats this; say what they run and propose, don't widen or skip hooks.
+
+
+      ## Done when
+
+      - [ ] The lock: every merge job (lotar's own merge with `agent.merge`, and the merge agent, in any repo lotar runs) takes one machine-wide lock before its checks and holds it until the job ends. A second merge job waits, then runs. lotar's own merge takes it only when it gets to the checks (not for "nothing to merge" or a hand-off before them); a hand-off keeps it held while the merge agent runs. Fix, review and rework jobs never take it.
+      - [ ] The lock is a file lock (`checks.lock` in lotar's queue folder, `LOTAR_AGENT_QUEUE_DIR` when set); the OS frees it when lotar exits or crashes, so a dead holder never blocks. The waiting job says in its progress whose checks it waits for (ticket, job, since when) and comments the wait time. A lock file lotar can't open or lock: the merge runs without it and says so (a fix of the lock must not stop merges).
+      - [ ] Waiting is no stall and no timeout: the job runs (live check sees it), no agent is started yet, so no `stall_timeout_seconds` applies; cancelling the job while it waits ends the wait.
+      - [ ] A test shows two merge jobs that reach their checks at the same time run them one after the other, and one says it waited.
+      - [ ] Fix, work, rework and review prompts in `.tasks/DEV/automation.yml` and standards' `configs/lotar/automation.yml` (the source of every repo's copy; repos.ts `--fix` copies it on) ask for targeted tests for what changed, not the full suites; the merge prompt says the merge runs them once, under the lock. lotar's AGENTS.md and skill testing-strategy say the same (owner 2026-11-22: "fix and review jobs run only the tests for what changed; only the merge runs the full suites").
+      - [ ] Git hooks: unchanged. pre-commit checks only staged files (format, oxlint, ESLint, secrets); pre-push runs fmt + clippy (lib, bins) and the frontend typecheck/lint for what the push changes; neither runs test or smoke suites, so neither defeats this.
+      - [ ] docs/help/agent.md describes the lock and the check rule.
+      - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline (a follow-up after the release, not this job).

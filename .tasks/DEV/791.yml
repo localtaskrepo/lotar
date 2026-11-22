@@ -1,11 +1,11 @@
 title: lotar comment -m <text> - reads stdin and silently drops the -m text
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T08:26:27.727612+00:00
-modified: 2026-11-22T19:29:36.751567+00:00
+modified: 2026-11-22T19:38:35.052031+00:00
 relationships:
   depends_on:
   - DEV-776
@@ -20,6 +20,31 @@ comments:
     - DEV-776 (status Merging) added the lone `-` → stdin branch in `resolve_comment_text` (`crates/lotar-lib/src/cli/handlers/comment.rs`); commit `3968c82a1` is only on `agent/DEV-776`
     - `main` (`878c80d5f`) doesn't have it, so the check can't reproduce here, and a fix now would edit the same lines and conflict
     - Plan once DEV-776 is in: refuse more than one of `-m`, `-F` and TEXT (a lone `-` counts as `-F -`) with a hint, in `resolve_comment_text`; tests in `crates/lotar-lib/tests/dev282_cli_safety_test.rs`; update `docs/help/comment.md`
+- date: 2026-11-22T19:38:20.845325+00:00
+  author: claude
+  text: |-
+    Fixed: giving more than one of -m, -F and TEXT is now refused with a hint; nothing is silently dropped.
+
+    - `resolve_comment_text` in `crates/lotar-lib/src/cli/handlers/comment.rs` checks first: e.g. `-m msg -` fails with exit 1, `Give the comment once, not with -m and TEXT: only one of them would be saved. Hint: …`
+    - Covers `lotar comment` and `lotar task comment` (same code path)
+    - Test `more_than_one_comment_source_is_refused` in `crates/lotar-lib/tests/dev282_cli_safety_test.rs`: four combinations, nothing saved
+    - Docs: `docs/help/comment.md`, `docs/help/task.md`
+    - Branch fast-forwarded to `main` (`e343b4e33`, has DEV-776) before the change
+  report:
+    commits:
+    - hash: e76b91e7f
+      what: refuse more than one of -m, -F and TEXT with a hint
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: lotar comment X-1 -m msg - <<<'other' (dev build)
+      result: passed
+      reason: exit 1 with the hint, nothing saved
+    next: Merge agent/DEV-791 onto main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab0f4d5f17a66f33db4ed35ffaf7aa830bbe9872437d49c9bc5a4ef36fcbd364
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad64dba53a7c591ed66fa7ce0bf338b913bb9a0aa1ba4e893b7e2dd768705c648
@@ -84,3 +109,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad64dba53a7c591ed66fa7ce0bf338b913bb9a0aa1ba4e893b7e2dd768705c648
+- at: 2026-11-22T19:38:20.845325+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:38:35.052031+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

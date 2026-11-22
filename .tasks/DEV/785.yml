@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T03:06:53.746513+00:00
-modified: 2026-11-22T19:22:35.479294+00:00
+modified: 2026-11-22T19:53:49.367030+00:00
 relationships:
   related:
   - DEV-748
@@ -86,8 +86,41 @@ comments:
     Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
 
     - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
+- date: 2026-11-22T19:53:38.993482+00:00
+  author: claude
+  text: |-
+    Review findings fixed: 5 more smoke files run serially; full smoke and `test:agent` pass at load 30+.
+
+    - Read the review against HEAD `bfc44b466`: it is the commit the review names
+    - `smoke/vitest.config.ts` `WALL_CLOCK_SPECS` now also has `ui.config-coverage` (DEV-781), `ui.sprints-responsive` (DEV-775), `ui.attachment-previews`, `ui.sort-export`, `cli.automation` (13 files)
+    - `cli.automation` alone: 16/16 passed at load 35 (`npm run -s test:smoke:quick:agent -- tests/cli.automation.smoke.spec.ts`), so it is a load flake, not a bug: it goes on the list, no ticket
+    - Full smoke wall time, same build, back to back: before (base config) 36 s, load 29-43; after 80 s, load 34-41; second after-run 104 s while `test:agent` ran alongside. All 407 passed each time
+    - The earlier "39 s -> 65 s" was the same measure (vitest Duration of a full smoke run). The review's 716 s was one run at load 35-59
+    - No `lotar serve` left after the runs; `npm run -s lint:agent` passes
+    - Amended, signed: `4972e5d47`. Not rebased onto main (not asked)
+  report:
+    commits:
+    - hash: 4972e5d47
+      what: serial wall-clock group for nextest, UI and smoke; 5 more smoke files on the list
+    checks:
+    - command: npm run -s test:smoke:quick:agent
+      result: passed
+      reason: 407/407 twice, load 29-45
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2453/2453, UI 1564/1564, load 19-45
+    - command: npm run -s lint:agent
+      result: passed
+    - command: vitest list (smoke)
+      result: passed
+      reason: 118 files, each once
+    - command: npm run -s test:rust:agent before/after timing
+      result: not_run
+      reason: Rust config unchanged this round; earlier 122 s -> 164 s
+    next: Review again; the merge rebases onto main (DEV-772 fixes merge_job_that_cannot_fast_forward_fails)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5c8d6340739f46b0d7639fb411a4783a3b4b64b5e4a2c44a360165f04868dca7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aaa376e2dca1164c2886cfc33f343f2fad6c545f916a895617146d4c65e615310
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). DEV-748..761 were one ticket per timing test that failed under load, each with fix, review and merge jobs rerunning the suite.
 
@@ -206,3 +239,27 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T19:44:25.932320+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-22T19:44:29.861995+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aaa376e2dca1164c2886cfc33f343f2fad6c545f916a895617146d4c65e615310
+- at: 2026-11-22T19:53:38.993482+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:53:49.367030+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

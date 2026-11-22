@@ -1,14 +1,24 @@
 title: 'Waiting for the owner without a question: DEV-784'
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-light'
 created: 2026-11-22T18:09:50.526921+00:00
-modified: 2026-11-22T18:10:10.137913+00:00
+modified: 2026-11-22T20:01:28.033584+00:00
 relationships:
   related:
   - DEV-784
+comments:
+- date: 2026-11-22T20:01:18.404129+00:00
+  author: claude
+  text: |-
+    Nothing to fix: DEV-784 moved on by itself.
+
+    - DEV-784 is now Reviewing, assigned `@review` (19:45Z, after a fix job's work-done comment)
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[question:DEV-784]`
+    - No file change, no commit
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A41e515bf33936af3a7c4ff6c7256eaf52cf4fdd091773bb91e4199deb5b58c23
 description: |-
   DEV-784 (Agent jobs: one full test run at a time across jobs, agents keep working in parallel) is HelpNeeded, but its last comment asks no question: "Retry: the work was committed already (`ff83b472e`); this run checked it, all gates pass. - `npm run lint:agent`, `npm …" (lotar show DEV-784)
 
@@ -38,3 +48,26 @@ history:
   changes:
   - field: assignee
     new: '@fix-light'
+- at: 2026-11-22T20:00:54.328074+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T20:00:58.387878+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A41e515bf33936af3a7c4ff6c7256eaf52cf4fdd091773bb91e4199deb5b58c23
+- at: 2026-11-22T20:01:18.404129+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T20:01:28.033584+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

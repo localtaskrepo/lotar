@@ -1,12 +1,14 @@
 title: Agents page shows Running 0, Queued 0 while the queue worker runs 2 jobs and 13 tickets wait
-status: Reviewing
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-21T22:12:31.042289+00:00
-modified: 2026-11-22T19:10:59.374358+00:00
+modified: 2026-11-22T21:10:40.516209+00:00
 relationships:
+  blocks:
+  - DEV-798
   related:
   - DEV-279
   - DEV-522
@@ -174,6 +176,7 @@ references:
 - attachment: DEV-771-before-light-390.e6541c9b68d12e2c85c9fa5b81f5772d.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac558615ba28039309b0d9402b5f5e0ca5252132f8bb651afd80575a159123a29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A776ae64ff3c0d61b3a6f1ed0e24451a7de8ba5b7ac1b3be17909f0050a116710
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada661d1e3ac4990c7fea615800a31c57ef9e5b1d632ba41cd5b535457b459343
 description: |-
   Found (owner 2026-11-21: "I have no where to see what's queued up"): `GET /api/jobs` on the DEV server answers `queue_stats {running: 0, queued: 0}` while `lotar agent queue` shows Running 2, Queued 13 (DEV-725's release retry 9th). The route (crates/lotar-lib/src/routes/jobs.rs ~36) returns `AgentJobService::queue_stats()`, the serving process's own worker only. The CLI (cli/handlers/agent.rs ~454) adds jobs other processes run (DEV-279) and the on-disk queue (DEV-522). The page's Queued tab filters job logs with status queued, so tickets waiting in the on-disk queue never show.
 
@@ -389,3 +392,20 @@ history:
   - field: tags
     old: fix-retried, ui, retry-fix, review-blocked
     new: fix-retried, ui, retry-fix, review-returned
+- at: 2026-11-22T21:10:09.322478+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-279","DEV-522","DEV-725","DEV-765","DEV-798","DEV-766"]}'
+    new: '{"blocks":["DEV-798"],"related":["DEV-279","DEV-522","DEV-725","DEV-765","DEV-798","DEV-766"]}'
+- at: 2026-11-22T21:10:37.222075+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-22T21:10:40.516209+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada661d1e3ac4990c7fea615800a31c57ef9e5b1d632ba41cd5b535457b459343

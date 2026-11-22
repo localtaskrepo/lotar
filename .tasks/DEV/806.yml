@@ -1,0 +1,29 @@
+title: After an upgrade the queue says "waiting for the running jobs of their tickets to end" while the old worker only drains
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T20:41:41.734525+00:00
+modified: 2026-11-22T20:41:42.311136+00:00
+relationships:
+  related:
+  - DEV-768
+description: |-
+  Seen 2026-11-22 11:38-11:43 PST after brew upgrade to 0.15.6: `lotar agent queue` showed Running 1, Queued 25, reason "waiting for the running jobs of their tickets to end". The real reason: the 0.15.5 worker (pid 52655) saw the upgrade and took no new entries until its last job (DEV-768, a T3 rework) ended (crates/lotar-agent/src/services/agent_queue_service.rs:629, "After an upgrade, take no new entries"). worker_state (same file, ~line 452) has no case for it and falls through to the default text at line 475, which names the wrong cause. A long or hung job on the old binary holds every slot's new work for as long as it runs.
+
+  Done when:
+  - [ ] worker_state reports the upgrade drain (e.g. "the worker waits for <ticket>'s job to end before it restarts on the upgraded lotar"), with a test.
+  - [ ] Decide and document: either a new worker on the upgraded binary starts the free slots at once (the old one keeps only its running jobs), or the drain stays and docs/help/agent.md says how long it can hold the queue.
+history:
+- at: 2026-11-22T20:41:42.031686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-768"]}'
+- at: 2026-11-22T20:41:42.311136+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,14 +1,27 @@
 title: 'Agents page tab counts disagree with the queue it lists: All 0 beside 3 waiting tickets, Queued counts prerequisite waits'
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T19:10:25.728494+00:00
-modified: 2026-11-22T19:10:26.452588+00:00
+modified: 2026-11-22T21:10:18.495362+00:00
 relationships:
+  depends_on:
+  - DEV-771
   related:
   - DEV-771
+comments:
+- date: 2026-11-22T21:10:09.829931+00:00
+  author: claude
+  text: |-
+    Waits for DEV-771: the code this ticket fixes is not on main yet.
+
+    - The **Waiting in the queue** card and the on-disk queue counts come from `3333807b1` on `agent/DEV-771`; `git log main..agent/DEV-771` shows it unmerged, DEV-771 is in Reviewing with a blocking finding
+    - On main, `view/pages/AgentJobs.vue:323` tabs count jobs only and there is no waiting-ticket list to agree with, so a fix now would conflict with DEV-771's rework
+    - Next: once DEV-771 is on main, count waiting tickets in the All and Queued tabs per the rule in `docs/help/agent.md`, plus a Vitest
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f2cf92fa6872f2c564eefe71cdf3f838044e29cd640d405d056eb3a11d82d3b
 description: |-
   Found in the review of DEV-771 (branch agent/DEV-771, 3333807b1): with 3 tickets in the on-disk queue the All tab shows 'All 0' above the **Waiting in the queue** card listing them (view/pages/AgentJobs.vue:401 counts jobs only). The Queued tab counts jobs waiting for prerequisites too (AgentJobs.vue:406), while the Queued count at the top and docs/help/agent.md say they don't count as queued.
 
@@ -17,6 +30,7 @@ description: |-
   Done when: All and Queued tab counts include the waiting tickets consistently with the top counts; a Vitest covers it.
 tags:
 - ui
+- waits
 history:
 - at: 2026-11-22T19:10:26.105371+00:00
   actor: claude
@@ -29,3 +43,36 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T21:09:41.019377+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T21:09:46.183800+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f2cf92fa6872f2c564eefe71cdf3f838044e29cd640d405d056eb3a11d82d3b
+- at: 2026-11-22T21:10:09.323149+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-771"]}'
+    new: '{"depends_on":["DEV-771"],"related":["DEV-771"]}'
+- at: 2026-11-22T21:10:09.775842+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui
+    new: ui, waits
+- at: 2026-11-22T21:10:09.829931+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:10:18.495362+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

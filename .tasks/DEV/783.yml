@@ -1,11 +1,11 @@
 title: 'Merge without agent: rerun a failed check once on its own before handing the merge to @merge'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T03:06:52.324630+00:00
-modified: 2026-11-22T19:36:22.128899+00:00
+modified: 2026-11-22T19:57:49.734851+00:00
 relationships:
   related:
   - DEV-726
@@ -17,6 +17,9 @@ relationships:
   - DEV-786
   - DEV-761
   - DEV-725
+  - DEV-738
+  - DEV-784
+  - DEV-762
 comments:
 - date: 2026-11-22T08:38:28.396704+00:00
   author: claude
@@ -82,6 +85,31 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-22T19:37:29.596639+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `1bf8ee672` on origin.
+
+    - lotar's own merge had already rebased the branch, run the checks (all passed), fast-forwarded `main` and amended `.tasks` (`17dc4d9d3`). It stopped only because `main` also held the unpushed DEV-738 commit `e343b4e33`
+    - DEV-738 is Done, so that commit is finished work. I pushed both: `c8ea61a59..1bf8ee672`
+    - I amended the new `.tasks/DEV/783.yml` change into the merged commit (`17dc4d9d3` → `1bf8ee672`). The main checkout is clean
+    - Trust: not needed, because the merge changes no rules or config files
+    - Checks: I reran none of them. lotar's merge ran lint, test and smoke on this head, and the pre-push hook's Rust check passed
+  report:
+    commits:
+    - hash: 1bf8ee672
+      what: a failed merge check reruns once on its own; lands without @merge when the rerun passes
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s smoke
+      result: passed
+      reason: lotar's merge run
+    next: 'None: Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1924bde0bfa0885fd85e4266862a953a8495f52ea6d26e813016d1eae3ce1bd9
 description: |-
@@ -190,3 +218,31 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-22T19:37:29.596639+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:37:31.082451+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725"]}'
+    new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725","DEV-738"]}'
+- at: 2026-11-22T19:37:40.445143+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-22T19:44:56.316290+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725","DEV-738"]}'
+    new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725","DEV-738","DEV-784"]}'
+- at: 2026-11-22T19:57:49.734851+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725","DEV-738","DEV-784"]}'
+    new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725","DEV-738","DEV-784","DEV-762"]}'

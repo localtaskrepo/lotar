@@ -1,0 +1,30 @@
+title: 'list-running --all: wrapper rows show tasks_dir ''-'' and the docs still say only this tasks directory''s wrappers are listed'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T20:12:34.614201+00:00
+modified: 2026-11-22T20:12:57.925886+00:00
+relationships:
+  related:
+  - DEV-763
+description: |-
+  Found in the DEV-763 review (2026-11-22).
+
+  - `list_running_jobs_everywhere` in `crates/lotar-lib/src/cli/handlers/agent.rs` calls `with_wrapper_processes(jobs, None)`, so `--all` lists every `lotar-agent-wrapper` on the machine, each with `tasks_dir` `-` (`list_wrapper_processes` sets `tasks_dir: None`) although the wrapper's command line has `--tasks-dir`.
+  - `docs/help/agent.md` ("`list-running` also lists the `lotar-agent-wrapper` processes ... of this tasks directory") doesn't say that `--all` lists them all.
+
+  Done when: wrapper rows under `--all` show the `--tasks-dir` from their command line (`-` for older wrappers), and the docs paragraph says what `--all` lists.
+history:
+- at: 2026-11-22T20:12:40.963936+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-763"]}'
+- at: 2026-11-22T20:12:57.925886+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

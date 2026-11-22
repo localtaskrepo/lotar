@@ -1,11 +1,11 @@
 title: A continue job treats any ACP error on resume as a session that can't be resumed, not only a refused session/resume or session/load
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-22T18:08:13.705943+00:00
+modified: 2026-11-22T20:14:32.604944+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -33,9 +33,38 @@ comments:
 - date: 2026-11-22T18:08:12.827499+00:00
   author: mallox
   text: 'Yes: add the refused-resume error (NotResumable) to harnessmux and release it as a new version, then have lotar resume only on that. Owner 2026-11-22 10:05 PST, relayed by the chief of staff: "Releases of harnessmux can from now on be done by agents when needed. No need to wait for my green light. Lotar releases should still ask me."'
+- date: 2026-11-22T20:14:20.239233+00:00
+  author: claude
+  text: |-
+    Done: a continue job now starts a new session only when the agent refuses `session/resume` or `session/load`.
+
+    - harnessmux HARN-25: new `Error::NotResumable` for those two refusals. Released as `v0.3.0` (tag on `651e4a1`, release run `45064053899` passed, crate published). 0.3.0 was still untagged, so HARN-23/24 shipped with it
+    - lotar bumps to `harnessmux = "0.3.0"`. `open_session` (`crates/lotar-agent/src/services/agent_runner.rs:263`) matches only `NotResumable`. Any other `Protocol` error fails the job and leaves the session alone
+    - 0.3.0 changes `EventBody::ToolFinished`, so a `..` was added in `agent_job_service.rs:4660`
+    - Test `a_continue_job_whose_agent_refuses_initialize_fails_and_keeps_the_session`: the fake ACP agent refuses `initialize` on resume. The job fails, there is no second `session/new`, and the session keeps its name (not `<name>.<last used>`)
+    - `docs/help/agent.md`: a refused `initialize` or authentication is listed among the start errors that fail the job
+  report:
+    commits:
+    - hash: 4f69c2ca6
+      what: resume falls back only on harnessmux NotResumable; harnessmux 0.3.0
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent (Rust 2454, UI 1564), test:release, test:hooks
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 407 tests
+    - command: new test fails without the fix
+      result: passed
+      reason: a_continue_job_whose_agent_refuses_initialize_fails_and_keeps_the_session fails with the old Protocol mapping
+    next: Merge agent/DEV-777
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0a7852970afa0266056fb48bf89fa0fd177b850a6e9b43958fbb0a2c9930ee39
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75a6d2ce35fd6bba59cd70aa8ab5c6579794cbcc6a508ad1ea655ac420701bf
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac9299f6f929a9e30092b2ee88e5301b86926db8243934153757582270cf65534
 description: |-
   Found in the DEV-757 review (2026-11-21).
 
@@ -127,3 +156,27 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-22T19:57:48.948252+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T19:57:57.485275+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac9299f6f929a9e30092b2ee88e5301b86926db8243934153757582270cf65534
+- at: 2026-11-22T20:14:20.239233+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T20:14:32.604944+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
