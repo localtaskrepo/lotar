@@ -90,3 +90,32 @@ fn renumber_resolves_a_number_stored_twice() {
     let shown = ok(root, &["show", "DUP-3"]);
     assert!(shown.contains("their first"), "{shown}");
 }
+
+fn git(dir: &std::path::Path, args: &[&str]) {
+    let out = std::process::Command::new("git").current_dir(dir).args(args).output().unwrap();
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+}
+
+// DEV-802: a worktree's .tasks copy predates tickets added in the main
+// checkout; a ticket filed in the worktree must not reuse their IDs, and
+// one the main checkout files next must not reuse the worktree's.
+#[test]
+fn checkouts_of_one_repository_get_distinct_ids() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let main = root.join("main");
+    std::fs::create_dir_all(&main).unwrap();
+    git(&main, &["init", "-q", "-b", "main"]);
+    ok(&main, &["add", "first", "-p", "DEV"]);
+    git(&main, &["add", "-A"]);
+    git(&main, &["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "commit", "-qm", "first"]);
+    let worktree = root.join("worktrees/DEV-1");
+    git(&main, &["worktree", "add", "-q", "-b", "agent/DEV-1", worktree.to_str().unwrap()]);
+
+    let out = ok(&main, &["add", "only in main", "-p", "DEV"]);
+    assert!(out.contains("DEV-2"), "{out}");
+    let out = ok(&worktree, &["add", "filed in the worktree", "-p", "DEV"]);
+    assert!(out.contains("DEV-3"), "{out}");
+    let out = ok(&main, &["add", "main again", "-p", "DEV"]);
+    assert!(out.contains("DEV-4"), "{out}");
+}

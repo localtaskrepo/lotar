@@ -268,6 +268,30 @@ pub fn commit_url_prefix(remote: &str) -> Option<String> {
     Some(format!("https://{host}/{path}/{commit}/"))
 }
 
+/// The top folder of every checkout of the repository `repo_root` belongs
+/// to: the main checkout and each linked worktree, `repo_root` included.
+/// Read from Git's metadata files, so no `git` process runs; missing or
+/// pruned worktrees are left out.
+pub fn checkout_tops(repo_root: &Path) -> Vec<PathBuf> {
+    let Some((_, common_dir)) = metadata_dirs(&repo_root.join(".git")) else {
+        return vec![];
+    };
+    let mut tops = Vec::new();
+    if common_dir.file_name().is_some_and(|name| name == ".git")
+        && let Some(main) = common_dir.parent()
+    {
+        tops.push(main.to_path_buf());
+    }
+    let admins = fs::read_dir(common_dir.join("worktrees")).into_iter().flatten().flatten();
+    for admin in admins {
+        let top = metadata_line(&admin.path().join("gitdir")).and_then(|line| Path::new(&line).parent().and_then(|top| fs::canonicalize(top).ok()));
+        if let Some(top) = top.filter(|top| top.is_dir() && !tops.contains(top)) {
+            tops.push(top);
+        }
+    }
+    tops
+}
+
 /// Read-only metadata location, not the ownership verification used for Git writes.
 pub fn metadata_dirs(git_entry: &Path) -> Option<(PathBuf, PathBuf)> {
     let git_dir = if git_entry.is_dir() {

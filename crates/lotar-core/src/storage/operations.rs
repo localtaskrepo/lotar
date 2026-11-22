@@ -463,7 +463,10 @@ impl StorageOperations {
     /// archive included, so new tasks never reuse a number. Every workspace
     /// root that can read the project counts: this root, its sibling roots,
     /// and the parent workspace that lists this root as a sibling, so nested
-    /// workspaces sharing a prefix never create one ID twice (DEV-270).
+    /// workspaces sharing a prefix never create one ID twice (DEV-270). In a
+    /// git repository the same tasks folder in every other checkout counts
+    /// too, so a ticket filed in a worktree never takes an ID the main
+    /// checkout or another worktree already has (DEV-802).
     pub fn get_current_id(project_path: &Path) -> u64 {
         let local = crate::storage::layout::max_number(project_path);
         let (Some(root), Some(project)) = (project_path.parent(), project_path.file_name()) else {
@@ -481,6 +484,16 @@ impl StorageOperations {
         if let Some(parent_root) = absolute.parent().and_then(Path::parent).map(|dir| dir.join(".tasks")).filter(|dir| dir.is_dir()) {
             for other in crate::storage::locator::StorageLocator::candidate_task_roots(&parent_root) {
                 if !roots.contains(&other) {
+                    roots.push(other);
+                }
+            }
+        }
+        if let Some(repo_root) = crate::utils::git::find_repo_root(&absolute)
+            && let Some(rel) = crate::utils::git::repo_relative_path(&repo_root, &absolute)
+        {
+            for top in crate::utils::git::checkout_tops(&repo_root) {
+                let other = top.join(&rel);
+                if other.is_dir() && !roots.contains(&other) {
                     roots.push(other);
                 }
             }
