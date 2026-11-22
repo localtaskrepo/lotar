@@ -1,17 +1,42 @@
 title: A t3 job that hits Claude's 5-hour limit fails into retries and an owner question instead of pausing (local LOCA-631, 2026-11-26)
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T23:29:18.207980+00:00
-modified: 2026-11-27T00:08:35.601137+00:00
+modified: 2026-11-27T00:15:13.950807+00:00
 relationships:
   related:
   - DEV-584
   - DEV-833
   - DEV-855
   - DEV-901
+comments:
+- date: 2026-11-27T00:15:04.901603+00:00
+  author: claude
+  text: |-
+    Fixed: a job that took over a resumed T3 Code thread now pauses on a usage limit, like any other job.
+
+    - **Cause:** not the repo, not the amount of work. LOCA-631's job `job-20261126T204940.803Z-13` was a takeover: its log says "T3 Code runs the thread of the job job-20261126T204500.272Z-3 again, with no lotar job; this job takes it over". `adopt` in `crates/lotar-agent/src/services/agent_job_service/resumed.rs` gave such a job `request: None`. With no request, `usage_limit_pause` has nothing to queue as a retry, returns `None`, and the job fails. That failure fired 'Fix failed again: hand to mallox'. DEV-901's job `job-20261126T212746.696Z-71` was a fresh job that lotar started, so it had a request and paused.
+    - **Fix:** `adopt` now gives the job a request: the earlier job's profile and its "User request" from that job's `run_inputs` log line. When the log has none, it uses a "go on in this thread" request. The usage-limit pause, the queue pause and the run-again-in-a-new-session path all work for taken-over jobs now.
+    - **Test:** `a_taken_over_t3_job_that_hits_a_usage_limit_pauses_and_its_retry_continues_the_thread` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`. Before the fix it failed with status `failed`, the same line as LOCA-631. Now the job is `paused`, no `agent_job_failed` is logged, and the retry is queued on `fix` with `not_before`, `session: continue` and the original request. The retry then sends its turn to the same thread.
+  report:
+    commits:
+    - hash: ad7f33724
+      what: a taken-over t3 job pauses on a usage limit
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev503 dev626 dev584 dev833
+      result: passed
+      reason: 81 tests
+    - command: cargo nextest run -p lotar-agent usage_limit resumed adopt
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test, npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad43913606878248e7587ef76a76c59158e8af6e92648c892a41f3c30e985ef08
 description: |-
@@ -50,3 +75,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad43913606878248e7587ef76a76c59158e8af6e92648c892a41f3c30e985ef08
+- at: 2026-11-27T00:15:04.901603+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:15:13.950807+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

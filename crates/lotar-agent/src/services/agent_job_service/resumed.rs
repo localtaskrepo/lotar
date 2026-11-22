@@ -388,6 +388,7 @@ fn adopt(
                 runner_errors: Vec::new(),
                 worker_running: true,
                 main_head_at_start: None,
+                checks_since: None,
                 assignee_at_start: None,
                 request: None,
                 commit_retry: None,

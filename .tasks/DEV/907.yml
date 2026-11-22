@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:25:32.394470+00:00
-modified: 2026-11-26T23:33:34.071823+00:00
+modified: 2026-11-27T00:18:07.346541+00:00
 relationships:
   related:
   - DEV-905
@@ -56,6 +56,56 @@ comments:
     - **Reran:** `cargo nextest run -p lotar-lib --test integration -E 'test(config)'` (281 passed), `cargo nextest run -p lotar-core config` (53 passed), `cargo clippy -p lotar-core -p lotar-lib --all-targets -D warnings` (clean), `rustfmt --check` on the 4 files (clean). `npm ci` ran OK. Not UI work, so no screenshots.
     - **Scope:** no stray files, no second branch. The `source_label_for_global` signature cleanup is small and stays inside the fix.
     - No findings, no tickets filed.
+- date: 2026-11-27T00:18:07.346541+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed, and again when rerun on its own:
+    ```
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1687 filtered out; finished in 0.08s
+
+      stderr ───
+
+        thread 'dev61_reference_kinds_test::file_reference_rejects_custom_configured_store_location' (394004760) panicked at crates/lotar-lib/tests/dev61_reference_kinds_test.rs:266:5:
+        custom store rejection: Validation error: Reference path escapes repository
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+            FAIL [   0.177s] (1730/2613) lotar-lib::integration dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works
+      stdout ───
+
+        running 1 test
+        test dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works ... FAILED
+
+        failures:
+
+        failures:
+            dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1687 filtered out; finished in 0.16s
+
+      stderr ───
+
+        thread 'dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works' (394004682) panicked at crates/lotar-lib/tests/dev61_reference_kinds_test.rs:743:9:
+        code attach must reject store paths: Validation error: Reference path escapes repository
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 871/2613 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-907` onto `main` (`88a9554462f8`): `2ca379800947`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+      reason: first run
+    - command: npm run -s test:agent
+      result: failed
+      reason: rerun
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab16f27083c5f528df245bcfb6b6173afb0e70c46ca82ae243eb6648699b9929a
 description: |-
@@ -134,3 +184,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T00:18:07.346541+00:00
+  actor: automation
+  changes:
+  - field: comment_added

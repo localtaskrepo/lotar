@@ -155,6 +155,9 @@ struct AgentJobState {
     /// The main checkout's commit when a merge job started, so its end
     /// knows which of main's commits the job landed (DEV-411).
     main_head_at_start: Option<String>,
+    /// For a commit retry, when the paused job's first run started: a merge
+    /// job counts check reports since then, not since the retry (DEV-793).
+    checks_since: Option<String>,
     /// The ticket's assignee once the job's start rules ran, so its end
     /// sees whether the agent handed the ticket back (DEV-516) or something
     /// moved it on while it ran (DEV-566).
@@ -552,6 +555,7 @@ impl AgentJobService {
                     runner_errors: Vec::new(),
                     worker_running: false,
                     main_head_at_start: None,
+                    checks_since: None,
                     assignee_at_start: None,
                     request: Some(req.clone()),
                     commit_retry,
@@ -2353,7 +2357,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                     summary: None,
                     session_id: job.session_id.clone(),
                     worktree_path: header.as_ref().and_then(|header| header.worktree_path.clone()),
-                    worktree_branch: header.as_ref().and_then(|header| header.worktree_branch.clone()),
+                    worktree_branch: takeover_branch(header.as_ref(), is_merge_job, &ticket_id, &config),
                     model: header.as_ref().and_then(|header| header.model.clone()),
                     effort: header.as_ref().and_then(|header| header.effort.clone()),
                     usage: None,
@@ -2368,6 +2372,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 runner_errors: Vec::new(),
                 worker_running: true,
                 main_head_at_start: None,
+                checks_since: None,
                 assignee_at_start: restored_assignee(job.assignee_at_start.clone()),
                 request: job.request.clone(),
                 commit_retry: None,
@@ -3716,6 +3721,14 @@ fn run_job(
         .ok()
         .and_then(|mut registry| registry.jobs.get_mut(&job_id)?.commit_retry.take())
         .filter(|retry| std::path::Path::new(&retry.worktree_path).is_dir());
+    // It counts check reports since the paused job's first run, and the
+    // commits landed since then (DEV-793, DEV-411).
+    if let Some(retry) = commit_retry.as_ref() {
+        update_job(&job_id, |state| {
+            state.checks_since = retry.checks_since.clone();
+            state.main_head_at_start = retry.main_head_at_start.clone();
+        });
+    }
     if let Some(carried) = JOB_REGISTRY.lock().ok().and_then(|mut registry| registry.jobs.get_mut(&job_id)?.carried_outcome.take()) {
         carry_outcome(&job_id, &tasks_dir, &ticket_id, carried);
     }
@@ -3758,7 +3771,7 @@ fn run_job(
                 }
             };
             comment_merge(&job_id, &tasks_dir, &ticket_id, &summary);
-            let hand_off = merge::hand_off_prompt(&summary);
+            let hand_off = merge::hand_off_prompt(&summary, settings);
             prompt.prepend("Merge hand-off", &hand_off);
             user_prompt.insert_str(0, &hand_off);
             profile.session = Some(AgentSession::Fresh);
@@ -4097,7 +4110,9 @@ fn start_job(
     if merge::is_merge_job(job_id)
         && let Some(head) = resolve_repo_root(tasks_dir).and_then(|root| rev_parse(&root, "HEAD"))
     {
-        update_job(job_id, |state| state.main_head_at_start = Some(head.clone()));
+        update_job(job_id, |state| {
+            state.main_head_at_start.get_or_insert_with(|| head.clone());
+        });
     }
     if let Some((_, assignee)) = ticket_state(tasks_dir, ticket_id) {
         update_job(job_id, |state| state.assignee_at_start = Some(assignee.clone()));
@@ -5629,14 +5644,18 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// its work (`merge::work_elsewhere`, DEV-677, DEV-679). So does one
 /// whose branch brought nothing while no commit named after the ticket is
 /// on main anywhere (`merge::built_anywhere`, DEV-680): nothing was built.
-fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, prefix: &str) -> Result<Option<String>, String> {
-    let Some((branch, start, assignee_at_start)) =
-        JOB_REGISTRY.lock().ok().and_then(|registry| {
-            registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| {
-                state.record.worktree_branch.clone().map(|branch| (branch, state.main_head_at_start.clone(), state.assignee_at_start.clone()))
-            })
+fn ensure_branch_merged(
+    job_id: &str,
+    ticket_id: &str,
+    tasks_dir: &std::path::Path,
+    prefix: &str,
+    required_checks: &[String],
+) -> Result<Option<String>, String> {
+    let Some((branch, start, assignee_at_start, started_at)) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| {
+            state.record.worktree_branch.clone().map(|branch| (branch, state.main_head_at_start.clone(), state.assignee_at_start.clone(), checks_since(state)))
         })
-    else {
+    }) else {
         return Ok(None);
     };
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
@@ -5699,27 +5718,55 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
     if let Some(handed_back) = handed_back() {
         return Ok(Some(handed_back));
     }
+    // The agent landed the work on main itself, reworked to resolve a
+    // conflict (DEV-411): merged, whatever its reports say.
+    let landed_reworked = || {
+        let reworked = start.as_deref().map(|start| reworked_landing(&repo_root, start, &branch, ticket_id)).unwrap_or_default();
+        if reworked.is_empty() {
+            return None;
+        }
+        let head = record_landing(&repo_root, &branch)?;
+        let short = |commit: &str| commit.get(..12).unwrap_or(commit).to_string();
+        Some(format!(
+            "{branch} conflicts with the main checkout, but this job landed its work reworked as {}; recorded {branch} at {} as landed in {}",
+            reworked.iter().map(|commit| short(commit)).collect::<Vec<_>>().join(", "),
+            rev_parse(&repo_root, &format!("refs/heads/{branch}")).map_or_else(String::new, |tip| short(&tip)),
+            short(&head)
+        ))
+    };
+    // A check that failed in this job and never passed after, or one of
+    // `agent.merge.checks` no report names passed, holds back lotar's
+    // fast-forward: the agent's turn may have ended while it ran the check
+    // (DEV-793).
+    let head = rev_parse(&repo_root, &format!("refs/heads/{branch}"));
+    let unpassed = started_at.as_deref().map(|since| merge::unpassed_checks(tasks_dir, ticket_id, since, required_checks, head.as_deref())).unwrap_or_default();
+    if !unpassed.is_empty() {
+        if let Some(note) = landed_reworked() {
+            return Ok(Some(note));
+        }
+        let checks = unpassed.iter().map(|check| format!("`{check}`")).collect::<Vec<_>>().join(", ");
+        return Err(format!(
+            "Merge job finished, but no report since the job started names {checks} passed after its latest run (the agent's turn may have ended while a check still ran): LoTaR leaves {branch} unmerged"
+        ));
+    }
     let output = git_command(&repo_root).args(["merge", "--ff-only", "--quiet", &branch]).output().map_err(|err| format!("git merge: {err}"))?;
     if output.status.success() {
         record_landing(&repo_root, &branch);
         return Ok(Some(format!("Fast-forwarded the main checkout to {branch}")));
     }
-    let reworked = start.map(|start| reworked_landing(&repo_root, &start, &branch, ticket_id)).unwrap_or_default();
-    if !reworked.is_empty()
-        && let Some(head) = record_landing(&repo_root, &branch)
-    {
-        let short = |commit: &str| commit.get(..12).unwrap_or(commit).to_string();
-        return Ok(Some(format!(
-            "{branch} conflicts with the main checkout, but this job landed its work reworked as {}; recorded {branch} at {} as landed in {}",
-            reworked.iter().map(|commit| short(commit)).collect::<Vec<_>>().join(", "),
-            rev_parse(&repo_root, &format!("refs/heads/{branch}")).map_or_else(String::new, |tip| short(&tip)),
-            short(&head)
-        )));
+    if let Some(note) = landed_reworked() {
+        return Ok(Some(note));
     }
     Err(format!(
         "Merge job finished, but {branch} is not merged into the main checkout's current branch and can't be fast-forwarded: {}",
         String::from_utf8_lossy(&output.stderr).trim()
     ))
+}
+
+/// Since when a merge job counts check reports: its start, or for a commit
+/// retry the paused job's first run (DEV-793).
+fn checks_since(state: &AgentJobState) -> Option<String> {
+    state.checks_since.clone().or_else(|| state.record.started_at.clone())
 }
 
 /// Whether a merge job's `branch` is in the checkout's current branch:
@@ -5823,7 +5870,15 @@ fn finalize_job(
     // fast-forwards when the agent couldn't, and fails the job otherwise so
     // automation doesn't treat the ticket as merged.
     let failure_note = if success {
-        match ensure_branch_merged(job_id, ticket_id, tasks_dir, &config.agent_worktree.branch_prefix) {
+        // lotar's own merge ran when the repository has `agent.merge` and
+        // is trusted; its hand-off names these checks.
+        let required_checks = config
+            .agent_merge
+            .as_ref()
+            .filter(|_| crate::config::trust::TrustService::allows_commands(tasks_dir))
+            .map(|settings| settings.checks.as_slice())
+            .unwrap_or_default();
+        match ensure_branch_merged(job_id, ticket_id, tasks_dir, &config.agent_worktree.branch_prefix, required_checks) {
             Ok(Some(message)) => {
                 update_job(job_id, |state| {
                     record_and_emit(state, "agent_job_progress", Some(message.clone()));
@@ -6169,13 +6224,26 @@ fn save_retry<T, E>(tasks_dir: &std::path::Path, job_id: &str, ticket_id: &str, 
 /// login pause holds the jobs on the job's provider. Also whether this job
 /// opened the pause, rather than joined an open one.
 fn pause_queue(job_id: &str, tasks_dir: &std::path::Path, reason: PauseReason, line: &str, retry_commit: bool) -> Option<(String, bool)> {
-    let (mut request, ticket_id, worktree, branch, provider) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+    let (mut request, ticket_id, worktree, branch, provider, since, main_head) = JOB_REGISTRY.lock().ok().and_then(|registry| {
         let state = registry.jobs.get(job_id).filter(|state| reason != PauseReason::Signing || state.scope.commits || state.commit_retry.is_some())?;
         let provider = (reason == PauseReason::Auth).then(|| state.scope.provider.clone());
-        Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.worktree_path.clone(), state.record.worktree_branch.clone(), provider))
+        Some((
+            state.request.clone()?,
+            state.record.ticket_id.clone(),
+            state.record.worktree_path.clone(),
+            state.record.worktree_branch.clone(),
+            provider,
+            checks_since(state),
+            state.main_head_at_start.clone(),
+        ))
     })?;
-    let commit_retry =
-        worktree.filter(|_| retry_commit).map(|worktree_path| CommitRetry { job_id: job_id.to_string(), worktree_path, worktree_branch: branch });
+    let commit_retry = worktree.filter(|_| retry_commit).map(|worktree_path| CommitRetry {
+        job_id: job_id.to_string(),
+        worktree_path,
+        worktree_branch: branch,
+        checks_since: since,
+        main_head_at_start: main_head,
+    });
     let retry = if commit_retry.is_some() { "retries only its commit (the work stays in its worktree)" } else { "runs again" };
     // A status or assignee the agent set during the job (a hand-back) goes
     // with the retry, which applies it when it ends.
@@ -6657,6 +6725,20 @@ fn is_merge_profile(agent_profile: Option<&str>) -> bool {
 /// has only its profile to tell.
 fn takes_over_as_merge_job(job: &crate::services::agent_active_jobs::ActiveJob) -> bool {
     job.merge || is_merge_profile(job.agent.as_deref())
+}
+
+/// The branch a taken-over job works on: its log's, else for a merge job
+/// the ticket's. lotar's own merge writes the log before the worktree is
+/// known, and a merge job without a branch would end Done unmerged (DEV-793).
+fn takeover_branch(
+    header: Option<&crate::services::agent_log_service::JobLogHeader>,
+    is_merge_job: bool,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+) -> Option<String> {
+    header
+        .and_then(|header| header.worktree_branch.clone())
+        .or_else(|| is_merge_job.then(|| build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id))))
 }
 
 fn should_stop_job(job_id: &str) -> bool {
@@ -7486,6 +7568,7 @@ mod tests {
             runner_failed: false,
             runner_errors: Vec::new(),
             worker_running: false,
+            checks_since: None,
             main_head_at_start: None,
             assignee_at_start: None,
             request: None,
@@ -7581,7 +7664,7 @@ mod tests {
             crate::api_types::TaskUpdate { assignee: Some("reviewer".to_string()), ..Default::default() },
         )
         .unwrap();
-        let note = ensure_branch_merged("job-tko-direct", "TKO-1", &tasks_dir, "agent/").unwrap();
+        let note = ensure_branch_merged("job-tko-direct", "TKO-1", &tasks_dir, "agent/", &[]).unwrap();
         assert_eq!(note.as_deref(), Some("The agent handed TKO-1 back (to reviewer): LoTaR leaves agent/TKO-1 unmerged"));
         assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
     }
@@ -7591,7 +7674,7 @@ mod tests {
         let (dir, tasks_dir) = taken_over_merge_job("job-tko-recorded", None);
         let outcome = crate::api_types::JobOutcome { job_id: "job-tko-recorded".to_string(), assignee: Some("reviewer".to_string()), ..Default::default() };
         crate::services::agent_active_jobs::record_outcome(&tasks_dir, &outcome).unwrap();
-        let note = ensure_branch_merged("job-tko-recorded", "TKO-1", &tasks_dir, "agent/").unwrap();
+        let note = ensure_branch_merged("job-tko-recorded", "TKO-1", &tasks_dir, "agent/", &[]).unwrap();
         assert_eq!(note.as_deref(), Some("The agent handed TKO-1 back (to reviewer): LoTaR leaves agent/TKO-1 unmerged"));
         assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
     }
@@ -7599,9 +7682,152 @@ mod tests {
     #[test]
     fn a_taken_over_merge_job_that_finished_is_fast_forwarded() {
         let (dir, tasks_dir) = taken_over_merge_job("job-tko-done", restored_assignee(Some("sam".to_string())));
-        let note = ensure_branch_merged("job-tko-done", "TKO-1", &tasks_dir, "agent/").unwrap();
+        let note = ensure_branch_merged("job-tko-done", "TKO-1", &tasks_dir, "agent/", &[]).unwrap();
         assert_eq!(note.as_deref(), Some("Fast-forwarded the main checkout to agent/TKO-1"));
         assert!(dir.path().join("feature.txt").exists());
+    }
+
+    /// Comment a report with `checks` (command, result) on TKO-1.
+    fn report_checks(tasks_dir: &std::path::Path, checks: &[(&str, &str)]) {
+        let report = crate::types::CommentReport {
+            checks: checks
+                .iter()
+                .map(|(command, result)| crate::types::ReportCheck { command: command.to_string(), result: result.to_string(), ..Default::default() })
+                .collect(),
+            ..Default::default()
+        };
+        let context = crate::services::task_service::CommentContext { report: Some(report), ..crate::services::task_service::CommentContext::automation() };
+        crate::services::task_service::TaskService::add_comment_with_context(&mut Storage::new(tasks_dir), "TKO-1", "report", context).unwrap();
+    }
+
+    fn start_now(job_id: &str) {
+        update_job(job_id, |state| state.record.started_at = Some("2000-01-01T00:00:00Z".to_string()));
+    }
+
+    /// DEV-793: lotar's merge found smoke failing, the agent's turn ended
+    /// while it reran it; lotar didn't land the branch for it.
+    #[test]
+    fn a_merge_job_whose_check_failed_and_never_passed_stays_unmerged() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-failed", restored_assignee(Some("sam".to_string())));
+        start_now("job-dev793-failed");
+        report_checks(&tasks_dir, &[("npm run -s lint", "passed"), ("npm run -s smoke", "failed")]);
+        let err = ensure_branch_merged("job-dev793-failed", "TKO-1", &tasks_dir, "agent/", &[]).unwrap_err();
+        assert!(err.contains("no report since the job started names `npm run -s smoke` passed after its latest run"), "{err}");
+        assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
+    }
+
+    #[test]
+    fn a_merge_job_whose_failed_check_passed_later_is_fast_forwarded() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-passed", restored_assignee(Some("sam".to_string())));
+        start_now("job-dev793-passed");
+        report_checks(&tasks_dir, &[("npm run -s smoke", "failed")]);
+        report_checks(&tasks_dir, &[("npm run -s smoke", "passed")]);
+        let note = ensure_branch_merged("job-dev793-passed", "TKO-1", &tasks_dir, "agent/", &[]).unwrap();
+        assert_eq!(note.as_deref(), Some("Fast-forwarded the main checkout to agent/TKO-1"));
+        assert!(dir.path().join("feature.txt").exists());
+    }
+
+    #[test]
+    fn a_check_that_failed_before_the_job_started_does_not_hold_its_merge() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-earlier", restored_assignee(Some("sam".to_string())));
+        report_checks(&tasks_dir, &[("npm run -s smoke", "failed")]);
+        update_job("job-dev793-earlier", |state| state.record.started_at = Some("2999-01-01T00:00:00Z".to_string()));
+        ensure_branch_merged("job-dev793-earlier", "TKO-1", &tasks_dir, "agent/", &[]).unwrap();
+        assert!(dir.path().join("feature.txt").exists());
+    }
+
+    /// DEV-793 review: lotar's merge handed off on a rebase conflict, so
+    /// no check ran; the agent's turn ended while it ran them itself.
+    #[test]
+    fn a_merge_job_whose_configured_checks_never_passed_stays_unmerged() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-conflict", restored_assignee(Some("sam".to_string())));
+        start_now("job-dev793-conflict");
+        report_checks(&tasks_dir, &[("npm run -s lint", "passed")]);
+        let required = ["npm run -s lint".to_string(), "npm run -s smoke".to_string()];
+        let err = ensure_branch_merged("job-dev793-conflict", "TKO-1", &tasks_dir, "agent/", &required).unwrap_err();
+        assert!(err.contains("no report since the job started names `npm run -s smoke` passed"), "{err}");
+        assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
+    }
+
+    #[test]
+    fn a_merge_job_whose_configured_checks_passed_is_fast_forwarded() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-all", restored_assignee(Some("sam".to_string())));
+        start_now("job-dev793-all");
+        report_checks(&tasks_dir, &[(" npm run -s lint ", "passed"), ("npm run -s smoke", "passed")]);
+        let required = ["npm run -s lint".to_string(), "npm run -s smoke".to_string()];
+        ensure_branch_merged("job-dev793-all", "TKO-1", &tasks_dir, "agent/", &required).unwrap();
+        assert!(dir.path().join("feature.txt").exists());
+    }
+
+    /// A check lotar skipped because the fix comment's report on the
+    /// branch's commit names it passed counts as passed.
+    #[test]
+    fn a_configured_check_passed_on_the_branch_commit_counts() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-head", restored_assignee(Some("sam".to_string())));
+        let head = rev_parse(dir.path(), "refs/heads/agent/TKO-1").unwrap();
+        let report = crate::types::CommentReport {
+            commits: vec![crate::types::ReportCommit { hash: head[..9].to_string(), ..Default::default() }],
+            checks: vec![crate::types::ReportCheck { command: "npm run -s smoke".to_string(), result: "passed".to_string(), ..Default::default() }],
+            ..Default::default()
+        };
+        let context = crate::services::task_service::CommentContext { report: Some(report), ..crate::services::task_service::CommentContext::automation() };
+        crate::services::task_service::TaskService::add_comment_with_context(&mut Storage::new(&tasks_dir), "TKO-1", "fixed", context).unwrap();
+        update_job("job-dev793-head", |state| state.record.started_at = Some("2999-01-01T00:00:00Z".to_string()));
+        ensure_branch_merged("job-dev793-head", "TKO-1", &tasks_dir, "agent/", &["npm run -s smoke".to_string()]).unwrap();
+        assert!(dir.path().join("feature.txt").exists());
+    }
+
+    /// DEV-793 review: the gate holds back only lotar's fast-forward; an
+    /// agent that landed the work reworked on main itself (DEV-411) still
+    /// merged, whether or not it reported the checks.
+    #[test]
+    fn a_merge_job_that_landed_its_work_reworked_completes_without_check_reports() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-reworked", restored_assignee(Some("sam".to_string())));
+        start_now("job-dev793-reworked");
+        let repo = dir.path();
+        let start = rev_parse(repo, "HEAD").unwrap();
+        update_job("job-dev793-reworked", |state| state.main_head_at_start = Some(start.clone()));
+        fs::write(repo.join("feature.txt"), "feature, reworked\n").unwrap();
+        let git = |args: &[&str]| assert!(git_command(repo).args(args).status().unwrap().success(), "git {args:?}");
+        git(&["add", "feature.txt"]);
+        git(&["commit", "-qm", "TKO-1 feature, reworked"]);
+        let note = ensure_branch_merged("job-dev793-reworked", "TKO-1", &tasks_dir, "agent/", &["npm run -s smoke".to_string()]).unwrap();
+        let note = note.unwrap_or_default();
+        assert!(note.starts_with("agent/TKO-1 conflicts with the main checkout, but this job landed its work reworked as "), "{note}");
+    }
+
+    /// DEV-793 review: a commit retry (DEV-604) starts later than the run
+    /// that reported the checks; it counts reports since that run.
+    #[test]
+    fn a_commit_retry_counts_the_checks_its_paused_run_reported() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-dev793-retry", restored_assignee(Some("sam".to_string())));
+        report_checks(&tasks_dir, &[("npm run -s smoke", "passed")]);
+        update_job("job-dev793-retry", |state| {
+            state.record.started_at = Some("2999-01-01T00:00:00Z".to_string());
+            state.checks_since = Some("2000-01-01T00:00:00Z".to_string());
+        });
+        ensure_branch_merged("job-dev793-retry", "TKO-1", &tasks_dir, "agent/", &["npm run -s smoke".to_string()]).unwrap();
+        assert!(dir.path().join("feature.txt").exists());
+    }
+
+    #[test]
+    fn the_merge_hand_off_names_the_checks_lotar_waits_for() {
+        let summary = merge::Summary { text: "lotar's merge needs the merge agent: rebasing conflicts.".to_string(), report: Default::default() };
+        let settings =
+            crate::config::types::AgentMergeConfig { checks: vec!["npm run -s lint".to_string(), "npm run -s smoke".to_string()], ..Default::default() };
+        let prompt = merge::hand_off_prompt(&summary, &settings);
+        assert!(prompt.contains(r#"`--check "npm run -s lint=passed" --check "npm run -s smoke=passed"`"#), "{prompt}");
+        assert!(prompt.contains("Don't end your turn while a check still runs"), "{prompt}");
+        assert!(!merge::hand_off_prompt(&summary, &Default::default()).contains("--check"));
+    }
+
+    /// DEV-793 (DEV-780): lotar's own merge logs no branch; a taken-over
+    /// merge job falls back to the ticket's, so its end checks the merge.
+    #[test]
+    fn a_taken_over_merge_job_without_a_logged_branch_uses_the_tickets() {
+        let config = ResolvedConfig::from_global(GlobalConfig::default());
+        assert_eq!(takeover_branch(None, true, "DEV-780", &config).as_deref(), Some("agent/DEV-780"));
+        assert_eq!(takeover_branch(None, false, "DEV-780", &config), None, "other jobs keep working without one");
     }
 
     #[test]

@@ -1,11 +1,11 @@
 title: 'A t3 job paused on Claude''s weekly limit retries hourly: the reset time is only in the thread''s message'
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:39:09.103486+00:00
-modified: 2026-11-26T23:29:19.284660+00:00
+modified: 2026-11-27T00:13:39.378636+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-31
@@ -70,6 +70,32 @@ comments:
     - The 0.3.1 patch release was within harnessmux's AGENTS.md and the owner's patch-release rule.
     - Reran: `npm ci` passed; `cargo nextest run --workspace -E 'test(/dev584|usage_limit|t3/)'` passed, 63/63. The worktree is unchanged.
     - Not rerun: full `npm run lint`, `npm test` and `npm run smoke` (the merge runs them). No UI change, so no screenshots needed.
+- date: 2026-11-27T00:13:39.043881+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-855` is in `main`.
+
+    - Rebased `agent/DEV-855` onto `main` (`a86a55cca13f`): `ce83208b471a`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `ce83208b471a`
+    - Amended the pending `.tasks` changes into the merged commit: `88a9554462f8`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[agent-jobs:limit-reset-in-message]`
+  report:
+    commits:
+    - hash: 88a955446
+      what: 'DEV-855 A t3 job paused on Claude''s weekly limit retries hourly: the reset time is only in the thread''s message'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae62a87351aceefc08e381281dfb92af0b04239bbe4ef6d135c49d6cf3e112f84
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aef83f80acc839a4d7f09243dd7af7e36aef01d903c74244e1c1fdcf59d5f736b
@@ -77,7 +103,6 @@ references:
 description: 'Found 2026-11-24 (DEV-832): DEV-811''s t3 jobs on 2026-11-23 paused with `after the default wait (the provider named no reset time)` and retried every hour until the reset. The runner error was `Usage limit reached: Claude API rate limit reached. Try again later.`; the reset was only in the job''s agent message `You''ve hit your weekly limit · resets Nov 24 at 8am (America/Los_Angeles)`, which usage_limit.rs ignores on purpose (DEV-711: the agent''s words don''t count). Check: `lotar agent logs job-20261123T085509.723Z-112`. Done: a t3 job paused on such a limit waits until the reset that line names (for example, read T3''s own limit notice, not the agent''s replies), with a test.'
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: agent-jobs:limit-reset-in-message
 history:
@@ -224,3 +249,16 @@ history:
   - field: relationships
     old: '{"depends_on":["harnessmux:HARN-31"],"related":["DEV-711","DEV-811","DEV-832","DEV-833","DEV-897"]}'
     new: '{"depends_on":["harnessmux:HARN-31"],"related":["DEV-711","DEV-811","DEV-832","DEV-833","DEV-897","DEV-912"]}'
+- at: 2026-11-27T00:13:39.043881+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:13:39.378636+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried
+    new: health

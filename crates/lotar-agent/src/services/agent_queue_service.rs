@@ -187,6 +187,14 @@ pub struct CommitRetry {
     pub worktree_path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worktree_branch: Option<String>,
+    /// When the paused job's first run started: a merge job's retry counts
+    /// the check reports since then (DEV-793).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checks_since: Option<String>,
+    /// The main checkout's commit when that run started, so the retry
+    /// still sees the commits it landed (DEV-411).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub main_head_at_start: Option<String>,
 }
 
 /// The status and assignee change a paused job recorded (DEV-320), carried
@@ -2033,7 +2041,13 @@ mod tests {
             thread_name: Some(format!("{ticket} review")),
             ..Default::default()
         };
-        let commit_retry = CommitRetry { job_id: "job-1".to_string(), worktree_path: "/tmp/wt".to_string(), worktree_branch: Some("agent/TEST-1".to_string()) };
+        let commit_retry = CommitRetry {
+            job_id: "job-1".to_string(),
+            worktree_path: "/tmp/wt".to_string(),
+            worktree_branch: Some("agent/TEST-1".to_string()),
+            checks_since: None,
+            main_head_at_start: None,
+        };
         let carried = CarriedOutcome {
             outcome: crate::api_types::JobOutcome { job_id: "job-1".to_string(), status: Some("Merging".to_string()), ..Default::default() },
             status_at_pause: "Reviewing".to_string(),

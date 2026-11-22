@@ -100,7 +100,7 @@ pub(super) fn run(job_id: &str, tasks_dir: &Path, ticket_id: &str, config: &Reso
 
 /// What the merge agent reads before its prompt when lotar's merge hands
 /// off: what lotar did and where it stopped.
-pub(super) fn hand_off_prompt(summary: &Summary) -> String {
+pub(super) fn hand_off_prompt(summary: &Summary, settings: &AgentMergeConfig) -> String {
     let landed = if summary.report.commits.is_empty() {
         String::new()
     } else {
@@ -108,8 +108,22 @@ pub(super) fn hand_off_prompt(summary: &Summary) -> String {
             .to_string()
     };
     format!(
-        "LoTaR started this merge itself and stopped where it needs your judgment. Its comment on the ticket:\n\n{}\n{landed}\nContinue from there with the steps below.\n\n",
-        summary.text.trim()
+        "LoTaR started this merge itself and stopped where it needs your judgment. Its comment on the ticket:\n\n{}\n{landed}{}\nContinue from there with the steps below.\n\n",
+        summary.text.trim(),
+        checks_note(&settings.checks)
+    )
+}
+
+/// What the hand-off tells the agent about the checks LoTaR waits for
+/// before it fast-forwards the branch itself (lotar DEV-793).
+fn checks_note(checks: &[String]) -> String {
+    let checks: Vec<_> = checks.iter().map(|check| check.trim()).filter(|check| !check.is_empty()).collect();
+    if checks.is_empty() {
+        return String::new();
+    }
+    let flags = checks.iter().map(|check| format!("--check \"{check}=passed\"")).collect::<Vec<_>>().join(" ");
+    format!(
+        "\nIf you leave the fast-forward to LoTaR, it lands the branch only when a comment of yours names each of these checks passed, with these exact commands, after any failure: `{flags}`. Don't end your turn while a check still runs: wait for its result.\n"
     )
 }
 
@@ -520,6 +534,51 @@ fn passed_checks(tasks_dir: &Path, ticket_id: &str, head: &str) -> Vec<String> {
         .and_then(|comment| comment.report.as_ref())
         .map(|report| report.checks.iter().filter(|check| check.result == "passed").map(|check| check.command.trim().to_string()).collect())
         .unwrap_or_default()
+}
+
+/// The checks that keep a merge from landing on the agent's behalf (lotar
+/// DEV-793): those a report on the ticket since `since` (the job's start)
+/// names failed, lotar's merge hand-off for one, with no later report
+/// naming them passed; and those of `required` (the repository's
+/// `agent.merge.checks`) no report since names passed, unless the latest
+/// report on `head`, the branch's commit, does. The merge agent's turn may
+/// have ended while it ran them.
+pub(super) fn unpassed_checks(tasks_dir: &Path, ticket_id: &str, since: &str, required: &[String], head: Option<&str>) -> Vec<String> {
+    let Ok(since) = crate::utils::time::parse_rfc3339(since) else {
+        return Vec::new();
+    };
+    let storage = crate::storage::manager::Storage::new(tasks_dir);
+    let Ok(task) = crate::services::task_service::TaskService::get(&storage, ticket_id, None) else {
+        return Vec::new();
+    };
+    // Each command's latest result since the job started, in first-seen order.
+    let mut latest: Vec<(String, bool)> = Vec::new();
+    let reports = task
+        .comments
+        .iter()
+        .filter(|comment| crate::utils::time::parse_rfc3339(&comment.date).is_ok_and(|date| date >= since))
+        .filter_map(|comment| comment.report.as_ref());
+    for check in reports.flat_map(|report| report.checks.iter()) {
+        let passed = match check.result.as_str() {
+            "passed" => true,
+            "failed" => false,
+            _ => continue,
+        };
+        let command = check.command.trim();
+        match latest.iter_mut().find(|(seen, _)| seen == command) {
+            Some(entry) => entry.1 = passed,
+            None => latest.push((command.to_string(), passed)),
+        }
+    }
+    let passed_on_head = head.map(|head| passed_checks(tasks_dir, ticket_id, head)).unwrap_or_default();
+    let mut unpassed: Vec<String> = latest.iter().filter(|(_, passed)| !passed).map(|(command, _)| command.clone()).collect();
+    for command in required.iter().map(|command| command.trim()).filter(|command| !command.is_empty()) {
+        let reported = latest.iter().any(|(seen, _)| seen == command);
+        if !reported && !passed_on_head.iter().any(|passed| passed == command) && !unpassed.iter().any(|seen| seen == command) {
+            unpassed.push(command.to_string());
+        }
+    }
+    unpassed
 }
 
 /// Another repository the ticket names, by a path in its description or

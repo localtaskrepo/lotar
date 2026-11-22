@@ -1,0 +1,32 @@
+title: 'Done ticket''s failed T3 thread isn''t settled by the look: harnessmux settle refuses any status but completed'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T00:16:20.412681+00:00
+modified: 2026-11-27T00:16:22.223694+00:00
+relationships:
+  related:
+  - DEV-810
+  - DEV-876
+description: |-
+  Found in the DEV-810 review (2026-11-26).
+
+  - `kept::settle` (DEV-876, and DEV-810's threads found by title) picks a done ticket's threads whatever their run ended, but `settle_ticket` settles through `settle_session` → `harnessmux::backend::t3::settle` (harnessmux 0.3.0, `src/backend/t3.rs:1033`), which refuses when `t3 thread show` says anything but `completed`: `ended its last run with status 'failed'`.
+  - The tests miss it: the fake t3 changes only the list status (`listed-<id>`), `thread show` still says completed (`dev503_harness_jobs_test.rs` DEV-876 test, DEV-810 title test).
+  - So live, a failed/interrupted thread of a done ticket logs once `was not settled` and stays in the sidebar; `docs/help/agent.md` says it is settled.
+
+  Done when: a failing test where `thread show` also reports `failed`; then settle such threads (e.g. through `t3_thread_api::settle_thread`, as `settle_superseded` does) and the docs agree.
+history:
+- at: 2026-11-27T00:16:21.866418+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-810","DEV-876"]}'
+- at: 2026-11-27T00:16:22.223694+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
