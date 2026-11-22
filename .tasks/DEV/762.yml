@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-21T20:21:04.802424+00:00
-modified: 2026-11-22T04:25:45.090215+00:00
+modified: 2026-11-22T18:08:14.189962+00:00
 relationships:
   blocks:
   - DEV-778
@@ -14,6 +14,7 @@ relationships:
   - DEV-778
   - DEV-760
   - DEV-781
+  - DEV-725
 comments:
 - date: 2026-11-21T20:55:35.079582+00:00
   author: claude
@@ -109,6 +110,9 @@ comments:
       result: failed
       reason: 2 full runs, different UI timeouts each (load 30–46); every failing file passes alone
     next: 'Owner: land despite the load flakes (DEV-781), or wait for a green full smoke'
+- date: 2026-11-22T18:08:11.458415+00:00
+  author: mallox
+  text: 'Merge. (Owner 2026-11-22 10:05 PST, relayed by the chief of staff from his answer "Marge" to "merge now or wait": merge with the load flakes.)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A554b4ea9c0d8ed6283d447223332845ede88e3fc4c30c0320f2860da1f2baf4b
 description: |-
@@ -221,3 +225,19 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-22T18:08:11.458415+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:08:12.555137+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T18:08:14.189962+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781"]}'
+    new: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781","DEV-725"]}'

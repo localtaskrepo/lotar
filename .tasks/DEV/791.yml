@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T08:26:27.727612+00:00
-modified: 2026-11-22T15:42:58.610904+00:00
+modified: 2026-11-22T16:34:47.916133+00:00
 relationships:
   depends_on:
   - DEV-776
@@ -25,7 +25,6 @@ references:
 description: 'Found (DEV-776 review): since DEV-776 a lone `-` as TEXT means `-F -`, which comes before `-m` in `resolve_comment_text` (crates/lotar-lib/src/cli/handlers/comment.rs:362). So `lotar comment <ID> -m msg - <<EOF` saves the stdin text and drops msg without a word; before DEV-776 the `-` was dropped instead. Check: `lotar comment <ID> -m msg - <<<''other''`. Done: giving more than one of -m, -F and TEXT is refused with a hint (or -m and a lone - is), never one silently dropped.'
 tags:
 - health
-- waits
 custom_fields:
   finding: review:comment-message-and-lone-dash
 history:
@@ -67,3 +66,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-22T16:34:47.916133+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, waits
+    new: health

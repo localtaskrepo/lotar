@@ -1,11 +1,11 @@
 title: A t3 job taken over whose harnessmux record is gone runs again in a new T3 Code thread while its first thread may still run
-status: InProgress
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix-fable'
 created: 2026-11-20T20:32:05.812565+00:00
-modified: 2026-11-22T11:20:08.182425+00:00
+modified: 2026-11-22T18:47:34.897332+00:00
 relationships:
   depends_on:
   - DEV-734
@@ -48,9 +48,50 @@ comments:
       result: passed
       reason: '407'
     next: Merge agent lands agent/DEV-738
+- date: 2026-11-22T18:47:13.408153+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T184637.892Z-3 failed again or on a rate limit (lotar agent logs job-20261122T184637.892Z-3). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T18:47:33.936138+00:00
+  author: triage
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the same error came back twice (job-20261122T111009.524Z-169, job-20261122T184637.892Z-3): the t3 thread ended its turn 'waiting' while lint/test/smoke ran in the background, so the runner exited with code 1. The fix is committed (7ecd3de1d); only the checks need to run to the end in the foreground.
+  answer:
+    to: 2026-11-22T18:47:13.408153+00:00
+    choice:
+    - fix-fable
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the same error came back twice (job-20261122T111009.524Z-169, job-20261122T184637.892Z-3): the t3 thread ended its turn ''waiting'' while lint/test/smoke ran in the background, so the runner exited with code 1. The fix is committed (7ecd3de1d); only the checks need to run to the end in the foreground.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A307e79648a44f94e77a66ae9a9e1c2bc3358efcb3cc2f4afe2fb2b0a2a3eaacb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8e00b511ae7a936e7eab274a7e6c9b20d70ffb41671cd32ad36e0d96f9cc7ab6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c3058150474b974691f040dd630f743ca2dae8ae1ac8d27c0e9bdd4a96edb97
 description: |-
   Found in the DEV-734 review (2026-11-20): `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2169`) now queues any taken-over job whose session can't be opened again with `session: fresh`. For a `t3` job the T3 Code thread keeps running in T3 Code (docs/help/agent.md: the takeover follows it, and starts no thread when it can't tell whether one exists, as that could be a second one). When only harnessmux's record is gone (the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` in `dev510_t3_session_test.rs` does exactly this), the retry starts a second thread next to the first. Check: take over a t3 job whose harnessmux session record is deleted while its thread still runs. Done: lotar starts no second thread then (fails as before, or finds the thread by its title) and the docs say which.
 
@@ -63,6 +104,7 @@ description: |-
 tags:
 - backend
 - fix-retried
+- retry-fable
 history:
 - at: 2026-11-20T20:32:09.446911+00:00
   actor: claude
@@ -184,3 +226,37 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T18:46:39.937334+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c3058150474b974691f040dd630f743ca2dae8ae1ac8d27c0e9bdd4a96edb97
+- at: 2026-11-22T18:47:12.458836+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T18:47:13.408153+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:47:33.936138+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:47:33.936174+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'
+- at: 2026-11-22T18:47:34.897332+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: backend, fix-retried
+    new: backend, fix-retried, retry-fable

@@ -1,0 +1,40 @@
+title: 'Waiting for the owner without a question: DEV-784'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-22T18:09:50.526921+00:00
+modified: 2026-11-22T18:10:10.137913+00:00
+relationships:
+  related:
+  - DEV-784
+description: |-
+  DEV-784 (Agent jobs: one full test run at a time across jobs, agents keep working in parallel) is HelpNeeded, but its last comment asks no question: "Retry: the work was committed already (`ff83b472e`); this run checked it, all gates pass. - `npm run lint:agent`, `npm …" (lotar show DEV-784)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-784`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-784]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: question:DEV-784
+history:
+- at: 2026-11-22T18:10:02.828473+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-784"]}'
+- at: 2026-11-22T18:10:10.137913+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'

@@ -5,10 +5,11 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-26T17:02:37.302496+00:00
-modified: 2026-11-14T05:46:03.851445+00:00
+modified: 2026-11-22T18:50:35.514412+00:00
 relationships:
   related:
   - DEV-501
+  - DEV-796
 comments:
 - date: 2026-10-26T19:52:58.209005+00:00
   text: |-
@@ -90,3 +91,9 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-501"]}'
+- at: 2026-11-22T18:50:35.514412+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501"]}'
+    new: '{"related":["DEV-501","DEV-796"]}'

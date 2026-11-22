@@ -1,0 +1,83 @@
+title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-22T18:50:35.107598+00:00
+modified: 2026-11-22T18:51:52.076423+00:00
+relationships:
+  related:
+  - DEV-201
+  - standards:STD-219
+comments:
+- date: 2026-11-22T18:51:51.656944+00:00
+  author: claude
+  text: |-
+    Add a built-in lotar agent template built from our working rules?
+
+    Options:
+    - yes: Build the template
+    - no: Not now
+    - explore: Draft the template file and list which of our rules are generic first (recommended)
+  question:
+    options:
+    - key: yes
+      label: Build the template
+    - key: no
+      label: Not now
+    - key: explore
+      label: Draft the template file and list which of our rules are generic first
+    recommended: explore
+description: |-
+  The agent templates lotar ships are far behind the setup our own repos run on, so someone who starts with `lotar init --template agent-pipeline` misses most of what we learned. The shipped templates run implement, test and merge, and send any failure back to the reporter. Ours adds a review on a second provider, one retry before a person is asked, the person's comment reaching the running agent, and tickets that wait Blocked until their prerequisites are done. Found by product development (2026-11-22). It came from the standards thread "Sharing Agent Setup With Teammates" (2026-11-21), where the owner wrote: "I was already mulling over a lotar template that includes our learnings for an easy project set up", and "I'm also thinking about other people that may want to use it, and keep using it the same as we are and improving it". It takes the standards Direction "a platform for other people" further. The thread holds the packaging question (plugins, copier, a shared repo); this ticket covers only what lotar itself ships.
+
+  ## Evidence
+
+  - Ours: standards `configs/lotar/automation.yml` (948 lines) and `agents.yml` (147 lines), used by all lotar repos. Among others:
+    - `automation.yml:179` "Fix done: review on Codex": a fresh review session on another provider, change nothing, the verdict as a tag.
+    - `automation.yml:383` to `:502`: a blocked review goes back to the fix agent, up to three times, then to a person with one question.
+    - `automation.yml:534` and `:575`: a failed job retries once on `@fix-retry`, then goes to a person as HelpNeeded with the log command.
+    - `automation.yml:262` "Fix waits: Blocked until its prerequisites are done", and `:680` continues it when they are.
+    - `automation.yml:717` "Comments: the owner's comment reaches the agent" (tell_agent).
+  - Shipped: `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-pipeline.yml` (4.8 kB) and `agent-reviewed.yml` (5.4 kB). Phase rules and `:131` "Agent failures go to the reporter" only. Their contents were last reviewed in DEV-201 (Done, 2026-11-14), which compared them with lotar's own mechanics, not with our rules.
+  - Outside: sortie-ai/sortie (Apache-2.0, 225 stars, pushed 2026-11-21) ships one working example per agent and tracker (`examples/WORKFLOW.md`, `WORKFLOW.codex.md`, `WORKFLOW.linear.md` and 8 more), each with review and fix branches in its prompt, stall timeout and retry backoff (code, read). The sharing thread's research (2026-11-22) found copier and obra/superpowers using the same idea: one maintained source that new users start from.
+
+  ## Proposal
+
+  - A third built-in template, say `agent-team`, built from the generic part of our rules: implement, review on a second runner, one retry, three review rounds, a question to `@reporter` instead of `mallox`, comments reaching the running agent, prerequisites, a no-change job that closes itself.
+  - Leave out what is ours alone: health findings and repos.ts restarts, the inbox and triage, T3-specific prompts, names.
+  - `docs/help/templates.md` lists it, and a test runs it end to end like `shipped_agent_pipeline_template_runs_end_to_end`.
+  - Later, standards could install from it, so the two stay one source. That waits for the sharing thread's packaging decision.
+
+  ## Cost
+
+  - About 4 to 6 hours of agent work: the template, rule prompts made generic, docs and one end-to-end test.
+  - Risk: two sources until standards uses the template. A drift check could cover that later.
+  - Saves: a new person, or a new repo of ours, starts with rules that took us 52 commits since 2026-11-11 to get right, instead of a three-step pipeline.
+
+  ## Done when
+
+  - [ ] `lotar config templates` lists the new template, and `lotar init --template <name>` writes a config and automation.yml that pass `lotar config validate`.
+  - [ ] It names no person, repo or host of ours; failures and questions go to `@reporter`.
+  - [ ] A test runs a ticket through implement, a blocked review, a fix and a passed review to the merge.
+  - [ ] docs/help/templates.md describes it, with what it adds over agent-reviewed.
+tags:
+- proposal
+history:
+- at: 2026-11-22T18:50:35.515064+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-201"]}'
+- at: 2026-11-22T18:51:51.656944+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:51:52.076423+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-201"]}'
+    new: '{"related":["DEV-201","standards:STD-219"]}'

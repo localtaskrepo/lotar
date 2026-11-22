@@ -18,7 +18,9 @@ async function inspect(url: string, project?: string) {
     };
 }
 
-describe.concurrent('UI configuration coverage (DEV-146)', () => {
+// Long UI scenarios: when the machine stalls they hit the shared 120 s cap
+// first, though no single step waits too long (DEV-755, DEV-781).
+describe.concurrent('UI configuration coverage (DEV-146)', { timeout: 300_000 }, () => {
     it('turns custom fields off for one project and back to inherit', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
             name: 'dev146-config-',

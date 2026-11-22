@@ -1,11 +1,11 @@
 title: 'Agent jobs: one full test run at a time across jobs, agents keep working in parallel'
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-22T03:06:53.057587+00:00
-modified: 2026-11-22T09:10:40.414804+00:00
+modified: 2026-11-22T18:10:02.826878+00:00
 relationships:
   related:
   - DEV-748
@@ -13,6 +13,7 @@ relationships:
   - DEV-586
   - DEV-605
   - DEV-785
+  - DEV-795
 comments:
 - date: 2026-11-22T08:49:27.438495+00:00
   author: claude
@@ -56,8 +57,75 @@ comments:
       result: not_run
       reason: needs the new build installed and a full queue
     next: Review; after install, watch load average while 3 jobs run checks
+- date: 2026-11-22T16:44:56.041755+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T164401.502Z-185 failed again or on a rate limit (lotar agent logs job-20261122T164401.502Z-185). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T16:45:46.988610+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261122T164401.502Z-185 ended its turn with checks running in the background, t3 runner exited code 1. Work is committed (ff83b472e); only the final check results are missing, so run them in the foreground.
+  answer:
+    to: 2026-11-22T16:44:56.041755+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261122T164401.502Z-185 ended its turn with checks running in the background, t3 runner exited code 1. Work is committed (ff83b472e); only the final check results are missing, so run them in the foreground.'
+- date: 2026-11-22T16:49:16.576668+00:00
+  author: claude
+  text: |-
+    Retry: the work was committed already (`ff83b472e`); this run checked it, all gates pass.
+
+    - `npm run lint:agent`, `npm run test:agent` (2458 Rust, 1564 UI), `npm run test:smoke:agent` (407) passed
+    - First `test:agent` failed once: nextest couldn't exec `target/debug/deps/lotar-d5936856a7c14dd2` (`No such file or directory`), the binary was back right after; rerun passed. Not caused by this change, looks like something else rebuilt the worktree's `target/` mid-run
+    - No new commit; branch is 7 commits behind main, left for the merge agent
+    - Guidance: no durable finding
+  report:
+    commits:
+    - hash: ff83b472e
+      what: machine-wide check lock (port 47586) for lotar's merge checks and the repo's full Rust, UI and smoke runs
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2458 Rust, 1564 UI; first run hit an exec error (test binary missing mid-run), rerun passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 407 tests
+    - command: load near core count on a full queue
+      result: not_run
+      reason: needs the new build installed on the queue
+    next: Review, then merge agent lands ff83b472e (branch is 7 commits behind main)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74696b7a2d960572c6a68d1078f63f25eba1e0fcbc23d815d4b9c4cc6b8c50bf
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A127f32860f776708e00d865e74409e5ba45f8df03a998ccfaee2a641b9d5ce92
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Three jobs each run lint, the full suite (2,445 Rust, 1,563 UI) and smoke (406) at once; timing tests then time out and become merge-agent jobs and flaky-test tickets. Do: a machine-wide lock (or token) that heavy check runs take: lotar's merge checks, and the repo's test/smoke scripts that fix and review jobs run; editing and agent turns stay parallel. Waiting for the lock shows in the job log. Done when: two jobs' check runs never overlap (test), load during a full queue stays near the core count.
 
@@ -76,6 +144,7 @@ description: |-
   - [ ] Load during a full queue stays near the core count: checked on the queue after the new build is installed (not testable in CI).
 tags:
 - fix-retried
+- retry-fix
 history:
 - at: 2026-11-22T03:06:53.285183+00:00
   actor: claude
@@ -189,3 +258,47 @@ history:
   - field: relationships
     old: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605"]}'
     new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785"]}'
+- at: 2026-11-22T16:44:21.216014+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A127f32860f776708e00d865e74409e5ba45f8df03a998ccfaee2a641b9d5ce92
+- at: 2026-11-22T16:44:55.326347+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T16:44:56.041755+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T16:45:46.988610+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T16:45:46.988668+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T16:46:27.148578+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, retry-fix
+- at: 2026-11-22T16:49:16.576668+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:10:02.826878+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785"]}'
+    new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795"]}'

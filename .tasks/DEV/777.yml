@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-22T09:28:23.409956+00:00
+modified: 2026-11-22T18:08:13.705943+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -30,6 +30,9 @@ comments:
     - The only way to tell them apart from lotar is to read harnessmux's `HARNESSMUX_RECORD` wire log, which would mean setting a process-wide env var while the server runs other jobs. I don't recommend that
     - Proposal: add `Error::NotResumable(String)` to harnessmux for a refused `session/resume`/`session/load`, release it, then bump lotar and match only that variant in `open_session`, plus a fake-ACP test that refuses `initialize`. Changing harnessmux's public API and publishing a release is your decision
     - Next: on your yes, file the HARN ticket, wait for the release, then finish DEV-777 here
+- date: 2026-11-22T18:08:12.827499+00:00
+  author: mallox
+  text: 'Yes: add the refused-resume error (NotResumable) to harnessmux and release it as a new version, then have lotar resume only on that. Owner 2026-11-22 10:05 PST, relayed by the chief of staff: "Releases of harnessmux can from now on be done by agents when needed. No need to wait for my green light. Lotar releases should still ask me."'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0a7852970afa0266056fb48bf89fa0fd177b850a6e9b43958fbb0a2c9930ee39
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75a6d2ce35fd6bba59cd70aa8ab5c6579794cbcc6a508ad1ea655ac420701bf
@@ -114,3 +117,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-22T18:08:12.827499+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:08:13.705943+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

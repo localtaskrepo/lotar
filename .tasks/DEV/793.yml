@@ -5,10 +5,15 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-22T14:05:12.046894+00:00
+modified: 2026-11-22T18:46:53.538307+00:00
 relationships:
   related:
   - DEV-725
+  - DEV-780
+comments:
+- date: 2026-11-22T18:46:53.150110+00:00
+  author: claude
+  text: 'Second case, the other way round: DEV-780''s merge job (taken over after the worker restart at 18:45Z) ended its turn on "Waiting for the smoke run to finish" and went Done with nothing merged (`agent/DEV-780` `1fcbc12ba` not on main). Merge requeued by hand. A merge job''s end should check that the branch is on main before `job_completed` sets Done.'
 description: |-
   Found by the standards communication review (STD-17), 2026-11-22.
 
@@ -42,3 +47,13 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T18:46:53.150110+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:46:53.538307+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725"]}'
+    new: '{"related":["DEV-725","DEV-780"]}'

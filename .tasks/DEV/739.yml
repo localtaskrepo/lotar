@@ -5,12 +5,13 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T20:32:12.764651+00:00
-modified: 2026-11-22T11:19:57.058363+00:00
+modified: 2026-11-22T18:08:14.189531+00:00
 relationships:
   depends_on:
   - DEV-734
   related:
   - DEV-744
+  - DEV-725
 comments:
 - date: 2026-11-20T21:11:19.743133+00:00
   author: claude
@@ -241,3 +242,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-22T18:08:14.189531+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-734"],"related":["DEV-744"]}'
+    new: '{"depends_on":["DEV-734"],"related":["DEV-744","DEV-725"]}'

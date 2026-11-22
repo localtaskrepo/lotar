@@ -455,7 +455,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     const jobStartedAt = Date.now();
                     await startJobViaApi(server.url, task.id, 'slow', 'Stream the logs slowly');
                     const startReturnedAfterMs = Date.now() - jobStartedAt;
-                    await page.waitForSelector('.job-card', { timeout: 15_000 });
+                    await page.waitForSelector('.job-card', { timeout: WAIT_BUDGET_MS });
                     const cardObservedAfterMs = Date.now() - jobStartedAt;
                     await page.click('button:has-text("Show logs")');
                     const logsOpenedAfterMs = Date.now() - jobStartedAt;

@@ -1,14 +1,16 @@
 title: 'harness.agent-launcher smoke: a failed 45 s start wait loses its wrapper stderr to the 120 s test timeout'
-status: Todo
+status: InProgress
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T11:07:54.938084+00:00
-modified: 2026-11-22T11:08:05.117581+00:00
+modified: 2026-11-22T18:46:40.461584+00:00
 relationships:
   related:
   - DEV-781
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3a5b702f4f0841a6f3112eafa0efcf6e0ff29db5b01c7ccf1a8355cbacaadde
 description: |-
   Found (review of DEV-781): in `smoke/tests/harness.agent-launcher.smoke.spec.ts` the shim and fwd tests (lines ~396 and ~456) catch a failed `gate.waitForStarted` (now 45 s) and then `await exit`, whose bound is now 90 s. 45 + 90 s is past the 120 s `testTimeout`, so a hung wrapper ends in vitest's generic timeout and the stderr diagnostic is lost. The conflict test already races `exit` against 1 s.
   Check: read the two catch blocks; or force waitForStarted to fail with a wrapper that hangs.
@@ -27,3 +29,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T18:46:39.956931+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T18:46:40.461584+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3a5b702f4f0841a6f3112eafa0efcf6e0ff29db5b01c7ccf1a8355cbacaadde

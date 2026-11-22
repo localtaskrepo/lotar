@@ -1,11 +1,11 @@
 title: 'Agent jobs: check whether T3 and ACP jobs get stuck or leave processes behind'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T20:23:21.712446+00:00
-modified: 2026-11-21T21:21:12.951566+00:00
+modified: 2026-11-22T18:45:20.845124+00:00
 relationships:
   related:
   - DEV-755
@@ -160,3 +160,12 @@ history:
   - field: relationships
     old: '{"related":["DEV-755","DEV-770"]}'
     new: '{"related":["DEV-755","DEV-770","DEV-725","DEV-729"]}'
+- at: 2026-11-22T18:45:20.845124+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

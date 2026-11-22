@@ -1,11 +1,11 @@
 title: 'Agent job log: record the prompt and settings a run used, behind an Instructions button'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T20:47:04.852936+00:00
-modified: 2026-11-21T23:27:56.757332+00:00
+modified: 2026-11-22T18:45:20.814874+00:00
 relationships:
   blocks:
   - DEV-769
@@ -345,3 +345,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T18:45:20.814874+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

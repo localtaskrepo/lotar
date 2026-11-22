@@ -1,0 +1,40 @@
+title: 'Waiting for the owner without a question: DEV-786'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-22T18:09:32.776838+00:00
+modified: 2026-11-22T18:09:45.856368+00:00
+relationships:
+  related:
+  - DEV-786
+description: |-
+  DEV-786 (Agent queue: order by priority, manage the queue (move up/down, keep each entry's prompt), categories) is HelpNeeded, but its last comment asks no question: "Retry job: the work from the first run is complete and every check passes. No new changes were needed. - I checked the …" (lotar show DEV-786)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-786`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-786]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: question:DEV-786
+history:
+- at: 2026-11-22T18:09:38.389725+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-786"]}'
+- at: 2026-11-22T18:09:45.856368+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'

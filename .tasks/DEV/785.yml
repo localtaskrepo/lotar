@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-22T03:06:53.746513+00:00
-modified: 2026-11-22T09:10:54.049672+00:00
+modified: 2026-11-22T17:43:07.497773+00:00
 relationships:
   related:
   - DEV-748
@@ -20,6 +20,7 @@ relationships:
   - DEV-761
   - DEV-773
   - DEV-784
+  - DEV-772
 comments:
 - date: 2026-11-22T09:10:40.200018+00:00
   author: claude
@@ -48,6 +49,36 @@ comments:
       result: passed
       reason: a spec leaving a temp file still fails the run with the two projects
     next: 'Review, then merge. Optional trim if the extra time hurts: keep only the flaky dev605 test in the group instead of the whole module'
+- date: 2026-11-22T17:42:49.402364+00:00
+  author: claude
+  text: |-
+    Review: blocking. Full smoke fails at load 35+: 4 files that are not on the smoke `WALL_CLOCK_SPECS` list. One of them, `ui.config-coverage`, comes from DEV-781, a ticket the Done when names.
+
+    Read: `bfc44b466` (the only commit on `main..HEAD`), the ticket, DEV-741..781, `AGENTS.md`, main's recent commits to the touched files (none since the branch base), the fix session log.
+
+    What holds:
+    - Rust: `cargo nextest show-config test-groups` lists 135 tests in `wall-clock` (`max-threads = 1`). Every Rust test from DEV-741..773 is in it: 742/752 in `dev604`, 743/749/772 in `agent_automation`, 748 in `dev605`, 753 in `agent_safety`, 741 `sse_*`, plus 761 and 773 by exact name. DEV-760 stays out.
+    - Vitest 5 runs a root `globalSetup` once per run, and the projects don't inherit it (`NON_INHERITED_ROOT_OPTIONS`). So the run lock, server guard and temp guard run once. After my smoke run: no `lotar serve` left, no new `lotar-vitest-temp-*` folder.
+    - `vitest list`: UI 139 files and smoke 118, each exactly once, none missing. A file filter picks files from both projects (`SprintsList`, `ui.theming` + `api.basic`).
+    - `npm ci` and `npm run -s lint:agent` pass.
+    - `npm run -s test:agent` on main with this commit applied, in a scratch worktree: passed, Rust 2466/2466, UI 1567/1567. Load was 14–24, not 30.
+    - On this branch, `test:agent` failed once: `merge_job_that_cannot_fast_forward_fails` (`agent_automation_integration_test.rs:2494`). The branch predates DEV-772 (`60a9cf1c5`, on main), which fixes that wait, and the merge rebases onto it. Not counted against this change.
+
+    Blocking:
+    - `npm run -s test:smoke:agent` (load 35–38): 403/407. Failed, all in the `parallel` project:
+      - `tests/ui.config-coverage.smoke.spec.ts`: 120 s timeout. DEV-781 names it as failing under load and passing alone.
+      - `tests/ui.attachment-previews.smoke.spec.ts`: `toHaveCount`.
+      - `tests/ui.sort-export.smoke.spec.ts`: `waitForSelector` 20 s.
+      - `tests/cli.automation.smoke.spec.ts`: "async run action…", 10 s sentinel wait.
+    - Run alone (`npm run -s test:smoke:quick:agent -- <the 4 files>`, load 59): `config-coverage`, `attachment-previews` and `sort-export` pass. `cli.automation` fails again.
+    - `smoke/vitest.config.ts:13`: the list leaves out `ui.config-coverage` (DEV-781) and `tests/ui.sprints-responsive.smoke.spec.ts`, which timed out at 120 s in DEV-775's full-run log. The Done when says "the files of … DEV-775, DEV-781".
+    - Fix:
+      - Add those two files, plus `ui.attachment-previews` and `ui.sort-export`, to `WALL_CLOCK_SPECS`.
+      - Run `cli.automation` alone at normal load. If it passes, add it to the list. If not, it is a real failure and gets a ticket.
+      - Rerun full smoke at load 30 or more.
+    - Hand-off timing: the comment says smoke went from 39 s to 65 s, but a full `test:smoke:agent` here took 716 s (vitest Duration). Say what the 39/65 s measured, or give the full-run wall times before and after, as the Done when asks.
+
+    No UI changes, so no screenshots needed. No files changed in this worktree; the scratch worktree is removed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5c8d6340739f46b0d7639fb411a4783a3b4b64b5e4a2c44a360165f04868dca7
 description: |-
@@ -64,6 +95,8 @@ description: |-
   - [ ] AGENTS.md says: a test that waits on a wall-clock budget, or fails under load and passes alone, goes in the serial group (nextest override or the vitest timing list) in the change that finds it, named in the hand-off comment, instead of a ticket of its own. A test that fails alone too is a real bug and still gets a ticket. The testing-strategy skill says where the lists are.
   - [ ] When the group makes the suite slower: the wall time of `npm run -s test:rust:agent` and full smoke before and after is in the hand-off comment.
   - [ ] `npm run -s test:agent` and `npm run -s test:smoke:agent` pass at load average >= 30 (raised with busy loops if the machine is quieter), `npm run -s lint:agent` passes.
+tags:
+- review-returned
 history:
 - at: 2026-11-22T03:06:53.985562+00:00
   actor: claude
@@ -131,3 +164,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T17:42:49.402364+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T17:42:51.846743+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-750","DEV-755","DEV-741","DEV-751","DEV-760","DEV-764","DEV-775","DEV-781","DEV-761","DEV-773","DEV-784"]}'
+    new: '{"related":["DEV-748","DEV-750","DEV-755","DEV-741","DEV-751","DEV-760","DEV-764","DEV-775","DEV-781","DEV-761","DEV-773","DEV-784","DEV-772"]}'
+- at: 2026-11-22T17:42:54.717215+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-22T17:43:07.497773+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

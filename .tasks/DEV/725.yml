@@ -1,11 +1,11 @@
 title: Release v0.15.6
-status: Done
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-20T05:17:29.812031+00:00
-modified: 2026-11-22T14:05:11.815896+00:00
+modified: 2026-11-22T18:08:14.595911+00:00
 relationships:
   related:
   - DEV-702
@@ -27,6 +27,12 @@ relationships:
   - DEV-761
   - DEV-764
   - DEV-793
+  - DEV-739
+  - DEV-762
+  - DEV-779
+  - DEV-780
+  - DEV-781
+  - DEV-783
 comments:
 - date: 2026-11-21T15:01:56.811998+00:00
   author: claude
@@ -128,6 +134,9 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-22T18:08:13.967729+00:00
+  author: claude
+  text: 'Reopened: not released. The merge landed while the merge agent still waited on its smoke rerun (DEV-793); b18be094a is on origin/main, but there is no v0.15.6 tag, no QA run, and the installed lotar is 0.15.5. Owner 2026-11-22 10:05 PST, to "reopen DEV-725 so an agent finishes the release": "go ahead" (his release OK stands from 2026-11-21 12:26). He also asked that other finished changes go in: release from origin/main as it is when this job runs, so the merges queued ahead of it (DEV-762, DEV-779, DEV-780, DEV-781, DEV-783, DEV-739) are in it. Done when: full smoke and QA green on that commit, tag v0.15.6 pushed, release published, lotar 0.15.6 installed (`lotar --version`).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A580d32a8d87852253f1f686139c79390e4f085954cd9223ddd756b0e4d895c13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afa80554ec24afa8bc5ca6b66e5d3652d9b9239eea26c371b20b250ada1399828
@@ -321,3 +330,25 @@ history:
   - field: relationships
     old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764"]}'
     new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793"]}'
+- at: 2026-11-22T18:08:13.967729+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:08:14.188921+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783"]}'
+- at: 2026-11-22T18:08:14.526055+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-11-22T18:08:14.595911+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'

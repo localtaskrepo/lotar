@@ -1,17 +1,18 @@
 title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-22T09:30:44.926217+00:00
+modified: 2026-11-22T18:09:38.364865+00:00
 relationships:
   related:
   - DEV-725
   - DEV-748
   - DEV-755
   - DEV-783
+  - DEV-794
 comments:
 - date: 2026-11-22T05:07:00.362925+00:00
   author: claude
@@ -49,6 +50,70 @@ comments:
     - command: npm run smoke
       result: passed
     next: Review the commit on agent/DEV-786 and the before/after screenshots; merge when happy
+- date: 2026-11-22T17:44:32.753899+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T174311.432Z-187 failed again or on a rate limit (lotar agent logs job-20261122T174311.432Z-187). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T17:45:23.987904+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-187 ended 'The t3 runner exited with code 1' while the thread was waiting on its checks; no rate limit. Commit bc0c7d822 is already on agent/DEV-786.
+  answer:
+    to: 2026-11-22T17:44:32.753899+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-187 ended ''The t3 runner exited with code 1'' while the thread was waiting on its checks; no rate limit. Commit bc0c7d822 is already on agent/DEV-786.'
+- date: 2026-11-22T17:48:46.641201+00:00
+  author: claude
+  text: |-
+    Retry job: the work from the first run is complete and every check passes. No new changes were needed.
+
+    - I checked the commit `bc0c7d822` against "Done when": the order (priority, then kind, then arrival), paused retries first, entries put back go to their place by rank, `move` keeps the prompt and settings, REST and docs agree, and the Agents page has a **Queue** panel
+    - `npm run lint:agent`, `npm run test:agent` and `npm run test:smoke:agent` all passed on this branch
+    - In the first test run, 5 CLI tests failed with `target/debug/lotar is missing`. The binary wasn't built yet in this fresh worktree. After the smoke build created it, they passed
+    - Screenshots from the first run are still on the ticket: `dev786-before-*` and `dev786-after-*`
+    - `main` has 7 newer commits. The merge agent rebases onto them
+  report:
+    commits:
+    - hash: bc0c7d822
+      what: queue order by priority and kind, queue move (CLI, REST, Agents page), kind column
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2456 Rust, 1569 UI tests; first run failed 5 CLI tests because target/debug/lotar was not built yet in this worktree, passed on rerun after the build
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 408 tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -63,6 +128,7 @@ references:
 - attachment: dev786-before-light-1440.8329d4499145190f39bbde9f005ae8e6.png
 - attachment: dev786-before-light-1920.132623d68127332a387e3b674cf854bd.png
 - attachment: dev786-before-light-390.3bfc4a73ef913a0431f941cd72692dc2.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A67fc5720ba826219716ea277a59b751ba1d4296682edd17a9af20cdf991f4882
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
 
@@ -94,6 +160,7 @@ description: |-
 tags:
 - ui
 - fix-retried
+- retry-fix
 history:
 - at: 2026-11-22T03:06:54.686868+00:00
   actor: claude
@@ -268,3 +335,47 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T17:43:32.761577+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A67fc5720ba826219716ea277a59b751ba1d4296682edd17a9af20cdf991f4882
+- at: 2026-11-22T17:44:32.022179+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T17:44:32.753899+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T17:45:23.987904+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T17:45:23.990777+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T17:46:06.472761+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: ui, fix-retried
+    new: ui, fix-retried, retry-fix
+- at: 2026-11-22T17:48:46.641201+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T18:09:38.364865+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794"]}'

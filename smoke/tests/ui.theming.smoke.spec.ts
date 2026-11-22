@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expect, type Page } from '@playwright/test';
+import { expect as playwrightExpect, type Page } from '@playwright/test';
 import { describe, it } from 'vitest';
 import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
@@ -7,6 +7,10 @@ import { SmokeWorkspace } from '../helpers/workspace.js';
 
 // DEV-218: colour themes with light and dark modes, chosen per person in
 // Preferences or for everyone in Config, plus repository logo, name and icon.
+
+// Playwright's 5 s default fails these polls and locator waits under
+// full-suite load; 15 s matches the smoke config's poll budget (DEV-781).
+const expect = playwrightExpect.configure({ timeout: 15_000 });
 
 const ICON_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2f7d4f"/></svg>';

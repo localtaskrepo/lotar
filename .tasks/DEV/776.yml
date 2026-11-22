@@ -1,17 +1,20 @@
 title: lotar comment saves a lone - as the comment text instead of reading stdin
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:39:20.858113+00:00
-modified: 2026-11-22T16:25:31.527534+00:00
+modified: 2026-11-22T16:34:41.497220+00:00
 relationships:
   blocks:
   - DEV-791
   related:
   - DEV-768
   - DEV-791
+  - DEV-770
+  - DEV-775
+  - DEV-788
 comments:
 - date: 2026-11-22T02:53:13.779728+00:00
   author: claude
@@ -71,6 +74,34 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-22T16:34:24.733166+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `6afd5ae66` on `main`.
+
+    - Full smoke failed only on 2 UI timeouts under load (load ~39; same pattern as [DEV-775](https://lotar.pyxzl.net/task/DEV-775), open as [DEV-788](https://lotar.pyxzl.net/task/DEV-788)). The change is CLI-only (`comment.rs`, a test, `docs/help/comment.md`)
+    - Rerun alone: `npm run -s test:smoke:quick -- smoke/tests/ui.agent-jobs.smoke.spec.ts smoke/tests/ui.sprints-responsive.smoke.spec.ts` passed (19 tests)
+    - `git -C <root> merge --ff-only` from `878c80d5f`; main checkout's `.tasks` changes amended in (owner 2026-11-12)
+    - Pushed `f7733872c..6afd5ae66` with 6 others' Done commits (DEV-770, 725, 772, 773, 766, 775); push hooks passed
+    - No rules or config changed: no `lotar trust` needed
+    - Health check `lotar comment <ID> - < file` with the branch build in a scratch repo: saved the stdin text
+  report:
+    commits:
+    - hash: 6afd5ae66
+      what: lone - reads the comment from stdin (amended with the main checkout's .tasks)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s smoke
+      result: failed
+      reason: 2 UI timeouts at load ~39 (agent-jobs Permission, sprints-responsive 1440px); both files rerun alone passed, 19 tests
+    - command: lotar comment <ID> - < file
+      result: passed
+    next: 'None: lands as Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa8aed42de28a4aafdd4ad3d8ff4a47cd7e7c19faf1b1f7b425aa0f3d7109a0b9
 description: 'Found: lotar comment DEV-768 --commit … - <<EOF saved the text ''-'' and dropped the heredoc; only -F - reads stdin (DEV-768 hand-off). Check: lotar comment <ID> - < file. Done: a lone - reads stdin like -F -, or is refused with a hint to use -F -.'
@@ -143,3 +174,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-22T16:34:24.733166+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T16:34:28.229883+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791"]}'
+    new: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791","DEV-770","DEV-775","DEV-788"]}'
+- at: 2026-11-22T16:34:41.497220+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

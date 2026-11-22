@@ -78,7 +78,12 @@ interface ExitOutcome {
     readonly stderr: string;
 }
 
-function awaitExit(child: ChildProcess, boundMs = 20_000): Promise<ExitOutcome> {
+// The wrapper and gate agent are spawned processes: under full-suite load
+// (load average 30+) they can take well over 10 s to start, so waits use a
+// load-sized budget and the exit bound outlasts it (DEV-781).
+const FIXTURE_WAIT_MS = 45_000;
+
+function awaitExit(child: ChildProcess, boundMs = 2 * FIXTURE_WAIT_MS): Promise<ExitOutcome> {
     let stderr = '';
     child.stderr?.setEncoding('utf8');
     child.stderr?.on('data', (chunk: string) => {
@@ -227,7 +232,7 @@ describe('agent fixture launcher Windows counterfactuals', () => {
                             return undefined;
                         }
                     },
-                    { timeout: 10_000 },
+                    { timeout: FIXTURE_WAIT_MS },
                 )
                 .toMatchObject({
                     pid: expect.any(Number),
@@ -235,13 +240,13 @@ describe('agent fixture launcher Windows counterfactuals', () => {
                     argv: expect.arrayContaining([dir]),
                 });
 
-            await waitForFile(path.join(dir, 'started-spaced probe.sentinel'), 10_000);
+            await waitForFile(path.join(dir, 'started-spaced probe.sentinel'), FIXTURE_WAIT_MS);
             expect(fs.pathExistsSync(path.join(dir, 'completed-spaced probe.sentinel'))).toBe(false);
 
             await fs.writeFile(path.join(dir, 'release.sentinel'), `${process.pid}\n`);
             const outcome = await exit;
             expect(outcome.code).toBe(0);
-            await waitForFile(path.join(dir, 'completed-spaced probe.sentinel'), 10_000);
+            await waitForFile(path.join(dir, 'completed-spaced probe.sentinel'), FIXTURE_WAIT_MS);
         } finally {
             await fs.remove(dir).catch(() => undefined);
         }
@@ -275,14 +280,14 @@ describe('agent fixture launcher Windows counterfactuals', () => {
                     : spawn(launcher, runnerArgs, { stdio: ['ignore', 'ignore', 'pipe'] });
             const exit = awaitExit(child);
 
-            await waitForFile(path.join(dir, 'boot-launcher.sentinel'), 10_000);
-            await waitForFile(path.join(dir, 'started-launcher.sentinel'), 10_000);
+            await waitForFile(path.join(dir, 'boot-launcher.sentinel'), FIXTURE_WAIT_MS);
+            await waitForFile(path.join(dir, 'started-launcher.sentinel'), FIXTURE_WAIT_MS);
             expect(fs.pathExistsSync(path.join(dir, 'completed-launcher.sentinel'))).toBe(false);
 
             await fs.writeFile(path.join(dir, 'release.sentinel'), `${process.pid}\n`);
             const outcome = await exit;
             expect(outcome.code).toBe(0);
-            await waitForFile(path.join(dir, 'completed-launcher.sentinel'), 10_000);
+            await waitForFile(path.join(dir, 'completed-launcher.sentinel'), FIXTURE_WAIT_MS);
         } finally {
             await fs.writeFile(path.join(dir, 'release.sentinel'), `${process.pid}\n`).catch(() => undefined);
             await agents.dispose();
@@ -388,7 +393,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             const exit = awaitExit(child);
 
             try {
-                await gate.waitForStarted('shim', 10_000);
+                await gate.waitForStarted('shim', FIXTURE_WAIT_MS);
             } catch (error) {
                 const outcome = await exit;
                 throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`, {
@@ -406,7 +411,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             await gate.release();
             const outcome = await exit;
             expect(outcome.code).toBe(0);
-            await gate.waitForCompleted('shim', 10_000);
+            await gate.waitForCompleted('shim', FIXTURE_WAIT_MS);
         } finally {
             await fs.writeFile(path.join(gate.dir, 'release.sentinel'), `${process.pid}\n`).catch(() => undefined);
             await gate.dispose();
@@ -448,7 +453,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             const exit = awaitExit(child);
 
             try {
-                await gate.waitForStarted('fwd', 10_000);
+                await gate.waitForStarted('fwd', FIXTURE_WAIT_MS);
             } catch (error) {
                 const outcome = await exit;
                 throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`, {
@@ -467,7 +472,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             await gate.release();
             const outcome = await exit;
             expect(outcome.code).toBe(0);
-            await gate.waitForCompleted('fwd', 10_000);
+            await gate.waitForCompleted('fwd', FIXTURE_WAIT_MS);
         } finally {
             await fs.writeFile(path.join(gate.dir, 'release.sentinel'), `${process.pid}\n`).catch(() => undefined);
             await gate.dispose();
@@ -518,7 +523,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             const exit = awaitExit(child);
 
             try {
-                await gate.waitForStarted('conflict', 10_000);
+                await gate.waitForStarted('conflict', FIXTURE_WAIT_MS);
             } catch (error) {
                 const outcome = await Promise.race([
                     exit,
@@ -551,7 +556,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             await gate.release();
             const outcome = await exit;
             expect(outcome.code).toBe(0);
-            await gate.waitForCompleted('conflict', 10_000);
+            await gate.waitForCompleted('conflict', FIXTURE_WAIT_MS);
 
             const wrongSentinels = fs.readdirSync(wrongDir).filter((entry) => entry.endsWith('.sentinel'));
             expect(wrongSentinels).toEqual([]);
