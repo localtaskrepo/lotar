@@ -17,13 +17,16 @@ profile.default.slow-timeout = "90s"
 
 # Mark slow tests here in the future if desired (no ignored tests per policy).
 
-# The agent automation and safety suites spawn real worker processes (mock
-# agents polling the filesystem or running shell loops) on wall-clock
-# schedules. Under full num-cpus parallelism those windows blow and the tests
-# flake (passing standalone, failing under load). Serialize both suites in
-# this group (agent safety joined via DEV-78). Since DEV-302 all integration
-# tests share one binary, so the suites are selected by their module prefix.
-[test-groups.agent-processes]
+# Tests that wait on wall-clock budgets (DEV-785): real worker processes on
+# timers (the agent automation and safety suites, joined via DEV-78; since
+# DEV-302 all integration tests share one binary, so they are selected by module
+# prefix), SSE streams, merge without agent, queue pauses, and each test that
+# failed under full-suite load but passed alone (DEV-741..773). At num-cpus
+# parallelism those budgets blow under load, so the group runs them one at a
+# time, and they start first so the serial chain overlaps the parallel rest.
+# A new timing test, or one that flakes under load, joins this filter in the
+# change that finds it, not a ticket of its own (AGENTS.md).
+[test-groups.wall-clock]
 max-threads = 1
 
 # Retries only dampen transient load spikes for plain test:rust runs;
@@ -31,8 +34,17 @@ max-threads = 1
 # relies on them. Assertions are unchanged and deterministic failures still
 # fail all retries.
 [[profile.default.overrides]]
-filter = 'test(/^agent_automation_integration_test::/) + test(/^agent_safety_test::/)'
-test-group = 'agent-processes'
+filter = """
+test(/^agent_automation_integration_test::/)
++ test(/^agent_safety_test::/)
++ test(/^dev604_queue_pauses_test::/)
++ test(/^dev605_merge_without_agent_test::/)
++ test(/^web_api_integration_test::sse_/)
++ test(=dev503_harness_jobs_test::a_ticket_hands_its_context_from_harness_to_harness_through_its_states)
++ test(=services::audit_service::blob_batch_tests::hanging_cat_file_fails_the_activity_feed_at_the_timeout)
+"""
+test-group = 'wall-clock'
+priority = 50
 retries = 2
 
 # DEV-78: dedicated profile for wall-clock performance budget runs
@@ -60,7 +72,7 @@ junit = { path = "perf-junit.xml" }
 
 # DEV-79: runtime Git selection profile. scripts/rust-test-runner.mjs selects
 # this profile when its isolated real-git probe fails; every other setting
-# (concurrency, timeouts, the agent-processes group and its retries) is
+# (concurrency, timeouts, the wall-clock group and its retries) is
 # inherited from profile.default. The default filter excludes exactly the
 # source-local `git_required` test modules, so those tests stay COMPILED and
 # are reported by nextest as skipped via this filter - never as passes.

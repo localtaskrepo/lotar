@@ -1,6 +1,6 @@
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defineConfig, mergeConfig } from 'vitest/config'
+import { configDefaults, defineConfig, mergeConfig } from 'vitest/config'
 import baseConfig from '../vite.config.mts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -12,6 +12,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // Pacific-time machines and failed on UTC CI runners).
 process.env.TZ = 'America/Los_Angeles'
 
+// Specs that wait on wall-clock budgets (DEV-785): they failed in full runs under
+// load and passed alone (DEV-764). They run in the `wall-clock` project after the
+// parallel files finish, one file at a time. A spec that flakes under load joins
+// this list instead of getting its own ticket (AGENTS.md).
+const WALL_CLOCK_SPECS = ['__tests__/SprintsList.backlogPagination.spec.ts']
+
 const poolPreference = process.env.VITEST_POOL ?? (process.platform === 'win32' ? 'forks' : 'threads')
 
 export default mergeConfig(
@@ -19,7 +25,6 @@ export default mergeConfig(
     defineConfig({
         test: {
             root: __dirname,
-            include: ['__tests__/**/*.spec.ts'],
             pool: poolPreference,
             environment: 'jsdom',
             globals: true,
@@ -41,6 +46,25 @@ export default mergeConfig(
                 reporter: ['text-summary', 'json-summary', 'html', 'lcov'],
                 reportsDirectory: '../target/coverage/ui',
             },
+            projects: [
+                {
+                    extends: true,
+                    test: {
+                        name: 'parallel',
+                        include: ['__tests__/**/*.spec.ts'],
+                        exclude: [...configDefaults.exclude, ...WALL_CLOCK_SPECS],
+                    },
+                },
+                {
+                    extends: true,
+                    test: {
+                        name: 'wall-clock',
+                        include: WALL_CLOCK_SPECS,
+                        fileParallelism: false,
+                        sequence: { groupOrder: 1 },
+                    },
+                },
+            ],
         },
     }),
 )

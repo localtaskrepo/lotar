@@ -38,6 +38,11 @@ and report without edits, task mutations, or implementation gates.
 - A check the agent sandbox stops before compiling (`sccache`, `Operation not
   permitted`) has not failed: rerun it with approval, else with `RUSTC_WRAPPER=`,
   as testing-strategy says, before handing the ticket back.
+- A test that waits on a wall-clock budget, or fails under load and passes
+  alone, joins the serial `wall-clock` group in the change that finds it (see
+  [testing-strategy](.github/skills/testing-strategy/SKILL.md)) and is named
+  in the hand-off comment, instead of getting a ticket of its own. A test that
+  also fails alone is a real failure.
 - Lint requires warning-free Rust, frontend and smoke typechecking, oxlint, ESLint
   (Vue templates), and Rust plus Prettier formatting. Format only the files you changed (`rustfmt --edition 2024
   <files>`, `npx prettier --write <files>`), not the whole repo: other sessions' files are in progress. Rust tests use **nextest, not `cargo test`**.

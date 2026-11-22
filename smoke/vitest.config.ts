@@ -1,14 +1,35 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Specs that wait on wall-clock budgets (DEV-785): each failed in a full run under
+// load and passed alone (DEV-750, DEV-751, DEV-755, DEV-775, DEV-781, DEV-785
+// review). They run in the `wall-clock` project after the parallel files finish,
+// one file at a time.
+// A spec that flakes under load joins this list instead of getting its own ticket
+// (AGENTS.md).
+const WALL_CLOCK_SPECS = [
+    'tests/api.automation.smoke.spec.ts',
+    'tests/api.review-policy.smoke.spec.ts',
+    'tests/cli.automation.smoke.spec.ts',
+    'tests/harness.agent-launcher.smoke.spec.ts',
+    'tests/ui.advanced.smoke.spec.ts',
+    'tests/ui.agent-jobs.smoke.spec.ts',
+    'tests/ui.attachment-previews.smoke.spec.ts',
+    'tests/ui.config-coverage.smoke.spec.ts',
+    'tests/ui.dialogs.smoke.spec.ts',
+    'tests/ui.filter-autocomplete.smoke.spec.ts',
+    'tests/ui.sort-export.smoke.spec.ts',
+    'tests/ui.sprints-responsive.smoke.spec.ts',
+    'tests/ui.theming.smoke.spec.ts',
+];
+
 export default defineConfig({
     test: {
         root: __dirname,
-        include: ['tests/**/*.smoke.spec.ts'],
         globals: true,
         pool: 'threads',
         maxConcurrency: 4,
@@ -27,6 +48,25 @@ export default defineConfig({
             LOTAR_TEST_SILENT: '1',
         },
         reporters: 'default',
+        projects: [
+            {
+                extends: true,
+                test: {
+                    name: 'parallel',
+                    include: ['tests/**/*.smoke.spec.ts'],
+                    exclude: [...configDefaults.exclude, ...WALL_CLOCK_SPECS],
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: 'wall-clock',
+                    include: WALL_CLOCK_SPECS,
+                    fileParallelism: false,
+                    sequence: { groupOrder: 1 },
+                },
+            },
+        ],
     },
     resolve: {
         alias: {

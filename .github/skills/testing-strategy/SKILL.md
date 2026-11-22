@@ -26,6 +26,12 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
   (`scripts/check-lock.mjs`), and print `Waiting for the machine's check lock
   ..., held by <run>` while another holds it. That wait is not a hang. Runs
   filtered by file, test name or nextest filter don't wait, so iterate with them.
+- Wall-clock tests run serially (DEV-785): the nextest `wall-clock` test-group
+  (`.config/nextest.toml`, `max-threads = 1`, started first) and the
+  `WALL_CLOCK_SPECS` lists in `view/vitest.config.ts` and `smoke/vitest.config.ts`
+  (a `wall-clock` project that runs one file at a time after the parallel files).
+  A test that waits on real time or flakes under load goes there: add its module
+  or exact name to the nextest filter, or its spec file to the list.
 - Pure documentation needs link/example/consistency checks. Run executable
   examples in isolated temporary workspaces. Embedded prompts and behavioral
   configuration need relevant behavior checks even when their files are Markdown.
