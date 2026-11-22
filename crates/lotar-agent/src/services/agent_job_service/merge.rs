@@ -5,6 +5,7 @@
 //! agent starts. Only what needs judgment starts the merge agent: a
 //! conflict, a check that fails twice, others' unpushed commits, a refused push.
 
+use super::check_lock;
 use super::{
     JOB_REGISTRY, OUTPUT_DRAIN_LIMIT, git_command, linked_worktrees, merged_landed, prepare_worktree, record_and_emit, resolve_repo_root, rev_parse,
     should_stop_job, terminate_child, update_job,
@@ -162,8 +163,12 @@ impl Merge<'_> {
                 self.install(install, &worktree)?;
             }
             let passed_on_head = if before == after { passed_checks(self.tasks_dir, self.ticket_id, &after) } else { Vec::new() };
+            let checks: Vec<&str> = self.settings.checks.iter().map(|check| check.trim()).filter(|check| !check.is_empty()).collect();
+            let runs = checks.iter().any(|check| !passed_on_head.iter().any(|passed| passed == check));
+            let (lock, held) = if runs { self.check_lock(&worktree)? } else { (None, false) };
+            let env: &[(&str, &str)] = if held { &[(check_lock::HELD_ENV, "1")] } else { &[] };
             self.checks.clear();
-            for check in self.settings.checks.iter().map(|check| check.trim()).filter(|check| !check.is_empty()) {
+            for check in checks {
                 if passed_on_head.iter().any(|passed| passed == check) {
                     self.checks.push(ReportCheck {
                         command: check.to_string(),
@@ -173,8 +178,9 @@ impl Merge<'_> {
                     });
                     continue;
                 }
-                self.check(check, &worktree)?;
+                self.check(check, &worktree, env)?;
             }
+            drop(lock);
             let changes = git(&worktree, &["status", "--porcelain"]).map_err(hand_off)?;
             if !changes.is_empty() {
                 return Err(hand_off(format!("the checks left changes in `{}`:\n```\n{}\n```", worktree.display(), first_lines(&changes, 10))));
@@ -251,9 +257,9 @@ impl Merge<'_> {
     /// Run a check; one that fails runs once more right away, before the
     /// next check starts, and the merge goes on when that run passes: most
     /// failures of lotar's own merge were tests that pass alone (DEV-783).
-    fn check(&mut self, command: &str, dir: &Path) -> Result<(), Stop> {
+    fn check(&mut self, command: &str, dir: &Path, env: &[(&str, &str)]) -> Result<(), Stop> {
         self.progress(&format!("Running the check `{command}` in {}", dir.display()));
-        let output = match run_shell(self.job_id, command, dir, &[])? {
+        let output = match run_shell(self.job_id, command, dir, env)? {
             Ok((true, _)) => {
                 self.checks.push(ReportCheck { command: command.to_string(), result: "passed".to_string(), ..ReportCheck::default() });
                 self.done.push(format!("The check `{command}` passed"));
@@ -267,7 +273,7 @@ impl Merge<'_> {
         };
         let first = last_lines(&output, OUTPUT_TAIL_LINES);
         self.progress(&format!("Rerunning the check `{command}` once on its own: its first run failed"));
-        let rerun = run_shell(self.job_id, command, dir, &[])?;
+        let rerun = run_shell(self.job_id, command, dir, env)?;
         let passed = matches!(rerun, Ok((true, _)));
         self.checks.push(ReportCheck {
             command: command.to_string(),
@@ -290,6 +296,38 @@ impl Merge<'_> {
                 Err(hand_off(format!("the check `{command}` failed, and again when rerun on its own:\n```\n{}\n```", last_lines(&output, OUTPUT_TAIL_LINES))))
             }
             Err(err) => Err(hand_off(format!("the check `{command}` failed, and its rerun could not run: {err}"))),
+        }
+    }
+
+    /// The machine's check lock for this round's checks (DEV-784), and
+    /// whether the checks' own scripts are to be told it is held. Under a
+    /// run that holds it already (`LOTAR_CHECK_LOCK_HELD=1`) the checks run
+    /// in it; when the port can't be opened, without it.
+    fn check_lock(&mut self, worktree: &Path) -> Result<(Option<check_lock::CheckLock>, bool), Stop> {
+        if std::env::var(check_lock::HELD_ENV).is_ok_and(|held| held == "1") {
+            return Ok((None, true));
+        }
+        let holder = format!(
+            "lotar's merge checks of {} in {} (pid {}), since {}",
+            self.ticket_id,
+            worktree.display(),
+            std::process::id(),
+            jiff::Timestamp::now().strftime("%H:%M UTC")
+        );
+        let job_id = self.job_id;
+        let waiting = |held_by: &str| self.progress(&format!("Waiting for the machine's check lock (port {}), held by {held_by}", check_lock::PORT));
+        match check_lock::acquire(check_lock::PORT, &holder, waiting, || should_stop_job(job_id)) {
+            check_lock::Acquired::Held(lock) => {
+                if let Some(waited) = lock.waited {
+                    self.progress(&format!("Took the check lock after {}", check_lock::duration_text(waited)));
+                }
+                Ok((Some(lock), true))
+            }
+            check_lock::Acquired::Unavailable(err) => {
+                self.progress(&format!("Running the checks without the machine's check lock: port {} can't be opened ({err})", check_lock::PORT));
+                Ok((None, false))
+            }
+            check_lock::Acquired::Cancelled => Err(Stop::Cancelled),
         }
     }
 

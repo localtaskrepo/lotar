@@ -21,6 +21,11 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
   `test:ui` and the smoke suite run with a fresh temp folder and fail when
   anything is left in it (`scripts/rust-test-runner.mjs`, `scripts/vitest-temp-guard.mjs`;
   the vitest guard ignores Chromium's own `.org.chromium.Chromium.*` files).
+- One full run per machine at a time (DEV-784): a full Rust, UI or smoke run
+  and lotar's merge checks take the machine's check lock, port 47586
+  (`scripts/check-lock.mjs`), and print `Waiting for the machine's check lock
+  ..., held by <run>` while another holds it. That wait is not a hang. Runs
+  filtered by file, test name or nextest filter don't wait, so iterate with them.
 - Pure documentation needs link/example/consistency checks. Run executable
   examples in isolated temporary workspaces. Embedded prompts and behavioral
   configuration need relevant behavior checks even when their files are Markdown.

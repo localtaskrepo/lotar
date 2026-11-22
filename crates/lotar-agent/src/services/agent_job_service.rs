@@ -24,6 +24,7 @@ use std::sync::{Arc, Condvar, LazyLock, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod check_lock;
 mod follow;
 mod kept;
 mod merge;

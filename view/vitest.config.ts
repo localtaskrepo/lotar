@@ -23,7 +23,7 @@ export default mergeConfig(
             pool: poolPreference,
             environment: 'jsdom',
             globals: true,
-            globalSetup: ['../scripts/vitest-temp-guard.mjs'],
+            globalSetup: ['../scripts/check-lock.mjs', '../scripts/vitest-temp-guard.mjs'],
             setupFiles: ['__tests__/vitest.setup.ts'],
             // A hang guard, not a speed budget. The slowest specs render for
             // ~1 s on an idle machine, but the machine stalls for tens of

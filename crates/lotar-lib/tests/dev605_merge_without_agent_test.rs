@@ -177,6 +177,20 @@ fn a_clean_branch_lands_and_pushes_without_an_agent() {
     assert!(merged.text.contains("Pushed"), "{}", merged.text);
 }
 
+/// DEV-784: the checks run under the machine's check lock and tell the
+/// repository's scripts in them that it is held, so they don't wait for it.
+#[test]
+fn the_checks_tell_their_scripts_that_the_check_lock_is_held() {
+    let repo = Repo::new("  merge:\n    checks: ['test \"$LOTAR_CHECK_LOCK_HELD\" = 1']\n");
+    repo.commit_fix("feature.txt", "feature\n");
+
+    let (status, prompt) = repo.merge();
+
+    assert_eq!(status, "completed");
+    assert_eq!(prompt, None, "the check passed, so no agent started");
+    assert!(repo.on_main("feature.txt"));
+}
+
 #[test]
 fn a_check_that_passed_on_the_unchanged_commit_is_skipped() {
     let repo = Repo::new("  merge:\n    checks: ['exit 1']\n");

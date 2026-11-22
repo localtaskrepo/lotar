@@ -34,6 +34,7 @@ import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { acquireCheckLock, CHECK_LOCK_HELD_ENV } from './check-lock.mjs';
 
 // Windows child processes require these bootstrap variables (crypto/SSL,
 // console, temp resolution); they are passed through case-insensitively and
@@ -287,6 +288,11 @@ export function inventoryAllowed(parsed) {
     return (
         !parsed.hasFilterset && !parsed.hasPositionalFilter && !parsed.sawSeparator && !parsed.hasIgnoreDefaultFilter
     );
+}
+
+// A run that selects tests by name or filterset, or passes test binary arguments after `--`.
+export function isFilteredRun(parsed) {
+    return parsed.hasFilterset || parsed.hasPositionalFilter || parsed.sawSeparator;
 }
 
 export function buildInventoryArgs(parsed) {
@@ -625,7 +631,22 @@ export async function main({
         }
     }
 
-    const outcome = await runTestsInFreshTemp(runArgs, childEnv, stderr);
+    // A full run waits for the machine's check lock (DEV-784); a filtered one doesn't. Either way the tests themselves
+    // never take it: they get LOTAR_CHECK_LOCK_HELD=1.
+    const release = isFilteredRun(parsed)
+        ? async () => {}
+        : await acquireCheckLock({
+              label: 'the Rust suite (scripts/rust-test-runner.mjs)',
+              env: childEnv,
+              log: (line) => stderr.write(`rust-test-runner: ${line}\n`),
+          });
+    childEnv[CHECK_LOCK_HELD_ENV] = '1';
+    let outcome;
+    try {
+        outcome = await runTestsInFreshTemp(runArgs, childEnv, stderr);
+    } finally {
+        await release();
+    }
     if (plan.gitlessSelected) {
         stderr.write(
             `JUnit report for this run: ${GITLESS_JUNIT_PATH} (gitless profile dir; git_required tests excluded, not passed).\n`,
