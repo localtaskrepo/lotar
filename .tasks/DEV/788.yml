@@ -1,11 +1,11 @@
 title: 'Flaky smoke: full npm run smoke fails with timeouts under machine load, the failing tests pass alone'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T07:34:05.012147+00:00
-modified: 2026-11-22T19:27:34.109114+00:00
+modified: 2026-11-22T21:59:06.765191+00:00
 relationships:
   related:
   - DEV-765
@@ -16,6 +16,8 @@ relationships:
   - DEV-802
   - DEV-738
   - DEV-803
+  - DEV-780
+  - DEV-783
 comments:
 - date: 2026-11-22T13:42:25.866501+00:00
   author: automation
@@ -127,9 +129,33 @@ comments:
     Update: DEV-738 merged without the clashing ticket file. The docs follow-up is now DEV-803.
 
     - Main's `.tasks/DEV/788.yml` is still this flaky-smoke ticket. Nothing changed on `agent/DEV-788`.
+- date: 2026-11-22T21:58:48.342726+00:00
+  author: claude
+  text: |-
+    Ready for review: rebased onto main again, all three checks pass under load.
+
+    - Rebased onto main (DEV-779, DEV-780, DEV-783, DEV-738 landed since), no conflicts. The commit is now `830fe5ba3` (was `65b7b571d`)
+    - Small fix in the same commit: the "Graceful teardown" doc comment in `smoke/helpers/server.ts` sat above `isRunning`. It now sits above `stopChildProcess`, the function it describes
+    - I ran the checks in the foreground this time. The previous job ended while it waited on background runs
+  report:
+    commits:
+    - hash: 830fe5ba3
+      what: browser cleanup owed from launch, server stderr wait and 60 s readiness bound, with tests
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2469 Rust, 1567 UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 408/408 in 35 s at load average 25-46 on 14 cores
+    next: Review, then the merge agent lands 830fe5ba3 and reruns npm run smoke on main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A00eba8331e1b4442199bd2736f308391518047db59474cfa0c61a0898113a84c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa50b0d4d92d6a344c5466c713576a982c93b232e1afe53fe0ea758a6ccb4dbb6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae81eeeffd44cb0fe8b45dd8f03e6c8bcc4538caea7a3597f4a91ed6f40b15c0a
 description: |-
   Found: merging DEV-765 on 2026-11-21, two full `npm run smoke` runs failed on different tests while load average was 40-48 on 14 cores: run 1 `harness.agent-launcher.smoke.spec.ts` (batch-shim test, 'fixture child did not exit within 20000ms'); run 2 nine tests in `ui.theming`, `harness.server` (occupied port, expected /Failed to bind/), `ui.config-coverage`, `ui.backlog-order`, `ui.filter-panel`, `ui.global-actions` (120 s timeouts) and `harness.failed-test-cleanup` (Tests left playwright temp entries). Each file passes alone (32/32, launcher test in 0.8 s). Related: DEV-779 (same for test:ui).
   Check: `npm run smoke` while the machine is busy.
@@ -266,3 +292,39 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T21:12:41.359516+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738","DEV-803"]}'
+    new: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738","DEV-803","DEV-780"]}'
+- at: 2026-11-22T21:54:16.198122+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T21:54:27.430221+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae81eeeffd44cb0fe8b45dd8f03e6c8bcc4538caea7a3597f4a91ed6f40b15c0a
+- at: 2026-11-22T21:58:48.342726+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:58:48.588137+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738","DEV-803","DEV-780"]}'
+    new: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738","DEV-803","DEV-780","DEV-783"]}'
+- at: 2026-11-22T21:59:06.765191+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

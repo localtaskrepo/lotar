@@ -1,0 +1,34 @@
+title: 'Release skill and guide: a patch release ships without the owner''s OK, a minor or major one asks him'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T22:24:48.000467+00:00
+modified: 2026-11-22T22:35:23.553850+00:00
+relationships:
+  related:
+  - DEV-804
+  - DEV-817
+description: |-
+  Owner 2026-11-22 (chief of staff thread): "Let's change the rule for releasing. Only minor changes need my okay. Patch level updates can always be done". Scope (picker): every repo; a major release asks him too. Shared rule: standards global/AGENTS.md ("publishing but patch releases"), docs/decisions/2026-11-22-releases.md (STD-311).
+
+  Done when: .github/skills/release/SKILL.md step 4 tags and pushes a patch release without asking and asks him only for a minor or major bump; docs/release-guide.md says the same where it says who picks the bump; no other text in the repo says every release needs his OK.
+history:
+- at: 2026-11-22T22:24:48.361175+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T22:24:53.664496+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-804"]}'
+- at: 2026-11-22T22:35:23.553850+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-804"]}'
+    new: '{"related":["DEV-804","DEV-817"]}'

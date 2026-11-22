@@ -3,12 +3,19 @@ status: Todo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-22T19:39:15.567169+00:00
-modified: 2026-11-22T19:39:31.260419+00:00
+modified: 2026-11-22T22:24:58.067582+00:00
 relationships:
   related:
   - DEV-725
+  - DEV-815
+  - DEV-816
+  - DEV-817
+comments:
+- date: 2026-11-22T22:24:53.412571+00:00
+  author: claude
+  text: 'No longer waits for the owner: a patch release ships without his OK, a minor or major one asks him (owner 2026-11-22: "Only minor changes need my okay. Patch level updates can always be done"; STD-311, DEV-816). The chief of staff hands this to @fix once DEV-816 (the release skill) and DEV-815 (the sprints lock the web UI trips on) are merged.'
 releases:
 - 12
 description: |-
@@ -27,3 +34,25 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-725"]}'
+- at: 2026-11-22T22:24:53.412571+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:24:53.663945+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725"]}'
+    new: '{"related":["DEV-725","DEV-815","DEV-816"]}'
+- at: 2026-11-22T22:24:53.980210+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude
+- at: 2026-11-22T22:24:58.067582+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-815","DEV-816"]}'
+    new: '{"related":["DEV-725","DEV-815","DEV-816","DEV-817"]}'

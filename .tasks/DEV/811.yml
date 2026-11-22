@@ -1,0 +1,19 @@
+title: lotar config set drops every YAML comment in the project config it rewrites
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T21:21:07.483127+00:00
+modified: 2026-11-22T21:21:07.811181+00:00
+description: 'Found (STD-305, 2026-11-22, lotar 0.15.6): `lotar --project DEV config set issue.types Feature,Bug,Chore,Research` rewrote .tasks/DEV/config.yml and dropped the owner-decision comments on agent.worktree (max_parallel_jobs, waiting_run). It also turned the flow list waiting_run: [cargo, clean, --workspace] into a block list. Same in standards .tasks/INBOX/config.yml. Check: copy a project config with comments into a scratch .tasks, run config set on one key, then diff. Done: config set changes only that key and keeps comments and the formatting of other keys, with a test.'
+tags:
+- health
+custom_fields:
+  finding: config-set:comments
+history:
+- at: 2026-11-22T21:21:07.811181+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

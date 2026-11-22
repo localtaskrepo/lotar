@@ -21,6 +21,11 @@ issue:
   done_states:
   - Done
   - WontDo
+  types:
+  - Feature
+  - Bug
+  - Chore
+  - Research
 attachments:
   dir: DEV/@attachments
 agent:

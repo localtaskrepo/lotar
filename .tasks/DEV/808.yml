@@ -1,0 +1,32 @@
+title: 'Server: an automation run command that runs lotar comment on another ticket hangs until the 300 s limit, and the owner''s inbox answers aren''t relayed'
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T21:11:09.195177+00:00
+modified: 2026-11-22T22:13:05.495250+00:00
+relationships:
+  related:
+  - DEV-732
+  - DEV-757
+  - DEV-815
+description: 'Found (2026-11-22, chief of staff): standards'' rule ''Inbox: the owner''s answer goes to the source'' (standards .tasks/INBOX/automation.yml) runs `lotar --tasks-dir <source_repo>/.tasks comment <source> --answer ...` and then `lotar status <INBOX> Done`. On INBOX-651 (source STD-299, 21:04 UTC, lotar 0.15.6) the comment was written on STD-299 at once, but the command didn''t return: the server log (~/Library/Logs/lotar-services/standards.log) says ''Automation run command did not finish within 300s and was stopped''. So INBOX-651 stayed Todo, STD-299 stayed HelpNeeded/mallox, and the STD rule ''Comments: the owner''s comment reaches the agent'' (its set, run and tell_agent) didn''t take effect: no job started. The same failure earlier today on INBOX-567 (STD-257), INBOX-580 (STD-262), INBOX-592 (DEV-732), while INBOX-554 (STD-210), 613 (DEV-757), 621 (LOCA-571) went through: intermittent, not tied to one repo. The owner felt his inbox inputs didn''t respond. The step the STD rule runs, `repos.ts --inbox STD-299`, takes 0.2 s alone. Suspects: the nested lotar call''s own automation (tell_agent, or the storage lock the outer server run holds, crates/lotar-agent/src/services/automation_service.rs), and whether the server blocks the comment request for those 300 s. Done when: a nested lotar comment from a run command returns within seconds and its own rules fire, with a test that reproduces the hang first; and a run that times out leaves a visible comment on the ticket, not only a server log line.'
+history:
+- at: 2026-11-22T21:11:09.477794+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-732","DEV-757"]}'
+- at: 2026-11-22T21:11:09.764886+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T22:13:05.495250+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-757"]}'
+    new: '{"related":["DEV-732","DEV-757","DEV-815"]}'

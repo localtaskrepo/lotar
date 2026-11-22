@@ -1,14 +1,55 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-22T20:46:08.262949+00:00
+modified: 2026-11-22T21:30:16.313374+00:00
 relationships:
   blocks:
   - DEV-801
+comments:
+- date: 2026-11-22T21:30:02.840094+00:00
+  author: claude
+  text: |-
+    Done: one merge runs its checks on the machine at a time, and fix, rework and review jobs run only targeted tests.
+
+    - Lock: `crates/lotar-agent/src/services/agent_job_service/checks_lock.rs`, a file lock `checks.lock` in the agent queue folder (`.../agent-queue/`). Any repo, any lotar process. The OS frees it when the holder exits.
+    - lotar's own merge takes it before its first rebase when `agent.merge` has checks. A merge agent takes it before it starts (a hand-off keeps it). It is held until the job ends. Waiting is no stall. The log line names the holder; the merge comment says how long it waited.
+    - Fallback: if the lock can't be opened, the merge runs without it and says why.
+    - Limit: a waiting merge occupies a job slot.
+    - Tests: `crates/lotar-lib/tests/dev797_one_merge_checks_at_a_time_test.rs` holds the lock like another process; both paths wait, then run. Merges in one process were already serialized.
+    - Prompts: `.tasks/DEV/automation.yml` (fix, work, review, rework, continue, owner-answer: targeted; merge: full suites). Also `AGENTS.md`, `.github/skills/testing-strategy/SKILL.md`, `docs/help/agent.md` ("The checks lock").
+    - Standards source `configs/lotar/automation.yml`: the same edit, identical prefix, **uncommitted** in `~/.t3/worktrees/standards/dev-797-targeted-checks`. The standards commit gate (`npm run -s check`) fails on 2 usage-limit tests (STD-130/133, STD-194) that fail on main too; no `--no-verify`.
+    - Git hooks unchanged: pre-commit runs staged-file checks, pre-push runs clippy and the typecheck; neither runs test or smoke.
+    - Guidance correction: AGENTS.md and testing-strategy now say targeted checks in agent jobs, full suites only at merge.
+  report:
+    commits:
+    - hash: afdb9d5c0
+      what: machine-wide checks lock for merge jobs, targeted-check prompts, docs
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run --cargo-profile dev -E 'test(/dev797/) | test(/dev605/) | test(/checks_lock/)'
+      result: passed
+    - command: cargo nextest run --cargo-profile dev -E 'package(lotar-agent) | test(/merge/) | test(/agent_job/)'
+      result: passed
+    - command: lotar automation simulate --ticket DEV-797 --event manual
+      result: passed
+      reason: .tasks/DEV/automation.yml loads
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: 'standards: node --test --test-name-pattern=STD-155 scripts/automation.test.ts'
+      result: passed
+    - command: 'standards: npm run -s check'
+      result: failed
+      reason: STD-130/133 and STD-194 usage-limit tests in scripts/automation.test.ts fail on main's file too; the commit gate refuses the standards commit
+    next: Merge afdb9d5c0; commit the uncommitted standards change in ~/.t3/worktrees/standards/dev-797-targeted-checks once standards' check passes, and land it; after the release, measure merge check rounds against the 84% failure baseline
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 description: |-
@@ -97,3 +138,16 @@ history:
       - [ ] Git hooks: unchanged. pre-commit checks only staged files (format, oxlint, ESLint, secrets); pre-push runs fmt + clippy (lib, bins) and the frontend typecheck/lint for what the push changes; neither runs test or smoke suites, so neither defeats this.
       - [ ] docs/help/agent.md describes the lock and the check rule.
       - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline (a follow-up after the release, not this job).
+- at: 2026-11-22T21:30:02.840094+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:30:16.313374+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

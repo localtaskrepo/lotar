@@ -1,15 +1,17 @@
 title: 'Flaky test risk: the shipped agent-pipeline template test waits for three agent jobs within the 30 s wait floor'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T06:13:38.957747+00:00
-modified: 2026-11-22T19:22:37.760206+00:00
+modified: 2026-11-22T22:40:37.423912+00:00
 relationships:
   related:
   - DEV-772
   - DEV-801
+  - DEV-779
+  - DEV-780
 comments:
 - date: 2026-11-22T11:29:27.723430+00:00
   author: claude
@@ -53,6 +55,39 @@ comments:
     Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
 
     - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
+- date: 2026-11-22T22:35:02.308551+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:\n```\ntarget/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB\ntarget/web/assets/AutomationRulesEditor-ugyk1aPA.js      72.27 kB │ gzip:  20.10 kB\ntarget/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB\ntarget/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB\ntarget/web/assets/ConfigView-DfWYORyb.js                153.98 kB │ gzip:  38.53 kB\ntarget/web/assets/SprintsList-CGcF2nGk.js               254.93 kB │ gzip:  85.09 kB\ntarget/web/assets/index-AdOIdUyW.js                     416.09 kB │ gzip: 126.30 kB\n\n✓ built in 39.28s\n\e[33m[PLUGIN_TIMINGS] \e[0mJavaScript callbacks ran for 31.9s of this 39.3s build (81%).\nThe slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):\n  - plugin vite:vue transform (68%, 26.6s, 307 calls)\n  - plugin vite:prepare-out-dir renderStart (5%, 1.8s, 1 call)\nAdditional callback time came from the callbacks below and from callbacks under 1s.\n1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:\n  - plugin vite:asset load (3 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.\n\ncompressed 1930KiB -> 580KiB (70% saved), embedding 89 gz + 1 raw assets\n   Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-787/crates/lotar-agent)\n   Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-787/crates/lotar-web-assets)\n   Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-787/crates/lotar-lib)\n   Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-787)\n    Finished `dev` profile [unoptimized] target(s) in 8m 26s\n────────────\n Nextest run ID 7961f80e-e106-4ff0-a9ec-bbe005c4b66f with nextest profile: default\n    Starting 2469 tests across 14 binaries\n────────────\n     Summary [1066.035s] 2469 tests run: 2469 passed (1 slow), 0 skipped\nrust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpo9xMic\n```.\n\n- Rebased `agent/DEV-787` onto `main` (`83043eacf8be`): `94bafac22763`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed\n- The check `npm run -s smoke` passed\n- `main` moved on during the checks: rebasing again\n- Rebased `agent/DEV-787` onto `main` (`321debdf9566`): `6ab3e9002931`\n- The check `npm run -s lint:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-22T22:40:34.474718+00:00
+  author: claude
+  text: |-
+    Landed on `main` as `6ab3e9002` and pushed with DEV-779 and DEV-780.
+
+    - lotar's merge stopped on `npm run -s test:agent`: all 2469 tests passed, but the temp guard found a leftover `.tmpo9xMic`. The change only edits two test waits, so it can't cause that. Reported on the flaky list [DEV-801](https://lotar.pyxzl.net/task/DEV-801).
+    - I reran the check, but my session ended its turn while waiting. That ended the job: lotar fast-forwarded `main` (14:38), set Done and removed the worktree, so the rerun broke off at link time.
+    - No rules or profiles changed, so no `lotar trust`. The ticket's check (test:agent under load 35+) ran at load 35 to 41.
+  report:
+    commits:
+    - hash: 6ab3e9002
+      what: both waits of the shipped pipeline template test use JOB_END_LIMIT_MS
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: on 6ab3e9002, lotar's merge
+    - command: npm run -s test:agent
+      result: failed
+      reason: on 6ab3e9002 all 2469 tests passed, but the temp guard caught a leaked .tmpo9xMic (unrelated, on DEV-801); passed on 94bafac2 (same change, previous base); my rerun was cut off when the job ended
+    - command: npm run -s smoke
+      result: passed
+      reason: on 94bafac2 (lotar's merge); not rerun on 6ab3e9002
+    next: 'None: landed; the temp leak is tracked on DEV-801'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5f4408af6858c3a0bb37fa97e5f4fd3186eac9d65a094f00a7885b3a0f55baa6
 description: 'Found in the review of DEV-772 (2026-11-21): `crates/lotar-lib/tests/agent_automation_integration_test.rs:2376` waits `wait_for_completed_jobs(&created.id, 3, 6000)` (raised to the 30 s `WAIT_FLOOR_MS`) and then 10 s for Done, for the same implement, test, merge pipeline whose waits DEV-772 moved to `JOB_END_LIMIT_MS`. Not seen failing yet. Check: `npm run -s test:agent` at load average 35+. Done: waits for tickets or jobs that three agent jobs move use `JOB_END_LIMIT_MS`.'
@@ -119,3 +154,23 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T22:35:02.308551+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:38:01.857497+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-22T22:40:34.474718+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:40:37.423912+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-772","DEV-801"]}'
+    new: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780"]}'

@@ -1,11 +1,11 @@
 title: Agents page shows Running 0, Queued 0 while the queue worker runs 2 jobs and 13 tickets wait
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T22:12:31.042289+00:00
-modified: 2026-11-22T21:10:40.516209+00:00
+modified: 2026-11-22T21:25:49.422639+00:00
 relationships:
   blocks:
   - DEV-798
@@ -160,6 +160,34 @@ comments:
     - **Manual check:** `lotar serve` from this branch on a scratch workspace with 3 tickets queued by the CLI. `/api/jobs` showed Running 0, Queued 3, the same as `lotar agent queue`. The fix agent's 12 screenshots were read and look fine; they show the free-slot text, which has no backticks
     - **Minor, filed:** [DEV-798](https://lotar.pyxzl.net/task/DEV-798): the tab counts don't match the list. "All 0" shows above 3 waiting tickets, and the Queued tab counts jobs waiting for prerequisites
     - **My mistake, cleaned up:** the job's `LOTAR_TASKS_DIR` made my first scratch `lotar add` create DEV-798..801 in the main checkout. They were untracked, I deleted them, and no queue entries or jobs exist for them. The number 798 was then reused for the minor ticket above
+- date: 2026-11-22T21:25:34.199687+00:00
+  author: claude
+  text: |-
+    Fixed: the queue row shows backtick spans as code. Amended as `074ab0e67` (review had read HEAD `3333807b1`).
+
+    - **Backticks (blocking):** `view/pages/AgentJobs.vue` ~98 now renders `waits_for` through `MarkdownContent` (sanitized, already used on this page), inside a `div.queue-row__waits`. The wrapper keeps the row's muted 13px style: scoped styles don't reach `MarkdownContent`'s root
+    - **Test:** `view/__tests__/AgentJobs.spec.ts` adds a queue entry whose `waits_for` has `\`lotar agent queue resume\``. It checks for no backtick and a `<code>`. It fails without the fix ("not to contain '`'") and passes with it
+    - **Browser:** scratch workspace, 3 queued tickets, worker stopped (`LOTAR_AGENT_QUEUE_DISABLE_WORKER=1`). `/api/jobs` gave `running 0, queued 3, stopped`. Rows read "start one with `lotar agent queue resume`" set as code, in light and dark at 1440 and 390. Screenshots: `/private/tmp/claude-501/-Users-mallox-Development--localtaskrepo--lotar-worktrees-lotar-DEV-771/105f15bc-c475-428e-8cd8-b11abdd5e521/scratchpad/after-light-1440.png`, `after-dark-390.png` (same folder)
+    - **Rebase (not done):** `git merge-tree --write-tree main HEAD` still exits 1 with the 2 conflicts the review named (`docs/help/agent.md` ~361, the `import type` in `AgentJobs.vue`). This job may not rebase, so the merge agent resolves them: keep both lines, add `AgentJobTool`
+  report:
+    commits:
+    - hash: 074ab0e67
+      what: amended; the queue row renders waits_for as markdown, with a Vitest for backticks
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2446 Rust, 1564 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '406'
+    - command: vitest view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: 32, rerun after the last template edit
+    - command: browser screenshots light/dark at 1440 and 390
+      result: passed
+    next: Review again; the merge agent rebases onto main (2 small conflicts)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1224931913f390b0667f0bc0e9b90bc806302a13aae24ec5e6fd5fc180d2b92e
 - attachment: DEV-771-after-dark-1440.ca37cea0ad6ab1dd3d749d4033f02bf0.png
@@ -409,3 +437,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada661d1e3ac4990c7fea615800a31c57ef9e5b1d632ba41cd5b535457b459343
+- at: 2026-11-22T21:25:34.199687+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:25:49.422639+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

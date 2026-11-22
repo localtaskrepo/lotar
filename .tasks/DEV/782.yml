@@ -1,16 +1,17 @@
 title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-22T19:21:11.937475+00:00
+modified: 2026-11-22T21:52:51.036195+00:00
 relationships:
   depends_on:
   - DEV-765
   related:
   - DEV-765
+  - DEV-766
 comments:
 - date: 2026-11-22T06:37:21.509101+00:00
   author: claude
@@ -116,10 +117,34 @@ comments:
       result: not_run
       reason: no page, component or style changed (backend DTO + tests only)
     next: Review, then merge agent
+- date: 2026-11-22T21:52:37.741185+00:00
+  author: claude
+  text: |-
+    Fix ready on `799bb8b8a`; amended so it still compiles after the rebase onto main.
+
+    - main's DEV-766 added a `tool` field to `JobLogEntry`; the DEV-782 test built that struct field by field, so it would have failed to compile once rebased
+    - The test now builds entries from JSON, and also checks that a later `agent_job_tool` event clears the question
+    - `git merge-tree main HEAD`: no conflicts
+    - `npm run lint:agent`, `npm run test:agent`, `npm run smoke` (407 tests): all pass
+    - No screenshots: no page, component or style changed
+  report:
+    commits:
+    - hash: 799bb8b8a
+      what: logged question in saved_job_dto, Rust + UI tests
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run smoke
+      result: passed
+      reason: 407 tests
+    next: Review, then the merge agent rebases onto main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A213f6f4501a6f08135284814b3c429c20077b295d8c5df00ce09be201fb88dad
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A50f958bdaa784d4118c01f21dcbf17988a72435778df104a80c7d3d4e1197f2d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65ef83e7116702c76bd3e4c058364b8f78158b576ce3b9e0b9b28a24a470b955
 description: |-
   Found while reviewing DEV-765.
 
@@ -274,3 +299,33 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T21:30:59.591256+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-22T21:31:04.210972+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65ef83e7116702c76bd3e4c058364b8f78158b576ce3b9e0b9b28a24a470b955
+- at: 2026-11-22T21:52:37.741185+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:52:38.074261+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"related":["DEV-765"]}'
+    new: '{"depends_on":["DEV-765"],"related":["DEV-765","DEV-766"]}'
+- at: 2026-11-22T21:52:51.036195+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

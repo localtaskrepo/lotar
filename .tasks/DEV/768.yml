@@ -1,11 +1,11 @@
 title: 'Assignee picker: searchable, grouped by people and agent roles, showing each profile''s runner, model and effort'
-status: HelpNeeded
+status: Todo
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-21T20:47:05.414784+00:00
-modified: 2026-11-22T20:41:42.029924+00:00
+modified: 2026-11-22T22:02:29.669666+00:00
 relationships:
   related:
   - DEV-769
@@ -13,6 +13,7 @@ relationships:
   - DEV-756
   - DEV-765
   - DEV-806
+  - DEV-812
 comments:
 - date: 2026-11-21T23:36:23.239354+00:00
   author: automation
@@ -223,6 +224,20 @@ comments:
     - key: drop
       label: Drop the description line from Done when
     recommended: add
+- date: 2026-11-22T21:42:31.959029+00:00
+  author: mallox
+  text: |-
+    Answer: add (Add an optional description key to agent profiles)
+
+    (answered in INBOX-648)
+  answer:
+    to: 2026-11-22T19:54:26.623129+00:00
+    choice:
+    - add
+    note: (answered in INBOX-648)
+- date: 2026-11-22T22:00:01.659749+00:00
+  author: claude
+  text: 'The owner''s answer reached this ticket, but the rules after it hung on a git call (DEV-812: lotar''s background git read ~/.gitconfig from Dropbox and blocked). Fixed on the machine; handing it to @fix as the rule would have.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa12f0aa7aa7c3a5663ff7f38b51ea73b9a85fabf949074533a44458e86ad9e8a
 - attachment: after-automation-dark.e4a61bebbc5bfd235e640881d2e978ed.png
@@ -1186,3 +1201,29 @@ history:
   - field: relationships
     old: '{"related":["DEV-769","DEV-776","DEV-756","DEV-765"]}'
     new: '{"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806"]}'
+- at: 2026-11-22T21:42:31.959029+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:00:01.659749+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:00:01.997006+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806"]}'
+    new: '{"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806","DEV-812"]}'
+- at: 2026-11-22T22:00:02.277845+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T22:02:29.669666+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo

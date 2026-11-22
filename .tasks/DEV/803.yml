@@ -1,17 +1,41 @@
 title: 'docs/help/automation.md job_paused: a taken-over t3 job that can''t resume its session fails (DEV-738), not named there'
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T19:27:28.533467+00:00
-modified: 2026-11-22T19:27:29.140664+00:00
+modified: 2026-11-22T22:01:02.456312+00:00
 relationships:
   related:
   - DEV-738
   - DEV-739
   - DEV-788
   - DEV-802
+comments:
+- date: 2026-11-22T22:00:48.592556+00:00
+  author: claude
+  text: |-
+    job_paused docs now say a taken-over `t3` job fails instead of pausing
+
+    - `docs/help/automation.md:230`: a `t3` job fails there (a new session would start a second thread beside the one that may still run in T3 Code), as does a job with nothing to run again; their `job_failed` rules run. Wording follows `docs/help/agent.md` (Jobs whose process died)
+    - `docs/help/sse.md:50` and its copy `docs/developers/sse.md:41`: `agent_job_paused` notes a taken-over `t3` job sends `agent_job_failed` instead
+    - Only other running thread (DEV-802) touches other files; no notice needed
+  report:
+    commits:
+    - hash: d5ebdcfde
+      what: job_paused and agent_job_paused name the t3 takeover failure
+    checks:
+    - command: npx prettier --check (3 changed docs)
+      result: passed
+    - command: 'anchor check: agent.md Jobs whose process died, Usage limits, Paused queue'
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A403495f232f793ff0dd6be6046a5ba2fa34cf84d94311e60290786b09dd57251
 description: |-
   Found in the DEV-738 review (filed there as DEV-788 in its worktree, an ID main already had, see DEV-802): docs/help/automation.md:230 (job_paused, from DEV-739) says a taken-over job that can't resume its session runs again in a new one, 'a job with nothing to run again fails'. Since DEV-738 (e343b4e33, on main) a t3 job fails there too, so its job_failed rules run, not job_paused. Check: read the job_paused line against docs/help/agent.md (Jobs whose process died).
 
@@ -33,3 +57,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T22:00:03.192059+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T22:00:07.394783+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A403495f232f793ff0dd6be6046a5ba2fa34cf84d94311e60290786b09dd57251
+- at: 2026-11-22T22:00:48.592556+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:01:02.456312+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

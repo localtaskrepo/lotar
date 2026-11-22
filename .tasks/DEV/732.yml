@@ -5,7 +5,7 @@ type: Feature
 reporter: triage
 assignee: '@merge'
 created: 2026-11-20T13:45:47.182735+00:00
-modified: 2026-11-21T21:12:05.099296+00:00
+modified: 2026-11-22T21:11:09.476285+00:00
 relationships:
   blocks:
   - DEV-730
@@ -24,6 +24,7 @@ relationships:
   - DEV-741
   - DEV-747
   - DEV-757
+  - DEV-808
 comments:
 - date: 2026-11-20T14:22:54.037142+00:00
   author: automation
@@ -614,3 +615,9 @@ history:
   changes:
   - field: releases
     new: '#11'
+- at: 2026-11-22T21:11:09.476285+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735","DEV-741","DEV-747","DEV-757"]}'
+    new: '{"blocks":["DEV-730","DEV-731"],"related":["DEV-728","DEV-730","DEV-731","DEV-361","DEV-729","DEV-733","DEV-378","DEV-734","DEV-727","DEV-735","DEV-741","DEV-747","DEV-757","DEV-808"]}'

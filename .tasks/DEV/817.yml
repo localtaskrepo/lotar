@@ -1,0 +1,63 @@
+title: 'Releases: patch releases without the owner''s OK, minor and major ones with it'
+status: WontDo
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-22T22:24:57.734074+00:00
+modified: 2026-11-22T22:35:23.554049+00:00
+relationships:
+  related:
+  - DEV-804
+  - DEV-816
+comments:
+- date: 2026-11-22T22:35:23.325536+00:00
+  author: claude
+  text: |-
+    Duplicate: closed, the chief of staff filed DEV-816 for this first.
+
+    - Filed by the STD-311 job, which ran after the chief of staff had already finished STD-311.
+description: |-
+  Found: the owner changed the release rule for every repo (2026-11-22, chief of staff thread): "Only minor changes need my okay. Patch level updates can always be done". Major releases still ask him. Recorded in standards STD-311, docs/decisions/2026-11-22-releases.md. Here .github/skills/release/SKILL.md step 4 still says every tag needs his OK, and docs/release-guide.md (Pre-Release Checklist, step 1) says he picks the bump.
+
+  ## Done when
+  - [ ] SKILL.md step 4: a patch release (only Z of vX.Y.Z changes) is tagged, pushed and released without asking; a minor or major release asks him first (HelpNeeded on the release ticket when you can't ask directly), quoting his words.
+  - [ ] release-guide.md: the bump stays a patch by default; a minor or major one only on his OK; patch releases need no OK.
+  - [ ] No other line in AGENTS.md, docs/ or .github/ still says each release asks him (grep release + OK/owner).
+  - [ ] DEV-804 (v0.15.7) and later patch releases go ahead without waiting for him.
+tags:
+- health
+custom_fields:
+  finding: standards:releases-patch-no-ok
+history:
+- at: 2026-11-22T22:24:58.069035+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-804"]}'
+- at: 2026-11-22T22:24:58.375985+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T22:35:22.868824+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: WontDo
+- at: 2026-11-22T22:35:23.277204+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-22T22:35:23.325536+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:35:23.554049+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-804"]}'
+    new: '{"related":["DEV-804","DEV-816"]}'

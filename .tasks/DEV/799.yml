@@ -1,17 +1,54 @@
 title: 'Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-22T19:22:20.629481+00:00
+modified: 2026-11-22T21:54:00.131322+00:00
 relationships:
   related:
   - DEV-464
   - DEV-615
   - DEV-725
   - DEV-801
+comments:
+- date: 2026-11-22T21:39:08.887960+00:00
+  author: claude
+  text: |-
+    Cause found: the release list misses a release created before the page's event stream subscribed.
+
+    - `view/composables/useReleases.ts` reloaded only on `release_changed` and on a *re*open, not the first open; the watcher can also start late, so the create sends no event.
+    - Fix: reload on every stream `open` and `ready`; smoke test starts the server with `LOTAR_SSE_READY=1` (ready comes after the watcher watches).
+    - Failing unit test first in `view/__tests__/useReleases.spec.ts`; now passes. Building for smoke.
+- date: 2026-11-22T21:53:38.658557+00:00
+  author: claude
+  text: |-
+    Fixed: the row menu's release list now catches a release created before the page's event stream was listening.
+
+    - `view/composables/useReleases.ts`: it reloads on every stream `open` and `ready`, not only on `release_changed` and reconnects. A release created before the subscription or before the server's watcher started sent no event, so Add to release stayed disabled.
+    - `smoke/tests/ui.releases.smoke.spec.ts`: the server starts with `LOTAR_SSE_READY=1`, so `ready` arrives only after the watcher watches.
+    - New unit test in `view/__tests__/useReleases.spec.ts`, failing before the fix. The `useSse` mock in `view/__tests__/Dependencies.navigation.spec.ts` now accepts calls without options.
+    - The CI failure couldn't be reproduced locally; the releases spec passes 5 of 5, full smoke 407 of 407.
+  report:
+    commits:
+    - hash: d4b3cb4de
+      what: release list reloads on stream open and ready; smoke test waits for the watcher via LOTAR_SSE_READY
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts
+      result: passed
+      reason: 5 of 5 runs
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: Rust 2469, UI 1568, release 60, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 407 of 407
+    next: Review, then merge; watch the next CI smoke runs for this test
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adfb741c2086c10a924409cd5752026c76392856e3a908ac33e047e23a887365e
 description: |-
   Found in Quality Assurance run 45057966596 (attempt 1) on main `78c006d4b`, the v0.15.6 release commit (DEV-725): `tests/ui.releases.smoke.spec.ts` > offers Add to release in the row menu once a release appears (DEV-464) failed at line 125, `expect.poll(() => item.isEnabled())`: the Add to release item did not become enabled in time after the release was created. 1 of 407 smoke tests failed on the GitHub runner, so this is not the local machine's load. DEV-615 fixed an earlier failure of the same test at the release creation step.
 
@@ -38,3 +75,31 @@ history:
   - field: relationships
     old: '{"related":["DEV-464","DEV-615","DEV-725"]}'
     new: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801"]}'
+- at: 2026-11-22T21:26:42.845189+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T21:26:46.740308+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adfb741c2086c10a924409cd5752026c76392856e3a908ac33e047e23a887365e
+- at: 2026-11-22T21:39:08.887960+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:53:38.658557+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:54:00.131322+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

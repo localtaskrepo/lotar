@@ -1,0 +1,20 @@
+title: Delete a comment or withdraw a question (soft, kept in history)
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T21:14:20.898265+00:00
+modified: 2026-11-22T21:14:21.231389+00:00
+description: |-
+  Owner 2026-11-22: "You can't edit an existing question? I thought we support (soft) deletes. If not ... file as a feature request on lotar."
+
+  Found: tasks have soft delete (deleted_at, restore); comments can only be updated (POST /api/tasks/comment/update, MCP task_comment_update), with no CLI command and no delete. An automation asked a wrong question on STD-302 (retry options on a finished research job), and its inbox entry took over those options; the only way out was editing both YAML files by hand.
+
+  Done when: a comment can be soft-deleted and restored from the CLI (lotar comment <ID> --delete <index|date>), the API, MCP and the web UI; a deleted comment drops out of normal views and open-question lists but stays in the file with deleted_at and a history entry; an open question can be withdrawn the same way, so whatever mirrors it (an inbox entry) sees it as gone; lotar comment also gets --edit for the existing update.
+history:
+- at: 2026-11-22T21:14:21.231389+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

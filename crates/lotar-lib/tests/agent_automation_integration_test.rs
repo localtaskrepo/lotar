@@ -2373,10 +2373,10 @@ exit 0
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
             .expect("assign implementation agent");
 
-        let jobs = wait_for_completed_jobs(&created.id, 3, 6000);
+        let jobs = wait_for_completed_jobs(&created.id, 3, JOB_END_LIMIT_MS);
         assert_eq!(jobs.len(), 3, "expected implement, test, and merge jobs");
 
-        assert!(wait_for_task_status(&storage, &created.id, "Done", 10_000), "task did not reach Done after pipeline completed");
+        assert!(wait_for_task_status(&storage, &created.id, "Done", JOB_END_LIMIT_MS), "task did not reach Done after pipeline completed");
 
         let refreshed = TaskService::get(&storage, &created.id, None).expect("get final task");
         assert_eq!(refreshed.status.as_str(), "Done");

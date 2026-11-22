@@ -1,0 +1,47 @@
+title: 'File viewer hangs forever when a git call hangs: git children have no timeout'
+status: WontDo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T21:53:15.614370+00:00
+modified: 2026-11-22T21:53:52.306212+00:00
+relationships:
+  related:
+  - DEV-812
+comments:
+- date: 2026-11-22T21:53:51.820732+00:00
+  author: claude
+  text: 'Duplicate of DEV-812: filed three times by a retry loop of mine. Work on DEV-812.'
+description: |-
+  Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
+
+  Cause: each server has a child `git -C <repo>/.tasks rev-parse --path-format=absolute --git-common-dir` running since 11:28, blocked in open() inside read_very_early_config. ~/.gitconfig is a symlink into Dropbox's File Provider folder (~/Library/CloudStorage/Dropbox), and macOS holds the open while it checks Files and Folders access for the process lotar started (sandboxd logs TCCAccessRequestIndirect for a FileProvider domain with lotar as the subject). Each brew upgrade changes lotar's path (Cellar/lotar/<version>), so the check comes back after every upgrade.
+
+  The same hang stops automation runs: 'Inbox: the owner's answer goes to the source' times out after 300 s (INBOX-647, 648, 651, 652), and its repos.ts --inbox children stay blocked on the same git call.
+
+  Expected: git calls from the server have a timeout and fail, so one hung git call gives an error (or no file links) instead of blocking the endpoint until a restart. The machine's git config is fixed separately (standards side).
+
+  Check: with GIT_CONFIG_GLOBAL pointing at a FIFO nobody writes, /api/files/resolve answers within a few seconds.
+history:
+- at: 2026-11-22T21:53:15.903703+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T21:53:51.820732+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T21:53:52.035449+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-812"]}'
+- at: 2026-11-22T21:53:52.306212+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: WontDo

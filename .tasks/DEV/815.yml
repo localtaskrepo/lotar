@@ -1,0 +1,43 @@
+title: 'Web UI and CLI writes fail with ''sprints lock still busy'': the standards agent worker holds @sprints/.sprints.lock for up to 13.5 s at a time'
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T22:13:05.166729+00:00
+modified: 2026-11-22T22:24:53.664276+00:00
+relationships:
+  related:
+  - DEV-643
+  - DEV-808
+  - DEV-804
+description: |-
+  The owner keeps getting sprint lock errors in the web UI (2026-11-22). Writes wait 2 s for `@sprints/.sprints.lock` (`acquire_storage_lock`, `DEFAULT_STORAGE_LOCK_WAIT`) and then fail with "Storage lock .../@sprints/.sprints.lock is still busy after 2 seconds".
+
+  Measured live on 0.15.6, standards (`~/Development/standards/.tasks`), 2026-11-22 14:10-14:20 PST:
+  - A flock probe (`LOCK_EX|LOCK_NB` every 50 ms) found the lock held 19% of 45 s (longest hold 4.4 s), then 43% of 40 s. In a 50 s run the holds were 4.5 s, 13.5 s, 0.45 s and 9.2 s.
+  - Every time the lock was busy, `lsof` showed only `lotar --tasks-dir /Users/mallox/Development/standards/.tasks agent worker` (pid 50691, started 11:56) with the lock file open.
+  - `sample 50691`: the main thread sat in `poll` 86% of the time, the rest in `open`/`readdir`/`stat`. That looks like a thread holding the lock while it waits on a child process or I/O. The binary is stripped, so there are no Rust frames.
+  - Worker children that started as holds began: `git merge-base --is-ancestor ... HEAD`, `git merge-tree --write-tree --no-messages HEAD refs/heads/agent/STD-243`, `t3 thread show mcp:launch:...`, `t3 thread list --project /Users/mallox/Development/standards --json`, plus the INBOX rule's relay `sh -c ... lotar comment ...`. This is a correlation only; a holder that runs git or t3 under the storage locks is the likely cause, like the job-registry wait in DEV-643.
+
+  Possibly the same cause as DEV-808: the inbox relay ran `lotar --tasks-dir local/.tasks comment LOCA-578 ...` for 45 s and more. Its automation ran `node standards/scripts/repos.ts --inbox LOCA-578`, which calls lotar on standards' INBOX while the worker holds standards' locks.
+
+  Done when: no worker path holds the sprints lock (or a task lock) while it runs a child process (git, t3, harnessmux, automation run commands) or waits on a mutex that such a path holds. A test holds each slow step and checks that both locks stay free (as in `a_task_update_waits_for_the_registry_without_holding_the_storage_locks`). After the install, the flock probe on standards shows no hold over 1 s under load.
+history:
+- at: 2026-11-22T22:13:05.495443+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-643","DEV-808"]}'
+- at: 2026-11-22T22:13:05.824753+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T22:24:53.664276+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-808"]}'
+    new: '{"related":["DEV-643","DEV-808","DEV-804"]}'

@@ -1,0 +1,33 @@
+title: 'Kept T3 Code threads of done tickets stay unsettled: 56 completed job threads in the sidebar on 0.15.6'
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T21:19:09.010490+00:00
+modified: 2026-11-22T21:22:50.394391+00:00
+relationships:
+  related:
+  - DEV-747
+  - DEV-752
+comments:
+- date: 2026-11-22T21:22:50.394391+00:00
+  author: claude
+  text: 'Backlog settled by hand 2026-11-22 13:45 PST (chief of staff, full access): 42 job threads of Done tickets. The 28 still unsettled belong to open tickets or running roles. The fix still needs its test: the next done ticket with pruned job logs shows whether lotar settles it.'
+description: 'Found 2026-11-22 13:30 PST (chief of staff, owner: ''t3 still has a lot of open threads. We''re on the new version of lotar so I hope this can be cleaned up now?''). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads (''<ID> fix: ...'', ''<ID> review: ...''), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing ''Threads to settle'' lists 42). DEV-747''s look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says ''Settled'' or ''was not settled''. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else ''no harnessmux session holds it''. The chief of staff can''t settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job''s log or session record is gone (find them from T3''s thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner''s OK.'
+history:
+- at: 2026-11-22T21:19:09.309565+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-747","DEV-752"]}'
+- at: 2026-11-22T21:19:09.603562+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T21:22:50.394391+00:00
+  actor: claude
+  changes:
+  - field: comment_added
