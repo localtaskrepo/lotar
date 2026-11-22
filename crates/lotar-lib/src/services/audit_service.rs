@@ -1242,8 +1242,15 @@ mod blob_batch_tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let pid_file = dir.path().join("pid");
         let mut command = Command::new("sh");
-        command.arg("-c").arg(format!("sleep 600 & echo $! > {}; wait", pid_file.display()));
+        command.arg("-c").arg(format!("sleep 600 & echo $! > {0}.tmp && mv {0}.tmp {0}; wait", pid_file.display()));
         let blobs = BlobBatch::spawn_within(&mut command, Duration::from_millis(300)).expect("spawn");
+        // The timeout counts per read, so a slow start under load must not
+        // race it: wait until the stub has written its child's pid (DEV-773).
+        let waiting = Instant::now();
+        while !pid_file.exists() {
+            assert!(waiting.elapsed() < Duration::from_secs(60), "the stub never wrote its pid file");
+            std::thread::sleep(Duration::from_millis(10));
+        }
         let commit = ParsedCommit {
             sha: "0123456789abcdef0123456789abcdef01234567".to_string(),
             author: "a".to_string(),
