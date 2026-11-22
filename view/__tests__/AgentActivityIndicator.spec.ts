@@ -23,6 +23,16 @@ vi.mock('../api/client', () => ({
                 },
                 { id: 'job-2', ticket_id: 'DEV-2', runner: 'codex', status: 'queued', created_at: '' },
                 { id: 'job-3', ticket_id: 'DEV-3', runner: 'codex', status: 'completed', created_at: '' },
+                {
+                    id: 'job-8',
+                    ticket_id: 'DEV-8',
+                    runner: 'claude',
+                    agent: 'fix',
+                    status: 'running',
+                    created_at: '',
+                    last_message: 'Run git push? (Allow, Deny)',
+                    question: { request: '', title: 'Run git push? (Allow, Deny)', options: [] },
+                },
             ],
         })),
     },
@@ -156,6 +166,16 @@ describe('AgentActivityIndicator', () => {
         tool('failed', 'Bash: npm test failed', 3)
         await flushPromises()
         expect(title()).toBe('fix is working on this: Bash: npm test failed')
+        card.unmount()
+    })
+
+    // DEV-782: after a reload, a job of another process that waits on a question asks, as it does live.
+    it('shows the question a listed job waits on', async () => {
+        const card = mount(AgentActivityIndicator, { props: { taskId: 'DEV-8', label: true } })
+        await flushPromises()
+        const pill = card.get('[data-testid="agent-activity"]')
+        expect(pill.text()).toContain('Asks')
+        expect(pill.attributes('title')).toBe('fix asks: Run git push? (Allow, Deny)')
         card.unmount()
     })
 })

@@ -1055,8 +1055,15 @@ fn saved_job_dto(saved: &crate::services::agent_log_service::SavedJob, running: 
         model: header.model.clone(),
         effort: header.effort.clone(),
         usage: status.and_then(|status| status.usage.clone()),
-        question: None,
+        question: logged_question(saved, running),
     }
+}
+
+/// The question a logged job waits on (DEV-782): its last event asks, and it still runs without an end. Only
+/// the job's own process can answer, so the question has the event's message as its title and no options.
+fn logged_question(saved: &crate::services::agent_log_service::SavedJob, running: bool) -> Option<crate::api_types::AgentJobQuestion> {
+    let last = saved.events.last().filter(|entry| entry.kind == "agent_job_question" && running && saved.status.is_none())?;
+    Some(crate::api_types::AgentJobQuestion { request: String::new(), title: last.message.clone().unwrap_or_default(), options: Vec::new() })
 }
 
 fn job_context_for(id: &str) -> Option<AutomationJobContext> {
@@ -9076,5 +9083,39 @@ mod dev853_job_reporter_tests {
         assert!(notes(Some("Jane O'Doe")).contains("`LOTAR_DEFAULT_REPORTER='Jane O'\\''Doe'`"), "{}", notes(Some("Jane O'Doe")));
         assert!(notes(None).contains("`LOTAR_DEFAULT_REPORTER=<your agent name>` (`claude`, `codex`)"), "{}", notes(None));
         assert!(!notes(Some("")).contains(REPORTER_VAR), "{}", notes(Some("")));
+    }
+}
+
+#[cfg(test)]
+mod dev782_logged_question_tests {
+    use super::saved_job_dto;
+    /// DEV-782: a logged job another process runs reports the question its last event asks, without options;
+    /// a later event, an end or no live process clears it.
+    #[test]
+    fn a_logged_job_reports_the_question_its_last_event_asks() {
+        use crate::services::agent_log_service::{JobLogEntry, JobLogHeader, JobStatusLine, SavedJob};
+        let event = |kind: &str, message: &str| -> JobLogEntry {
+            serde_json::from_value(serde_json::json!({"kind": kind, "at": "2026-11-22T10:00:00Z", "message": message})).expect("event")
+        };
+        let header: JobLogHeader =
+            serde_json::from_value(serde_json::json!({"job_id": "job-1", "ticket_id": "DEV-1", "runner": "claude", "created_at": "2026-11-22T10:00:00Z"}))
+                .expect("header");
+        let asks = vec![event("agent_job_started", ""), event("agent_job_question", "Run ls? (Allow, Reject)")];
+        let job = |events: Vec<JobLogEntry>, status: Option<JobStatusLine>, running: bool| {
+            saved_job_dto(&SavedJob { header: header.clone(), events, status }, running).question
+        };
+
+        let question = job(asks.clone(), None, true).expect("the job asks");
+        assert_eq!(question.title, "Run ls? (Allow, Reject)");
+        assert!(question.options.is_empty() && question.request.is_empty(), "only the job's own process can answer: {question:?}");
+
+        for later in ["agent_job_progress", "agent_job_message", "agent_job_tool"] {
+            let mut events = asks.clone();
+            events.push(event(later, "Run ls?: allow (owner)"));
+            assert!(job(events, None, true).is_none(), "{later} after the question clears it");
+        }
+        let ended: JobStatusLine = serde_json::from_value(serde_json::json!({"status": "completed", "at": "2026-11-22T10:01:00Z"})).expect("status");
+        assert!(job(asks.clone(), Some(ended), true).is_none(), "an end status clears it");
+        assert!(job(asks, None, false).is_none(), "a job no live process holds asks nothing");
     }
 }

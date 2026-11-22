@@ -5,8 +5,10 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:40:17.216351+00:00
-modified: 2026-11-27T00:04:21.035774+00:00
+modified: 2026-11-27T02:39:31.600451+00:00
 relationships:
+  blocks:
+  - DEV-915
   related:
   - DEV-871
   - DEV-915
@@ -57,6 +59,12 @@ comments:
     - No REST shape change: state values and fields are unchanged. No stray files, no second branch
     - Reran: `npm ci` passed; `cargo nextest run -p lotar-agent agent_queue_service` passed (19 tests); `npm run lint` passed. Worktree left clean
     - Minor: `held_in_memory` was placed under `combined_stats`'s doc comment, so it took that doc over (`agent_queue_service.rs:1054`): [DEV-915](https://lotar.pyxzl.net/task/DEV-915)
+- date: 2026-11-27T02:39:31.600451+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-910` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-910` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc0d53bae55baf591510f51ca1605d4de7c5708d320028e2cb712e47bd6136ce
 description: |-
@@ -141,3 +149,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T02:39:22.473919+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-871","DEV-915"]}'
+    new: '{"blocks":["DEV-915"],"related":["DEV-871","DEV-915"]}'
+- at: 2026-11-27T02:39:31.600451+00:00
+  actor: automation
+  changes:
+  - field: comment_added

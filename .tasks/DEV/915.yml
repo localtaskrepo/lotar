@@ -1,15 +1,28 @@
 title: combined_stats lost its doc comment to held_in_memory in agent_queue_service.rs
-status: Todo
+status: Blocked
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T00:04:01.449016+00:00
-modified: 2026-11-27T00:04:03.209462+00:00
+modified: 2026-11-27T02:39:28.997479+00:00
 relationships:
+  depends_on:
+  - DEV-910
   related:
   - DEV-910
   - DEV-865
+comments:
+- date: 2026-11-27T02:39:23.118727+00:00
+  author: claude
+  text: |-
+    Waits for DEV-910 to land on main: the code to fix isn't there yet.
+
+    - `held_in_memory` comes from `15d212009`, which is only on `agent/DEV-910` (status Merging); main (`5738fa5b2`) still has `combined_stats` with its doc comment at `crates/lotar-agent/src/services/agent_queue_service.rs:1229`
+    - A fix made now on this branch would conflict with DEV-910's merge, so DEV-915 now depends on DEV-910 and is tagged `waits`
+    - Once DEV-910 is done: rebase onto main, move the four DEV-865 doc lines back above `combined_stats`, leaving `held_in_memory` its own three
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A680674b4bb9f3226a0545c290f9674bbc58c2d66158ba18bc621157fff9695be
 description: |-
   Found in the review of DEV-910.
 
@@ -19,6 +32,8 @@ description: |-
   ## Done when
 
   - [ ] The first four doc lines sit above `combined_stats` again; `held_in_memory` keeps only its own three
+tags:
+- waits
 history:
 - at: 2026-11-27T00:04:02.861555+00:00
   actor: claude
@@ -31,3 +46,36 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T02:38:50.019678+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T02:38:50.648953+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A680674b4bb9f3226a0545c290f9674bbc58c2d66158ba18bc621157fff9695be
+- at: 2026-11-27T02:39:22.474438+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-910","DEV-865"]}'
+    new: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865"]}'
+- at: 2026-11-27T02:39:23.066288+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-27T02:39:23.118727+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T02:39:28.997479+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

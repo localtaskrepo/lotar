@@ -1,11 +1,11 @@
 title: lotar agent worktree cleanup doesn't sweep a project's own build_root
-status: Blocked
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T17:20:58.415465+00:00
-modified: 2026-11-26T18:53:17.560539+00:00
+modified: 2026-11-27T02:38:20.993445+00:00
 relationships:
   depends_on:
   - DEV-778
@@ -147,3 +147,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-778"],"related":["DEV-778"]}'
     new: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905"]}'
+- at: 2026-11-27T02:38:20.993445+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
