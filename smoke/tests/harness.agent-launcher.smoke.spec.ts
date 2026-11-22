@@ -83,13 +83,16 @@ interface ExitOutcome {
 // load-sized budget and the exit bound outlasts it (DEV-781).
 const FIXTURE_WAIT_MS = 45_000;
 
-function awaitExit(child: ChildProcess, boundMs = 2 * FIXTURE_WAIT_MS): Promise<ExitOutcome> {
+// The exit promise also exposes the stderr read so far, for a child that hangs.
+type ExitWait = Promise<ExitOutcome> & { readonly stderrSoFar: () => string };
+
+function awaitExit(child: ChildProcess, boundMs = 2 * FIXTURE_WAIT_MS): ExitWait {
     let stderr = '';
     child.stderr?.setEncoding('utf8');
     child.stderr?.on('data', (chunk: string) => {
         stderr += chunk;
     });
-    return new Promise((resolve, reject) => {
+    const exit = new Promise<ExitOutcome>((resolve, reject) => {
         const timer = setTimeout(() => {
             reject(new Error(`fixture child did not exit within ${boundMs}ms; stderr: ${stderr}`));
         }, boundMs);
@@ -102,6 +105,21 @@ function awaitExit(child: ChildProcess, boundMs = 2 * FIXTURE_WAIT_MS): Promise<
             resolve({ code, stderr });
         });
     });
+    return Object.assign(exit, { stderrSoFar: () => stderr });
+}
+
+// A failed start wait reports the wrapper's exit and stderr when it has already
+// exited; a hung wrapper must not hold the test past its timeout (DEV-792).
+async function exitDetail(exit: ExitWait): Promise<string> {
+    return Promise.race([
+        exit.then(
+            (outcome) => `; wrapper exit=${outcome.code} stderr=${outcome.stderr}`,
+            (error: unknown) => `; wrapper ${(error as Error).message}`,
+        ),
+        new Promise<string>((resolve) => {
+            setTimeout(() => resolve(`; wrapper still running stderr=${exit.stderrSoFar()}`), 1_000);
+        }),
+    ]);
 }
 
 async function waitForFile(filePath: string, timeoutMs: number): Promise<void> {
@@ -395,10 +413,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             try {
                 await gate.waitForStarted('shim', FIXTURE_WAIT_MS);
             } catch (error) {
-                const outcome = await exit;
-                throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`, {
-                    cause: error,
-                });
+                throw new Error(`${(error as Error).message}${await exitDetail(exit)}`, { cause: error });
             }
 
             const boot = await readBootSentinel(gate.dir, 'shim');
@@ -455,10 +470,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             try {
                 await gate.waitForStarted('fwd', FIXTURE_WAIT_MS);
             } catch (error) {
-                const outcome = await exit;
-                throw new Error(`${(error as Error).message}; wrapper exit=${outcome.code} stderr=${outcome.stderr}`, {
-                    cause: error,
-                });
+                throw new Error(`${(error as Error).message}${await exitDetail(exit)}`, { cause: error });
             }
 
             const boot = await readBootSentinel(gate.dir, 'fwd');
@@ -525,14 +537,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
             try {
                 await gate.waitForStarted('conflict', FIXTURE_WAIT_MS);
             } catch (error) {
-                const outcome = await Promise.race([
-                    exit,
-                    new Promise<null>((resolve) => {
-                        setTimeout(() => resolve(null), 1_000);
-                    }),
-                ]);
-                const detail = outcome ? `; wrapper exit=${outcome.code} stderr=${outcome.stderr}` : '';
-                throw new Error(`${(error as Error).message}${detail}`, { cause: error });
+                throw new Error(`${(error as Error).message}${await exitDetail(exit)}`, { cause: error });
             }
 
             const boot = await readBootSentinel(gate.dir, 'conflict');
