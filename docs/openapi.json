@@ -10620,13 +10620,18 @@
         "type": "object",
         "properties": {
           "queue_stats": {
-            "description": "Running and queued job counts when the job registry is in this process.",
+            "description": "Jobs running in every process for the tasks directory and the tickets waiting in its agent queue, as `lotar agent queue` counts them.",
             "nullable": true,
             "type": "object",
             "properties": {
               "running": {"type": "integer"},
-              "queued": {"type": "integer"}
+              "queued": {"type": "integer"},
+              "max_parallel": {"type": "integer", "nullable": true}
             }
+          },
+          "queue": {
+            "$ref": "#/components/schemas/AgentQueueOverview",
+            "nullable": true
           },
           "jobs": {
             "type": "array",
@@ -10638,6 +10643,40 @@
         "required": [
           "jobs"
         ]
+      },
+      "AgentQueueOverview": {
+        "type": "object",
+        "description": "The agent queue as `lotar agent queue` shows it.",
+        "properties": {
+          "worker_state": {"type": "string", "enum": ["active", "stopped", "idle"]},
+          "reason": {"type": "string", "nullable": true, "description": "What the waiting tickets wait for."},
+          "pending": {"type": "array", "description": "The waiting tickets, in queue order.", "items": {"$ref": "#/components/schemas/AgentQueuedTicket"}},
+          "waiting_for_prerequisites": {"type": "array", "items": {"$ref": "#/components/schemas/AgentParkedTicket"}}
+        },
+        "required": ["worker_state", "pending", "waiting_for_prerequisites"]
+      },
+      "AgentQueuedTicket": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {"type": "string"},
+          "agent": {"type": "string", "description": "Agent profile; empty for a bare runner."},
+          "runner": {"type": "string", "nullable": true},
+          "queued_at": {"type": "string", "format": "date-time"},
+          "attempts": {"type": "integer"},
+          "not_before": {"type": "string", "format": "date-time", "nullable": true},
+          "waits_for": {"type": "string", "description": "What the ticket waits for: a queue worker, memory, a usage limit's reset, a paused queue, a free slot, its ticket's running job, or `starting`."}
+        },
+        "required": ["ticket_id", "agent", "queued_at", "attempts", "waits_for"]
+      },
+      "AgentParkedTicket": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {"type": "string"},
+          "agent": {"type": "string"},
+          "parked_at": {"type": "string", "format": "date-time"},
+          "status": {"type": "string", "nullable": true, "description": "The ticket's status before it was set to Blocked."}
+        },
+        "required": ["ticket_id", "agent", "parked_at"]
       },
       "AgentJobCancelRequest": {
         "type": "object",

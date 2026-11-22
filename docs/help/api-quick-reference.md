@@ -48,7 +48,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/agents/profiles[?project=PREFIX] -> { data: { profiles: AgentProfileInfo[], installed_runners: string[], project } } (name, runner, model?, effort?, permissions), sorted by name; without `project` the default project is used
 - POST /api/agents/profiles (AgentProfileCreateRequest: name, runner, project?, global?, model?, effort?, permissions?) -> { data: ConfigSetResponse }; refuses a name that already exists for that scope
 - POST /api/jobs (AgentJobCreateRequest; optional `model`/`effort`/`provider`/`session` override the profile for this run) -> { data: AgentJobCreateResponse }
-- GET  /api/jobs?ticket_id=ID&status=STATUS -> { data: AgentJobListResponse }; newest first, including jobs only the saved job logs hold (earlier server runs, other processes); `ticket_id` also matches a moved task's old ID
+- GET  /api/jobs?ticket_id=ID&status=STATUS -> { data: AgentJobListResponse }; newest first, including jobs only the saved job logs hold (earlier server runs, other processes); `ticket_id` also matches a moved task's old ID. `queue_stats` counts the jobs running in every process for the tasks directory and the tickets waiting in its agent queue, as `lotar agent queue` does; `queue` lists those tickets in queue order with what each waits for (`waits_for`), and the jobs waiting for prerequisites
 - GET  /api/jobs/get?id=JOB_ID -> { data: AgentJobStatusResponse }
 - POST /api/jobs/cancel ({ id }) -> { data: AgentJobCancelResponse }
 - POST /api/jobs/cancel-all -> { data: AgentJobCancelAllResponse }

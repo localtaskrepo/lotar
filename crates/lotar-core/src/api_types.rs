@@ -937,6 +937,56 @@ pub struct AgentJobListResponse {
     /// Queue statistics
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub queue_stats: Option<AgentQueueStats>,
+    /// The tickets waiting in the agent queue of every process (DEV-771)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub queue: Option<AgentQueueOverview>,
+}
+
+/// The agent queue as `lotar agent queue` shows it (DEV-771).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentQueueOverview {
+    /// `active` (a worker process runs), `stopped` (tickets wait, no worker runs) or `idle`
+    pub worker_state: String,
+    /// What the waiting tickets wait for, with tickets queued
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reason: Option<String>,
+    /// The waiting tickets, in queue order
+    pub pending: Vec<AgentQueuedTicket>,
+    /// The jobs waiting for their tickets' prerequisites
+    pub waiting_for_prerequisites: Vec<AgentParkedTicket>,
+}
+
+/// A ticket waiting in the agent queue.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentQueuedTicket {
+    pub ticket_id: String,
+    /// Agent profile; empty for a bare runner
+    pub agent: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub runner: Option<String>,
+    pub queued_at: String,
+    /// Failed starts so far
+    pub attempts: u32,
+    /// The entry starts no earlier than this
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub not_before: Option<String>,
+    /// What the ticket waits for: a free slot, its ticket's running job, memory, a paused queue, a worker
+    pub waits_for: String,
+}
+
+/// A job waiting for its ticket's prerequisites.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentParkedTicket {
+    pub ticket_id: String,
+    /// Agent profile; empty for a bare runner
+    pub agent: String,
+    pub parked_at: String,
+    /// The ticket's status before it was set to Blocked
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -11,7 +11,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
 
-    // GET /api/jobs -> list agent jobs, with the ones only the job logs hold (DEV-518)
+    // GET /api/jobs -> list agent jobs, with the ones only the job logs hold (DEV-518),
+    // and the agent queue of every process (DEV-771)
 
     api_server.register_handler("GET", "/api/jobs", |req: &HttpRequest| {
         let resolver = resolve_tasks_dir().ok();
@@ -33,8 +34,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
             jobs.retain(|job| job.status.eq_ignore_ascii_case(status));
         }
         jobs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-        let queue_stats = crate::services::agent_job_service::AgentJobService::queue_stats();
-        ok_json(200, json!({"data": {"jobs": jobs, "queue_stats": queue_stats}}))
+        // The counts and waiting tickets of every process, as `lotar agent queue` shows them (DEV-771).
+        let overview = resolver.as_ref().and_then(|resolver| crate::services::agent_queue_service::AgentQueueService::overview(&resolver.path).ok());
+        match overview {
+            Some(overview) => ok_json(200, json!({"data": {"jobs": jobs, "queue_stats": overview.stats, "queue": overview.to_api()}})),
+            None => {
+                let queue_stats = crate::services::agent_job_service::AgentJobService::queue_stats();
+                ok_json(200, json!({"data": {"jobs": jobs, "queue_stats": queue_stats}}))
+            }
+        }
     });
 
     // GET /api/jobs/get -> fetch agent job status

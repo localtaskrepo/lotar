@@ -453,45 +453,20 @@ impl AgentHandler {
             }
             None => {
                 // Default: list pending entries + worker status
-                let pending = AgentQueueService::list_pending(tasks_dir).map_err(|e| e.to_string())?;
-                let parked = AgentQueueService::list_parked(tasks_dir).map_err(|e| e.to_string())?;
-                let mut stats = AgentJobService::queue_stats();
-                // Count jobs other processes run too (DEV-279).
-                stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
-                // And the on-disk queue this command lists (DEV-522).
-                stats.queued = stats.queued.max(pending.len());
-                let memory = crate::services::memory_gate::status(tasks_dir);
-                let (state, reason) = AgentQueueService::worker_state(tasks_dir, &pending, memory.hold.as_ref());
-                let worker_running = state == WorkerState::Active;
+                let overview = AgentQueueService::overview(tasks_dir).map_err(|e| e.to_string())?;
+                let (stats, state, reason, memory) = (&overview.stats, overview.state, &overview.reason, &overview.memory);
 
                 if matches!(renderer.format, OutputFormat::Json) {
-                    let entries: Vec<_> = pending
-                        .iter()
-                        .map(|e| {
-                            serde_json::json!({
-                                "ticket_id": e.ticket_id,
-                                "agent": e.agent,
-                                "queued_at": e.queued_at,
-                                "attempts": e.attempts,
-                                "not_before": e.not_before,
-                            })
-                        })
-                        .collect();
-                    let parked: Vec<_> = parked
-                        .iter()
-                        .map(
-                            |p| serde_json::json!({"ticket_id": p.entry.ticket_id, "agent": p.entry.agent, "parked_at": p.entry.queued_at, "status": p.status}),
-                        )
-                        .collect();
+                    let queue = overview.to_api();
                     renderer.emit_json(&serde_json::json!({
-                        "pending": entries,
-                        "waiting_for_prerequisites": parked,
-                        "worker_running": worker_running,
+                        "pending": queue.pending,
+                        "waiting_for_prerequisites": queue.waiting_for_prerequisites,
+                        "worker_running": state == WorkerState::Active,
                         "worker_state": state.as_str(),
                         "reason": reason,
                         "memory_hold": memory.hold.as_ref().map(crate::services::memory_gate::MemoryHold::to_json),
                         "memory_error": memory.error,
-                        "pause": AgentQueueService::pause_state(tasks_dir),
+                        "pause": overview.pause,
                         "running_jobs": stats.running,
                         "queued_jobs": stats.queued,
                     }));
@@ -506,25 +481,26 @@ impl AgentHandler {
                     renderer.emit_warning(format!("The memory reading failed, so the queue doesn't wait for memory: {error}"));
                 }
 
-                if pending.is_empty() {
+                if overview.pending.is_empty() {
                     renderer.emit_notice("No pending entries in queue.");
                 } else {
-                    renderer.emit_raw_stdout(format_args!("ticket\tagent\tqueued_at\tattempts\tnot_before"));
-                    for entry in &pending {
+                    renderer.emit_raw_stdout(format_args!("ticket\tagent\tqueued_at\tattempts\tnot_before\twaits_for"));
+                    for (entry, waits_for) in &overview.pending {
                         renderer.emit_raw_stdout(format_args!(
-                            "{}\t{}\t{}\t{}\t{}",
+                            "{}\t{}\t{}\t{}\t{}\t{}",
                             entry.ticket_id,
                             entry.agent,
                             entry.queued_at,
                             entry.attempts,
-                            entry.not_before.as_deref().unwrap_or("-")
+                            entry.not_before.as_deref().unwrap_or("-"),
+                            waits_for
                         ));
                     }
                 }
-                if !parked.is_empty() {
+                if !overview.parked.is_empty() {
                     renderer.emit_notice("Waiting for prerequisites (they start once those are done):");
                     renderer.emit_raw_stdout(format_args!("ticket\tagent\tparked_at"));
-                    for item in &parked {
+                    for item in &overview.parked {
                         renderer.emit_raw_stdout(format_args!("{}\t{}\t{}", item.entry.ticket_id, item.entry.agent, item.entry.queued_at));
                     }
                 }

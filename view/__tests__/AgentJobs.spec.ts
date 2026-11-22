@@ -1163,3 +1163,71 @@ describe('AgentJobs setup when no agents exist', () => {
         }
     })
 })
+
+describe('AgentJobs queue of every process (DEV-771)', () => {
+    it('lists the waiting tickets in queue order with what they wait for', async () => {
+        ;(api.listAgentJobs as any).mockResolvedValue({
+            jobs: [runningJob],
+            queue_stats: { running: 2, queued: 3, max_parallel: 2 },
+            queue: {
+                worker_state: 'active',
+                reason: 'waiting for a free slot (2 of the global agent.worktree.max_parallel_jobs 2 running)',
+                pending: [
+                    {
+                        ticket_id: 'DEV-7',
+                        agent: 'fix',
+                        queued_at: '2026-10-08T09:00:00.000Z',
+                        attempts: 0,
+                        waits_for:
+                            'waiting for a free slot (2 of the global agent.worktree.max_parallel_jobs 2 running)',
+                    },
+                    {
+                        ticket_id: 'DEV-3',
+                        agent: '',
+                        runner: 'codex',
+                        queued_at: '2026-10-08T09:05:00.000Z',
+                        attempts: 0,
+                        waits_for: "waiting for its ticket's running job job-9",
+                    },
+                    {
+                        ticket_id: 'DEV-4',
+                        agent: 'review',
+                        queued_at: '2026-10-08T09:06:00.000Z',
+                        attempts: 0,
+                        waits_for: 'waiting for a queue worker; start one with `lotar agent queue resume`',
+                    },
+                ],
+                waiting_for_prerequisites: [
+                    { ticket_id: 'DEV-8', agent: 'implement', parked_at: '2026-10-08T08:00:00.000Z', status: 'Todo' },
+                ],
+            },
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            expect(wrapper.find('.queue-stats-card').text()).toContain('3 Queued')
+            const queuedTab = wrapper.findAll('.filter-tab').find((tab) => tab.text().startsWith('Queued'))!
+            expect(queuedTab.find('.tab-count').text()).toBe('4')
+            const entries = wrapper.findAll('[data-testid="agent-queue-entry"]')
+            expect(entries.map((entry) => entry.find('.chip').text())).toEqual(['DEV-7', 'DEV-3', 'DEV-4'])
+            expect(entries[0]!.text()).toContain('@fix')
+            expect(entries[0]!.text()).toContain('Queued')
+            expect(entries[0]!.text()).toContain('Waiting for a free slot (2 of the global')
+            expect(entries[1]!.text()).toContain('codex')
+            expect(entries[1]!.text()).toContain("Waiting for its ticket's running job job-9")
+            expect(entries[2]!.text()).not.toContain('`')
+            expect(entries[2]!.find('.queue-row__waits code').text()).toBe('lotar agent queue resume')
+            const parked = wrapper.findAll('[data-testid="agent-queue-parked"]')
+            expect(parked).toHaveLength(1)
+            expect(parked[0]!.text()).toContain('DEV-8')
+
+            await queuedTab.trigger('click')
+            expect(wrapper.find('[data-testid="agent-queue"]').exists()).toBe(true)
+            expect(wrapper.text()).not.toContain('No queued jobs')
+            const completedTab = wrapper.findAll('.filter-tab').find((tab) => tab.text().startsWith('Completed'))!
+            await completedTab.trigger('click')
+            expect(wrapper.find('[data-testid="agent-queue"]').exists()).toBe(false)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})

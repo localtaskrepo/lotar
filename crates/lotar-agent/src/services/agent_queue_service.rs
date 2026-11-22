@@ -1,4 +1,4 @@
-use crate::api_types::AgentJobCreateRequest;
+use crate::api_types::{AgentJobCreateRequest, AgentParkedTicket, AgentQueueOverview, AgentQueueStats, AgentQueuedTicket};
 use crate::config::manager::ConfigManager;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::AgentJobService;
@@ -476,6 +476,43 @@ impl AgentQueueService {
         (WorkerState::Active, Some(reason))
     }
 
+    /// The jobs running and queued for the tasks directory in every process:
+    /// this one's, the records of the others (DEV-279) and the queue file's
+    /// `pending` entries (DEV-522). Without a limit in this process's
+    /// registry, the configured global limit (DEV-771).
+    pub fn queue_stats(tasks_dir: &Path, pending: &[AgentQueueEntry]) -> AgentQueueStats {
+        let mut stats = AgentJobService::queue_stats();
+        stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
+        stats.queued = stats.queued.max(pending.len());
+        if stats.max_parallel.is_none() {
+            stats.max_parallel = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
+                .ok()
+                .and_then(|config| config.get_resolved_config().agent_worktree.max_parallel_jobs);
+        }
+        stats
+    }
+
+    /// The queue as `lotar agent queue`, `GET /api/jobs` and the Agents page
+    /// show it, with what each waiting ticket waits for (DEV-771).
+    pub fn overview(tasks_dir: &Path) -> LoTaRResult<QueueOverview> {
+        let pending = Self::list_pending(tasks_dir)?;
+        let parked = Self::list_parked(tasks_dir)?;
+        let taken = read_state(tasks_dir).map(|state| state.taken).unwrap_or_default();
+        let memory = crate::services::memory_gate::status(tasks_dir);
+        let pause = Self::pause_state(tasks_dir);
+        let (state, reason) = Self::worker_state(tasks_dir, &pending, memory.hold.as_ref());
+        let waits_for = entries_wait_for(tasks_dir, state, &pending, &taken, pause.as_ref(), memory.hold.as_ref());
+        Ok(QueueOverview {
+            stats: Self::queue_stats(tasks_dir, &pending),
+            state,
+            reason,
+            pending: pending.into_iter().zip(waits_for).collect(),
+            parked,
+            memory,
+            pause,
+        })
+    }
+
     /// Why a job for the ticket must wait for a free slot under
     /// `agent.worktree.max_parallel_jobs` (the global limit for all jobs
     /// together, its project's for that project's), or `None` when it may
@@ -699,6 +736,104 @@ impl AgentQueueService {
         }
         result
     }
+}
+
+/// What [`AgentQueueService::overview`] found.
+pub struct QueueOverview {
+    pub stats: AgentQueueStats,
+    pub state: WorkerState,
+    pub reason: Option<String>,
+    /// The waiting entries in queue order, each with what it waits for.
+    pub pending: Vec<(AgentQueueEntry, String)>,
+    pub parked: Vec<ParkedEntry>,
+    pub memory: crate::services::memory_gate::GateStatus,
+    pub pause: Option<QueuePause>,
+}
+
+impl QueueOverview {
+    pub fn to_api(&self) -> AgentQueueOverview {
+        AgentQueueOverview {
+            worker_state: self.state.as_str().to_string(),
+            reason: self.reason.clone(),
+            pending: self
+                .pending
+                .iter()
+                .map(|(entry, waits_for)| AgentQueuedTicket {
+                    ticket_id: entry.ticket_id.clone(),
+                    agent: entry.agent.clone(),
+                    runner: entry.runner.clone(),
+                    queued_at: entry.queued_at.clone(),
+                    attempts: entry.attempts,
+                    not_before: entry.not_before.clone(),
+                    waits_for: waits_for.clone(),
+                })
+                .collect(),
+            waiting_for_prerequisites: self
+                .parked
+                .iter()
+                .map(|parked| AgentParkedTicket {
+                    ticket_id: parked.entry.ticket_id.clone(),
+                    agent: parked.entry.agent.clone(),
+                    parked_at: parked.entry.queued_at.clone(),
+                    status: parked.status.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// What each of the `pending` entries waits for, in the order the worker's
+/// round checks it: a worker, memory, a usage limit's reset, the pause, a
+/// free slot, the ticket's running job (DEV-771). `taken` entries start.
+fn entries_wait_for(
+    tasks_dir: &Path,
+    state: WorkerState,
+    pending: &[AgentQueueEntry],
+    taken: &[AgentQueueEntry],
+    pause: Option<&QueuePause>,
+    memory_hold: Option<&MemoryHold>,
+) -> Vec<String> {
+    if state != WorkerState::Active {
+        return vec!["waiting for a queue worker; start one with `lotar agent queue resume`".to_string(); pending.len()];
+    }
+    let own = AgentJobService::active_jobs();
+    let mut running: HashMap<String, String> = own.iter().cloned().collect();
+    running.extend(crate::services::agent_active_jobs::list(tasks_dir).into_iter().map(|job| (job.ticket_id, job.job_id)));
+    let mut slots = job_slots(tasks_dir, pending, own).ok();
+    pending
+        .iter()
+        .map(|entry| {
+            if taken.iter().any(|item| same_entry(item, entry)) {
+                return "starting".to_string();
+            }
+            if let Some(hold) = memory_hold {
+                return format!("waiting for memory: {}", hold.describe());
+            }
+            if let Some(at) = entry.waiting_until() {
+                return format!("waiting for a provider's usage limit to reset at {at}");
+            }
+            if let Some(pause) = pause.filter(|pause| pause.reason == PauseReason::Disk || pause.reason.holds(entry_commits(tasks_dir, entry))) {
+                return format!(
+                    "waiting for the paused queue: {} since {}; one held job tries again at {}",
+                    pause.reason.describe(),
+                    pause.since,
+                    pause.next_try_at
+                );
+            }
+            if let Some(slots) = slots.as_mut()
+                && !slots.take(entry)
+            {
+                return slots.wait_reason(entry_project(entry).as_deref()).unwrap_or_default();
+            }
+            if let Some(job) = running.get(&entry.ticket_id) {
+                return format!("waiting for its ticket's running job {job}");
+            }
+            if let Some(thread) = &entry.held_by {
+                return format!("waiting for the T3 Code thread {thread} of its ticket's earlier job");
+            }
+            "starting with the worker's next round".to_string()
+        })
+        .collect()
 }
 
 /// True when workers are enabled and no worker holds this tasks directory's lock.
@@ -1557,6 +1692,57 @@ mod tests {
         let reason = AgentQueueService::slot_wait_reason(&tasks_dir, "GLA-2", running[..1].to_vec()).unwrap();
         assert_eq!(reason.as_deref(), Some("waiting for a free slot (1 of GLA's agent.worktree.max_parallel_jobs 1 running)"));
         assert_eq!(AgentQueueService::slot_wait_reason(&tasks_dir, "GLB-3", running[..1].to_vec()).unwrap(), None);
+    }
+
+    /// DEV-771: each waiting entry says what it waits for, in the order the
+    /// worker's round checks it.
+    #[test]
+    fn each_waiting_entry_says_what_it_waits_for() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  worktree:\n    max_parallel_jobs: 2\n").unwrap();
+        // Another live process (pid 1) runs a job on WFA-1.
+        let elsewhere = crate::services::agent_active_jobs::ActiveJob {
+            job_id: "job-elsewhere".into(),
+            ticket_id: "WFA-1".into(),
+            runner: "command".into(),
+            agent: Some("a".into()),
+            owner_pid: 1,
+            child_pid: 1,
+            started_at: "2026-11-21T00:00:00Z".into(),
+            session_id: None,
+            merge: false,
+            assignee_at_start: None,
+            in_setup: false,
+            request: None,
+        };
+        crate::services::agent_active_jobs::register(&tasks_dir, &elsewhere);
+        let later = AgentQueueEntry { not_before: Some("2999-01-01T00:00:00Z".into()), ..entry("WFA-4") };
+        let pending = [entry("WFA-5"), later, entry("WFA-1"), entry("WFA-2")];
+        let taken = [pending[0].clone()];
+
+        let stats = AgentQueueService::queue_stats(&tasks_dir, &pending);
+        assert_eq!((stats.running, stats.queued, stats.max_parallel), (1, 4, Some(2)), "the other process's job and the configured limit count");
+
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending, &taken, None, None);
+        assert_eq!(why[0], "starting");
+        assert_eq!(why[1], "waiting for a provider's usage limit to reset at 2999-01-01T00:00:00Z");
+        assert_eq!(why[2], "waiting for its ticket's running job job-elsewhere", "WFA-1 takes the second slot");
+        assert_eq!(why[3], "waiting for a free slot (2 of the global agent.worktree.max_parallel_jobs 2 running)");
+
+        let hold = MemoryHold { reason: "swap 9.5 of 10.0 GB used".into(), since: "2026-11-21T00:00:00Z".parse().unwrap() };
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending[1..], &[], None, Some(&hold));
+        assert!(why.iter().all(|why| why.starts_with("waiting for memory: swap 9.5 of 10.0 GB used")), "{why:?}");
+
+        let pause = AgentQueueService::pause(&tasks_dir, PauseReason::Disk, "No space left on device", "job-9", &entry("WFA-9")).unwrap();
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending[2..], &[], Some(&pause), None);
+        assert!(why.iter().all(|why| why.starts_with("waiting for the paused queue: the disk is full since")), "{why:?}");
+
+        let why = entries_wait_for(&tasks_dir, WorkerState::Stopped, &pending, &[], None, None);
+        assert!(why.iter().all(|why| why.contains("lotar agent queue resume")), "{why:?}");
+        crate::services::agent_active_jobs::unregister(&tasks_dir, &elsewhere.job_id);
     }
 
     #[test]

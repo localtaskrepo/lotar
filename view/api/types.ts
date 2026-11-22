@@ -1843,9 +1843,37 @@ export interface AgentQueueStats {
     max_parallel?: number | null
 }
 
+export interface AgentQueuedTicket {
+    ticket_id: string
+    /** Agent profile; empty for a bare runner */
+    agent: string
+    runner?: string | null
+    queued_at: string
+    attempts: number
+    not_before?: string | null
+    /** What the ticket waits for: a free slot, its ticket's running job, memory, a paused queue, a worker */
+    waits_for: string
+}
+
+export interface AgentParkedTicket {
+    ticket_id: string
+    agent: string
+    parked_at: string
+    status?: string | null
+}
+
+export interface AgentQueueOverview {
+    worker_state: 'active' | 'stopped' | 'idle'
+    reason?: string | null
+    pending: AgentQueuedTicket[]
+    waiting_for_prerequisites: AgentParkedTicket[]
+}
+
 export interface AgentJobListResponse {
     jobs: AgentJob[]
     queue_stats?: AgentQueueStats | null
+    /** The agent queue of every process (DEV-771) */
+    queue?: AgentQueueOverview | null
 }
 
 export interface AgentJobCancelRequest {

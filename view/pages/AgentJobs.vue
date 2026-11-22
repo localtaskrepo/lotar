@@ -73,11 +73,60 @@
         </button>
       </div>
 
+      <UiCard v-if="showQueue && queue" class="queue-card" data-testid="agent-queue" aria-label="Waiting in the queue">
+        <div class="queue-card__header">
+          <h2 class="queue-card__title">Waiting in the queue</h2>
+          <span class="queue-card__state" data-testid="agent-queue-worker">Worker {{ queue.worker_state }}</span>
+        </div>
+        <ol v-if="queue.pending.length" class="queue-list">
+          <li
+            v-for="entry in queue.pending"
+            :key="`${entry.ticket_id}:${entry.agent}:${entry.runner ?? ''}`"
+            class="queue-row"
+            data-testid="agent-queue-entry"
+          >
+            <div class="queue-row__identity">
+              <button class="chip" type="button" @click="openTask(entry.ticket_id)">{{ entry.ticket_id }}</button>
+              <span class="phase-chip">{{ entry.agent ? `@${entry.agent}` : entry.runner }}</span>
+              <span v-if="ticketInfo[entry.ticket_id]?.title" class="ticket-title">{{
+                ticketInfo[entry.ticket_id]?.title
+              }}</span>
+              <span class="queue-row__time" :title="formatDate(entry.queued_at)"
+                >Queued {{ formatRelativeTime(entry.queued_at) }}</span
+              >
+            </div>
+            <div class="queue-row__waits"><MarkdownContent :source="capitalize(entry.waits_for)" /></div>
+          </li>
+        </ol>
+        <template v-if="queue.waiting_for_prerequisites.length">
+          <h3 class="queue-card__subtitle">Waiting for prerequisites</h3>
+          <ul class="queue-list">
+            <li
+              v-for="entry in queue.waiting_for_prerequisites"
+              :key="`${entry.ticket_id}:${entry.agent}`"
+              class="queue-row"
+              data-testid="agent-queue-parked"
+            >
+              <div class="queue-row__identity">
+                <button class="chip" type="button" @click="openTask(entry.ticket_id)">{{ entry.ticket_id }}</button>
+                <span v-if="entry.agent" class="phase-chip">@{{ entry.agent }}</span>
+                <span v-if="ticketInfo[entry.ticket_id]?.title" class="ticket-title">{{
+                  ticketInfo[entry.ticket_id]?.title
+                }}</span>
+                <span class="queue-row__time" :title="formatDate(entry.parked_at)"
+                  >Held back {{ formatRelativeTime(entry.parked_at) }}</span
+                >
+              </div>
+            </li>
+          </ul>
+        </template>
+      </UiCard>
+
       <div v-if="loading && !jobs.length" class="muted">Loading jobs…</div>
       <div v-else-if="error" class="error">{{ error }}</div>
 
       <UiEmptyState
-        v-else-if="!filteredJobs.length"
+        v-else-if="!filteredJobs.length && !showQueue"
         :title="activeTab === 'all' ? 'No agent jobs yet' : `No ${activeTab} jobs`"
         :description="
           activeTab === 'all'
@@ -270,7 +319,15 @@ import PageHeader from '../components/PageHeader.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import { formatDateTime, formatRelativeTime } from '../utils/date'
-import type { AgentJob, AgentJobLogEntry, AgentJobTool, AgentProfileInfo, AgentQueueStats } from '../api/types'
+import type {
+  AgentJob,
+  AgentJobListResponse,
+  AgentJobLogEntry,
+  AgentJobTool,
+  AgentProfileInfo,
+  AgentQueueOverview,
+  AgentQueueStats,
+} from '../api/types'
 import AgentJobLog from '../components/AgentJobLog.vue'
 import AgentRunDialog from '../components/AgentRunDialog.vue'
 import AgentSetupPanel from '../components/AgentSetupPanel.vue'
@@ -295,6 +352,8 @@ import { useTaskPanelController } from '../composables/useTaskPanelController'
 
 const jobs = ref<AgentJob[]>([])
 const queueStats = ref<AgentQueueStats | null>(null)
+// The tickets waiting in the queue of every process, which have no job yet (DEV-771).
+const queue = ref<AgentQueueOverview | null>(null)
 const loading = ref(false)
 const error = ref('')
 const activeTab = ref<'all' | 'running' | 'queued' | 'completed' | 'failed'>('all')
@@ -315,11 +374,38 @@ const runDialog = reactive<{ open: boolean; ticket?: string; agent?: string | nu
 // Ticks while a job runs so its duration stays current.
 const now = ref(Date.now())
 let clock: ReturnType<typeof setInterval> | null = null
+// Other processes change the queue without job events; read it again now and then.
+let queuePoll: ReturnType<typeof setInterval> | null = null
+const QUEUE_POLL_MS = 15000
+
+const queueWaiting = computed(
+  () => (queue.value?.pending.length ?? 0) + (queue.value?.waiting_for_prerequisites.length ?? 0),
+)
+const showQueue = computed(() => queueWaiting.value > 0 && (activeTab.value === 'all' || activeTab.value === 'queued'))
+
+function applyQueue(response: AgentJobListResponse) {
+  queueStats.value = response.queue_stats || null
+  queue.value = response.queue || null
+}
+
+async function refreshQueue() {
+  try {
+    applyQueue(await api.listAgentJobs())
+  } catch {
+    // The next refresh tries again.
+  }
+}
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 const tabs = computed(() => [
   { value: 'all' as const, label: 'All', count: jobs.value.length },
   { value: 'running' as const, label: 'Running', count: jobs.value.filter((j) => j.status === 'running').length },
-  { value: 'queued' as const, label: 'Queued', count: jobs.value.filter((j) => j.status === 'queued').length },
+  {
+    value: 'queued' as const,
+    label: 'Queued',
+    count: jobs.value.filter((j) => j.status === 'queued').length + queueWaiting.value,
+  },
   { value: 'completed' as const, label: 'Completed', count: jobs.value.filter((j) => j.status === 'completed').length },
   {
     value: 'failed' as const,
@@ -402,7 +488,13 @@ async function loadTicket(id: string) {
 }
 
 watch(
-  () => [...new Set(jobs.value.map((job) => job.ticket_id))],
+  () => [
+    ...new Set([
+      ...jobs.value.map((job) => job.ticket_id),
+      ...(queue.value?.pending ?? []).map((entry) => entry.ticket_id),
+      ...(queue.value?.waiting_for_prerequisites ?? []).map((entry) => entry.ticket_id),
+    ]),
+  ],
   (ids) => {
     for (const id of ids) if (!ticketInfo.value[id]) void loadTicket(id)
   },
@@ -488,7 +580,7 @@ async function refresh(options: { silent?: boolean } = {}) {
       byId.set(next.id, existing ? mergeJobFields(existing, next) : next)
     }
     jobs.value = sortJobs([...byId.values()])
-    queueStats.value = jobsResponse.queue_stats || null
+    applyQueue(jobsResponse)
   } catch (err) {
     if (reportErrors && myRefresh === refreshSeq) {
       error.value = err instanceof Error ? err.message : String(err)
@@ -554,12 +646,7 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
     ].includes(kind)
   ) {
     refreshTicketSoon(next.ticket_id)
-    api
-      .listAgentJobs()
-      .then((r) => {
-        queueStats.value = r.queue_stats || null
-      })
-      .catch(() => {})
+    void refreshQueue()
   }
 }
 
@@ -654,9 +741,7 @@ async function cancel(id: string) {
     if (response.job) {
       mergeJob(response.job)
     }
-    // Refresh queue stats
-    const statsResponse = await api.listAgentJobs()
-    queueStats.value = statsResponse.queue_stats || null
+    await refreshQueue()
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   }
@@ -691,8 +776,7 @@ async function confirmStopAll() {
   try {
     const response = await api.cancelAllAgentJobs()
     jobs.value = sortJobs(response.jobs)
-    const statsResponse = await api.listAgentJobs()
-    queueStats.value = statsResponse.queue_stats || null
+    await refreshQueue()
     stopAllDialogOpen.value = false
   } catch (err) {
     // Keep the dialog open so the failure is visible and retry remains possible.
@@ -817,12 +901,16 @@ onMounted(async () => {
   clock = setInterval(() => {
     if (jobs.value.some((job) => job.status === 'running')) now.value = Date.now()
   }, 1000)
+  queuePoll = setInterval(() => {
+    if (document.visibilityState === 'visible') void refreshQueue()
+  }, QUEUE_POLL_MS)
   void loadProfiles()
   await refresh()
 })
 
 onBeforeUnmount(() => {
   if (clock) clearInterval(clock)
+  if (queuePoll) clearInterval(queuePoll)
   sseUnsubscribers.splice(0).forEach((fn) => fn())
   sse?.close()
 })
@@ -871,6 +959,73 @@ onBeforeUnmount(() => {
 .stat-label {
   font-size: 13px;
   color: var(--color-muted);
+}
+
+.queue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.queue-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.queue-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.queue-card__subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.queue-card__state {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.queue-row__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.queue-row__time {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.queue-row__waits {
+  font-size: 13px;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
 }
 
 .profile-list {
