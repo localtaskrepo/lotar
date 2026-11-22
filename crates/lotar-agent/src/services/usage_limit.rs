@@ -23,6 +23,10 @@ const DEFAULT_WAIT_SECONDS: i64 = 3600;
 /// The shortest wait for a named reset time, so one already past (a clock
 /// off, a time zone misread) doesn't spin the queue.
 const MIN_WAIT_SECONDS: i64 = 60;
+/// The furthest reset time believed: the longest real limits are weekly. A
+/// time further away (a misread, a fake runner's 2099) waits the default
+/// instead, so a queue worker doesn't stay in memory until then (DEV-770).
+const MAX_WAIT_SECONDS: i64 = 7 * 24 * 3600;
 
 #[expect(clippy::expect_used, reason = "a literal pattern, covered by the tests")]
 static LIMIT: LazyLock<Regex> = LazyLock::new(|| {
@@ -43,12 +47,20 @@ pub struct UsageLimit {
 
 impl UsageLimit {
     /// When the job may run again: the reset time, at least a minute from
-    /// `now`, or the default wait when no time was named.
+    /// `now`, or the default wait when no time was named or the named one is
+    /// [ignored](Self::ignored_reset).
     pub fn resume_at(&self, now: Timestamp) -> Timestamp {
-        match self.resets_at {
+        match self.resets_at.filter(|_| self.ignored_reset(now).is_none()) {
             Some(at) => at.max(now.saturating_add(SignedDuration::from_secs(MIN_WAIT_SECONDS)).unwrap_or(Timestamp::MAX)),
             None => now.saturating_add(default_wait()).unwrap_or(Timestamp::MAX),
         }
+    }
+
+    /// The named reset time when it is more than 7 days after `now`, too far
+    /// to believe.
+    pub fn ignored_reset(&self, now: Timestamp) -> Option<Timestamp> {
+        let latest = now.saturating_add(SignedDuration::from_secs(MAX_WAIT_SECONDS)).unwrap_or(Timestamp::MAX);
+        self.resets_at.filter(|at| *at > latest)
     }
 }
 
@@ -212,6 +224,25 @@ mod tests {
     fn a_past_reset_waits_at_least_a_minute() {
         let limit = find_in(["usage limit, resets 2026-11-18T09:00:00Z"], now(), &berlin()).expect("limit");
         assert_eq!(limit.resume_at(now()), "2026-11-18T10:01:00Z".parse().expect("timestamp"));
+    }
+
+    #[test]
+    fn a_reset_more_than_7_days_away_is_ignored_for_the_default_wait() {
+        let limit = find_in(["You've hit your usage limit. Upgrade to Pro or try again at Nov 20th, 2099 7:43 PM."], now(), &berlin()).expect("limit");
+        let named: Timestamp = "2099-11-20T18:43:00Z".parse().expect("timestamp");
+        assert_eq!(limit.resets_at, Some(named));
+        assert_eq!(limit.ignored_reset(now()), Some(named));
+        assert_eq!(limit.resume_at(now()), now().saturating_add(default_wait()).expect("timestamp"));
+        let limit = UsageLimit { line: "weekly limit".into(), resets_at: Some("2026-11-25T10:00:01Z".parse().expect("timestamp")) };
+        assert_eq!(limit.ignored_reset(now()), limit.resets_at);
+    }
+
+    #[test]
+    fn a_reset_up_to_7_days_away_is_kept() {
+        let at: Timestamp = "2026-11-25T10:00:00Z".parse().expect("timestamp");
+        let limit = UsageLimit { line: "weekly limit reached".into(), resets_at: Some(at) };
+        assert_eq!(limit.ignored_reset(now()), None);
+        assert_eq!(limit.resume_at(now()), at);
     }
 
     fn failure(error: &str, kind: FailureKind, resets_at: Option<&str>) -> Failure {

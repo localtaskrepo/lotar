@@ -13,7 +13,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-const CODEX_LIMIT: &str = "You've hit your usage limit. Upgrade to Pro or try again at Nov 20th, 2099 7:43 PM.";
+use jiff::{Timestamp, ToSpan, tz::TimeZone};
+
+const CODEX_LIMIT_2099: &str = "You've hit your usage limit. Upgrade to Pro or try again at Nov 20th, 2099 7:43 PM.";
 const CLAUDE_LIMIT: &str = "Claude API rate limit reached. Try again later.";
 
 /// `t3 thread start` counts its runs in `starts`; while that count is at
@@ -173,14 +175,24 @@ fn starts(t3: &Path) -> usize {
     std::fs::read_to_string(t3.join("starts")).unwrap_or_default().lines().count()
 }
 
+/// A reset 3 days from now, to the minute: the time and Codex's message
+/// naming it in the machine's time zone, as Codex prints it.
+fn codex_limit_in_3_days() -> (Timestamp, String) {
+    let zone = TimeZone::system();
+    let at = zone.to_datetime(Timestamp::now()).checked_add(3.days()).unwrap().with().second(0).subsec_nanosecond(0).build().unwrap();
+    let message = format!("You've hit your usage limit. Upgrade to Pro or try again at {}.", at.strftime("%b %-d, %Y %-I:%M %p"));
+    (zone.to_timestamp(at).unwrap(), message)
+}
+
 #[test]
 fn codexs_usage_limit_pauses_the_job_until_the_reset_it_names() {
-    let ws = workspace(CODEX_LIMIT, 1);
+    let (reset, message) = codex_limit_in_3_days();
+    let ws = workspace(&message, 1);
     run(&ws);
     wait_for("the job to pause", || !jobs(&ws, "paused").is_empty());
     let paused = jobs(&ws, "paused").remove(0);
     let resumes_at = paused["resumes_at"].as_str().unwrap_or_default().to_string();
-    assert!(resumes_at.starts_with("2099-11-2"), "it runs again at the reset Codex names: {paused}");
+    assert_eq!(resumes_at.parse::<Timestamp>().ok(), Some(reset), "it runs again at the reset Codex names: {paused}");
     let summary = paused["summary"].as_str().unwrap_or_default();
     assert!(summary.contains("Paused, not failed: codex hit its usage limit") && summary.contains("@fixer"), "{summary}");
     assert!(jobs(&ws, "failed").is_empty(), "no job failed");
@@ -201,6 +213,22 @@ fn codexs_usage_limit_pauses_the_job_until_the_reset_it_names() {
     let text = lotar(&ws).args(["agent", "list-jobs"]).output().unwrap();
     let text = String::from_utf8_lossy(&text.stdout);
     assert!(text.contains(&format!("paused (until {resumes_at})")), "{text}");
+}
+
+/// A reset more than 7 days away isn't believed (DEV-770): the job waits the
+/// default, its note names the ignored time, and its retry completes.
+#[test]
+fn a_reset_more_than_7_days_away_waits_the_default_and_says_so() {
+    let ws = workspace(CODEX_LIMIT_2099, 1);
+    run(&ws);
+    wait_for("the job to pause", || !jobs(&ws, "paused").is_empty());
+    let paused = jobs(&ws, "paused").remove(0);
+    let resumes_at = paused["resumes_at"].as_str().unwrap_or_default().parse::<Timestamp>().unwrap();
+    assert!(resumes_at < Timestamp::now().saturating_add(1.hour()).unwrap(), "it waits the default, not until 2099: {paused}");
+    let summary = paused["summary"].as_str().unwrap_or_default();
+    assert!(summary.contains("after the default wait (ignored the named reset 2099-11-2") && summary.contains("more than 7 days away)"), "{summary}");
+    wait_for("the retry to complete", || !jobs(&ws, "completed").is_empty());
+    assert_eq!(starts(&ws.t3), 2);
 }
 
 /// A limit with no reset time waits the default; a retry that hits it again
@@ -245,16 +273,18 @@ fn an_agent_that_only_talks_about_a_rate_limit_fails() {
 #[test]
 fn a_typed_rate_limit_pauses_the_job_until_its_resets_at() {
     let ws = workspace_on(FAKE_ACP, "[agents.claude]\n", "    runner: claude\n");
-    std::fs::write(ws.t3.join("resets_at"), "4099766400").unwrap();
+    let reset = Timestamp::from_second(Timestamp::now().as_second() + 3 * 24 * 3600).unwrap();
+    std::fs::write(ws.t3.join("resets_at"), reset.as_second().to_string()).unwrap();
     run(&ws);
     wait_for("the job to pause", || !jobs(&ws, "paused").is_empty());
     let paused = jobs(&ws, "paused").remove(0);
-    assert_eq!(paused["resumes_at"], "2099-12-01T00:00:00+00:00", "it runs again at the reset the error data names: {paused}");
+    let resumes_at = paused["resumes_at"].as_str().unwrap_or_default().to_string();
+    assert_eq!(resumes_at.parse::<Timestamp>().ok(), Some(reset), "it runs again at the reset the error data names: {paused}");
     let summary = paused["summary"].as_str().unwrap_or_default();
     assert!(summary.contains("hit its usage limit (Claude stopped the turn)") && summary.contains("after the reset"), "{summary}");
     assert!(jobs(&ws, "failed").is_empty(), "no job failed");
     let queue = json(&ws, &["agent", "queue"]);
-    assert_eq!(queue["pending"][0]["not_before"], "2099-12-01T00:00:00+00:00", "{queue}");
+    assert_eq!(queue["pending"][0]["not_before"].as_str(), Some(resumes_at.as_str()), "{queue}");
     wait_for("the job_paused rule's comment", || comments(&ws).iter().any(|text| text == "paused: claude"));
     assert!(!comments(&ws).iter().any(|text| text == "failed"), "no failure rule ran: {:?}", comments(&ws));
     assert_eq!(starts(&ws.t3), 1, "the retry waits for the reset");

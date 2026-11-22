@@ -5508,8 +5508,9 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
         let state = registry.jobs.get(job_id)?;
         Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.runner.clone(), state.runner_errors.clone()))
     })?;
-    let limit = crate::services::usage_limit::of_failures(&errors, Timestamp::now())?;
-    let resumes_at = limit.resume_at(Timestamp::now()).to_rfc3339();
+    let now = Timestamp::now();
+    let limit = crate::services::usage_limit::of_failures(&errors, now)?;
+    let resumes_at = limit.resume_at(now).to_rfc3339();
     request.ticket_id = ticket_id;
     save_retry(tasks_dir, job_id, &request.ticket_id, |carried| {
         let mut retry = AgentQueueEntry::retry_of(&request, None, carried);
@@ -5518,7 +5519,11 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
     })?;
     let provider = request.provider.clone().or_else(|| resolve_profile(config, &request).ok()?.provider).unwrap_or_else(|| runner.clone());
     let profile = request.agent.as_deref().map_or_else(|| format!("the {runner} runner"), |agent| format!("@{agent}"));
-    let when = if limit.resets_at.is_some() { "after the reset" } else { "after the default wait (the provider named no reset time)" };
+    let when = match (limit.resets_at, limit.ignored_reset(now)) {
+        (_, Some(ignored)) => format!("after the default wait (ignored the named reset {}, more than 7 days away)", ignored.to_rfc3339()),
+        (Some(_), None) => "after the reset".to_string(),
+        (None, None) => "after the default wait (the provider named no reset time)".to_string(),
+    };
     let note = format!("Paused, not failed: {provider} hit its usage limit ({}). The job runs again on {profile} at {resumes_at}, {when}.", limit.line);
     Some((note, resumes_at))
 }
