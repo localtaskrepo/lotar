@@ -157,6 +157,31 @@ pub enum AgentQueueAction {
     Resume,
     /// List the memory gate's holds: when each started and ended, and why
     Holds,
+    /// Move a waiting entry to the front, one up, one down or to the back;
+    /// it keeps its prompt and settings, and its new place
+    Move(AgentQueueMoveArgs),
+}
+
+#[derive(Args)]
+#[command(group(clap::ArgGroup::new("to").required(true).args(["first", "up", "down", "last"])))]
+pub struct AgentQueueMoveArgs {
+    /// The ticket whose entry moves (e.g. PROJ-1)
+    pub ticket: String,
+    /// The entry's agent profile, needed when the ticket is queued for several
+    #[arg(long)]
+    pub agent: Option<String>,
+    /// To the front: it starts next
+    #[arg(long)]
+    pub first: bool,
+    /// One place up
+    #[arg(long)]
+    pub up: bool,
+    /// One place down
+    #[arg(long)]
+    pub down: bool,
+    /// To the back
+    #[arg(long)]
+    pub last: bool,
 }
 
 #[derive(Args)]

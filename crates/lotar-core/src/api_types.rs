@@ -1005,7 +1005,7 @@ pub struct AgentQueueOverview {
     /// What the waiting tickets wait for, with tickets queued
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub reason: Option<String>,
-    /// The waiting tickets, in queue order
+    /// The waiting tickets, in start order: priority, kind, arrival; moved entries keep their place (DEV-786)
     pub pending: Vec<AgentQueuedTicket>,
     /// The jobs waiting for their tickets' prerequisites
     pub waiting_for_prerequisites: Vec<AgentParkedTicket>,
@@ -1026,6 +1026,15 @@ pub struct AgentQueuedTicket {
     /// The entry starts no earlier than this
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub not_before: Option<String>,
+    /// What the job does: `release`, `merge`, `review`, `fix`, another profile's name, or `run` for a bare runner (DEV-786)
+    pub kind: String,
+    /// The ticket's priority when the entry was queued (DEV-786)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub priority: Option<String>,
+    /// Moved by hand, or a paused job's retry: it keeps its place (DEV-786)
+    pub pinned: bool,
+    /// A worker took it and is starting its job: it can't be moved (DEV-786)
+    pub starting: bool,
     /// What the ticket waits for: a free slot, its ticket's running job, memory, a paused queue, a worker
     pub waits_for: String,
 }
@@ -1297,6 +1306,41 @@ pub struct StatusWaitingTicket {
     /// When it got that status: the date of its question (RFC 3339).
     pub since: String,
     pub ticket_url: String,
+}
+
+/// Where `POST /api/agent-queue/move` puts an entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum AgentQueueMove {
+    First,
+    Up,
+    Down,
+    Last,
+}
+
+/// Body of `POST /api/agent-queue/move`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentQueueMoveRequest {
+    pub ticket_id: String,
+    /// The entry's profile, needed when the ticket is queued for several.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent: Option<String>,
+    pub to: AgentQueueMove,
+}
+
+/// Answer of `POST /api/agent-queue/move`: the moved entry, its place and the queue.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentQueueMoveResponse {
+    pub entry: AgentQueuedTicket,
+    /// The entry's place in the start order, from 1
+    pub position: usize,
+    /// Entries in the queue
+    pub total: usize,
+    /// The queue after the move, as `GET /api/jobs` lists it
+    pub queue: AgentQueueOverview,
 }
 
 /// List of available agent profiles

@@ -1,11 +1,11 @@
 title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T23:12:42.246301+00:00
+modified: 2026-11-26T23:54:05.144123+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -26,6 +26,7 @@ relationships:
   - DEV-853
   - DEV-854
   - DEV-902
+  - DEV-886
 comments:
 - date: 2026-11-22T18:51:51.656944+00:00
   author: claude
@@ -585,6 +586,26 @@ comments:
       result: not_run
       reason: the merge runs it
     next: 'Review again: both findings are answered'
+- date: 2026-11-26T23:53:56.065135+00:00
+  author: claude
+  text: |-
+    Review: passed. `2b01c8b1c` fixes both findings from the first review, and all of "Done when" holds.
+
+    - **Finding 1 (a comment reached the wrong job):** fixed. The comment rule now fires only on HelpNeeded tickets and on InProgress tickets that `@implement`/`@implement-retry` holds (`agent-team.yml:442-444`). The review and merge jobs keep their own prompts. A ticket a person works on stays with them. Both cases are tested (`shipped_agent_team_template_reworks_a_blocked_review_and_merges`, `shipped_agent_team_template_tells_implement_only_what_it_should_act_on`).
+    - **Finding 2 (review runner):** your answer in INBOX-807 (2026-11-26) was claude, as built. `agent-team.yml:57-71` and `docs/help/templates.md` say to give `@review` a second runner.
+    - **Done when:**
+      - `lotar config templates` lists agent-team.
+      - `init --template agent-team` passes `config validate`, including the automation rules.
+      - The written `.tasks/` names no person, repo or host of ours.
+      - Failures and questions go to `@reporter`.
+      - The end-to-end test runs implement, a blocked review, the rework, a passed review and the merge to Done.
+      - `templates.md` describes what agent-team adds over agent-reviewed.
+    - **Main since the base (29 commits):** `d2b22c8b1` (DEV-886) fixes how lotar picks a merge job after a failed merge. On main, the template's "Merge failed: back to the implementer" rule works as meant. `git merge-tree main HEAD` merges cleanly.
+    - **Reran:**
+      - `npm ci`: passed.
+      - `cargo nextest run --workspace -E 'test(agent_team) | test(templates) | test(agent_templates) | test(shipped_agent)'`: 14 passed.
+      - In a scratch repo with its own queue directory: `lotar automation simulate --event commented` on an InProgress ticket held by `@implement` shows the `tell_agent` to `@implement`. The scratch repo is removed.
+    - No stray files, a single commit, no UI changes. The minor finding [DEV-902](https://lotar.pyxzl.net/task/DEV-902) is already filed. No new tickets.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
@@ -1221,3 +1242,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T23:53:56.065135+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:53:56.341396+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886"]}'
+- at: 2026-11-26T23:54:05.144123+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -96,25 +96,57 @@
         <div class="queue-card__header">
           <h2 class="queue-card__title">Waiting in the queue</h2>
           <span class="queue-card__state" data-testid="agent-queue-worker">Worker {{ queue.worker_state }}</span>
+          <span v-if="queue.pending.length" class="queue-card__hint"
+            >Starts top first: priority, then kind, then arrival.</span
+          >
         </div>
+        <div v-if="moveError" class="queue-card__error" role="alert">{{ moveError }}</div>
         <ol v-if="queue.pending.length" class="queue-list">
           <li
-            v-for="entry in queue.pending"
-            :key="`${entry.ticket_id}:${entry.agent}:${entry.runner ?? ''}`"
+            v-for="(entry, index) in queue.pending"
+            :key="queueKey(entry)"
             class="queue-row"
             data-testid="agent-queue-entry"
+            :data-ticket-id="entry.ticket_id"
           >
-            <div class="queue-row__identity">
-              <button class="chip" type="button" @click="openTask(entry.ticket_id)">{{ entry.ticket_id }}</button>
-              <span class="phase-chip">{{ entry.agent ? `@${entry.agent}` : entry.runner }}</span>
-              <span v-if="ticketInfo[entry.ticket_id]?.title" class="ticket-title">{{
-                ticketInfo[entry.ticket_id]?.title
-              }}</span>
-              <span class="queue-row__time" :title="formatDate(entry.queued_at)"
-                >Queued {{ formatRelativeTime(entry.queued_at) }}</span
-              >
+            <span class="queue-row__place">{{ index + 1 }}</span>
+            <div class="queue-row__main">
+              <div class="queue-row__identity">
+                <button class="chip" type="button" @click="openTask(entry.ticket_id)">{{ entry.ticket_id }}</button>
+                <span class="queue-kind" :class="`queue-kind--${kindClass(entry.kind)}`">{{ entry.kind }}</span>
+                <span class="queue-row__priority">{{ entry.priority || 'No priority' }}</span>
+                <span class="phase-chip">{{ entry.agent ? `@${entry.agent}` : entry.runner }}</span>
+                <span v-if="ticketInfo[entry.ticket_id]?.title" class="ticket-title">{{
+                  ticketInfo[entry.ticket_id]?.title
+                }}</span>
+                <span class="queue-row__time" :title="formatDate(entry.queued_at)"
+                  >Queued {{ formatRelativeTime(entry.queued_at) }}</span
+                >
+                <span
+                  v-if="entry.pinned && !entry.starting"
+                  class="queue-row__kept"
+                  title="Moved here, or a paused job's retry: new entries don't push it down"
+                  >Kept in place</span
+                >
+              </div>
+              <div class="queue-row__waits"><MarkdownContent :source="capitalize(entry.waits_for)" /></div>
             </div>
-            <div class="queue-row__waits"><MarkdownContent :source="capitalize(entry.waits_for)" /></div>
+            <div v-if="!entry.starting" class="queue-row__actions" role="group" :aria-label="`Move ${entry.ticket_id}`">
+              <UiButton
+                v-for="action in moveActions"
+                :key="action.to"
+                type="button"
+                variant="ghost"
+                icon-only
+                :aria-label="`${action.label}: ${entry.ticket_id}`"
+                :title="action.label"
+                :disabled="movingKey !== null || !canMove(index, action.to)"
+                :data-testid="`agent-queue-move-${action.to}`"
+                @click="moveQueueEntry(entry, action.to)"
+              >
+                <IconGlyph :name="action.icon" />
+              </UiButton>
+            </div>
           </li>
         </ol>
         <template v-if="queue.waiting_for_prerequisites.length">
@@ -358,13 +390,16 @@ import type {
   AgentJobPlanEntry,
   AgentJobTool,
   AgentProfileInfo,
+  AgentQueueMove,
   AgentQueueOverview,
   AgentQueueStats,
+  AgentQueuedTicket,
 } from '../api/types'
 import AgentJobLog from '../components/AgentJobLog.vue'
 import AgentRunInputs from '../components/AgentRunInputs.vue'
 import AgentT3Thread from '../components/AgentT3Thread.vue'
 import AgentRunDialog from '../components/AgentRunDialog.vue'
+import IconGlyph from '../components/IconGlyph.vue'
 import AgentSetupPanel from '../components/AgentSetupPanel.vue'
 import MarkdownContent from '../components/MarkdownContent.vue'
 import {
@@ -431,6 +466,41 @@ async function refreshQueue() {
     applyQueue(await api.listAgentJobs())
   } catch {
     // The next refresh tries again.
+  }
+}
+
+// Moving a waiting entry (DEV-786): entries being started sit first and can't move.
+const movingKey = ref<string | null>(null)
+const moveError = ref('')
+const moveActions = [
+  { to: 'first', label: 'Move to the top', icon: 'chevrons-up' },
+  { to: 'up', label: 'Move up', icon: 'chevron-up' },
+  { to: 'down', label: 'Move down', icon: 'chevron-down' },
+  { to: 'last', label: 'Move to the bottom', icon: 'chevrons-down' },
+] as const
+
+const queueKey = (entry: AgentQueuedTicket) => `${entry.ticket_id}:${entry.agent}:${entry.runner ?? ''}`
+
+function kindClass(kind: string) {
+  return ['release', 'merge', 'review', 'fix', 'run'].includes(kind) ? kind : 'other'
+}
+
+function canMove(index: number, to: AgentQueueMove) {
+  const pending = queue.value?.pending ?? []
+  const first = pending.findIndex((entry) => !entry.starting)
+  return to === 'first' || to === 'up' ? index > first : index < pending.length - 1
+}
+
+async function moveQueueEntry(entry: AgentQueuedTicket, to: AgentQueueMove) {
+  movingKey.value = queueKey(entry)
+  try {
+    const response = await api.moveAgentQueueEntry({ ticket_id: entry.ticket_id, agent: entry.agent || null, to })
+    queue.value = response.queue
+    moveError.value = ''
+  } catch (err) {
+    moveError.value = `Couldn't move ${entry.ticket_id}: ${err instanceof Error ? err.message : String(err)}`
+  } finally {
+    movingKey.value = null
   }
 }
 
@@ -996,7 +1066,7 @@ onMounted(async () => {
     if (jobs.value.some((job) => job.status === 'running')) now.value = Date.now()
   }, 1000)
   queuePoll = setInterval(() => {
-    if (document.visibilityState === 'visible') void refreshQueue()
+    if (document.visibilityState === 'visible' && movingKey.value === null) void refreshQueue()
   }, QUEUE_POLL_MS)
   void loadProfiles()
   await refresh()
@@ -1083,9 +1153,10 @@ onBeforeUnmount(() => {
 
 .queue-card__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px 12px;
 }
 
 .queue-card__title {
@@ -1116,11 +1187,79 @@ onBeforeUnmount(() => {
 }
 
 .queue-row {
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.queue-row__place {
+  padding-top: 3px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--color-muted);
+}
+
+.queue-row__main {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 0;
-  border-top: 1px solid var(--color-border);
+  min-width: 0;
+}
+
+.queue-row__actions {
+  display: flex;
+  gap: 2px;
+}
+
+.queue-kind {
+  padding: 1px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.queue-kind--release,
+.queue-kind--merge,
+.queue-kind--review {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+
+.queue-row__priority {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.queue-row__kept {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warning-strong);
+}
+
+.queue-card__hint {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.queue-card__error {
+  font-size: 13px;
+  color: var(--color-danger-strong);
+}
+
+@media (max-width: 600px) {
+  .queue-row {
+    grid-template-columns: 2ch minmax(0, 1fr);
+  }
+
+  .queue-row__actions {
+    grid-column: 2;
+  }
 }
 
 .queue-row__identity {

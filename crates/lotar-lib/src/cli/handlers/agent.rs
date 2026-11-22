@@ -1,4 +1,4 @@
-use crate::api_types::AgentJobCreateRequest;
+use crate::api_types::{AgentJobCreateRequest, AgentQueueMove};
 use crate::automation::types::AutomationFile;
 use crate::cli::args::{
     AgentAction, AgentCheckArgs, AgentListJobsArgs, AgentListRunningArgs, AgentQueueAction, AgentQueueArgs, AgentRunArgs, AgentWorkerArgs, WorktreeAction,
@@ -469,6 +469,30 @@ impl AgentHandler {
                 }
                 Ok(())
             }
+            Some(AgentQueueAction::Move(args)) => {
+                let to = match (args.first, args.up, args.down) {
+                    (true, _, _) => AgentQueueMove::First,
+                    (_, true, _) => AgentQueueMove::Up,
+                    (_, _, true) => AgentQueueMove::Down,
+                    _ => AgentQueueMove::Last,
+                };
+                let moved = AgentQueueService::move_entry(tasks_dir, &args.ticket, args.agent.as_deref(), to).map_err(|e| e.to_string())?;
+                if matches!(renderer.format, OutputFormat::Json) {
+                    // The same answer as `POST /api/agent-queue/move`.
+                    let overview = AgentQueueService::overview(tasks_dir).map_err(|e| e.to_string())?;
+                    renderer.emit_json(&moved.to_api(&overview));
+                } else {
+                    renderer.emit_success(format!(
+                        "Moved {} ({} {}) to place {} of {}.",
+                        moved.entry.ticket_id,
+                        moved.entry.kind(),
+                        if moved.entry.agent.is_empty() { moved.entry.runner.clone().unwrap_or_default() } else { format!("@{}", moved.entry.agent) },
+                        moved.position,
+                        moved.total
+                    ));
+                }
+                Ok(())
+            }
             Some(AgentQueueAction::Resume) => {
                 let outcome = AgentQueueService::resume(tasks_dir).map_err(|e| e.to_string())?;
                 let pending = outcome.pending;
@@ -554,16 +578,28 @@ impl AgentHandler {
                 if overview.pending.is_empty() {
                     renderer.emit_notice("No pending entries in queue.");
                 } else {
-                    renderer.emit_raw_stdout(format_args!("ticket\tagent\tqueued_at\tattempts\tnot_before\twaits_for"));
-                    for (entry, waits_for) in &overview.pending {
+                    // In start order (DEV-786): priority, then kind, then arrival; a moved entry keeps its place.
+                    renderer.emit_raw_stdout(format_args!("#\tticket\tkind\tpriority\tagent\tqueued_at\tattempts\tnot_before\tplace\twaits_for"));
+                    for (index, queued) in overview.pending.iter().enumerate() {
+                        let entry = &queued.entry;
                         renderer.emit_raw_stdout(format_args!(
-                            "{}\t{}\t{}\t{}\t{}\t{}",
+                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                            index + 1,
                             entry.ticket_id,
+                            entry.kind(),
+                            entry.priority.as_deref().unwrap_or("-"),
                             entry.agent,
                             entry.queued_at,
                             entry.attempts,
                             entry.not_before.as_deref().unwrap_or("-"),
-                            waits_for
+                            if queued.starting {
+                                "starting"
+                            } else if entry.pinned {
+                                "kept"
+                            } else {
+                                "-"
+                            },
+                            queued.waits_for
                         ));
                     }
                 }

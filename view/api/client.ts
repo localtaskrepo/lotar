@@ -13,6 +13,8 @@ import type {
     AgentJobListResponse,
     AgentJobInputsResponse,
     AgentJobT3ThreadResponse,
+    AgentQueueMoveRequest,
+    AgentQueueMoveResponse,
     AgentJobLogsResponse,
     AgentJobMessageRequest,
     AgentJobMessageResponse,
@@ -491,6 +493,9 @@ export const api = {
     },
     cancelAllAgentJobs(): Promise<AgentJobCancelAllResponse> {
         return post('/api/jobs/cancel-all', {})
+    },
+    moveAgentQueueEntry(payload: AgentQueueMoveRequest): Promise<AgentQueueMoveResponse> {
+        return post('/api/agent-queue/move', payload)
     },
 
     // Automations

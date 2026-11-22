@@ -1,11 +1,11 @@
 title: 'A merge agent that lands a ticket in InProgress sends it to Reviewing: DEV-832 went back to review after it was on main'
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T07:28:02.692146+00:00
-modified: 2026-11-26T23:15:08.879322+00:00
+modified: 2026-11-26T23:59:29.262784+00:00
 relationships:
   related:
   - DEV-832
@@ -91,6 +91,17 @@ comments:
       result: not_run
       reason: test-only change, the merge runs the full suites
     next: Review again
+- date: 2026-11-26T23:59:22.985287+00:00
+  author: claude
+  text: |-
+    Review: passed. `e58f0b9aa` adds one regression test and no code. DEV-886 (`d2b22c8b1`) already fixed the cause on main.
+
+    - **Read:** the ticket and its 5 comments, and the DEV-832 timeline from 00:04Z to 07:25Z. It confirms the path: the fix job on a `Merging` ticket ran as a merge job, then its end rule set `InProgress → Reviewing`. I also read `is_merge_job_candidate` (`crates/lotar-agent/src/services/agent_job_service.rs:6621`) and the last 5 commits on main to the test file.
+    - **Done when:** the fix job no longer lands the branch (DEV-886). The merge job that does land it ends the ticket `Done`, also when it ran while the ticket was in `Reviewing`. `only_the_merge_job_lands_a_merging_tickets_branch_and_ends_it_done` (`crates/lotar-lib/tests/dev605_merge_without_agent_test.rs:280`) covers both. Dropping the earlier `@merge` end-rule matching keeps the change to what the ticket asks.
+    - **Fails before the fix:** in a scratch detached worktree (removed afterwards) I put back main's old `is_merge_job_candidate`. The test then fails 3 of 3 tries at `:308` (`the fix agent ran`).
+    - **Reran:** `cargo nextest run -p lotar-lib --test integration -E 'test(/dev605/)'`: 23 passed. `rustfmt --edition 2024 --check` on the test: clean. `cargo clippy -p lotar-lib --tests`: clean. `npm ci`: ok.
+    - **Merge:** `git merge-tree --write-tree main HEAD` is clean against main `61a229a1e`. No stray files, no second branch. Not a UI change.
+    - No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62e6c6a30da835027e75d59a109fde65035449f33aff308ba9aef1a3a6a12815
@@ -220,3 +231,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T23:59:22.985287+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:59:29.262784+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

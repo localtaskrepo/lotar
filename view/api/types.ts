@@ -1864,6 +1864,14 @@ export interface AgentQueuedTicket {
     queued_at: string
     attempts: number
     not_before?: string | null
+    /** release, merge, review, fix, another profile's name, or run for a bare runner (DEV-786) */
+    kind: string
+    /** The ticket's priority when the entry was queued (DEV-786) */
+    priority?: string | null
+    /** Moved by hand, or a paused job's retry: it keeps its place (DEV-786) */
+    pinned: boolean
+    /** A worker is starting its job: it can't be moved (DEV-786) */
+    starting: boolean
     /** What the ticket waits for: a free slot, its ticket's running job, memory, a paused queue, a worker */
     waits_for: string
 }
@@ -1878,6 +1886,7 @@ export interface AgentParkedTicket {
 export interface AgentQueueOverview {
     worker_state: 'active' | 'stopped' | 'idle'
     reason?: string | null
+    /** In start order: priority, kind, arrival; moved entries keep their place (DEV-786) */
     pending: AgentQueuedTicket[]
     waiting_for_prerequisites: AgentParkedTicket[]
 }
@@ -1925,6 +1934,24 @@ export interface StatusWaitingTicket {
     assignee?: string | null
     since: string
     ticket_url: string
+}
+
+export type AgentQueueMove = 'first' | 'up' | 'down' | 'last'
+
+export interface AgentQueueMoveRequest {
+    ticket_id: string
+    /** The entry's profile, needed when the ticket is queued for several */
+    agent?: string | null
+    to: AgentQueueMove
+}
+
+export interface AgentQueueMoveResponse {
+    entry: AgentQueuedTicket
+    /** The entry's place in the start order, from 1 */
+    position: number
+    total: number
+    /** The queue after the move, as GET /api/jobs lists it */
+    queue: AgentQueueOverview
 }
 
 export interface AgentJobListResponse {

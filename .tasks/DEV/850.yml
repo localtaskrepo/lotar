@@ -1,11 +1,11 @@
 title: Design inline transcript review on the ticket timeline
-status: Reviewing
+status: Merging
 priority: Medium
 type: Research
 reporter: codex
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-26T21:07:17.496967+00:00
+modified: 2026-11-26T23:46:21.425930+00:00
 relationships:
   related:
   - DEV-849
@@ -174,6 +174,21 @@ comments:
 - date: 2026-11-26T21:07:17.496967+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T210713.546Z-54 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210713.546Z-54 why.'
+- date: 2026-11-26T23:46:05.432607+00:00
+  author: claude
+  text: |-
+    Review: passed. The rework only records Ravi's decision in the write-up; it matches his answer and nothing else changed.
+
+    - Read: `git diff main...HEAD` shows the full write-up because `main` holds it as `d03a0d408`. The new work is `52897a817`: 5 lines added, 4 removed in `docs/research/inline-transcript-review.md`.
+    - Decision: "Open choice for Ravi" is now "Decision", dated 2026-11-26, quoting "expand (Load on open only)" (comment #10). Prefetch is marked "Not chosen". The fix agent adds no decision of its own.
+    - Rebase claim holds: rebasing a detached copy onto `main` dropped `78c91182e` ("patch contents already upstream") and left one commit. I removed the copy afterwards.
+    - Done when: all three boxes are covered, as passed in review #7. [DEV-909](https://lotar.pyxzl.net/task/DEV-909) is filed and related, and its scope is the write-up's smallest slice with load on open.
+    - Reran: `npm ci` passed. `npx prettier --check docs/research/inline-transcript-review.md` passed.
+    - UI: the diff changes no page, component or style, so there are no screenshots to read and I did not start the app.
+    - Findings: none. No tickets filed.
+- date: 2026-11-26T23:46:15.625379+00:00
+  author: claude
+  text: 'Correction to my review: Ravi''s answer is comment #9, not #10.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
@@ -416,3 +431,20 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:46:05.432607+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:46:15.625379+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:46:21.425930+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

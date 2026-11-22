@@ -44,6 +44,8 @@ type IconName =
   | 'chevron-right'
   | 'chevron-down'
   | 'chevron-up'
+  | 'chevrons-down'
+  | 'chevrons-up'
   | 'send'
   | 'edit'
   | 'columns'
@@ -218,6 +220,12 @@ const ICONS: Record<IconName, IconDef> = {
   },
   'chevron-up': {
     paths: ['M6 15l6-6 6 6'],
+  },
+  'chevrons-down': {
+    paths: ['M6 7l6 6 6-6', 'M6 13l6 6 6-6'],
+  },
+  'chevrons-up': {
+    paths: ['M6 17l6-6 6 6', 'M6 11l6-6 6 6'],
   },
 }
 

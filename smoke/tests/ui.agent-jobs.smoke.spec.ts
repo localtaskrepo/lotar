@@ -253,6 +253,60 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
+    it('lists the queue by priority with kinds and moves an entry to the top', async () => {
+        const agents = await createFixtureAgents({ fix: {}, review: {} }, 'lotar-smoke-agents-queue-');
+
+        try {
+            const workspace = await SmokeWorkspace.create({
+                // A job limit of 0 keeps every entry waiting in the queue.
+                seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml, { maxParallelJobs: 0 }) },
+            });
+            const env = { LOTAR_AGENT_QUEUE_DISABLE_WORKER: '1' };
+
+            try {
+                const low = await workspace.addTask('Example low fix', { args: ['--priority', 'Low'] });
+                const medium = await workspace.addTask('Example medium review', { args: ['--priority', 'Medium'] });
+                const high = await workspace.addTask('Example high fix', { args: ['--priority', 'High'] });
+                for (const [task, agent] of [
+                    [low, 'fix'],
+                    [medium, 'review'],
+                    [high, 'fix'],
+                ] as const) {
+                    await workspace.runLotar(['agent', 'run', task.id, `Work ${task.id}`, '--agent', agent], { env });
+                }
+                const server = await startLotarServer(workspace, { env });
+                try {
+                    await withPage(`${server.url}/agents`, async (page) => {
+                        const rows = page.locator('[data-testid="agent-queue-entry"]');
+                        await expect.poll(() => rows.count(), { timeout: 15_000 }).toBe(3);
+                        const order = async () =>
+                            (await rows.locator('.chip').allTextContents()).map((text) => text.trim());
+                        expect(await order()).toEqual([high.id, medium.id, low.id]);
+                        // The stats count the same entries the list shows.
+                        expect(await page.locator('.stat-value.queued').textContent()).toBe('3');
+                        const reviewRow = page.locator(
+                            `[data-testid="agent-queue-entry"][data-ticket-id="${medium.id}"]`,
+                        );
+                        expect(await reviewRow.locator('.queue-kind').textContent()).toBe('review');
+                        expect(await reviewRow.textContent()).toContain('Medium');
+
+                        await page
+                            .locator(`[data-testid="agent-queue-entry"][data-ticket-id="${low.id}"]`)
+                            .getByRole('button', { name: `Move to the top: ${low.id}` })
+                            .click();
+                        await expect.poll(order, { timeout: 10_000 }).toEqual([low.id, high.id, medium.id]);
+                    });
+                } finally {
+                    await server.stop();
+                }
+            } finally {
+                await workspace.dispose();
+            }
+        } finally {
+            await agents.dispose();
+        }
+    });
+
     it('shows a completed job in the job list', async () => {
         const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-completed-');
 

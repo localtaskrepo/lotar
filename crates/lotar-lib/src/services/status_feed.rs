@@ -8,7 +8,7 @@
 //! change, and every [`FULL_READ_EVERY`] in case an event was missed.
 
 use crate::api_types::{StatusFeed, StatusInstance, StatusQueue, StatusQueueEntry, StatusRunningJob, StatusWaitingTicket};
-use crate::services::agent_queue_service::AgentQueueService;
+use crate::services::agent_queue_service::{AgentQueueService, QueuedEntry};
 use crate::storage::TaskFilter;
 use crate::storage::manager::Storage;
 use crate::storage::task::Task;
@@ -112,7 +112,7 @@ fn queue(tasks_dir: &Path, ticket_url: &dyn Fn(&str) -> String) -> StatusQueue {
     let entries: Vec<StatusQueueEntry> = overview
         .pending
         .into_iter()
-        .map(|(entry, waits_for)| StatusQueueEntry {
+        .map(|QueuedEntry { entry, waits_for, .. }| StatusQueueEntry {
             ticket_url: ticket_url(&entry.ticket_id),
             ticket_id: entry.ticket_id,
             profile: entry.agent,

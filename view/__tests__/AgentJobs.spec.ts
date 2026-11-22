@@ -1,6 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentJob, AgentJobCancelAllResponse, AgentJobLogEntry, AgentJobLogsResponse } from '../api/types'
+import type {
+    AgentJob,
+    AgentJobCancelAllResponse,
+    AgentJobLogEntry,
+    AgentJobLogsResponse,
+    AgentQueuedTicket,
+} from '../api/types'
 import AgentJobs from '../pages/AgentJobs.vue'
 
 const sseCalls: Array<{
@@ -24,6 +30,7 @@ vi.mock('../api/client', () => ({
         runAgentJob: vi.fn(),
         addAgentProfile: vi.fn(),
         getAgentJobT3Thread: vi.fn(),
+        moveAgentQueueEntry: vi.fn(),
     },
 }))
 
@@ -1291,6 +1298,10 @@ describe('AgentJobs queue of every process (DEV-771)', () => {
                     {
                         ticket_id: 'DEV-7',
                         agent: 'fix',
+                        kind: 'fix',
+                        priority: 'High',
+                        pinned: false,
+                        starting: false,
                         queued_at: '2026-10-08T09:00:00.000Z',
                         attempts: 0,
                         waits_for:
@@ -1300,6 +1311,10 @@ describe('AgentJobs queue of every process (DEV-771)', () => {
                         ticket_id: 'DEV-3',
                         agent: '',
                         runner: 'codex',
+                        kind: 'run',
+                        priority: 'Medium',
+                        pinned: false,
+                        starting: false,
                         queued_at: '2026-10-08T09:05:00.000Z',
                         attempts: 0,
                         waits_for: "waiting for its ticket's running job job-9",
@@ -1307,6 +1322,10 @@ describe('AgentJobs queue of every process (DEV-771)', () => {
                     {
                         ticket_id: 'DEV-4',
                         agent: 'review',
+                        kind: 'review',
+                        priority: 'Low',
+                        pinned: false,
+                        starting: false,
                         queued_at: '2026-10-08T09:06:00.000Z',
                         attempts: 0,
                         waits_for: 'waiting for a queue worker; start one with `lotar agent queue resume`',
@@ -1401,6 +1420,104 @@ describe('AgentJobs Max parallel stat (DEV-856)', () => {
             const stat = wrapper.findAll('.queue-stats-card .stat-item')[2]!
             expect(stat.find('.stat-value').text()).toBe(value)
             expect(stat.find('.stat-label').text()).toBe(label)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})
+
+describe('AgentJobs queue order and moves (DEV-786)', () => {
+    const entry = (ticket_id: string, kind: string, priority: string, extra: Partial<AgentQueuedTicket> = {}) =>
+        ({
+            ticket_id,
+            agent: kind,
+            kind,
+            priority,
+            queued_at: '2026-10-08T09:00:00.000Z',
+            attempts: 0,
+            pinned: false,
+            starting: false,
+            waits_for: 'waiting for a free slot',
+            ...extra,
+        }) satisfies AgentQueuedTicket
+    const pending = [
+        entry('DEV-14', 'merge', 'High', { starting: true, waits_for: 'starting' }),
+        entry('DEV-15', 'fix', 'High'),
+        entry('DEV-13', 'review', 'Medium'),
+        entry('DEV-11', 'fix', 'Low'),
+    ]
+    const overview = (list: AgentQueuedTicket[]) => ({
+        worker_state: 'active' as const,
+        pending: list,
+        waiting_for_prerequisites: [],
+    })
+    const row = (wrapper: ReturnType<typeof mount>, ticket: string) =>
+        wrapper.get(`[data-testid="agent-queue-entry"][data-ticket-id="${ticket}"]`)
+    const order = (wrapper: ReturnType<typeof mount>) =>
+        wrapper.findAll('[data-testid="agent-queue-entry"]').map((item) => item.find('.chip').text())
+
+    beforeEach(() => {
+        ;(api.listAgentJobs as any).mockResolvedValue({
+            jobs: [],
+            queue_stats: { running: 0, queued: 4, max_parallel: 1 },
+            queue: overview(pending),
+        })
+    })
+
+    it('shows each entry with its place, kind and priority, and which moves it allows', async () => {
+        const wrapper = await mountAgentJobs()
+        try {
+            expect(order(wrapper)).toEqual(['DEV-14', 'DEV-15', 'DEV-13', 'DEV-11'])
+            const review = row(wrapper, 'DEV-13')
+            expect(review.find('.queue-row__place').text()).toBe('3')
+            expect(review.find('.queue-kind').text()).toBe('review')
+            expect(review.find('.queue-row__priority').text()).toBe('Medium')
+            // An entry being started can't be moved.
+            expect(row(wrapper, 'DEV-14').find('.queue-row__actions').exists()).toBe(false)
+            // The first movable entry can't go up, the last can't go down.
+            const first = row(wrapper, 'DEV-15')
+            expect(first.get('[data-testid="agent-queue-move-up"]').attributes('disabled')).toBeDefined()
+            expect(first.get('[data-testid="agent-queue-move-down"]').attributes('disabled')).toBeUndefined()
+            expect(
+                row(wrapper, 'DEV-11').get('[data-testid="agent-queue-move-last"]').attributes('disabled'),
+            ).toBeDefined()
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('moves an entry to the top and shows the queue the server answers', async () => {
+        const moved = { ...pending[3]!, pinned: true }
+        ;(api.moveAgentQueueEntry as any).mockResolvedValue({
+            entry: moved,
+            position: 2,
+            total: 4,
+            queue: overview([pending[0]!, moved, pending[1]!, pending[2]!]),
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            await row(wrapper, 'DEV-11').get('[data-testid="agent-queue-move-first"]').trigger('click')
+            await flushPromises()
+
+            expect(api.moveAgentQueueEntry).toHaveBeenCalledWith({ ticket_id: 'DEV-11', agent: 'fix', to: 'first' })
+            expect(order(wrapper)).toEqual(['DEV-14', 'DEV-11', 'DEV-15', 'DEV-13'])
+            expect(row(wrapper, 'DEV-11').text()).toContain('Kept in place')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('shows a failed move and keeps the list', async () => {
+        ;(api.moveAgentQueueEntry as any).mockRejectedValue(new Error("DEV-13's job is starting; it can't be moved"))
+        const wrapper = await mountAgentJobs()
+        try {
+            await row(wrapper, 'DEV-13').get('[data-testid="agent-queue-move-up"]').trigger('click')
+            await flushPromises()
+
+            expect(wrapper.get('.queue-card [role="alert"]').text()).toContain(
+                "Couldn't move DEV-13: DEV-13's job is starting",
+            )
+            expect(order(wrapper)).toEqual(['DEV-14', 'DEV-15', 'DEV-13', 'DEV-11'])
         } finally {
             wrapper.unmount()
         }

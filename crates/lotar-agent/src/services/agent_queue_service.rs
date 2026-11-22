@@ -1,4 +1,6 @@
-use crate::api_types::{AgentJobCreateRequest, AgentParkedTicket, AgentQueueOverview, AgentQueueStats, AgentQueuedTicket};
+use crate::api_types::{
+    AgentJobCreateRequest, AgentParkedTicket, AgentQueueMove as QueueMove, AgentQueueMoveResponse, AgentQueueOverview, AgentQueueStats, AgentQueuedTicket,
+};
 use crate::config::manager::ConfigManager;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::AgentJobService;
@@ -244,9 +246,82 @@ pub struct AgentQueueEntry {
     /// provider's usage limit runs again after the reset (DEV-584).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub not_before: Option<String>,
+    /// The ticket's priority when the entry was queued: the queue starts the
+    /// higher ones first (DEV-786).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    /// Moved by hand, or a paused job's retry put first: the entry keeps its
+    /// place, and new entries are placed among the others (DEV-786).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pinned: bool,
+    /// Where a worker took a pinned entry from, among the entries it left:
+    /// one whose start fails goes back there.
+    #[serde(skip)]
+    pub taken_from: Option<usize>,
+}
+
+/// A moved entry and its place in the queue, from 1.
+#[derive(Debug, Clone)]
+pub struct MovedEntry {
+    pub entry: AgentQueueEntry,
+    pub position: usize,
+    pub total: usize,
+}
+
+impl MovedEntry {
+    /// The answer of `POST /api/agent-queue/move` and `agent queue move`
+    /// in JSON, with the queue as `overview` lists it after the move.
+    pub fn to_api(&self, overview: &QueueOverview) -> AgentQueueMoveResponse {
+        let queue = overview.to_api();
+        let entry = overview
+            .pending
+            .iter()
+            .find(|queued| same_entry(&queued.entry, &self.entry))
+            .map_or_else(|| self.entry.to_api(String::new(), false), |queued| queued.entry.to_api(queued.waits_for.clone(), queued.starting));
+        AgentQueueMoveResponse { entry, position: self.position, total: self.total, queue }
+    }
 }
 
 impl AgentQueueEntry {
+    /// What the entry does, from its profile's name: `release`, `merge`,
+    /// `review`, `fix` (also `fix-retry`), the profile's own name for other
+    /// profiles, and `run` for a bare runner (DEV-786).
+    pub fn kind(&self) -> String {
+        let name = self.agent.to_ascii_lowercase();
+        if name.is_empty() {
+            return "run".to_string();
+        }
+        ["release", "merge", "review", "fix"].into_iter().find(|kind| name.contains(kind)).map_or(name.clone(), str::to_string)
+    }
+
+    /// The entry as `lotar agent queue` and the Agents page list it.
+    pub fn to_api(&self, waits_for: String, starting: bool) -> AgentQueuedTicket {
+        AgentQueuedTicket {
+            ticket_id: self.ticket_id.clone(),
+            agent: self.agent.clone(),
+            runner: self.runner.clone(),
+            kind: self.kind(),
+            priority: self.priority.clone(),
+            queued_at: self.queued_at.clone(),
+            attempts: self.attempts,
+            not_before: self.not_before.clone(),
+            pinned: self.pinned,
+            starting,
+            waits_for,
+        }
+    }
+
+    /// Releases, merges and reviews finish work, so they go before fixes and
+    /// other jobs of the same priority.
+    fn kind_rank(&self) -> u8 {
+        match self.kind().as_str() {
+            "release" => 0,
+            "merge" => 1,
+            "review" => 2,
+            _ => 3,
+        }
+    }
+
     /// When the entry still waits for its `not_before` time, that time.
     pub fn waiting_until(&self) -> Option<&str> {
         self.not_before.as_deref().filter(|at| time::parse_rfc3339(at).is_ok_and(|at| at > jiff::Timestamp::now()))
@@ -270,6 +345,9 @@ impl AgentQueueEntry {
             commit_retry,
             carried_outcome,
             not_before: None,
+            priority: None,
+            pinned: false,
+            taken_from: None,
         }
     }
 
@@ -329,7 +407,8 @@ impl WorkerState {
 impl AgentQueueService {
     #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
     pub fn enqueue(tasks_dir: &Path, req: AgentJobCreateRequest) -> LoTaRResult<bool> {
-        let entry = queue_entry(&req)?;
+        let mut entry = queue_entry(&req)?;
+        entry.priority = ticket_priority(tasks_dir, &entry.ticket_id);
         let (ticket_id, agent, runner) = (entry.ticket_id.clone(), entry.agent.clone(), entry.runner.clone());
 
         let mut inserted = false;
@@ -343,7 +422,7 @@ impl AgentQueueService {
             {
                 return;
             }
-            state.pending.push(entry.clone());
+            place(tasks_dir, &mut state.pending, entry.clone());
             inserted = true;
         })?;
 
@@ -382,13 +461,14 @@ impl AgentQueueService {
             };
             let parked = &state.parked[index].entry;
             let (commit_retry, carried_outcome) = (parked.commit_retry.clone(), parked.carried_outcome.clone());
+            let priority = ticket_priority(tasks_dir, &parked.ticket_id);
             moved = queue_entry(&parked.request()).map(|entry| {
-                let entry = AgentQueueEntry { commit_retry, carried_outcome, ..entry };
+                let entry = AgentQueueEntry { commit_retry, carried_outcome, priority, ..entry };
                 state.parked.remove(index);
                 if !state.pending.iter().any(|item| {
                     crate::storage::identity::aliases_match(&item.ticket_id, &entry.ticket_id) && item.agent == entry.agent && item.runner == entry.runner
                 }) {
-                    state.pending.push(entry);
+                    place(tasks_dir, &mut state.pending, entry);
                 }
                 true
             });
@@ -451,6 +531,46 @@ impl AgentQueueService {
             removed = state.pending.len() + state.taken.len() + state.parked.len() < before;
         })?;
         Ok(removed)
+    }
+
+    /// Move the queued entry of `ticket_id` (of the profile `agent`, needed
+    /// when the ticket has entries for several) to the front, one up, one
+    /// down or to the back (DEV-786). It keeps its prompt and settings, and
+    /// its place: new entries are placed among the entries not moved.
+    pub fn move_entry(tasks_dir: &Path, ticket_id: &str, agent: Option<&str>, to: QueueMove) -> LoTaRResult<MovedEntry> {
+        let mut moved = Err(LoTaRError::ValidationError(format!("{ticket_id} is not in the queue")));
+        with_locked_queue(tasks_dir, |state| {
+            let matches = |entry: &AgentQueueEntry| {
+                crate::storage::identity::aliases_match(&entry.ticket_id, ticket_id) && agent.is_none_or(|agent| entry.agent == agent.trim_start_matches('@'))
+            };
+            let found: Vec<usize> = state.pending.iter().enumerate().filter(|(_, entry)| matches(entry)).map(|(index, _)| index).collect();
+            let index = match found.as_slice() {
+                [index] => *index,
+                [] if state.taken.iter().any(matches) => {
+                    moved = Err(LoTaRError::ValidationError(format!("{ticket_id}'s job is starting; it can't be moved")));
+                    return;
+                }
+                [] => return,
+                _ => {
+                    let profiles: Vec<String> = found.iter().map(|index| entry_label(&state.pending[*index])).collect();
+                    moved = Err(LoTaRError::ValidationError(format!("{ticket_id} is queued for {}: pass the profile to move (--agent)", profiles.join(", "))));
+                    return;
+                }
+            };
+            let mut entry = state.pending.remove(index);
+            entry.pinned = true;
+            let target = match to {
+                QueueMove::First => 0,
+                QueueMove::Up => index.saturating_sub(1),
+                QueueMove::Down => (index + 1).min(state.pending.len()),
+                QueueMove::Last => state.pending.len(),
+            };
+            state.pending.insert(target, entry.clone());
+            // Entries a worker took start first, so they count ahead.
+            let total = state.taken.len() + state.pending.len();
+            moved = Ok(MovedEntry { entry, position: state.taken.len() + target + 1, total });
+        })?;
+        moved
     }
 
     /// Check if the worker process is running.
@@ -560,7 +680,11 @@ impl AgentQueueService {
             stats: Self::queue_stats(tasks_dir, &pending),
             state,
             reason,
-            pending: pending.into_iter().zip(waits_for).collect(),
+            pending: pending
+                .into_iter()
+                .zip(waits_for)
+                .map(|(entry, waits_for)| QueuedEntry { starting: taken.iter().any(|item| same_entry(item, &entry)), entry, waits_for })
+                .collect(),
             parked,
             memory,
             disk,
@@ -597,6 +721,7 @@ impl AgentQueueService {
     ) -> LoTaRResult<(QueuePause, bool)> {
         let now = jiff::Timestamp::now();
         let next_try_at = next_try_at_from(now);
+        let priority = retry.priority.clone().or_else(|| ticket_priority(tasks_dir, &retry.ticket_id));
         let mut paused = None;
         with_locked_queue(tasks_dir, |state| {
             let open = state.pauses.iter().position(|open| reason.joins(provider, open)).map(|index| state.pauses.remove(index));
@@ -619,7 +744,7 @@ impl AgentQueueService {
                 },
             };
             state.pending.retain(|item| !same_entry(item, retry));
-            state.pending.insert(0, retry.clone());
+            state.pending.insert(0, AgentQueueEntry { pinned: true, priority: priority.clone(), ..retry.clone() });
             paused = Some((pause.clone(), opened));
             state.pauses.push(pause);
         })?;
@@ -632,9 +757,10 @@ impl AgentQueueService {
     /// run meanwhile; the queue itself stays open. A taken-over job whose
     /// session can't be resumed starts next (DEV-734).
     pub fn requeue_first(tasks_dir: &Path, retry: &AgentQueueEntry) -> LoTaRResult<()> {
+        let priority = retry.priority.clone().or_else(|| ticket_priority(tasks_dir, &retry.ticket_id));
         with_locked_queue(tasks_dir, |state| {
             state.pending.retain(|item| !same_entry(item, retry));
-            state.pending.insert(0, retry.clone());
+            state.pending.insert(0, AgentQueueEntry { pinned: true, priority: priority.clone(), ..retry.clone() });
         })?;
         Self::ensure_worker(tasks_dir)
     }
@@ -828,8 +954,8 @@ pub struct QueueOverview {
     pub stats: AgentQueueStats,
     pub state: WorkerState,
     pub reason: Option<String>,
-    /// The waiting entries in queue order, each with what it waits for.
-    pub pending: Vec<(AgentQueueEntry, String)>,
+    /// The waiting entries in start order (DEV-786), each with what it waits for.
+    pub pending: Vec<QueuedEntry>,
     pub parked: Vec<ParkedEntry>,
     pub memory: crate::services::memory_gate::GateStatus,
     /// Why new jobs in job worktrees wait for disk space (DEV-837).
@@ -837,24 +963,21 @@ pub struct QueueOverview {
     pub pauses: Vec<QueuePause>,
 }
 
+/// A waiting entry of [`QueueOverview`].
+pub struct QueuedEntry {
+    pub entry: AgentQueueEntry,
+    /// What it waits for.
+    pub waits_for: String,
+    /// A worker took it and is starting its job: it can't be moved.
+    pub starting: bool,
+}
+
 impl QueueOverview {
     pub fn to_api(&self) -> AgentQueueOverview {
         AgentQueueOverview {
             worker_state: self.state.as_str().to_string(),
             reason: self.reason.clone(),
-            pending: self
-                .pending
-                .iter()
-                .map(|(entry, waits_for)| AgentQueuedTicket {
-                    ticket_id: entry.ticket_id.clone(),
-                    agent: entry.agent.clone(),
-                    runner: entry.runner.clone(),
-                    queued_at: entry.queued_at.clone(),
-                    attempts: entry.attempts,
-                    not_before: entry.not_before.clone(),
-                    waits_for: waits_for.clone(),
-                })
-                .collect(),
+            pending: self.pending.iter().map(|queued| queued.entry.to_api(queued.waits_for.clone(), queued.starting)).collect(),
             waiting_for_prerequisites: self
                 .parked
                 .iter()
@@ -1047,6 +1170,50 @@ fn comment_entry_ticket(tasks_dir: &Path, entry: &AgentQueueEntry, text: &str) -
     .is_ok()
 }
 
+/// The ticket's priority, `None` when the ticket can't be read.
+fn ticket_priority(tasks_dir: &Path, ticket_id: &str) -> Option<String> {
+    let storage = crate::storage::manager::Storage::new(tasks_dir);
+    crate::services::task_service::TaskService::get(&storage, ticket_id, None).ok().map(|task| task.priority.to_string())
+}
+
+/// Put `entry` in its place (DEV-786): a pinned one where a worker took it
+/// from (else first), else after the last entry not pinned that starts
+/// before it by priority (the project's configured order, highest first, an
+/// unknown one as the default), kind and arrival, else before the first
+/// entry not pinned, else at the end.
+fn place(tasks_dir: &Path, pending: &mut Vec<AgentQueueEntry>, mut entry: AgentQueueEntry) {
+    if entry.pinned {
+        let index = entry.taken_from.take().unwrap_or(0).min(pending.len());
+        pending.insert(index, entry);
+        return;
+    }
+    let mut priorities: HashMap<Option<String>, (Vec<String>, Option<String>)> = HashMap::new();
+    let mut key = |item: &AgentQueueEntry| {
+        let (order, default) = priorities.entry(entry_project(item)).or_insert_with_key(|project| {
+            crate::config::resolution::config_for_project(tasks_dir, project.as_deref()).map_or_else(
+                |_| (Vec::new(), None),
+                |config| {
+                    (
+                        config.issue_priorities.values.iter().map(ToString::to_string).collect(),
+                        config.effective_default_priority().map(|priority| priority.to_string()),
+                    )
+                },
+            )
+        });
+        let rank = |value: &str| order.iter().position(|known| known.eq_ignore_ascii_case(value));
+        let priority = item.priority.as_deref().and_then(rank).or_else(|| default.as_deref().and_then(rank)).unwrap_or(0);
+        (std::cmp::Reverse(priority), item.kind_rank(), item.queued_at.clone())
+    };
+    let own = key(&entry);
+    let index = pending
+        .iter()
+        .rposition(|item| !item.pinned && key(item) <= own)
+        .map(|index| index + 1)
+        .or_else(|| pending.iter().position(|item| !item.pinned))
+        .unwrap_or(pending.len());
+    pending.insert(index, entry);
+}
+
 fn same_entry(a: &AgentQueueEntry, b: &AgentQueueEntry) -> bool {
     a.ticket_id == b.ticket_id && a.agent == b.agent && a.runner == b.runner
 }
@@ -1072,7 +1239,7 @@ fn settle_taken(tasks_dir: &Path, entry: &AgentQueueEntry, again: Option<&AgentQ
         if let Some(again) = again
             && !state.pending.iter().any(|item| same_entry(item, again))
         {
-            state.pending.push(again.clone());
+            place(tasks_dir, &mut state.pending, again.clone());
         }
     })
 }
@@ -1120,11 +1287,24 @@ fn dequeue_startable(tasks_dir: &Path, disk_held: bool) -> LoTaRResult<Vec<Agent
         // Each pause gives one held entry a try when it is due; an entry
         // two pauses hold takes it only when both are due.
         let mut retry_due: Vec<bool> = state.pauses.iter().map(|pause| pause.try_free(tasks_dir, None, |ticket| own.contains(ticket))).collect();
+        // Tickets with a job here or in another process: their entries wait
+        // without a slot, so the entries after them start meanwhile (DEV-786).
+        let mut busy: Vec<String> =
+            own.iter().cloned().chain(crate::services::agent_active_jobs::list(tasks_dir).into_iter().map(|job| job.ticket_id)).collect();
         let mut take = Vec::new();
         let mut keep = Vec::new();
-        for entry in std::mem::take(&mut state.pending) {
+        for mut entry in std::mem::take(&mut state.pending) {
             // A job paused on a usage limit waits for the reset (DEV-584).
             if entry.waiting_until().is_some() || (disk_held && !entry.starts_as_merge_job(tasks_dir)) {
+                keep.push(entry);
+                continue;
+            }
+            // A T3 Code thread that held the ticket at its last try, as T3
+            // Code answered recently (DEV-600): once that answer is old, the
+            // entry is tried again and T3 Code asked.
+            if busy.iter().any(|ticket| crate::storage::identity::aliases_match(ticket, &entry.ticket_id))
+                || crate::services::agent_job_service::recent_t3_thread_hold(&entry.ticket_id).is_some()
+            {
                 keep.push(entry);
                 continue;
             }
@@ -1137,6 +1317,8 @@ fn dequeue_startable(tasks_dir: &Path, disk_held: bool) -> LoTaRResult<Vec<Agent
                     state.pauses[index].next_try_at = next_try_at();
                     state.pauses[index].trying = Some(entry.ticket_id.clone());
                 }
+                busy.push(entry.ticket_id.clone());
+                entry.taken_from = entry.pinned.then_some(keep.len());
                 take.push(entry);
             } else {
                 keep.push(entry);
@@ -1604,8 +1786,10 @@ mod tests {
         let disk =
             DiskHold { reason: "41.5 GB free on the job worktrees' disk, under the floor of 60 GB".into(), since: "2026-11-25T00:00:00Z".parse().unwrap() };
         let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending, &[], &[], Holds { memory: None, disk: Some(&disk) });
-        assert!(why[0].starts_with("waiting for disk space: "), "{why:?}");
-        assert!(!why[1].contains("disk"), "{why:?}");
+        // The merge ranks before the fix (DEV-786): look the entries up by ticket.
+        let why_of = |ticket: &str| &why[pending.iter().position(|entry| entry.ticket_id == ticket).unwrap()];
+        assert!(why_of("TEST-1").starts_with("waiting for disk space: "), "{why:?}");
+        assert!(!why_of("TEST-2").contains("disk"), "{why:?}");
 
         let taken: Vec<String> = dequeue_startable(&tasks_dir, true).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
         assert_eq!(taken, ["TEST-2"]);
@@ -2144,5 +2328,186 @@ mod tests {
         let task = crate::services::task_service::TaskService::get(&storage, "GVU-1", None).unwrap();
         let said: Vec<_> = task.comments.iter().map(|comment| comment.text.as_str()).collect();
         assert_eq!(said, ["The queued @implement job did not start after 4 tries and left the queue: Validation error: runner missing"]);
+    }
+
+    /// A queue of one slot whose tickets have the given priorities (DEV-786).
+    fn prioritized_queue(dir: &Path, tickets: &[(&str, &str)]) -> PathBuf {
+        let tasks_dir = dir.join("tasks");
+        std::fs::create_dir_all(tasks_dir.join("PRQ")).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  worktree:\n    max_parallel_jobs: 1\n").unwrap();
+        for (ticket, priority) in tickets {
+            let number = ticket.trim_start_matches("PRQ-");
+            std::fs::write(
+                tasks_dir.join(format!("PRQ/{number}.yml")),
+                format!("title: t{number}\nstatus: Todo\npriority: {priority}\ntype: feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"),
+            )
+            .unwrap();
+        }
+        tasks_dir
+    }
+
+    fn queue(tasks_dir: &Path, ticket: &str, agent: &str) {
+        let req = AgentJobCreateRequest { ticket_id: ticket.into(), prompt: format!("{agent} {ticket}"), agent: Some(agent.into()), ..Default::default() };
+        assert!(AgentQueueService::enqueue(tasks_dir, req).unwrap());
+    }
+
+    fn order(tasks_dir: &Path) -> Vec<String> {
+        AgentQueueService::list_pending(tasks_dir).unwrap().iter().map(|entry| format!("{} {}", entry.kind(), entry.ticket_id)).collect()
+    }
+
+    /// DEV-786: the queue starts the higher priority first, then releases,
+    /// merges and reviews before fixes, then by arrival; an entry put back
+    /// (its ticket was busy) returns to its place; a paused job's retry
+    /// stays first.
+    #[test]
+    fn the_queue_starts_the_higher_priority_first_then_by_kind_then_arrival() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = prioritized_queue(
+            dir.path(),
+            &[("PRQ-1", "Low"), ("PRQ-2", "High"), ("PRQ-3", "Medium"), ("PRQ-4", "Medium"), ("PRQ-5", "Medium"), ("PRQ-6", "High")],
+        );
+
+        queue(&tasks_dir, "PRQ-1", "fix");
+        queue(&tasks_dir, "PRQ-2", "fix");
+        let started = dequeue_startable(&tasks_dir, false).unwrap();
+        assert_eq!(started.iter().map(|entry| entry.ticket_id.as_str()).collect::<Vec<_>>(), ["PRQ-2"], "the High starts first");
+        assert_eq!(started[0].priority.as_deref(), Some("High"));
+        // Its ticket is busy: the entry goes back to its place, not to the end.
+        settle_taken(&tasks_dir, &started[0], Some(&started[0])).unwrap();
+
+        queue(&tasks_dir, "PRQ-3", "fix");
+        queue(&tasks_dir, "PRQ-4", "review");
+        queue(&tasks_dir, "PRQ-5", "merge");
+        queue(&tasks_dir, "PRQ-3", "release");
+        queue(&tasks_dir, "PRQ-6", "fix-retry");
+        assert_eq!(
+            order(&tasks_dir),
+            ["fix PRQ-2", "fix PRQ-6", "release PRQ-3", "merge PRQ-5", "review PRQ-4", "fix PRQ-3", "fix PRQ-1"],
+            "priority wins over kind, kind over arrival"
+        );
+
+        AgentQueueService::requeue_first(&tasks_dir, &entry("PRQ-1")).unwrap();
+        queue(&tasks_dir, "PRQ-6", "review");
+        let order = order(&tasks_dir);
+        assert_eq!(order[..3], ["a PRQ-1", "review PRQ-6", "fix PRQ-2"], "the retry stays first: {order:?}");
+    }
+
+    /// DEV-786: a paused job's retry and a usage-limit retry are built from
+    /// the job's request, which has no priority: they read it from the ticket.
+    #[test]
+    fn a_retry_shows_its_tickets_priority() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = prioritized_queue(dir.path(), &[("PRQ-1", "High"), ("PRQ-2", "Low")]);
+
+        AgentQueueService::requeue_first(&tasks_dir, &entry("PRQ-1")).unwrap();
+        AgentQueueService::pause(&tasks_dir, PauseReason::Disk, None, "No space left on device", "job-1", &entry("PRQ-2")).unwrap();
+
+        let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+        let shown: Vec<_> = pending.iter().map(|entry| (entry.ticket_id.as_str(), entry.priority.as_deref())).collect();
+        assert_eq!(shown, [("PRQ-2", Some("Low")), ("PRQ-1", Some("High"))]);
+    }
+
+    /// DEV-786: an entry whose ticket has a running job waits without a
+    /// slot, so a lower one starts meanwhile; a moved entry whose start
+    /// fails goes back where it was moved to.
+    #[test]
+    fn a_busy_tickets_entry_leaves_its_slot_to_the_next_one() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = prioritized_queue(dir.path(), &[("PRQ-1", "High"), ("PRQ-2", "Low"), ("PRQ-3", "Low")]);
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  worktree:\n    max_parallel_jobs: 2\n").unwrap();
+        queue(&tasks_dir, "PRQ-1", "fix");
+        queue(&tasks_dir, "PRQ-2", "fix");
+        queue(&tasks_dir, "PRQ-3", "review");
+        AgentQueueService::move_entry(&tasks_dir, "PRQ-2", None, QueueMove::Up).unwrap();
+        assert_eq!(order(&tasks_dir), ["fix PRQ-1", "fix PRQ-2", "review PRQ-3"]);
+
+        // PRQ-1's earlier job still runs, in one of the two slots.
+        let running = crate::services::agent_active_jobs::ActiveJob {
+            job_id: "job-prq-1".into(),
+            ticket_id: "PRQ-1".into(),
+            runner: "codex".into(),
+            agent: Some("fix".into()),
+            owner_pid: std::process::id(),
+            child_pid: 0,
+            started_at: time::now_rfc3339(),
+            session_id: None,
+            merge: false,
+            assignee_at_start: None,
+            in_setup: false,
+            request: None,
+        };
+        crate::services::agent_active_jobs::register(&tasks_dir, &running);
+        let started = dequeue_startable(&tasks_dir, false).unwrap();
+        assert_eq!(started.iter().map(|entry| entry.ticket_id.as_str()).collect::<Vec<_>>(), ["PRQ-2"], "the busy High leaves the free slot");
+
+        // Its start fails: the moved entry goes back to its place, not first.
+        assert!(requeue_entry(&tasks_dir, started[0].clone(), &LoTaRError::ValidationError("runner missing".into())).unwrap());
+        assert_eq!(order(&tasks_dir), ["fix PRQ-1", "fix PRQ-2", "review PRQ-3"]);
+
+        crate::services::agent_active_jobs::unregister(&tasks_dir, "job-prq-1");
+        let started = dequeue_startable(&tasks_dir, false).unwrap();
+        assert_eq!(started.iter().map(|entry| entry.ticket_id.as_str()).collect::<Vec<_>>(), ["PRQ-1", "PRQ-2"]);
+    }
+
+    /// DEV-786: a moved entry keeps its prompt and settings and its place:
+    /// moved to the front, it starts next; later entries go among the
+    /// others.
+    #[test]
+    fn a_moved_entry_starts_in_its_new_place_with_its_prompt() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = prioritized_queue(dir.path(), &[("PRQ-1", "Medium"), ("PRQ-2", "Medium"), ("PRQ-3", "Low"), ("PRQ-4", "High")]);
+        for ticket in ["PRQ-1", "PRQ-2"] {
+            queue(&tasks_dir, ticket, "fix");
+        }
+        let req = AgentJobCreateRequest {
+            ticket_id: "PRQ-3".into(),
+            prompt: "Review PRQ-3 as the rule said".into(),
+            agent: Some("review".into()),
+            model: Some("haiku".into()),
+            effort: Some("low".into()),
+            thread_name: Some("PRQ-3 review".into()),
+            ..Default::default()
+        };
+        assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+        assert_eq!(order(&tasks_dir), ["fix PRQ-1", "fix PRQ-2", "review PRQ-3"]);
+
+        let moved = AgentQueueService::move_entry(&tasks_dir, "PRQ-3", None, QueueMove::Up).unwrap();
+        assert_eq!((moved.position, moved.total), (2, 3));
+        AgentQueueService::move_entry(&tasks_dir, "PRQ-3", Some("@review"), QueueMove::Last).unwrap();
+        AgentQueueService::move_entry(&tasks_dir, "PRQ-2", None, QueueMove::Down).unwrap();
+        assert_eq!(order(&tasks_dir), ["fix PRQ-1", "review PRQ-3", "fix PRQ-2"]);
+        let moved = AgentQueueService::move_entry(&tasks_dir, "PRQ-2", None, QueueMove::First).unwrap();
+        assert_eq!((moved.position, moved.total), (1, 3));
+        AgentQueueService::move_entry(&tasks_dir, "PRQ-3", None, QueueMove::First).unwrap();
+        assert_eq!(order(&tasks_dir), ["review PRQ-3", "fix PRQ-2", "fix PRQ-1"]);
+        // A High ticket queued later goes among the entries not moved.
+        queue(&tasks_dir, "PRQ-4", "fix");
+        assert_eq!(order(&tasks_dir), ["review PRQ-3", "fix PRQ-2", "fix PRQ-4", "fix PRQ-1"]);
+
+        let started = dequeue_startable(&tasks_dir, false).unwrap();
+        assert_eq!(started.len(), 1);
+        let entry = &started[0];
+        assert_eq!(
+            (entry.ticket_id.as_str(), entry.agent.as_str(), entry.prompt.as_str(), entry.model.as_deref(), entry.effort.as_deref()),
+            ("PRQ-3", "review", "Review PRQ-3 as the rule said", Some("haiku"), Some("low")),
+            "the moved entry starts next as it was queued"
+        );
+        assert_eq!(entry.thread_name.as_deref(), Some("PRQ-3 review"));
+
+        let starting = AgentQueueService::move_entry(&tasks_dir, "PRQ-3", None, QueueMove::Last).unwrap_err().to_string();
+        assert!(starting.contains("is starting"), "{starting}");
+        let missing = AgentQueueService::move_entry(&tasks_dir, "PRQ-9", None, QueueMove::Up).unwrap_err().to_string();
+        assert!(missing.contains("PRQ-9 is not in the queue"), "{missing}");
+        queue(&tasks_dir, "PRQ-2", "review");
+        let ambiguous = AgentQueueService::move_entry(&tasks_dir, "PRQ-2", None, QueueMove::Up).unwrap_err().to_string();
+        assert!(ambiguous.contains("PRQ-2 is queued for @fix, @review"), "{ambiguous}");
     }
 }

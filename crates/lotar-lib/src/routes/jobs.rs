@@ -122,6 +122,23 @@ pub(super) fn register(api_server: &mut ApiServer) {
         },
     );
 
+    // POST /api/agent-queue/move -> move a queued entry (DEV-786)
+
+    api_server.register_handler("POST", "/api/agent-queue/move", |req: &HttpRequest| {
+        let resolver = try_response!(resolve_tasks_dir());
+        let payload: crate::api_types::AgentQueueMoveRequest = try_response!(parse_body(req));
+        let moved =
+            match crate::services::agent_queue_service::AgentQueueService::move_entry(&resolver.path, &payload.ticket_id, payload.agent.as_deref(), payload.to)
+            {
+                Ok(moved) => moved,
+                Err(err) => return bad_request(err.to_string()),
+            };
+        match crate::services::agent_queue_service::AgentQueueService::overview(&resolver.path) {
+            Ok(overview) => ok_json(200, json!({"data": moved.to_api(&overview)})),
+            Err(err) => internal_error(err),
+        }
+    });
+
     // POST /api/jobs/message -> send message to agent job
 
     api_server.register_handler("POST", "/api/jobs/message", |req: &HttpRequest| {

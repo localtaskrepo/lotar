@@ -566,6 +566,39 @@
         }
       }
     },
+    "/api/agent-queue/move": {
+      "post": {
+        "summary": "Move a queued entry to the front, up, down or to the back; it keeps its prompt and settings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentQueueMoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentQueueMoveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/jobs/message": {
       "post": {
         "summary": "Send agent job message",
@@ -10831,7 +10864,7 @@
         "properties": {
           "worker_state": {"type": "string", "enum": ["active", "stopped", "idle"]},
           "reason": {"type": "string", "nullable": true, "description": "What the waiting tickets wait for."},
-          "pending": {"type": "array", "description": "The waiting tickets, in queue order.", "items": {"$ref": "#/components/schemas/AgentQueuedTicket"}},
+          "pending": {"type": "array", "description": "The waiting tickets in start order: priority, kind, arrival; moved entries keep their place. Entries being started come first.", "items": {"$ref": "#/components/schemas/AgentQueuedTicket"}},
           "waiting_for_prerequisites": {"type": "array", "items": {"$ref": "#/components/schemas/AgentParkedTicket"}}
         },
         "required": ["worker_state", "pending", "waiting_for_prerequisites"]
@@ -10845,9 +10878,13 @@
           "queued_at": {"type": "string", "format": "date-time"},
           "attempts": {"type": "integer"},
           "not_before": {"type": "string", "format": "date-time", "nullable": true},
+          "kind": {"type": "string", "description": "What the job does: release, merge, review, fix, another profile's name, or run for a bare runner."},
+          "priority": {"type": "string", "nullable": true, "description": "The ticket's priority when the entry was queued."},
+          "pinned": {"type": "boolean", "description": "Moved by hand, or a paused job's retry: it keeps its place."},
+          "starting": {"type": "boolean", "description": "A worker is starting its job: it can't be moved."},
           "waits_for": {"type": "string", "description": "What the ticket waits for: a queue worker, memory, a usage limit's reset, a paused queue, a free slot, its ticket's running job, or `starting`."}
         },
-        "required": ["ticket_id", "agent", "queued_at", "attempts", "waits_for"]
+        "required": ["ticket_id", "agent", "queued_at", "attempts", "kind", "pinned", "starting", "waits_for"]
       },
       "AgentParkedTicket": {
         "type": "object",
@@ -10971,6 +11008,25 @@
           "cancelled",
           "jobs"
         ]
+      },
+      "AgentQueueMoveRequest": {
+        "type": "object",
+        "properties": {
+          "ticket_id": { "type": "string" },
+          "agent": { "type": "string", "description": "The entry's profile, needed when the ticket is queued for several" },
+          "to": { "type": "string", "enum": ["first", "up", "down", "last"] }
+        },
+        "required": ["ticket_id", "to"]
+      },
+      "AgentQueueMoveResponse": {
+        "type": "object",
+        "properties": {
+          "entry": { "$ref": "#/components/schemas/AgentQueuedTicket" },
+          "position": { "type": "integer", "format": "uint", "description": "The entry's place in the start order, from 1" },
+          "total": { "type": "integer", "format": "uint", "description": "Entries in the queue" },
+          "queue": { "$ref": "#/components/schemas/AgentQueueOverview", "description": "The queue after the move, as GET /api/jobs lists it" }
+        },
+        "required": ["entry", "position", "total", "queue"]
       },
       "AgentJobLogEntry": {
         "type": "object",
@@ -11161,6 +11217,17 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AgentJobCancelAllResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentQueueMoveResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentQueueMoveResponse"
           }
         },
         "required": [

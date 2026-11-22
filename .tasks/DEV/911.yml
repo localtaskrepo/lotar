@@ -1,16 +1,20 @@
 title: Run review and triage jobs on dyson over ssh (claude/codex runners)
-status: Todo
+status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T23:14:46.615229+00:00
-modified: 2026-11-26T23:15:04.121835+00:00
+modified: 2026-11-26T23:56:13.506951+00:00
 relationships:
   depends_on:
   - DEV-901
   related:
   - DEV-901
+comments:
+- date: 2026-11-26T23:56:13.506951+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-901. It starts once they are done.'
 description: |-
   Part of the owner's route B on DEV-901 (2026-11-26, INBOX-805): besides fix and research jobs in dyson's T3 Code, the profiles lotar runs through harnessmux (`review`, `review-claude`, `review-light`, `triage`, `triage-codex`) run on dyson over ssh. `merge` stays on the Mac. Builds on DEV-901's `agent.hosts`, placement, wake, worktree push/fetch/re-sign and ticket socket.
 
@@ -40,3 +44,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-901"]}'
     new: '{"depends_on":["DEV-901"],"related":["DEV-901"]}'
+- at: 2026-11-26T23:56:13.463689+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Blocked
+- at: 2026-11-26T23:56:13.506951+00:00
+  actor: automation
+  changes:
+  - field: comment_added

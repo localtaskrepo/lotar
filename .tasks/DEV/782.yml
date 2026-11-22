@@ -1,11 +1,11 @@
 title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-26T23:13:35.258719+00:00
+modified: 2026-11-26T23:52:05.161591+00:00
 relationships:
   depends_on:
   - DEV-765
@@ -22,6 +22,8 @@ relationships:
   - DEV-840
   - DEV-778
   - DEV-909
+  - DEV-789
+  - DEV-853
 comments:
 - date: 2026-11-22T06:37:21.509101+00:00
   author: claude
@@ -382,6 +384,28 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: 'Merge: rebase onto main (has DEV-840 a18d5ff8e) and run the merge checks'
+- date: 2026-11-26T23:51:54.426197+00:00
+  author: claude
+  text: |-
+    Review: passed. `3a9eef64a` does everything "Done when" asks and nothing else; it still works on top of today's main.
+
+    **Read**
+    - Diff `main...3a9eef64a`: `logged_question` in `saved_job_dto` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:970), one help sentence (`docs/help/agent.md:230`), one vitest case in `view/__tests__/AgentActivityIndicator.spec.ts`. No stray files.
+    - The live pill (`view/composables/useAgentActivity.ts:107`) drops the question on any event that isn't a question; the DTO does the same, so the live view and a reload agree.
+    - Main is 71 commits ahead. `git merge-tree` shows conflicts in `agent_job_service.rs` (the test module at the end, next to DEV-853's) and in `AgentActivityIndicator.spec.ts` (DEV-789's new case). Both sides only add code there, so the fix is to keep both. The merge agent's rebase has to resolve them.
+    - All 36 fix-agent screenshots are attached (before/after: agents, list, board; light and dark; 1920/1440/390). No visible problems.
+
+    **Reran** (`npm ci` passed in this worktree; checks ran on a scratch copy of main with the commit cherry-picked and the conflicts resolved by keeping both sides)
+    - `cargo nextest run -p lotar-agent dev782`: passed. With `question: None` put back, it fails.
+    - `cargo clippy -p lotar-agent --all-targets`: no warnings. `rustfmt --check` and `prettier --check` on the changed files: clean.
+    - `vitest` on `AgentActivityIndicator.spec.ts` + `AgentJobs.spec.ts`: 44 passed. That includes DEV-789's case, which uses the same `DEV-8`/`job-8` ids as the new mock entry.
+    - Debug `lotar serve` on a seeded scratch workspace with a job log ending in `agent_job_question`, held by a live process:
+      - `GET /api/jobs` and `/api/jobs/get?id=` return `question.title` = the message, `options: []`, `request: ""`.
+      - An `agent_job_progress` line after the question makes `question` null; a later `status` line also leaves it null.
+    - My own 18 screenshots (agents, list, board; light and dark; 1920/1440/390): the Agents card shows the question box with no buttons; the board pill is amber. In Playwright the list pill reads "Asks" with the title "fix asks: …".
+
+    **Findings**
+    - None blocking, no new tickets. The known gap (the live Agents page doesn't show the question box) stays with DEV-826.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A213f6f4501a6f08135284814b3c429c20077b295d8c5df00ce09be201fb88dad
@@ -1007,3 +1031,22 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778"]}'
     new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909"]}'
+- at: 2026-11-26T23:51:54.426197+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:51:54.707550+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909"]}'
+    new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909","DEV-789","DEV-853"]}'
+- at: 2026-11-26T23:52:05.161591+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
