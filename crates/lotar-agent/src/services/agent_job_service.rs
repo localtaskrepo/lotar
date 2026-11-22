@@ -2151,7 +2151,7 @@ fn finish_orphaned_job(
 /// Resume the session `name` in this process and end the job with its turn:
 /// a `t3` session follows its thread's run without sending a turn, others
 /// ask the agent to go on. `why` starts the note when it can't be resumed:
-/// the job then runs again in a new session, else fails.
+/// the job then runs again in a new session, else fails (always for `t3`).
 #[expect(clippy::too_many_arguments, reason = "the job's independent inputs from both of its takeovers")]
 fn resume_session_to_end(
     job_id: &str,
@@ -2176,6 +2176,12 @@ fn resume_session_to_end(
         Ok(session) => session,
         Err(err) => {
             let message = format!("{why}, and its session {name} could not be resumed: {err}");
+            // A t3 job's thread may still run in T3 Code: a new session would start a second thread beside it (DEV-738).
+            if runner_kind == AgentRunnerKind::T3 {
+                let note = "It doesn't run again: its T3 Code thread may still run, and a new session would start a second thread.";
+                update_job_failure(job_id, ticket_id, format!("{message}. {note}"), tasks_dir);
+                return;
+            }
             match run_again_in_new_session(job_id, tasks_dir) {
                 Some(note) => end_unfinished_job(job_id, ticket_id, format!("{message}. {note}"), true, tasks_dir),
                 None => update_job_failure(job_id, ticket_id, message, tasks_dir),
@@ -5747,8 +5753,8 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
 
 /// Queue a taken-over job whose session can't be resumed to run again
 /// first, in a new session (DEV-734), with the status and assignee change it
-/// recorded. The job's note; `None` when it can't (no request: a T3 Code
-/// thread lotar took over, or a record of an older build).
+/// recorded. The job's note; `None` when it can't (no request: a record of
+/// an older build).
 fn run_again_in_new_session(job_id: &str, tasks_dir: &std::path::Path) -> Option<String> {
     let (mut request, ticket_id) = JOB_REGISTRY.lock().ok().and_then(|registry| {
         let state = registry.jobs.get(job_id)?;

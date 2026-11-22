@@ -222,20 +222,18 @@ fn a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_it
     assert!(reason.contains("can't tell whether that turn made a thread"), "{reason}");
 }
 
-/// DEV-734: a taken-over job whose session can't be resumed (its agent kept no record of it) runs again first in the
-/// queue, in a new session, and ends paused instead of failed: its `job_failed` rules don't hand the ticket back.
+/// DEV-738: a taken-over t3 job whose session can't be resumed (harnessmux's record is gone) fails instead of
+/// running again: its thread may still run in T3 Code, and a new session would start a second thread beside it.
 #[test]
-fn a_taken_over_job_whose_session_cant_be_resumed_runs_again() {
+fn a_taken_over_t3_job_whose_session_cant_be_resumed_fails_without_a_second_thread() {
     let _no_worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
     let (harness, job) = take_over(false, false, true);
-    assert_eq!(job.status, "paused", "{job:?}");
+    assert_eq!(job.status, "failed", "{job:?}");
     let reason = job.summary.or(job.last_message).unwrap_or_default();
-    assert!(reason.contains("could not be resumed") && reason.contains("runs again in a new session"), "{reason}");
+    assert!(reason.contains("could not be resumed") && reason.contains("a second thread"), "{reason}");
     let pending = lotar::services::agent_queue_service::AgentQueueService::list_pending(&harness.fixtures.tasks_root).unwrap();
-    let retry = pending.iter().find(|entry| entry.ticket_id == "TEST-1").unwrap_or_else(|| panic!("the job is queued again: {pending:?}"));
-    assert_eq!((retry.agent.as_str(), retry.prompt.as_str()), ("fixer", "Fix it"), "{retry:?}");
-    assert_eq!(retry.session, Some(lotar::config::types::AgentSession::Fresh), "{retry:?}");
-    assert_eq!(harness.task().status.to_string(), "Todo", "the ticket isn't handed back");
+    assert!(pending.iter().all(|entry| entry.ticket_id != "TEST-1"), "the job isn't queued again: {pending:?}");
+    assert_eq!(std::fs::read_to_string(harness.dir.join("rule-failed")).unwrap_or_default(), "x\n", "its job_failed rule ran once");
 }
 
 /// Kill lotar during a t3 job's turn, finish the thread's run and take the job over; the job as it ended. No second
@@ -244,6 +242,12 @@ fn a_taken_over_job_whose_session_cant_be_resumed_runs_again() {
 fn take_over(forget_thread: bool, list_fails: bool, lose_session: bool) -> (Harness, lotar::api_types::AgentJob) {
     let harness = harness(0, 30);
     harness.show("running", "\"r1\"", 0, "Working.");
+    // A `job_failed` rule notes each run in `rule-failed`.
+    let _trust = EnvVarGuard::set("LOTAR_TRUST_ALL", "1");
+    let failed = harness.dir.join("rule-failed");
+    let rules =
+        format!("automation:\n  rules:\n    - name: Failed\n      on:\n        job_failed:\n          run: \"sh -c 'echo x >> {}'\"\n", failed.display());
+    std::fs::write(harness.fixtures.tasks_root.join("automation.yml"), rules).unwrap();
     let mut lotar = std::process::Command::new(crate::common::lotar_bin());
     lotar
         .env_remove("RUST_TEST_THREADS")

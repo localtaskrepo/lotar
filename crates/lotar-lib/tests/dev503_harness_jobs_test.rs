@@ -328,6 +328,42 @@ fn a_continue_job_whose_session_cant_be_resumed_starts_a_new_one_with_a_handoff(
     assert!(kept, "the session it couldn't continue keeps its event log");
 }
 
+/// DEV-734: lotar dies during a claude job's turn and the agent refuses to resume the session, so the job taken over
+/// ends paused, not failed, and runs again first in the queue in a new session (`t3` jobs fail there: DEV-738).
+#[test]
+fn a_taken_over_job_whose_session_cant_be_resumed_runs_again() {
+    let _no_worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let hold = std::env::temp_dir().join(format!("lotar-dev738-hold-{}", std::process::id()));
+    let _ = std::fs::remove_file(&hold);
+    let harness = harness("", &[("FAKE_HOLD", hold.display().to_string()), ("FAKE_NO_RESUME", "1".into())]);
+    let mut lotar = std::process::Command::new(crate::common::lotar_bin());
+    lotar
+        .env_remove("RUST_TEST_THREADS")
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .current_dir(harness.root())
+        .args(["agent", "run", "TEST-1", "Fix it", "--agent", "fixer", "--wait"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    let mut lotar = lotar.spawn().unwrap();
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    let session_known = || lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_some_and(|job| job.session_id.is_some());
+    wait_for("the turn to start", || hold.exists() && session_known());
+    lotar.kill().unwrap();
+    lotar.wait().unwrap();
+    let _ = std::fs::remove_file(&hold);
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    let job_id = lotar::services::agent_active_jobs::list(&tasks_dir).first().map(|job| job.job_id.clone()).unwrap_or_default();
+    wait_for("the job's end", || AgentJobService::job_settled(&job_id) && status(&job_id) != "running");
+    let job = AgentJobService::get_job(&job_id).unwrap();
+    assert_eq!(job.status, "paused", "{job:?}");
+    let reason = job.summary.or(job.last_message).unwrap_or_default();
+    assert!(reason.contains("could not be resumed") && reason.contains("runs again in a new session"), "{reason}");
+    let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+    let retry = pending.iter().find(|entry| entry.ticket_id == "TEST-1").unwrap_or_else(|| panic!("the job is queued again: {pending:?}"));
+    assert_eq!((retry.agent.as_str(), retry.prompt.as_str()), ("fixer", "Fix it"), "{retry:?}");
+    assert_eq!(retry.session, Some(lotar::config::types::AgentSession::Fresh), "{retry:?}");
+}
+
 /// DEV-757: a session start that fails for another reason than the session (here the agent's program is gone) still
 /// fails the continue job, and no new session takes the old one's place.
 #[test]
