@@ -446,7 +446,7 @@ lotar --format json task timeline <TASK_ID> [--threads]
 lotar task comment <TASK_ID> [TEXT] [--message|-m TEXT] [--file|-F PATH] [--dry-run|-n] [--explain|-e]
 ```
 
-- Works like `lotar comment`: TEXT can come from the positional argument, `--message`, `--file`, or stdin. Without comment content the command lists existing comments.
+- Works like `lotar comment`: TEXT comes from one of the positional argument, `--message` or `--file` (more than one is an error), else piped stdin. Without comment content the command lists existing comments.
 - See `docs/help/comment.md` for JSON payloads and formatting rules.
 
 ### reference

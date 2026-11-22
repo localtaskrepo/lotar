@@ -54,6 +54,25 @@ fn comments_fail_loudly_and_never_hang() {
     assert!(shown.contains("from stdin"), "{shown}");
 }
 
+/// DEV-791: more than one of -m, -F and TEXT is refused, none silently dropped.
+#[test]
+fn more_than_one_comment_source_is_refused() {
+    let fixtures = workspace();
+    for args in [
+        &["comment", "SAFE-1", "-m", "msg", "-"][..],
+        &["comment", "SAFE-1", "-m", "msg", "other"],
+        &["comment", "SAFE-1", "-F", "-", "other"],
+        &["task", "comment", "SAFE-1", "-m", "msg", "-F", "-"],
+    ] {
+        let out = run(&fixtures, args, "from stdin\n");
+        assert!(!out.status.success(), "{args:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("Give the comment once") && stderr.contains("Hint:"), "{args:?}: {stderr}");
+    }
+    let yaml = std::fs::read_to_string(fixtures.tasks_root.join("SAFE").join("1.yml")).unwrap();
+    assert!(!yaml.contains("msg") && !yaml.contains("from stdin") && !yaml.contains("other"), "{yaml}");
+}
+
 /// DEV-776: a lone `-` as the text reads stdin like `-F -`, also with a report.
 #[test]
 fn a_lone_dash_reads_the_comment_from_stdin() {

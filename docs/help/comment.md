@@ -26,7 +26,7 @@ lotar comment <TASK_ID> --review pass|block [--commit <SHA>] [--finding "<findin
 
 - `-F -` reads the comment from stdin, and so does a lone `-` as TEXT. A file that can't be read is an error (exit 1), never a silent listing.
 - If neither TEXT, -m, nor -F are provided, the command reads from stdin when piped and data arrives within a moment; otherwise (a terminal, or a pipe that stays silent, as in many agent and CI harnesses) it lists existing comments for the task right away.
-- TEXT is optional when using -m/--message or -F/--file.
+- Give the text one way: TEXT, -m/--message or -F/--file. More than one of them (also `-m <text> -`) is an error (exit 1) with a hint, so no text is silently dropped.
 
 ## Examples
 

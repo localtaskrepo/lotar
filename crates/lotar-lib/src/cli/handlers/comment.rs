@@ -349,16 +349,24 @@ fn insert_optional_string(payload: &mut Map<String, Value>, key: &str, value: Op
     }
 }
 
-/// The comment text from `-F <file>` (`-F -` reads stdin), `-m`, the
-/// positional text (a lone `-` reads stdin too, DEV-776), or piped stdin, in
-/// that order. An unreadable file is an
-/// error with its path (DEV-282: it used to fall back to listing comments
+/// The comment text from one of `-F <file>` (`-F -` reads stdin), `-m` or
+/// the positional text (a lone `-` reads stdin too, DEV-776), else piped
+/// stdin. More than one of them is refused, so none is dropped (DEV-791).
+/// An unreadable file is an error with its path (DEV-282: it used to fall back to listing comments
 /// with exit 0). Piped stdin is only read when data shows up promptly, so
 /// listing comments never hangs on a pipe that stays open with nothing in
 /// it (agents, CI, `ssh -T`).
 pub fn resolve_comment_text(file: Option<String>, message: Option<String>, text: Option<String>) -> Result<String, String> {
     use std::io::Read;
     let trim = |s: String| s.trim_end_matches(['\n', '\r']).to_string();
+    let given: Vec<&str> =
+        [(file.is_some(), "-F"), (message.is_some(), "-m"), (text.is_some(), "TEXT")].into_iter().filter_map(|(set, name)| set.then_some(name)).collect();
+    if given.len() > 1 {
+        return Err(format!(
+            "Give the comment once, not with {}: only one of them would be saved. Hint: use one of -m <text>, -F <file>, -F - (stdin), or TEXT (a lone - reads stdin).",
+            given.join(" and ")
+        ));
+    }
     let (file, text) = match (file, text) {
         (None, Some(text)) if text == "-" => (Some(text), None),
         other => other,
