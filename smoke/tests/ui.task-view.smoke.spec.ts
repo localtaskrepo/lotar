@@ -13,6 +13,20 @@ async function panelBox(page: Page) {
     return box;
 }
 
+// The panel slides in from 40 px to the right (the task-panel enter transition). Vue holds
+// the start position for two frames before the transition runs, and the toggle stays still
+// meanwhile, so a click then measures the large view 80 px off-center (DEV-799). The
+// position is final once Vue drops its enter classes and no transition runs.
+async function panelSettled(page: Page) {
+    return page
+        .locator('.task-panel__overlay')
+        .evaluate(
+            (overlay) =>
+                ![...overlay.classList].some((name) => name.startsWith('task-panel-enter')) &&
+                overlay.getAnimations().length === 0,
+        );
+}
+
 describe('DEV-239 large task view (actual backend/browser)', () => {
     it('switches between the side panel and the large view, and opens in the preferred view', async ({ expect }) => {
         const workspace = await SmokeWorkspace.create({
@@ -39,6 +53,7 @@ describe('DEV-239 large task view (actual backend/browser)', () => {
                         const panel = page.locator('aside.task-panel');
                         const toggle = page.getByTestId('task-view-toggle');
                         await expect.poll(() => toggle.isVisible()).toBe(true);
+                        await expect.poll(() => panelSettled(page)).toBe(true);
                         expect(await toggle.getAttribute('aria-pressed')).toBe('false');
                         const side = await panelBox(page);
                         expect(side.width).toBeLessThanOrEqual(660);

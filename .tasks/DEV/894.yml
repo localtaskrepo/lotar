@@ -1,15 +1,38 @@
 title: 'docs/help/agent.md: created_at is not when a job left the queue for a job lotar serve held as queued'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T07:08:32.438639+00:00
-modified: 2026-11-26T20:00:35.393345+00:00
+modified: 2026-11-26T20:09:45.033823+00:00
 relationships:
   related:
   - DEV-882
   - DEV-889
+comments:
+- date: 2026-11-26T20:09:34.734647+00:00
+  author: claude
+  text: |-
+    Doc fixed: `docs/help/agent.md` now says what `created_at` means in each place.
+
+    - List-jobs line: in a job log, `created_at` is when the job left the queue. A job that `lotar serve` held as queued keeps `created_at` = `queued_at` in that server's record (`GET /api/jobs`, the Agents page), also after it runs and ends. Its log, and so `list-jobs` and other processes, has the start time.
+    - Code evidence: `agent_job_service.rs` `start_job_inner` sets `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`, and nothing reassigns `record.created_at` later (`grep '.created_at = '` finds nothing). `start_job` calls `init_job_log(.., started_at, ..)` for the header.
+    - Took the ticket's doc option, not a code change: the Agents page sorts by `created_at`, so changing the record would change the page's order.
+    - Branch fast-forwarded to `main` `d2b22c8b1` first (it had no commits of its own), so it holds DEV-882's line.
+  report:
+    commits:
+    - hash: 63a6e526f
+      what: docs/help/agent.md list-jobs line describes created_at for the log and for serve's record
+    checks:
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: live serve hold + GET /api/jobs
+      result: not_run
+      reason: doc-only change; behaviour confirmed by reading the code
+    next: Merge agent lands agent/DEV-894
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A470c11b34c29bb4c843c90ed862b3d00652bc82aabe62bbd4762e4028a98de0f
 description: 'Found in review of DEV-882 (4a46916a2). docs/help/agent.md list-jobs line says `created_at` is when a job left the queue. For a job that `lotar serve` holds as queued, the in-memory record (`GET /api/jobs` while it is queued or running) keeps `created_at` = the time it was queued, which equals `queued_at` (agent_job_service.rs start_job_inner: `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`). Only the saved log header takes `created_at` from `started_at` (start_job -> init_job_log). Check: hold a job in serve, read GET /api/jobs. Done: the doc describes created_at for both, or the record''s created_at matches the log header''s.'
 history:
 - at: 2026-11-26T07:08:35.462071+00:00
@@ -29,3 +52,21 @@ history:
   - field: relationships
     old: '{"related":["DEV-882"]}'
     new: '{"related":["DEV-882","DEV-889"]}'
+- at: 2026-11-26T20:07:52.514969+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A470c11b34c29bb4c843c90ed862b3d00652bc82aabe62bbd4762e4028a98de0f
+- at: 2026-11-26T20:09:34.734647+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:09:45.033823+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,11 +1,10 @@
 title: Record memory-gate holds and each job's queued time in the job records
-status: InProgress
+status: Done
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-25T22:11:53.112006+00:00
-modified: 2026-11-26T20:04:46.589450+00:00
+modified: 2026-11-26T20:07:45.225826+00:00
 relationships:
   related:
   - DEV-827
@@ -25,6 +24,7 @@ relationships:
   - DEV-828
   - DEV-866
   - DEV-840
+  - DEV-886
 comments:
 - date: 2026-11-26T02:14:30.503383+00:00
   author: claude
@@ -114,6 +114,28 @@ comments:
     - `repos.json` has `"push": true` for lotar; finished work is pushed without asking (`docs/decisions/2026-11-12-push-finished-work.md`, `docs/decisions/2026-11-11-formatting.md` in ~/Development/standards).
     - `git status`: main is ahead 1 (`fd6d2b098`, unpushed, finished and checked) and behind 1 (`71791a991 DEV-804 Release v0.15.7`, already on origin). Rebasing an unpushed commit is no history rewrite of shared work.
     - Leave DEV-804 to the release session: the release commit is already on origin, so you don't land it.
+- date: 2026-11-26T20:07:38.108356+00:00
+  author: claude
+  text: |-
+    Pushed: main is `d2b22c8b1` on origin, with DEV-882 as `a1a70da33` on top of the release commit `71791a991`.
+
+    - Rebased all 12 unpushed main commits (DEV-882 and 11 other merges, including DEV-886, which landed meanwhile) onto `origin/main` in a temporary worktree. No conflicts; all commits are signed.
+    - The rebased tree differs from the old main only in the version bump in `Cargo.toml` and `Cargo.lock`.
+    - Moved main with `git reset --keep`; the other sessions' open `.tasks` edits are unchanged. Removed the temporary worktree.
+    - DEV-804 left to the release session.
+  report:
+    commits:
+    - hash: a1a70da33
+      what: DEV-882 on main, rebased onto the release commit
+    checks:
+    - command: cargo check --locked --workspace --all-targets
+      result: passed
+    - command: cargo nextest run --workspace -E 'test(/version/)'
+      result: passed
+      reason: 36 tests
+    - command: npm run lint/test/smoke
+      result: not_run
+      reason: passed before on the same code; the rebase changed only the version in Cargo.toml and Cargo.lock
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf75b0019e9a04d1379a692646fbceb73e18d6a69e7cad88070db40e0a4c5b8a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9e0c51bcd7facc24ccb67d85538304a8a3e8bbbba88f7c3e962d27f8b997c36a
@@ -317,3 +339,21 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9e0c51bcd7facc24ccb67d85538304a8a3e8bbbba88f7c3e962d27f8b997c36a
+- at: 2026-11-26T20:06:38.677920+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883","DEV-870","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-786","DEV-828","DEV-866","DEV-840"]}'
+    new: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883","DEV-870","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-786","DEV-828","DEV-866","DEV-840","DEV-886"]}'
+- at: 2026-11-26T20:07:38.108356+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:07:45.225826+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

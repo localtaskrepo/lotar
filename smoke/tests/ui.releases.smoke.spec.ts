@@ -88,7 +88,9 @@ describe.concurrent('UI releases smoke scenarios (DEV-393)', () => {
 
         try {
             const task = await workspace.addTask('Row menu release ticket', { args: ['--project', 'WEB'] });
-            const server = await startLotarServer(workspace);
+            // The release list reloads on the stream's ready event, sent once the watcher
+            // watches: a release created before then still shows (DEV-799).
+            const server = await startLotarServer(workspace, { env: { LOTAR_SSE_READY: '1' } });
             const taskReleases = async () => {
                 const response = await fetch(`${server.url}/api/tasks/get?id=${encodeURIComponent(task.id)}`);
                 const body = (await response.json()) as Envelope<{ releases: number[] }>;

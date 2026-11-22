@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T20:00:39.778177+00:00
-modified: 2026-11-26T17:23:59.792773+00:00
+modified: 2026-11-26T20:06:50.874148+00:00
 relationships:
   depends_on:
   - DEV-852
@@ -56,6 +56,12 @@ comments:
     - `docs/help/automation.md:314` matches the new behaviour. No stray files.
     - Reran `npm ci` (ok), `npx vitest run view/__tests__/automationRules.spec.ts` (passed), `npx oxlint` and `npx prettier --check` on the changed files (passed). Worktree left clean.
     - Not UI work (only a util's message text), so no screenshots needed. No minor tickets filed.
+- date: 2026-11-26T20:06:50.874148+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-879` onto `main` conflicts in `view/__tests__/automationRules.spec.ts`; lotar aborted the rebase, `agent/DEV-879` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8550d9ef314bccf32436fc0a30369bbe508616d4599363b7b3e2c9fe2fd6d8ec
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92224bf0efbfeddca815d33ded1caf820d6f85e3deae5190bfcc8bae1a3c8f34
@@ -169,3 +175,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T20:06:50.874148+00:00
+  actor: automation
+  changes:
+  - field: comment_added

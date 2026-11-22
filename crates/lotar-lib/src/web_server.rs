@@ -1199,7 +1199,11 @@ fn process_watch_batch(
     // FSEvents reports canonical paths (/private/var/... for /var/...), so
     // match the canonical tasks directory as well.
     let canonical = tasks_dir.canonicalize().ok();
-    for path in paths {
+    let mut pending: Vec<PathBuf> = paths.to_vec();
+    let mut next = 0;
+    while let Some(path) = pending.get(next).cloned() {
+        next += 1;
+        let path = &path;
         if follower.follows(path) {
             for event in follower.changed(path) {
                 crate::api_events::emit(&event);
@@ -1226,6 +1230,17 @@ fn process_watch_batch(
             continue;
         }
         announced.insert(relative.to_path_buf(), fingerprint);
+        // A new folder: inotify watches it only after its create event, so
+        // files written into it before that are never reported (DEV-799).
+        if path.is_dir()
+            && let Ok(entries) = fs::read_dir(path)
+        {
+            for entry in entries.flatten() {
+                if !pending.contains(&entry.path()) {
+                    pending.push(entry.path());
+                }
+            }
+        }
         let is_config = |name: &str| name == "config.yml" || name == "automation.yml";
         match parts.as_slice() {
             [file] if is_config(file) => {
@@ -1690,5 +1705,36 @@ mod tests {
         std::fs::write(&task, "title: after start\n").expect("rewrite task");
         batch(&mut announced);
         assert!(seen().contains(&"task_updated".to_string()), "a write after start is announced");
+    }
+
+    #[test]
+    fn watcher_announces_files_inside_a_new_folder() {
+        // DEV-799: inotify watches a new folder only after its create event,
+        // so a file written into it right away is never reported itself.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut follower = crate::services::agent_job_service::LogFollower::new(dir.path());
+        let mut announced = super::seed_fingerprints(dir.path(), &follower);
+        let events = crate::api_events::subscribe();
+
+        let releases = dir.path().join("@releases");
+        std::fs::create_dir_all(&releases).expect("releases dir");
+        std::fs::write(releases.join("7990.yml"), "version: 1.0.0\n").expect("write release");
+        let task = dir.path().join("NEWP").join("1.yml");
+        std::fs::create_dir_all(task.parent().expect("parent")).expect("project dir");
+        std::fs::write(&task, "title: first task\n").expect("write task");
+
+        // Only the folders' create events arrive.
+        let paths = [releases.clone(), task.parent().expect("parent").to_path_buf()];
+        super::process_watch_batch(dir.path(), &paths, &mut Default::default(), &mut Default::default(), &mut announced, &mut follower);
+
+        let seen: Vec<(String, serde_json::Value)> = events.try_iter().map(|e| (e.kind, e.data)).collect();
+        assert!(
+            seen.iter().any(|(kind, data)| kind == "release_changed" && data["id"] == 7990),
+            "the first release in a new @releases folder is announced: {seen:?}"
+        );
+        assert!(
+            seen.iter().any(|(kind, data)| kind == "task_updated" && data["id"] == "NEWP-1"),
+            "the first task in a new project folder is announced: {seen:?}"
+        );
     }
 }

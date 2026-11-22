@@ -1,11 +1,11 @@
 title: 'A fix job retried after a failed merge fails in 2s with the merge job''s verdict: STD-336 job-20261124T231242.639Z-51'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T00:48:58.355185+00:00
-modified: 2026-11-26T19:46:35.539554+00:00
+modified: 2026-11-26T20:06:47.960284+00:00
 relationships:
   related:
   - DEV-860
@@ -13,6 +13,9 @@ relationships:
   - DEV-835
   - DEV-804
   - DEV-897
+  - DEV-866
+  - DEV-882
+  - DEV-883
 comments:
 - date: 2026-11-26T03:48:15.461422+00:00
   author: claude
@@ -113,6 +116,32 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-26T20:06:38.285232+00:00
+  author: claude
+  text: |-
+    Merged: `8c7e5bad6` is on main, not pushed (DEV-882's unpushed commit is still in progress).
+
+    - `test:agent` failed at first on `a_queued_job_does_not_start_after_its_ticket_moved_on` in `crates/lotar-agent/src/services/automation_service.rs`. That DEV-566 unit test (`8da72b93f`) still asserted the old rule that a `@fix` job on a `Merging` ticket is a merge job. The fix removed the same case from the integration test, and the review approved that, but missed this copy.
+    - Changed the case to assert that the `@fix` rework starts. Amended it into the DEV-886 commit; `rustfmt --check` is clean.
+    - Main moved on (DEV-866, `preprocess.rs` only), so I rebased again; the lockfile is unchanged. On the final hash: `lint:agent`, `test:agent` (2598/2598) and `smoke` (412/412) passed.
+    - Fast-forwarded main and amended the main checkout's `.tasks` changes into `8c7e5bad6`.
+    - Trust: not needed, no rules or config changed.
+    - Push: not run. The oldest unpushed commit `fd6d2b098` belongs to DEV-882, which is still InProgress (`@fix`), so nothing comes before it. DEV-883 (`70f1095a0`) is Todo.
+    - The finding `bug:fix-retry-carries-merge-verdict` has no check command. The dev605 test `a_fix_job_on_a_merging_ticket_runs_its_agent` covers it and passed.
+  report:
+    commits:
+    - hash: 8c7e5bad6
+      what: a @fix job on a Merging ticket runs its agent; updated the DEV-566 unit test to the new rule
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2598/2598
+    - command: npm run -s smoke
+      result: passed
+      reason: 412/412
+    next: Push once DEV-882 (fd6d2b098, oldest unpushed) is finished
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6
 description: |-
@@ -210,3 +239,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T20:06:38.285232+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:06:38.678972+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860","DEV-566","DEV-835","DEV-804","DEV-897"]}'
+    new: '{"related":["DEV-860","DEV-566","DEV-835","DEV-804","DEV-897","DEV-866","DEV-882","DEV-883"]}'
+- at: 2026-11-26T20:06:47.960284+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

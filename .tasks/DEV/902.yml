@@ -1,15 +1,39 @@
 title: 'agent-team: Prerequisites rule keeps the ticket Blocked, so lotar automation run tells it again on every run'
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:27:28.763305+00:00
-modified: 2026-11-26T17:27:29.440071+00:00
+modified: 2026-11-26T20:15:35.925713+00:00
 relationships:
+  depends_on:
+  - DEV-796
   related:
   - DEV-796
-description: 'Found in the DEV-796 review (2026-11-26). The rule "Prerequisites done: continue the waiting ticket" (crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml:408) has no set that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one, because lotar automation run fires unblocked on every run while the ticket matches. The ticket only leaves Blocked at job_started. While the job waits for a slot, each scheduled run tells the agent again and leaves another "told no agent on <ID> yet" comment. Done when: the rule sets status InProgress, as the doc example does, and a test runs the rule twice and gets one job.'
+comments:
+- date: 2026-11-26T20:15:27.768631+00:00
+  author: claude
+  text: |-
+    Waits for DEV-796: the file to fix isn't on main yet.
+
+    - `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml` exists only on `agent/DEV-796` (commit `c2c24bcca`, ticket in Reviewing, review blocked).
+    - Fixing it here would copy DEV-796's whole template into this branch, so this ticket now depends on DEV-796 and is tagged `waits`.
+    - When DEV-796 is Done: add `set: status: InProgress` to the rule's `unblocked` action and the run-twice test from "Done when".
+    - No running DEV-796 thread to tell (checked `t3_thread_list`). If its fix job adds the `set` itself, this ticket closes with no change.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2d1de45ca813895e721f5f0dfbce0dedb4b74fa2f6b6424e61f6fe4f89e6a087
+description: |-
+  Found in the DEV-796 review (2026-11-26). The rule "Prerequisites done: continue the waiting ticket" in `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml` (on `agent/DEV-796`, not yet on main) has no `set` that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one, because `lotar automation run` fires `unblocked` on every run while the ticket matches. The ticket only leaves Blocked at job_started. While the job waits for a slot, each scheduled run tells the agent again and leaves another "told no agent on <ID> yet" comment.
+
+  ## Done when
+
+  - [ ] The agent-team rule "Prerequisites done: continue the waiting ticket" sets `status: InProgress` in its `unblocked` action, as the docs/help/automation.md example does; its `remove tags [waits]` and `tell_agent` stay.
+  - [ ] A test inits a workspace from the agent-team template, makes a Blocked ticket whose prerequisites are done, runs `lotar automation run "Prerequisites done: continue the waiting ticket"` twice and gets exactly one agent job and one tell comment; the second run reports none match.
+  - [ ] The ticket is InProgress after the first run, also while its job waits for a free slot.
+  - [ ] `lotar config validate` still passes on a workspace from the template.
+tags:
+- waits
 history:
 - at: 2026-11-26T17:27:29.098761+00:00
   actor: claude
@@ -22,3 +46,50 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T20:14:42.762368+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:14:43.618470+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2d1de45ca813895e721f5f0dfbce0dedb4b74fa2f6b6424e61f6fe4f89e6a087
+- at: 2026-11-26T20:15:26.803135+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found in the DEV-796 review (2026-11-26). The rule "Prerequisites done: continue the waiting ticket" (crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml:408) has no set that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one, because lotar automation run fires unblocked on every run while the ticket matches. The ticket only leaves Blocked at job_started. While the job waits for a slot, each scheduled run tells the agent again and leaves another "told no agent on <ID> yet" comment. Done when: the rule sets status InProgress, as the doc example does, and a test runs the rule twice and gets one job.'
+    new: |-
+      Found in the DEV-796 review (2026-11-26). The rule "Prerequisites done: continue the waiting ticket" in `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml` (on `agent/DEV-796`, not yet on main) has no `set` that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one, because `lotar automation run` fires `unblocked` on every run while the ticket matches. The ticket only leaves Blocked at job_started. While the job waits for a slot, each scheduled run tells the agent again and leaves another "told no agent on <ID> yet" comment.
+
+      ## Done when
+
+      - [ ] The agent-team rule "Prerequisites done: continue the waiting ticket" sets `status: InProgress` in its `unblocked` action, as the docs/help/automation.md example does; its `remove tags [waits]` and `tell_agent` stay.
+      - [ ] A test inits a workspace from the agent-team template, makes a Blocked ticket whose prerequisites are done, runs `lotar automation run "Prerequisites done: continue the waiting ticket"` twice and gets exactly one agent job and one tell comment; the second run reports none match.
+      - [ ] The ticket is InProgress after the first run, also while its job waits for a free slot.
+      - [ ] `lotar config validate` still passes on a workspace from the template.
+- at: 2026-11-26T20:15:27.114979+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-796"]}'
+    new: '{"depends_on":["DEV-796"],"related":["DEV-796"]}'
+- at: 2026-11-26T20:15:27.714089+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-26T20:15:27.768631+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:15:35.925713+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

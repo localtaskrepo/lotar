@@ -35,7 +35,9 @@ async function load(force = false): Promise<void> {
 }
 
 // While any page shows the list, a release_changed event (a release file was
-// created, edited or deleted) reloads it (DEV-464).
+// created, edited or deleted) reloads it (DEV-464). So does every open of the
+// stream and its ready event: a release created before the stream subscribed,
+// or before the server's watcher watched, sent no event (DEV-799).
 let stream: ReturnType<typeof useSse> | null = null
 let consumers = 0
 let eventTimer: ReturnType<typeof setTimeout> | null = null
@@ -51,8 +53,8 @@ function scheduleReload() {
 function subscribe() {
     consumers += 1
     if (stream) return
-    stream = useSse('/api/events', { kinds: 'release_changed' }, { onReconnect: scheduleReload })
-    stream.on('release_changed', scheduleReload)
+    stream = useSse('/api/events', { kinds: 'release_changed' })
+    for (const kind of ['open', 'ready', 'release_changed']) stream.on(kind, scheduleReload)
 }
 
 function unsubscribe() {

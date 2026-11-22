@@ -69,4 +69,22 @@ describe('useReleases (DEV-464)', () => {
         second.unmount()
         expect(events.closed).toBe(1)
     })
+
+    it('reloads once the stream is open and ready, so a release created before it subscribed shows (DEV-799)', async () => {
+        // The shared list is already loaded by the test above.
+        const consumer = mount(Consumer)
+        await vi.runAllTimersAsync()
+        expect(releaseList).not.toHaveBeenCalled()
+
+        releaseList.mockResolvedValueOnce({ releases: [release(1, '0.1.0')] })
+        events.handlers.get('open')?.()
+        await vi.runAllTimersAsync()
+        expect(consumer.text()).toBe('0.1.0')
+
+        releaseList.mockResolvedValueOnce({ releases: [release(1, '0.1.0'), release(2, '0.2.0')] })
+        events.handlers.get('ready')?.()
+        await vi.runAllTimersAsync()
+        expect(consumer.text()).toBe('0.1.0,0.2.0')
+        consumer.unmount()
+    })
 })
