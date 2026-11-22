@@ -5,10 +5,11 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T11:07:54.938084+00:00
-modified: 2026-11-22T18:58:52.932327+00:00
+modified: 2026-11-22T19:22:42.029921+00:00
 relationships:
   related:
   - DEV-781
+  - DEV-801
 comments:
 - date: 2026-11-22T18:58:43.115280+00:00
   author: claude
@@ -37,6 +38,12 @@ comments:
       result: passed
       reason: fails in ~3 s with own message
     next: Review, then merge; rebases cleanly onto DEV-781 (catch lines untouched there)
+- date: 2026-11-22T19:22:42.029921+00:00
+  author: claude
+  text: |-
+    Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
+
+    - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3a5b702f4f0841a6f3112eafa0efcf6e0ff29db5b01c7ccf1a8355cbacaadde
 description: |-
@@ -81,3 +88,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T19:22:20.629171+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-781"]}'
+    new: '{"related":["DEV-781","DEV-801"]}'
+- at: 2026-11-22T19:22:42.029921+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -5,7 +5,10 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-22T19:02:57.524782+00:00
+modified: 2026-11-22T19:22:15.481974+00:00
+relationships:
+  blocks:
+  - DEV-801
 description: |-
   Owner decision 2026-11-22 (chief of staff's options picker, after a 72 h pipeline measurement): picked "Full suites once, one at a time": fix and review jobs run only the tests for what changed; only the merge runs the full suites; one full suite runs on the machine at a time (a shared lock in lotar). Not picked: the lock alone, or 2 parallel jobs instead of 3.
 
@@ -29,3 +32,9 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-22T19:22:15.481974+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"blocks":["DEV-801"]}'

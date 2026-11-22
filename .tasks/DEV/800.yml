@@ -1,0 +1,54 @@
+title: 'Proposal: findings: agents add a health finding to the repo''s open bundle of the day instead of a ticket of their own'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-22T19:21:29.504789+00:00
+modified: 2026-11-22T19:21:45.678256+00:00
+relationships:
+  related:
+  - standards:STD-299
+comments:
+- date: 2026-11-22T19:21:44.907191+00:00
+  author: claude
+  text: |-
+    Approve this lotar feature (a `--bundle` option for `lotar add --finding`)?
+
+    - Why: STD-299 bundles the daily run's findings in standards; agent-filed findings need lotar to do the same.
+    - Yes: an agent builds it as the Done when says. No: WontDo; agents keep one ticket per finding.
+description: |-
+  Standards STD-299 (owner 2026-11-22, his pick verbatim: "Bundle health findings"): one health ticket per repo per day collects that day's findings. The daily `repos.ts --report` run now does that itself (finding `health:<date>`, one section per finding). Agents that file a problem during the day (`lotar add --finding <check>:<subject> --tag health`, about 55 tickets in 72 h besides flaky tests) still get one ticket each: lotar has no way to add a new key to an open ticket.
+
+  Proposal: `lotar add --finding <key> --bundle <name>`: with no ticket for the key, the report goes into the project's open ticket of bundle <name> created today (a section and the key added to the ticket), else a new bundle ticket; `finding=<key>` lists the bundle too; open, won't-do and done keep their current meaning per key. Open question for the design: a report added while the bundle's fix job runs, reviews or merges must reach that job or start a new bundle, so it isn't closed unfixed.
+
+  Done when:
+  - [ ] Two `lotar add --finding a:x --bundle health` and `--finding b:y --bundle health` on one day give one ticket that lists both keys; a third on the next day gives a new ticket.
+  - [ ] `lotar list finding=a:x` finds the bundle; a won't-do bundle suppresses its keys.
+  - [ ] A report while the bundle is in a job (InProgress, Reviewing, Merging) is not lost (reaches the job or starts a new bundle).
+  - [ ] Docs (findings help) describe it; standards then switches the global rule and repos.ts to `--bundle health`.
+tags:
+- proposal
+history:
+- at: 2026-11-22T19:21:42.179621+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: 'Findings: agents add a health finding to the repo''s open bundle of the day instead of a ticket of their own'
+    new: 'Proposal: findings: agents add a health finding to the repo''s open bundle of the day instead of a ticket of their own'
+- at: 2026-11-22T19:21:42.954429+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["standards:STD-299"]}'
+- at: 2026-11-22T19:21:44.907191+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:21:45.678256+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: HelpNeeded

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-20T05:17:29.812031+00:00
-modified: 2026-11-22T19:02:19.008694+00:00
+modified: 2026-11-22T19:20:39.176239+00:00
 relationships:
   related:
   - DEV-702
@@ -33,6 +33,15 @@ relationships:
   - DEV-780
   - DEV-781
   - DEV-783
+  - DEV-765
+  - DEV-766
+  - DEV-770
+  - DEV-772
+  - DEV-773
+  - DEV-775
+  - DEV-776
+  - DEV-799
+  - DEV-464
 comments:
 - date: 2026-11-21T15:01:56.811998+00:00
   author: claude
@@ -140,6 +149,23 @@ comments:
 - date: 2026-11-22T19:02:19.008694+00:00
   author: claude
   text: 'Owner 2026-11-22: picked "Release v0.15.6 myself now" instead of waiting behind the queue. Taken out of the queue; the chief of staff''s agent releases it now.'
+- date: 2026-11-22T19:04:40.822629+00:00
+  author: claude
+  text: |-
+    Releasing from origin/main `78c006d4b` (DEV-781), which has the bump `b18be094a` and the merges after it.
+
+    - Step 1: no ticket blocks on DEV-725. Added the 13 tickets merged since the bump to release 0.15.6: DEV-756, DEV-757, DEV-760, DEV-761, DEV-764, DEV-765, DEV-766, DEV-770, DEV-772, DEV-773, DEV-775, DEV-776, DEV-781. Nothing else in it is open. DEV-739, DEV-762, DEV-779, DEV-780 and DEV-783 have no commit on main and aren't in it
+    - Step 2: `Cargo.toml` is at 0.15.6, and nothing after the bump touches `Cargo.toml` or `Cargo.lock`. Running lint, test and smoke on `78c006d4b` in a clean worktree now
+    - Step 3: Quality Assurance for `78c006d4b` is running
+- date: 2026-11-22T19:20:36.512700+00:00
+  author: claude
+  text: |-
+    Tagged and pushed `v0.15.6` on `78c006d4b`; the Release run is in progress (45060142456).
+
+    - Local checks on `78c006d4b` in a clean worktree: `npm run lint:agent` passed, `npm run test:agent` passed (2466 Rust, 1567 UI tests, release and hook tests), `npm run test:smoke:agent` passed (407 of 407)
+    - Quality Assurance 45057966596, first attempt: 1 smoke test failed on the GitHub runner, `ui.releases` > offers Add to release in the row menu (DEV-464). It passes alone locally. Filed [DEV-799](https://lotar.pyxzl.net/task/DEV-799). Rerunning the failed job passed, so QA is green
+    - Signed tag pushed; `lotar release release 0.15.6` done
+    - `c8ea61a59` (DEV-739, docs) landed on main after the checks and isn't in 0.15.6
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A580d32a8d87852253f1f686139c79390e4f085954cd9223ddd756b0e4d895c13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afa80554ec24afa8bc5ca6b66e5d3652d9b9239eea26c371b20b250ada1399828
@@ -365,3 +391,29 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-22T19:04:40.822629+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:04:41.307071+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776"]}'
+- at: 2026-11-22T19:16:18.586918+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799"]}'
+- at: 2026-11-22T19:20:36.512700+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:20:39.176239+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464"]}'

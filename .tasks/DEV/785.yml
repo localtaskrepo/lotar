@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T03:06:53.746513+00:00
-modified: 2026-11-22T17:43:07.497773+00:00
+modified: 2026-11-22T19:22:35.479294+00:00
 relationships:
   related:
   - DEV-748
@@ -21,6 +21,7 @@ relationships:
   - DEV-773
   - DEV-784
   - DEV-772
+  - DEV-801
 comments:
 - date: 2026-11-22T09:10:40.200018+00:00
   author: claude
@@ -79,6 +80,12 @@ comments:
     - Hand-off timing: the comment says smoke went from 39 s to 65 s, but a full `test:smoke:agent` here took 716 s (vitest Duration). Say what the 39/65 s measured, or give the full-run wall times before and after, as the Done when asks.
 
     No UI changes, so no screenshots needed. No files changed in this worktree; the scratch worktree is removed.
+- date: 2026-11-22T19:22:35.479294+00:00
+  author: claude
+  text: |-
+    Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
+
+    - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5c8d6340739f46b0d7639fb411a4783a3b4b64b5e4a2c44a360165f04868dca7
 description: |-
@@ -189,3 +196,13 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-22T19:22:20.627969+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-750","DEV-755","DEV-741","DEV-751","DEV-760","DEV-764","DEV-775","DEV-781","DEV-761","DEV-773","DEV-784","DEV-772"]}'
+    new: '{"related":["DEV-748","DEV-750","DEV-755","DEV-741","DEV-751","DEV-760","DEV-764","DEV-775","DEV-781","DEV-761","DEV-773","DEV-784","DEV-772","DEV-801"]}'
+- at: 2026-11-22T19:22:35.479294+00:00
+  actor: claude
+  changes:
+  - field: comment_added

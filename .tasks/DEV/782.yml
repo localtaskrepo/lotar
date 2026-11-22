@@ -1,11 +1,11 @@
 title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
-status: InProgress
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-22T13:49:40.401168+00:00
+modified: 2026-11-22T19:21:11.937475+00:00
 relationships:
   depends_on:
   - DEV-765
@@ -52,9 +52,74 @@ comments:
       result: not_run
       reason: covered by the fromJob UI test with a mocked GET /api/jobs
     next: Merge agent/DEV-782 onto main
+- date: 2026-11-22T19:11:53.741037+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T191100.274Z-8 failed again or on a rate limit (lotar agent logs job-20261122T191100.274Z-8). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T19:17:43.473257+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited with code 1 because the thread's run ended 'waiting' while lint, test and smoke ran in the background. The commit 72d6e632f exists; this run should wait for the checks to finish before it ends.
+  answer:
+    to: 2026-11-22T19:11:53.741037+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited with code 1 because the thread''s run ended ''waiting'' while lint, test and smoke ran in the background. The commit 72d6e632f exists; this run should wait for the checks to finish before it ends.'
+- date: 2026-11-22T19:21:11.937475+00:00
+  author: claude
+  text: |-
+    Checks now pass on `72d6e632f`; no new changes in this job.
+
+    - The previous job ended while its checks still ran; reran them here on the same commit
+    - `npm run lint:agent`, `npm run test:agent` (Rust + 1565 UI tests), `npm run smoke` (407 tests): all pass
+    - Branch is 5 commits behind main; the merge agent rebases it
+    - No screenshots: no page, component or style changed, only `saved_job_dto` and tests
+  report:
+    commits:
+    - hash: 72d6e632f
+      what: logged_question in saved_job_dto, Rust + UI tests, docs/help/agent.md
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: ui-review screenshots
+      result: not_run
+      reason: no page, component or style changed (backend DTO + tests only)
+    next: Review, then merge agent
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A213f6f4501a6f08135284814b3c429c20077b295d8c5df00ce09be201fb88dad
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A50f958bdaa784d4118c01f21dcbf17988a72435778df104a80c7d3d4e1197f2d
 description: |-
   Found while reviewing DEV-765.
 
@@ -71,6 +136,7 @@ tags:
 - ui
 - agent
 - fix-retried
+- retry-fix
 history:
 - at: 2026-11-22T02:36:08.788363+00:00
   actor: claude
@@ -167,6 +233,44 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-22T13:49:40.401168+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:11:03.571118+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A50f958bdaa784d4118c01f21dcbf17988a72435778df104a80c7d3d4e1197f2d
+- at: 2026-11-22T19:11:53.284553+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T19:11:53.741037+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:17:43.473257+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:17:43.473285+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T19:17:46.302669+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: ui, agent, fix-retried
+    new: ui, agent, fix-retried, retry-fix
+- at: 2026-11-22T19:21:11.937475+00:00
   actor: claude
   changes:
   - field: comment_added

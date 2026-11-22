@@ -1,0 +1,31 @@
+title: 'Agents page tab counts disagree with the queue it lists: All 0 beside 3 waiting tickets, Queued counts prerequisite waits'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T19:10:25.728494+00:00
+modified: 2026-11-22T19:10:26.452588+00:00
+relationships:
+  related:
+  - DEV-771
+description: |-
+  Found in the review of DEV-771 (branch agent/DEV-771, 3333807b1): with 3 tickets in the on-disk queue the All tab shows 'All 0' above the **Waiting in the queue** card listing them (view/pages/AgentJobs.vue:401 counts jobs only). The Queued tab counts jobs waiting for prerequisites too (AgentJobs.vue:406), while the Queued count at the top and docs/help/agent.md say they don't count as queued.
+
+  Check: 3 tickets queued, 1 waiting for prerequisites, no jobs: the tab counts and the top Queued count follow one rule that docs/help/agent.md states.
+
+  Done when: All and Queued tab counts include the waiting tickets consistently with the top counts; a Vitest covers it.
+tags:
+- ui
+history:
+- at: 2026-11-22T19:10:26.105371+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-771"]}'
+- at: 2026-11-22T19:10:26.452588+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

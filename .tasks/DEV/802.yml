@@ -1,0 +1,36 @@
+title: A review job's lotar add in its worktree gives the new ticket an ID main already has (DEV-788 twice)
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T19:26:48.779913+00:00
+modified: 2026-11-22T19:27:28.813481+00:00
+relationships:
+  related:
+  - DEV-738
+  - DEV-788
+  - DEV-803
+description: 'Found: the DEV-738 review job filed its docs follow-up with lotar add in the DEV-738 worktree. Its .tasks copy predates main''s DEV-788 (flaky smoke, 2026-11-22T07:34), so the new ticket got DEV-788 too (commit c1dc25aa2 on agent/DEV-738 adds .tasks/DEV/788.yml). Its fix job then ran on agent/DEV-788, the flaky-smoke ticket''s branch, and merging agent/DEV-738 would hit an add/add conflict on .tasks/DEV/788.yml. Check: from a job worktree, lotar add allocates an ID that is already taken in the main checkout''s .tasks. Done: tickets filed from a job''s worktree go to the main checkout''s tasks directory (or get an ID free there), and a test covers it.'
+tags:
+- health
+custom_fields:
+  finding: lotar:ticket-id-collision
+history:
+- at: 2026-11-22T19:26:49.769624+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-738","DEV-788"]}'
+- at: 2026-11-22T19:26:51.093481+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T19:27:28.813481+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-738","DEV-788"]}'
+    new: '{"related":["DEV-738","DEV-788","DEV-803"]}'

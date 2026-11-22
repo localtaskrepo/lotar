@@ -1,0 +1,40 @@
+title: 'Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T19:16:17.993108+00:00
+modified: 2026-11-22T19:22:20.629481+00:00
+relationships:
+  related:
+  - DEV-464
+  - DEV-615
+  - DEV-725
+  - DEV-801
+description: |-
+  Found in Quality Assurance run 45057966596 (attempt 1) on main `78c006d4b`, the v0.15.6 release commit (DEV-725): `tests/ui.releases.smoke.spec.ts` > offers Add to release in the row menu once a release appears (DEV-464) failed at line 125, `expect.poll(() => item.isEnabled())`: the Add to release item did not become enabled in time after the release was created. 1 of 407 smoke tests failed on the GitHub runner, so this is not the local machine's load. DEV-615 fixed an earlier failure of the same test at the release creation step.
+
+  Check: `npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts -t 'offers Add to release in the row menu'` passes alone (3.4 s, 2026-11-22), and the full local smoke run on `78c006d4b` passed (407 of 407).
+
+  Done: the test waits for what enables the item (the release list refresh after release_changed), or the row menu enables the item once the release appears, and the test passes repeatedly in the full suite.
+tags:
+- health
+history:
+- at: 2026-11-22T19:16:18.587645+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-464","DEV-615","DEV-725"]}'
+- at: 2026-11-22T19:16:19.445353+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-22T19:22:20.629481+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-615","DEV-725"]}'
+    new: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801"]}'

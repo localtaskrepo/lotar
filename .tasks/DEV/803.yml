@@ -1,0 +1,35 @@
+title: 'docs/help/automation.md job_paused: a taken-over t3 job that can''t resume its session fails (DEV-738), not named there'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-22T19:27:28.533467+00:00
+modified: 2026-11-22T19:27:29.140664+00:00
+relationships:
+  related:
+  - DEV-738
+  - DEV-739
+  - DEV-788
+  - DEV-802
+description: |-
+  Found in the DEV-738 review (filed there as DEV-788 in its worktree, an ID main already had, see DEV-802): docs/help/automation.md:230 (job_paused, from DEV-739) says a taken-over job that can't resume its session runs again in a new one, 'a job with nothing to run again fails'. Since DEV-738 (e343b4e33, on main) a t3 job fails there too, so its job_failed rules run, not job_paused. Check: read the job_paused line against docs/help/agent.md (Jobs whose process died).
+
+  ## Done when
+  - [ ] docs/help/automation.md job_paused: the taken-over-job cause says a `t3` job fails there instead (a new session would start a second thread), so its `job_failed` rules run, worded as docs/help/agent.md says it.
+  - [ ] docs/help/sse.md `agent_job_paused` says the same where it names the taken-over cause, if it reads as covering t3 jobs.
+  - [ ] Docs-only checks: links and consistency with docs/help/agent.md.
+tags:
+- docs
+history:
+- at: 2026-11-22T19:27:28.813678+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-738","DEV-739","DEV-788","DEV-802"]}'
+- at: 2026-11-22T19:27:29.140664+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

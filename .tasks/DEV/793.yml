@@ -1,11 +1,11 @@
 title: 'A merge job that ends while its agent waits on a check still lands: DEV-725 (v0.15.6) went to main with smoke failed, and is Done without push or tag'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-22T18:46:53.538307+00:00
+modified: 2026-11-22T19:29:28.702865+00:00
 relationships:
   related:
   - DEV-725
@@ -14,6 +14,32 @@ comments:
 - date: 2026-11-22T18:46:53.150110+00:00
   author: claude
   text: 'Second case, the other way round: DEV-780''s merge job (taken over after the worker restart at 18:45Z) ended its turn on "Waiting for the smoke run to finish" and went Done with nothing merged (`agent/DEV-780` `1fcbc12ba` not on main). Merge requeued by hand. A merge job''s end should check that the branch is on main before `job_completed` sets Done.'
+- date: 2026-11-22T19:29:17.031054+00:00
+  author: claude
+  text: |-
+    Fixed: lotar no longer lands a merge whose check failed in the job and never passed.
+
+    - DEV-725 case: when the agent didn't land the branch itself, `ensure_branch_merged` fast-forwarded anyway. Now, if a report since the job started names a check failed (as lotar's merge hand-off does) and no later report names it passed, the job fails with the branch unmerged (`merge::unpassed_check`).
+    - DEV-780 case: lotar's own merge writes the job log before the worktree is known, so a taken-over merge job had no branch and `ensure_branch_merged` skipped it. It now falls back to the ticket's branch (`takeover_branch`).
+    - An agent that reran the check reports `--check "<cmd>=passed"` or fast-forwards main itself; both still land.
+    - Tests: 4 new in `agent_job_service.rs` (failed check stays unmerged, failed then passed lands, older failure ignored, takeover branch). Docs: `docs/help/agent.md` merge-job paragraph.
+    - DEV-725 is reopened already (InProgress, the chief of staff's agent releases it, with the owner's OK at 19:02Z), so that part needs nothing here. With this gate, a release ticket's merge can't go Done on a failed smoke run any more. Push and tag stay steps in the release skill.
+  report:
+    commits:
+    - hash: 6112404d5
+      what: merge gate for unpassed checks, takeover branch fallback
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2470 Rust tests and the UI tests
+    - command: npm run -s smoke
+      result: passed
+      reason: 407 of 407 at load ~50
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 description: |-
   Found by the standards communication review (STD-17), 2026-11-22.
 
@@ -57,3 +83,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-725"]}'
     new: '{"related":["DEV-725","DEV-780"]}'
+- at: 2026-11-22T19:17:53.328457+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-22T19:17:54.449014+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
+- at: 2026-11-22T19:29:17.031054+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:29:28.702865+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

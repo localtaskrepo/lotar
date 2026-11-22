@@ -3,7 +3,7 @@
 //! branch, runs the repository's checks, fast-forwards, pushes and reruns a
 //! finding's check, the steps the merge agent's prompt names, before any
 //! agent starts. Only what needs judgment starts the merge agent: a
-//! conflict, a failed check, others' unpushed commits, a refused push.
+//! conflict, a check that fails twice, others' unpushed commits, a refused push.
 
 use super::{
     JOB_REGISTRY, OUTPUT_DRAIN_LIMIT, git_command, linked_worktrees, merged_landed, prepare_worktree, record_and_emit, resolve_repo_root, rev_parse,
@@ -159,7 +159,7 @@ impl Merge<'_> {
             if let Some(install) = self.settings.install.as_deref().filter(|install| !install.trim().is_empty())
                 && ((fresh && round == 1) || lockfile_changed(&worktree, &before, &after))
             {
-                self.command("install", install, &worktree, false)?;
+                self.install(install, &worktree)?;
             }
             let passed_on_head = if before == after { passed_checks(self.tasks_dir, self.ticket_id, &after) } else { Vec::new() };
             self.checks.clear();
@@ -173,7 +173,7 @@ impl Merge<'_> {
                     });
                     continue;
                 }
-                self.command("check", check, &worktree, true)?;
+                self.check(check, &worktree)?;
             }
             let changes = git(&worktree, &["status", "--porcelain"]).map_err(hand_off)?;
             if !changes.is_empty() {
@@ -234,26 +234,62 @@ impl Merge<'_> {
         Err(hand_off(format!("rebasing `{}` onto `{}` conflicts in {files}; {state}", self.branch, self.main)))
     }
 
-    /// Run the repository's `install` or a check in `dir`; a failure hands
-    /// off with its output's tail.
-    fn command(&mut self, what: &str, command: &str, dir: &Path, report: bool) -> Result<(), Stop> {
-        self.progress(&format!("Running the {what} `{command}` in {}", dir.display()));
-        let ran = run_shell(self.job_id, command, dir, &[])?;
-        let passed = ran.as_ref().is_ok_and(|(success, _)| *success);
-        if report {
-            self.checks.push(ReportCheck {
-                command: command.to_string(),
-                result: if passed { "passed" } else { "failed" }.to_string(),
-                ..ReportCheck::default()
-            });
-        }
-        match ran {
+    /// Run the repository's `install` in `dir`; a failure hands off with
+    /// its output's tail.
+    fn install(&mut self, command: &str, dir: &Path) -> Result<(), Stop> {
+        self.progress(&format!("Running the install `{command}` in {}", dir.display()));
+        match run_shell(self.job_id, command, dir, &[])? {
             Ok((true, _)) => {
-                self.done.push(format!("The {what} `{command}` passed"));
+                self.done.push(format!("The install `{command}` passed"));
                 Ok(())
             }
-            Ok((false, output)) => Err(hand_off(format!("the {what} `{command}` failed:\n```\n{}\n```", last_lines(&output, OUTPUT_TAIL_LINES)))),
-            Err(err) => Err(hand_off(format!("the {what} `{command}` could not run: {err}"))),
+            Ok((false, output)) => Err(hand_off(format!("the install `{command}` failed:\n```\n{}\n```", last_lines(&output, OUTPUT_TAIL_LINES)))),
+            Err(err) => Err(hand_off(format!("the install `{command}` could not run: {err}"))),
+        }
+    }
+
+    /// Run a check; one that fails runs once more right away, before the
+    /// next check starts, and the merge goes on when that run passes: most
+    /// failures of lotar's own merge were tests that pass alone (DEV-783).
+    fn check(&mut self, command: &str, dir: &Path) -> Result<(), Stop> {
+        self.progress(&format!("Running the check `{command}` in {}", dir.display()));
+        let output = match run_shell(self.job_id, command, dir, &[])? {
+            Ok((true, _)) => {
+                self.checks.push(ReportCheck { command: command.to_string(), result: "passed".to_string(), ..ReportCheck::default() });
+                self.done.push(format!("The check `{command}` passed"));
+                return Ok(());
+            }
+            Ok((false, output)) => output,
+            Err(err) => {
+                self.checks.push(ReportCheck { command: command.to_string(), result: "failed".to_string(), ..ReportCheck::default() });
+                return Err(hand_off(format!("the check `{command}` could not run: {err}")));
+            }
+        };
+        let first = last_lines(&output, OUTPUT_TAIL_LINES);
+        self.progress(&format!("Rerunning the check `{command}` once on its own: its first run failed"));
+        let rerun = run_shell(self.job_id, command, dir, &[])?;
+        let passed = matches!(rerun, Ok((true, _)));
+        self.checks.push(ReportCheck {
+            command: command.to_string(),
+            result: "failed".to_string(),
+            reason: Some(if passed { "first run; the rerun passed" } else { "first run" }.to_string()),
+            ..ReportCheck::default()
+        });
+        self.checks.push(ReportCheck {
+            command: command.to_string(),
+            result: if passed { "passed" } else { "failed" }.to_string(),
+            reason: Some("rerun".to_string()),
+            ..ReportCheck::default()
+        });
+        match rerun {
+            Ok((true, _)) => {
+                self.done.push(format!("The check `{command}` failed, then passed when rerun on its own. Its first run's output:\n```\n{first}\n```"));
+                Ok(())
+            }
+            Ok((false, output)) => {
+                Err(hand_off(format!("the check `{command}` failed, and again when rerun on its own:\n```\n{}\n```", last_lines(&output, OUTPUT_TAIL_LINES))))
+            }
+            Err(err) => Err(hand_off(format!("the check `{command}` failed, and its rerun could not run: {err}"))),
         }
     }
 

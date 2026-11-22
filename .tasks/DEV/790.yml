@@ -1,11 +1,11 @@
 title: 'docs/help/sse.md: the agent_job_tool example shows a message the server never writes'
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T08:06:45.907365+00:00
-modified: 2026-11-22T14:18:55.269641+00:00
+modified: 2026-11-22T19:30:10.915103+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -19,8 +19,35 @@ comments:
 
     - `docs/help/sse.md` on `main` (`fc82f726e`) has no `agent_job_tool` entry, and `tool_line` doesn't exist in `crates/` there; both come with `agent/DEV-766` (status Merging).
     - Added depends-on DEV-766 and tag `waits`; I continue once DEV-766 is on main.
+- date: 2026-11-22T19:30:02.667071+00:00
+  author: claude
+  text: |-
+    Fixed the agent_job_tool example in `docs/help/sse.md`.
+
+    - Fast-forwarded `agent/DEV-790` to `main` (`e343b4e33`), which now has DEV-766.
+    - `message` in the example is `cargo test` now, not `Run: cargo test`.
+    - Added how `message` is built, from `tool_line` in `crates/lotar-agent/src/services/agent_job_service/tools.rs`: it's the `title`, or `<title>: <input>` (or the first path) when that differs from the title, cut to the first line. A failed call gets `Failed: ` in front.
+    - Checked against the `tool_line` tests (`Failed: cargo test`, `Read File: src/a.rs`). No other doc shows a `message` for this event.
+  report:
+    commits:
+    - hash: f4e423ea1
+      what: example message is cargo test; text says how message is built
+    checks:
+    - command: npx prettier --check docs/help/sse.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change, AGENTS.md asks link/example/consistency checks
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: Merge agent/DEV-790
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af68db688c1e0533662b498344bec6fec634c25e801f8ae8a824bef0f8e0a09e8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada91346e2107337f45dfb7170c7b2951af57080f0ed29810518762552c765873
 description: |-
   Found in the review of DEV-766.
 
@@ -85,3 +112,27 @@ history:
   - field: tags
     old: agent, docs, waits
     new: agent, docs
+- at: 2026-11-22T19:29:34.155572+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-22T19:29:34.604766+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada91346e2107337f45dfb7170c7b2951af57080f0ed29810518762552c765873
+- at: 2026-11-22T19:30:02.667071+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:30:10.915103+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

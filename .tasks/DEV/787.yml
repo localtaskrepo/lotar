@@ -1,14 +1,15 @@
 title: 'Flaky test risk: the shipped agent-pipeline template test waits for three agent jobs within the 30 s wait floor'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T06:13:38.957747+00:00
-modified: 2026-11-22T11:29:40.477619+00:00
+modified: 2026-11-22T19:22:37.760206+00:00
 relationships:
   related:
   - DEV-772
+  - DEV-801
 comments:
 - date: 2026-11-22T11:29:27.723430+00:00
   author: claude
@@ -35,6 +36,23 @@ comments:
     - command: npm run smoke
       result: passed
     next: Review, then merge
+- date: 2026-11-22T19:07:01.838025+00:00
+  author: claude
+  text: |-
+    Review: passed. Both waits on the shipped pipeline test now use `JOB_END_LIMIT_MS`, which is what "Done" asks for.
+
+    - Reviewed `6ec1ebf01` (`main..HEAD`, 1 commit, 2 lines in `crates/lotar-lib/tests/agent_automation_integration_test.rs`). The ticket branch has no newer commits.
+    - Line 2376: the three-job wait goes from `6000` (raised to the 30 s floor) to `JOB_END_LIMIT_MS`. Line 2379: the Done wait goes from `10_000` to `JOB_END_LIMIT_MS`. Both waits still return as soon as the state is reached (`wait_for_completed_jobs`, `wait_for_task_status`), so the test isn't slower.
+    - This matches what DEV-772 (`60a9cf1c5`) did for the same pipeline at lines 2586, 2618 and 2691. No commit on main since then touches this file.
+    - I found no other wait for three jobs in the file. The REV pipeline around line 2900 waits for one job per step, and line 456 waits for two jobs, so neither is in this ticket's scope.
+    - Reran `npm ci` (ok) and `npm run -s test:agent`: passed at load average 26 to 86. The load reached the 35+ the ticket names during the run.
+    - Change is test-only: no stray files, no decision for the owner, no tickets filed.
+- date: 2026-11-22T19:22:37.760206+00:00
+  author: claude
+  text: |-
+    Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
+
+    - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5f4408af6858c3a0bb37fa97e5f4fd3186eac9d65a094f00a7885b3a0f55baa6
 description: 'Found in the review of DEV-772 (2026-11-21): `crates/lotar-lib/tests/agent_automation_integration_test.rs:2376` waits `wait_for_completed_jobs(&created.id, 3, 6000)` (raised to the 30 s `WAIT_FLOOR_MS`) and then 10 s for Done, for the same implement, test, merge pipeline whose waits DEV-772 moved to `JOB_END_LIMIT_MS`. Not seen failing yet. Check: `npm run -s test:agent` at load average 35+. Done: waits for tickets or jobs that three agent jobs move use `JOB_END_LIMIT_MS`.'
@@ -78,3 +96,26 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T19:07:01.838025+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:07:10.895944+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-22T19:22:20.628429+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-772"]}'
+    new: '{"related":["DEV-772","DEV-801"]}'
+- at: 2026-11-22T19:22:37.760206+00:00
+  actor: claude
+  changes:
+  - field: comment_added

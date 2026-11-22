@@ -1,16 +1,21 @@
 title: 'Flaky smoke: full npm run smoke fails with timeouts under machine load, the failing tests pass alone'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-22T07:34:05.012147+00:00
-modified: 2026-11-22T16:34:28.234084+00:00
+modified: 2026-11-22T19:27:34.109114+00:00
 relationships:
   related:
   - DEV-765
   - DEV-779
   - DEV-776
+  - DEV-781
+  - DEV-801
+  - DEV-802
+  - DEV-738
+  - DEV-803
 comments:
 - date: 2026-11-22T13:42:25.866501+00:00
   author: automation
@@ -39,8 +44,92 @@ comments:
       result: passed
       reason: 408/408 at load 15-41; first run 406/407 at load ~35, only fail was my half-done fixture
     next: Review, then merge; rerun npm run smoke on main
+- date: 2026-11-22T19:13:27.205913+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261122T191017.578Z-7 failed again or on a rate limit (lotar agent logs job-20261122T191017.578Z-7). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-22T19:17:44.284644+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the job ended with 'The t3 runner exited with code 1' while the agent waited on background smoke and test runs; the work is on `agent/DEV-788`, rebased on main without the launcher change (DEV-781 covers it).
+  answer:
+    to: 2026-11-22T19:13:27.205913+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the job ended with ''The t3 runner exited with code 1'' while the agent waited on background smoke and test runs; the work is on `agent/DEV-788`, rebased on main without the launcher change (DEV-781 covers it).'
+- date: 2026-11-22T19:22:40.462177+00:00
+  author: claude
+  text: |-
+    Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
+
+    - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
+- date: 2026-11-22T19:23:18.160976+00:00
+  author: claude
+  text: |-
+    Ready for review: the branch is rebased onto main and the full smoke suite passes under heavy load.
+
+    - Rebased onto main: it conflicted with DEV-781 in `smoke/tests/harness.agent-launcher.smoke.spec.ts`. I kept main's version: its `FIXTURE_WAIT_MS` (90 s exit bound) replaces my 60 s `awaitExit` change. The commit is now `65b7b571d` (was `a9bc39a7a`): `smoke/helpers/ui.ts`, `smoke/helpers/server.ts`, 2 new tests
+    - `npm run smoke` passed 408/408 in about 2 min, at load average 68-103 on 14 cores
+    - My first smoke run failed 343 tests at once with `LoTaR binary was not found at target/debug/lotar`, although `cargo build` printed `Finished`. The rerun passed. Possibly a concurrent cargo run; I couldn't reproduce it
+    - That run also left 7 `lotar smoke agents/gate` temp dirs: the launcher tests skip cleanup when the wrapper binary is missing. This only happens on that setup error
+  report:
+    commits:
+    - hash: 65b7b571d
+      what: browser cleanup owed from launch, server stderr wait and 60 s readiness bound, with tests
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: 2466 Rust, 1567 UI
+    - command: npm run smoke
+      result: passed
+      reason: 408/408 at load average 68-103
+    next: Review, then merge agent lands 65b7b571d
+- date: 2026-11-22T19:27:02.426007+00:00
+  author: claude
+  text: |-
+    Note: a job for another ticket that also got ID DEV-788 ran on `agent/DEV-788`. It changed nothing here.
+
+    - The DEV-738 review filed a docs follow-up as DEV-788 in its worktree. See DEV-802.
+    - `agent/DEV-788` still has only `65b7b571d`.
+- date: 2026-11-22T19:27:34.109114+00:00
+  author: claude
+  text: |-
+    Update: DEV-738 merged without the clashing ticket file. The docs follow-up is now DEV-803.
+
+    - Main's `.tasks/DEV/788.yml` is still this flaky-smoke ticket. Nothing changed on `agent/DEV-788`.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A00eba8331e1b4442199bd2736f308391518047db59474cfa0c61a0898113a84c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa50b0d4d92d6a344c5466c713576a982c93b232e1afe53fe0ea758a6ccb4dbb6
 description: |-
   Found: merging DEV-765 on 2026-11-21, two full `npm run smoke` runs failed on different tests while load average was 40-48 on 14 cores: run 1 `harness.agent-launcher.smoke.spec.ts` (batch-shim test, 'fixture child did not exit within 20000ms'); run 2 nine tests in `ui.theming`, `harness.server` (occupied port, expected /Failed to bind/), `ui.config-coverage`, `ui.backlog-order`, `ui.filter-panel`, `ui.global-actions` (120 s timeouts) and `harness.failed-test-cleanup` (Tests left playwright temp entries). Each file passes alone (32/32, launcher test in 0.8 s). Related: DEV-779 (same for test:ui).
   Check: `npm run smoke` while the machine is busy.
@@ -48,6 +137,7 @@ description: |-
 tags:
 - health
 - fix-retried
+- retry-fix
 custom_fields:
   finding: npm run smoke:flaky-under-load
 history:
@@ -96,3 +186,83 @@ history:
   - field: relationships
     old: '{"related":["DEV-765","DEV-779"]}'
     new: '{"related":["DEV-765","DEV-779","DEV-776"]}'
+- at: 2026-11-22T19:10:20.329357+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa50b0d4d92d6a344c5466c713576a982c93b232e1afe53fe0ea758a6ccb4dbb6
+- at: 2026-11-22T19:13:26.944729+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-22T19:13:27.205913+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:17:44.284644+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:17:44.284672+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-22T19:17:45.676424+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765","DEV-779","DEV-776"]}'
+    new: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781"]}'
+- at: 2026-11-22T19:17:47.265731+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, retry-fix
+- at: 2026-11-22T19:22:20.628746+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781"]}'
+    new: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801"]}'
+- at: 2026-11-22T19:22:40.462177+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:23:18.160976+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:26:49.518985+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801"]}'
+    new: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802"]}'
+- at: 2026-11-22T19:27:02.426007+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:27:03.587145+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802"]}'
+    new: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738"]}'
+- at: 2026-11-22T19:27:28.813021+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738"]}'
+    new: '{"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738","DEV-803"]}'
+- at: 2026-11-22T19:27:34.109114+00:00
+  actor: claude
+  changes:
+  - field: comment_added

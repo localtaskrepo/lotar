@@ -1,11 +1,11 @@
 title: lotar comment -m <text> - reads stdin and silently drops the -m text
-status: Blocked
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T08:26:27.727612+00:00
-modified: 2026-11-22T16:34:47.916133+00:00
+modified: 2026-11-22T19:29:36.751567+00:00
 relationships:
   depends_on:
   - DEV-776
@@ -22,6 +22,7 @@ comments:
     - Plan once DEV-776 is in: refuse more than one of `-m`, `-F` and TEXT (a lone `-` counts as `-F -`) with a hint, in `resolve_comment_text`; tests in `crates/lotar-lib/tests/dev282_cli_safety_test.rs`; update `docs/help/comment.md`
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab0f4d5f17a66f33db4ed35ffaf7aa830bbe9872437d49c9bc5a4ef36fcbd364
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad64dba53a7c591ed66fa7ce0bf338b913bb9a0aa1ba4e893b7e2dd768705c648
 description: 'Found (DEV-776 review): since DEV-776 a lone `-` as TEXT means `-F -`, which comes before `-m` in `resolve_comment_text` (crates/lotar-lib/src/cli/handlers/comment.rs:362). So `lotar comment <ID> -m msg - <<EOF` saves the stdin text and drops msg without a word; before DEV-776 the `-` was dropped instead. Check: `lotar comment <ID> -m msg - <<<''other''`. Done: giving more than one of -m, -F and TEXT is refused with a hint (or -m and a lone - is), never one silently dropped.'
 tags:
 - health
@@ -72,3 +73,14 @@ history:
   - field: tags
     old: health, waits
     new: health
+- at: 2026-11-22T19:29:36.255309+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-22T19:29:36.751567+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad64dba53a7c591ed66fa7ce0bf338b913bb9a0aa1ba4e893b7e2dd768705c648

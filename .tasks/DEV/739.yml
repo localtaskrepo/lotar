@@ -1,17 +1,18 @@
 title: docs/help/automation.md's job_paused names two causes; a taken-over job that runs again in a new session (DEV-734) is a third
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T20:32:12.764651+00:00
-modified: 2026-11-22T18:08:14.189531+00:00
+modified: 2026-11-22T19:27:28.812528+00:00
 relationships:
   depends_on:
   - DEV-734
   related:
   - DEV-744
   - DEV-725
+  - DEV-803
 comments:
 - date: 2026-11-20T21:11:19.743133+00:00
   author: claude
@@ -95,6 +96,36 @@ comments:
     - Grepping `job_paused` in `docs/` finds no page that still lists only two causes. Both `sse.md` pages now name all three
     - Nothing outside the ticket's scope changed. No UI work, so no screenshots were needed
     - No minor findings, so no tickets were filed
+- date: 2026-11-22T19:04:22.434031+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-739` is in `main`.
+
+    - Rebased `agent/DEV-739` onto `main` (`6afd5ae66320`): `65685b1b9dd1`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-739` onto `main` (`78c006d4b92e`): `4359618bcd15`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `4359618bcd15`
+    - Amended the pending `.tasks` changes into the merged commit: `c8ea61a5919b`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: 78c006d4b
+      what: 'DEV-781 Flaky smoke under load: ui.theming and harness.agent-launcher time out in the full run, pass alone'
+    - hash: c8ea61a59
+      what: DEV-739 docs/help/automation.md's job_paused names two causes; a taken-over job that runs again in a new session (DEV-734) is a third
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1bed5233326b43586d924cbfc83666f08ba6833a4325145d33153a12707c0c5e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0d2421313df406ec3d391335287bfcb3e9436bed646cb2c6e9744c9636e0c6bc
@@ -108,7 +139,6 @@ description: |-
   - [ ] No other help page says `job_paused` has only two causes (grep `job_paused` in `docs/`)
 tags:
 - docs
-- review-returned
 history:
 - at: 2026-11-20T20:32:13.839027+00:00
   actor: claude
@@ -248,3 +278,22 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-734"],"related":["DEV-744"]}'
     new: '{"depends_on":["DEV-734"],"related":["DEV-744","DEV-725"]}'
+- at: 2026-11-22T19:04:22.434031+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:04:23.110147+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: docs, review-returned
+    new: docs
+- at: 2026-11-22T19:27:28.812528+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-734"],"related":["DEV-744","DEV-725"]}'
+    new: '{"depends_on":["DEV-734"],"related":["DEV-744","DEV-725","DEV-803"]}'

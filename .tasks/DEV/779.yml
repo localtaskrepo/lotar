@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T00:21:29.120752+00:00
-modified: 2026-11-22T18:08:14.190377+00:00
+modified: 2026-11-22T19:22:33.956516+00:00
 relationships:
   related:
   - DEV-753
@@ -15,6 +15,7 @@ relationships:
   - DEV-765
   - DEV-402
   - DEV-725
+  - DEV-801
 comments:
 - date: 2026-11-22T04:31:39.604238+00:00
   author: automation
@@ -102,6 +103,12 @@ comments:
       result: not_run
       reason: does not use view/vitest.config.ts
     next: Merge a76e155e7
+- date: 2026-11-22T19:22:33.956516+00:00
+  author: claude
+  text: |-
+    Flaky tests now go on one list per repo: [DEV-801](https://lotar.pyxzl.net/task/DEV-801), no ticket per test (owner 2026-11-22, standards STD-299).
+
+    - This ticket stays open and finishes in its job. A test of it that still fails only under load: report it on the list (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D ...`), not as a new ticket.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa9d927ee729fe344be319f20082fda7be034d97f7c6b9d43a5404db4c68cee15
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6d88bdfb76931ef8468d0770bd854c62c3b4d12e47c5fafc83f64d303b0b4cc
@@ -212,3 +219,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-753","DEV-764","DEV-755","DEV-788","DEV-765","DEV-402"]}'
     new: '{"related":["DEV-753","DEV-764","DEV-755","DEV-788","DEV-765","DEV-402","DEV-725"]}'
+- at: 2026-11-22T19:22:20.627412+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-753","DEV-764","DEV-755","DEV-788","DEV-765","DEV-402","DEV-725"]}'
+    new: '{"related":["DEV-753","DEV-764","DEV-755","DEV-788","DEV-765","DEV-402","DEV-725","DEV-801"]}'
+- at: 2026-11-22T19:22:33.956516+00:00
+  actor: claude
+  changes:
+  - field: comment_added

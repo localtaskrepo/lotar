@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T03:06:52.324630+00:00
-modified: 2026-11-22T18:08:14.191306+00:00
+modified: 2026-11-22T19:36:22.128899+00:00
 relationships:
   related:
   - DEV-726
@@ -56,6 +56,32 @@ comments:
     - No commits on main since the branch touch `merge.rs` or the test; `git merge-tree` with main is clean. No stale "failed check" text left in the prompts or docs
     - Reran: `npm ci` (ok), `cargo nextest run --workspace --test integration -E 'test(/dev605_merge_without_agent/)'` (20/20 passed), `cargo clippy --workspace --all-targets` (clean), `rustfmt --check` and `prettier --check` on the changed files (clean)
     - Not rerun: the full `npm test` and `npm run smoke`. The fix agent reports both passed
+- date: 2026-11-22T19:36:22.128899+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    e343b4e33 DEV-738 A t3 job taken over whose harnessmux record is gone runs again in a new T3 Code thread while its first thread may still run
+    ```.
+
+    - Rebased `agent/DEV-783` onto `main` (`e343b4e3366a`): `1e8a5d3997da`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `1e8a5d3997da`
+    - Amended the pending `.tasks` changes into the merged commit: `17dc4d9d3bbf`
+  report:
+    commits:
+    - hash: 1e8a5d399
+      what: 'DEV-783 Merge without agent: rerun a failed check once on its own before handing the merge to @merge'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1924bde0bfa0885fd85e4266862a953a8495f52ea6d26e813016d1eae3ce1bd9
 description: |-
@@ -160,3 +186,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761"]}'
     new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725"]}'
+- at: 2026-11-22T19:36:22.128899+00:00
+  actor: automation
+  changes:
+  - field: comment_added

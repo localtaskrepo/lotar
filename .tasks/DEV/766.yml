@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:04.045653+00:00
-modified: 2026-11-22T19:03:32.416720+00:00
+modified: 2026-11-22T19:10:47.963554+00:00
 relationships:
   blocks:
   - DEV-769
@@ -19,6 +19,8 @@ relationships:
   - DEV-790
   - DEV-765
   - DEV-738
+  - DEV-725
+  - DEV-771
 comments:
 - date: 2026-11-21T22:42:52.723697+00:00
   author: claude
@@ -446,3 +448,15 @@ history:
   changes:
   - field: releases
     new: '#11'
+- at: 2026-11-22T19:04:41.330719+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790","DEV-765","DEV-738"]}'
+    new: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790","DEV-765","DEV-738","DEV-725"]}'
+- at: 2026-11-22T19:10:47.963554+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790","DEV-765","DEV-738","DEV-725"]}'
+    new: '{"blocks":["DEV-769","DEV-789","DEV-790"],"related":["DEV-693","harnessmux:HARN-14","DEV-774","DEV-789","DEV-790","DEV-765","DEV-738","DEV-725","DEV-771"]}'

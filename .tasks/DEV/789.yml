@@ -1,11 +1,11 @@
 title: 'Agents page: a finished tool call replaces the job card''s last message, unlike the server'
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T08:06:40.134808+00:00
-modified: 2026-11-22T14:18:48.639564+00:00
+modified: 2026-11-22T19:27:44.974370+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -20,8 +20,32 @@ comments:
     - `agent_job_tool` and the server's `tool_entry` exist only on `agent/DEV-766` (`15f30d2f4`, status Merging); `main` (`fc82f726e`) has neither.
     - On main, `view/composables/useAgentActivity.ts` still sets the message only from `agent_job_progress`/`agent_job_message`; the `agent_job_tool` case is added by DEV-766.
     - Next: once DEV-766 is on main, rebase `agent/DEV-789` onto it, then change `updateFromEvent` (`view/pages/AgentJobs.vue`) and `applyAgentJobEvent` so that only a tool's start (`running`) or `failed` event sets the message, and add the two vitests.
+- date: 2026-11-22T19:27:37.007560+00:00
+  author: claude
+  text: |-
+    Done: a finished tool call no longer replaces the job card's last message; a start or failure still does, as on the server.
+
+    - Rebased `agent/DEV-789` onto main (`c8ea61a59`, has DEV-766).
+    - `view/pages/AgentJobs.vue` `updateFromEvent` and `view/composables/useAgentActivity.ts` `applyAgentJobEvent` skip `agent_job_tool` with `tool.status == completed`.
+    - New vitests in `view/__tests__/AgentJobs.spec.ts` and `view/__tests__/AgentActivityIndicator.spec.ts` (running → completed → failed); both fail without the fix.
+    - Checked the Done-when boxes.
+  report:
+    commits:
+    - hash: 017d20071
+      what: a finished tool keeps the card line in updateFromEvent and applyAgentJobEvent, with two vitests
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2466 Rust, 1569 UI
+    - command: npm run smoke
+      result: passed
+      reason: '407'
+    next: Merge agent/DEV-789
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbec1b9366a3e727602217837d75843415ce7d4c239dc0ded79a4911ff97aad0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8cf00dfcf8a49abc2ffc9d2aac60765537ab121463ce2db3a7b3264007c1ba3a
 description: |-
   Found in the review of DEV-766.
 
@@ -36,8 +60,8 @@ description: |-
 
   ## Done when
 
-  - [ ] A completed `agent_job_tool` event doesn't change the card's last message in either place; a start and a failure still do, matching the server.
-  - [ ] A vitest covers it for `applyAgentJobEvent` and for the Agents page.
+  - [x] A completed `agent_job_tool` event doesn't change the card's last message in either place; a start and a failure still do, matching the server.
+  - [x] A vitest covers it for `applyAgentJobEvent` and for the Agents page.
 tags:
 - agent
 - ui
@@ -92,3 +116,63 @@ history:
   - field: tags
     old: agent, ui, waits
     new: agent, ui
+- at: 2026-11-22T19:17:17.562815+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-22T19:17:18.642844+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8cf00dfcf8a49abc2ffc9d2aac60765537ab121463ce2db3a7b3264007c1ba3a
+- at: 2026-11-22T19:27:36.962227+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-766.
+
+      ## Found
+
+      The server sets a job's `last_message` only from a tool call's start or failure (`crates/lotar-agent/src/services/agent_job_service.rs:4521`, `tool_entry`). The web UI sets it from every `agent_job_tool` event, also a completed one:
+
+      - `view/pages/AgentJobs.vue:524` (`updateFromEvent`)
+      - `view/composables/useAgentActivity.ts:80`
+
+      So while a job runs, the job card shows the line of the last finished tool (for Claude usually just "Terminal"). After a reload it shows the server's line, which can differ.
+
+      ## Done when
+
+      - [ ] A completed `agent_job_tool` event doesn't change the card's last message in either place; a start and a failure still do, matching the server.
+      - [ ] A vitest covers it for `applyAgentJobEvent` and for the Agents page.
+    new: |-
+      Found in the review of DEV-766.
+
+      ## Found
+
+      The server sets a job's `last_message` only from a tool call's start or failure (`crates/lotar-agent/src/services/agent_job_service.rs:4521`, `tool_entry`). The web UI sets it from every `agent_job_tool` event, also a completed one:
+
+      - `view/pages/AgentJobs.vue:524` (`updateFromEvent`)
+      - `view/composables/useAgentActivity.ts:80`
+
+      So while a job runs, the job card shows the line of the last finished tool (for Claude usually just "Terminal"). After a reload it shows the server's line, which can differ.
+
+      ## Done when
+
+      - [x] A completed `agent_job_tool` event doesn't change the card's last message in either place; a start and a failure still do, matching the server.
+      - [x] A vitest covers it for `applyAgentJobEvent` and for the Agents page.
+- at: 2026-11-22T19:27:37.007560+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T19:27:44.974370+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -100,6 +100,12 @@ impl Repo {
     /// Run the ticket's merge job to its end; its status and the merge
     /// agent's prompt, when the agent ran.
     fn merge(&self) -> (String, Option<String>) {
+        let (_, status, prompt) = self.merge_job();
+        (status, prompt)
+    }
+
+    /// [`Self::merge`], with the job's progress lines first.
+    fn merge_job(&self) -> (Vec<String>, String, Option<String>) {
         let job = AgentJobService::start_job_with_tasks_dir(
             AgentJobCreateRequest {
                 ticket_id: TICKET.to_string(),
@@ -116,7 +122,12 @@ impl Repo {
             if matches!(status.as_str(), "completed" | "failed" | "cancelled") {
                 // The end rules and cleanup run after the status is set.
                 std::thread::sleep(Duration::from_millis(200));
-                return (status, fs::read_to_string(self.outside.path().join("prompt")).ok());
+                let progress = AgentJobService::events_for(&job.id)
+                    .into_iter()
+                    .filter(|event| event.kind == "agent_job_progress")
+                    .filter_map(|event| event.message)
+                    .collect();
+                return (progress, status, fs::read_to_string(self.outside.path().join("prompt")).ok());
             }
             assert!(Instant::now() < deadline, "the merge job didn't end: {status}");
             std::thread::sleep(Duration::from_millis(50));
@@ -368,8 +379,38 @@ fn a_failed_check_hands_off_with_its_output() {
     let comments = repo.comments();
     let hand_off = comments.iter().find(|comment| comment.text.starts_with("lotar's merge needs the merge agent")).expect("the hand-off comment");
     let report = hand_off.report.as_ref().expect("a report");
-    assert_eq!(report.checks[0].result, "failed");
+    let runs: Vec<_> = report.checks.iter().map(|check| (check.result.as_str(), check.reason.as_deref())).collect();
+    assert_eq!(runs, vec![("failed", Some("first run")), ("failed", Some("rerun"))], "the check ran twice");
+    assert!(prompt.contains("and again when rerun on its own"), "{prompt}");
     assert!(report.commits.is_empty(), "lotar landed nothing: {report:?}");
+}
+
+/// DEV-783: most merge-agent jobs came from a check that fails under load
+/// and passes alone. lotar reruns a failed check once and lands when that
+/// run passes.
+#[test]
+fn a_check_that_fails_once_then_passes_lands_without_an_agent() {
+    let marker = tempfile::tempdir().expect("tempdir");
+    let ran = marker.path().join("ran");
+    let check = format!("if [ -e '{0}' ]; then echo second run; else touch '{0}'; echo flaky boom; exit 1; fi", ran.display());
+    let repo = Repo::new(&format!("  merge:\n    checks: [\"{check}\", 'test -f feature.txt']\n"));
+    repo.commit_fix("feature.txt", "feature\n");
+
+    let (progress, status, prompt) = repo.merge_job();
+
+    assert_eq!(status, "completed");
+    assert_eq!(prompt, None, "no agent started");
+    assert!(repo.on_main("feature.txt"), "the fix landed");
+    assert!(
+        progress.iter().any(|line| line.starts_with("Rerunning the check `if [ -e") && line.ends_with("once on its own: its first run failed")),
+        "{progress:?}"
+    );
+    let comments = repo.comments();
+    let merged = comments.iter().find(|comment| comment.text.starts_with("Merged without an agent")).expect("the outcome comment");
+    assert!(merged.text.contains("failed, then passed when rerun on its own") && merged.text.contains("flaky boom"), "{}", merged.text);
+    let report = merged.report.as_ref().expect("a report");
+    let runs: Vec<_> = report.checks.iter().map(|check| (check.result.as_str(), check.reason.as_deref())).collect();
+    assert_eq!(runs, vec![("failed", Some("first run; the rerun passed")), ("passed", Some("rerun")), ("passed", None)]);
 }
 
 #[test]
