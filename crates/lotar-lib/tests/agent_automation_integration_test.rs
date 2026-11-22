@@ -2437,7 +2437,8 @@ exit 0
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
             .expect("assign implementation agent");
 
-        let task = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 10_000).expect("failed commit should hand the ticket back");
+        let task =
+            wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), JOB_END_LIMIT_MS).expect("failed commit should hand the ticket back");
         assert!(task.tags.contains(&"agent-failed".to_string()));
         let job = job_for_ticket(&created.id);
         assert_eq!(job.status, "failed");
@@ -2491,7 +2492,8 @@ exit 0
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
             .expect("assign implementation agent");
 
-        let task = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 10_000).expect("unmerged merge should hand the ticket back");
+        let task = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), JOB_END_LIMIT_MS)
+            .expect("unmerged merge should hand the ticket back");
         assert!(task.tags.contains(&"agent-failed".to_string()));
         let merge_job =
             AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == created.id && job.agent.as_deref() == Some("merge")).expect("merge job");
@@ -2782,7 +2784,7 @@ exit 0
         TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
             .expect("assign implementation agent");
 
-        wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), 10_000).expect("the rebased branch counts as merged");
+        wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), JOB_END_LIMIT_MS).expect("the rebased branch counts as merged");
         let merge_job =
             AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == created.id && job.agent.as_deref() == Some("merge")).expect("merge job");
         assert_eq!(merge_job.status, "completed", "{merge_job:?}");
