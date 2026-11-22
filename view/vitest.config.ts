@@ -25,11 +25,13 @@ export default mergeConfig(
             globals: true,
             globalSetup: ['../scripts/vitest-temp-guard.mjs'],
             setupFiles: ['__tests__/vitest.setup.ts'],
-            // The slowest specs render for ~1 s on an idle machine and took
-            // 5-9 s at load 20+ while other agents build; Vitest's 5 s default
-            // failed them (DEV-402). 30 s still catches a hung test quickly.
-            testTimeout: 30_000,
-            hookTimeout: 30_000,
+            // A hang guard, not a speed budget. The slowest specs render for
+            // ~1 s on an idle machine, but the machine stalls for tens of
+            // seconds at a time (memory pressure, Time Machine's deep scans),
+            // with worker startup 50x slower and 0.5 s tests passing 30 s
+            // (DEV-402, DEV-779). Same bound as the Rust suite's waits (DEV-753).
+            testTimeout: 120_000,
+            hookTimeout: 120_000,
             // Report-only coverage (DEV-164): `npm run coverage:ui`. No
             // thresholds; the numbers inform where tests are missing.
             coverage: {
