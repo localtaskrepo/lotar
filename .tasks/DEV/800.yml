@@ -1,11 +1,11 @@
 title: 'Proposal: findings: agents add a health finding to the repo''s open bundle of the day instead of a ticket of their own'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:21:29.504789+00:00
-modified: 2026-11-25T13:24:17.601610+00:00
+modified: 2026-11-25T16:26:22.956206+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -20,6 +20,9 @@ relationships:
   - DEV-824
   - DEV-863
   - DEV-864
+  - DEV-789
+  - DEV-836
+  - DEV-849
 comments:
 - date: 2026-11-22T19:21:44.907191+00:00
   author: claude
@@ -247,6 +250,32 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-800` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-800` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-25T16:26:14.405312+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `d79bf634c` on `main`.
+
+    - Rebase conflict in `crates/lotar-lib/tests/integration.rs`: both sides only added `mod` lines (main: `dev771_…`, `dev809_…`; branch: `dev800_finding_bundle_test`). Kept all three, sorted as rustfmt wants.
+    - Main moved twice during the checks (DEV-849, DEV-836). Rebased cleanly each time and reran the full checks on the final rebase.
+    - `npm ci`, `lint:agent`, `test:agent` (2522/2522 Rust) and `smoke` (410/410) all passed on the pushed commit.
+    - `.tasks` changes from the main checkout (DEV-789, 811, 836, 857, 858) were amended into the commit, as the rule says.
+    - No rules or config changed, so no `lotar trust` was needed. The push hook passed.
+  report:
+    commits:
+    - hash: d79bf634c
+      what: DEV-800 finding bundles (lotar add --finding --bundle)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2522 Rust tests + Vitest/node suites
+    - command: npm run -s smoke
+      result: passed
+      reason: 410 tests
+    - command: npm ci
+      result: passed
+    next: 'standards: switch the global rule and repos.ts to --bundle health (criterion 4)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3ebf16ff34582047edf563b966469b7a92d4ed540d3faa3d9306e482871e5d3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3a03ec4dedd1c78405b0b9c07c48b204cac1cc5303fded5ca8cebf2acf89a9bd
@@ -273,8 +302,6 @@ description: |-
   - [ ] Docs (findings help) describe it; standards then switches the global rule and repos.ts to `--bundle health`.
 tags:
 - proposal
-- job-paused
-- fix-retried
 history:
 - at: 2026-11-22T19:21:42.179621+00:00
   actor: claude
@@ -675,3 +702,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T16:26:14.405312+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T16:26:14.652380+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834","DEV-798","DEV-824","DEV-863","DEV-864"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834","DEV-798","DEV-824","DEV-863","DEV-864","DEV-789","DEV-836","DEV-849"]}'
+- at: 2026-11-25T16:26:22.956206+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: proposal, job-paused, fix-retried
+    new: proposal

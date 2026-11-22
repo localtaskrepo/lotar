@@ -82,6 +82,7 @@ interface AgentJobEventPayload {
     status?: string
     sequence?: number
     question?: AgentJobQuestion | null
+    tool?: { status?: string } | null
 }
 
 export function applyAgentJobEvent(kind: string, payload: AgentJobEventPayload | null | undefined) {
@@ -97,11 +98,13 @@ export function applyAgentJobEvent(kind: string, payload: AgentJobEventPayload |
     } else {
         const previous = next.get(payload.id)
         const text = typeof payload.message === 'string' ? payload.message.trim() || null : null
-        const message =
-            (kind === 'agent_job_progress' || kind === 'agent_job_message' || kind === 'agent_job_tool') &&
-            typeof payload.message === 'string'
-                ? text
-                : (previous?.message ?? null)
+        // As the server: a tool's start or failure says what the agent does now,
+        // its completion does not (DEV-789).
+        const setsMessage =
+            kind === 'agent_job_progress' ||
+            kind === 'agent_job_message' ||
+            (kind === 'agent_job_tool' && payload.tool?.status !== 'completed')
+        const message = setsMessage && typeof payload.message === 'string' ? text : (previous?.message ?? null)
         // Only the job's own process holds the question; elsewhere its event is
         // all there is, and the agent's next event says it went on.
         const question = kind === 'agent_job_question' ? text : payload.question?.title.trim() || null

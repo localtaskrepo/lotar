@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-25T12:32:15.790228+00:00
+modified: 2026-11-25T16:27:51.844537+00:00
 relationships:
   blocks:
   - DEV-782
+  - DEV-778
   related:
   - DEV-816
   - DEV-768
@@ -255,3 +256,9 @@ history:
   - field: tags
     old: health, job-paused, fix-retried, review-blocked
     new: health, job-paused, fix-retried, review-returned
+- at: 2026-11-25T16:27:51.844537+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805"]}'
+    new: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805"]}'

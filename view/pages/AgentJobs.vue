@@ -619,7 +619,13 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
     finished_at: payload.finished_at || null,
     exit_code: payload.exit_code ?? null,
     // Thinking and plans are no status line: they stay in the log (DEV-766, DEV-774).
-    last_message: (kind !== 'agent_job_thought' && kind !== 'agent_job_plan' && payload.message) || null,
+    // A finished tool keeps the line, as on the server (DEV-789).
+    last_message:
+      (kind !== 'agent_job_thought' &&
+        kind !== 'agent_job_plan' &&
+        !(kind === 'agent_job_tool' && payload.tool?.status === 'completed') &&
+        payload.message) ||
+      null,
     summary: payload.summary || null,
     session_id: payload.session_id || null,
     worktree_path: payload.worktree_path || null,

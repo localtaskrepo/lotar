@@ -130,4 +130,32 @@ describe('AgentActivityIndicator', () => {
         expect(pill().exists()).toBe(false)
         card.unmount()
     })
+
+    it('keeps the line when a tool finishes, as the server does', async () => {
+        const card = mount(AgentActivityIndicator, { props: { taskId: 'DEV-8', label: true } })
+        await flushPromises()
+        const title = () => card.find('[data-testid="agent-activity"]').attributes('title')
+        const tool = (status: string, message: string, sequence: number) =>
+            applyAgentJobEvent('agent_job_tool', {
+                id: 'job-8',
+                ticket_id: 'DEV-8',
+                agent: 'fix',
+                sequence,
+                message,
+                tool: { status },
+            })
+
+        tool('running', 'Bash: npm test', 1)
+        await flushPromises()
+        expect(title()).toBe('fix is working on this: Bash: npm test')
+
+        tool('completed', 'Terminal', 2)
+        await flushPromises()
+        expect(title()).toBe('fix is working on this: Bash: npm test')
+
+        tool('failed', 'Bash: npm test failed', 3)
+        await flushPromises()
+        expect(title()).toBe('fix is working on this: Bash: npm test failed')
+        card.unmount()
+    })
 })

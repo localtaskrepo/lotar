@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-25T13:24:39.629142+00:00
+modified: 2026-11-25T16:26:25.052568+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -211,6 +211,12 @@ comments:
 - date: 2026-11-25T13:24:39.629142+00:00
   author: claude
   text: 'Stalled since 2026-11-25T12:42Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-25T16:26:25.052568+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-769` onto `main` conflicts in `view/components/AgentRunInputs.vue`; lotar aborted the rebase, `agent/DEV-769` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
@@ -841,5 +847,9 @@ history:
     new: '@merge'
 - at: 2026-11-25T13:24:39.629142+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T16:26:25.052568+00:00
+  actor: automation
   changes:
   - field: comment_added

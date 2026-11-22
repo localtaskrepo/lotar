@@ -1098,6 +1098,36 @@ describe('AgentJobs page context and actions', () => {
         }
     })
 
+    it('keeps the card line when a tool finishes, as the server does', async () => {
+        const wrapper = await mountAgentJobs()
+        try {
+            const tool = (status: string, message: string, sequence: number) =>
+                emitSse('agent_job_tool', {
+                    id: 'job-tool',
+                    ticket_id: 'DEV-1',
+                    status: 'running',
+                    sequence,
+                    message,
+                    tool: { id: 't1', title: message, status },
+                })
+            const line = () => wrapper.find('.job-summary').text()
+
+            tool('running', 'Bash: npm test', 1)
+            await flushPromises()
+            expect(line()).toBe('Bash: npm test')
+
+            tool('completed', 'Terminal', 2)
+            await flushPromises()
+            expect(line()).toBe('Bash: npm test')
+
+            tool('failed', 'Bash: npm test failed', 3)
+            await flushPromises()
+            expect(line()).toBe('Bash: npm test failed')
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
     it('offers the message box for running agent sessions, not for commands', async () => {
         const commandJob = job('job-command', { runner: 'command', created_at: '2026-10-08T10:00:05.000Z' })
         const claudeJob = job('job-claude', { runner: 'claude', created_at: '2026-10-08T10:00:06.000Z' })
