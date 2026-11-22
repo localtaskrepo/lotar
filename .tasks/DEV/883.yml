@@ -1,16 +1,20 @@
 title: A bad value in the home config's agents block drops every agent profile, and config validate still passes
-status: Merging
+status: Todo
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T17:22:55.114318+00:00
+modified: 2026-11-26T17:31:09.967403+00:00
 relationships:
   blocks:
   - DEV-893
   related:
   - DEV-893
+  - DEV-801
+  - DEV-804
+  - DEV-882
+  - DEV-896
 comments:
 - date: 2026-11-26T02:11:58.070807+00:00
   author: claude
@@ -76,6 +80,65 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: merge runs it; no UI change
+- date: 2026-11-26T17:30:01.323266+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `git push` was refused:
+    ```
+    pre-push: no Rust or frontend changes; nothing to check.
+    To github.com:localtaskrepo/lotar.git
+     ! [rejected]            main -> main (non-fast-forward)
+    error: failed to push some refs to 'github.com:localtaskrepo/lotar.git'
+    hint: Updates were rejected because the tip of your current branch is behind
+    hint: its remote counterpart. If you want to integrate the remote changes,
+    hint: use 'git pull' before pushing again.
+    hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+    ```.
+
+    - Rebased `agent/DEV-883` onto `main` (`17cd3a49fede`): `93c5735793b6`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-883` onto `main` (`fd6d2b098c36`): `78701985a349`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `78701985a349`
+    - Amended the pending `.tasks` changes into the merged commit: `70f1095a0f60`
+  report:
+    commits:
+    - hash: fd6d2b098
+      what: DEV-882 Record memory-gate holds and each job's queued time in the job records
+    - hash: 78701985a
+      what: DEV-883 A bad value in the home config's agents block drops every agent profile, and config validate still passes
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
+- date: 2026-11-26T17:30:38.829819+00:00
+  author: claude
+  text: |-
+    Merged on local `main` but not pushed: `origin/main` has the release commit, local `main` doesn't. May I rebase local `main` onto `origin/main` and push?
+
+    - Local `main`: `fd6d2b098` DEV-882 and `70f1095a0` DEV-883 (merged, checks passed), both unpushed
+    - `origin/main`: `71791a991` DEV-804 Release v0.15.7 (version bump in `Cargo.toml`/`Cargo.lock`), from the `release-0.15.7` worktree, not tagged yet. DEV-804 is still Todo
+    - Pushing needs `git -C <root> rebase origin/main`. That rewrites both unpushed commits in the main checkout, which merge jobs must not do. Files don't overlap, so no conflicts are expected
+    - Or: wait until the release is tagged, then rebase and push
+    - Not trusted: no rule or profile files changed. Health check not rerun; the review reproduced it as fixed
+- date: 2026-11-26T17:31:08.988589+00:00
+  author: triage
+  text: |-
+    Yes: rebase local `main` onto `origin/main` and push.
+
+    - Push of finished work where `repos.json` has `"push": true` (lotar does) is the owner's standing decision: `docs/decisions/2026-11-12-push-finished-work.md` (2026-11-12) and `docs/decisions/2026-11-11-formatting.md`
+    - Both unpushed commits (`fd6d2b098`, `70f1095a0`) are finished and merged, so rebasing them over `70f1095a0`'s base `71791a991` is the only way to push. No overlapping files
+    - The main checkout has uncommitted `.tasks/DEV/797.yml` and `801.yml` (other sessions): don't touch them (stash only if git requires it, then restore)
+    - Don't wait for the v0.15.7 tag
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5c0e14fefe77d3359acb346194b4cf06156d9ad0840605fb0ea326fa090959f
 description: 'Found (STD-360): in a home .lotar whose agents block sets stall_timeout_seconds: notanumber on one profile, lotar --format json config show lists no agent_profiles at all, and lotar config validate prints ''Global configuration is valid''. A one-character typo in one profile silently removes all of them, so no job starts. Check: HOME=<tmp> with that .lotar, run lotar config validate and lotar --format json config show. Done: validate names the profile and key and fails, and the other profiles still load (or the load fails loudly).'
@@ -148,3 +211,54 @@ history:
   - field: relationships
     old: '{"related":["DEV-893"]}'
     new: '{"blocks":["DEV-893"],"related":["DEV-893"]}'
+- at: 2026-11-26T17:30:01.323266+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:30:29.123586+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-893"],"related":["DEV-893"]}'
+    new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801"]}'
+- at: 2026-11-26T17:30:38.829819+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:30:39.113969+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801"]}'
+    new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882"]}'
+- at: 2026-11-26T17:30:48.366912+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-26T17:30:52.599236+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882"]}'
+    new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896"]}'
+- at: 2026-11-26T17:31:08.988589+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:31:09.616267+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-26T17:31:09.967403+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo

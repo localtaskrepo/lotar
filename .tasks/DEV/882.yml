@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T22:11:53.112006+00:00
-modified: 2026-11-26T17:21:37.727278+00:00
+modified: 2026-11-26T17:35:51.027303+00:00
 relationships:
   related:
   - DEV-827
@@ -13,6 +13,8 @@ relationships:
   - DEV-797
   - DEV-804
   - DEV-884
+  - DEV-883
+  - DEV-870
 comments:
 - date: 2026-11-26T02:14:30.503383+00:00
   author: claude
@@ -221,3 +223,15 @@ history:
   - field: status
     old: HelpNeeded
     new: Todo
+- at: 2026-11-26T17:30:39.113581+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884"]}'
+    new: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883"]}'
+- at: 2026-11-26T17:35:51.027303+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883"]}'
+    new: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883","DEV-870"]}'

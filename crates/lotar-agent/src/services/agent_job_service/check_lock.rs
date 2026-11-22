@@ -8,9 +8,14 @@
 //! one line that says who it is, which a waiting run logs. A run that holds
 //! the lock gives its commands `HELD_ENV=1`, so the scripts they run don't
 //! wait for it again.
+//!
+//! Every merge job takes it (DEV-797): lotar's own merge around a round's
+//! checks, and a merge agent from before it starts until the job ends, also
+//! when lotar's merge hands off to it in the middle of its checks.
 
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
@@ -18,6 +23,8 @@ use std::time::{Duration, Instant};
 
 /// The port DEV-586's smoke lock held, so older smoke runs wait as well.
 pub(super) const PORT: u16 = 47_586;
+/// Another port for the lock, where tests hold their own.
+pub(super) const PORT_ENV: &str = "LOTAR_CHECK_LOCK_PORT";
 /// Set for the commands of a run that holds the lock.
 pub(super) const HELD_ENV: &str = "LOTAR_CHECK_LOCK_HELD";
 /// How often a waiting run tries again.
@@ -49,6 +56,48 @@ pub(super) enum Acquired {
     /// The port can't be opened for another reason than being in use.
     Unavailable(String),
     Cancelled,
+}
+
+/// The lock's port: `LOTAR_CHECK_LOCK_PORT` when set, else [`PORT`].
+pub(super) fn port() -> u16 {
+    std::env::var(PORT_ENV).ok().and_then(|port| port.parse().ok()).unwrap_or(PORT)
+}
+
+/// What a job's wait for the lock ended with.
+pub(super) enum ForJob {
+    /// The lock, and whom the job waited for and how long (`None`: it was free).
+    Held(CheckLock, Option<(String, Duration)>),
+    /// The lotar run that started this one holds it (`LOTAR_CHECK_LOCK_HELD=1`).
+    HeldAbove,
+    /// The port can't be opened: the job goes on without the lock (why).
+    Unavailable(String),
+    Cancelled,
+}
+
+/// Take the lock for job `job_id` as `holder`, waiting while another run
+/// holds it; `progress` logs the wait. Cancelling the job ends the wait,
+/// also `lotar agent cancel` from another process.
+pub(super) fn for_job(job_id: &str, tasks_dir: &Path, holder: &str, progress: impl Fn(&str)) -> ForJob {
+    if std::env::var(HELD_ENV).is_ok_and(|held| held == "1") {
+        return ForJob::HeldAbove;
+    }
+    let port = port();
+    let mut held_by = String::new();
+    let waiting = |line: &str| {
+        progress(&format!("Waiting for the machine's check lock (port {port}), held by {line}"));
+        held_by = line.to_string();
+    };
+    match acquire(port, holder, waiting, || super::wait_cancelled(job_id, tasks_dir)) {
+        Acquired::Held(lock) => {
+            let waited = lock.waited.map(|waited| {
+                progress(&format!("Took the check lock after {}", duration_text(waited)));
+                (held_by, waited)
+            });
+            ForJob::Held(lock, waited)
+        }
+        Acquired::Unavailable(err) => ForJob::Unavailable(format!("port {port} can't be opened ({err})")),
+        Acquired::Cancelled => ForJob::Cancelled,
+    }
 }
 
 /// Take the lock on `port`, waiting while another run holds it.

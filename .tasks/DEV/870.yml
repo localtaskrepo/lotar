@@ -1,14 +1,16 @@
 title: 'A job held in the in-process pending queue starts with the prompt built at create: an old title and ticket context'
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T11:03:31.428115+00:00
-modified: 2026-11-26T16:53:09.550104+00:00
+modified: 2026-11-26T17:35:57.589509+00:00
 relationships:
   related:
   - DEV-845
+  - DEV-882
+  - DEV-884
 comments:
 - date: 2026-11-25T21:42:33.214544+00:00
   author: claude
@@ -86,6 +88,18 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review again
+- date: 2026-11-26T17:35:50.629580+00:00
+  author: claude
+  text: |-
+    Review: passed. A job from the in-process pending queue now starts with a prompt built from the ticket as it is then, title in the request text included.
+
+    - Read: `dad9f916b` (diff against `main`), the ticket and its comments, DEV-845, `AGENTS.md`, and the main commits to `agent_job_service.rs` since the rebase (`17cd3a49f` DEV-884, `fd6d2b098` DEV-882).
+    - Merge: `git merge-tree --write-tree main HEAD` is clean against main `70f1095a0`.
+    - Reran in a scratch copy with main merged in: `cargo nextest run -p lotar-agent agent_job_service` passed (104 tests), `cargo clippy -p lotar-agent --all-targets` passed. `npm ci` passed.
+    - Test failed before: with `PendingJob::current_prompt` set back to return the prompt from create, `a_job_from_the_pending_queue_builds_its_prompt_when_it_starts` fails.
+    - Done when holds: `PendingJob` keeps the raw `request`. `PromptInputs::build` fills `${{ticket.title}}` and rebuilds the context. `process_pending_queue` is the only way a job leaves that queue, so memory holds, slot waits, a paused queue and a busy merge slot are all covered. Runner, profile and config come from create. A job that starts at once builds its prompt once. A missing ticket or instructions file falls back to the prompt from create.
+    - Docs: one sentence added in `docs/help/agent.md`. No stray files.
+    - Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45021289cd79c488d60288becfc5eda4ec7b52ab4dbb85e9b913bbd7438a6255
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abed1e95d9797f676018a0044af5a06f3f9362e18bf65da817c118b352cadead9
@@ -219,3 +233,22 @@ history:
     new: Reviewing
   - field: assignee
     new: '@review'
+- at: 2026-11-26T17:35:50.629580+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:35:51.026809+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-845"]}'
+    new: '{"related":["DEV-845","DEV-882","DEV-884"]}'
+- at: 2026-11-26T17:35:57.589509+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

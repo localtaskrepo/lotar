@@ -4,6 +4,8 @@
 //! finding's check, the steps the merge agent's prompt names, before any
 //! agent starts. Only what needs judgment starts the merge agent: a
 //! conflict, a check that fails twice, others' unpushed commits, a refused push.
+//! A round's checks run under the machine's check lock (DEV-784); a hand-off
+//! from the checks keeps it for the merge agent (DEV-797).
 
 use super::check_lock;
 use super::{
@@ -31,8 +33,9 @@ const LOCKFILES: &[&str] = &["package-lock.json", "pnpm-lock.yaml", "yarn.lock"]
 pub(super) enum Outcome {
     /// Landed, or nothing to merge: the job completes.
     Completed(Summary),
-    /// A step needs judgment: the merge agent takes over.
-    HandOff(Summary),
+    /// A step needs judgment: the merge agent takes over, with the check
+    /// lock when the checks handed off.
+    HandOff(Summary, Option<check_lock::CheckLock>),
     /// The job was cancelled.
     Cancelled,
 }
@@ -59,10 +62,10 @@ fn hand_off(why: impl Into<String>) -> Stop {
 pub(super) fn run(job_id: &str, tasks_dir: &Path, ticket_id: &str, config: &ResolvedConfig, settings: &AgentMergeConfig) -> Outcome {
     let branch = super::build_worktree_branch(&config.agent_worktree.branch_prefix, &super::sanitize_worktree_token(ticket_id));
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
-        return Outcome::HandOff(Summary {
-            text: "lotar's merge needs the merge agent: no git repository found.".to_string(),
-            report: CommentReport::default(),
-        });
+        return Outcome::HandOff(
+            Summary { text: "lotar's merge needs the merge agent: no git repository found.".to_string(), report: CommentReport::default() },
+            None,
+        );
     };
     let mut merge = Merge {
         job_id,
@@ -76,6 +79,7 @@ pub(super) fn run(job_id: &str, tasks_dir: &Path, ticket_id: &str, config: &Reso
         done: Vec::new(),
         checks: Vec::new(),
         landed: Vec::new(),
+        lock: None,
     };
     let result = merge.land();
     let steps = merge.done.iter().map(|step| format!("\n- {step}")).collect::<String>();
@@ -83,10 +87,13 @@ pub(super) fn run(job_id: &str, tasks_dir: &Path, ticket_id: &str, config: &Reso
     match result {
         Ok(()) => Outcome::Completed(Summary { text: format!("Merged without an agent: `{}` is in `{}`.\n{steps}", merge.branch, merge.main), report }),
         Err(Stop::Nothing(why)) => Outcome::Completed(Summary { text: format!("Nothing to merge: {why}.\n{steps}"), report }),
-        Err(Stop::HandOff(why)) => Outcome::HandOff(Summary {
-            text: format!("lotar's merge needs the merge agent: {why}.\n{steps}"),
-            report: CommentReport { next: Some("The merge agent takes over in a new session".to_string()), ..report },
-        }),
+        Err(Stop::HandOff(why)) => Outcome::HandOff(
+            Summary {
+                text: format!("lotar's merge needs the merge agent: {why}.\n{steps}"),
+                report: CommentReport { next: Some("The merge agent takes over in a new session".to_string()), ..report },
+            },
+            merge.lock.take(),
+        ),
         Err(Stop::Cancelled) => Outcome::Cancelled,
     }
 }
@@ -121,6 +128,8 @@ struct Merge<'a> {
     checks: Vec<ReportCheck>,
     /// The commits this merge brought to main.
     landed: Vec<ReportCommit>,
+    /// The check lock while a round's checks run.
+    lock: Option<check_lock::CheckLock>,
 }
 
 impl Merge<'_> {
@@ -165,7 +174,7 @@ impl Merge<'_> {
             let passed_on_head = if before == after { passed_checks(self.tasks_dir, self.ticket_id, &after) } else { Vec::new() };
             let checks: Vec<&str> = self.settings.checks.iter().map(|check| check.trim()).filter(|check| !check.is_empty()).collect();
             let runs = checks.iter().any(|check| !passed_on_head.iter().any(|passed| passed == check));
-            let (lock, held) = if runs { self.check_lock(&worktree)? } else { (None, false) };
+            let held = runs && self.check_lock(&worktree)?;
             let env: &[(&str, &str)] = if held { &[(check_lock::HELD_ENV, "1")] } else { &[] };
             self.checks.clear();
             for check in checks {
@@ -180,7 +189,8 @@ impl Merge<'_> {
                 }
                 self.check(check, &worktree, env)?;
             }
-            drop(lock);
+            // A check that hands off keeps the lock: the merge agent reruns it.
+            self.lock = None;
             let changes = git(&worktree, &["status", "--porcelain"]).map_err(hand_off)?;
             if !changes.is_empty() {
                 return Err(hand_off(format!("the checks left changes in `{}`:\n```\n{}\n```", worktree.display(), first_lines(&changes, 10))));
@@ -299,14 +309,12 @@ impl Merge<'_> {
         }
     }
 
-    /// The machine's check lock for this round's checks (DEV-784), and
+    /// Take the machine's check lock for this round's checks (DEV-784);
     /// whether the checks' own scripts are to be told it is held. Under a
     /// run that holds it already (`LOTAR_CHECK_LOCK_HELD=1`) the checks run
-    /// in it; when the port can't be opened, without it.
-    fn check_lock(&mut self, worktree: &Path) -> Result<(Option<check_lock::CheckLock>, bool), Stop> {
-        if std::env::var(check_lock::HELD_ENV).is_ok_and(|held| held == "1") {
-            return Ok((None, true));
-        }
+    /// in it; when the port can't be opened, without it. The merge comment
+    /// says how long the merge waited, or that it ran without it (DEV-797).
+    fn check_lock(&mut self, worktree: &Path) -> Result<bool, Stop> {
         let holder = format!(
             "lotar's merge checks of {} in {} (pid {}), since {}",
             self.ticket_id,
@@ -314,20 +322,22 @@ impl Merge<'_> {
             std::process::id(),
             jiff::Timestamp::now().strftime("%H:%M UTC")
         );
-        let job_id = self.job_id;
-        let waiting = |held_by: &str| self.progress(&format!("Waiting for the machine's check lock (port {}), held by {held_by}", check_lock::PORT));
-        match check_lock::acquire(check_lock::PORT, &holder, waiting, || should_stop_job(job_id)) {
-            check_lock::Acquired::Held(lock) => {
-                if let Some(waited) = lock.waited {
-                    self.progress(&format!("Took the check lock after {}", check_lock::duration_text(waited)));
+        match check_lock::for_job(self.job_id, self.tasks_dir, &holder, |line| self.progress(line)) {
+            check_lock::ForJob::Held(lock, waited) => {
+                if let Some((held_by, waited)) = waited {
+                    self.done.push(format!("Waited {} for the machine's check lock, held by {held_by}", check_lock::duration_text(waited)));
                 }
-                Ok((Some(lock), true))
+                self.lock = Some(lock);
+                Ok(true)
             }
-            check_lock::Acquired::Unavailable(err) => {
-                self.progress(&format!("Running the checks without the machine's check lock: port {} can't be opened ({err})", check_lock::PORT));
-                Ok((None, false))
+            check_lock::ForJob::HeldAbove => Ok(true),
+            check_lock::ForJob::Unavailable(why) => {
+                let note = format!("Ran the checks without the machine's check lock: {why}");
+                self.progress(&note);
+                self.done.push(note);
+                Ok(false)
             }
-            check_lock::Acquired::Cancelled => Err(Stop::Cancelled),
+            check_lock::ForJob::Cancelled => Err(Stop::Cancelled),
         }
     }
 

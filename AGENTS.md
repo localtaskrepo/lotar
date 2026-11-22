@@ -31,10 +31,14 @@ and report without edits, task mutations, or implementation gates.
 
 ## Verification and contracts
 
-- During implementation, run targeted checks. Before final code handoff run
-  `npm run lint`, `npm test`, and `npm run smoke`. Use the low-noise variants and
-  targeting guidance in [testing-strategy](.github/skills/testing-strategy/SKILL.md).
-  Repeat checks only when subsequent edits, failures, or unresolved risks justify it.
+- Fix, rework and review jobs run targeted checks: `npm run lint` and the tests
+  for what changed. Only the merge runs the full suites (`.tasks/config.yml`
+  `agent.merge` checks: lint, `test:agent`, smoke), once, one merge at a time on
+  the machine (owner 2026-11-22, DEV-797). Work outside the agent pipeline runs
+  `npm run lint`, `npm test`, and `npm run smoke` before handoff. Use the
+  low-noise variants and targeting guidance in
+  [testing-strategy](.github/skills/testing-strategy/SKILL.md). Repeat checks only
+  when subsequent edits, failures, or unresolved risks justify it.
 - A check the agent sandbox stops before compiling (`sccache`, `Operation not
   permitted`) has not failed: rerun it with approval, else with `RUSTC_WRAPPER=`,
   as testing-strategy says, before handing the ticket back.

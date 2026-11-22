@@ -1,19 +1,49 @@
 title: Job prompt's Comments section points agents at the full lotar show for all comments, beside the block's --brief
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review-light'
 created: 2026-11-26T07:11:26.742561+00:00
-modified: 2026-11-26T16:53:03.845532+00:00
+modified: 2026-11-26T17:34:03.862435+00:00
 relationships:
   related:
   - DEV-884
+comments:
+- date: 2026-11-26T17:33:52.869496+00:00
+  author: claude
+  text: |-
+    The prompt's Comments line now names `lotar show <ID> --brief` and `--comment <N>` instead of the full `lotar show <ID>`.
+
+    - `crates/lotar-agent/src/services/agent_job_service.rs`: "All of them, each cut to one line: `lotar show <ID> --brief`; one in full: `lotar show <ID> --comment <N>`; the history: `lotar task timeline <ID>`".
+    - Tests `no_comment_picked_leaves_one_comments_line` and `the_prompt_carries_the_question_and_the_newest_fix_and_review_comments` assert the new commands (both line forms).
+    - Branch fast-forwarded to main first: it lacked DEV-884 (`17cd3a49f`). The earlier session failed at start (T3 server down) and left nothing.
+    - No docs describe this line; no other `All of them: lotar show` left. No guidance correction.
+  report:
+    commits:
+    - hash: fcd5c9659
+      what: Comments line names show --brief and --comment <N>
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(/comment|prompt/)'
+      result: passed
+      reason: 22 tests
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: rustfmt --edition 2024 --check agent_job_service.rs
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    next: light review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1d5a203926b86a2ec80fe3f18002efc723142d9db0b434b8eb989bab16e71a29
 description: |-
   Found in the DEV-884 review: `crates/lotar-agent/src/services/agent_job_service.rs:1525` writes "All of them: `lotar show <ID>`" into the job prompt, while the LoTaR CLI block now names `show <ID> --brief` and `--comment <N>`. An agent that follows the Comments line reads every comment in full again.
 
   ## Done when
   - [ ] The Comments line names `lotar show <ID> --brief` (and `--comment <N>` for one in full) instead of the full `lotar show <ID>`; the prompt test asserts it.
+tags:
+- small-diff
 history:
 - at: 2026-11-26T07:11:27.646375+00:00
   actor: claude
@@ -36,3 +66,27 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-26T17:31:09.299792+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1d5a203926b86a2ec80fe3f18002efc723142d9db0b434b8eb989bab16e71a29
+- at: 2026-11-26T17:33:52.720447+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: small-diff
+- at: 2026-11-26T17:33:52.869496+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:34:03.862435+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review-light'

@@ -1,14 +1,47 @@
 title: 'A merge agent that lands a ticket in InProgress sends it to Reviewing: DEV-832 went back to review after it was on main'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T07:28:02.692146+00:00
-modified: 2026-11-26T16:52:07.721135+00:00
+modified: 2026-11-26T17:31:06.045482+00:00
 relationships:
   related:
   - DEV-832
+  - DEV-801
+  - DEV-883
+comments:
+- date: 2026-11-26T17:30:52.308456+00:00
+  author: claude
+  text: |-
+    Fixed: a merge job that completes now ends as the merge agent's does, whichever profile ran it.
+
+    - **Cause:** the failed merge sent DEV-832 to `@fix` while it was still `Merging`. A job on a ticket in `Merging` is a merge job, so lotar's own merge ran in the fix job and handed off, and the agent landed `5d3223431`. The fix lifecycle's start rule had moved it to InProgress, and at the end `Fix done: review on Codex` matched `@fix`, which sent it to Reviewing.
+    - **Change:** `apply_job_end_rules` (`crates/lotar-agent/src/services/agent_job_service.rs`) matches a completed merge job's rules as if `@merge` held the ticket, through the new `AutomationService::apply_job_event_as`. The changes apply to the ticket as it is. So `Merge agent lifecycle` sets Done, and no review starts. The rules files don't change.
+    - **Test:** `a_fix_job_that_lands_the_branch_ends_as_the_merge_does` in `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs`. It fails without the fix (`Reviewing`) and passes with it (`Done`). It sets no `agent.merge` checks, so it doesn't wait for the machine's check lock.
+    - **Docs:** `docs/help/agent.md`, in the merge job paragraph.
+    - **Side effect:** a Research retry on a ticket in `Merging` whose merge lands now goes straight to mallox with its question (`Research merged`). Before, it went through the source check again.
+    - **Flaky:** two dev605 tests timed out waiting on the check lock that DEV-883's suite held. They passed on retry, and I reported them on DEV-801.
+  report:
+    commits:
+    - hash: ee70967d6
+      what: a completed merge job's end rules match as @merge
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/a_fix_job_that_lands/)'
+      result: passed
+      reason: fails without the fix (Reviewing), passes with it (Done)
+    - command: cargo nextest run --workspace -E 'test(/dev605|dev566|dev320|dev528|dev465|dev516|dev680|dev503|merge|job_end|reassigned/)'
+      result: passed
+      reason: 133 of 133, 2 dev605 tests needed retries (check lock, reported on DEV-801)
+    - command: cargo clippy -p lotar-agent -p lotar-lib --tests
+      result: passed
+    - command: rustfmt --check, prettier --check on changed files
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7
 description: 'Found 2026-11-26 on DEV-832: merge failed → assignee @fix, tag merge-retried; the fix job ended and set status Merging → InProgress (02:41Z); lotar''s own merge then failed smoke, the merge agent landed `5d3223431` on main and origin (03:23Z), and its job''s end moved InProgress → Reviewing, @review. A review job then ran on work already on main (branch `agent/DEV-832` holds only a copy of `5d3223431` without the .tasks edit). Check: `lotar task timeline DEV-832` lines from 00:04Z to 07:25Z. Done when: a job that lands the branch on main ends the ticket at Done (or the step after merging), whatever status it ran in, with a test.'
@@ -47,3 +80,28 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7
+- at: 2026-11-26T17:30:29.123913+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-832"]}'
+    new: '{"related":["DEV-832","DEV-801"]}'
+- at: 2026-11-26T17:30:52.308456+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:30:52.599671+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-832","DEV-801"]}'
+    new: '{"related":["DEV-832","DEV-801","DEV-883"]}'
+- at: 2026-11-26T17:31:06.045482+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

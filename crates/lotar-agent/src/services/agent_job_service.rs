@@ -3667,8 +3667,10 @@ fn run_job(
     };
     // A merge job of a repository with `agent.merge` merges without an
     // agent first (DEV-605); the agent starts only on a hand-off, in a new
-    // session that reads why.
+    // session that reads why, and with the check lock when the hand-off
+    // came from the checks (DEV-797).
     let mut merge_started_at = None;
+    let mut held_lock = None;
     if let Some(settings) = config.agent_merge.as_ref().filter(|_| commit_retry.is_none() && merge::is_merge_job(&job_id)) {
         if crate::config::trust::TrustService::allows_commands(&tasks_dir) {
             let started_at = time::now_rfc3339();
@@ -3689,7 +3691,10 @@ fn run_job(
                     finalize_job(&job_id, &ticket_id, Some(0), &[], &tasks_dir, &config);
                     return;
                 }
-                merge::Outcome::HandOff(summary) => summary,
+                merge::Outcome::HandOff(summary, lock) => {
+                    held_lock = lock;
+                    summary
+                }
             };
             comment_merge(&job_id, &tasks_dir, &ticket_id, &summary);
             let hand_off = merge::hand_off_prompt(&summary);
@@ -3839,6 +3844,23 @@ fn run_job(
         }
     };
     let is_merge_job = merge::is_merge_job(&job_id);
+    // A merge agent runs the checks: it holds the machine's check lock
+    // until the job ends, so no other merge's checks run beside its own
+    // (DEV-797). A job that only commits runs no agent.
+    let in_check_lock = is_merge_job && commit_retry.is_none() && {
+        if held_lock.is_none() {
+            match merge_agent_check_lock(&job_id, &tasks_dir, &ticket_id) {
+                Some(Ok(lock)) => held_lock = Some(lock),
+                Some(Err(())) => return,
+                None => {}
+            }
+        }
+        held_lock.is_some() || std::env::var(check_lock::HELD_ENV).is_ok_and(|held| held == "1")
+    };
+    let _held_lock = held_lock;
+    if in_check_lock {
+        prompt.append("Check lock", &check_lock_note());
+    }
     for note in followed_note.into_iter().chain(session_reason).chain(worktree_context.note.clone()) {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
@@ -3879,7 +3901,10 @@ fn run_job(
     if let Some((record, events)) = handoff_from.as_ref() {
         prompt.append("Handoff", &handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record, events, handoff_why));
     }
-    let env = job_env(&job_id, &tasks_dir, &ticket_id, &config, &profile, runner_kind);
+    let mut env = job_env(&job_id, &tasks_dir, &ticket_id, &config, &profile, runner_kind);
+    if in_check_lock {
+        env.insert(check_lock::HELD_ENV.to_string(), "1".to_string());
+    }
     let end = match agent {
         _ if commit_retry.is_some() => RunEnd::Exited(Some(0)),
         None => run_command(&job_id, &profile, &prompt, env, &worktree_context.working_dir, &tasks_dir, &ticket_id, active_record),
@@ -4017,6 +4042,66 @@ fn start_job(
         update_job(job_id, |state| state.assignee_at_start = Some(assignee.clone()));
     }
     true
+}
+
+/// Take the machine's check lock for a merge agent; `None` when the job
+/// goes on without it (the lotar run above holds it, or the port can't be
+/// opened), `Err` when the job was cancelled while it waited. A wait, or a
+/// start without the lock, is in the job log and on the ticket (DEV-797).
+fn merge_agent_check_lock(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str) -> Option<Result<check_lock::CheckLock, ()>> {
+    let holder = format!("the merge agent of {ticket_id} (job {job_id}, pid {}), since {}", std::process::id(), jiff::Timestamp::now().strftime("%H:%M UTC"));
+    let progress = |line: &str| {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(line.to_string()));
+        });
+    };
+    let note = match check_lock::for_job(job_id, tasks_dir, &holder, progress) {
+        check_lock::ForJob::Held(lock, None) => return Some(Ok(lock)),
+        check_lock::ForJob::Held(lock, Some((held_by, waited))) => {
+            comment_check_lock(
+                tasks_dir,
+                ticket_id,
+                &format!("Waited {} for the machine's check lock, held by {held_by}; the merge agent starts now.", check_lock::duration_text(waited)),
+                progress,
+            );
+            return Some(Ok(lock));
+        }
+        check_lock::ForJob::HeldAbove => return None,
+        check_lock::ForJob::Unavailable(why) => format!("The merge agent starts without the machine's check lock: {why}"),
+        check_lock::ForJob::Cancelled => return Some(Err(())),
+    };
+    progress(&note);
+    comment_check_lock(tasks_dir, ticket_id, &note, progress);
+    None
+}
+
+fn comment_check_lock(tasks_dir: &std::path::Path, ticket_id: &str, note: &str, progress: impl Fn(&str)) {
+    let mut storage = Storage::new(tasks_dir);
+    if let Err(err) = TaskService::add_comment_with_context(&mut storage, ticket_id, note, crate::services::task_service::CommentContext::automation()) {
+        progress(&format!("Could not comment on {ticket_id}: {err}"));
+    }
+}
+
+/// What a merge agent that holds the check lock reads: a T3 Code thread
+/// doesn't get the job's `LOTAR_CHECK_LOCK_HELD=1`, and a check whose
+/// scripts take the lock would wait for this job until it ends.
+fn check_lock_note() -> String {
+    format!(
+        "\nCheck lock:\nThis job holds the machine's check lock (port {}) until it ends, so no other merge's checks run beside yours (lotar DEV-797). \
+Run each check with LOTAR_CHECK_LOCK_HELD=1 in its environment (LOTAR_CHECK_LOCK_HELD=1 npm run test:agent): a repository script that takes \
+the same lock (lotar's do) would otherwise wait for this job.\n",
+        check_lock::port()
+    )
+}
+
+/// Whether a job that waits before its agent starts is to stop: cancelled
+/// in this process, or by `lotar agent cancel` from another, which leaves a
+/// cancel request (DEV-797).
+fn wait_cancelled(job_id: &str, tasks_dir: &std::path::Path) -> bool {
+    if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
+        let _ = AgentJobService::cancel_job(job_id);
+    }
+    should_stop_job(job_id)
 }
 
 /// Comment lotar's merge outcome on the ticket, and keep it as the job's

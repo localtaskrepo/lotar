@@ -6,7 +6,9 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
 ## Strategy
 
 - Start with the affected behavior (one failing test or file), then run the
-  applicable final gates in [AGENTS.md](../../../AGENTS.md). Repeat successful
+  applicable final gates in [AGENTS.md](../../../AGENTS.md): in a fix, rework or
+  review job, lint and the tests for what changed (a filter, a file, the touched
+  crate); the merge runs the full suites once (DEV-797). Repeat successful
   checks only for subsequent changes, failures, or unresolved risks.
 - For a bug, reproduce its actual symptom with a focused failing test or command
   before fixing when feasible. Minimize inputs, test a falsifiable hypothesis,

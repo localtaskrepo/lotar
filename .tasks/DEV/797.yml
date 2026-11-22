@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-26T16:53:01.962075+00:00
+modified: 2026-11-26T17:30:51.594168+00:00
 relationships:
   blocks:
   - DEV-801
@@ -230,6 +230,12 @@ comments:
       result: not_run
       reason: the merge runs it
     next: 'Merge: rebase on main resolves one mechanical conflict in agent_job_service.rs (job_env signature, DEV-853)'
+- date: 2026-11-26T17:30:51.594168+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-797` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-797` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
@@ -569,3 +575,7 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T17:30:51.594168+00:00
+  actor: automation
+  changes:
+  - field: comment_added

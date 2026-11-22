@@ -15,7 +15,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-export const CHECK_LOCK_PORT = 47_586;
+// LOTAR_CHECK_LOCK_PORT moves it, as it does lotar's (tests hold their own).
+export const CHECK_LOCK_PORT = Number(process.env.LOTAR_CHECK_LOCK_PORT) || 47_586;
 export const CHECK_LOCK_HELD_ENV = 'LOTAR_CHECK_LOCK_HELD';
 const MAX_WAIT_MS = 90 * 60_000;
 const RETRY_MS = 2_000;
