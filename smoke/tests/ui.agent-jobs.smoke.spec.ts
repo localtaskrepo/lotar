@@ -652,13 +652,19 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         2 * JOB_END_LIMIT_MS + 60_000,
     );
 
-    it('stops queued and running jobs only after accessible confirmation', async ({ expect }) => {
+    // Both scenarios below wait for an agent to start and then walk the UI:
+    // under full-suite load (load average 46) that outlasts the shared 120 s
+    // cap and the 15-20 s waits, though nothing hangs (DEV-775).
+    it('stops queued and running jobs only after accessible confirmation', { timeout: 300_000 }, async ({ expect }) => {
         const gate = await createGateFixture('lotar-smoke-gate-stopall-');
         const agents = await createFixtureAgents(
             {
                 slow: {
                     script: gate.script,
-                    args: gate.agentArgs({ mode: 'hold', label: 'stop-all' }),
+                    // Held past the 20 s default: a child that exits on its own
+                    // completes its job before Stop all, which then never
+                    // cancels every job. The `finally` releases it (DEV-775).
+                    args: gate.agentArgs({ mode: 'hold', label: 'stop-all', holdMs: JOB_END_LIMIT_MS }),
                 },
             },
             'lotar-smoke-agents-stopall-',
@@ -681,7 +687,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
                 // Deterministic precondition: with max_parallel_jobs 1 exactly
                 // one job runs while the other stays queued.
-                await waitUntil('exactly one running and one queued job', 20_000, async () => {
+                await waitUntil('exactly one running and one queued job', WAIT_BUDGET_MS, async () => {
                     const jobs = await fetchJobsViaApi(server.url);
                     return (
                         jobs.filter((job) => job.status === 'running').length === 1 &&
@@ -736,7 +742,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         .getByRole('button', { name: 'Stop all', exact: true })
                         .click();
 
-                    await waitUntil('stop-all to cancel every job', 20_000, async () => {
+                    await waitUntil('stop-all to cancel every job', WAIT_BUDGET_MS, async () => {
                         const jobs = await fetchJobsViaApi(server.url);
                         return jobs.length === 2 && jobs.every((job) => job.status === 'cancelled');
                     });
@@ -755,7 +761,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
-    it("shows the agent's permission question in the job view and answers it", async () => {
+    it("shows the agent's permission question in the job view and answers it", { timeout: 300_000 }, async () => {
         // The claude runner is the harnessmux claude agent; its agents.toml
         // under HARNESSMUX_HOME runs the fake ACP agent instead (DEV-503).
         const harnessmuxHome = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-harnessmux-'));
@@ -777,11 +783,11 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                 await withPage(`${server.url}/agents`, async (page) => {
                     await startJobViaApi(server.url, task.id, 'asker', 'Edit the notes');
                     const question = page.locator('.job-question');
-                    await question.waitFor({ timeout: 15_000 });
+                    await question.waitFor({ timeout: WAIT_BUDGET_MS });
                     expect(await question.textContent()).toContain('The agent asks: Edit notes.md');
                     await question.getByRole('button', { name: 'Allow', exact: true }).click();
                     await waitForJobStatusViaApi(server.url, task.id, 'completed');
-                    await page.locator('.job-question').waitFor({ state: 'detached', timeout: 15_000 });
+                    await page.locator('.job-question').waitFor({ state: 'detached', timeout: WAIT_BUDGET_MS });
                     await waitForText(page, '.job-card', 'Permission: allow');
                 });
             } finally {
