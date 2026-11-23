@@ -54,8 +54,13 @@ Reports add optional `report: {commits?, checks?, next?}` to plain comments only
 
 ### `task_comment_update`
 - **Params:** `id` (required), `index` (0-based, required), `text` (required).
-- **Behavior:** updates the comment at the specified index and records a history entry.
+- **Behavior:** updates the comment at the specified index and records a history entry. A deleted comment is refused; restore it first.
 - **Response:** Updated `TaskDTO`.
+
+### `task_comment_delete` and `task_comment_restore`
+- **Params:** `id` (required), `index` (0-based, counting deleted comments, required).
+- **Behavior:** soft-deletes or restores the comment (DEV-809): it stays in `comments` with `deleted_at`, and the history records `comment#N.deleted_at`. A deleted question is withdrawn (no longer open, can't be answered); a deleted answer leaves its question open again. Deleting a deleted comment, or restoring one that isn't deleted, changes nothing (`changed: false`). See [lotar comment](./comment.md#edit-delete-and-restore).
+- **Response:** `{ status, action, id, index, changed, task }` with the updated `TaskDTO`.
 
 ### `task_reference_add`
 - **Params:** `id` (required), optional `project`, `kind` (required: `link|file|code|jira|github|attachment`), `value` (required).

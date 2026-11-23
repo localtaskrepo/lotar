@@ -4887,6 +4887,80 @@
           }
         }
       }
+    },
+    "/api/tasks/comment/delete": {
+      "post": {
+        "summary": "Delete a comment (soft, DEV-809): body { id, index } (0-based, counting deleted comments). The comment stays in the file with deleted_at and a history entry; views leave it out and a deleted question is withdrawn. Deleting a deleted comment changes nothing.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Invalid task ID or request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "invalidTaskId": {
+                    "summary": "Malformed task ID",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "Invalid task ID: TEST-+12: numeric suffix '+12' is invalid: expected decimal digits only"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/comment/restore": {
+      "post": {
+        "summary": "Restore a deleted comment (DEV-809): body { id, index }, with a history entry. Restoring one that is not deleted changes nothing.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Invalid task ID or request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "invalidTaskId": {
+                    "summary": "Malformed task ID",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "Invalid task ID: TEST-+12: numeric suffix '+12' is invalid: expected decimal digits only"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6525,6 +6599,10 @@
           },
           "report": {
             "$ref": "#/components/schemas/CommentReport"
+          },
+          "deleted_at": {
+            "type": "string",
+            "description": "When the comment was deleted (DEV-809). It stays in the list so indexes don't shift; views leave it out, and a deleted question is withdrawn."
           }
         },
         "required": [

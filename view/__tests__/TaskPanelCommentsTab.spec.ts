@@ -81,3 +81,47 @@ describe('TaskPanelCommentsTab (DEV-491)', () => {
         expect(muted).toEqual([true, false, false, false])
     })
 })
+
+describe('TaskPanelCommentsTab (DEV-809)', () => {
+    const question: TaskComment = {
+        date: '2026-11-20',
+        author: 'claude',
+        text: 'Ship it?',
+        question: { options: [{ key: 'y', label: 'Yes' }] },
+    }
+
+    it('offers Delete on comments, Withdraw on an open question, and emits the stored index', async () => {
+        const wrapper = mountTab([
+            { date: '2026-11-19', author: 'claude', text: 'gone', deleted_at: '2026-11-21' },
+            { date: '2026-11-19', author: 'claude', text: 'note' },
+            question,
+        ])
+        const buttons = wrapper.findAll('[data-testid="comment-delete"]')
+        expect(buttons.map((button) => button.text())).toEqual(['Delete', 'Withdraw'])
+        await buttons[1]!.trigger('click')
+        expect(wrapper.emitted('delete')).toEqual([[2]])
+    })
+
+    it('hides deleted comments behind a toggle that lists them with Restore', async () => {
+        const wrapper = mountTab([
+            { date: '2026-11-19', author: 'claude', text: 'gone', deleted_at: '2026-11-21' },
+            { date: '2026-11-19', author: 'claude', text: 'note' },
+        ])
+        expect(wrapper.text()).not.toContain('gone')
+        const toggle = wrapper.get('[data-testid="comments-deleted-toggle"]')
+        expect(toggle.text()).toBe('Show 1 deleted')
+        await toggle.trigger('click')
+        expect(wrapper.get('[data-testid="comment-deleted"]').text()).toContain('gone')
+        await wrapper.get('[data-testid="comment-restore"]').trigger('click')
+        expect(wrapper.emitted('restore')).toEqual([[0]])
+    })
+
+    it('deletes an answer through its question', async () => {
+        const wrapper = mountTab([
+            question,
+            { date: '2026-11-21', author: 'mallox', text: 'Answer: y', answer: { to: question.date, choice: ['y'] } },
+        ])
+        await wrapper.get('[data-testid="answer-delete"]').trigger('click')
+        expect(wrapper.emitted('delete')).toEqual([[1]])
+    })
+})

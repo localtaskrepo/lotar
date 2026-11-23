@@ -124,6 +124,7 @@ impl TemplateContext {
             format!("{prefix}.comments"),
             task.comments
                 .iter()
+                .filter(|comment| !comment.is_deleted())
                 .map(|comment| {
                     let mut fields = HashMap::from([("text", comment.text.clone()), ("date", comment.date.clone())]);
                     if let Some(ref author) = comment.author {

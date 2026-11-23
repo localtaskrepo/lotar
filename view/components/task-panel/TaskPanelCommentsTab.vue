@@ -56,6 +56,19 @@
                   @click="$emit('startEdit', commentIndex)"
                   >Edit</UiButton
                 >
+                <UiButton
+                  variant="ghost"
+                  type="button"
+                  class="task-panel__comment-action"
+                  :title="
+                    comment.question && !answerOf(comment)
+                      ? 'Withdraw the question (can be restored)'
+                      : 'Delete (can be restored)'
+                  "
+                  data-testid="comment-delete"
+                  @click="$emit('delete', commentIndex)"
+                  >{{ comment.question && !answerOf(comment) ? 'Withdraw' : 'Delete' }}</UiButton
+                >
               </template>
               <template v-else>
                 <UiButton
@@ -84,10 +97,21 @@
               class="task-panel__answer"
               data-testid="comment-answer"
             >
-              <div class="task-panel__comment-meta">
-                <span v-if="answerOf(comment)?.author" class="task-panel__comment-author"
-                  >{{ answerOf(comment)?.author }} · </span
-                >answered {{ formatDate(answerOf(comment)?.date || '') }}
+              <div class="task-panel__comment-header">
+                <div class="task-panel__comment-meta">
+                  <span v-if="answerOf(comment)?.author" class="task-panel__comment-author"
+                    >{{ answerOf(comment)?.author }} · </span
+                  >answered {{ formatDate(answerOf(comment)?.date || '') }}
+                </div>
+                <UiButton
+                  variant="ghost"
+                  type="button"
+                  class="task-panel__comment-action"
+                  title="Delete the answer: the question is open again (can be restored)"
+                  data-testid="answer-delete"
+                  @click="deleteAnswer(comment)"
+                  >Delete</UiButton
+                >
               </div>
               <ul v-if="answerChoice(comment).length" class="task-panel__answer-choice">
                 <li v-for="label in answerChoice(comment)" :key="label">{{ label }}</li>
@@ -141,6 +165,43 @@
         <li v-if="!comments.length" class="muted">No comments yet</li>
         <li v-else-if="!visibleComments.length" class="muted">All comments are hidden by the filter</li>
       </ul>
+      <div v-if="deletedComments.length" class="task-panel__deleted-comments">
+        <UiButton
+          variant="ghost"
+          type="button"
+          class="task-panel__comment-action"
+          :aria-expanded="showDeleted"
+          data-testid="comments-deleted-toggle"
+          @click="showDeleted = !showDeleted"
+          >{{ showDeleted ? 'Hide' : 'Show' }} {{ deletedComments.length }} deleted</UiButton
+        >
+        <ul v-if="showDeleted" class="task-panel__comments">
+          <li
+            v-for="{ comment, index: commentIndex } in deletedComments"
+            :key="`${comment.date}-${commentIndex}`"
+            class="task-panel__comment task-panel__comment--deleted"
+            data-testid="comment-deleted"
+          >
+            <div class="task-panel__comment-header">
+              <div class="task-panel__comment-meta">
+                <span v-if="comment.author" class="task-panel__comment-author">{{ comment.author }} · </span
+                >{{ formatDate(comment.date) }} · deleted {{ formatDate(comment.deleted_at || '') }}
+              </div>
+              <div class="task-panel__comment-actions">
+                <UiButton
+                  variant="ghost"
+                  type="button"
+                  class="task-panel__comment-action"
+                  data-testid="comment-restore"
+                  @click="$emit('restore', commentIndex)"
+                  >Restore</UiButton
+                >
+              </div>
+            </div>
+            <MarkdownContent :source="comment.question ? questionPrompt(comment) : comment.text" />
+          </li>
+        </ul>
+      </div>
       <div class="task-panel__comment-editor">
         <textarea :value="newComment" rows="3" placeholder="Add a comment…" @input="onNewCommentInput"></textarea>
         <UiButton
@@ -161,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type ComponentPublicInstance } from 'vue'
+import { computed, ref, type ComponentPublicInstance } from 'vue'
 import { COMMENT_FILTER_KEY, useActivityFilter } from '../../composables/task-panel/useActivityFilter'
 import type { CommentReview, ReviewFinding, TaskComment } from '../../api/types'
 import { useBranding } from '../../composables/useBranding'
@@ -195,6 +256,8 @@ const emit = defineEmits<{
   (e: 'startEdit', index: number): void
   (e: 'saveEdit', index: number): void
   (e: 'cancelEdit'): void
+  (e: 'delete', index: number): void
+  (e: 'restore', index: number): void
   (e: 'addComment'): void
   (e: 'answer', question: TaskComment, value: { choice: string[]; note: string }): void
   (e: 'update:newComment', value: string): void
@@ -204,7 +267,11 @@ const emit = defineEmits<{
 const filter = useActivityFilter(COMMENT_FILTER_KEY)
 const branding = useBranding()
 
-const comments = computed(() => (props.task.comments || []).map((comment, index) => ({ comment, index })))
+/** Each comment with its stored index; deleted ones (DEV-809) are listed apart. */
+const indexedComments = computed(() => (props.task.comments || []).map((comment, index) => ({ comment, index })))
+const comments = computed(() => indexedComments.value.filter(({ comment }) => !comment.deleted_at))
+const deletedComments = computed(() => indexedComments.value.filter(({ comment }) => comment.deleted_at))
+const showDeleted = ref(false)
 function commentType(comment: TaskComment): string {
   return comment.question
     ? 'question'
@@ -291,6 +358,12 @@ const shownComments = computed(() => {
 
 function answerOf(question: TaskComment): TaskComment | null {
   return answerTo(allComments.value, question)
+}
+
+function deleteAnswer(question: TaskComment) {
+  const answer = answerOf(question)
+  const index = answer ? allComments.value.indexOf(answer) : -1
+  if (index >= 0) emit('delete', index)
 }
 
 function answerChoice(question: TaskComment): string[] {
@@ -434,6 +507,25 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
   padding: 0 var(--space-2, 0.5rem);
   font-size: var(--text-xs, 0.75rem);
   line-height: 1.4;
+}
+
+.task-panel__deleted-comments {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2, 0.5rem);
+  margin-top: var(--space-2, 0.5rem);
+}
+
+.task-panel__deleted-comments > .task-panel__comments {
+  align-self: stretch;
+}
+
+/* A deleted comment steps back: it is kept for the record and can be restored. */
+.task-panel__comment--deleted {
+  background: transparent;
+  border: 1px dashed var(--color-border, var(--border));
+  color: var(--color-muted, var(--muted));
 }
 
 .task-panel__comment-edit {

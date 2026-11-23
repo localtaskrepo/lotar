@@ -807,16 +807,21 @@ impl AutomationService {
                     }
                 }
                 // The latest comment stands in for the new one (DEV-383).
-                AutomationEvent::Commented => {
-                    matches_rule(rule, task, &ChangeSet::commented(task, task.comments.last()), MatchMode::Current, config, &active_sprints)
-                }
+                AutomationEvent::Commented => matches_rule(
+                    rule,
+                    task,
+                    &ChangeSet::commented(task, task.comments.iter().rfind(|comment| !comment.is_deleted())),
+                    MatchMode::Current,
+                    config,
+                    &active_sprints,
+                ),
                 _ => matches_rule(rule, task, &ChangeSet::empty(task), MatchMode::Current, config, &active_sprints),
             };
             if !matched {
                 continue;
             }
             if matches!(event, AutomationEvent::Commented) && has_comment_condition(rule) {
-                match task.comments.last().and_then(|comment| comment.author.as_deref()) {
+                match task.comments.iter().rfind(|comment| !comment.is_deleted()).and_then(|comment| comment.author.as_deref()) {
                     Some(author) => notes.push(format!("Checked against the latest comment, by {author}.")),
                     None => notes.push("Checked against the latest comment, which has no author.".to_string()),
                 }

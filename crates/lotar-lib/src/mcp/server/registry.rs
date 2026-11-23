@@ -32,9 +32,10 @@ use super::handlers::{
     handle_release_release, handle_release_remove, handle_release_reopen, handle_release_update, handle_sprint_add, handle_sprint_backlog,
     handle_sprint_burndown, handle_sprint_create, handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove, handle_sprint_reorder,
     handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull, handle_sync_push, handle_task_archive, handle_task_bulk_comment_add,
-    handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add, handle_task_comment_update,
-    handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_move, handle_task_reference_add, handle_task_reference_remove,
-    handle_task_restore, handle_task_timeline, handle_task_unarchive, handle_task_update, handle_whoami,
+    handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add, handle_task_comment_delete,
+    handle_task_comment_restore, handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_move,
+    handle_task_reference_add, handle_task_reference_remove, handle_task_restore, handle_task_timeline, handle_task_unarchive, handle_task_update,
+    handle_whoami,
 };
 use super::schema::{unsupported_keywords, validate_instance};
 use super::tools::build_tool_definitions;
@@ -82,6 +83,8 @@ pub(crate) fn tool_specs() -> &'static [ToolSpec] {
         ToolSpec { name: "task_update", method: "task/update", handler: handle_task_update },
         ToolSpec { name: "task_comment_add", method: "task/comment_add", handler: handle_task_comment_add },
         ToolSpec { name: "task_comment_update", method: "task/comment_update", handler: handle_task_comment_update },
+        ToolSpec { name: "task_comment_delete", method: "task/comment_delete", handler: handle_task_comment_delete },
+        ToolSpec { name: "task_comment_restore", method: "task/comment_restore", handler: handle_task_comment_restore },
         ToolSpec { name: "task_bulk_update", method: "task/bulk_update", handler: handle_task_bulk_update },
         ToolSpec { name: "task_bulk_comment_add", method: "task/bulk_comment_add", handler: handle_task_bulk_comment_add },
         ToolSpec { name: "task_bulk_reference_add", method: "task/bulk_reference_add", handler: handle_task_bulk_reference_add },
@@ -314,7 +317,7 @@ mod tests {
         let definitions = build_tool_definitions(None);
         let mut advertised: Vec<String> = definitions.iter().map(|tool| tool.get("name").and_then(|v| v.as_str()).unwrap().to_string()).collect();
         advertised.sort();
-        assert_eq!(advertised.len(), 58, "advertised tool count changed");
+        assert_eq!(advertised.len(), 60, "advertised tool count changed");
         assert!(advertised.iter().any(|name| name == "sprint_reorder"));
         for name in ["relationship_graph", "relationship_check", "relationship_mutate", "relationship_repair"] {
             assert!(advertised.iter().any(|advertised| advertised == name));

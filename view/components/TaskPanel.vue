@@ -676,6 +676,8 @@
                     @startEdit="startEditComment"
                     @saveEdit="saveCommentEdit"
                     @cancelEdit="cancelEditComment"
+                    @delete="deleteComment"
+                    @restore="restoreComment"
                     @addComment="addComment"
                     @answer="answerQuestion"
                     @update:newComment="updateNewComment"
@@ -1146,6 +1148,8 @@ const {
   startEditComment,
   cancelEditComment,
   saveCommentEdit,
+  deleteComment,
+  restoreComment,
   answeringQuestion,
   answerQuestion,
   orderedKnownUsers,

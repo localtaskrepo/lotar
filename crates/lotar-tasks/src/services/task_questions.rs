@@ -246,7 +246,10 @@ fn find_question<'a>(comments: &'a [TaskComment], to: Option<&str>) -> LoTaRResu
             }
         }
     };
-    if comments.iter().any(|comment| comment.answer.as_ref().is_some_and(|answer| answer.to == found.date)) {
+    if found.is_deleted() {
+        return Err(LoTaRError::ValidationError(format!("the question asked at {} was withdrawn (deleted)", found.date)));
+    }
+    if crate::types::live_comments(comments).any(|(_, comment)| comment.answer.as_ref().is_some_and(|answer| answer.to == found.date)) {
         return Err(LoTaRError::ValidationError(format!("the question asked at {} is answered already", found.date)));
     }
     Ok(found)

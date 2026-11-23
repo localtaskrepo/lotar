@@ -44,17 +44,36 @@ impl CommentArgs {
     }
 }
 
-/// What `lotar comment` writes: plain text, a question, an answer or a review.
+/// What `lotar comment` writes: plain text, a question, an answer or a
+/// review, or a change to an existing comment (DEV-809).
 enum CommentKind {
     Plain(String),
     Question { prompt: String, question: CommentQuestion },
     Answer(AnswerInput),
     Review { summary: Option<String>, review: CommentReview },
+    Edit { target: String, text: String },
+    Delete(String),
+    Restore(String),
 }
 
 impl CommentKind {
     /// `None` lists the comments.
     fn from_args(text: Option<String>, ask: CommentAskArgs) -> Result<Option<Self>, String> {
+        if let Some(target) = ask.edit {
+            let text = text.ok_or("--edit needs the new text (as the comment text, -m or -F)")?;
+            return Ok(Some(Self::Edit { target, text }));
+        }
+        for (flag, target) in [("--delete", &ask.delete), ("--restore", &ask.restore)] {
+            if target.is_some() && text.is_some() {
+                return Err(format!("{flag} takes the comment's number or date; leave out the comment text"));
+            }
+        }
+        if let Some(target) = ask.delete {
+            return Ok(Some(Self::Delete(target)));
+        }
+        if let Some(target) = ask.restore {
+            return Ok(Some(Self::Restore(target)));
+        }
         if let Some(prompt) = ask.question {
             if text.is_some() {
                 return Err("--question takes the question; leave out the comment text".to_string());
@@ -109,6 +128,7 @@ impl CommandHandler for CommentHandler {
 
     fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
         let CommentArgs { task_id, text, explicit_project, dry_run, explain, mut ask, mut report } = args;
+        let include_deleted = ask.deleted;
 
         let project_hint = explicit_project.as_deref().or(project);
         renderer.log_info(format_args!("comment: begin task_id={} explicit_project={:?}", task_id, project_hint));
@@ -127,7 +147,11 @@ impl CommandHandler for CommentHandler {
         let comment = CommentKind::from_args(text.filter(|candidate| !candidate.trim().is_empty()), ask)?;
         // A report goes with a plain comment, whose text is the prose summary.
         if report.is_some() && !matches!(comment, Some(CommentKind::Plain(_))) {
-            return Err("A report comment needs its text, the prose summary, and goes without --question, --answer or --review".to_string());
+            return Err("A report comment needs its text, the prose summary, and goes without --question, --answer, --review, --edit, --delete or --restore"
+                .to_string());
+        }
+        if include_deleted && comment.is_some() {
+            return Err("--deleted lists the comments; leave out the comment text".to_string());
         }
 
         let mut ctx = if comment.is_some() {
@@ -154,8 +178,35 @@ impl CommandHandler for CommentHandler {
                 let add_inputs = CommentAddInputs { project: resolved_project.clone(), task, text: body, report, dry_run, explain };
                 handle_add_comment(&mut ctx, renderer, &full_id, add_inputs)
             }
-            Some(CommentKind::Question { .. } | CommentKind::Answer(_) | CommentKind::Review { .. }) if dry_run => {
-                Err("--dry-run does not apply to --question, --answer or --review".to_string())
+            Some(
+                CommentKind::Question { .. }
+                | CommentKind::Answer(_)
+                | CommentKind::Review { .. }
+                | CommentKind::Edit { .. }
+                | CommentKind::Delete(_)
+                | CommentKind::Restore(_),
+            ) if dry_run => Err("--dry-run does not apply to --question, --answer, --review, --edit, --delete or --restore".to_string()),
+            Some(CommentKind::Edit { target, text }) => {
+                let index = resolve_comment_target(&task.comments, &target)?;
+                let text = text.trim();
+                if text.is_empty() {
+                    return Err("--edit needs the new text".to_string());
+                }
+                let receipt = TaskService::update_comment_with_receipt(&mut ctx.storage, &full_id, index, text).map_err(|e| e.to_string())?;
+                render_comment_change(renderer, &full_id, resolved_project.as_deref(), &receipt, index, CommentChange::Edit);
+                Ok(())
+            }
+            Some(CommentKind::Delete(target)) => {
+                let index = resolve_comment_target(&task.comments, &target)?;
+                let receipt = TaskService::delete_comment_with_receipt(&mut ctx.storage, &full_id, index).map_err(|e| e.to_string())?;
+                render_comment_change(renderer, &full_id, resolved_project.as_deref(), &receipt, index, CommentChange::Delete);
+                Ok(())
+            }
+            Some(CommentKind::Restore(target)) => {
+                let index = resolve_comment_target(&task.comments, &target)?;
+                let receipt = TaskService::restore_comment_with_receipt(&mut ctx.storage, &full_id, index).map_err(|e| e.to_string())?;
+                render_comment_change(renderer, &full_id, resolved_project.as_deref(), &receipt, index, CommentChange::Restore);
+                Ok(())
             }
             Some(CommentKind::Question { prompt, question }) => {
                 let dto = TaskService::ask_question(&mut ctx.storage, &full_id, &prompt, question).map_err(|e| e.to_string())?;
@@ -170,7 +221,7 @@ impl CommandHandler for CommentHandler {
                 render_last_comment(renderer, &full_id, resolved_project.as_deref(), &dto, |comment| comment.review.is_some())
             }
             None => {
-                render_comment_list(renderer, &full_id, resolved_project.as_deref(), &task, explain);
+                render_comment_list(renderer, &full_id, resolved_project.as_deref(), &task, include_deleted, explain);
                 Ok(())
             }
         }
@@ -195,7 +246,7 @@ fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, f
         let text = crate::services::task_service::strip_author_prefix(&inputs.text, author.as_deref()).map_err(|e| e.to_string())?.to_string();
         let report = inputs.report.map(crate::services::task_service::normalize_report).transpose().map_err(|e| e.to_string())?.flatten();
         let entry = TaskComment { report, ..TaskComment::new(timestamp, author, text) };
-        render_comment_preview(renderer, full_id, inputs.project.as_deref(), &entry, inputs.task.comments.len() + 1, inputs.explain);
+        render_comment_preview(renderer, full_id, inputs.project.as_deref(), &entry, live_count(&inputs.task.comments) + 1, inputs.explain);
         return Ok(());
     }
 
@@ -204,7 +255,7 @@ fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, f
     renderer.log_info("comment: comment persisted");
 
     let entry = dto.comments.last().ok_or("comment was not stored")?;
-    render_comment_success(renderer, full_id, inputs.project.as_deref(), entry, dto.comments.len());
+    render_comment_success(renderer, full_id, inputs.project.as_deref(), entry, live_count(&dto.comments));
     Ok(())
 }
 
@@ -218,7 +269,7 @@ fn render_last_comment(
     kind: impl Fn(&TaskComment) -> bool,
 ) -> Result<(), String> {
     let entry = dto.comments.iter().rev().find(|comment| kind(comment)).ok_or("comment was not stored")?;
-    render_comment_success(renderer, task_id, project, entry, dto.comments.len());
+    render_comment_success(renderer, task_id, project, entry, live_count(&dto.comments));
     Ok(())
 }
 
@@ -254,10 +305,28 @@ fn render_comment_success(renderer: &OutputRenderer, task_id: &str, project: Opt
     }
 }
 
-fn render_comment_list(renderer: &OutputRenderer, task_id: &str, project: Option<&str>, task: &crate::storage::task::Task, explain: bool) {
+/// The comments a list shows: deleted ones only with `--deleted` (DEV-809),
+/// each with its stored index, so numbers don't shift.
+fn listed_comments(comments: &[TaskComment], include_deleted: bool) -> Vec<(usize, &TaskComment)> {
+    comments.iter().enumerate().filter(|(_, comment)| include_deleted || !comment.is_deleted()).collect()
+}
+
+fn live_count(comments: &[TaskComment]) -> usize {
+    crate::types::live_comments(comments).count()
+}
+
+fn render_comment_list(
+    renderer: &OutputRenderer,
+    task_id: &str,
+    project: Option<&str>,
+    task: &crate::storage::task::Task,
+    include_deleted: bool,
+    explain: bool,
+) {
+    let listed = listed_comments(&task.comments, include_deleted);
     match renderer.format {
         OutputFormat::Json => {
-            let items: Vec<_> = task.comments.iter().map(comment_to_json).collect();
+            let items: Vec<_> = listed.iter().map(|(_, comment)| comment_to_json(comment)).collect();
             let mut payload = build_comment_payload("ok", "task.comment.list", task_id, items.len());
             payload.insert("items".to_string(), Value::Array(items));
             insert_project(&mut payload, project);
@@ -265,14 +334,14 @@ fn render_comment_list(renderer: &OutputRenderer, task_id: &str, project: Option
             renderer.emit_json(&Value::Object(payload));
         }
         _ => {
-            if task.comments.is_empty() {
+            if listed.is_empty() {
                 renderer.emit_success(format_args!("No comments for {}.", task_id));
             } else {
                 let open = crate::types::open_questions(&task.comments);
-                for (index, c) in task.comments.iter().enumerate() {
+                for (index, c) in listed {
                     let author = c.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
                     let marker = comment_marker(c, open.contains(&index));
-                    renderer.emit_raw_stdout(format_args!("{}  {marker}{author}{}", c.date, c.text));
+                    renderer.emit_raw_stdout(format_args!("#{}  {}  {marker}{author}{}", index + 1, c.date, c.text));
                     if let Some(report) = &c.report {
                         for line in report_lines(report) {
                             renderer.emit_raw_stdout(format_args!("    {line}"));
@@ -287,6 +356,66 @@ fn render_comment_list(renderer: &OutputRenderer, task_id: &str, project: Option
     }
 }
 
+/// The comment `target` names: its number as listed (1-based) or its
+/// date, exact or a unique start of it.
+fn resolve_comment_target(comments: &[TaskComment], target: &str) -> Result<usize, String> {
+    let target = target.trim();
+    if let Ok(number) = target.parse::<usize>() {
+        return match number {
+            1.. if number <= comments.len() => Ok(number - 1),
+            _ => Err(format!("No comment #{number}: the ticket has {} comments (lotar comment <ID> --deleted lists them all)", comments.len())),
+        };
+    }
+    if target.is_empty() {
+        return Err("Give the comment's number (as listed) or its date".to_string());
+    }
+    if let Some(index) = comments.iter().position(|comment| comment.date == target) {
+        return Ok(index);
+    }
+    let mut matches = comments.iter().enumerate().filter(|(_, comment)| comment.date.starts_with(target));
+    match (matches.next(), matches.next()) {
+        (Some((index, _)), None) => Ok(index),
+        (Some(_), Some(_)) => Err(format!("Several comments were written at '{target}'; give the full date or the number")),
+        (None, _) => Err(format!("No comment was written at '{target}'")),
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CommentChange {
+    Edit,
+    Delete,
+    Restore,
+}
+
+fn render_comment_change(
+    renderer: &OutputRenderer,
+    task_id: &str,
+    project: Option<&str>,
+    receipt: &crate::services::task_service::TaskUpdateReceipt,
+    index: usize,
+    change: CommentChange,
+) {
+    let (action, done, unchanged) = match change {
+        CommentChange::Edit => ("task.comment.edit", "updated", "already has this text"),
+        CommentChange::Delete => ("task.comment.delete", "deleted", "is deleted already"),
+        CommentChange::Restore => ("task.comment.restore", "restored", "is not deleted"),
+    };
+    let number = index + 1;
+    match renderer.format {
+        OutputFormat::Json => {
+            let mut payload = build_comment_payload(if receipt.changed { "success" } else { "unchanged" }, action, task_id, live_count(&receipt.dto.comments));
+            payload.insert("index".to_string(), Value::from(number));
+            if let Some(comment) = receipt.dto.comments.get(index) {
+                payload.insert("comment".to_string(), comment_to_json(comment));
+            }
+            insert_project(&mut payload, project);
+            renderer.emit_json(&Value::Object(payload));
+        }
+        _ if receipt.changed => renderer.emit_success(format_args!("Comment #{number} {done} on {task_id}")),
+        _ => renderer.emit_info(format_args!("Comment #{number} on {task_id} {unchanged}; nothing changed")),
+    }
+}
+
 fn build_comment_payload(status: &str, action: &str, task_id: &str, count: usize) -> Map<String, Value> {
     let mut payload = Map::with_capacity(4);
     payload.insert("status".to_string(), Value::String(status.to_string()));
@@ -298,6 +427,9 @@ fn build_comment_payload(status: &str, action: &str, task_id: &str, count: usize
 
 /// The text-mode label before a comment: an open question or a review's verdict.
 pub(crate) fn comment_marker(comment: &TaskComment, open_question: bool) -> String {
+    if comment.is_deleted() {
+        return "[deleted] ".to_string();
+    }
     if open_question {
         return "[open question] ".to_string();
     }

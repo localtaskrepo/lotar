@@ -506,6 +506,7 @@ fn passed_checks(tasks_dir: &Path, ticket_id: &str, head: &str) -> Vec<String> {
     task.comments
         .iter()
         .rev()
+        .filter(|comment| !comment.is_deleted())
         .find(on_head)
         .and_then(|comment| comment.report.as_ref())
         .map(|report| report.checks.iter().filter(|check| check.result == "passed").map(|check| check.command.trim().to_string()).collect())
@@ -557,8 +558,12 @@ fn named_checkouts(tasks_dir: &Path, ticket_id: &str, root: &Path) -> Option<Vec
     let storage = crate::storage::manager::Storage::new(tasks_dir);
     let task = crate::services::task_service::TaskService::get(&storage, ticket_id, None).ok()?;
     let ours = common_dir(root)?;
-    let texts = std::iter::once(task.description.unwrap_or_default())
-        .chain(task.comments.into_iter().flat_map(|comment| std::iter::once(comment.text).chain(comment.report.and_then(|report| report.next))));
+    let texts = std::iter::once(task.description.unwrap_or_default()).chain(
+        task.comments
+            .into_iter()
+            .filter(|comment| !comment.is_deleted())
+            .flat_map(|comment| std::iter::once(comment.text).chain(comment.report.and_then(|report| report.next))),
+    );
     let mut seen = vec![ours];
     let mut checkouts = Vec::new();
     for path in texts.flat_map(|text| named_paths(&text)) {

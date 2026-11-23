@@ -1849,7 +1849,7 @@ impl TaskListRow {
         let open_question = open_question(&task.comments).cloned();
         let status_since = status_since(&task);
         Self {
-            comment_count: task.comments.len(),
+            comment_count: crate::types::live_comments(&task.comments).count(),
             history_count: task.history.len(),
             open_question,
             status_since,
@@ -1886,10 +1886,7 @@ impl TaskListRow {
 /// The newest question comment no answer points to (DEV-488), as the web
 /// view's `lastOpenQuestion` picks it.
 fn open_question(comments: &[crate::types::TaskComment]) -> Option<&crate::types::TaskComment> {
-    comments
-        .iter()
-        .rev()
-        .find(|comment| comment.question.is_some() && !comments.iter().any(|other| other.answer.as_ref().is_some_and(|answer| answer.to == comment.date)))
+    crate::types::open_questions(comments).last().map(|&index| &comments[index])
 }
 
 /// Status labels compared like board columns: case, spaces, `_` and `-`

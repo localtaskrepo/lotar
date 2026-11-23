@@ -439,7 +439,7 @@ fn folded_fields<'a>(doc: &SearchDocument<'a>) -> Vec<FoldedField<'a>> {
             push(Field::Reference, value);
         }
     }
-    for comment in doc.comments {
+    for comment in doc.comments.iter().filter(|comment| !comment.is_deleted()) {
         push(Field::Comment, &comment.text);
     }
     fields

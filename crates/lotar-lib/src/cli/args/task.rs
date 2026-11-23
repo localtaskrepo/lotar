@@ -217,7 +217,8 @@ pub struct AddArgs {
     pub explain: bool,
 }
 
-/// Question and answer comments (DEV-488) and review comments (DEV-489).
+/// Question and answer comments (DEV-488), review comments (DEV-489), and
+/// editing, deleting and restoring a comment (DEV-809).
 #[derive(Args, Debug, Clone, Default)]
 pub struct CommentAskArgs {
     /// Ask this question; the owner answers by choosing an --option
@@ -256,6 +257,18 @@ pub struct CommentAskArgs {
     /// A blocking finding of the --review, written as --finding (repeatable)
     #[arg(long = "blocker", value_name = "FINDING", requires = "review")]
     pub blockers: Vec<String>,
+    /// Replace the text of comment N (1-based, as listed) or of the comment with this date; the comment text is the new text
+    #[arg(long, value_name = "N|DATE", conflicts_with_all = ["question", "answer", "review", "delete", "restore", "deleted"])]
+    pub edit: Option<String>,
+    /// Delete comment N or the comment with this date (DEV-809). It stays in the file and history and can be restored; a deleted question is withdrawn.
+    #[arg(long, value_name = "N|DATE", conflicts_with_all = ["question", "answer", "review", "restore", "deleted"])]
+    pub delete: Option<String>,
+    /// Restore deleted comment N or the deleted comment with this date
+    #[arg(long, value_name = "N|DATE", conflicts_with_all = ["question", "answer", "review", "deleted"])]
+    pub restore: Option<String>,
+    /// List deleted comments too, marked [deleted]
+    #[arg(long)]
+    pub deleted: bool,
 }
 
 #[derive(Subcommand)]

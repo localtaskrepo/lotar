@@ -350,6 +350,11 @@ pub struct TaskComment {
     /// A hand-off report with a plain comment.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub report: Option<CommentReport>,
+    /// When the comment was deleted (DEV-809). A deleted comment stays in
+    /// the file, in place, so positions don't shift and it can be
+    /// restored; views leave it out, and a deleted question is withdrawn.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub deleted_at: Option<String>,
     /// Keys this version does not know, kept so a newer tool's or a
     /// hand-written field survives edits (DEV-268).
     #[serde(flatten, default)]
@@ -359,8 +364,18 @@ pub struct TaskComment {
 
 impl TaskComment {
     pub fn new(date: String, author: Option<String>, text: String) -> Self {
-        Self { date, author, text, question: None, answer: None, review: None, report: None, extra: Default::default() }
+        Self { date, author, text, question: None, answer: None, review: None, report: None, deleted_at: None, extra: Default::default() }
     }
+
+    /// Whether the comment was deleted (DEV-809).
+    pub fn is_deleted(&self) -> bool {
+        self.deleted_at.is_some()
+    }
+}
+
+/// The comments that are not deleted, with their stored indexes.
+pub fn live_comments(comments: &[TaskComment]) -> impl Iterator<Item = (usize, &TaskComment)> {
+    comments.iter().enumerate().filter(|(_, comment)| !comment.is_deleted())
 }
 
 /// A question the reader answers by choosing an option (DEV-488).
@@ -504,18 +519,18 @@ pub struct ReviewFinding {
     pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
 }
 
-/// The newest review comment, if any.
+/// The newest review comment that is not deleted, if any.
 pub fn latest_review(comments: &[TaskComment]) -> Option<&TaskComment> {
-    comments.iter().rev().find(|comment| comment.review.is_some())
+    comments.iter().rev().find(|comment| comment.review.is_some() && !comment.is_deleted())
 }
 
 /// Indexes of the question comments no answer points to, oldest first.
+/// Deleted comments count for nothing (DEV-809): a deleted question is
+/// withdrawn, and a deleted answer leaves its question open again.
 pub fn open_questions(comments: &[TaskComment]) -> Vec<usize> {
-    comments
-        .iter()
-        .enumerate()
+    live_comments(comments)
         .filter(|(_, comment)| comment.question.is_some())
-        .filter(|(_, question)| !comments.iter().any(|comment| comment.answer.as_ref().is_some_and(|answer| answer.to == question.date)))
+        .filter(|(_, question)| !live_comments(comments).any(|(_, comment)| comment.answer.as_ref().is_some_and(|answer| answer.to == question.date)))
         .map(|(index, _)| index)
         .collect()
 }

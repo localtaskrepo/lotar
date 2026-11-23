@@ -14,7 +14,7 @@ struct CommentRanking {
 fn rank_by_comments(global: bool, project: Option<&str>, limit: usize, filter: &str, resolver: &TasksDirectoryResolver) -> Result<CommentRanking, String> {
     let scope = scope_project(global, project, resolver);
     let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
-    let rows = ranked_counts(tasks.iter().map(|(id, task)| (id.clone(), task.comments.len())), limit);
+    let rows = ranked_counts(tasks.iter().map(|(id, task)| (id.clone(), crate::types::live_comments(&task.comments).count())), limit);
     let titles = tasks.into_iter().map(|(id, task)| (id, task.title)).collect();
     Ok(CommentRanking { scope, rows, titles })
 }
@@ -52,7 +52,7 @@ pub(crate) fn run_by_author(
     let scope = scope_project(global, project, resolver);
     let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
     let mut counts: HashMap<Option<String>, usize> = HashMap::new();
-    for comment in tasks.into_iter().flat_map(|(_, task)| task.comments) {
+    for comment in tasks.into_iter().flat_map(|(_, task)| task.comments).filter(|comment| !comment.is_deleted()) {
         *counts.entry(comment.author).or_insert(0) += 1;
     }
     let mut rows: Vec<(Option<String>, usize)> = counts.into_iter().collect();

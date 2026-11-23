@@ -121,6 +121,28 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
         }
     }
 
+    /** DEV-809: soft-delete (or restore) the comment at `index`; a deleted question is withdrawn. */
+    async function setCommentDeleted(index: number, deleted: boolean) {
+        if (options.mode.value !== 'edit') return
+        if (isDeletedTask(options.task)) return
+        const id = options.task.id
+        if (!id || !options.task.comments?.[index]) return
+        if (editingCommentIndex.value === index) cancelEditComment()
+        try {
+            const updated = deleted ? await api.deleteComment(id, index) : await api.restoreComment(id, index)
+            Object.assign(options.task, updated)
+            options.applyTask(updated)
+            options.emitUpdated(updated)
+        } catch (error: unknown) {
+            showToast(
+                errorMessage(error) || (deleted ? 'Failed to delete the comment' : 'Failed to restore the comment'),
+            )
+        }
+    }
+
+    const deleteComment = (index: number) => setCommentDeleted(index, true)
+    const restoreComment = (index: number) => setCommentDeleted(index, false)
+
     async function answerQuestion(question: TaskComment, value: { choice: string[]; note: string }) {
         if (options.mode.value !== 'edit') return
         if (isDeletedTask(options.task)) return
@@ -157,6 +179,8 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
         startEditComment,
         cancelEditComment,
         saveCommentEdit,
+        deleteComment,
+        restoreComment,
         resetComments,
     }
 }

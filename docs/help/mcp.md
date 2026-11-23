@@ -86,6 +86,8 @@ The registry binds every advertised tool to its handler; `tools/list` returns ex
 | `task_update` | Patch mutable fields, relationships, and custom fields. |
 | `task_comment_add` | Append a comment to a task. |
 | `task_comment_update` | Update an existing comment on a task. |
+| `task_comment_delete` | Delete a comment (soft; a deleted question is withdrawn). |
+| `task_comment_restore` | Restore a deleted comment. |
 | `task_reference_add` | Attach one reference (link/file/code/jira/github/attachment) to a task. |
 | `task_reference_remove` | Remove one reference from a task. |
 | `task_bulk_update` | Patch multiple tasks in one call. |

@@ -34,3 +34,17 @@ describe('question comments (DEV-488)', () => {
         expect(questionPrompt({ date: 'd', text: 'No options here' })).toBe('No options here')
     })
 })
+
+describe('deleted comments (DEV-809)', () => {
+    it('a withdrawn question is not open, and a deleted answer reopens its question', () => {
+        const asked = question('2026-11-20T10:00:00Z')
+        const answer: TaskComment = {
+            date: '2026-11-20T11:00:00Z',
+            text: 'Answer: close',
+            answer: { to: asked.date, choice: ['close'] },
+        }
+        expect(openQuestions([{ ...asked, deleted_at: '2026-11-21' }])).toEqual([])
+        expect(openQuestions([asked, answer])).toEqual([])
+        expect(openQuestions([asked, { ...answer, deleted_at: '2026-11-21' }])).toEqual([asked])
+    })
+})

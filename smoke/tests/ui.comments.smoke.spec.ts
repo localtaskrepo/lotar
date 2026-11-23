@@ -50,4 +50,51 @@ describe.concurrent('UI comments', () => {
             }
         });
     }
+
+    // DEV-809: Delete (Withdraw on an open question) hides a comment behind the
+    // "N deleted" toggle; Restore brings it back. The task file keeps it.
+    it('withdraws a question and restores it', async ({ expect }) => {
+        const workspace = await SmokeWorkspace.create();
+        try {
+            const created = await workspace.addTask('Delete comments task');
+            await workspace.runLotar(['comment', created.id, 'A note to keep.']);
+            await workspace.runLotar([
+                'comment',
+                created.id,
+                '--question',
+                'Ship it?',
+                '--option',
+                'y: Yes',
+                '--option',
+                'n: No',
+            ]);
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/task/${created.id}`, async (page) => {
+                    await page.getByRole('tab', { name: 'Comments', exact: true }).click();
+                    const live = page.locator('.task-panel__comments > .task-panel__comment');
+                    await expect.poll(() => live.count()).toBe(2);
+                    await page.getByTestId('comment-delete').filter({ hasText: 'Withdraw' }).click();
+                    await expect.poll(() => live.count()).toBe(1);
+
+                    const toggle = page.getByTestId('comments-deleted-toggle');
+                    await expect.poll(() => toggle.textContent()).toContain('Show 1 deleted');
+                    await toggle.click();
+                    await expect.poll(() => page.getByTestId('comment-deleted').textContent()).toContain('Ship it?');
+                    const shown = JSON.parse(
+                        (await workspace.runLotar(['--format', 'json', 'show', created.id])).stdout,
+                    );
+                    expect(shown.comments.map((c: { text: string }) => c.text)).toEqual(['A note to keep.']);
+
+                    await page.getByTestId('comment-restore').click();
+                    await expect.poll(() => live.count()).toBe(2);
+                    await expect.poll(() => toggle.count()).toBe(0);
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
 });

@@ -367,7 +367,7 @@ function readTaskValue(task: TaskDTO, path: string): string | null {
                 : list === 'releases'
                   ? task.releases
                   : list === 'comments'
-                    ? (task.comments ?? [])
+                    ? (task.comments ?? []).filter((comment) => !comment.deleted_at)
                     : task.references
         const pick = (item: unknown) => {
             if (item == null) return ''

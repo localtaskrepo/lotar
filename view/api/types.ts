@@ -1173,6 +1173,8 @@ export interface TaskComment {
     review?: CommentReview
     /** A hand-off report (DEV-490); `text` stays the prose summary. */
     report?: CommentReport
+    /** DEV-809: when the comment was deleted. It stays in the list so indexes don't shift; views leave it out and a deleted question is withdrawn. */
+    deleted_at?: string
     [key: string]: unknown
 }
 

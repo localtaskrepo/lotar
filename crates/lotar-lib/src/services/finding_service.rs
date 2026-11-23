@@ -219,6 +219,7 @@ fn already_reported(task: &TaskDTO, text: &str) -> bool {
         .comments
         .iter()
         .rev()
+        .filter(|comment| !comment.is_deleted())
         .find_map(|comment| comment.text.strip_prefix(REPORT_PREFIX).map(|rest| rest.split_once("\n\n").map_or("", |(_, body)| body).trim()));
     last_report == Some(text)
 }

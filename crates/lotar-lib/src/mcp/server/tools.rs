@@ -110,6 +110,8 @@ pub(crate) const FORCE_ARCHIVED_TOOLS: &[&str] = &[
     "task_update",
     "task_comment_add",
     "task_comment_update",
+    "task_comment_delete",
+    "task_comment_restore",
     "task_bulk_update",
     "task_bulk_comment_add",
     "task_bulk_reference_add",
@@ -150,6 +152,14 @@ fn all_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
         make_task_update_tool(enum_hints),
         make_task_comment_add_tool(enum_hints),
         make_task_comment_update_tool(enum_hints),
+        make_task_comment_delete_tool(
+            "task_comment_delete",
+            "Delete a task comment by 0-based index (soft, DEV-809): it stays in the file with deleted_at and a history entry, views leave it out, and a deleted question is withdrawn (no longer open, can't be answered). Deleting a deleted comment changes nothing. Returns {task, changed}.",
+        ),
+        make_task_comment_delete_tool(
+            "task_comment_restore",
+            "Restore a deleted task comment by 0-based index, with a history entry. Restoring one that isn't deleted changes nothing. Returns {task, changed}.",
+        ),
         make_task_bulk_update_tool(enum_hints),
         make_task_bulk_comment_add_tool(enum_hints),
         make_task_bulk_reference_add_tool(enum_hints),
@@ -1128,6 +1138,22 @@ fn make_task_comment_update_tool(_enum_hints: Option<&EnumHints>) -> Value {
                 "text": {"type": "string"}
             },
             "required": ["id", "index", "text"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_task_comment_delete_tool(name: &str, description: &str) -> Value {
+    json!({
+        "name": name,
+        "description": description,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "index": {"type": "integer", "minimum": 0, "description": "0-based comment index, counting deleted comments."}
+            },
+            "required": ["id", "index"],
             "additionalProperties": false
         }
     })

@@ -2,7 +2,7 @@ import type { CommentReview, TaskComment } from '../api/types'
 
 /** DEV-489: the newest review comment, if any. */
 export function latestReview(comments: readonly TaskComment[] | null | undefined): TaskComment | null {
-    return [...(comments ?? [])].reverse().find((comment) => comment.review) ?? null
+    return [...(comments ?? [])].reverse().find((comment) => comment.review && !comment.deleted_at) ?? null
 }
 
 /** The commit as people read it: its first 7 characters. */

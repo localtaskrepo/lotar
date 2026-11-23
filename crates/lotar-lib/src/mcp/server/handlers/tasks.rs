@@ -654,6 +654,59 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
     text_result(req.id, &payload)
 }
 
+pub(crate) fn handle_task_comment_delete(req: JsonRpcRequest) -> JsonRpcResponse {
+    comment_deleted(req, true)
+}
+
+pub(crate) fn handle_task_comment_restore(req: JsonRpcRequest) -> JsonRpcResponse {
+    comment_deleted(req, false)
+}
+
+/// `task_comment_delete` and `task_comment_restore` (DEV-809).
+fn comment_deleted(req: JsonRpcRequest, delete: bool) -> JsonRpcResponse {
+    let id = match req.params.get("id").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing id", None),
+    };
+    let index = match req.params.get("index") {
+        Some(Value::Number(num)) => num.as_u64().and_then(|v| usize::try_from(v).ok()),
+        Some(Value::String(text)) => text.trim().parse::<usize>().ok(),
+        _ => None,
+    };
+    let Some(index) = index else {
+        return err(req.id, -32602, "Missing index", None);
+    };
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
+    let mut storage = Storage::new(&resolver.path.clone());
+    let result = if delete {
+        TaskService::delete_comment_with_receipt(&mut storage, &id, index)
+    } else {
+        TaskService::restore_comment_with_receipt(&mut storage, &id, index)
+    };
+    let receipt = match result {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            let msg = error.to_string();
+            if msg.contains("not found") {
+                return err(req.id, -32004, "Task not found", Some(json!({"message": format!("Task '{}' not found", id)})));
+            }
+            if msg.contains("Invalid comment index") {
+                return err(req.id, -32602, "Invalid comment index", None);
+            }
+            return internal_error(req.id, msg);
+        }
+    };
+    let payload = json!({
+        "status": "ok",
+        "action": if delete { "comment_delete" } else { "comment_restore" },
+        "id": id,
+        "index": index,
+        "changed": receipt.changed,
+        "task": receipt.dto,
+    });
+    text_result(req.id, &payload)
+}
+
 pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let ids = match req.params.get("ids").and_then(|v| v.as_array()) {
         Some(arr) => arr.iter().filter_map(|v| v.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect::<Vec<_>>(),

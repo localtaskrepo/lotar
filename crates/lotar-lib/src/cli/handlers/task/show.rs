@@ -10,7 +10,13 @@ pub fn handle_show(id: &str, project: Option<&str>, resolver: &TasksDirectoryRes
     let mut ctx = TaskCommandContext::for_reading(resolver, project, Some(id))?;
     let loaded = load_task_including_deleted(&mut ctx, id, project)?;
     match renderer.format {
-        OutputFormat::Json => renderer.emit_json(&loaded.task),
+        // Deleted comments are left out (DEV-809), so whatever reads this
+        // (the inbox mirror) sees a withdrawn question as gone.
+        OutputFormat::Json => {
+            let mut task = loaded.task;
+            task.comments.retain(|comment| !comment.is_deleted());
+            renderer.emit_json(&task)
+        }
         OutputFormat::Text => renderer.emit_raw_stdout(render_task_text(&loaded.task, &resolver.path)),
     }
     Ok(())
@@ -117,14 +123,17 @@ pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String 
         }
     }
 
-    if !task.comments.is_empty() {
-        out.push_str(&format!("\nComments ({})\n", task.comments.len()));
+    // Deleted comments are left out (DEV-809); `#N` is the stored position,
+    // which `lotar comment --edit/--delete` take.
+    let live: Vec<_> = crate::types::live_comments(&task.comments).collect();
+    if !live.is_empty() {
+        out.push_str(&format!("\nComments ({})\n", live.len()));
         let open = crate::types::open_questions(&task.comments);
-        for (index, comment) in task.comments.iter().enumerate() {
+        for (index, comment) in live {
             let mut lines = comment.text.lines();
             let author = comment.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
             let marker = crate::cli::handlers::comment::comment_marker(comment, open.contains(&index));
-            out.push_str(&format!("  {}  {marker}{author}{}\n", comment.date, lines.next().unwrap_or_default()));
+            out.push_str(&format!("  #{}  {}  {marker}{author}{}\n", index + 1, comment.date, lines.next().unwrap_or_default()));
             for line in lines {
                 out.push_str(&format!("    {line}\n"));
             }

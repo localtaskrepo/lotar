@@ -25,7 +25,8 @@ impl TaskTimelineService {
             let changes: Vec<_> = entry.changes.iter().filter(|change| change.field != "comment_added").cloned().collect();
             (!changes.is_empty()).then(|| TaskTimelineEntry::Change { at: entry.at.clone(), actor: entry.actor.clone(), changes })
         }));
-        entries.extend(task.comments.iter().enumerate().map(|(index, comment)| TaskTimelineEntry::Comment {
+        // Deleted comments are left out (DEV-809); their deletion shows as a change.
+        entries.extend(crate::types::live_comments(&task.comments).map(|(index, comment)| TaskTimelineEntry::Comment {
             at: comment.date.clone(),
             index,
             comment: comment.clone(),

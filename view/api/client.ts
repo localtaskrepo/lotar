@@ -282,6 +282,13 @@ export const api = {
     updateComment(id: string, index: number, text: string): Promise<TaskDTO> {
         return post('/api/tasks/comment/update', { id, index, text })
     },
+    /** DEV-809: soft-delete the comment at `index` (0-based, counting deleted ones). */
+    deleteComment(id: string, index: number): Promise<TaskDTO> {
+        return post('/api/tasks/comment/delete', { id, index })
+    },
+    restoreComment(id: string, index: number): Promise<TaskDTO> {
+        return post('/api/tasks/comment/restore', { id, index })
+    },
     setStatus(id: string, status: string): Promise<TaskDTO> {
         return postTaskChange('/api/tasks/status', { id, status })
     },

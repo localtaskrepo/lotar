@@ -866,6 +866,9 @@ impl TaskService {
             if index >= task.comments.len() {
                 return Err(LoTaRError::ValidationError(format!("Invalid comment index {index}")));
             }
+            if task.comments[index].is_deleted() {
+                return Err(LoTaRError::ValidationError(format!("Comment #{} is deleted; restore it first", index + 1)));
+            }
 
             let previous = task.comments[index].text.clone();
             if previous == text {
@@ -890,6 +893,61 @@ impl TaskService {
         if outcome.changed && Self::link_mentions(storage, &canonical, Some(text), previous_text.as_deref()) {
             dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
         }
+        Ok(TaskUpdateReceipt { dto, changed: outcome.changed, deferred: None })
+    }
+
+    /// Soft-delete a comment (0-based index, DEV-809): set its `deleted_at`
+    /// and record `comment#N.deleted_at`. The comment stays in the file, in
+    /// place; views leave it out, and a deleted question is withdrawn. A
+    /// comment deleted already is left as it is (`changed` false).
+    pub fn delete_comment_with_receipt(storage: &mut Storage, id: &str, index: usize) -> LoTaRResult<TaskUpdateReceipt> {
+        Self::set_comment_deleted(storage, id, index, true)
+    }
+
+    /// Restore a deleted comment (0-based index, DEV-809), recording
+    /// `comment#N.deleted_at` back to none. A comment that isn't deleted is
+    /// left as it is (`changed` false).
+    pub fn restore_comment_with_receipt(storage: &mut Storage, id: &str, index: usize) -> LoTaRResult<TaskUpdateReceipt> {
+        Self::set_comment_deleted(storage, id, index, false)
+    }
+
+    fn set_comment_deleted(storage: &mut Storage, id: &str, index: usize, delete: bool) -> LoTaRResult<TaskUpdateReceipt> {
+        let (id, _) = Self::follow_moves(storage, id, None)?;
+        let id = id.as_str();
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let canonical = parsed.canonical();
+        Self::ensure_local_task(storage, id)?;
+
+        let root_path = storage.root_path.clone();
+        let canonical_guard = canonical.clone();
+        let identity_project = parsed.project.clone();
+        let outcome = storage.mutate_task(&canonical, move |task| {
+            // Lifecycle guard (DEV-92): tombstones are read-only.
+            Self::ensure_not_deleted(task, &canonical_guard)?;
+            let comment = task.comments.get_mut(index).ok_or_else(|| LoTaRError::ValidationError(format!("Invalid comment index {index}")))?;
+            if comment.is_deleted() == delete {
+                return Ok(false);
+            }
+            let now = time::now_rfc3339();
+            let (old, new) = if delete {
+                comment.deleted_at = Some(now.clone());
+                (None, Some(now.clone()))
+            } else {
+                (comment.deleted_at.take(), None)
+            };
+            task.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
+                at: now.clone(),
+                actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)),
+                changes: vec![TaskChange { field: format!("comment#{}.deleted_at", index + 1), old, new }],
+            });
+            task.modified = now;
+            Ok(true)
+        })?;
+
+        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
+        let sprint_lookup = Self::load_sprint_lookup(storage);
+        let dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, Timestamp::now());
         Ok(TaskUpdateReceipt { dto, changed: outcome.changed, deferred: None })
     }
 

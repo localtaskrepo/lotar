@@ -1374,6 +1374,8 @@ fn excerpt(text: &str) -> String {
 /// `@merge…` neither, any other profile a fix. Automation's comments are
 /// never the newest fix or review comment, but can be the open question.
 fn prompt_comments(task: &crate::api_types::TaskDTO) -> Vec<(&'static str, &crate::types::TaskComment)> {
+    // Deleted comments are left out (DEV-809): a withdrawn question asks nothing.
+    let comments: Vec<&crate::types::TaskComment> = crate::types::live_comments(&task.comments).map(|(_, comment)| comment).collect();
     let assignments: Vec<(&str, &str)> = task
         .history
         .iter()
@@ -1388,17 +1390,16 @@ fn prompt_comments(task: &crate::api_types::TaskDTO) -> Vec<(&'static str, &crat
     };
 
     let handed_back = assignments.iter().rev().find(|(_, name)| is_person(name));
-    let before_hand_back = handed_back.and_then(|(at, name)| {
-        task.comments.iter().rposition(|comment| comment.date.as_str() <= *at && comment.author.as_deref().map(str::trim) != Some(*name))
-    });
-    let with_question = task.comments.iter().rposition(|comment| comment.question.is_some());
+    let before_hand_back = handed_back
+        .and_then(|(at, name)| comments.iter().rposition(|comment| comment.date.as_str() <= *at && comment.author.as_deref().map(str::trim) != Some(*name)));
+    let with_question = comments.iter().rposition(|comment| comment.question.is_some());
     let question = before_hand_back.max(with_question);
     let answer = question.and_then(|index| {
         // The person the question's phase handed the ticket to: the hand-back can be logged just before the comment.
-        let date = task.comments[index].date.as_str();
+        let date = comments[index].date.as_str();
         let phase_start = assignments.iter().rposition(|(at, name)| *at <= date && name.starts_with('@')).unwrap_or(0);
         let asked = assignments.iter().skip(phase_start).find(|(_, name)| is_person(name)).map(|(_, name)| *name);
-        task.comments
+        comments
             .iter()
             .enumerate()
             .skip(index + 1)
@@ -1410,7 +1411,7 @@ fn prompt_comments(task: &crate::api_types::TaskDTO) -> Vec<(&'static str, &crat
             let is_review = comment.review.is_some() || phase.starts_with("@review");
             !phase.is_empty() && !phase.starts_with("@merge") && is_review == review && comment.author.as_deref() != Some("automation")
         };
-        task.comments.iter().enumerate().rev().find(|(i, comment)| Some(*i) != question && in_phase(comment)).map(|(i, _)| i)
+        comments.iter().enumerate().rev().find(|(i, comment)| Some(*i) != question && in_phase(comment)).map(|(i, _)| i)
     };
 
     let mut picked: Vec<(usize, &'static str)> = Vec::new();
@@ -1424,7 +1425,7 @@ fn prompt_comments(task: &crate::api_types::TaskDTO) -> Vec<(&'static str, &crat
         }
     }
     picked.sort_by_key(|(index, _)| *index);
-    picked.into_iter().map(|(index, label)| (label, &task.comments[index])).collect()
+    picked.into_iter().map(|(index, label)| (label, comments[index])).collect()
 }
 
 fn build_prompt(
@@ -1497,7 +1498,8 @@ fn build_prompt(
         }
     }
 
-    if !history.full && !task.comments.is_empty() {
+    let live_count = crate::types::live_comments(&task.comments).count();
+    if !history.full && live_count > 0 {
         let picked = prompt_comments(task);
         let shown = if picked.is_empty() {
             ". ".to_string()
@@ -1508,7 +1510,7 @@ fn build_prompt(
         out.section("Comments");
         out.push_str(&format!(
             "Comments ({} on the ticket{shown}All of them: `lotar show {id}`; the history: `lotar task timeline {id}`){}\n",
-            task.comments.len(),
+            live_count,
             if picked.is_empty() { "" } else { ":" },
             id = task.id
         ));
@@ -3892,6 +3894,7 @@ fn handoff_text(
     }
     let comments =
         Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, ticket_id, None).ok()).map(|task| task.comments).unwrap_or_default();
+    let comments: Vec<_> = comments.into_iter().filter(|comment| !comment.is_deleted()).collect();
     let start = comments.len().saturating_sub(COMMENTS);
     for comment in comments.iter().skip(start) {
         let mut text: String = comment.text.trim().chars().take(COMMENT_CHARS).collect();

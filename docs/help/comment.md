@@ -1,6 +1,6 @@
 # lotar comment
 
-Add or list comments for a task. Supports positional text, message flag, file input, or stdin. If no text is provided, the command lists existing comments.
+Add, list, edit, delete or restore comments for a task. Supports positional text, message flag, file input, or stdin. If no text is provided, the command lists existing comments.
 
 ## Usage
 
@@ -22,6 +22,12 @@ lotar comment <TASK_ID> --answer [<keys>] [--to <DATE>] [NOTE]
 
 # Report a review's verdict
 lotar comment <TASK_ID> --review pass|block [--commit <SHA>] [--finding "<finding>"...] [--blocker "<finding>"...] [SUMMARY]
+
+# Edit, delete (withdraw a question) or restore a comment, by its number or date
+lotar comment <TASK_ID> --edit <N|DATE> <TEXT>
+lotar comment <TASK_ID> --delete <N|DATE>
+lotar comment <TASK_ID> --restore <N|DATE>
+lotar comment <TASK_ID> --deleted
 ```
 
 - `-F -` reads the comment from stdin, and so does a lone `-` as TEXT. A file that can't be read is an error (exit 1), never a silent listing.
@@ -113,6 +119,32 @@ lotar list --has question
 - The answer and its option fields are saved together. A rejected field update leaves the question open so you can retry.
 - The comment's `text` keeps the question with its options, or the answer with its labels, in prose, so `lotar show`, older lotar versions and agents reading the YAML see everything. `lotar comment <ID>` and `lotar show` mark a question no answer points to as `[open question]`.
 - The stored comment adds `question: { options: [{key, label, set?}], recommended?, multiple?, other? }` or `answer: { to, choice?, note? }`; REST (`POST /api/tasks/comment`) and MCP (`task_comment_add`) take the same `question` and `answer` fields.
+
+## Edit, delete and restore
+
+Each comment in `lotar comment <ID>` and `lotar show` starts with its number, `#N`, counted from 1 in the order stored. `--edit`, `--delete` and `--restore` take that number or the comment's date (exact, or a unique start of it).
+
+```bash
+# Fix a typo in comment #3
+lotar comment AUTH-1 --edit 3 "Fixed in 5b7385dc"
+
+# Withdraw a question asked by mistake, then bring it back
+lotar comment AUTH-1 --delete 2026-11-22T21:14
+lotar comment AUTH-1 --restore 4
+
+# List deleted comments too, marked [deleted]
+lotar comment AUTH-1 --deleted
+```
+
+- Delete is soft: the comment stays in the task file, in place, with `deleted_at`, and the history records `comment#N.deleted_at`. Restore clears it and records that too. Numbers never shift, so `#N` keeps naming the same comment.
+- `lotar comment <ID>`, `lotar show` (text and JSON), search, counts, stats, the timeline, automation templates (`${{ticket.comments[-1].text}}`) and agent prompts leave deleted comments out. REST and MCP keep them in the task's `comments` with `deleted_at`, so indexes stay stable and the web UI can restore them.
+- A deleted question is withdrawn: it is no open question (`[open question]`, `lotar list --has question`, the web UI), and answering it is refused. Whatever mirrors the question from `lotar show` sees it as gone.
+- A deleted answer no longer answers its question, which is open again. The fields its option set stay as they are.
+- Deleting a deleted comment, or restoring one that isn't deleted, changes nothing. A deleted comment can't be edited; restore it first. Comments of a task in the trash can't be changed.
+- `--edit` takes the new text as a new comment does (TEXT, `-m`, `-F`). Editing doesn't fire `on.commented` rules.
+- The web UI's Comments tab has Delete (Withdraw on an open question) on each comment and answer; "Show N deleted" lists the deleted ones with Restore.
+- REST: `POST /api/tasks/comment/update`, `/comment/delete` and `/comment/restore` take `{ id, index }` (plus `text` for update), `index` counted from 0 including deleted comments. MCP: `task_comment_update`, `task_comment_delete`, `task_comment_restore`.
+
 ## Hand-off reports
 
 A report belongs to a plain comment only. Combining it with a question, answer or review verdict is refused. With `--review`, `--commit <sha>` identifies the reviewed commit; without `--review`, repeat `--commit "<sha>: <what>"` to list report commits.
@@ -168,5 +200,5 @@ lotar comment AUTH-1 --review block --commit 5b7385dc \
 ## Notes
 
 - Each comment stores a UTC timestamp (RFC3339), its author and the text. The author is the identity the history records as actor (`default_reporter` such as `LOTAR_DEFAULT_REPORTER`, then git or system user; see [Identity & Users](./identity.md)). Comments written before lotar stored authors have no `author` and show without one.
-- `lotar comment <ID>` and `lotar show` print the author before the text (`2025-08-19T10:30:42Z  alice: First note`).
+- `lotar comment <ID>` and `lotar show` print the number and the author before the text (`#1  2025-08-19T10:30:42Z  alice: First note`).
 - Project context is inferred from the numeric ID using your current repo (or configured `default_project`). Pass a fully-qualified ID (`AUTH-1`) or `--project` when multiple prefixes exist.

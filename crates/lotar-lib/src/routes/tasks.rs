@@ -782,6 +782,42 @@ pub(super) fn register(api_server: &mut ApiServer) {
         ok_json(200, json!({"data": receipt.dto}))
     });
 
+    // POST /api/tasks/comment/delete { id, index } and
+    // POST /api/tasks/comment/restore { id, index } (DEV-809): soft delete,
+    // kept in the file and history; a deleted question is withdrawn.
+
+    for (path, delete) in [("/api/tasks/comment/delete", true), ("/api/tasks/comment/restore", false)] {
+        api_server.register_handler("POST", path, move |req: &HttpRequest| {
+            let resolver = try_response!(resolve_tasks_dir());
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+            let body: serde_json::Value = match parse_body_or_empty(req) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            let id = match body.get("id").and_then(|v| v.as_str()) {
+                Some(s) if !s.is_empty() => s.to_string(),
+                _ => return bad_request("Missing id".into()),
+            };
+            let Some(index) = body.get("index").and_then(|v| v.as_u64()).and_then(|i| usize::try_from(i).ok()) else {
+                return bad_request("Missing index".into());
+            };
+            let result = if delete {
+                TaskService::delete_comment_with_receipt(&mut storage, &id, index)
+            } else {
+                TaskService::restore_comment_with_receipt(&mut storage, &id, index)
+            };
+            let receipt = match result {
+                Ok(receipt) => receipt,
+                Err(err) => return map_lotar_error(err),
+            };
+            if receipt.changed {
+                let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_updated(&receipt.dto, actor.as_deref());
+            }
+            ok_json(200, json!({"data": receipt.dto}))
+        });
+    }
+
     // POST /api/tasks/delete {id, hard?=false}
 
     api_server.register_handler("POST", "/api/tasks/delete", |req: &HttpRequest| {
