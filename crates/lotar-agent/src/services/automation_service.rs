@@ -1883,7 +1883,7 @@ fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: 
     }
     let output = format!("{out}\n{err}");
     match status {
-        None => Err(LoTaRError::ValidationError(format!("Automation run command did not finish within {}s and was stopped", timeout.as_secs()))),
+        None => Err(LoTaRError::ValidationError(format!("{RUN_TIMED_OUT} {}s and was stopped", timeout.as_secs()))),
         Some(status) if !status.success() && !ignore_failure => {
             let detail = err.trim();
             Err(LoTaRError::ValidationError(if detail.is_empty() {
@@ -1893,6 +1893,19 @@ fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: 
             }))
         }
         Some(status) => Ok((output, Some(status).filter(|status| !status.success()))),
+    }
+}
+
+/// How a waited-for run that ran out of time fails.
+const RUN_TIMED_OUT: &str = "Automation run command did not finish within";
+
+/// `it did not finish within <timeout>`, when the run failed by running out of time.
+fn run_timeout(err: &LoTaRError) -> Option<String> {
+    match err {
+        LoTaRError::ValidationError(msg) => {
+            msg.strip_prefix(RUN_TIMED_OUT).map(|rest| format!("it did not finish within{}", rest.trim_end_matches(" and was stopped")))
+        }
+        _ => None,
     }
 }
 
@@ -2702,7 +2715,18 @@ fn apply_action(
     if let Some(run) = action.run.as_ref() {
         // Repository rules run commands only in a trusted workspace (DEV-259).
         if run_allowed(&storage.root_path, task_for_env) {
-            execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl)?;
+            if let Err(err) = execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl) {
+                // A server's log line alone left the owner's answer looking
+                // unanswered (DEV-808): the ticket says what stopped.
+                if let Some(why) = run_timeout(&err) {
+                    let text =
+                        format!("Automation rule '{}' stopped its run on {}: {why}. The rule's actions after it didn't run.", action_context.rule, current.id);
+                    if let Err(note) = append_automation_comment(storage, &current.id, &text) {
+                        eprintln!("[lotar][warn] {text} (no comment on the ticket: {note})");
+                    }
+                }
+                return Err(err);
+            }
         } else {
             let kept = keep_skipped_run(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl);
             note_run(format!("Automation rule '{}' skipped its run on {}: this workspace isn't trusted (`lotar trust`).", action_context.rule, current.id));

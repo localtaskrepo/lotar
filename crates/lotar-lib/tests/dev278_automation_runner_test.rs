@@ -40,6 +40,9 @@ fn run_commands_time_out() {
     let out = lotar(&fixtures, &["priority", "AR-1", "High"], "");
     assert!(started.elapsed() < std::time::Duration::from_secs(10));
     assert!(String::from_utf8_lossy(&out.stderr).contains("did not finish within 1s"), "{}", String::from_utf8_lossy(&out.stderr));
+    // The owner sees it on the ticket, not only in a server log (DEV-808).
+    let task = std::fs::read_to_string(fixtures.tasks_root.join("AR").join("1.yml")).unwrap();
+    assert!(task.contains("stopped its run on AR-1: it did not finish within 1s."), "{task}");
 }
 
 #[test]
