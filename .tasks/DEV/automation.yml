@@ -28,13 +28,16 @@ automation:
               LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex): lotar records it as the comment's author.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
-              1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. After
+              1. Read the ticket: what was found, how to check it, what done looks like. Run its check command (a
+                 day's bundle, finding health:<date>, names one per finding: fix them all). After
                  a failed merge your branch may hold earlier commits (git log <main>..HEAD): build on them.
-              2. Fix it the way this repo's AGENTS.md says: the smallest change, with the tests and checks it names.
+              2. Fix it the way this repo's AGENTS.md says: the smallest change, with targeted tests and checks for
+                 what it changes, not the full suites: the merge runs them once (owner 2026-11-22, lotar DEV-797).
               3. Never delete or discard work that isn't saved elsewhere (unmerged commits, uncommitted changes,
                  files a tool or another session may still use), and never decide what only the owner decides.
                  Before asking him, ask the agents that are running (T3 threads, other sessions) what they know, and
-                 file every bug you find in its repo (lotar add --finding). When the fix still needs him, comment one
+                 file every bug you find in its repo (lotar add --finding; a test that fails only under load and
+                 passes alone goes on the repo's flaky list instead, skill lotar-workflow). When the fix still needs him, comment one
                  question, set the status to HelpNeeded, assign the ticket to mallox (the owner) and stop.
                  It waits for another ticket: lotar task relationships add --kind depends-on ${{ticket.id}} <ID>, lotar
                  task edit ${{ticket.id}} --tag waits, comment what it waits for and stop. The ticket goes Blocked,
@@ -84,8 +87,10 @@ automation:
               - reporter: claude
               - reporter: codex
           - not: { assignee: "@any" }
-          - not: { tags: { any: [health, proposal, owner, recurring] } }
+          # Tag flaky: the repo's flaky list (skill lotar-workflow), fixed in one batch (owner 2026-11-22, STD-299).
+          - not: { tags: { any: [health, proposal, owner, recurring, flaky] } }
           - not: { type: Change }
+          - not: { type: Research }
           - not: { status: Blocked }
       on:
         created:
@@ -98,7 +103,8 @@ automation:
             provider: "${{ticket.field:provider}}"
             prompt: &work-prompt |
               Work ticket ${{ticket.id}} ("${{ticket.title}}"): read it and its relationships, then do it the way this
-              repo's AGENTS.md says, with the tests and checks it names. Run lotar with LOTAR_DEFAULT_REPORTER set to
+              repo's AGENTS.md says, with targeted tests and checks for what you change, not the full suites: the
+              merge runs them once (owner 2026-11-22, lotar DEV-797). Run lotar with LOTAR_DEFAULT_REPORTER set to
               your agent name (claude, codex). After a failed merge your branch may hold earlier commits
               (git log <main>..HEAD): build on them.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
@@ -138,6 +144,52 @@ automation:
                  Changed pages, components or styles: tag the ticket ui (lotar task edit ${{ticket.id}} --tag ui)
                  and attach the before and after screenshots of skill ui-review (lotar task reference add upload
                  ${{ticket.id}} <file>), linked in that comment; the reviewer blocks without them.
+    # A Research ticket ends in a write-up with sources, one recommendation and a question for the owner, not a code
+    # change (owner 2026-11-22, STD-305: "@research + new type", docs/decisions/2026-11-22-research-role.md). Anyone's,
+    # not only an agent's; proposals, owner and recurring tickets wait as above. A write-up file gets the light source
+    # check, the merge, then goes to him ("Research done", "Research merged"); an answer in a comment goes to him at once.
+    - name: "Research: start the research agent"
+      when:
+        all:
+          - type: Research
+          - not: { assignee: "@any" }
+          - not: { tags: { any: [proposal, owner, recurring] } }
+          - not: { status: Blocked }
+      on:
+        created:
+          set:
+            assignee: "@research"
+          agent:
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+            prompt: |
+              Research ticket ${{ticket.id}} ("${{ticket.title}}"): answer its question. Change no code. Run lotar with
+              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex).
+              Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
+              findings or evidence, with paths, commands and hashes in backticks.
+              1. Read the ticket, its comments and relationships, and the owner decisions it names (docs/decisions):
+                 what he asked and what the answer must let him decide. Ask the running agents (T3 threads) what they
+                 know first (skill cross-project-help).
+              2. Check every fact on the web: current releases, versions, prices and limits from the project's own
+                 pages or release notes, never from memory. Each fact gets its source (a link) and the date you checked
+                 it. A fact you couldn't check: say so, don't state it.
+              3. Write the result. Fits one phone screen: the comment of step 4 is the write-up. Longer:
+                 docs/research/<topic>.md (<topic> a short kebab-case name): what was asked, the options compared,
+                 every claim with its source, the recommendation. Commit it on your worktree's branch, signed, never
+                 with --no-verify, message "${{ticket.id}} ${{ticket.title}}"; don't merge or push. No other file:
+                 no code, configs, rules or skills; a change the research shows is needed is a ticket of its own
+                 (skill lotar-workflow), related to ${{ticket.id}}.
+              4. End with one recommendation and its cost (agent time, money, upkeep). Comment the outcome, the
+                 findings with their sources, the recommendation and its cost, and the write-up's path. Then ask one
+                 question he can answer in a line: lotar comment ${{ticket.id}} --question "<question>" --option
+                 "<key>: <label>" for each choice, --recommend <key>.
+              5. No write-up file: set the status to HelpNeeded, assign the ticket to mallox and stop. With one: leave
+                 status and assignee. When your job ends a light check that its claims have sources runs, the file
+                 lands on main, and the ticket goes to him with your question.
+              Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
+              His answer in this thread, also while your job still runs: comment his words on the ticket and file
+              the work it starts as tickets of their own, related to ${{ticket.id}}, quoting him (their agent records
+              his decision in docs/decisions); then lotar status ${{ticket.id}} Done and lotar assignee ${{ticket.id}} --clear.
     # Every job's worktree gets the repo's install from repos.json before the agent's first turn: lotar runs job_started
     # rules after it made the worktree. The only trigger, no T3 Code scripts (owner 2026-11-20, STD-270: "keep
     # automation all in one place", docs/decisions/2026-11-20-worktree-setup.md). It skips an install that already ran
@@ -160,6 +212,7 @@ automation:
           - assignee: "@fix-light"
           - assignee: "@fix-fable"
           - assignee: "@fix-retry"
+          - assignee: "@research"
       on:
         job_started:
           set:
@@ -215,7 +268,8 @@ automation:
                  something outside the change holds (another check, a config or rule that uses the code, "still
                  covered"); it decides nothing only the owner decides; a bug fix has a test that failed before it; no
                  stray files, no second branch or copy of the same fix. Rerun the checks the fix agent names that
-                 finish in a few minutes, and put back whatever they change. When step 1 reviews the ticket branch,
+                 finish in a few minutes, targeted ones, not the full suites: the merge runs them once (owner
+                 2026-11-22, lotar DEV-797). Put back whatever they change. When step 1 reviews the ticket branch,
                  this worktree is on the old commit: run them, and step 4's app, in a detached copy instead (git
                  worktree add --detach <scratch> ${{agent.worktree_branch}}, <scratch> a new folder outside the repo,
                  set up as the repo's AGENTS.md says) and remove it afterwards (git worktree remove --force <scratch>).
@@ -255,6 +309,37 @@ automation:
             assignee: "@review-light"
             status: Reviewing
           agent: *review
+    # A research job that committed a write-up: no code review, a light check that its claims have sources on the
+    # cheap model (STD-305), then "Review passed: merge". One that answered in a comment set HelpNeeded and mallox
+    # itself, which replaces these, so no check starts.
+    - name: "Research done: source check"
+      when:
+        assignee: "@research"
+      on:
+        job_completed:
+          set:
+            assignee: "@review-light"
+            status: Reviewing
+          agent: &source-check
+            session: fresh
+            prompt: |
+              Check the write-up for Research ticket ${{ticket.id}} ("${{ticket.title}}") before it lands on main. A
+              research agent committed it on your worktree's branch; you didn't write it. Run lotar with
+              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Change no files, commit nothing and leave
+              status and assignee as they are: when your job ends the rules send it on by tag review-blocked. You run
+              headless: nobody reads this session, so never ask in it; what you find goes into the ticket's comments.
+              Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
+              findings or evidence, with paths, commands and hashes in backticks.
+              1. The work: git log <main>..HEAD and its diff, main being the main checkout's branch (git -C <root>
+                 branch --show-current, <root> the first entry of git worktree list). No commits: comment "Review:
+                 nothing to review" and stop.
+              2. A light check, not a code review: the commits change only docs/research/*.md (and .tasks); each fact
+                 it states (a release, version, price, limit, what a tool does) names its source, a link; it ends with
+                 one recommendation and its cost. Open the sources the recommendation rests on: they must say it.
+              3. Blocking: another file changed, a fact without a source, or a source that says otherwise. Comment
+                 each with file and line, then lotar task edit ${{ticket.id}} --tag review-blocked. Taste and wording
+                 aren't findings.
+              4. Comment the outcome, starting "Review: passed" or "Review: blocking": what you read, the findings.
     # A fix job that ends waiting for another ticket (tag waits, from the fix and work prompts) gets no review: it goes
     # Blocked on its fix profile, and "Prerequisites done" continues it there, then the review follows. Without the tag
     # it went to @review, whose job lotar parked Blocked; after the unblock tell_agent ran the fix as @review, whose end
@@ -328,7 +413,8 @@ automation:
                  worktree, without asking, so the checks run on the rebased lockfile (lotar DEV-556). It fails: hand
                  back.
               3. Run the checks this repo's AGENTS.md names (agent.merge checks in .tasks/config.yml, where set), in
-                 your worktree. One fails: hand back.
+                 your worktree: the full suites, which only the merge runs (owner 2026-11-22, lotar DEV-797). One
+                 fails: hand back.
                  Skip a check the fix or rework comment says passed on the commit that is still HEAD (the rebase
                  changed nothing: same hash before and after), and name it as skipped in your comment.
               4. git -C <root> merge --ff-only <your branch>. Main moved on: back to step 2. Refused
@@ -347,13 +433,14 @@ automation:
                  ticket InProgress, a session still working in the main checkout). Then git -C <root> push, also
                  others' finished commits. One unfinished: push the commits before it, git -C <root> push origin
                  <sha>:<main>, and comment what waits. Never with --no-verify. Refused: hand back.
-              7. A health ticket names a check command: run it again; it must no longer list the finding.
+              7. A health ticket names check commands (one per finding in a day's bundle): run each again; none may
+                 still list its finding.
               8. Comment the outcome: the commits merged, pushed or why not, trusted or not, the checks that ran. The
-                 ticket goes to Done when your job ends.
-    # A failed review job (a crash, a usage limit: Codex on 2026-11-15) doesn't merge: until 2026-11-15 it merged
-    # without a review, and FND-3, STD-128 and LOCA-326 reached main unreviewed (owner 2026-11-15, STD-133: "no merges
-    # without review"). It waits for mallox. A review that tagged review-blocked and then failed goes the blocked way
-    # below (STD-139). lotar's rules can't see why a job failed, so a usage limit asks him too (DEV-584).
+                 ticket goes to Done when your job ends (a Research ticket: to mallox with its question).
+    # A failed review job (a crash) doesn't merge: until 2026-11-15 it merged without a review, and FND-3, STD-128 and
+    # LOCA-326 reached main unreviewed (owner 2026-11-15, STD-133: "no merges without review"). It waits for mallox. A
+    # review that tagged review-blocked and then failed goes the blocked way below (STD-139). A usage limit (Codex on
+    # 2026-11-15) no longer fails a job: it pauses ("Job paused: comment once" below).
     - name: "Review failed: hand to mallox"
       when:
         all:
@@ -368,13 +455,14 @@ automation:
             status: HelpNeeded
             assignee: mallox
           run: >-
-            env LOTAR_DEFAULT_REPORTER=automation sh -c 'lotar comment "$1" --question "$2" --option "fix: An agent
-            checks the branch and sends it to review again" --set "fix:assignee=@fix" --option "self: I merge it
-            myself" --set "self:status=InProgress" --option "wontdo: WontDo" --set "wontdo:status=WontDo" --set
-            "wontdo:assignee="; node "$HOME/Development/standards/scripts/repos.ts" --inbox "$1"' sh ${{ticket.id}}
-            "The review job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}), so the work on branch
-            ${{agent.worktree_branch}} isn't merged without a review. Review again, merge it
-            yourself, or WontDo?"
+            env LOTAR_DEFAULT_REPORTER=automation sh -c 'node "$HOME/Development/standards/scripts/repos.ts" --asked
+            "$1" "$3" || lotar comment "$1" --question "$2" --option "fix: An agent checks the branch and sends it to
+            review again" --set "fix:assignee=@fix" --option "self: I merge it myself" --set "self:status=InProgress"
+            --option "wontdo: WontDo" --set "wontdo:status=WontDo" --set "wontdo:assignee="; node
+            "$HOME/Development/standards/scripts/repos.ts" --inbox "$1"' sh ${{ticket.id}} "The review job
+            ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}), so the work on branch
+            ${{agent.worktree_branch}} isn't merged without a review. Review again, merge it yourself, or WontDo?"
+            ${{agent.job_id}}
     # Blocking findings go back to the author's profile, as the next turn of its own T3 thread, not the reviewer's
     # (lotar 0.15.0, DEV-472; owner 2026-11-13, STD-88). Twice, then the third blocking review asks mallox: his answer
     # was "fix" 9 times out of 9 (owner 2026-11-15, STD-156, docs/decisions/2026-11-15-inbox-triage.md). Tag
@@ -411,10 +499,10 @@ automation:
                  "Review read <its commit>, not HEAD <hash>: review again", take back this round's tag so it doesn't
                  count (lotar task edit ${{ticket.id}} --untag review-returned-twice when the ticket has it, else
                  --untag review-returned) and end your turn; the review runs again. Otherwise fix each finding the
-                 way this repo's AGENTS.md says, with the tests and checks it names, or answer in a comment why it
-                 isn't a problem. Never delete or discard work that isn't saved elsewhere. A finding
-                 only the owner can decide: comment one question, set the status to HelpNeeded, assign the ticket to
-                 mallox and stop.
+                 way this repo's AGENTS.md says, with targeted tests and checks for what you change (the merge runs
+                 the full suites), or answer in a comment why it isn't a problem. Never delete or discard work that
+                 isn't saved elsewhere. A finding only the owner can decide: comment one question, set the status to
+                 HelpNeeded, assign the ticket to mallox and stop.
                  He answers in this thread, also while your job still runs: finish steps 2 and 3, then start the
                  review with lotar automation run "Answered in the thread: review on Codex" --select 'id:${{ticket.id}}'
                  (you on Claude Sonnet: "... light review"; on Codex: "... review on Claude"). The rule skips a ticket
@@ -444,6 +532,7 @@ automation:
           - assignee: "@review-light"
           - tags: { any: [review-blocked] }
           - not: { tags: { any: [review-returned] } }
+          - not: { type: Research }
       on:
         job_completed: &back-to-fix-light
           set:
@@ -452,6 +541,48 @@ automation:
           remove: *unblocked
           agent: *rework
         job_failed: *back-to-fix-light
+    # A blocked source check goes back to the research agent, as the next turn of its thread (STD-305), with a prompt of
+    # its own: the code rework's would start a code review after his answer in the thread (STD-307).
+    - name: "Research check blocked: back to @research"
+      when:
+        all:
+          - assignee: "@review-light"
+          - tags: { any: [review-blocked] }
+          - not: { tags: { any: [review-returned] } }
+          - type: Research
+      on:
+        job_completed: &back-to-research
+          set:
+            assignee: "@research"
+          add: *returned
+          remove: *unblocked
+          agent: &research-rework
+            session: continue
+            thread_name: "${{ticket.id}} rework: ${{ticket.title}}"
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+            prompt: |
+              The source check of Research ticket ${{ticket.id}} ("${{ticket.title}}") found blocking problems: its last
+              comments name them. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Your
+              worktree's branch holds the write-up commit (git log <main>..HEAD): build on it.
+              Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
+              findings or evidence, with paths, commands and hashes in backticks.
+              1. First check the check read your branch's HEAD (git log -1 --format=%h): its comment names the commit
+                 or quotes the text it read. It read an older commit: change nothing, comment "Review read <its
+                 commit>, not HEAD <hash>: review again", take back this round's tag (lotar task edit ${{ticket.id}}
+                 --untag review-returned-twice when the ticket has it, else --untag review-returned) and end your turn;
+                 the check runs again. Otherwise fix each finding in the write-up under docs/research, checking the
+                 fact on the web with its source, or answer in a comment why it isn't one. Change no other file. Never
+                 delete or discard work that isn't saved elsewhere. A finding only the owner can decide: comment one
+                 question, set the status to HelpNeeded, assign the ticket to mallox and stop.
+                 He answers in this thread, also while your job still runs: finish steps 2 and 3, then start the
+                 check with lotar automation run "Answered in the thread: source check" --select 'id:${{ticket.id}}',
+                 never a review rule. The rule skips a ticket an agent still holds; then the job's end moves it on.
+              2. Amend the write-up commit (it isn't pushed), signed, never with --no-verify, message
+                 "${{ticket.id}} ${{ticket.title}}". Don't merge or push.
+              3. Comment the outcome: what you did about each finding, the commit hash. Leave status and assignee:
+                 when your job ends the source check runs again.
+        job_failed: *back-to-research
     - name: "Review blocked again: rework on @fix"
       when:
         all:
@@ -490,6 +621,7 @@ automation:
           - tags: { any: [review-blocked] }
           - tags: { any: [review-returned] }
           - not: { tags: { any: [review-returned-twice] } }
+          - not: { type: Research }
       on:
         job_completed: &again-to-fix-light
           set:
@@ -498,6 +630,22 @@ automation:
           remove: *unblocked
           agent: *rework
         job_failed: *again-to-fix-light
+    - name: "Research check blocked again: rework on @research"
+      when:
+        all:
+          - assignee: "@review-light"
+          - tags: { any: [review-blocked] }
+          - tags: { any: [review-returned] }
+          - not: { tags: { any: [review-returned-twice] } }
+          - type: Research
+      on:
+        job_completed: &again-to-research
+          set:
+            assignee: "@research"
+          add: *returned-twice
+          remove: *unblocked
+          agent: *research-rework
+        job_failed: *again-to-research
     # The triage writes what each round fixed and whether the findings converge into his inbox ticket (inbox.yml).
     - name: "Review blocked a third time: hand to mallox"
       when:
@@ -527,10 +675,11 @@ automation:
         job_failed: *to-mallox
     # A failed fix job goes to @fix-retry once before it waits for mallox (owner 2026-11-12, STD-55): STD-18's job
     # failed only because the agent ended its turn while the commit hook ran. The retry keeps the branch and runs on
-    # the profile's model, not the ticket's fields. Tag fix-retried sends a second failure to mallox. A job that failed
-    # on a rate or usage limit goes to mallox at once: @fix-retry runs on Claude too and would hit it again (owner
-    # 2026-11-16, INBOX-379: "don't retry a job that failed on a rate limit"). The job condition needs lotar DEV-617:
-    # lotar 0.15.1 reads job as a custom field the ticket lacks, so these rules retry as before until that release.
+    # the profile's model, not the ticket's fields. Tag fix-retried sends a second failure to mallox. A rate or usage
+    # limit doesn't get here: the job pauses and reruns on its own profile after the reset ("Job paused: comment once"),
+    # so no retry hits the limit again (owner 2026-11-16, INBOX-379: "don't retry a job that failed on a rate limit").
+    # A job whose agent asked mallox ends with him: his hand-back replaces set.assignee, so no retry starts, and the run
+    # leaves no retry comment over his question and takes the tag off again (repos.ts --asked, STD-320).
     - name: "Fix failed: retry on @fix-retry"
       when:
         all:
@@ -540,16 +689,17 @@ automation:
               - assignee: "@fix-fable"
           - tags: { any: [health] }
           - not: { tags: { any: [fix-retried] } }
-          - not: { job: &rate-limit { error: { matches: '(?i)rate limit|usage limit' } } }
       on:
         job_failed:
           set:
             assignee: "@fix-retry"
           add:
             tags: [fix-retried]
-          comment: &fix-retry >-
-            The fix agent's job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); @fix-retry retries it on
-            branch ${{agent.worktree_branch}}.
+          run: &fix-retry >-
+            env LOTAR_DEFAULT_REPORTER=automation sh -c 'if node "$HOME/Development/standards/scripts/repos.ts" --asked
+            "$1" "$2"; then lotar task edit "$1" --untag fix-retried; else lotar comment "$1" -m "$3"; fi' sh
+            ${{ticket.id}} ${{agent.job_id}} "The fix agent's job ${{agent.job_id}} failed (lotar agent logs
+            ${{agent.job_id}}); @fix-retry retries it on branch ${{agent.worktree_branch}}."
           agent:
             prompt: *fix-prompt
     - name: "Fix failed: retry an agent ticket on @fix-retry"
@@ -560,18 +710,18 @@ automation:
               - assignee: "@fix-light"
               - assignee: "@fix-fable"
           - not: { tags: { any: [health, fix-retried] } }
-          - not: { job: *rate-limit }
       on:
         job_failed:
           set:
             assignee: "@fix-retry"
           add:
             tags: [fix-retried]
-          comment: *fix-retry
+          run: *fix-retry
           agent:
             prompt: *work-prompt
-    # A retry, a @fix-retry job (only retries start one), or a rate limit. It asks a question: repos.ts reports a
-    # HelpNeeded ticket whose last comment asks none (check question).
+    # A retry, or a @fix-retry job (only retries start one). It asks a question: repos.ts reports a
+    # HelpNeeded ticket whose last comment asks none (check question). Not when the job's agent asked him already
+    # (repos.ts --asked): his hand-back is the job's outcome, and the retry options replaced its question (STD-306).
     - name: "Fix failed again: hand to mallox"
       when:
         all:
@@ -583,27 +733,45 @@ automation:
           - any:
               - assignee: "@fix-retry"
               - tags: { any: [fix-retried] }
-              - job: *rate-limit
       on:
         job_failed:
           set:
             status: HelpNeeded
             assignee: mallox
           run: >-
-            env LOTAR_DEFAULT_REPORTER=automation sh -c 'lotar comment "$1" --question "$2" --option "fix: Retry with
-            @fix" --set "fix:assignee=@fix" --option "fix-fable: Retry with @fix-fable" --set
-            "fix-fable:assignee=@fix-fable" --option "fix-retry: Retry with @fix-retry" --set
-            "fix-retry:assignee=@fix-retry" --option "wontdo: WontDo" --set "wontdo:status=WontDo" --set
+            env LOTAR_DEFAULT_REPORTER=automation sh -c 'node "$HOME/Development/standards/scripts/repos.ts" --asked
+            "$1" "$3" || lotar comment "$1" --question "$2" --option "fix: Retry with @fix" --set "fix:assignee=@fix"
+            --option "fix-fable: Retry with @fix-fable" --set "fix-fable:assignee=@fix-fable" --option "fix-retry: Retry
+            with @fix-retry" --set "fix-retry:assignee=@fix-retry" --option "wontdo: WontDo" --set
+            "wontdo:status=WontDo" --set "wontdo:assignee="; node "$HOME/Development/standards/scripts/repos.ts" --inbox
+            "$1"' sh ${{ticket.id}} "The fix agent's job ${{agent.job_id}} failed again (lotar agent logs
+            ${{agent.job_id}}). Retry with which agent, or WontDo?" ${{agent.job_id}}
+    # A failed research job asks mallox at once: it changed no code a retry would keep (STD-305). Not when the
+    # research agent asked him already (repos.ts --asked, STD-306).
+    - name: "Research failed: hand to mallox"
+      when:
+        assignee: "@research"
+      on:
+        job_failed:
+          set:
+            status: HelpNeeded
+            assignee: mallox
+          run: >-
+            env LOTAR_DEFAULT_REPORTER=automation sh -c 'node "$HOME/Development/standards/scripts/repos.ts" --asked
+            "$1" "$3" || lotar comment "$1" --question "$2" --option "research: Retry with @research" --set
+            "research:assignee=@research" --option "wontdo: WontDo" --set "wontdo:status=WontDo" --set
             "wontdo:assignee="; node "$HOME/Development/standards/scripts/repos.ts" --inbox "$1"' sh ${{ticket.id}}
-            "The fix agent's job ${{agent.job_id}} failed again or on a rate limit (lotar agent logs ${{agent.job_id}}).
-            Retry with which agent, or WontDo?"
+            "The research agent's job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}). Retry with
+            @research, or WontDo?" ${{agent.job_id}}
     # A merge agent that stops for a conflict or a failing check hands the ticket to mallox itself; the retry goes to
     # the fix agent, whose branch the next merge picks up.
     - name: "Merge agent lifecycle"
       when:
-        assignee: "@merge"
+        all:
+          - assignee: "@merge"
+          - not: { type: Research }
       on:
-        job_started:
+        job_started: &merging-status
           set:
             status: Merging
         job_completed:
@@ -612,16 +780,34 @@ automation:
           # A rule's own change doesn't fire the "clear the tags" rule below.
           remove: &done-tags
             tags: [merge-retried, fix-retried, review-blocked, review-returned, review-returned-twice, retry-fix,
-              retry-fable]
+              retry-fable, job-paused]
+    # A merged write-up is on main: the research agent's question goes to mallox (STD-305). Its question comment stays
+    # open after the check's and the merge's comments, so the inbox asks it. A rule's own change fires no other rule:
+    # this one files the inbox ticket itself.
+    - name: "Research merged: the question goes to mallox"
+      when:
+        all:
+          - assignee: "@merge"
+          - type: Research
+      on:
+        job_started: *merging-status
+        job_completed:
+          set:
+            status: HelpNeeded
+            assignee: mallox
+          remove: *done-tags
+          run: *inbox
     # A failed merge job (a crash, or a false failure like DEV-342's) goes back to the fix agent once, which ends with
     # nothing to do when the work is on main already; tag merge-retried sends a second failure to mallox, so fix,
-    # merge, fail can't loop (owner 2026-11-11, STD-46).
+    # merge, fail can't loop (owner 2026-11-11, STD-46). A Research ticket's goes to @research instead (below): the fix
+# agent would find nothing to do, set Done and drop the question for mallox (STD-307).
     - name: "Merge failed: retry with @fix"
       when:
         all:
           - assignee: "@merge"
           - tags: { any: [health] }
           - not: { tags: { any: [merge-retried] } }
+          - not: { type: Research }
       on:
         job_failed:
           set:
@@ -637,6 +823,7 @@ automation:
         all:
           - assignee: "@merge"
           - not: { tags: { any: [health, merge-retried] } }
+          - not: { type: Research }
       on:
         job_failed:
           set:
@@ -647,6 +834,42 @@ automation:
             The merge agent's job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); the fix agent retries
             it on branch ${{agent.worktree_branch}}.
           agent: *work
+    # Its job's end runs "Research done: source check", then the merge again; a second failure goes to mallox below.
+    - name: "Research merge failed: retry with @research"
+      when:
+        all:
+          - assignee: "@merge"
+          - type: Research
+          - not: { tags: { any: [merge-retried] } }
+      on:
+        job_failed:
+          set:
+            assignee: "@research"
+          add:
+            tags: [merge-retried]
+          comment: >-
+            The merge agent's job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); the research agent
+            retries it on branch ${{agent.worktree_branch}}.
+          agent:
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+            prompt: |
+              The merge of Research ticket ${{ticket.id}} ("${{ticket.title}}") failed: the merge agent's job
+              ${{agent.job_id}} (lotar agent logs ${{agent.job_id}}, and the ticket's last comments). Run lotar with
+              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Your worktree's branch holds the
+              write-up commit. Change no code: only the write-up under docs/research.
+              Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
+              findings or evidence, with paths, commands and hashes in backticks.
+              1. Main is the main checkout's branch (git -C <root> branch --show-current, <root> the first entry of
+                 git worktree list). The write-up is on main already (git log <main>..HEAD lists nothing, or the
+                 file on main is the one you wrote): comment that in one line, set the status to HelpNeeded, assign
+                 the ticket to mallox and stop. Its question comment stands; never set Done.
+              2. Otherwise rebase onto main, fix what failed and amend the write-up commit, signed, never with
+                 --no-verify, message "${{ticket.id}} ${{ticket.title}}"; don't merge or push. Never delete or discard work that
+                 isn't saved elsewhere. What only the owner can decide: comment one question, set the status to
+                 HelpNeeded, assign the ticket to mallox and stop.
+              3. Comment the outcome: what failed, what you changed, the commit hash. Leave status and assignee:
+                 when your job ends the source check and the merge run again.
     - name: "Merge failed again: hand to mallox"
       when:
         all:
@@ -658,11 +881,27 @@ automation:
             status: HelpNeeded
             assignee: mallox
           run: >-
-            env LOTAR_DEFAULT_REPORTER=automation sh -c 'lotar comment "$1" --question "$2" --option "fix: Retry with
-            @fix" --set "fix:assignee=@fix" --option "self: I merge it myself" --set "self:status=InProgress"; node
+            env LOTAR_DEFAULT_REPORTER=automation sh -c 'node "$HOME/Development/standards/scripts/repos.ts" --asked
+            "$1" "$3" || lotar comment "$1" --question "$2" --option "fix: Retry with @fix" --set "fix:assignee=@fix"
+            --option "self: I merge it myself" --set "self:status=InProgress"; node
             "$HOME/Development/standards/scripts/repos.ts" --inbox "$1"' sh ${{ticket.id}} "The merge agent's job
             ${{agent.job_id}} failed again (lotar agent logs ${{agent.job_id}}). The fix is on branch
-            ${{agent.worktree_branch}}. Retry with @fix, or will you merge it yourself?"
+            ${{agent.worktree_branch}}. Retry with @fix, or will you merge it yourself?" ${{agent.job_id}}
+    # A job that stops on its provider's usage or rate limit, or on a paused queue (commit signing, a full disk), pauses
+    # instead of failing (lotar DEV-584; t3 jobs since 0.15.6): no job_failed rule runs, the ticket keeps its status and
+    # assignee, and the job reruns on the same profile once the limit resets or the pause ends. So nobody is asked; one
+    # comment says so (STD-246). Tag job-paused keeps a pause that repeats, or a later job's, quiet until the ticket is done.
+    - name: "Job paused: comment once"
+      when:
+        not: { tags: { any: [job-paused] } }
+      on:
+        job_paused:
+          add:
+            tags: [job-paused]
+          comment: >-
+            Paused, not failed: the job ${{agent.job_id}} (${{agent.profile}}) stopped on a usage limit or a paused
+            queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs
+            shows when it resumes, lotar agent logs ${{agent.job_id}} why.
     # Not "and tagged": on updated every field condition needs that field to change in the same update.
     - name: "Retries: clear the tags when done"
       when:
@@ -702,7 +941,8 @@ automation:
                 result, then lotar status ${{ticket.id}} Done and lotar assignee ${{ticket.id}} --clear, and stop.
                 It still fails: comment what you ran and what still fails, set the status to HelpNeeded, assign the
                 ticket to mallox and stop. Don't fix it in this job: the owner decides what comes next.
-              - Otherwise continue the ticket from where it stopped, the way this repo's AGENTS.md says. Commit on
+              - Otherwise continue the ticket from where it stopped, the way this repo's AGENTS.md says, with targeted
+                tests for what you change (the merge runs the full suites). Commit on
                 your worktree's branch, signed, never with --no-verify, message "${{ticket.id}} ${{ticket.title}}";
                 don't merge or push: the merge agent does that when your job ends. Don't end your turn while tests
                 still run. Comment the outcome: what you changed, the commit hash, the checks that ran.
@@ -747,9 +987,10 @@ automation:
               - The ticket was InProgress, Reviewing or Merging with an agent (@...) as assignee: this is a further
                 turn of the job that runs on it. Answer in a comment, change the work as he asks and carry on as before.
               - It answers what the ticket waits for, or asks for a change: do the work the way this repo's AGENTS.md
-                says. Commit on your worktree's branch, signed, never with --no-verify, message "${{ticket.id}}
-                ${{ticket.title}}"; don't merge or push: the merge agent does that when your job ends. Don't end your
-                turn while tests still run. Comment the outcome: what you changed, the commit hash, the checks that ran.
+                says, with targeted tests for what you change (the merge runs the full suites). Commit on your
+                worktree's branch, signed, never with --no-verify, message "${{ticket.id}} ${{ticket.title}}"; don't
+                merge or push: the merge agent does that when your job ends. Don't end your turn while tests still
+                run. Comment the outcome: what you changed, the commit hash, the checks that ran.
               - It shows the done criteria are met and nothing is left to do (a triage comment, for example): comment
                 the evidence in one line, then lotar status ${{ticket.id}} Done and lotar assignee ${{ticket.id}}
                 --clear; setting it back would keep it open and the inbox would report it again.
@@ -862,6 +1103,22 @@ automation:
             status: Reviewing
           agent: *review
           run: *inbox
+    # A Research write-up reworked after his answer in the thread gets the source check, not a code review (STD-307).
+    - name: "Answered in the thread: source check"
+      when:
+        all:
+          - type: Research
+          - any:
+              - status: InProgress
+              - status: HelpNeeded
+          - not: { assignee: "@agent" }
+      on:
+        manual:
+          set:
+            assignee: "@review-light"
+            status: Reviewing
+          agent: *source-check
+          run: *inbox
     # Manual: the live check restarts a ticket stalled between agent steps (owner 2026-11-15, STD-167: "yes, build the
     # STD-113 recovery"; docs/decisions/2026-11-15-stall-recovery.md). repos.ts --live --report picks the step and runs
     # one of these, or the "Answered in the thread" rules above for a review. tell_agent keeps the assignee and starts
@@ -924,7 +1181,8 @@ automation:
                 result, then lotar status ${{ticket.id}} Done and lotar assignee ${{ticket.id}} --clear, and stop.
                 It still fails: comment what you ran and what still fails, set the status to HelpNeeded, assign the
                 ticket to mallox and stop. Don't fix it in this job: the owner decides what comes next.
-              - Otherwise continue the ticket from where it stopped, the way this repo's AGENTS.md says. Commit on
+              - Otherwise continue the ticket from where it stopped, the way this repo's AGENTS.md says, with targeted
+                tests for what you change (the merge runs the full suites). Commit on
                 your worktree's branch, signed, never with --no-verify, message "${{ticket.id}} ${{ticket.title}}";
                 don't merge or push: the merge agent does that when your job ends. Don't end your turn while tests
                 still run. Comment the outcome: what you changed, the commit hash, the checks that ran.
