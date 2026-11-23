@@ -1,11 +1,11 @@
 title: 'Agent merge: no test covers finding_check, which now runs once per key of a bundle'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T05:05:13.706118+00:00
-modified: 2026-11-27T00:15:46.232421+00:00
+modified: 2026-11-27T03:24:24.207599+00:00
 relationships:
   related:
   - DEV-800
@@ -60,6 +60,29 @@ comments:
     - No stray files and no second branch. `npm ci` passed.
     - Reran on HEAD: `cargo nextest run -p lotar-lib --test integration dev605` passed 25 of 25, `cargo clippy -p lotar-lib --tests -- -D warnings` passed, and `rustfmt --edition 2024 --check` on the file passed.
     - Reran on main `cc453dc5c` plus this commit, in a scratch copy: the older test `a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge` failed 3 of 3 tries, at load 7-10. On main alone it failed once, then passed on retry. This change doesn't cause it: it only adds tests and doesn't touch that one. Filed as minor DEV-890, related to DEV-885, which closed it as passing.
+- date: 2026-11-27T03:24:23.880779+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-863` is in `main`.
+
+    - Rebased `agent/DEV-863` onto `main` (`12c765c9a25c`): `5e3f66c0f18e`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `5e3f66c0f18e`
+    - Amended the pending `.tasks` changes into the merged commit: `80fae087df83`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 80fae087d
+      what: 'DEV-863 Agent merge: no test covers finding_check, which now runs once per key of a bundle'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac1446514f0f23bb72421194b0e5e77c99111bf6d4c506a370fdeea3db377d9d9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6486f71b7414fc80d61eb2aaa162858575728dd7c05d5c804c1f459c37e4c357
@@ -70,8 +93,6 @@ description: |-
 
   - [ ] A test with a ticket that has two finding keys: a check that lists neither passes the merge, and a check that still lists the second key hands off with that key named.
   - [ ] A ticket without a finding key, or with no `finding_check` set, skips the check.
-tags:
-- fix-retried
 history:
 - at: 2026-11-25T05:05:14.057536+00:00
   actor: claude
@@ -167,3 +188,16 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-27T03:24:23.880779+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:24:24.207599+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''

@@ -856,7 +856,8 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// to the script, an `activeRunId` while `active-<id>` is, as waiting for an answer while `waiting-<id>` is, and with
 /// status `failed` while `failed-<id>` is, and as waiting on a background command (status `waiting`,
 /// `pendingBackgroundTasks`) for as many more shows as the number in `background-<id>`; it logs `show <id>` to `t3-show.log` there.
-/// While `list-threads` is there, `thread list` lists the threads with those statuses and whether they are settled. `thread start` (a session in the
+/// While `list-threads` is there, `thread list` lists the threads with those statuses, their title (`title` in the
+/// thread's folder), their runtime mode (`auto` while a file `auto` is there, else `full-access`) and whether they are settled. `thread start` (a session in the
 /// main checkout, before DEV-652) makes a thread in the project and runs it the same way. `auth pairing create` prints
 /// the pairing code `pair-1`.
 const FAKE_T3: &str = r#"#!/bin/sh
@@ -902,7 +903,9 @@ case "$1 $2" in
       [ -f "$dir/failed-$id" ] && status=failed
       [ -f "$dir/listed-$id" ] && status=$(cat "$dir/listed-$id")
       [ -f "$t/settled" ] && settled=true
-      printf '%s{"threadId":"%s","link":"https://t3.test/%s","status":"%s","latestRunId":"%s","settled":%s}' "$sep" "$id" "$id" "$status" "$(cat "$t/latest" 2>/dev/null)" "$settled"
+      mode=full-access
+      [ -f "$t/auto" ] && mode=auto
+      printf '%s{"threadId":"%s","title":"%s","runtimeMode":"%s","link":"https://t3.test/%s","status":"%s","latestRunId":"%s","settled":%s}' "$sep" "$id" "$(cat "$t/title" 2>/dev/null)" "$mode" "$id" "$status" "$(cat "$t/latest" 2>/dev/null)" "$settled"
       sep=,
     done
     echo ']'; exit 0 ;;
@@ -1022,6 +1025,9 @@ fn fake_t3_server(dir: &Path, project: &Path) -> String {
                                 std::fs::write(thread.join("tree"), tree).unwrap();
                             }
                             std::fs::write(thread.join("kind"), kind).unwrap();
+                            if let Some(title) = arguments["title"].as_str() {
+                                std::fs::write(thread.join("title"), title).unwrap();
+                            }
                             std::fs::write(thread.join("message"), arguments["message"].as_str().unwrap_or_default()).unwrap();
                             std::fs::write(thread.join("pending"), format!("r{runs}")).unwrap();
                             serde_json::json!({"threadId": id, "link": format!("https://t3.test/{id}"), "runId": format!("r{runs}"), "status": "starting"})
@@ -1371,6 +1377,92 @@ fn a_kept_thread_that_isnt_settled_is_named_by_its_link() {
     AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
     let logs = job_logs(&fixtures);
     assert!(logs.contains("The T3 Code thread https://t3.test/thread-0 was not settled: "), "{logs}");
+}
+
+/// DEV-810: a ticket's next job reuses its session's name, so the harnessmux record holds only the newest thread. The
+/// older thread a failed job kept is settled all the same once the later job completes. The later job starts its own
+/// session (`--session new`): continuing thread-0 would hand off and keep its record as `<name>.<stamp>` (DEV-611).
+#[test]
+fn a_kept_thread_whose_session_holds_a_newer_thread_is_settled() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    run_t3(&fixtures, "fix").failure();
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    lotar::services::automation_service::AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Fixed\n      on:\n        job_completed:\n          set: { status: Done }\n",
+    )
+    .expect("automation rules");
+    run_t3_with(&fixtures, "fix", &["--session", "new"]).success();
+    let logs = job_logs(&fixtures);
+    assert_eq!(settled_threads(root), vec!["thread-1", "thread-0"], "{logs}");
+    assert!(logs.contains("Settled the T3 Code thread https://t3.test/thread-0"), "{logs}");
+}
+
+/// DEV-810: the session of a kept thread ran in the ticket's worktree, which went with the merge. `t3` runs in the
+/// repository's checkout instead, so the thread is still settled once its ticket is done.
+#[test]
+fn a_kept_thread_whose_worktree_is_gone_is_settled() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    run_t3(&fixtures, "fix").failure();
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    git(root, &["worktree", "remove", "--force", &ticket_worktree(&fixtures).display().to_string()]);
+    let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+    TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    let logs = job_logs(&fixtures);
+    assert_eq!(settled_threads(root), vec!["thread-0"], "{logs}");
+    assert!(logs.contains("Settled the T3 Code thread https://t3.test/thread-0"), "{logs}");
+}
+
+/// DEV-810: a job thread no job log names any more (logs pruned, harnessmux record gone) is found by its title in
+/// `t3 thread list` and settled once its ticket is done, also one whose run failed (DEV-876). One of an open ticket,
+/// one in auto mode (not a job's), and one that still runs stay as they are.
+#[test]
+fn a_done_tickets_job_thread_without_a_job_log_is_settled_by_its_title() {
+    let (fixtures, _env) = t3_harness("");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    run_t3(&fixtures, "fix").failure();
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    TaskService::create(&mut fixtures.create_storage(), TaskCreate { title: "Open".into(), project: Some("TEST".into()), ..Default::default() }).unwrap();
+    let threads = [
+        ("thread-7", "TEST-2 fix: Open", false),
+        ("thread-8", "TEST-1 Asked by hand", true),
+        ("thread-9", "TEST-1 review: Failed", false),
+        ("thread-10", "TEST-1 merge: Runs", false),
+    ];
+    std::fs::write(root.join("listed-thread-9"), "failed").unwrap();
+    std::fs::write(root.join("running-thread-10"), "").unwrap();
+    for (id, title, auto) in threads {
+        let thread = root.join("t3-threads").join(id);
+        std::fs::create_dir_all(&thread).unwrap();
+        std::fs::write(thread.join("title"), title).unwrap();
+        std::fs::write(thread.join("tree"), root.display().to_string()).unwrap();
+        if auto {
+            std::fs::write(thread.join("auto"), "").unwrap();
+        }
+    }
+    for entry in std::fs::read_dir(fixtures.tasks_root.join("@agent-logs")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|ext| ext == "jsonl") {
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+    std::fs::remove_dir_all(root.join("harnessmux/state/sessions")).unwrap();
+    let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+    TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    let mut settled = settled_threads(root);
+    settled.sort();
+    assert_eq!(settled, vec!["thread-0", "thread-9"]);
 }
 
 /// DEV-747: a kept thread whose run still goes is left alone, also on a done ticket.

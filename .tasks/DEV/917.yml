@@ -1,15 +1,29 @@
 title: 'Done ticket''s failed T3 thread isn''t settled by the look: harnessmux settle refuses any status but completed'
-status: Todo
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T00:16:20.412681+00:00
-modified: 2026-11-27T00:16:22.223694+00:00
+modified: 2026-11-27T03:26:30.012568+00:00
 relationships:
+  depends_on:
+  - DEV-810
   related:
   - DEV-810
   - DEV-876
+comments:
+- date: 2026-11-27T03:26:19.476116+00:00
+  author: claude
+  text: |-
+    Waits for DEV-810: it rewrites the same lines, and this fix must cover its threads found by title.
+
+    - DEV-810 (`1c909e027`, Merging) changes `settle_ticket`, `Thread` and `note` in `crates/lotar-agent/src/services/agent_job_service/kept.rs`, and the fake t3 tests in `dev503_harness_jobs_test.rs`. A fix on today's main would conflict with it in the same lines.
+    - Added "## Done when" with the route per status: `completed` through harnessmux as now, other ended statuses through `t3_thread_api::settle_thread`.
+    - No code changed yet; no commits on `agent/DEV-917`.
+    - Next: once DEV-810 is on main, rebase `agent/DEV-917` onto main, write the failing test (fake `thread show` reads `listed-<id>`), then the fix and docs.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A54c0a5c8da360b963fc88ee14eda15831f9d7b811da77dae836ce9d5a30930fd
 description: |-
   Found in the DEV-810 review (2026-11-26).
 
@@ -17,7 +31,14 @@ description: |-
   - The tests miss it: the fake t3 changes only the list status (`listed-<id>`), `thread show` still says completed (`dev503_harness_jobs_test.rs` DEV-876 test, DEV-810 title test).
   - So live, a failed/interrupted thread of a done ticket logs once `was not settled` and stays in the sidebar; `docs/help/agent.md` says it is settled.
 
-  Done when: a failing test where `thread show` also reports `failed`; then settle such threads (e.g. through `t3_thread_api::settle_thread`, as `settle_superseded` does) and the docs agree.
+  ## Done when
+  - [ ] Failing test first: the fake t3's `thread show` reports the status `listed-<id>` sets, so the DEV-876 test (`failed`, `interrupted`, `cancelled`, `idle`) and DEV-810's title test fail before the fix with `ended its last run with status '<status>'`.
+  - [ ] The look (`kept::settle`) settles a done ticket's thread that `t3 thread list` shows unsettled with an ended status other than `completed` through T3 Code's internal API (`t3_thread_api::settle_thread`, `thread.settle`), as `settle_superseded` does: with or without a job log or harnessmux session (DEV-810's threads found by title). The job log (when there is one) and stderr say `Settled the T3 Code thread <link>`.
+  - [ ] Which wins: the list's status picks the route. `completed` keeps going through `harnessmux::backend::t3::settle` (its `thread show` check stays); any other ended status goes through the internal API. A thread that still runs or waits, or one a session follows, is left alone, as now.
+  - [ ] A settle that fails is noted once per process, `The T3 Code thread <link> was not settled: <reason>`, and the thread stays; the look tries again next time.
+  - [ ] `docs/help/agent.md` says which route each status takes.
+tags:
+- waits
 history:
 - at: 2026-11-27T00:16:21.866418+00:00
   actor: claude
@@ -30,3 +51,61 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T03:25:14.881614+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T03:25:15.663135+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A54c0a5c8da360b963fc88ee14eda15831f9d7b811da77dae836ce9d5a30930fd
+- at: 2026-11-27T03:26:18.526112+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-810 review (2026-11-26).
+
+      - `kept::settle` (DEV-876, and DEV-810's threads found by title) picks a done ticket's threads whatever their run ended, but `settle_ticket` settles through `settle_session` → `harnessmux::backend::t3::settle` (harnessmux 0.3.0, `src/backend/t3.rs:1033`), which refuses when `t3 thread show` says anything but `completed`: `ended its last run with status 'failed'`.
+      - The tests miss it: the fake t3 changes only the list status (`listed-<id>`), `thread show` still says completed (`dev503_harness_jobs_test.rs` DEV-876 test, DEV-810 title test).
+      - So live, a failed/interrupted thread of a done ticket logs once `was not settled` and stays in the sidebar; `docs/help/agent.md` says it is settled.
+
+      Done when: a failing test where `thread show` also reports `failed`; then settle such threads (e.g. through `t3_thread_api::settle_thread`, as `settle_superseded` does) and the docs agree.
+    new: |-
+      Found in the DEV-810 review (2026-11-26).
+
+      - `kept::settle` (DEV-876, and DEV-810's threads found by title) picks a done ticket's threads whatever their run ended, but `settle_ticket` settles through `settle_session` → `harnessmux::backend::t3::settle` (harnessmux 0.3.0, `src/backend/t3.rs:1033`), which refuses when `t3 thread show` says anything but `completed`: `ended its last run with status 'failed'`.
+      - The tests miss it: the fake t3 changes only the list status (`listed-<id>`), `thread show` still says completed (`dev503_harness_jobs_test.rs` DEV-876 test, DEV-810 title test).
+      - So live, a failed/interrupted thread of a done ticket logs once `was not settled` and stays in the sidebar; `docs/help/agent.md` says it is settled.
+
+      ## Done when
+      - [ ] Failing test first: the fake t3's `thread show` reports the status `listed-<id>` sets, so the DEV-876 test (`failed`, `interrupted`, `cancelled`, `idle`) and DEV-810's title test fail before the fix with `ended its last run with status '<status>'`.
+      - [ ] The look (`kept::settle`) settles a done ticket's thread that `t3 thread list` shows unsettled with an ended status other than `completed` through T3 Code's internal API (`t3_thread_api::settle_thread`, `thread.settle`), as `settle_superseded` does: with or without a job log or harnessmux session (DEV-810's threads found by title). The job log (when there is one) and stderr say `Settled the T3 Code thread <link>`.
+      - [ ] Which wins: the list's status picks the route. `completed` keeps going through `harnessmux::backend::t3::settle` (its `thread show` check stays); any other ended status goes through the internal API. A thread that still runs or waits, or one a session follows, is left alone, as now.
+      - [ ] A settle that fails is noted once per process, `The T3 Code thread <link> was not settled: <reason>`, and the thread stays; the look tries again next time.
+      - [ ] `docs/help/agent.md` says which route each status takes.
+- at: 2026-11-27T03:26:18.844619+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-810","DEV-876"]}'
+    new: '{"depends_on":["DEV-810"],"related":["DEV-810","DEV-876"]}'
+- at: 2026-11-27T03:26:19.428277+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-27T03:26:19.476116+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:26:30.012568+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

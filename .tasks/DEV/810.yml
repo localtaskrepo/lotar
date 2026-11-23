@@ -5,11 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-27T00:17:01.078921+00:00
+modified: 2026-11-27T03:26:18.842832+00:00
 relationships:
   depends_on:
   - local:LOCA-601
   - DEV-872
+  blocks:
+  - DEV-917
   related:
   - DEV-747
   - DEV-752
@@ -1206,3 +1208,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T03:26:18.842832+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876","DEV-908","DEV-917"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-872"],"blocks":["DEV-917"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876","DEV-908","DEV-917"]}'

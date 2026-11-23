@@ -5,7 +5,8 @@
 //! settled once its ticket is done, or once the thread of a later job on the
 //! ticket is settled: that job moved the ticket on. A new job settles the
 //! threads of the ticket's earlier jobs, and a done ticket all of its
-//! threads, whatever their run's outcome (DEV-876).
+//! threads, whatever their run's outcome (DEV-876). A done ticket's job
+//! thread no job log names any more is found by its title (DEV-810).
 
 use super::{resumed, settle_session, ticket_done_state, workspace_root_of};
 use crate::config::types::AgentRunnerKind;
@@ -19,14 +20,14 @@ use std::sync::{LazyLock, Mutex};
 /// once, not at every look.
 static FAILED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
-/// A thread of an ended `t3` job with the newest job that ran it.
+/// A thread of an ended `t3` job with the newest job that ran it, if a job log still names it.
 pub(super) struct Thread {
     ticket_id: String,
-    job_id: String,
+    /// The newest job's id and log folder.
+    job: Option<(String, String)>,
     agent: Option<String>,
     thread: String,
     ended_at: String,
-    logs_dir: String,
 }
 
 /// Each thread of the tasks directory's ended `t3` jobs, whatever their outcome, by ticket and oldest job first.
@@ -43,11 +44,10 @@ pub(super) fn threads(tasks_dir: &Path) -> BTreeMap<String, Vec<Thread>> {
             let Ok(ticket) = crate::storage::TaskId::parse(&job.header.ticket_id) else { continue };
             let kept = Thread {
                 ticket_id: ticket.canonical(),
-                job_id: job.header.job_id,
+                job: Some((job.header.job_id, logs_dir.clone())),
                 agent: job.header.agent_profile,
                 thread: thread.clone(),
                 ended_at: status.at,
-                logs_dir: logs_dir.clone(),
             };
             by_thread.insert(thread, kept);
         }
@@ -69,10 +69,20 @@ fn ended(status: &str) -> bool {
     !matches!(status, "" | "running" | "waiting" | "queued" | "starting" | "preparing")
 }
 
+/// Whether a project of the tasks directory has a `t3` agent profile, so T3 Code may hold job threads no job log names.
+pub(super) fn runs_t3(tasks_dir: &Path) -> bool {
+    let mut projects = vec![None];
+    projects.extend(crate::utils::filesystem::list_visible_subdirs(tasks_dir).into_iter().map(|(prefix, _)| Some(prefix)));
+    projects.into_iter().any(|project| {
+        crate::config::resolution::config_for_project(tasks_dir, project.as_deref())
+            .is_ok_and(|config| config.agent_profiles.values().any(|profile| profile.runner == AgentRunnerKind::T3.as_str()))
+    })
+}
+
 /// Settle the kept threads now, asking T3 Code for its threads: as a job ends.
 pub(super) fn settle_now(tasks_dir: &Path) {
     let threads = threads(tasks_dir);
-    if threads.is_empty() {
+    if threads.is_empty() && !runs_t3(tasks_dir) {
         return;
     }
     let Some((program, env, cwd)) = super::t3_cli(tasks_dir) else { return };
@@ -101,7 +111,8 @@ pub(super) fn settle_superseded(tasks_dir: &Path, ticket_id: &str, own: Option<&
     for thread in &earlier {
         let Some(shown) = listed.get(&thread.thread).filter(|shown| !shown.settled && ended(&shown.status)) else { continue };
         let link = shown.link.as_deref().unwrap_or(&thread.thread);
-        let (job, status) = (&thread.job_id, &shown.status);
+        let Some((job, _)) = thread.job.as_ref() else { continue };
+        let status = &shown.status;
         let note = match crate::services::t3_thread_api::settle_thread(&program, &env, &cwd, &thread.thread) {
             Ok(()) => format!("Settled the T3 Code thread {link} of the earlier job {job} ({status}): this job is the ticket's attempt now."),
             Err(err) => format!("Could not settle the T3 Code thread {link} of the earlier job {job} ({status}), so it stays in T3 Code's sidebar: {err}"),
@@ -113,8 +124,12 @@ pub(super) fn settle_superseded(tasks_dir: &Path, ticket_id: &str, own: Option<&
 
 /// Settle each ticket's kept threads, those `listed` shows unsettled: on a
 /// done ticket all whose run ended, whatever its outcome (DEV-876), else the
-/// completed ones of jobs that ended before the job of a settled thread.
-pub(super) fn settle(tasks_dir: &Path, threads: BTreeMap<String, Vec<Thread>>, listed: &HashMap<String, resumed::Listed>) {
+/// completed ones of jobs that ended before the job of a settled thread. A
+/// done ticket's job threads no job log names count too ([`unlogged`]).
+pub(super) fn settle(tasks_dir: &Path, mut threads: BTreeMap<String, Vec<Thread>>, listed: &HashMap<String, resumed::Listed>) {
+    for thread in unlogged(tasks_dir, &threads, listed) {
+        threads.entry(thread.ticket_id.clone()).or_default().insert(0, thread);
+    }
     for (ticket_id, threads) in threads {
         let unsettled = |thread: &Thread| listed.get(&thread.thread).filter(|shown| !shown.settled).map(|shown| shown.status.as_str());
         if !threads.iter().any(|thread| unsettled(thread).is_some_and(ended)) {
@@ -132,6 +147,33 @@ pub(super) fn settle(tasks_dir: &Path, threads: BTreeMap<String, Vec<Thread>>, l
     }
 }
 
+/// The job threads `listed` shows that no job log names: unsettled, their run
+/// ended in any way ([`ended`], DEV-876), run in `full-access` as a job's thread is (the owner's own run in `auto`),
+/// and titled with the ID of a done ticket of the tasks directory, as a job
+/// names its thread (`<ID> <title>`, or `<ID> fix: <title>` by `thread_name`).
+/// The title's second word names the profile when one of that name is configured.
+fn unlogged(tasks_dir: &Path, logged: &BTreeMap<String, Vec<Thread>>, listed: &HashMap<String, resumed::Listed>) -> Vec<Thread> {
+    let known: HashSet<&str> = logged.values().flatten().map(|thread| thread.thread.as_str()).collect();
+    let mut done: HashMap<String, bool> = HashMap::new();
+    let mut found = Vec::new();
+    for (id, shown) in listed {
+        if known.contains(id.as_str()) || shown.settled || !ended(&shown.status) || shown.runtime_mode != "full-access" {
+            continue;
+        }
+        let mut words = shown.title.split_whitespace();
+        let Some(ticket) = words.next().and_then(|word| crate::storage::TaskId::parse(word).ok()) else { continue };
+        let ticket_id = ticket.canonical();
+        if !*done.entry(ticket_id.clone()).or_insert_with(|| ticket_done_state(tasks_dir, &ticket_id) == Some(true)) {
+            continue;
+        }
+        let profiles = crate::config::resolution::config_for_project(tasks_dir, Some(&ticket.project)).ok().map(|config| config.agent_profiles);
+        let agent = words.next().and_then(|word| word.strip_suffix(':')).filter(|name| profiles.as_ref().is_some_and(|profiles| profiles.contains_key(*name)));
+        found.push(Thread { ticket_id, job: None, agent: agent.map(str::to_string), thread: id.clone(), ended_at: String::new() });
+    }
+    found.sort_by(|a, b| a.thread.cmp(&b.thread));
+    found
+}
+
 /// Settle `threads` of the ticket, each with the link `t3 thread list` shows, under its lock, so one process at a time
 /// settles them; each one's newest job says how it went.
 fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[(&Thread, Option<&str>)]) {
@@ -144,10 +186,10 @@ fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[(&Thread, Option<
         if record.as_ref().is_some_and(resumed::followed) {
             continue;
         }
-        let settled = match (record, config.as_ref()) {
-            (Some(record), Some(config)) => settle_session(&record, thread.agent.as_deref(), config),
-            (None, _) => Err("no harnessmux session holds it".to_string()),
-            (_, None) => Err(format!("{ticket_id}'s configuration can't be read")),
+        let settled = match config.as_ref() {
+            Some(config) => record_for(tasks_dir, &thread.thread, record, thread.agent.as_deref(), config)
+                .and_then(|record| settle_session(&record, thread.agent.as_deref(), config)),
+            None => Err(format!("{ticket_id}'s configuration can't be read")),
         };
         match settled {
             Ok(settled_link) => note(tasks_dir, thread, format!("Settled the T3 Code thread {settled_link}")),
@@ -159,10 +201,43 @@ fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[(&Thread, Option<
     }
 }
 
-/// Add `message` to the log of the thread's job, which ended: a job this process still holds gets it as an event too.
+/// The harnessmux record to settle `thread` with: the session that holds it, else one made for it, as a ticket's next
+/// job reuses its session's name and its record then holds only the newest thread (DEV-810). `t3` runs in the
+/// repository's checkout when the session's directory is gone (a worktree the merge removed).
+fn record_for(
+    tasks_dir: &Path,
+    thread: &str,
+    record: Option<harnessmux::SessionRecord>,
+    agent: Option<&str>,
+    config: &crate::config::types::ResolvedConfig,
+) -> Result<harnessmux::SessionRecord, String> {
+    let checkout = || super::resolve_repo_root(tasks_dir).unwrap_or_else(|| workspace_root_of(tasks_dir));
+    let mut record = match record {
+        Some(record) => record,
+        None => {
+            let profile = match agent.and_then(|name| config.agent_profiles.get(name)) {
+                Some(profile) => crate::services::agent_runner::session_profile(profile, HashMap::new()).map_err(|err| err.to_string())?,
+                None => harnessmux::Profile::default(),
+            };
+            harnessmux::SessionRecord::new("lotar-settle", AgentRunnerKind::T3.as_str(), &checkout(), profile).map_err(|err| err.to_string())?
+        }
+    };
+    record.agent_session = Some(thread.to_string());
+    if !record.cwd.is_dir() {
+        record.cwd = checkout();
+    }
+    Ok(record)
+}
+
+/// Write `message` to the process's log (the server's or queue worker's stderr) and, when a job log names the thread,
+/// to the log of its job, which ended: a job this process still holds gets it as an event too.
 fn note(tasks_dir: &Path, thread: &Thread, message: String) {
+    if std::env::var("LOTAR_TEST_SILENT").as_deref() != Ok("1") {
+        eprintln!("[lotar] {}: {message}", thread.ticket_id);
+    }
+    let Some((job_id, logs_dir)) = thread.job.as_ref() else { return };
     let mut held = false;
-    super::update_job(&thread.job_id, |state| {
+    super::update_job(job_id, |state| {
         held = true;
         super::record_and_emit(state, "agent_job_progress", Some(message.clone()));
     });
@@ -170,10 +245,10 @@ fn note(tasks_dir: &Path, thread: &Thread, message: String) {
         return;
     }
     let root = workspace_root_of(tasks_dir);
-    let sequence = AgentLogService::load_job(&root, &thread.logs_dir, &thread.job_id)
+    let sequence = AgentLogService::load_job(&root, logs_dir, job_id)
         .ok()
         .flatten()
         .map(|saved| super::saved_events(&saved).iter().map(|event| event.sequence).max().unwrap_or(0) + 1);
     let entry = JobLogEntry { kind: "agent_job_progress".to_string(), at: time::now_rfc3339(), message: Some(message), sequence, tool: None, plan: None };
-    let _ = AgentLogService::append_event(&root, Some(&thread.logs_dir), &thread.job_id, entry);
+    let _ = AgentLogService::append_event(&root, Some(logs_dir), job_id, entry);
 }

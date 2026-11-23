@@ -51,7 +51,7 @@ impl Resumed {
 /// Take over or report the threads of the tasks directory's ended `t3` jobs
 /// that T3 Code runs again, and settle the threads lotar kept active whose
 /// time came ([`super::kept`]), at most every [`LOOK_EVERY`]. T3 Code is
-/// asked nothing while no ended job has a thread.
+/// asked nothing while no ended job has a thread and no project runs `t3`.
 pub(super) fn look(tasks_dir: &Path) {
     {
         let Ok(mut looks) = LAST_LOOK.lock() else {
@@ -64,7 +64,8 @@ pub(super) fn look(tasks_dir: &Path) {
     }
     let ended = ended_threads(tasks_dir);
     let kept = super::kept::threads(tasks_dir);
-    if kept.is_empty() {
+    // A job thread no job log names any more is found in T3 Code's list (DEV-810).
+    if kept.is_empty() && !super::kept::runs_t3(tasks_dir) {
         return;
     }
     let Some((program, env, cwd)) = t3_cli(tasks_dir) else {
@@ -135,6 +136,9 @@ pub(super) struct Listed {
     pub(super) link: Option<String>,
     /// Settled in T3 Code's sidebar (DEV-747).
     pub(super) settled: bool,
+    pub(super) title: String,
+    /// `full-access` for a job's thread, `auto` for the owner's own (DEV-810).
+    pub(super) runtime_mode: String,
 }
 
 /// The project's threads by id, from `t3 thread list --json`.
@@ -159,7 +163,15 @@ pub(super) fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path,
             .map(|thread| {
                 let link = Some(text(thread, "link")).filter(|link| !link.is_empty());
                 let settled = thread.get("settled").and_then(serde_json::Value::as_bool).unwrap_or(false);
-                (text(thread, "threadId"), Listed { status: text(thread, "status"), run: text(thread, "latestRunId"), link, settled })
+                let listed = Listed {
+                    status: text(thread, "status"),
+                    run: text(thread, "latestRunId"),
+                    link,
+                    settled,
+                    title: text(thread, "title"),
+                    runtime_mode: text(thread, "runtimeMode"),
+                };
+                (text(thread, "threadId"), listed)
             })
             .collect(),
     )
