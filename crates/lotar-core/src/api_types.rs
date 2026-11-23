@@ -811,8 +811,21 @@ pub struct AgentJobTool {
     pub finished_at: Option<String>,
 }
 
+/// One step of an agent's plan (its to-do list), on an `agent_job_plan` log entry (DEV-774).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobPlanEntry {
+    pub content: String,
+    /// pending, in_progress or completed.
+    #[serde(default)]
+    pub status: String,
+    /// high, medium or low; empty when the agent gives none.
+    #[serde(default)]
+    pub priority: String,
+}
+
 /// One entry of a job's log; `sequence` numbers a job's events from 1.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobEvent {
     pub kind: String,
@@ -822,6 +835,9 @@ pub struct AgentJobEvent {
     /// The tool call of an `agent_job_tool` entry.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tool: Option<AgentJobTool>,
+    /// The whole plan of an `agent_job_plan` entry; empty when the agent cleared it.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub plan: Option<Vec<AgentJobPlanEntry>>,
 }
 
 /// Everything that happened on a task, oldest first (DEV-518): field changes, comments, commits of the task
@@ -1230,6 +1246,9 @@ pub struct AgentJobLogEntry {
     /// The tool call of an `agent_job_tool` entry (DEV-766).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tool: Option<AgentJobTool>,
+    /// The whole plan of an `agent_job_plan` entry (DEV-774); empty when the agent cleared it.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub plan: Option<Vec<AgentJobPlanEntry>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

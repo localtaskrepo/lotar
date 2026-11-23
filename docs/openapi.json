@@ -10745,6 +10745,12 @@
           "tool": {
             "$ref": "#/components/schemas/AgentJobTool",
             "description": "The tool call of an agent_job_tool entry."
+          },
+          "plan": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AgentJobPlanEntry" },
+            "nullable": true,
+            "description": "The whole plan of an agent_job_plan entry; empty when the agent cleared it."
           }
         },
         "required": [
@@ -10752,6 +10758,16 @@
           "sequence",
           "at"
         ]
+      },
+      "AgentJobPlanEntry": {
+        "type": "object",
+        "description": "One step of an agent's plan (its to-do list), on an agent_job_plan log entry.",
+        "properties": {
+          "content": { "type": "string" },
+          "status": { "type": "string", "description": "pending, in_progress or completed." },
+          "priority": { "type": "string", "description": "high, medium or low; empty when the agent gives none." }
+        },
+        "required": ["content", "status", "priority"]
       },
       "AgentJobTool": {
         "type": "object",

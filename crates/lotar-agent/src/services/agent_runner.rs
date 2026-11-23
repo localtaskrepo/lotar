@@ -260,7 +260,7 @@ pub fn open_session(
                 registry.save(&record).map_err(|err| OpenSessionError::Other(err.to_string()))?;
             }
             return harnessmux::Session::resume(registry, table, name, Some(SESSION_IDLE_TTL)).await.map_err(|err| match err {
-                harnessmux::Error::Protocol(_) => OpenSessionError::NotResumable(err.to_string()),
+                harnessmux::Error::NotResumable(_) => OpenSessionError::NotResumable(err.to_string()),
                 err => OpenSessionError::Other(err.to_string()),
             });
         }

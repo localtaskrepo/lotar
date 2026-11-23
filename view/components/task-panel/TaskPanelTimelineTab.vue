@@ -120,7 +120,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../../api/client'
-import type { AgentJob, AgentJobLogEntry, AgentJobTool, TaskHistoryChange, TaskTimelineEntry } from '../../api/types'
+import type {
+  AgentJob,
+  AgentJobLogEntry,
+  AgentJobPlanEntry,
+  AgentJobTool,
+  TaskHistoryChange,
+  TaskTimelineEntry,
+} from '../../api/types'
 import { TIMELINE_FILTER_KEY, useActivityFilter } from '../../composables/task-panel/useActivityFilter'
 import { useSse } from '../../composables/useSse'
 import { formatCost, jobDuration, runSettings, usageDetail } from '../../utils/agentJobs'
@@ -309,6 +316,7 @@ const JOB_EVENTS = [
   'agent_job_message',
   'agent_job_tool',
   'agent_job_thought',
+  'agent_job_plan',
   'agent_job_input',
   'agent_job_question',
   'agent_job_result',
@@ -343,6 +351,7 @@ onMounted(() => {
         at?: string
         message?: string | null
         tool?: AgentJobTool | null
+        plan?: AgentJobPlanEntry[] | null
       }
       try {
         payload = JSON.parse(String(ev.data || '{}'))
@@ -358,6 +367,7 @@ onMounted(() => {
             at: payload.at,
             message: payload.message ?? null,
             tool: payload.tool ?? null,
+            plan: payload.plan ?? null,
           },
         ])
       }

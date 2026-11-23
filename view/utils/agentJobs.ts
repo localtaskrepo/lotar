@@ -52,16 +52,16 @@ function describeTool(entry: AgentJobLogEntry, text: string): LogEntryView {
 }
 
 /**
- * The entries a log shows: a tool's start is left out once its end is in the log, since the end
- * entry holds all of it (DEV-766).
+ * The entries a log shows: of a tool call's entries only the newest, since it holds all that came
+ * before: the end (DEV-766), else the newest running entry, which names Claude's command (DEV-774).
  */
 export function visibleLogEntries(entries: AgentJobLogEntry[]): AgentJobLogEntry[] {
-    const ended = new Set<string>()
-    for (const entry of entries) {
-        if (entry.kind === 'agent_job_tool' && entry.tool && entry.tool.status !== 'running') ended.add(entry.tool.id)
-    }
+    const newest = new Map<string, number>()
+    entries.forEach((entry, index) => {
+        if (entry.kind === 'agent_job_tool' && entry.tool) newest.set(entry.tool.id, index)
+    })
     return entries.filter(
-        (entry) => !(entry.kind === 'agent_job_tool' && entry.tool?.status === 'running' && ended.has(entry.tool.id)),
+        (entry, index) => !(entry.kind === 'agent_job_tool' && entry.tool && newest.get(entry.tool.id) !== index),
     )
 }
 
@@ -85,6 +85,8 @@ export function describeLogEntry(entry: AgentJobLogEntry): LogEntryView {
             return describeTool(entry, text)
         case 'agent_job_thought':
             return { label: 'Thinking', text, tone: 'note', mono: false, folded: true }
+        case 'agent_job_plan':
+            return { label: 'Plan', text: text || 'Plan cleared', tone: 'note', mono: false }
         case 'agent_job_input':
             return { label: 'You', text, tone: 'user', mono: false }
         case 'agent_job_question':

@@ -138,6 +138,7 @@ impl Followed {
                     at: entry.at,
                     message: entry.message,
                     tool: entry.tool,
+                    plan: entry.plan,
                 })
             }
         }

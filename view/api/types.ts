@@ -1910,6 +1910,15 @@ export interface AgentJobTool {
     finished_at?: string
 }
 
+/** One step of an agent's plan (its to-do list), on an `agent_job_plan` entry (DEV-774). */
+export interface AgentJobPlanEntry {
+    content: string
+    /** pending, in_progress or completed. */
+    status: string
+    /** high, medium or low; empty when the agent gives none. */
+    priority: string
+}
+
 export interface AgentJobLogEntry {
     kind: string
     /** Stable per-job identity: positive, starts at 1, strictly monotonic for the
@@ -1920,6 +1929,8 @@ export interface AgentJobLogEntry {
     message?: string | null
     /** The tool call of an `agent_job_tool` entry. */
     tool?: AgentJobTool | null
+    /** The whole plan of an `agent_job_plan` entry; empty when the agent cleared it. */
+    plan?: AgentJobPlanEntry[] | null
 }
 
 /** Everything that happened on a task, oldest first (DEV-518). */

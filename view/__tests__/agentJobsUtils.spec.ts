@@ -80,6 +80,27 @@ describe('agent job helpers', () => {
         expect(visibleLogEntries([start, other, end]).map((e) => e.sequence)).toEqual([2, 3])
     })
 
+    it("shows only a running tool call's newest entry, which names Claude's command", () => {
+        const start = {
+            kind: 'agent_job_tool',
+            sequence: 1,
+            at: '',
+            tool: { id: 'a', title: 'Terminal', kind: 'execute', status: 'running' as const },
+        }
+        const named = { ...start, sequence: 2, tool: { ...start.tool, title: 'cargo test', input: 'cargo test' } }
+        expect(visibleLogEntries([start, named])).toEqual([named])
+        expect(describeLogEntry(named)).toMatchObject({ label: 'Run', text: 'cargo test · running' })
+    })
+
+    it('shows a plan as its task list', () => {
+        const plan = entry('agent_job_plan', '- [x] Read the diff\n- [ ] Run the tests (in progress)')
+        expect(describeLogEntry(plan)).toMatchObject({
+            label: 'Plan',
+            text: '- [x] Read the diff\n- [ ] Run the tests (in progress)',
+        })
+        expect(describeLogEntry(entry('agent_job_plan', ''))).toMatchObject({ label: 'Plan', text: 'Plan cleared' })
+    })
+
     it('formats durations compactly', () => {
         expect(formatDuration(45_000)).toBe('45s')
         expect(formatDuration(185_000)).toBe('3m 05s')

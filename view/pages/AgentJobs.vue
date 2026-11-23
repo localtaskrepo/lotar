@@ -323,6 +323,7 @@ import type {
   AgentJob,
   AgentJobListResponse,
   AgentJobLogEntry,
+  AgentJobPlanEntry,
   AgentJobTool,
   AgentProfileInfo,
   AgentQueueOverview,
@@ -596,6 +597,7 @@ async function refresh(options: { silent?: boolean } = {}) {
 type AgentJobEventPayload = Partial<Omit<AgentJob, 'last_message'>> & {
   message?: string | null
   tool?: AgentJobTool | null
+  plan?: AgentJobPlanEntry[] | null
   at: string
   sequence: number
 }
@@ -612,8 +614,8 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
     started_at: payload.started_at || null,
     finished_at: payload.finished_at || null,
     exit_code: payload.exit_code ?? null,
-    // Thinking is no status line: it stays in the log, folded (DEV-766).
-    last_message: (kind !== 'agent_job_thought' && payload.message) || null,
+    // Thinking and plans are no status line: they stay in the log (DEV-766, DEV-774).
+    last_message: (kind !== 'agent_job_thought' && kind !== 'agent_job_plan' && payload.message) || null,
     summary: payload.summary || null,
     session_id: payload.session_id || null,
     worktree_path: payload.worktree_path || null,
@@ -632,6 +634,7 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
       message: payload.message ?? null,
       sequence: payload.sequence,
       tool: payload.tool ?? null,
+      plan: payload.plan ?? null,
     }
     updateLogEntries(next.id, [entry])
   }
@@ -835,6 +838,8 @@ function setupSse() {
       'agent_job_message',
       'agent_job_tool',
       'agent_job_thought',
+      'agent_job_plan',
+      'agent_job_plan',
       'agent_job_input',
       'agent_job_question',
       'agent_job_result',
@@ -864,6 +869,7 @@ function setupSse() {
     'agent_job_message',
     'agent_job_tool',
     'agent_job_thought',
+    'agent_job_plan',
     'agent_job_input',
     'agent_job_question',
     'agent_job_result',
