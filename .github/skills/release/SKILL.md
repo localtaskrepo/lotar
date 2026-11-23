@@ -14,14 +14,16 @@ this is the order and the gates. Comment each step's result on the release ticke
    `lotar list 'release:X.Y.Z -status:Done'` lists what is still open in its
    [release record](../../../docs/release-guide.md#release-records); add the tickets merged
    since the last tag that are in no release.
-2. **Version bump**: a patch unless the owner asks for a minor, as the guide's
+2. **Version bump**: a patch unless the owner asks for a minor or major one, as the guide's
    [Pre-Release Checklist](../../../docs/release-guide.md#pre-release-checklist) says, with
    its local checks, committed on main.
 3. **QA green** for that commit: the Quality Assurance run has succeeded, not just started:
    `gh run list --workflow "Quality Assurance" --commit <sha>`.
-4. **Signed tag, pushed, only with the owner's OK.** Pushing a tag publishes the release.
-   Ask him first (a HelpNeeded question on the release ticket when you can't ask directly),
-   then `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`, then
+4. **Signed tag, pushed.** Pushing a tag publishes the release. A patch release (only Z
+   changes) goes out without asking ("Only minor changes need my okay. Patch level updates
+   can always be done", owner 2026-11-22). A minor or major release waits for his OK: ask him
+   first (a HelpNeeded question on the release ticket when you can't ask directly). Then
+   `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`, then
    `lotar release release X.Y.Z`.
 5. **Release workflow green**: every job of the Release run for the tag succeeded
    ([Cutting a Release](../../../docs/release-guide.md#cutting-a-release)). Re-run a failed
