@@ -59,7 +59,10 @@ and report without edits, task mutations, or implementation gates.
 - Keep user-owned task YAML backwards-compatible. Only the DEV project under
   `.tasks/` is the tracked development backlog; other projects and `@sprints/`
   are local scenario data. Automated tests use isolated temporary workspaces;
-  manual scenarios use `npm run seed:test-tasks`, never fake DEV tickets.
+  manual scenarios use `npm run seed:test-tasks`, never fake DEV tickets. In an
+  agent job, `LOTAR_TASKS_DIR` points at the real backlog and wins over a
+  folder's `.tasks`: run other scratch `lotar` commands with
+  `env -u LOTAR_TASKS_DIR -u LOTAR_WORKSPACE_ROOT` or `--tasks-dir <dir>/.tasks`.
 - Verify UI behavior in a browser; prefer durable Playwright smoke coverage.
   Report failures, skipped checks, and environment limitations explicitly.
 

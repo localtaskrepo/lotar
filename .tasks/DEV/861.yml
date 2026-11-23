@@ -1,11 +1,11 @@
 title: Tests leave lotar agent workers and wait loops running after the test run ends
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-25T13:39:50.915818+00:00
+modified: 2026-11-26T00:54:10.997830+00:00
 relationships:
   related:
   - DEV-767
@@ -13,8 +13,41 @@ comments:
 - date: 2026-11-25T13:39:50.915818+00:00
   author: automation
   text: The fix agent's job job-20261125T124326.639Z-150 failed (lotar agent logs job-20261125T124326.639Z-150); @fix-retry retries it on branch agent/DEV-861.
+- date: 2026-11-26T00:54:00.167810+00:00
+  author: claude
+  text: |-
+    Test wait loops now end when the test process is gone, even if no release file is ever written.
+
+    - `common::while_this_test_runs()` in `crates/lotar-lib/tests/common/mod.rs` returns `kill -0 <test pid>`. Every unbounded `while [ ! -f release ]` loop and the endless `while :` loop in `crates/lotar-lib/tests` now also checks it.
+    - Changed: `agent_safety_test.rs` (job loops and the fake git), `dev320`, `dev361`, `dev592`, `dev630`, `dev646`, `dev660`.
+    - Nothing has to run on Drop, so this holds for a pass, a fail, a panic or a nextest timeout kill. Once its loops end, a detached worker has no job left and stops on its idle exit.
+    - New test `dev861_test_loops_end_with_the_test_test.rs`: the loop ends once its owner process is killed, and no release file appears.
+    - After the run, `ps` shows no scratch loops or workers left behind.
+  report:
+    commits:
+    - hash: e70f97356
+      what: test wait loops end with the test process
+    checks:
+    - command: cargo nextest run --cargo-profile dev -E 'test(/^(dev861|agent_safety|dev320|dev361|dev592|dev630|dev646|dev660)/)'
+      result: passed
+      reason: 64 tests
+    - command: cargo clippy --profile dev --workspace --tests
+      result: passed
+    - command: rustfmt --edition 2024 --check <changed files>
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
 description: |-
   Found 2026-11-24 18:10 PST: 12 orphaned processes under /var/folders/*/T/lotar-rust-temp-*/.lotar-test-scratch/, from 4 test runs whose cargo test process had exited (oldest from 2026-11-22 18:18, DEV-767's job worktree). Each run left a 'lotar --tasks-dir <scratch>/.tasks agent worker' (ppid 1) plus its job shell, a 'sh -c ... while [ ! -f <scratch>/release ]; do sleep 0.05; done' loop that forks sleep about 20 times a second until reboot. Tests that start a worker or a job with a release file must stop the worker and remove or release the loops on drop, also when the test fails or times out. Killed by the chief of staff with the owner's OK (2026-11-22, 'Kill and file').
 
@@ -78,3 +111,21 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T00:49:20.652019+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
+- at: 2026-11-26T00:54:00.167810+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:54:10.997830+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

@@ -1,17 +1,19 @@
 title: 'T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T19:54:54.013521+00:00
-modified: 2026-11-25T22:12:12.816826+00:00
+modified: 2026-11-26T01:19:22.210904+00:00
 relationships:
   related:
   - DEV-777
   - DEV-810
   - DEV-827
   - DEV-828
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9
 description: 'Found 2026-11-25: 205 unsettled T3 threads; 86 are older attempts on open tickets (DEV-810 15 threads, DEV-828 13, DEV-827..831 and DEV-777 about 12 each), 31 belong to Done tickets. Each retry or review job starts a new thread and never settles the previous one. Done when: starting a job settles the ticket''s earlier job threads, closing a ticket settles all of them, and a test covers both. Owner chose to file this 2026-11-25.'
 history:
 - at: 2026-11-25T19:54:54.341828+00:00
@@ -31,3 +33,14 @@ history:
   - field: priority
     old: Medium
     new: High
+- at: 2026-11-26T01:19:20.762174+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:19:22.210904+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9

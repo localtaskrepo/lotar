@@ -1,0 +1,33 @@
+title: 'A fix job retried after a failed merge fails in 2s with the merge job''s verdict: STD-336 job-20261124T231242.639Z-51'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T00:48:58.355185+00:00
+modified: 2026-11-26T00:48:58.998640+00:00
+relationships:
+  related:
+  - DEV-860
+description: |-
+  Found (DEV-860): in standards, STD-336's merge job job-20261124T231238.232Z-50 failed ('no commit named after STD-336 is on the main checkout's branch'); the retry rule moved it to @fix, whose t3 job job-20261124T231242.639Z-51 failed 2s later with the same summary. Its log (lotar agent logs job-20261124T231242.639Z-51 in ~/Development/standards) shows the worktree rules and 'Nothing to merge: agent/STD-336 is in main already', then agent_job_failed with the merge verdict, and no agent turn. The fix agent never ran, and the ticket went to the owner as 'failed again'.
+
+  Check: a merge job fails its 'nothing was built' check, the retry assigns @fix; the fix job runs its agent (or, if lotar means to carry the merge verdict, it says so instead of failing as a fix).
+
+  Done: a fix retry after a failed merge runs the fix agent, or this is documented as intended with the reason.
+tags:
+- health
+custom_fields:
+  finding: bug:fix-retry-carries-merge-verdict
+history:
+- at: 2026-11-26T00:48:58.683541+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-860"]}'
+- at: 2026-11-26T00:48:58.998640+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

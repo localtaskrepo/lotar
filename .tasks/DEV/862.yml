@@ -1,11 +1,11 @@
 title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-26T00:48:14.068200+00:00
+modified: 2026-11-26T00:55:17.041299+00:00
 relationships:
   related:
   - DEV-584
@@ -21,6 +21,38 @@ comments:
     - OpenClaw (https://github.com/openclaw/openclaw, MIT, 395k stars, pushed 2026-11-25) reads Claude's usage windows without running a turn. extensions/anthropic/claude-usage.ts calls `GET https://api.anthropic.com/api/oauth/usage` with the Claude OAuth token (`Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20`). The response has `five_hour`, `seven_day` and `seven_day_sonnet`/`seven_day_opus`, each with `utilization` and `resets_at`, plus `extra_usage`. Its v2026.11.10 changelog fixes "string-encoded numeric quotas in Claude ... usage windows" and "honors earlier authenticated quota resets". I read the code, not just the docs.
     - What it would add here: this ticket records a reading only when a job's agent reports one, so there is none while every queue is held (STD-346) or overnight. A poll would give the reset time at any moment. That is the owner's question of 2026-11-24 ("you can't use the claude cli or api or anything from anthropic to get the info?").
     - Caveats: the endpoint is undocumented and may change. It needs Claude Code's OAuth token from the login Keychain. Whether an agent or lotar may read that token is the owner's call (credentials rules, opgate). Without his OK, keep the readings from jobs as planned.
+- date: 2026-11-26T00:55:00.991139+00:00
+  author: claude
+  text: |-
+    `lotar usage` shows each provider's newest usage window and reset time from agent jobs.
+
+    - Readings: claude-agent-acp's `_claude/rateLimit` on every turn (`five_hour`, `seven_day`: status, used %, `resets_at`), plus a `rejected` reading when a job pauses on a usage limit.
+    - Codex and T3 Code jobs report no windows (harnessmux 0.3.0 passes none on), so their only reading is the pause. Real logs in `~/.local/state/harnessmux/sessions` hold Claude readings only.
+    - File: `usage.json` next to the agent queue (`~/Library/Caches/lotar/usage.json`), shared by every repo's server. Writes are locked and atomic. One reading per provider, account and window; the newest wins. A failed write only warns.
+    - Account: the profile's `CLAUDE_CONFIG_DIR` / `CODEX_HOME`, else `null`.
+    - `lotar usage` and `--format json` (`{"file", "readings"}`) need no tasks dir. With no file it exits 0; a broken file is exit 1 and names the file.
+    - Code in `crates/lotar-agent/src/services/provider_usage.rs`, `crates/lotar-lib/src/cli/handlers/usage.rs`; docs in `docs/help/usage.md`.
+    - There is no reading while no job runs. The OAuth usage poll (comment of 2026-11-25) stays the owner's call.
+    - No guidance correction; no durable finding.
+  report:
+    commits:
+    - hash: 701c218b5
+      what: usage.json readings from jobs, lotar usage, docs/help/usage.md
+    checks:
+    - command: cargo nextest run (provider_usage, usage window, dev584 pause tests)
+      result: passed
+      reason: 12 tests
+    - command: cargo nextest run (help, completion, doc, link, usage filters)
+      result: passed
+      reason: 131 tests
+    - command: cargo clippy --workspace --all-targets
+      result: passed
+    - command: rustfmt and prettier on changed files
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
@@ -108,3 +140,16 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-584"]}'
+- at: 2026-11-26T00:55:00.991139+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:55:17.041299+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

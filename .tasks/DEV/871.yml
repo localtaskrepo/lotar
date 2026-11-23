@@ -1,26 +1,50 @@
 title: lotar agent queue doesn't count the jobs queued in lotar serve's memory
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T14:02:30.792755+00:00
-modified: 2026-11-25T14:02:31.383425+00:00
+modified: 2026-11-26T01:00:49.937274+00:00
 relationships:
   related:
   - DEV-865
-description: |-
-  Found in DEV-865.
+comments:
+- date: 2026-11-26T01:00:37.633350+00:00
+  author: claude
+  text: |-
+    Every process now counts the jobs that other processes hold in their own job queue for the same tasks directory.
 
-  - A job queued in a process's registry (`registry.pending_queue`, e.g. a run started from the Agents page while the slots are full) lives only in that process's memory
-  - `lotar agent queue` and every other process count the queue file's tickets and the running jobs' records (`agent_active_jobs`), not those queued jobs
-  - Checked: `lotar serve` with 1 running and 1 queued job plus 3 queue-file tickets: the Agents page shows 4 Queued, `lotar agent queue` shows 3
-
-  ## Done when
-
-  - [ ] Every process counts the jobs queued in other processes for the same tasks directory (for example as records next to the running jobs' ones), so the CLI and the page show the same Queued
-  - [ ] A dead process's queued records don't count
-  - [ ] Rust test covers it
+    - `agent_active_jobs.rs`: a job in a process's `pending_queue` writes `<job>.queued` (job, ticket, owner pid) next to the running jobs' records. `queued_elsewhere` reads them, skips this process's own records, and removes records of dead pids
+    - `agent_job_service.rs`: the record is written where a job enters the queue (`start`) and removed where it leaves (`process_pending_queue`, `cancel_job`, `reset_for_tests`, `unregister`). If a write fails, the job still queues; other processes just don't see it
+    - `agent_queue_service.rs`: `queue_stats` adds `queued_elsewhere` to Queued. The worker's exit check (`AgentJobService::queue_stats`) is unchanged
+    - Tests: `queued_records_of_other_live_processes_count` and `queued_counts_the_jobs_other_processes_queue` (3 queue-file tickets + 1 live record from another process + 1 dead-pid record → 4)
+    - `docs/help/agent.md`: the `lotar agent queue` line says Queued counts the jobs every process holds in its own queue
+    - Depends on DEV-865 (not on main yet): main still takes `max(own, pending)`. My line is added after it, so it should merge without conflict. Only with both in place do the CLI and the page agree (4 and 4 in the ticket's case)
+    - Not changed: the Agents page's Queued tab lists only what its own process knows. A job queued in another process counts at the top but isn't listed in the tab
+    - Not checked: a live `lotar serve` against the CLI. The tests cover the counting rule
+  report:
+    commits:
+    - hash: a10ea1be9
+      what: queued jobs leave a .queued record; queue_stats counts other live processes' records
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(queued_counts_the_jobs) | test(queued_records_of_other) | test(records_are_visible)'
+      result: passed
+    - command: cargo nextest run --workspace -E 'binary_id(lotar-lib::integration) & (test(/agent_safety_test::/) | test(/dev646/) | test(/dev771/))'
+      result: passed
+      reason: 45 tests
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+      reason: no warnings
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: targeted checks only, the merge runs them (DEV-797)
+    next: Review; land after DEV-865 (agent/DEV-865), whose sum rule this builds on
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10eb79315e69bb050f3ef09b865df6903f423d6fa2c7100ad862ad363ae7c104
+description: '-'
 history:
 - at: 2026-11-25T14:02:31.097880+00:00
   actor: claude
@@ -33,3 +57,44 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T00:54:15.026331+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T00:54:15.603471+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10eb79315e69bb050f3ef09b865df6903f423d6fa2c7100ad862ad363ae7c104
+- at: 2026-11-26T00:55:27.909301+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-865.
+
+      - A job queued in a process's registry (`registry.pending_queue`, e.g. a run started from the Agents page while the slots are full) lives only in that process's memory
+      - `lotar agent queue` and every other process count the queue file's tickets and the running jobs' records (`agent_active_jobs`), not those queued jobs
+      - Checked: `lotar serve` with 1 running and 1 queued job plus 3 queue-file tickets: the Agents page shows 4 Queued, `lotar agent queue` shows 3
+
+      ## Done when
+
+      - [ ] Every process counts the jobs queued in other processes for the same tasks directory (for example as records next to the running jobs' ones), so the CLI and the page show the same Queued
+      - [ ] A dead process's queued records don't count
+      - [ ] Rust test covers it
+    new: '-'
+- at: 2026-11-26T01:00:37.633350+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:00:49.937274+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

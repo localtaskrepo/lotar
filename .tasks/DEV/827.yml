@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T05:02:58.468147+00:00
-modified: 2026-11-25T22:11:53.448580+00:00
+modified: 2026-11-26T01:01:40.645617+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -16,6 +16,8 @@ relationships:
   - DEV-833
   - DEV-876
   - DEV-882
+  - DEV-860
+  - DEV-887
 comments:
 - date: 2026-11-23T08:26:18.817426+00:00
   author: automation
@@ -683,3 +685,15 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876"]}'
     new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882"]}'
+- at: 2026-11-26T00:50:01.886253+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882","DEV-860"]}'
+- at: 2026-11-26T01:01:40.645617+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882","DEV-860"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882","DEV-860","DEV-887"]}'

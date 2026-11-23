@@ -1,11 +1,11 @@
 title: 'JSON comment lists leave deleted comments out without their #N, so counting positions picks the wrong comment for --edit/--delete'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-23T07:19:10.376712+00:00
-modified: 2026-11-25T19:54:54.341150+00:00
+modified: 2026-11-26T01:04:41.166758+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -180,6 +180,35 @@ comments:
       result: not_run
       reason: merge runs it
     next: merge agent runs the full suites and lands agent/DEV-828
+- date: 2026-11-26T01:04:33.383774+00:00
+  author: claude
+  text: |-
+    Fix was already committed in the last job; I checked it again here and it's ready for review.
+
+    - Commit `4aa38189b` (signed) on `agent/DEV-828`: `lotar --format json comment <ID>` and `lotar --format json show <ID>` give each comment its stored `number`
+    - Test `json_lists_number_comments_as_stored` passes: #2 of three deleted, JSON lists 1 and 3
+    - `docs/help/comment.md` documents `number`
+  report:
+    commits:
+    - hash: 4aa38189b
+      what: JSON comment lists carry each comment's stored number
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev809
+      result: passed
+    - command: cargo clippy -p lotar-lib --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check <changed files>
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review on another model, then the merge agent lands 4aa38189b
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60
@@ -194,6 +223,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0858c1b7cd77d94aa690da353b582acbd4d782034a9a9ae54c3d2b3df9cc4847
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A612fe8a46e05ce59bfef51e0cca7d5ccfe612b752039a4d4fd43857373f45aad
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad14b0684e914c8f624ed083a849b1c8ac1a6ee9d35ca64165b736b67c8086582
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad855fc669c08c54e229bb9b9ea2972a041b8f90a02ea7fda523824d92400cb4b
 description: |-
   Found in the DEV-809 review (2026-11-22).
 
@@ -473,3 +503,27 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601","DEV-809"],"related":["DEV-809","DEV-832"]}'
     new: '{"depends_on":["local:LOCA-601","DEV-809"],"related":["DEV-809","DEV-832","DEV-876"]}'
+- at: 2026-11-26T01:03:34.247752+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T01:03:34.850723+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad855fc669c08c54e229bb9b9ea2972a041b8f90a02ea7fda523824d92400cb4b
+- at: 2026-11-26T01:04:33.383774+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:04:41.166758+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

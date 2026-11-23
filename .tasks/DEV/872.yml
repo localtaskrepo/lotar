@@ -1,21 +1,35 @@
 title: 't3 thread show fails: ServerOwnsDatabaseError, t3 job runner exits 1 right after start'
-status: InProgress
+status: Done
 priority: High
 type: Feature
 reporter: triage
-assignee: '@fix'
 created: 2026-11-25T17:09:40.877284+00:00
-modified: 2026-11-25T22:12:12.619909+00:00
+modified: 2026-11-26T01:07:04.565068+00:00
 relationships:
   blocks:
   - DEV-858
   - DEV-810
   related:
   - DEV-858
+  - DEV-860
+  - DEV-887
+  - DEV-808
+  - DEV-873
 comments:
 - date: 2026-11-25T18:15:15.542511+00:00
   author: claude
   text: 'Stalled since 2026-11-25T17:10Z with no lotar job: the live check restarted @fix in a new thread, its job never started, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T01:06:55.875479+00:00
+  author: claude
+  text: |-
+    Gone already, no file change: `t3 thread show` works again and t3 jobs get past start.
+
+    - `~/.t3/bin/t3 thread show mcp:launch:7bdd4393…` (this job's thread) prints the thread, also with `--json --messages 20`, exit 0; no ServerOwnsDatabaseError (t3 v0.1.12)
+    - The T3 server (pid 376) started 11:48 today, after the failed jobs; the server and the bundled CLI now match
+    - `lotar agent list-running`: three t3 jobs running (DEV-808, DEV-873, this one `job-20261126T010613.681Z-216`), all past start
+    - `git log main..HEAD`: no commits
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7bdd4393083d9dcaeccbeeecdd7e7e0fb2d7f130c17af7301111da0d0f3f46da
 description: 'Found: fix jobs on DEV-858 (job-20261125T140809.214Z-57, job-20261125T170652.971Z-59) failed in 6 to 8 s: ''could not read the T3 Code thread ... with t3 thread show''. Check: ~/.t3/bin/t3 thread show <thread> prints ServerOwnsDatabaseError: another T3 Code process owns /Users/mallox/.t3/userdata and the CLI would change its schema (t3 v0.1.12). Likely the running T3 server and the bundled CLI differ in version after an app update. Done when: t3 thread show on a live job thread prints the thread, and a t3 job on a test ticket gets past start.'
 tags:
 - health
@@ -61,3 +75,38 @@ history:
   - field: priority
     old: Medium
     new: High
+- at: 2026-11-26T00:50:01.889281+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858"]}'
+    new: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858","DEV-860"]}'
+- at: 2026-11-26T01:01:40.650420+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858","DEV-860"]}'
+    new: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858","DEV-860","DEV-887"]}'
+- at: 2026-11-26T01:06:31.898511+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7bdd4393083d9dcaeccbeeecdd7e7e0fb2d7f130c17af7301111da0d0f3f46da
+- at: 2026-11-26T01:06:55.875479+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:06:56.197020+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858","DEV-860","DEV-887"]}'
+    new: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858","DEV-860","DEV-887","DEV-808","DEV-873"]}'
+- at: 2026-11-26T01:07:04.565068+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

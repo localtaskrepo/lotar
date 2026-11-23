@@ -1,15 +1,29 @@
 title: 'Flaky smoke on main: preserves plot height and page/plot scroll through a delayed root reload shifts the plot by 262 px'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-25T17:59:45.630098+00:00
-modified: 2026-11-25T23:30:27.095270+00:00
+modified: 2026-11-26T01:15:00.720102+00:00
 relationships:
   related:
   - DEV-799
   - DEV-819
+  - DEV-872
+  - DEV-797
+comments:
+- date: 2026-11-26T01:14:50.615571+00:00
+  author: claude
+  text: |-
+    Not reproducible on current main (`87482fff4`): 56 of 56 runs of the file pass, nothing to change.
+
+    - Built with `npm run build:smoke`, then ran `npx vitest run --config smoke/vitest.config.ts tests/ui.relationships.smoke.spec.ts`: 8 of 8 alone, 24 of 24 two at a time, 24 of 24 four at a time (load 10 to 49). That covers both "preserves plot height…" and "exposes Dependencies in navigation…".
+    - No commit since `c0fe875d6` touches `DependencyGraph.vue`, `Dependencies.vue`, `useRelationshipGraph.ts` or the spec, so the cause is still unknown.
+    - From the ticket's numbers: `plotTop` +262 while `documentHeight` grew only 147. That fits the window scrolling to the top (262 to 0) better than content showing up above the plot.
+    - If it comes back: log `windowY` and the page's child heights in the failure message (the test already prints `before` and `pending`).
+    - Full `npm run smoke` not run here: the merge runs it (DEV-797).
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2047b5bca257970a7c7dcdd461b6ab41265cf35e0e13fa1452803bf835b82425
 description: |-
   Found during the DEV-799 merge on main `c0fe875d6` (server and UI as on main): `tests/ui.relationships.smoke.spec.ts` > preserves plot height and page/plot scroll through a delayed root reload failed 1 of 8 runs of its file alone (load 5 to 13). Each failure is identical: `documentHeight` 1370 -> 1517, `plotTop` 79.9 -> 341.9, `scrollTop` 2196 -> 0. Something 147 px tall appears above the plot while the root graph request is held. The same file's 'exposes Dependencies in navigation and persists its Preferences visibility' test failed 5 of 14 runs on main too. Passes as a single test (`-t`), so it is a race between tests of the file, not wall-clock load (the wall-clock group would not help).
 
@@ -38,3 +52,38 @@ history:
   - field: relationships
     old: '{"related":["DEV-799"]}'
     new: '{"related":["DEV-799","DEV-819"]}'
+- at: 2026-11-26T01:04:39.775065+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:04:40.366406+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2047b5bca257970a7c7dcdd461b6ab41265cf35e0e13fa1452803bf835b82425
+- at: 2026-11-26T01:06:56.197264+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-799","DEV-819"]}'
+    new: '{"related":["DEV-799","DEV-819","DEV-872"]}'
+- at: 2026-11-26T01:14:50.615571+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:14:50.983414+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-799","DEV-819","DEV-872"]}'
+    new: '{"related":["DEV-799","DEV-819","DEV-872","DEV-797"]}'
+- at: 2026-11-26T01:15:00.720102+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

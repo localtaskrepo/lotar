@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-25T05:29:21.102795+00:00
-modified: 2026-11-25T14:14:27.262054+00:00
+modified: 2026-11-26T01:01:21.324309+00:00
 relationships:
   related:
   - DEV-789
@@ -34,6 +34,16 @@ comments:
       result: not_run
       reason: merge runs them (DEV-797)
     next: Review, then merge
+- date: 2026-11-26T01:01:07.575931+00:00
+  author: claude
+  text: |-
+    Review: blocking — `--config <KEY=VALUE>` after `serve` still loses its value when no port comes before it.
+
+    - Read: `7e45eea7d` (only `crates/lotar-lib/src/cli/preprocess.rs`), the ticket, `docs/help/serve.md`, `ServeArgs` (`crates/lotar-lib/src/cli/args/serve.rs`), the globals in `crates/lotar-lib/src/cli/mod.rs`; no other commits to the file on main since `3ec533d60`.
+    - Reran: `npm ci` (ok), `cargo build -p lotar`, `cargo nextest run -p lotar-lib preprocess` (22 passed). Manual: `lotar serve --tasks-dir <dir> --web-ui-path <dir> --allow-host tasks.example` starts on 8080: the ticket's two options are fixed.
+    - **Finding:** `crates/lotar-lib/src/cli/preprocess.rs:181` `SERVE_VALUE_OPTIONS` says it covers "globals given after it" but misses the global `--config`. `lotar serve --tasks-dir <dir> --config server.port=1` (also with `--port 1` after it) fails with `error: a value is required for '--config <KEY=VALUE>'`. `docs/help/serve.md:47` documents `--config server.port=...` for serve, and `find_serve_index` (`preprocess.rs:12`, `:314`) already treats `--config` as taking a value. "Done when" asks for every option that takes a value. The fix agent's claim that the other serve options are flags is wrong for this one.
+    - **Fix:** add `"--config"` to `SERVE_VALUE_OPTIONS` and a `--config server.port=1` case to `keeps_web_ui_path_and_allow_host_values_when_port_missing` (or a test of its own).
+    - Otherwise fine: the refactor keeps the old options' behaviour, the new test fails on main, there are no stray files, and the lines fit the 160-column rustfmt width.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af7c853bc72540dd8dd160e793ee215ee636fb7378dea9f82c7f46d1dfbc0eb6d
 description: |-
@@ -52,6 +62,7 @@ description: |-
   - [ ] Every serve option that takes a value keeps its value with a space, also without an earlier port. A test in the preprocess tests covers `--web-ui-path <dir>` and `--allow-host <name>`.
 tags:
 - health
+- review-returned
 custom_fields:
   finding: cli:serve-arg-preprocess
 history:
@@ -90,3 +101,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T01:01:07.575931+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:01:07.619673+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-26T01:01:21.324309+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned

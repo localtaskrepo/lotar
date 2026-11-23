@@ -1,11 +1,11 @@
 title: T3 thread row says Finished while the thread waits on background work
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T22:44:15.700672+00:00
-modified: 2026-11-25T17:12:39.002278+00:00
+modified: 2026-11-26T01:04:36.246649+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -174,6 +174,22 @@ comments:
       result: not_run
       reason: merge runs full suites
     next: Review on another model
+- date: 2026-11-26T01:00:52.957478+00:00
+  author: automation
+  text: 'The queued @fix job didn''t start: DEV-857 is assigned to @review now.'
+- date: 2026-11-26T01:04:26.797382+00:00
+  author: claude
+  text: |-
+    Review: passed. HEAD `794094f97` does what "Done when" asks; no findings.
+
+    - Read: `git show 794094f97` (only `t3_state.rs` and `docs/help/agent.md`; the rest of `git diff main..HEAD` is main moving ahead of the base `d4084d484`). Also read the ticket, its comments and DEV-849.
+    - `from_shown` (`crates/lotar-agent/src/services/agent_job_service/t3_state.rs:94`): a question (`pendingRequestCount > 0`) wins. Next, `activeRunId` or background work (`pendingBackgroundTasks` not empty, `blockedOnThreadWait: true`) gives Running. Only after that does plain `waiting` give Waits for an answer, and `completed` give Finished. That covers all four rows.
+    - harnessmux reads the same fields from the same `thread` object (`harnessmux/src/backend/t3.rs:620`), so the field names hold.
+    - The test `a_thread_waiting_on_background_work_runs` covers every row. Its `waiting` + background rows fail on `8d58511cf`, because there the `waiting` status was checked first (I read the code, didn't run it there).
+    - `docs/help/agent.md:186` now describes the Running and question cases.
+    - Reran: `cargo nextest run -p lotar-agent t3_state` (7 passed), `cargo clippy -p lotar-agent --all-targets -- -D warnings` (clean), `rustfmt --edition 2024 --check` on the file (clean).
+    - UI: no page, component or style changed, only which existing label shows. So there were no screenshots to check and I didn't start the app.
+    - No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a8fde63d3da51b14097b1f1ced5fc01af6d027e69cfab0dfe58d128c01170e4
@@ -386,3 +402,20 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T01:00:52.957478+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:04:26.797382+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:04:36.246649+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

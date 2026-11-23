@@ -1,11 +1,11 @@
 title: 'A merge job that ends while its agent waits on a check still lands: DEV-725 (v0.15.6) went to main with smoke failed, and is Done without push or tag'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-25T17:17:28.626514+00:00
+modified: 2026-11-26T01:03:28.006079+00:00
 relationships:
   related:
   - DEV-725
@@ -130,9 +130,35 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review again
+- date: 2026-11-26T01:03:22.857342+00:00
+  author: claude
+  text: |-
+    Retry job: the review findings were already fixed in `1b2a836ec`; nothing new to change.
+
+    - `1b2a836ec` is the only commit beyond main and merges cleanly with main `87482fff4` (`git merge-tree`), so no rebase now.
+    - Reran the targeted agent tests (21 passed, including `a_merge_job_that_landed_its_work_reworked_completes_without_check_reports` and `a_commit_retry_counts_the_checks_its_paused_run_reported`) and `npm run -s lint:agent`.
+    - No UI changes. Not pushed.
+  report:
+    commits:
+    - hash: 1b2a836ec
+      what: gate holds back only lotar's fast-forward; commit retry counts the paused run's reports
+    checks:
+    - command: cargo nextest run --cargo-profile dev -p lotar-agent -E 'test(/merge|hand_off|takeover|taken_over|commit_retry|reworked/)'
+      result: passed
+      reason: 21 of 21
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45d87c556bde964735d2412ab7fdc6552f84a47995510ad3bbe059b625a6900d
 description: |-
   Found by the standards communication review (STD-17), 2026-11-22.
 
@@ -311,3 +337,21 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T01:02:27.674844+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45d87c556bde964735d2412ab7fdc6552f84a47995510ad3bbe059b625a6900d
+- at: 2026-11-26T01:03:22.857342+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:03:28.006079+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

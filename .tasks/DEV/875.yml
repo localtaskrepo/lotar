@@ -1,14 +1,47 @@
 title: Smoke 'shows the prompt and settings a finished job ran with behind its Instructions button' failed once in the full suite
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T19:53:56.034648+00:00
-modified: 2026-11-25T19:53:56.733267+00:00
+modified: 2026-11-26T01:19:03.368608+00:00
 relationships:
   related:
   - DEV-769
+  - DEV-888
+comments:
+- date: 2026-11-26T01:18:53.374835+00:00
+  author: claude
+  text: |-
+    Fixed: the test clicked the card's placeholder Instructions button while the logs were still loading.
+
+    - Cause: while `/api/jobs/logs` loads, `view/pages/AgentJobs.vue` shows a standalone `AgentRunInputs` with its own "Instructions" button. Under load the test clicked that one; when the log arrived it unmounted and `AgentJobLog` mounted with its panel closed, so `Settings` never showed.
+    - Reproduced: with `/api/jobs/logs` delayed 1.5 s (temporary `page.route`), the old locator fails (log panel never opens); the fixed test passes.
+    - Fix in `smoke/tests/ui.agent-jobs.smoke.spec.ts`: wait for `.job-log__header`, then take the Instructions button from it.
+    - The user can hit the same thing, so I filed it as a finding: `ui:agent-jobs-instructions-remount`.
+  report:
+    commits:
+    - hash: 9bb8c306a
+      what: the test waits for the loaded log and clicks the Instructions button in its header
+    checks:
+    - command: npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'Instructions button'
+      result: passed
+      reason: 3 of 3, plus a run with /api/jobs/logs delayed 1.5 s
+    - command: npx prettier --check, smoke tsc, oxlint on the file
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs it
+    - command: npm test
+      result: not_run
+      reason: smoke-only change
+    - command: npm run -s smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa2d85a7e532ad07ff1783c51ac60fb06c0ad8feb5ce12117534dd7aa8b25650f
 description: 'Found: in DEV-769''s merge, `npm run -s smoke` on `bd4c626cb` failed this test in `smoke/tests/ui.agent-jobs.smoke.spec.ts` (already in the serial `wall-clock` group): `/api/jobs/inputs` answered ok, but `getByRole(''table'', { name: ''Settings'' })` never became visible (15 s). It passed 5 out of 5 alone and in 3 more full runs. Check: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t ''Instructions button''` repeated, and the full `npm run -s smoke`. Done: the cause is found (for example the log remounting and closing the panel, or an inputs response with no record yet) and the test waits on it, so it no longer fails under load.'
 tags:
 - health
@@ -26,3 +59,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T01:15:04.095386+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:15:04.633759+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa2d85a7e532ad07ff1783c51ac60fb06c0ad8feb5ce12117534dd7aa8b25650f
+- at: 2026-11-26T01:18:52.728604+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-769"]}'
+    new: '{"related":["DEV-769","DEV-888"]}'
+- at: 2026-11-26T01:18:53.374835+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:19:03.368608+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

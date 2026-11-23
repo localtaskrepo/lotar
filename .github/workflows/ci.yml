@@ -391,6 +391,10 @@ jobs:
     - name: Verify git hooks stay read-only
       run: npm run test:hooks
 
+    # The task seeder ignores an inherited LOTAR_TASKS_DIR (DEV-818).
+    - name: Verify the task seeder stays in its own folder
+      run: npm run test:seed
+
   smoke_tests:
     name: Smoke Tests
     runs-on: ubuntu-latest

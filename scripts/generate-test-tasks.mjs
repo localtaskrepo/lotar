@@ -11,7 +11,9 @@
 //
 // The script writes a project config with a broad vocabulary, then seeds tasks with a
 // realistic spread of status/priority/type/assignee/tags/effort/due-date/custom-fields.
-// It uses the built `lotar` binary (LOTAR_BINARY_PATH, else target/{debug,release}).
+// It uses the built `lotar` binary (LOTAR_BINARY_PATH, else target/{debug,release}). Every lotar it
+// starts gets LOTAR_TASKS_DIR=<dir>/.tasks and no other inherited LOTAR_* setting, so a run inside
+// an agent job seeds the target dir, not the job's backlog.
 //
 // `--demo` instead seeds the curated "Atlas" scenario from scripts/demo/workspace.mjs: a git
 // repository with backdated history, three people, a stub agent profile, sprints with burndown,
@@ -22,7 +24,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { seedDemoWorkspace } from './demo/workspace.mjs';
+import { demoEnvironment, seedDemoWorkspace, seedEnvironment } from './demo/workspace.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -135,7 +137,7 @@ const EFFORTS = ['', '', '2h', '4h', '1d', '2d', '3d', '1w'];
 function run(bin, cwd, args) {
     const res = spawnSync(bin, args, {
         cwd,
-        env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' },
+        env: seedEnvironment(cwd),
         encoding: 'utf8',
     });
     return res;
@@ -151,9 +153,9 @@ function main() {
         process.exit(1);
     }
 
-    const dir = opts.dir || path.join(os.tmpdir(), `lotar-demo-${process.pid}`);
+    const dir = path.resolve(opts.dir || path.join(os.tmpdir(), `lotar-demo-${process.pid}`));
     if (opts.demo) {
-        const demo = seedDemoWorkspace({ dir: path.resolve(dir), bin });
+        const demo = seedDemoWorkspace({ dir, bin });
         console.log(
             `\nSeeded the Atlas demo (${Object.keys(demo.ids).length} tasks, git history, 4 sprints) into: ${demo.dir}`,
         );
@@ -162,7 +164,7 @@ function main() {
         if (opts.serve) {
             spawnSync(bin, ['serve', '--port', '8080'], {
                 cwd: demo.dir,
-                env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' },
+                env: demoEnvironment(demo.dir),
                 stdio: 'inherit',
             });
         }
@@ -234,7 +236,7 @@ function main() {
         console.log(`\nStarting lotar serve against ${dir} ... (Ctrl-C to stop)`);
         spawnSync(bin, ['serve', '--port', '8080'], {
             cwd: dir,
-            env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' },
+            env: seedEnvironment(dir),
             stdio: 'inherit',
         });
     }

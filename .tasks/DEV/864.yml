@@ -1,11 +1,11 @@
 title: 'Proposal: finding bundles: a health bundle starts its fix agent when created, so later findings of the day start new bundles'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-25T05:05:15.164063+00:00
-modified: 2026-11-25T17:07:36.884481+00:00
+modified: 2026-11-26T01:02:03.364844+00:00
 relationships:
   related:
   - DEV-800
@@ -67,8 +67,34 @@ comments:
       result: not_run
       reason: no UI change; the merge runs it
     next: 'After release: check that one day of agent findings gives about one health bundle per repo (Done when, item 2)'
+- date: 2026-11-26T01:01:53.839310+00:00
+  author: claude
+  text: |-
+    Retry checked: the failed job's commit is complete and its checks pass, so nothing new to change.
+
+    - The earlier job ended because T3 couldn't read its thread (`t3 thread show`). That happened after its work was committed in `78263b6a8`.
+    - `FindingService::open_bundle` in `crates/lotar-lib/src/services/finding_service.rs` now accepts an `InProgress` bundle when its fix job can take a message. `lotar add --bundle` tells that job about the finding first, through `tell_running_job`.
+    - If the job can't take the message, the finding starts a new bundle, as before. Bundles in `Reviewing` or `Merging` take no new findings.
+    - Not tested end to end: a message actually reaching a live agent session.
+  report:
+    commits:
+    - hash: 78263b6a8
+      what: a finding joins the InProgress bundle whose fix job takes it as a message
+    checks:
+    - command: cargo nextest run -p lotar-lib -E 'test(/finding|bundle/)'
+      result: passed
+      reason: 18 tests, incl. 3 new DEV-864 cases
+    - command: cargo clippy -p lotar-lib --all-targets
+      result: passed
+    - command: rustfmt --edition 2024 --check (changed files)
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review, then merge. The second Done-when box (about one bundle per repo per day) can only be checked on real agent findings after this ships
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1b755a5ab91c95e3b823fcce51ab6579ef57c31453ec859b3d0d1fbc4d71942
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8ddcd2dcc4c43f0e3b898aa2d3ff0ab186958018063caaf2bfdf445b3fae9f9c
 description: |-
   `lotar add --finding <key> --bundle health` (DEV-800) puts a new finding into the day's open bundle only while no agent job holds it. With the shared rules, a health bundle starts its fix agent as soon as it is created, so a bundle will rarely collect more than one finding. STD-299's goal, one health ticket per repo per day, then isn't met for findings agents file.
 
@@ -205,3 +231,21 @@ history:
   - field: relationships
     old: '{"related":["DEV-800","standards:STD-299"]}'
     new: '{"related":["DEV-800","standards:STD-299","DEV-384"]}'
+- at: 2026-11-26T01:00:55.595764+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8ddcd2dcc4c43f0e3b898aa2d3ff0ab186958018063caaf2bfdf445b3fae9f9c
+- at: 2026-11-26T01:01:53.839310+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:02:03.364844+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

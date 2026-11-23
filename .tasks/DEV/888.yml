@@ -1,0 +1,28 @@
+title: 'Agents page: Instructions opened while a job''s logs load closes when the log arrives'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T01:18:52.353749+00:00
+modified: 2026-11-26T01:18:53.052730+00:00
+relationships:
+  related:
+  - DEV-875
+description: 'Found: in DEV-875, while a job card''s logs load, `view/pages/AgentJobs.vue` shows a standalone `AgentRunInputs` with its own Instructions button; once the logs arrive it unmounts and `AgentJobLog` mounts with its panel closed, so a panel the user opened is gone. Check: delay `/api/jobs/logs` (page.route), click Instructions before the log shows, and the panel should stay open. Done: the open state carries over to the log''s header button (or the placeholder button is not offered while loading).'
+tags:
+- health
+custom_fields:
+  finding: ui:agent-jobs-instructions-remount
+history:
+- at: 2026-11-26T01:18:52.729015+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-875"]}'
+- at: 2026-11-26T01:18:53.052730+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

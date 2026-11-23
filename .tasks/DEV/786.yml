@@ -1,11 +1,11 @@
 title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix-fable'
+assignee: '@review'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-25T18:12:59.776851+00:00
+modified: 2026-11-26T01:03:14.845211+00:00
 relationships:
   related:
   - DEV-725
@@ -451,6 +451,30 @@ comments:
       result: not_run
       reason: no code changed; the merge runs them
     next: Review the new dev786-card-* screenshots; the merge must rebase onto main (conflicts below)
+- date: 2026-11-26T01:03:10.155151+00:00
+  author: claude
+  text: |-
+    Nothing left to fix: the screenshot set the last review asked for is on the ticket (attached 2026-11-25 17:10Z), and the code is unchanged at `ba43e9632`.
+
+    - This job is the `fix-fable` retry that waited in the queue since 17:07Z; the resumed `fix` thread did its work at 17:10Z
+    - Checked: all 14 `dev786-card-*` files are in `.tasks/DEV/@attachments/`. I read `after-dark-1440`, `before-light-390` and `after-dark-390`: one "Waiting in the queue" card, order High merge, High fix, 2× Medium review, Low fix, with place, kind chip, priority and the four move buttons; "5 Queued" matches the 5 rows; no clipping at 390 px
+    - Tree clean, one commit past `main`
+    - **For the merge:** `main` is at `87482fff4`. The rebase conflicts in 4 files, each a one-line neighbour in a list, keep both sides: `crates/lotar-lib/tests/integration.rs` (`mod dev786_queue_order_test;` beside `dev800`/`dev809`), `view/__tests__/AgentJobs.spec.ts` (`moveAgentQueueEntry` beside `getAgentJobT3Thread`), `view/api/client.ts` (`AgentQueueMove*` imports beside `AgentJobT3ThreadResponse`), `docs/help/agent.md` (Agents page bullets: take main's "Show logs" bullet and this branch's queue bullet)
+    - I didn't rebase: this job may not rewrite history
+  report:
+    commits:
+    - hash: ba43e9632
+      what: unchanged, the commit to review
+    checks:
+    - command: screenshot set dev786-card-* (14 files) present and read
+      result: passed
+    - command: git merge-tree --write-tree main HEAD
+      result: failed
+      reason: 4 one-line list conflicts, for the merge's rebase
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: no code changed; the merge runs them
+    next: Review ba43e9632 with the dev786-card-* screenshots, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -488,6 +512,7 @@ references:
 - attachment: dev786-card-before-light-1440.a27e25e65ee9251f151e08520703735e.png
 - attachment: dev786-card-before-light-1920.69ccc638c759d77228d954449bb0bb43.png
 - attachment: dev786-card-before-light-390.d20de8714096d4c97c3e45c4df2eb2cc.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A40a5f6fd7d5720b45b98ccc2c2640b568c130b62ae10e310c98ff6632de2d226
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
 
@@ -1115,3 +1140,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856"]}'
     new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856","DEV-874"]}'
+- at: 2026-11-26T01:02:21.634108+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T01:02:22.471777+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A40a5f6fd7d5720b45b98ccc2c2640b568c130b62ae10e310c98ff6632de2d226
+- at: 2026-11-26T01:03:10.155151+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:03:14.845211+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-fable'
+    new: '@review'

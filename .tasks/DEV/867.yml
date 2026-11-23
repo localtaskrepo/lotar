@@ -1,11 +1,11 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: InProgress
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-25T18:01:05.737931+00:00
+modified: 2026-11-26T01:04:41.825078+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -23,6 +23,9 @@ comments:
     - `main` (`ede5d109f`) has no `checks_lock.rs` and no `checks.lock`; they're only on `agent/DEV-797` (`3c444f069`), which is in Merging (the merge agent is rebasing it).
     - Building on `agent/DEV-797` would carry DEV-797's commit into this merge, so I'm not doing that.
     - Once DEV-797 lands: `finish_orphaned_job` takes the lock (with the same wait and comment as `comment_checks_lock`) before it resumes a merge job's session, plus a test that holds the lock from outside and sees the takeover wait.
+- date: 2026-11-26T01:04:41.825078+00:00
+  author: automation
+  text: 'The @fix-retry job waits for its open prerequisites: DEV-797. It starts once they are done.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 description: |-
@@ -78,5 +81,15 @@ history:
     new: agent, fix-retried, waits
 - at: 2026-11-25T18:01:05.737931+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:04:41.789853+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-26T01:04:41.825078+00:00
+  actor: automation
   changes:
   - field: comment_added

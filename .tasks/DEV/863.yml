@@ -1,11 +1,11 @@
 title: 'Agent merge: no test covers finding_check, which now runs once per key of a bundle'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-25T05:05:13.706118+00:00
-modified: 2026-11-25T13:55:08.987744+00:00
+modified: 2026-11-26T00:55:20.343995+00:00
 relationships:
   related:
   - DEV-800
@@ -13,8 +13,42 @@ comments:
 - date: 2026-11-25T13:55:08.987744+00:00
   author: automation
   text: The fix agent's job job-20261125T133951.608Z-153 failed (lotar agent logs job-20261125T133951.608Z-153); @fix-retry retries it on branch agent/DEV-863.
+- date: 2026-11-26T00:55:11.224714+00:00
+  author: claude
+  text: |-
+    Added tests for the merge's `finding_check`; no code change.
+
+    - In `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs`:
+      - bundle `a:x`, `b:y`, a check that lists neither: completes; ran once per key in order, two `passed` checks
+      - the check still lists `[b:y]`: lands, then hands off with `still lists [b:y]`; report `passed`, `failed`
+      - a ticket without a finding key: the check doesn't run
+      - keys but no `finding_check`: lands, report has only the regular check
+    - The branch was behind DEV-800 (the earlier run died on a provider timeout before doing anything); I fast-forwarded it to `main` first.
+  report:
+    commits:
+    - hash: 7b4d30c40
+      what: four finding_check tests in the merge suite
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev605
+      result: passed
+      reason: 25 of 25
+    - command: cargo clippy -p lotar-lib --tests -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check on the test file
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: targeted checks only, the merge runs the full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: same
+    - command: npm run smoke
+      result: not_run
+      reason: test-only change
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac1446514f0f23bb72421194b0e5e77c99111bf6d4c506a370fdeea3db377d9d9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6486f71b7414fc80d61eb2aaa162858575728dd7c05d5c804c1f459c37e4c357
 description: |-
   The merge's `finding_check` (`crates/lotar-agent/src/services/agent_job_service/merge.rs`, `fn finding_check`) has no test. Since DEV-800 it runs once per key of a bundle ticket and stops at the first key the check still lists. Found in the review of DEV-800: `grep -rn finding_check crates smoke` finds only the code and its config type.
 
@@ -60,3 +94,21 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T00:50:24.044739+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6486f71b7414fc80d61eb2aaa162858575728dd7c05d5c804c1f459c37e4c357
+- at: 2026-11-26T00:55:11.224714+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:55:20.343995+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

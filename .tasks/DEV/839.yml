@@ -1,15 +1,16 @@
 title: 'betterleaks: tests/fixtures/agent-streams/copilot-edit.jsonl apiCallId values match generic-api-key'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:42:38.212660+00:00
-modified: 2026-11-26T00:35:37.430573+00:00
+modified: 2026-11-26T00:48:57.319860+00:00
 relationships:
   related:
   - DEV-503
   - DEV-519
+  - DEV-848
 comments:
 - date: 2026-11-24T19:12:36.503135+00:00
   author: automation
@@ -123,6 +124,31 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T00:48:50.294314+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `87482fff4` is on `main` and `origin/main`.
+
+    - Main had moved to `a458c2224` (DEV-848), so I rebased again: `ef9c6c508`. The diff is still only `.gitleaks.toml`, and the lockfile is unchanged. `npm ci` passed
+    - After the rebase, `lint:agent`, `test:agent` and `smoke` all passed (smoke: 411/411 in 188s). The earlier smoke failure was `ui.sync-scope.smoke.spec.ts` "editor saves global edits…", and it passed this time. That run took 789s, so the machine was likely under load. The test is already in the `wall-clock` group, and this change can't affect it
+    - Fast-forwarded the main checkout. I amended the pending `.tasks` changes into the merge commit, which made it `87482fff4`, then pushed `a458c2224..87482fff4`
+    - No rule or config files changed, so I didn't run `lotar trust`
+    - I reran `betterleaks git --config .gitleaks.toml --redact .` in the main checkout: no leaks found
+  report:
+    commits:
+    - hash: 87482fff4
+      what: allowlist apiCallId in tests/fixtures/agent-streams for generic-api-key
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411 on rerun after rebase
+    - command: betterleaks git --config .gitleaks.toml --redact .
+      result: passed
+      reason: no leaks found
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb05412bdd614deae4fbbce7434e92817be71817849e10680d39089e3c7ef9cd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A246b69a28e09213bdf866f311ded790e80b05882e8b28b3e2357cb1e2843d10e
@@ -135,7 +161,6 @@ description: |-
   Done when: an allowlist in .gitleaks.toml for apiCallId in tests/fixtures/agent-streams (narrow, with a comment why) makes the sweep report no leaks.
 tags:
 - health
-- job-paused
 custom_fields:
   finding: leaks:copilot-edit.jsonl
 history:
@@ -221,3 +246,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T00:48:50.294314+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:48:50.545456+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-503","DEV-519"]}'
+    new: '{"related":["DEV-503","DEV-519","DEV-848"]}'
+- at: 2026-11-26T00:48:57.319860+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health

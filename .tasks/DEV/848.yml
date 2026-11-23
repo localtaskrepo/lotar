@@ -5,12 +5,15 @@ type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-24T20:03:06.454346+00:00
-modified: 2026-11-26T00:33:53.722812+00:00
+modified: 2026-11-26T01:01:40.647734+00:00
 relationships:
   related:
   - DEV-300
   - DEV-777
   - DEV-819
+  - DEV-839
+  - DEV-860
+  - DEV-887
 comments:
 - date: 2026-11-24T20:04:10.740443+00:00
   author: automation
@@ -306,3 +309,21 @@ history:
   - field: tags
     old: backend, job-paused
     new: backend
+- at: 2026-11-26T00:48:50.545897+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-300","DEV-777","DEV-819"]}'
+    new: '{"related":["DEV-300","DEV-777","DEV-819","DEV-839"]}'
+- at: 2026-11-26T00:50:01.887339+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-300","DEV-777","DEV-819","DEV-839"]}'
+    new: '{"related":["DEV-300","DEV-777","DEV-819","DEV-839","DEV-860"]}'
+- at: 2026-11-26T01:01:40.647734+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-300","DEV-777","DEV-819","DEV-839","DEV-860"]}'
+    new: '{"related":["DEV-300","DEV-777","DEV-819","DEV-839","DEV-860","DEV-887"]}'

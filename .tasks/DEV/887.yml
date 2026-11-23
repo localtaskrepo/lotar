@@ -1,0 +1,42 @@
+title: 'A relative --tasks-dir (.tasks) gives every repo the same agent queue file: DEV and STD tickets wait in it with no worker'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T01:01:39.223004+00:00
+modified: 2026-11-26T01:01:41.244943+00:00
+relationships:
+  related:
+  - DEV-865
+  - DEV-822
+  - DEV-827
+  - DEV-848
+  - DEV-849
+  - DEV-850
+  - DEV-872
+description: |-
+  Found in the review of DEV-865.
+
+  - `crates/lotar-agent/src/services/agent_queue_service.rs:1391` `queue_file_path` and `:1405` `queue_hash` hash the tasks dir **as given**, not its absolute path. Every process that queues with `--tasks-dir .tasks` (or `LOTAR_TASKS_DIR=.tasks`), in any repo, shares one file.
+  - On this Mac: `~/Library/Caches/lotar/agent-queue/queue-b06823c0….json` has `"tasks_dir": ".tasks"` and 7 pending entries from two repos: DEV-850, DEV-849, DEV-848, DEV-827, DEV-872 (lotar) and STD-336, STD-359 (standards), queued 2026-11-24/25. `lotar agent queue` in the repos (absolute path) doesn't show them, so they wait with no worker.
+  - Repro: `lotar --tasks-dir .tasks agent queue` in any folder (for example a new scratch repo) lists those DEV/STD entries.
+  - Unknown: which caller queues with the relative path (an automation rule, a hook, a T3 thread). DEV-822 fixed the same relative path for `automation run`.
+
+  ## Done when
+
+  - [ ] The queue, worker lock and active-job paths come from the canonical absolute tasks dir, so `.tasks` and its absolute path give the same file
+  - [ ] Entries already in a relative-path queue file are not lost: moved to the right queue or reported (owner decides which)
+  - [ ] A test: queueing with `.tasks` from the repo root and listing with the absolute path show the same entries
+history:
+- at: 2026-11-26T01:01:40.650929+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872"]}'
+- at: 2026-11-26T01:01:41.244943+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

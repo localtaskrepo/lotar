@@ -20,14 +20,18 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const STUB_AGENT_SCRIPT = path.join(HERE, 'stub-agent.mjs');
 export const DEMO_PROJECT = 'ATLS';
 
+// The environment for a lotar that seeds or serves `dir`: inherited `LOTAR_*` settings are dropped
+// and `LOTAR_TASKS_DIR` points at `dir/.tasks`. An agent job exports `LOTAR_TASKS_DIR` (and
+// `LOTAR_WORKSPACE_ROOT`) for the real backlog, and lotar prefers it over the folder's own `.tasks`.
+export function seedEnvironment(dir, inherited = process.env) {
+    const env = Object.fromEntries(Object.entries(inherited).filter(([key]) => !key.startsWith('LOTAR_')));
+    return { ...env, LOTAR_IGNORE_HOME_CONFIG: '1', LOTAR_TASKS_DIR: path.join(dir, '.tasks') };
+}
+
 export function demoEnvironment(dir, inherited = process.env) {
-    const env = Object.fromEntries(
-        Object.entries(inherited).filter(([key]) => !key.startsWith('GIT_') && !key.startsWith('LOTAR_')),
-    );
+    const env = Object.fromEntries(Object.entries(inherited).filter(([key]) => !key.startsWith('GIT_')));
     return {
-        ...env,
-        LOTAR_IGNORE_HOME_CONFIG: '1',
-        LOTAR_TASKS_DIR: path.join(dir, '.tasks'),
+        ...seedEnvironment(dir, env),
         GIT_CONFIG_NOSYSTEM: '1',
         GIT_CONFIG_GLOBAL: path.join(dir, '.demo', 'gitconfig'),
     };

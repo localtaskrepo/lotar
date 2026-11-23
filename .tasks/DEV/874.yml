@@ -1,16 +1,26 @@
 title: 'Repo health 2026-11-25: Repo is no T3 Code project: project and 2 more'
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-25T18:12:57.249115+00:00
-modified: 2026-11-25T18:13:03.117505+00:00
+modified: 2026-11-26T01:06:05.028967+00:00
 relationships:
   related:
   - DEV-464
   - DEV-786
   - DEV-799
+comments:
+- date: 2026-11-26T01:05:54.574708+00:00
+  author: claude
+  text: |-
+    All 3 findings gone already: nothing to change.
+
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[t3:project]`, `[question:DEV-786]` or `[inbox:DEV-799]`
+    - DEV-799 now shows a different finding (`[question:DEV-799]`, owner answered "hold" in INBOX-729): a later run's ticket, not this one
+    - No commits on `agent/DEV-874` beyond `main`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A54d45d1db7d89758f1d6d06198f95072e97af571eedfa2f61fd0e19c875c17c6
 description: |-
   3 findings of the daily repo-health run on 2026-11-25 (`repos.ts --report`), in one ticket (owner 2026-11-22, STD-299). Fix each the way its section says; the ticket is done when no check command below lists its finding any more.
 
@@ -53,3 +63,26 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T01:04:47.771407+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:04:48.202565+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A54d45d1db7d89758f1d6d06198f95072e97af571eedfa2f61fd0e19c875c17c6
+- at: 2026-11-26T01:05:54.574708+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:06:05.028967+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

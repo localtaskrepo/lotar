@@ -1,11 +1,11 @@
 title: REST test for GET /api/jobs/t3-thread (400, 404, unavailable)
-status: InProgress
+status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
-assignee: claude
+assignee: '@fix'
 created: 2026-11-24T22:44:17.550162+00:00
-modified: 2026-11-25T17:15:06.499622+00:00
+modified: 2026-11-26T01:07:05.339697+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -127,6 +127,9 @@ comments:
       result: not_run
       reason: test-only change, the merge runs the full suites (DEV-797)
     next: Review, then merge
+- date: 2026-11-26T01:00:50.598257+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-872. It starts once they are done.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b1c83e2cf0d2436f0b72ea63e6750f769de0de33c35f3204adaa0b9888d2d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad158317efeb4c09caef52d93f060c84098ee0ec393e83112798470246e9fa9e3
@@ -316,3 +319,19 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T01:00:50.560392+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-26T01:00:50.598257+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:07:05.339697+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'

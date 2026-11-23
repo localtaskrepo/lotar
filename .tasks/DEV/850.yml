@@ -5,12 +5,14 @@ type: Research
 reporter: codex
 assignee: '@review-light'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-25T20:08:47.766892+00:00
+modified: 2026-11-26T01:01:40.649517+00:00
 relationships:
   related:
   - DEV-849
   - DEV-791
   - DEV-774
+  - DEV-860
+  - DEV-887
 comments:
 - date: 2026-11-24T20:22:41.002771+00:00
   author: automation
@@ -223,3 +225,15 @@ history:
   - field: assignee
     old: '@research'
     new: '@review-light'
+- at: 2026-11-26T00:50:01.888585+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-791","DEV-774"]}'
+    new: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860"]}'
+- at: 2026-11-26T01:01:40.649517+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860"]}'
+    new: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887"]}'

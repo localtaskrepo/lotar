@@ -1,11 +1,11 @@
 title: 'lotar add misses worktrees created with git worktree add --relative-paths: their ID can repeat (DEV-802)'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-23T04:27:34.695967+00:00
-modified: 2026-11-25T17:07:11.043477+00:00
+modified: 2026-11-26T01:03:43.942369+00:00
 relationships:
   related:
   - DEV-802
@@ -17,6 +17,7 @@ relationships:
   - DEV-767
   - DEV-768
   - DEV-789
+  - DEV-812
 comments:
 - date: 2026-11-23T07:49:27.544311+00:00
   author: claude
@@ -211,9 +212,43 @@ comments:
       result: failed
       reason: all 2490 passed; DEV-801 temp-folder guard trips, landing as known flake per owner
     next: Merge agent lands 54e806f30 and e6442860b on main as a known DEV-801 flake
+- date: 2026-11-26T01:03:36.228330+00:00
+  author: claude
+  text: |-
+    Rebased onto main: DEV-802 has landed, so the branch is now just this fix, `231460e6a`.
+
+    - `main` had DEV-802 as `a63022225` and DEV-812 (`e53d97ffb`) changing `git.rs`, so the old branch conflicted with main in `git.rs` and `dev270_task_numbers_test.rs`.
+    - `git rebase --onto main 54e806f30` dropped the old DEV-802 copy; the fix applied cleanly. No code change.
+    - Commit message fixed from "DEV-825 first" (DEV-845's bug) to the ticket title.
+    - Targeted tests and clippy pass on the rebased tree. The DEV-801 temp-folder flake may still trip the merge's suite run: mallox decided in INBOX-706 to land anyway.
+  report:
+    commits:
+    - hash: 231460e6a
+      what: checkout_tops resolves a relative gitdir line against its admin folder, with tests
+    checks:
+    - command: cargo nextest run -p lotar-core checkout_tops
+      result: passed
+    - command: cargo nextest run -p lotar-lib checkouts_of_one_repository dev73
+      result: passed
+      reason: 3 tests
+    - command: rustfmt --check (changed files)
+      result: passed
+    - command: cargo clippy -p lotar-core --all-targets
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs it
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge (fast-forward onto main)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a14eb294736299ddcfa1a4a685c83a62e6a240e9dccc5e2e91215857e91deab
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82adc9f2c69d8345b461a52f391213e96b97bf88d19728c98d78c39fe0aa27a5
 description: |-
   Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
 
@@ -446,3 +481,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768"]}'
     new: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768","DEV-789"]}'
+- at: 2026-11-26T01:01:23.613751+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82adc9f2c69d8345b461a52f391213e96b97bf88d19728c98d78c39fe0aa27a5
+- at: 2026-11-26T01:03:36.228330+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:03:36.486561+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768","DEV-789"]}'
+    new: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768","DEV-789","DEV-812"]}'
+- at: 2026-11-26T01:03:43.942369+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
