@@ -354,6 +354,14 @@ fn update_trust_file(apply: impl FnOnce(&mut TrustFile)) -> LoTaRResult<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
+    // Serve, the CLI and agent jobs all write this file: without the lock a
+    // concurrent update loses the other's skipped run (DEV-821).
+    let lock_name = path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("trust").trim_start_matches('.').to_string();
+    let _lock = crate::storage::safety::acquire_storage_lock_within(
+        path.parent().unwrap_or(Path::new(".")),
+        &lock_name,
+        crate::utils::time::env_millis(crate::storage::safety::STORAGE_LOCK_WAIT_ENV, std::time::Duration::from_secs(10)),
+    )?;
     let mut file = load_trust_file()?;
     apply(&mut file);
     let yaml = serde_yaml_ng::to_string(&file)?;
@@ -509,5 +517,58 @@ mod tests {
         let gone = source("config.yml", "gone_kind", "x\n");
         let trusted = record(&[automation.clone(), gone], Some(&["automation", "gone_kind"]));
         assert_eq!(trusted.state(&[automation]), TrustState::Changed);
+    }
+
+    /// DEV-821: skips written by several processes at once, with `lotar
+    /// trust` taking them in between, are each taken exactly once.
+    #[test]
+    fn concurrent_skips_and_a_trust_lose_no_skipped_run() {
+        let dir = tempfile::tempdir().unwrap();
+        // SAFETY: test-local override; nextest runs each test in its own process.
+        unsafe {
+            std::env::remove_var(TRUST_ALL_ENV);
+            std::env::set_var(TRUST_FILE_ENV, dir.path().join("trust.yml"));
+        }
+        let tasks = dir.path().join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        std::fs::write(tasks.join("automation.yml"), "automation:\n  rules: []\n").unwrap();
+        let skip = |ticket: String| SkippedRun {
+            ticket,
+            rule: "relay".to_string(),
+            skipped_at: crate::utils::time::now_rfc3339(),
+            run: "\"echo\"".to_string(),
+            program: "echo".to_string(),
+            args: Vec::new(),
+            env: BTreeMap::new(),
+            cwd: tasks.clone(),
+            wait: true,
+            ignore_failure: false,
+            timeout_secs: 1,
+        };
+        let taken = std::sync::Mutex::new(Vec::new());
+        std::thread::scope(|scope| {
+            for writer in 0..8 {
+                let skip = &skip;
+                let tasks = &tasks;
+                scope.spawn(move || {
+                    for n in 0..10 {
+                        TrustService::record_skipped_run(tasks, skip(format!("T-{writer}-{n}"))).unwrap();
+                    }
+                });
+            }
+            scope.spawn(|| {
+                for _ in 0..5 {
+                    assert!(TrustService::trust(&tasks).unwrap());
+                    taken.lock().unwrap().extend(TrustService::take_skipped_runs(&tasks).unwrap());
+                }
+            });
+        });
+        let mut tickets: Vec<String> =
+            taken.into_inner().unwrap().into_iter().chain(TrustService::take_skipped_runs(&tasks).unwrap()).map(|run| run.ticket).collect();
+        tickets.sort();
+        let mut expected: Vec<String> = (0..8).flat_map(|writer| (0..10).map(move |n| format!("T-{writer}-{n}"))).collect();
+        expected.sort();
+        assert_eq!(tickets, expected, "every skipped run taken exactly once");
+        assert_eq!(TrustService::state(&tasks), TrustState::Trusted, "no write lost the trust record");
     }
 }

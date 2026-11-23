@@ -1,11 +1,11 @@
 title: 'list-running --all: wrapper rows show tasks_dir ''-'' and the docs still say only this tasks directory''s wrappers are listed'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:12:34.614201+00:00
-modified: 2026-11-24T21:59:39.688545+00:00
+modified: 2026-11-24T23:28:46.553992+00:00
 relationships:
   depends_on:
   - DEV-763
@@ -15,6 +15,10 @@ relationships:
   - DEV-767
   - DEV-771
   - DEV-774
+  - DEV-768
+  - DEV-806
+  - DEV-833
+  - DEV-840
 comments:
 - date: 2026-11-23T00:54:01.640535+00:00
   author: claude
@@ -118,6 +122,32 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-24T23:28:36.373529+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `1ebc9245a` (origin too), and `.tasks` is trusted again.
+
+    - The failed check was a leak in an existing test, not in this work. `tests/embedded_web_ui_test.rs` left a `.tmpXXXXXX` folder on every run (4 out of 4 when run alone). Its `lotar serve` starts a queue worker in its own process group. The worker outlives the killed server and recreates `.tasks` in the removed temp dir.
+    - Fix: the test sets `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1`, as `dev646_serve_shared_job_limits_test.rs` does. Afterwards: 0 leaks out of 3 alone, and a clean full run. This isn't the cause DEV-840 is fixing (sccache, `dev732`), so I told DEV-840.
+    - Rebased twice, because main moved on (DEV-768, then STD-328 and DEV-806). STD-328 changed `package-lock.json`, so I ran `npm ci` and all three checks again on the final commit.
+    - The `.tasks` amend was refused by betterleaks `generic-password`, a false positive on `` login (`lotar-95e687-DEV-800-fix` `` in a DEV-833 comment. I reworded it to "after the login expired (…)" without changing the meaning. Nothing was bypassed.
+    - Seen, not touched: 5 orphaned `lotar … agent worker` processes from other runs' `install/bin` test scratch dirs (pids 27697, 52043, 54164, 57119, 58627).
+  report:
+    commits:
+    - hash: 4dcde021e
+      what: list-running --all wrapper rows show their --tasks-dir; docs
+    - hash: 1ebc9245a
+      what: embedded_web_ui_test starts no queue worker (temp-folder leak); also carries the pending .tasks files
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2489/2489 Rust, UI, release, hooks; temp folder empty
+    - command: npm run -s smoke
+      result: passed
+      reason: 409/409
+    next: 'None: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeced1b04e5228831466e9cd5e5b40847be299d3a868889d3e80daab96d8a6ba1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A42c6f21cbc4db470efa47a8538c852ec26c98bba092340aef9f8aae5c2a138d3
@@ -135,8 +165,6 @@ description: |-
   - [ ] A wrapper whose job record is also listed is still shown once (the record row wins).
   - [ ] `docs/help/agent.md` says that `--all` lists the wrappers of every tasks directory, with their `tasks_dir`.
   - [ ] Unit test for reading `--tasks-dir` from a wrapper command line, including the older-wrapper case.
-tags:
-- job-paused
 history:
 - at: 2026-11-22T20:12:40.963936+00:00
   actor: claude
@@ -280,3 +308,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-24T23:28:36.373529+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T23:28:36.628115+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774"]}'
+    new: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774","DEV-768","DEV-806","DEV-833","DEV-840"]}'
+- at: 2026-11-24T23:28:46.553992+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused
+    new: ''

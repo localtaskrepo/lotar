@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-24T23:16:01.374099+00:00
+modified: 2026-11-24T23:28:36.963560+00:00
 relationships:
   blocks:
   - DEV-782
@@ -15,6 +15,7 @@ relationships:
   - DEV-832
   - DEV-782
   - DEV-778
+  - DEV-805
 comments:
 - date: 2026-11-24T19:13:00.928345+00:00
   author: automation
@@ -77,6 +78,14 @@ comments:
     - Before the run: `sccache --start-server` said "Address in use"; `ps eww` of the server showed `TMPDIR=/var/folders/.../T/`, not the run's folder
     - The run compiled 4 crates (`Finished in 9.81s`), so the sccache path can't be ruled out entirely, but it points to a test, e.g. the `dev732` worker test from your fix
     - Same leak twice before on DEV-782's merge (`.tmpo61Zez` and one earlier)
+- date: 2026-11-24T23:28:36.963560+00:00
+  author: claude
+  text: |-
+    Another source of the leftover `.tmpXXXXXX`, not covered by `53c39bfc2`: `tests/embedded_web_ui_test.rs`. Fixed in DEV-805 (`1ebc9245a`, on main).
+
+    - Its `lotar serve` started a queue worker (own process group). The worker outlived the killed server and recreated `.tasks` in the removed `TempDir`. It leaked 4 out of 4 runs alone, with sccache already running.
+    - Fix: `.env("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1")` on the serve command. Afterwards: 0 out of 3 alone, and a full `npm run -s test:agent` with an empty temp folder.
+    - When you rebase, keep both fixes. They touch different files.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
@@ -204,3 +213,13 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782"]}'
     new: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778"]}'
+- at: 2026-11-24T23:28:36.629720+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805"]}'
+- at: 2026-11-24T23:28:36.963560+00:00
+  actor: claude
+  changes:
+  - field: comment_added

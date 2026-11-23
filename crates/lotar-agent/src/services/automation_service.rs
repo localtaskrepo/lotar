@@ -2665,6 +2665,11 @@ fn apply_action(
             let kept = keep_skipped_run(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl);
             note_run(format!("Automation rule '{}' skipped its run on {}: this workspace isn't trusted (`lotar trust`).", action_context.rule, current.id));
             report_skipped_run(storage, &current.id, &action_context.rule, kept)?;
+            // `lotar trust` may have taken the skipped runs between the trust
+            // check and the record above: replay it then (DEV-821).
+            if kept && TrustService::allows_commands(&storage.root_path) {
+                AutomationService::rerun_skipped_runs(&storage.root_path);
+            }
         }
     }
 
