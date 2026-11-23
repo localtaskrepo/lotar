@@ -223,7 +223,7 @@ A job runs inside the process that started it: `lotar serve`, the background que
 
 `list-running` prints one row per job: `pid` (the runner process; `0` for runners that harnessmux runs), `owner_pid` (the `lotar` process that runs the job: a queue worker, `lotar serve`, an MCP session or `agent run --wait`), `job_id`, `ticket`, `runner` and `started_at`. With `--all` it lists the running jobs of every tasks directory on this machine, oldest first, and adds `tasks_dir`; a job an older build recorded shows `-` there. `--format json` gives the same fields under `jobs`. A job whose `owner_pid` exited is not listed: it waits to be [taken over](#jobs-whose-process-died).
 
-`list-running` also lists the `lotar-agent-wrapper` processes (which run `command` jobs) of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
+`list-running` also lists the `lotar-agent-wrapper` processes (which run `command` jobs) of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID. With `--all` it lists the wrappers of every tasks directory, each with the `tasks_dir` it was started for; a wrapper an older build started shows `-` there.
 
 When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
 

@@ -1071,7 +1071,8 @@ fn list_wrapper_processes(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAge
                 return None;
             }
             let (job_id, ticket_id, runner) = parse_wrapper_metadata(&cmd);
-            Some(RunningAgentJob { pid: pid.as_u32(), owner_pid: None, job_id, ticket_id, runner, started_at: None, tasks_dir: None })
+            let tasks_dir = wrapper_tasks_dir(&cmd).map(|dir| dir.to_string_lossy().into_owned());
+            Some(RunningAgentJob { pid: pid.as_u32(), owner_pid: None, job_id, ticket_id, runner, started_at: None, tasks_dir })
         })
         .collect()
 }
@@ -1173,11 +1174,14 @@ fn is_wrapper_name(name: &str) -> bool {
 /// wrapper without `--tasks-dir` (an older lotar) is not counted; its job's
 /// record is (DEV-367).
 fn wrapper_runs_in(cmd: &[String], tasks_dir: &std::path::Path) -> bool {
-    let Some(value) = cmd.iter().take_while(|arg| *arg != "--").skip_while(|arg| *arg != "--tasks-dir").nth(1) else {
-        return false;
-    };
-    let canonical = |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    canonical(std::path::Path::new(value)) == canonical(tasks_dir)
+    wrapper_tasks_dir(cmd).is_some_and(|dir| dir == tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf()))
+}
+
+/// The wrapper's `--tasks-dir` (before `--`), canonicalized when it
+/// resolves; `None` for an older wrapper without the flag (DEV-805).
+fn wrapper_tasks_dir(cmd: &[String]) -> Option<std::path::PathBuf> {
+    let value = std::path::Path::new(cmd.iter().take_while(|arg| *arg != "--").skip_while(|arg| *arg != "--tasks-dir").nth(1)?);
+    Some(value.canonicalize().unwrap_or_else(|_| value.to_path_buf()))
 }
 
 fn parse_wrapper_metadata(cmd: &[String]) -> (Option<String>, Option<String>, Option<String>) {
@@ -1213,7 +1217,7 @@ fn parse_wrapper_metadata(cmd: &[String]) -> (Option<String>, Option<String>, Op
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_ticket_from_branch, parse_wrapper_metadata, running_job_matches, wrapper_runs_in};
+    use super::{extract_ticket_from_branch, parse_wrapper_metadata, running_job_matches, wrapper_runs_in, wrapper_tasks_dir};
     use std::path::Path;
 
     #[test]
@@ -1254,6 +1258,17 @@ mod tests {
         // job; its job's own record still counts (DEV-367).
         let legacy: Vec<String> = ["lotar-agent-wrapper", "--job-id", "job-1", "--", "codex"].map(String::from).to_vec();
         assert!(!wrapper_runs_in(&legacy, Path::new("/work/b/.tasks")));
+    }
+
+    #[test]
+    fn wrapper_rows_show_their_tasks_dir() {
+        let cmd: Vec<String> =
+            ["lotar-agent-wrapper", "--job-id", "job-1", "--tasks-dir", "/work/a/.tasks", "--", "codex", "--tasks-dir", "/x"].map(String::from).to_vec();
+        assert_eq!(wrapper_tasks_dir(&cmd).as_deref(), Some(Path::new("/work/a/.tasks")));
+        // An older wrapper names none (shown as `-`); the agent's own
+        // arguments after `--` don't count.
+        let legacy: Vec<String> = ["lotar-agent-wrapper", "--job-id", "job-1", "--", "codex", "--tasks-dir", "/x"].map(String::from).to_vec();
+        assert_eq!(wrapper_tasks_dir(&legacy), None);
     }
 
     #[test]
