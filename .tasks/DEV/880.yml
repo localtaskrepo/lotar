@@ -1,0 +1,32 @@
+title: 'Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log''s visible area'
+status: Todo
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T20:09:11.247882+00:00
+modified: 2026-11-25T20:09:18.781007+00:00
+relationships:
+  related:
+  - DEV-859
+description: |-
+  Found in the DEV-859 review. A search opens the matching tool call and shows its whole output, but the log list scrolls internally. With a long output, for example 20 lines followed by 'npm notice' at 1440 px, the highlighted word sits below the visible part of the log, and the user has to scroll to find it.
+
+  ## Done when
+  - [ ] Searching scrolls the log to the first match, or Next and Previous buttons step through the matches.
+  - [ ] A Vitest and a smoke test cover it.
+tags:
+- ui
+- web-ui
+history:
+- at: 2026-11-25T20:09:15.740281+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-859"]}'
+- at: 2026-11-25T20:09:18.781007+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

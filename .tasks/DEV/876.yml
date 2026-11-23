@@ -1,0 +1,27 @@
+title: 'T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T19:54:54.013521+00:00
+modified: 2026-11-25T19:54:54.693755+00:00
+relationships:
+  related:
+  - DEV-777
+  - DEV-810
+  - DEV-827
+  - DEV-828
+description: 'Found 2026-11-25: 205 unsettled T3 threads; 86 are older attempts on open tickets (DEV-810 15 threads, DEV-828 13, DEV-827..831 and DEV-777 about 12 each), 31 belong to Done tickets. Each retry or review job starts a new thread and never settles the previous one. Done when: starting a job settles the ticket''s earlier job threads, closing a ticket settles all of them, and a test covers both. Owner chose to file this 2026-11-25.'
+history:
+- at: 2026-11-25T19:54:54.341828+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828"]}'
+- at: 2026-11-25T19:54:54.693755+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

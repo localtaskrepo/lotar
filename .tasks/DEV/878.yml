@@ -1,0 +1,25 @@
+title: 'Automation service: expand_comment took append_automation_comment''s doc comment'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T20:00:38.684959+00:00
+modified: 2026-11-25T20:00:39.500224+00:00
+relationships:
+  related:
+  - DEV-852
+description: |-
+  Found in the DEV-852 review.
+
+  `crates/lotar-agent/src/services/automation_service.rs:3072-3078`: `expand_comment` was inserted between the doc comment of `append_automation_comment` and that function. Both doc comments now sit on `expand_comment` (one doc block that first describes appending a comment), and `append_automation_comment` has none.
+
+  ## Done when
+
+  - [ ] The "Append a comment to a task ..." doc comment sits on `append_automation_comment` again, and `expand_comment` keeps only its own
+history:
+- at: 2026-11-25T20:00:39.500224+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

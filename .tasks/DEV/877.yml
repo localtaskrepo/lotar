@@ -1,0 +1,24 @@
+title: 'T3 runner: read job results through t3_submit_output and milestones through MCP Events'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T19:54:54.990569+00:00
+modified: 2026-11-25T19:54:55.628551+00:00
+relationships:
+  related:
+  - DEV-849
+description: 'T3 Code 0.1.12 adds typed turn results (t3_submit_output) and MCP Events webhooks/streams for milestones. lotar''s T3 runner could take a structured result instead of parsing the final reply, and get live state instead of polling (related DEV-849). Done when: the runner asks for a typed result and uses it, takes events for live state, and tests cover both with the fake t3. Owner chose to file this 2026-11-25.'
+history:
+- at: 2026-11-25T19:54:55.315038+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-849"]}'
+- at: 2026-11-25T19:54:55.628551+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

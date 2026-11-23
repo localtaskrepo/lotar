@@ -1,16 +1,17 @@
 title: 'Job log search: a match inside a folded tool call''s output is counted but not shown'
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T22:50:59.233215+00:00
-modified: 2026-11-25T12:42:31.231119+00:00
+modified: 2026-11-25T20:09:58.323517+00:00
 relationships:
   depends_on:
   - DEV-769
   related:
   - DEV-769
+  - DEV-880
 comments:
 - date: 2026-11-25T12:42:24.803691+00:00
   author: claude
@@ -20,18 +21,71 @@ comments:
     - `view/components/AgentJobToolCall.vue`, the log search and `groupOpen` exist only on `agent/DEV-769` (`b29879cb9`); main `46fb767aa` has neither.
     - DEV-769 is in Merging (`@merge`). Building on its unmerged commit would conflict with that merge.
     - Added depends-on DEV-769 and tag `waits`; I continue here once DEV-769 is on main.
+- date: 2026-11-25T19:54:17.936814+00:00
+  author: automation
+  text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-859 yet. Agent job job-20261125T195417.443Z-62 is queued: it is waiting for a free slot (3 of DEV''s agent.worktree.max_parallel_jobs 3 running).'
+- date: 2026-11-25T20:05:44.829435+00:00
+  author: claude
+  text: |-
+    Fixed: a search now opens each tool call whose input or output holds the word, so the match shows highlighted.
+
+    - Rebased `agent/DEV-859` onto main `56de78e33` (DEV-769 is in).
+    - `view/components/AgentJobToolCall.vue` takes the log's `query`; a matching call opens (grouped or alone); a match only past the clipped 12 lines shows the whole output; clearing the search folds them again.
+    - `view/__tests__/AgentJobLog.spec.ts`: new test; `smoke/tests/ui.agent-jobs.smoke.spec.ts`: the DEV-769 test also searches `commit` (only in `git status` output) and checks the visible output and the `job-log-search` highlight in Chromium.
+    - Done when rewritten as checkboxes.
+  report:
+    commits:
+    - hash: 9e05afd76
+      what: search opens each tool call whose input or output holds the query
+    checks:
+    - command: npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobLog.spec.ts view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: new test fails before the fix
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'filters the log, folds'
+      result: passed
+      reason: fails before the fix
+    - command: vue-tsc, tsc smoke, oxlint, eslint, prettier on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
+    next: Merge agent lands agent/DEV-859
+- date: 2026-11-25T20:09:51.616768+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code is correct and its tests pass, but the UI screenshots are missing.
+
+    - **Blocking:** the fix comment links no before and after screenshots of the Agents page job log, in light and dark mode at 1920, 1440 and 390 px. The ticket has tag `ui`, so the review requires them. Fix: attach them to the ticket and link them in the fix comment. The code needs no change.
+    - Reviewed `9e05afd76`, the only commit in `main..HEAD`. `agent/DEV-859` has no newer commits. I read the diff against the ticket, DEV-769 and `view/utils/agentJobLog.ts`: the call's match test uses the same trimmed, lower-case query as `layoutLog`, and checks the same fields (input and output; `what` is always visible).
+    - Done when:
+      - A matching call opens, grouped (Vitest) or alone (smoke, `git status`).
+      - A match only past the first 12 lines shows the whole output, without a "Show all" button (`matchClipped`, `view/components/AgentJobToolCall.vue:63`).
+      - A failed call stays open (`status === 'failed' || matches`), and clearing the search folds the calls again.
+      - A Vitest and a smoke test cover it.
+    - Reran:
+      - `npm ci`: ok.
+      - `npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobLog.spec.ts view/__tests__/AgentJobs.spec.ts`: 45 passed.
+      - The same test with main's `AgentJobLog.vue` and `AgentJobToolCall.vue`: the new test fails. I restored both files.
+      - `npx vitest run --config smoke/vitest.config.ts smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'filters the log, folds'`: passed.
+    - My own screenshots, taken with a temporary spec that I removed afterwards (scratch folder `/tmp/dev859-shots`): light and dark mode at 1920, 1440 and 390 px. I saw no visual problem. After a search for `npm`, `make test` opens with its whole 21-line output; clearing the search folds the group again.
+    - Minor, filed as [DEV-880](https://lotar.pyxzl.net/task/DEV-880): the log doesn't scroll to the match, so a match deep in a long output stays below the log's visible area.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeed1b8c40422a5b7f27406f340918a1036ad58cc6146e101d17e6114deca44ee
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa559fdc5ea5ed7a48ec62c809edbd1978e27914e153885f7e6e01e9e191bd960
 description: |-
   Found in the DEV-769 review: searching a job log for a word that only appears in a tool call's output (for example `npm`) opens the Tools group and counts "3 matches", but each call stays folded, so its output and the highlight are hidden. `groupOpen` in `view/components/AgentJobLog.vue` opens the group; `view/components/AgentJobToolCall.vue` opens a call only when it failed.
 
   Fix: while a search is active, open each call whose input or output contains the query.
 
-  Done when: searching for a word that appears only in a call's output shows that output with the word highlighted. A Vitest or smoke test covers it.
+  ## Done when
+  - [ ] A search for a word only in a call's output opens that call, grouped or alone, and its output shows with the word highlighted.
+  - [ ] A match only past the clipped first 12 lines shows the whole output (no "Show all" button then).
+  - [ ] Calls without a match stay folded; a failed call stays open either way; clearing the search folds the opened calls again.
+  - [ ] A Vitest and a smoke test cover it.
 tags:
 - ui
 - web-ui
-- waits
+- review-returned
 history:
 - at: 2026-11-24T22:51:00.186554+00:00
   actor: claude
@@ -71,3 +125,82 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-25T19:54:17.151202+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: ui, web-ui, waits
+    new: ui, web-ui
+- at: 2026-11-25T19:54:17.936814+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:01:08.470917+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-25T20:01:08.992028+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa559fdc5ea5ed7a48ec62c809edbd1978e27914e153885f7e6e01e9e191bd960
+- at: 2026-11-25T20:05:15.304731+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-769 review: searching a job log for a word that only appears in a tool call's output (for example `npm`) opens the Tools group and counts "3 matches", but each call stays folded, so its output and the highlight are hidden. `groupOpen` in `view/components/AgentJobLog.vue` opens the group; `view/components/AgentJobToolCall.vue` opens a call only when it failed.
+
+      Fix: while a search is active, open each call whose input or output contains the query.
+
+      Done when: searching for a word that appears only in a call's output shows that output with the word highlighted. A Vitest or smoke test covers it.
+    new: |-
+      Found in the DEV-769 review: searching a job log for a word that only appears in a tool call's output (for example `npm`) opens the Tools group and counts "3 matches", but each call stays folded, so its output and the highlight are hidden. `groupOpen` in `view/components/AgentJobLog.vue` opens the group; `view/components/AgentJobToolCall.vue` opens a call only when it failed.
+
+      Fix: while a search is active, open each call whose input or output contains the query.
+
+      ## Done when
+      - [ ] A search for a word only in a call's output opens that call, grouped or alone, and its output shows with the word highlighted.
+      - [ ] A match only past the clipped first 12 lines shows the whole output (no "Show all" button then).
+      - [ ] Calls without a match stay folded; a failed call stays open either way; clearing the search folds the opened calls again.
+      - [ ] A Vitest and a smoke test cover it.
+- at: 2026-11-25T20:05:44.829435+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:05:55.311492+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-25T20:09:15.663954+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-769"],"related":["DEV-769"]}'
+    new: '{"depends_on":["DEV-769"],"related":["DEV-769","DEV-880"]}'
+- at: 2026-11-25T20:09:51.616768+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:09:51.906999+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, web-ui
+    new: ui, web-ui, review-blocked
+- at: 2026-11-25T20:09:58.323517+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, web-ui, review-blocked
+    new: ui, web-ui, review-returned

@@ -576,7 +576,8 @@ mod relative_path_search {
             .arg("show")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Tasks directory: ../other/tasks"));
+            // Shown joined to the working folder (DEV-822).
+            .stdout(predicate::str::contains(format!("{}", std::path::Path::new("subproject").join("../other/tasks").display())));
 
         // Verify the complex path directory was created
         let complex_path_dir = sub_dir.join("../other/tasks");

@@ -3,13 +3,14 @@ status: Reviewing
 priority: Medium
 type: Research
 reporter: codex
-assignee: '@research'
+assignee: '@review-light'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-25T08:07:54.672407+00:00
+modified: 2026-11-25T20:08:47.766892+00:00
 relationships:
   related:
   - DEV-849
   - DEV-791
+  - DEV-774
 comments:
 - date: 2026-11-24T20:22:41.002771+00:00
   author: automation
@@ -69,8 +70,34 @@ comments:
     - Not blocking: the Codex row (line 48) rests on a discussion and an issue, not official docs. The write-up says so itself.
 
     Next step: the research agent re-checks a T3 log from lotar 0.3.0 and corrects those lines.
+- date: 2026-11-25T20:08:38.083533+00:00
+  author: claude
+  text: |-
+    Fixed the blocking finding: T3 tool calls depend on which harnessmux wrote the log. Amended commit `13c0fe2e3`.
+
+    - The review read HEAD `ed765c1a0`, so I fixed rather than re-requested.
+    - **Reviewer is right about 0.3.0:** its README and `src/backend/t3.rs` read T3's activity and send `tool.started`/`tool.finished` and `thought.delta`.
+    - **Every t3 log here has no tool events,** because the installed lotar 0.15.6 links harnessmux `0.2.0` ([Cargo.lock](https://github.com/localtaskrepo/lotar/blob/v0.15.6/Cargo.lock)). 0.2.0 reads the activity only for a failed run's errors. Checked `lotar-95e687-DEV-849-fix`, `…DEV-850-research.20261124T212513Z`, `…DEV-859-fix.20261125T124231Z` and `standards-04f015-STD-353-fix` (today 19:55): all have `message` and `message.delta` but no `tool.*`.
+    - **Not verified:** a t3 log written by lotar's 0.3.0 library. None exists until a lotar release with DEV-774 runs a t3 job. The write-up says so.
+    - **Corrected:** the T3 read-path bullet, the T3 state, the sketch's T3 phase (expanded looks the same as the others; an older log shows replies plus "Tool calls are in T3"), slice item 3 (the smoke test seeds a 0.3.0 and a 0.2.0 t3 log) and the recommendation.
+    - Not blocking: the Codex row is unchanged. It already says no official doc exists.
+  report:
+    commits:
+    - hash: 13c0fe2e3
+      what: write-up, T3 tool calls corrected
+    checks:
+    - command: npx prettier --check docs/research/inline-transcript-review.md
+      result: passed
+    - command: source links (lotar v0.15.6 Cargo.lock, docs.rs harnessmux 0.2.0 t3.rs)
+      result: passed
+      reason: both HTTP 200
+    - command: t3 log written by harnessmux 0.3.0
+      result: not_run
+      reason: none exists until a lotar release with DEV-774 runs a t3 job
+    next: Source check reads 13c0fe2e3
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
 description: |-
   Ravi asked on 2026-11-24 to use the LoTaR ticket timeline to review the full chain of work across T3 and headless harnessmux jobs. Keep ticket files small by storing references to transcripts and showing the original text in the UI when someone opens a job. Figure out what that should feel like on a phone and what the links can reliably resolve.
 
@@ -166,3 +193,33 @@ history:
   - field: tags
     old: agent, ui, job-paused, review-blocked
     new: agent, ui, job-paused, review-returned
+- at: 2026-11-25T20:07:00.282170+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T20:07:00.774722+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
+- at: 2026-11-25T20:08:38.083533+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:08:38.477211+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-791"]}'
+    new: '{"related":["DEV-849","DEV-791","DEV-774"]}'
+- at: 2026-11-25T20:08:47.766892+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@research'
+    new: '@review-light'

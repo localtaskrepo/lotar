@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T22:42:33.887526+00:00
-modified: 2026-11-25T17:17:50.540984+00:00
+modified: 2026-11-25T20:08:38.476625+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-13
@@ -21,6 +21,7 @@ relationships:
   - DEV-769
   - DEV-789
   - DEV-810
+  - DEV-850
 comments:
 - date: 2026-11-22T02:38:02.077636+00:00
   author: claude
@@ -348,3 +349,9 @@ history:
   - field: relationships
     old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833","DEV-769","DEV-789"]}'
     new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833","DEV-769","DEV-789","DEV-810"]}'
+- at: 2026-11-25T20:08:38.476625+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833","DEV-769","DEV-789","DEV-810"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833","DEV-769","DEV-789","DEV-810","DEV-850"]}'

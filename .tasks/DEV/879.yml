@@ -1,0 +1,26 @@
+title: 'Rule builder: a comment map without a question is called ''comments with a question'''
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T20:00:39.778177+00:00
+modified: 2026-11-25T20:00:40.701640+00:00
+relationships:
+  related:
+  - DEV-852
+description: |-
+  Found in the DEV-852 review.
+
+  `view/utils/automationRules.ts:790` marks every non-string `comment` YAML-only with the reason "comments with a question are currently YAML-only". A rule with `comment: { text: hi }` (no `question`, which DEV-852 allows) gets that reason too, though it asks nothing.
+
+  ## Done when
+
+  - [ ] A `comment` map without `question` gets a reason that fits it (or, if the owner prefers, is edited in the builder as a plain comment, saved back in the same form)
+  - [ ] A test in `view/__tests__/automationRules.spec.ts` covers it
+history:
+- at: 2026-11-25T20:00:40.701640+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

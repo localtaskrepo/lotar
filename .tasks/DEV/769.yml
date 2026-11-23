@@ -1,11 +1,11 @@
 title: 'Agent job log viewer: filters, search, folded tool calls, live status line, and jobs list filters'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-25T16:26:25.052568+00:00
+modified: 2026-11-25T19:54:16.477950+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -21,6 +21,12 @@ relationships:
   - DEV-859
   - DEV-774
   - DEV-805
+  - DEV-875
+  - DEV-789
+  - DEV-803
+  - DEV-807
+  - DEV-811
+  - DEV-823
 comments:
 - date: 2026-11-24T19:37:14.500501+00:00
   author: automation
@@ -217,6 +223,36 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-769` onto `main` conflicts in `view/components/AgentRunInputs.vue`; lotar aborted the rebase, `agent/DEV-769` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-25T19:54:07.021270+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `56de78e33` is on `main` and `origin/main`.
+
+    - **Conflict 1, `view/components/AgentRunInputs.vue`:** main's DEV-807 makes the Instructions panel load again when it opens with no record yet. This branch moved the loading into `AgentRunInputsPanel.vue`, which loaded only once. I kept both: the panel has a new `open` prop and loads again when it opens with no record. `AgentJobLog.vue` and `AgentRunInputs.vue` pass the prop. DEV-807's tests in `AgentRunInputs.spec.ts` pass
+    - **Conflict 2, `view/__tests__/AgentJobs.spec.ts`:** DEV-789 and this branch each added tests at the same spot. I kept all of them
+    - **Formatting:** after `npm ci`, main's newer Prettier wraps one line of `AgentJobLog.vue` differently. I applied it; the text on screen is the same
+    - **Main moved 4 times** during the checks (DEV-789, DEV-811, DEV-823, DEV-803). After each move I rebased and ran the checks again. The last move was DEV-803, which changed only docs, so I fast-forwarded without another run
+    - **Smoke failures, both passed alone and in the later full runs:** this ticket's Instructions smoke test failed once under load, so I filed [DEV-875](https://lotar.pyxzl.net/task/DEV-875). `ui.sync-scope` timed out once while another worktree held the machine's check lock
+    - **Trust:** the merge changes no rules or config, so I didn't run `lotar trust`
+  report:
+    commits:
+    - hash: 56de78e33
+      what: DEV-769 job log viewer, rebased onto main, on origin/main
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2536 Rust, 1616 Vitest
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411 on bd4c626cb and a4e9b1ede
+    - command: checks on 5d90d3e02
+      result: not_run
+      reason: main only gained DEV-803's docs (docs/help/automation.md, docs/help/sse.md, docs/developers/sse.md)
+    next: 'None: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
@@ -309,9 +345,6 @@ description: |-
 tags:
 - ui
 - web-ui
-- job-paused
-- review-returned
-- review-returned-twice
 history:
 - at: 2026-11-21T20:47:26.221887+00:00
   actor: claude
@@ -853,3 +886,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T19:53:56.401059+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805","DEV-875"]}'
+- at: 2026-11-25T19:54:07.021270+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T19:54:07.277573+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805","DEV-875"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805","DEV-875","DEV-789","DEV-803","DEV-807","DEV-811","DEV-823"]}'
+- at: 2026-11-25T19:54:16.477950+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: ui, web-ui, job-paused, review-returned, review-returned-twice
+    new: ui, web-ui

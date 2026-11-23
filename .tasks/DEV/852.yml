@@ -1,11 +1,11 @@
 title: 'Automation: a rule''s comment can ask a question with options'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T21:03:41.684865+00:00
-modified: 2026-11-25T08:03:00.201445+00:00
+modified: 2026-11-25T20:01:07.491695+00:00
 relationships:
   blocks:
   - DEV-796
@@ -13,6 +13,8 @@ relationships:
   - DEV-796
   - DEV-488
   - DEV-851
+  - DEV-878
+  - DEV-879
 comments:
 - date: 2026-11-25T08:02:46.204900+00:00
   author: claude
@@ -52,6 +54,23 @@ comments:
       result: not_run
       reason: the merge runs it
     next: Review on another model, then merge
+- date: 2026-11-25T20:00:56.825955+00:00
+  author: claude
+  text: |-
+    Review: passed. `01daa6380` does what "Done when" asks. Two minor findings are filed as tickets.
+
+    - Read: the ticket, DEV-796/DEV-488, the whole diff (`git diff main...HEAD`), AGENTS.md, and the touched files' recent commits on main. The branch merges cleanly onto main `56de78e33` (`git merge-tree`). `npm ci` passed.
+    - Reran: `cargo nextest run -p lotar-agent checks_comment_questions`, `cargo nextest run --test integration dev852` (3/3), `cargo nextest run -p lotar-agent -p lotar-tasks automation question` (85/85), `npx vitest run view/__tests__/automationRules.spec.ts` (10/10). All passed.
+    - Ran by hand in a scratch workspace:
+      - The docs example runs end to end: `simulate` shows `Ask:` with the options and the recommended one, `automation run` posts the question as `automation`, `list --has question` finds it, and `--answer hand` sets the assignee.
+      - A bad question in a hand-edited file fails at run time: the error goes to stderr, no comment is written, and the `set`/`add` that come before it still apply.
+    - The claim that `config validate` now also checks automation files holds. I checked every repo under `~/Development` that has a `.tasks/**/automation.yml` (lotar DEV and standards included): no errors. No CI step runs `config validate`.
+    - REST: simulate's new action kind `ask_question` isn't in the `docs/openapi.json` list, but that list is marked "e.g." and already leaves out `tell_agent` and others, so it needs no change.
+    - Already true before this change, no ticket: a value of the wrong type (`multiple: maybe`) gives serde's `data did not match any variant of untagged enum AutomationRuleSet`, which doesn't name the rule. This happens for any action field, not only questions.
+    - Minor findings, filed:
+      - [DEV-878](https://lotar.pyxzl.net/task/DEV-878): in `automation_service.rs:3072`, `expand_comment` took over `append_automation_comment`'s doc comment.
+      - [DEV-879](https://lotar.pyxzl.net/task/DEV-879): in `view/utils/automationRules.ts:790`, the builder says "comments with a question" for a `comment:` map that has no question.
+    - UI: there is no `ui` tag and only `view/utils` changed (no pages, components or styles), so there was no screenshot review.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae300be0eb1776a74acd7f47cd42c1d251db1f4df2ca39cae4f189033f9da6082
 description: |-
@@ -183,3 +202,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T20:00:38.973338+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-488","DEV-851"]}'
+    new: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-488","DEV-851","DEV-878"]}'
+- at: 2026-11-25T20:00:40.061338+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-488","DEV-851","DEV-878"]}'
+    new: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'
+- at: 2026-11-25T20:00:56.825955+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:01:07.491695+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

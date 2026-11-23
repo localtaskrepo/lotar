@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-25T17:17:57.231149+00:00
+modified: 2026-11-25T19:54:54.338852+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -21,6 +21,7 @@ relationships:
   - DEV-849
   - DEV-774
   - DEV-836
+  - DEV-876
 comments:
 - date: 2026-11-22T21:22:50.394391+00:00
   author: claude
@@ -956,3 +957,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T19:54:54.338852+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876"]}'

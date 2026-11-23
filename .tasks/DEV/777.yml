@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-25T09:31:48.586063+00:00
+modified: 2026-11-25T19:54:54.337532+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -17,6 +17,7 @@ relationships:
   - DEV-832
   - DEV-833
   - DEV-767
+  - DEV-876
 comments:
 - date: 2026-11-22T02:54:19.137208+00:00
   author: claude
@@ -754,3 +755,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T19:54:54.337532+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876"]}'

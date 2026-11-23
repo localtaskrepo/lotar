@@ -296,3 +296,28 @@ fn cli_comment_json_reports_action_and_exact_count() {
     assert_eq!(payload["added_comment"]["text"], "json body", "added_comment must echo the persisted text: {payload}");
     assert_eq!(env.marker_count(MARKER_COMMENT_ADDED), 1);
 }
+
+/// DEV-822: `--tasks-dir .tasks` has the empty path as its parent; a run
+/// must still start in the workspace root instead of failing with ENOENT.
+#[test]
+fn cli_bare_relative_tasks_dir_runs_in_workspace_root() {
+    let fixtures = TestFixtures::new();
+    let workspace = fixtures.get_temp_path().to_path_buf();
+    std::fs::write(
+        fixtures.tasks_root.join("automation.yml"),
+        "automation:\n  rules:\n    - name: r\n      on:\n        updated:\n          run: 'pwd > out.txt'\n",
+    )
+    .expect("write automation config");
+    let lotar = |args: &[&str]| {
+        let mut cmd = common::lotar_cmd().expect("lotar binary");
+        let output = cmd.env("LOTAR_TEST_SILENT", "1").current_dir(&workspace).args(["--tasks-dir", ".tasks"]).args(args).output().expect("spawn lotar");
+        assert!(output.status.success(), "lotar {:?} failed: {}", args, String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stdout).to_string()
+    };
+    let task_id = common::extract_task_id_from_output(&lotar(&["add", "Relative tasks dir", "--project=AR"])).expect("task id");
+
+    lotar(&["priority", &task_id, "High"]);
+
+    let written = std::fs::read_to_string(workspace.join("out.txt")).expect("the run writes out.txt in the workspace root");
+    assert_eq!(std::fs::canonicalize(written.trim()).expect("pwd is a path"), std::fs::canonicalize(&workspace).expect("workspace exists"));
+}

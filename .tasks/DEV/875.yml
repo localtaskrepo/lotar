@@ -1,0 +1,28 @@
+title: Smoke 'shows the prompt and settings a finished job ran with behind its Instructions button' failed once in the full suite
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T19:53:56.034648+00:00
+modified: 2026-11-25T19:53:56.733267+00:00
+relationships:
+  related:
+  - DEV-769
+description: 'Found: in DEV-769''s merge, `npm run -s smoke` on `bd4c626cb` failed this test in `smoke/tests/ui.agent-jobs.smoke.spec.ts` (already in the serial `wall-clock` group): `/api/jobs/inputs` answered ok, but `getByRole(''table'', { name: ''Settings'' })` never became visible (15 s). It passed 5 out of 5 alone and in 3 more full runs. Check: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t ''Instructions button''` repeated, and the full `npm run -s smoke`. Done: the cause is found (for example the log remounting and closing the panel, or an inputs response with no record yet) and the test waits on it, so it no longer fails under load.'
+tags:
+- health
+custom_fields:
+  finding: flaky-smoke:ui.agent-jobs-instructions
+history:
+- at: 2026-11-25T19:53:56.402845+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-769"]}'
+- at: 2026-11-25T19:53:56.733267+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

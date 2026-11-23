@@ -51,7 +51,7 @@ impl TasksDirectoryResolver {
     ) -> Result<Self, String> {
         // 1. Command line flag takes highest priority
         if let Some(path) = explicit_path {
-            let path_buf = PathBuf::from(path);
+            let path_buf = absolute_from_cwd(PathBuf::from(path))?;
             // Create directory if it doesn't exist (for --tasks-dir support)
             if create_missing && !path_buf.exists() {
                 fs::create_dir_all(&path_buf).map_err(|e| format!("Failed to create tasks directory {}: {}", path, e))?;
@@ -85,6 +85,7 @@ impl TasksDirectoryResolver {
             }
 
             // If no existing directory found in parents, create at the specified path
+            let path_buf = absolute_from_cwd(path_buf)?;
             if create_missing && !path_buf.exists() {
                 fs::create_dir_all(&path_buf).map_err(|e| format!("Failed to create tasks directory from LOTAR_TASKS_DIR {}: {}", path_buf.display(), e))?;
             }
@@ -242,6 +243,16 @@ impl TasksDirectoryResolver {
 }
 
 // inline tests moved to tests/workspace_unit_test.rs (subset; env/cwd heavy tests remain elsewhere)
+
+/// A relative tasks dir joined to the working folder: `.tasks` has the empty
+/// path as its parent, which callers use as the workspace root (DEV-822).
+fn absolute_from_cwd(path: PathBuf) -> Result<PathBuf, String> {
+    if path.is_absolute() {
+        return Ok(path);
+    }
+    let current_dir = env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
+    Ok(current_dir.join(path))
+}
 
 /// `tasks_folder` from a home config file's YAML.
 fn tasks_folder_from_yaml(content: &str) -> Option<String> {
