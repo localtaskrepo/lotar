@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-23T04:27:34.695967+00:00
-modified: 2026-11-24T22:39:13.778293+00:00
+modified: 2026-11-25T05:36:12.394630+00:00
 relationships:
   related:
   - DEV-802
@@ -184,6 +184,9 @@ comments:
       result: not_run
       reason: test:agent failed first
     next: 'Owner: land despite the DEV-801 temp leak, or hold until DEV-801 is fixed'
+- date: 2026-11-25T05:36:11.415578+00:00
+  author: mallox
+  text: 'Answer: land (Land both commits now, as a known DEV-801 flake) (answered in INBOX-706)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
 description: |-
@@ -373,3 +376,13 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-25T05:36:11.415578+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:36:12.394630+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

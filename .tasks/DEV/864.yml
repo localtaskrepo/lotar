@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-25T05:05:15.164063+00:00
-modified: 2026-11-25T05:05:44.437289+00:00
+modified: 2026-11-25T05:33:42.893388+00:00
 relationships:
   related:
   - DEV-800
@@ -29,6 +29,9 @@ comments:
     - key: single
       label: Agent findings stay one ticket each; only the daily run bundles
     recommended: later
+- date: 2026-11-25T05:33:42.121870+00:00
+  author: mallox
+  text: 'Answer: message (A new finding is sent to the running job; the merge check covers every key) (answered in INBOX-715)'
 description: |-
   `lotar add --finding <key> --bundle health` (DEV-800) puts a new finding into the day's open bundle only while no agent job holds it. With the shared rules, a health bundle starts its fix agent as soon as it is created, so a bundle will rarely collect more than one finding. STD-299's goal, one health ticket per repo per day, then isn't met for findings agents file.
 
@@ -68,3 +71,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-800"]}'
     new: '{"related":["DEV-800","standards:STD-299"]}'
+- at: 2026-11-25T05:33:42.121870+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:33:42.893388+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

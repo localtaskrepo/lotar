@@ -1,0 +1,41 @@
+title: lotar serve reads the value of --web-ui-path or --allow-host as the port when no port comes before it
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T05:29:21.102795+00:00
+modified: 2026-11-25T05:29:21.811707+00:00
+relationships:
+  related:
+  - DEV-789
+description: |-
+  ## Found
+
+  Found while reviewing DEV-789. `lotar serve --tasks-dir /tmp/x --web-ui-path /tmp/web --port 18791` fails with `error: a value is required for '--web-ui-path <PATH>' but none was supplied`. `--web-ui-path=/tmp/web` works, and so does putting `--port` first.
+
+  `normalize_serve_args` (`crates/lotar-lib/src/cli/preprocess.rs:237`) reads the first bare positional after `serve` as the port. Only `--host`, `--tasks-dir`, `--format`, `--log-level`, `--project`, `-f` and `-l` are known to take a value (`preprocess.rs:247`), so the value of `--web-ui-path` (and `--allow-host`) becomes `--port <value>`. `docs/help/serve.md` documents `--web-ui-path <PATH>` and `--allow-host <NAME>` in the space form.
+
+  ## Check
+
+  `lotar serve --web-ui-path <dir>` and `lotar serve --allow-host <name>` without an earlier port.
+
+  ## Done when
+
+  - [ ] Every serve option that takes a value keeps its value with a space, also without an earlier port. A test in the preprocess tests covers `--web-ui-path <dir>` and `--allow-host <name>`.
+tags:
+- health
+custom_fields:
+  finding: cli:serve-arg-preprocess
+history:
+- at: 2026-11-25T05:29:21.452797+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-789"]}'
+- at: 2026-11-25T05:29:21.811707+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

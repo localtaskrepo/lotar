@@ -64,6 +64,11 @@ impl RepoFileService {
         // Dot directories such as `.github` hold files worth reading; only
         // what git ignores stays out, and `.git` itself.
         builder.hidden(false).require_git(false).filter_entry(|entry| entry.file_name() != ".git");
+        // A git that does not name the global excludes file in time could be
+        // hiding files from the viewer: list none rather than show them (DEV-812).
+        if crate::utils::git::apply_global_excludes(&mut builder, root).is_err() {
+            return Vec::new();
+        }
         let mut files = Vec::new();
         let mut links = Vec::new();
         for entry in builder.build().filter_map(Result::ok) {

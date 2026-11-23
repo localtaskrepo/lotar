@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix-fable'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-24T21:35:12.467973+00:00
+modified: 2026-11-25T05:37:18.429177+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -361,6 +361,17 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-25T05:37:18.429124+00:00
+  author: mallox
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    (answered in INBOX-701)
+  answer:
+    to: 2026-11-24T21:35:12.467973+00:00
+    choice:
+    - fix-fable
+    note: (answered in INBOX-701)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
@@ -788,3 +799,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T05:37:18.429124+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:37:18.429177+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'

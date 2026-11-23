@@ -105,7 +105,7 @@ Activity and references
 - GET  /api/activity/feed, /api/activity/series, /api/activity/authors, /api/activity/changed_tasks[?since&until&project...] -> { data }; activity for the Insights pages
 - GET  /api/references/files?q=TEXT[&limit=N] -> { data }; repository file paths for reference pickers
 - GET  /api/references/snippet?code=PATH#LINES[&context=N] -> { data }; the lines a code reference points to
-- POST /api/files/resolve ({ base?, references: [names] }) -> { data: { items: [{ reference, path }] } }; repository files that names in ticket text refer to
+- POST /api/files/resolve ({ base?, references: [names] }) -> { data: { items: [{ reference, path }] } }; repository files that names in ticket text refer to; none while git doesn't name its global excludes file within 5 s
 - GET  /api/files/content?path=PATH[&download=1] -> file bytes; a repository file for the file viewer (no ignored files, at most 2 MiB)
 - GET  /api/openapi.json -> this API's OpenAPI document
 

@@ -41,17 +41,99 @@ pub fn clear_repository_env(command: &mut Command) {
     }
 }
 
-pub fn git_command(root: &Path) -> Command {
+/// A git child in `root`. Its [`GitCommand::output`] and
+/// [`GitCommand::status`] stop it after [`GIT_TIMEOUT`], or
+/// [`GIT_LONG_TIMEOUT`] for the subcommands in [`LONG_SUBCOMMANDS`], unless
+/// [`GitCommand::timeout`] says otherwise (DEV-812).
+pub fn git_command(root: &Path) -> GitCommand {
     let mut command = Command::new("git");
     command.current_dir(root);
     clear_repository_env(&mut command);
-    command
+    GitCommand { command, timeout: None }
 }
 
 /// How long a read-only git call may take (DEV-466). A git that blocks, for
 /// example on a config file macOS holds behind a permission prompt, must not
 /// hold up a request forever or pile up processes.
 pub const GIT_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// How long a git call that can run long by design may take: a commit that
+/// runs hooks, network transfers, history rewrites, `add` or `worktree add`
+/// in a large checkout (DEV-812).
+pub const GIT_LONG_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+
+/// The subcommands that get [`GIT_LONG_TIMEOUT`].
+const LONG_SUBCOMMANDS: &[&str] = &["add", "am", "cherry-pick", "clone", "commit", "fetch", "gc", "merge", "pull", "push", "rebase", "worktree"];
+
+/// A git command that never waits on its child without a timeout: there is
+/// no untimed `output` or `status` to call (DEV-812).
+pub struct GitCommand {
+    command: Command,
+    timeout: Option<Duration>,
+}
+
+impl GitCommand {
+    pub fn arg(&mut self, arg: impl AsRef<std::ffi::OsStr>) -> &mut Self {
+        self.command.arg(arg);
+        self
+    }
+
+    pub fn args<I, S>(&mut self, args: I) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        self.command.args(args);
+        self
+    }
+
+    pub fn current_dir(&mut self, dir: impl AsRef<Path>) -> &mut Self {
+        self.command.current_dir(dir);
+        self
+    }
+
+    pub fn env(&mut self, key: impl AsRef<std::ffi::OsStr>, value: impl AsRef<std::ffi::OsStr>) -> &mut Self {
+        self.command.env(key, value);
+        self
+    }
+
+    /// How long [`Self::output`] and [`Self::status`] wait before they stop
+    /// the command.
+    pub fn timeout(&mut self, timeout: Duration) -> &mut Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    /// [`output_within`] the command's timeout.
+    pub fn output(&mut self) -> std::io::Result<Output> {
+        let timeout = self.effective_timeout();
+        output_within(&mut self.command, timeout)
+    }
+
+    fn effective_timeout(&self) -> Duration {
+        self.timeout.unwrap_or_else(|| {
+            let subcommand = self.command.get_args().next().and_then(|arg| arg.to_str());
+            if subcommand.is_some_and(|subcommand| LONG_SUBCOMMANDS.contains(&subcommand)) { GIT_LONG_TIMEOUT } else { GIT_TIMEOUT }
+        })
+    }
+
+    /// The exit status of [`Self::output`]; the output is discarded.
+    pub fn status(&mut self) -> std::io::Result<std::process::ExitStatus> {
+        self.output().map(|output| output.status)
+    }
+
+    /// The command itself, for a caller that runs it as a long-lived
+    /// process and times each exchange (`git cat-file --batch`).
+    pub fn command_mut(&mut self) -> &mut Command {
+        &mut self.command
+    }
+
+    /// The command itself, for a runner that applies a time limit of its
+    /// own (the merge job's `git push`).
+    pub fn into_command(self) -> Command {
+        self.command
+    }
+}
 
 /// [`Command::output`] that stops the command and its children after
 /// `timeout` and answers with a `TimedOut` error. Stdin is empty. The timeout
@@ -129,9 +211,44 @@ pub fn kill_process_group(child: &mut Child) {
     let _ = child.wait();
 }
 
-/// [`output_within`] with [`GIT_TIMEOUT`].
-pub fn output(command: &mut Command) -> std::io::Result<Output> {
-    output_within(command, GIT_TIMEOUT)
+/// How long a directory walk waits for git to name the global excludes file.
+pub const EXCLUDES_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Makes `builder` honour git's global excludes file without reading git's
+/// config in this process (DEV-812): the `ignore` crate's own lookup opens
+/// `~/.gitconfig`, and an open macOS holds behind a permission check blocks
+/// the walk with no way to time it out. Git names the file instead, within
+/// [`EXCLUDES_TIMEOUT`]; a `TimedOut` error means git did not answer and the
+/// walk has no global excludes.
+pub fn apply_global_excludes(builder: &mut ignore::WalkBuilder, root: &Path) -> std::io::Result<()> {
+    builder.git_global(false);
+    if let Some(path) = excludes_file(root)?.filter(|path| path.is_file()) {
+        // A broken pattern drops that pattern only, as git does.
+        let _ = builder.add_ignore(path);
+    }
+    Ok(())
+}
+
+/// Git's `core.excludesFile` as seen from `root`, else git's default
+/// (`$XDG_CONFIG_HOME/git/ignore`, `~/.config/git/ignore`). Missing git or a
+/// git error count as unset; only a git that does not answer is an error.
+fn excludes_file(root: &Path) -> std::io::Result<Option<PathBuf>> {
+    match git_command(root).args(["config", "--path", "--get", "core.excludesFile"]).timeout(EXCLUDES_TIMEOUT).output() {
+        Err(error) if error.kind() == std::io::ErrorKind::TimedOut => Err(error),
+        Ok(output) if output.status.success() => {
+            let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            Ok(if value.is_empty() { default_excludes_file() } else { Some(root.join(value)) })
+        }
+        _ => Ok(default_excludes_file()),
+    }
+}
+
+fn default_excludes_file() -> Option<PathBuf> {
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").filter(|dir| !dir.is_empty()).map(|home| PathBuf::from(home).join(".config")))?;
+    Some(config.join("git").join("ignore"))
 }
 
 /// Repository routing keys removed by [`clear_repository_env`]: presence in
@@ -425,6 +542,36 @@ mod timeout_tests {
             }
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    /// A git child blocked opening its global config (macOS holding
+    /// `~/.gitconfig` behind a permission check, here a FIFO nobody writes)
+    /// is stopped at its timeout (DEV-812).
+    #[test]
+    fn git_blocked_on_its_config_times_out() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        assert!(Command::new("mkfifo").arg(dir.path().join(".gitconfig")).status().expect("mkfifo").success());
+        let started = Instant::now();
+        let error = super::git_command(dir.path())
+            .env("HOME", dir.path())
+            .env("XDG_CONFIG_HOME", dir.path().join("xdg"))
+            .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+            .timeout(Duration::from_millis(500))
+            .output()
+            .expect_err("git must time out");
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < Duration::from_secs(5), "took {:?}", started.elapsed());
+    }
+
+    /// Subcommands that run hooks or transfers get the long limit; the rest
+    /// the read-only one (DEV-812).
+    #[test]
+    fn long_subcommands_get_the_long_timeout() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        assert_eq!(super::git_command(dir.path()).args(["commit", "-m", "x"]).effective_timeout(), super::GIT_LONG_TIMEOUT);
+        assert_eq!(super::git_command(dir.path()).args(["worktree", "add", "x"]).effective_timeout(), super::GIT_LONG_TIMEOUT);
+        assert_eq!(super::git_command(dir.path()).args(["rev-parse", "HEAD"]).effective_timeout(), super::GIT_TIMEOUT);
+        assert_eq!(super::git_command(dir.path()).arg("push").timeout(Duration::from_secs(1)).effective_timeout(), Duration::from_secs(1));
     }
 
     #[test]

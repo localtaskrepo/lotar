@@ -1,14 +1,16 @@
 title: 'Code scanning: 8 open CodeQL alerts'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:42:37.579831+00:00
-modified: 2026-11-25T05:04:48.145958+00:00
+modified: 2026-11-25T05:40:04.669866+00:00
 relationships:
   related:
   - DEV-824
+  - DEV-768
+  - DEV-802
 comments:
 - date: 2026-11-24T19:12:27.965379+00:00
   author: automation
@@ -104,6 +106,38 @@ comments:
       result: failed
       reason: still lists [scanning:open]
     next: The merge agent takes over in a new session
+- date: 2026-11-25T05:39:52.944498+00:00
+  author: claude
+  text: |-
+    Merged and pushed: CodeQL shows 0 open alerts on main.
+
+    - CodeQL's scan of `e9042987f` closed all 8 alerts. A new alert stayed open: #36 `js/insecure-randomness` in `view/components/AssigneePicker.vue:177` (from DEV-768), the same `Math.random()` id as #30. I fixed it the same way (`useId()`), in `903809073`. A ticket for it would only have added a comment here, because it has the same finding key, `scanning:open`
+    - Rebased onto `6c2aa4916` (DEV-824 landed while the checks ran), then fast-forwarded main and amended the pending `.tasks` changes into `903809073`
+    - Pushed `e9042987f..903809073`, which includes the landed DEV-802 and DEV-824 commits
+    - Trust: lotar's merge changed `.tasks/DEV/config.yml` (`max_parallel_jobs` 0 to 3), so I ran `lotar trust`, which said Trusted. My merge changed no rules
+    - The first lint run failed because `target/` files disappeared mid-build (a concurrent clean). It passed on the rerun. The first test and smoke runs were stopped by my harness's 30-minute limit while waiting for the check lock. I reran both, and all checks passed on `f81b538c7`, the rebased commit
+  report:
+    commits:
+    - hash: e9042987f
+      what: the 8 CodeQL alerts (landed and pushed by lotar)
+    - hash: '903809073'
+      what: '#36 AssigneePicker ids from Vue useId'
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: gh api 'repos/localtaskrepo/lotar/code-scanning/alerts?state=open' --jq length
+      result: passed
+      reason: '0'
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no [scanning:open]; the other findings belong to other checks
+    next: 'None: the count is 0 after CodeQL scanned 903809073'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A689e19b6ca434ecd9efbb258cb37a9453c44b16777c05bb7706c7bbaf0460e43
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5d55e5c1efc528a26267f309fba529309fc5f8a5feb7af032cfcd079d3b7a35
@@ -115,7 +149,6 @@ description: |-
   Done when: each alert is fixed in the code (or, for a test-only false positive, dismissed with a reason in the commit), and the count is 0.
 tags:
 - health
-- job-paused
 custom_fields:
   finding: scanning:open
 history:
@@ -221,3 +254,22 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-824"]}'
+- at: 2026-11-25T05:39:52.944498+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:39:53.205898+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-824"]}'
+    new: '{"related":["DEV-824","DEV-768","DEV-802"]}'
+- at: 2026-11-25T05:40:04.669866+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health

@@ -394,7 +394,7 @@ impl Merge<'_> {
         }
         let mut push = git_command(&root);
         push.args(["push", "--quiet"]).env("GIT_TERMINAL_PROMPT", "0");
-        match run_process(self.job_id, push)? {
+        match run_process(self.job_id, push.into_command(), Some(crate::utils::git::GIT_LONG_TIMEOUT))? {
             Ok((true, _)) => {
                 let count = ours.lines().count();
                 self.done.push(format!("Pushed {count} commit{} to `{upstream}`", if count == 1 { "" } else { "s" }));
@@ -617,12 +617,14 @@ fn run_shell(job_id: &str, command: &str, dir: &Path, env: &[(&str, &str)]) -> R
         }
     }
     cmd.envs(env.iter().copied());
-    run_process(job_id, cmd)
+    run_process(job_id, cmd, None)
 }
 
-/// Run `cmd` until it exits or the job is cancelled: `Ok((success, output))`
-/// with its stdout and stderr's tail, or why it couldn't start.
-fn run_process(job_id: &str, mut cmd: Command) -> Result<Result<(bool, String), String>, Stop> {
+/// Run `cmd` until it exits, the job is cancelled or `limit` passes:
+/// `Ok((success, output))` with its stdout and stderr's tail, or why it
+/// couldn't start or finish.
+fn run_process(job_id: &str, mut cmd: Command, limit: Option<Duration>) -> Result<Result<(bool, String), String>, Stop> {
+    let started = std::time::Instant::now();
     cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(unix)]
     {
@@ -665,6 +667,11 @@ fn run_process(job_id: &str, mut cmd: Command) -> Result<Result<(bool, String), 
             terminate_child(&mut child);
             let _ = child.wait();
             return Err(Stop::Cancelled);
+        }
+        if let Some(limit) = limit.filter(|limit| started.elapsed() >= *limit) {
+            terminate_child(&mut child);
+            let _ = child.wait();
+            return Ok(Err(format!("did not finish within {}s", limit.as_secs())));
         }
         std::thread::sleep(Duration::from_millis(100));
     };

@@ -481,8 +481,10 @@ impl Scanner {
             // Fallback to git ignore files
             builder.ignore(true); // .ignore
             builder.git_ignore(true); // .gitignore
-            builder.git_global(true);
             builder.git_exclude(true);
+            // Global excludes come from git with a timeout (DEV-812); a git
+            // that does not answer leaves them out of this scan.
+            let _ = crate::utils::git::apply_global_excludes(&mut builder, dir_path);
             // Explicitly add root .gitignore so it works even without a .git repo
             let root_gitignore = dir_path.join(".gitignore");
             if root_gitignore.exists() {

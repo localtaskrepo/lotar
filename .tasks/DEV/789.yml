@@ -1,11 +1,11 @@
 title: 'Agents page: a finished tool call replaces the job card''s last message, unlike the server'
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T08:06:40.134808+00:00
-modified: 2026-11-23T08:24:26.303431+00:00
+modified: 2026-11-25T05:29:52.075081+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -13,6 +13,8 @@ relationships:
   - DEV-766
   - DEV-818
   - DEV-779
+  - DEV-866
+  - DEV-774
 comments:
 - date: 2026-11-22T13:46:52.546394+00:00
   author: claude
@@ -109,6 +111,20 @@ comments:
 - date: 2026-11-23T08:24:26.303431+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261123T082341.781Z-94 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082341.781Z-94 why.'
+- date: 2026-11-25T05:29:43.121495+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix matches the server, its tests failed before it, and all 12 screenshots are now attached and look right.
+
+    - **Reviewed:** `017d20071` (HEAD = `agent/DEV-789`, no rework commit), 4 files under `view/`.
+    - **Matches the server:** `tool_entry` on main (`crates/lotar-agent/src/services/agent_job_service.rs`, `drive_turns`) still sets `last_message` only when `tool.status != "completed"`. `view/pages/AgentJobs.vue:524` and `view/composables/useAgentActivity.ts:101` now follow the same rule.
+    - **Tests:** `npx vitest run --config view/vitest.config.ts __tests__/AgentJobs.spec.ts __tests__/AgentActivityIndicator.spec.ts`: 35 passed. With base `c8ea61a59`'s two source files put back: 2 failed (the two new tests). Restored; worktree clean.
+    - **Lint on the changed files:** `prettier --check`, `oxlint` and `eslint` are clean.
+    - **Fix agent's screenshots:** all 12 are attached (before/after, light/dark, 1920/1440/390). Before shows `Terminal`, after keeps `Bash: npm test`. No layout problems.
+    - **My after screenshots:** `npm ci`, then built this branch with `vite build` into `/tmp/dev789-review2/web` and served it with a scratch `lotar serve`. Playwright mocked a running job, then a running and a completed tool event. In all 6 views the card keeps `Bash: npm test`. Nothing looks wrong in light or dark.
+    - **Rebase conflict for the merge:** since the base, main changed the same line in `view/pages/AgentJobs.vue` (`updateFromEvent`, `last_message`): DEV-774 (`504d8b538`) also skips `agent_job_plan` there. `git merge-tree` reports a conflict. Fix: keep both conditions (`kind !== 'agent_job_thought' && kind !== 'agent_job_plan' && !(kind === 'agent_job_tool' && payload.tool?.status === 'completed') && payload.message`). `useAgentActivity.ts` merges cleanly. Plan events don't reach its message rule.
+    - **Not rerun:** the Rust suite, `npm run smoke` and the full UI suite. The change is UI-only and has been the same commit since the last review's full UI run (1569 passed).
+    - **Filed:** [DEV-866](https://lotar.pyxzl.net/task/DEV-866), not part of this change. `lotar serve` reads the value of `--web-ui-path` or `--allow-host` as the port when no port comes before it (`crates/lotar-lib/src/cli/preprocess.rs:237`).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbec1b9366a3e727602217837d75843415ce7d4c239dc0ded79a4911ff97aad0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8cf00dfcf8a49abc2ffc9d2aac60765537ab121463ce2db3a7b3264007c1ba3a
@@ -382,3 +398,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T05:29:21.451869+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779"]}'
+    new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866"]}'
+- at: 2026-11-25T05:29:43.121495+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:29:43.367674+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866"]}'
+    new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774"]}'
+- at: 2026-11-25T05:29:52.075081+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -24,7 +24,7 @@ pub struct BlobBatch {
 
 impl BlobBatch {
     pub fn spawn(repo_root: &Path) -> std::io::Result<Self> {
-        Self::spawn_within(crate::utils::git::git_command(repo_root).args(["cat-file", "--batch"]), crate::utils::git::GIT_TIMEOUT)
+        Self::spawn_within(crate::utils::git::git_command(repo_root).args(["cat-file", "--batch"]).command_mut(), crate::utils::git::GIT_TIMEOUT)
     }
 
     /// Runs `command` as the batch process; each read waits at most `timeout`.
@@ -339,7 +339,7 @@ impl AuditService {
             cmd.arg(Self::git_path_arg(path));
         }
 
-        let output = crate::utils::git::output(&mut cmd).map_err(|e| format!("Failed to run git: {}", e))?;
+        let output = cmd.output().map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             // A repository without commits yet (fresh `git init`) has no
             // history; that is an empty result, not an error (DEV-217).
@@ -354,7 +354,9 @@ impl AuditService {
     /// Whether the repository's HEAD points at a commit. Asked of git
     /// directly rather than read from (possibly translated) error text.
     fn has_commits(repo_root: &Path) -> bool {
-        crate::utils::git::output(crate::utils::git::git_command(repo_root).args(["rev-parse", "--verify", "--quiet", "HEAD"]))
+        crate::utils::git::git_command(repo_root)
+            .args(["rev-parse", "--verify", "--quiet", "HEAD"])
+            .output()
             .map(|output| output.status.success())
             .unwrap_or(true)
     }
@@ -373,14 +375,13 @@ impl AuditService {
     /// archive keeps its earlier history; each event carries the file's path
     /// in that commit (DEV-4).
     pub fn list_commits_for_file(repo_root: &Path, file_rel: &Path) -> Result<Vec<FileCommitEvent>, String> {
-        let output = crate::utils::git::output(
-            crate::utils::git::git_command(repo_root)
-                .args(["log", "--no-merges", "--follow", "--name-status"])
-                .arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s")
-                .arg("--")
-                .arg(Self::git_path_arg(file_rel)),
-        )
-        .map_err(|e| format!("Failed to run git: {}", e))?;
+        let output = crate::utils::git::git_command(repo_root)
+            .args(["log", "--no-merges", "--follow", "--name-status"])
+            .arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s")
+            .arg("--")
+            .arg(Self::git_path_arg(file_rel))
+            .output()
+            .map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             if !Self::has_commits(repo_root) {
                 return Ok(Vec::new());
@@ -506,7 +507,7 @@ impl AuditService {
         let mut cmd = crate::utils::git::git_command(repo_root);
         cmd.arg("ls-files");
         cmd.arg(Self::git_path_arg(tasks_rel));
-        match crate::utils::git::output(&mut cmd) {
+        match cmd.output() {
             Ok(output) if output.status.success() => !output.stdout.is_empty(),
             _ => false,
         }
@@ -908,7 +909,7 @@ impl AuditService {
                 rev.arg("HEAD");
                 rev.arg("--");
                 rev.arg(&rel_path);
-                match crate::utils::git::output(&mut rev) {
+                match rev.output() {
                     Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).trim().parse::<usize>().unwrap_or(1),
                     _ => 1,
                 }
@@ -924,8 +925,7 @@ impl AuditService {
     pub fn show_file_at(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
         let spec = format!("{}:{}", commit, Self::git_path_str(file_rel));
-        let output =
-            crate::utils::git::output(crate::utils::git::git_command(repo_root).arg("show").arg(spec)).map_err(|e| format!("Failed to run git: {}", e))?;
+        let output = crate::utils::git::git_command(repo_root).arg("show").arg(spec).output().map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             return Err(format!("git show failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
         }
@@ -935,7 +935,12 @@ impl AuditService {
     /// Get raw patch for a specific commit restricted to file
     pub fn show_file_diff(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
-        let output = crate::utils::git::output(crate::utils::git::git_command(repo_root).arg("show").arg(commit).arg("--").arg(Self::git_path_arg(file_rel)))
+        let output = crate::utils::git::git_command(repo_root)
+            .arg("show")
+            .arg(commit)
+            .arg("--")
+            .arg(Self::git_path_arg(file_rel))
+            .output()
             .map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             return Err(format!("git show failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));

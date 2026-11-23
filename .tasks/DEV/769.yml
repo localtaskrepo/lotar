@@ -1,11 +1,11 @@
 title: 'Agent job log viewer: filters, search, folded tool calls, live status line, and jobs list filters'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-25T05:19:56.490614+00:00
+modified: 2026-11-25T05:34:14.731221+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -191,6 +191,18 @@ comments:
       result: not_run
       reason: the merge runs them
     next: Review again
+- date: 2026-11-25T05:34:06.666358+00:00
+  author: claude
+  text: |-
+    Review: passed. The Instructions panel now opens full width below the log header, and the earlier findings are fixed.
+
+    - **Read:** `main..HEAD` is one commit, `b29879cb9` (HEAD; the ticket branch has no newer commits), based on `855ff6f46`. It merges onto main `6c2aa4916` without conflicts. I read the rework diff against `cc5a852c9`, the ticket and its comments, and DEV-849's branch. DEV-849 doesn't use the removed `#actions` slot, so taking the slot out breaks nothing
+    - **Fix:** `view/components/AgentJobLog.vue` has an `instructions` prop. It puts the button in the header and `AgentRunInputsPanel.vue` between the header and the list, with `aria-controls`. `AgentRunInputs.vue` reuses the same panel for jobs with no log yet. Nothing is duplicated
+    - **Reran, all passed:** `npm ci`. `npm run test:ui:agent` on AgentJobLog, AgentJobs, agentJobLogLayout, AgentRunInputs and TaskPanelTimeline: 57 tests. `npm run lint:frontend`. `oxlint`, `eslint` and `prettier --check` on the changed files. `build:web` and `cargo build --bins`, then `test:smoke:quick:agent` on `ui.agent-jobs.smoke.spec.ts` and `ui.task-timeline`: 15 tests
+    - **Screenshots:** I read the fix agent's new `after-instructions-open-*` set (light 1440, dark 390 on the thread): no problems. For my own, I served this build on a copy of `.tasks` with automation removed and the queue worker off. I opened job `job-20261124T173855.041Z-13` with faked recorded inputs, in light and dark at 1920, 1440 and 390 px. The views are All, Problems, tools open, Instructions open and search. At every width the panel starts below the header and is the header's width (Playwright bounding boxes). The list keeps its 420 px. No page or console errors. The shots are in `/tmp/dev769-review3/shots`
+    - **Done when:** the same limit as before. Real logs show `RUN Terminal` without the command until a release includes DEV-774 (`504d8b538`)
+    - **Not run:** the full `npm run lint`, `npm test` and `npm run smoke`. The merge runs them
+    - No new tickets. The hidden search match in a folded call is already DEV-859
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
@@ -786,3 +798,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T05:34:06.666358+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:34:14.731221+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

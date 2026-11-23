@@ -107,3 +107,52 @@ fn content_refuses_ignored_and_outside_paths() {
     }
     assert_eq!(api.handle_request(&request("GET", "/api/files/content", &[], Value::Null)).status, 400);
 }
+
+/// Points git's global config at `home` for this test's git children
+/// (DEV-812); lotar strips `GIT_CONFIG*` from them, so `HOME` it is.
+fn git_home(home: &std::path::Path) -> (EnvVarGuard, EnvVarGuard) {
+    std::fs::create_dir_all(home.join("xdg")).unwrap();
+    (EnvVarGuard::set("HOME", &home.to_string_lossy()), EnvVarGuard::set("XDG_CONFIG_HOME", &home.join("xdg").to_string_lossy()))
+}
+
+fn resolve(api: &ApiServer, references: &[&str]) -> Value {
+    let resp = api.handle_request(&request("POST", "/api/files/resolve", &[], json!({ "references": references })));
+    assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
+    serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["items"].clone()
+}
+
+/// A git whose global config never opens (macOS holding `~/.gitconfig`
+/// behind a permission check, here a FIFO nobody writes) makes the file
+/// endpoints answer within seconds with no files, not hang (DEV-812).
+#[cfg(unix)]
+#[test]
+fn hung_git_config_gives_no_file_links_within_seconds() {
+    let fixture = repository();
+    let home = fixture._tmp.path().join("home");
+    let _home = git_home(&home);
+    let status = std::process::Command::new("mkfifo").arg(home.join(".gitconfig")).status().unwrap();
+    assert!(status.success());
+    let api = server();
+
+    let started = std::time::Instant::now();
+    assert_eq!(resolve(&api, &["src/main.rs"]), json!([]));
+    assert_eq!(content(&api, "src/main.rs").status, 404);
+    assert!(started.elapsed() < std::time::Duration::from_secs(15), "took {:?}", started.elapsed());
+}
+
+/// Files git's global excludes file ignores stay hidden, now that git names
+/// the file (DEV-812).
+#[test]
+fn globally_ignored_files_stay_hidden() {
+    let fixture = repository();
+    let root = fixture._tmp.path();
+    std::fs::write(root.join("notes.secret"), "private\n").unwrap();
+    let home = root.join("home");
+    let _home = git_home(&home);
+    std::fs::write(home.join("excludes"), "*.secret\n").unwrap();
+    std::fs::write(home.join(".gitconfig"), format!("[core]\n\texcludesFile = {}\n", home.join("excludes").display())).unwrap();
+    let api = server();
+
+    assert_eq!(resolve(&api, &["notes.secret", "src/main.rs"]), json!([{"reference": "src/main.rs", "path": "src/main.rs"}]));
+    assert_eq!(content(&api, "notes.secret").status, 404);
+}

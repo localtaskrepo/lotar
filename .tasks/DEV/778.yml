@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-22T00:05:08.801449+00:00
-modified: 2026-11-24T23:16:08.501762+00:00
+modified: 2026-11-25T05:31:02.518475+00:00
 relationships:
   depends_on:
   - DEV-762
@@ -374,6 +374,9 @@ comments:
       result: not_run
       reason: test:agent stops after the Rust step fails
     next: 'Owner: land DEV-778 despite the DEV-840 leak, or wait for DEV-840 to merge and rerun'
+- date: 2026-11-25T05:31:01.797090+00:00
+  author: mallox
+  text: 'Answer: wait (Wait for DEV-840 to merge, then rerun the merge) (answered in INBOX-712)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A282711a46030edc51d136dceb5c1716c2f6ab065a6408c803b5f8995e2d5510c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53f6b26caf08444d74b3031a53e4eaeb9201accb87a0965c458d756de69ad3f8
@@ -860,3 +863,13 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-25T05:31:01.797090+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:31:02.518475+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

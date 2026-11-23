@@ -3,14 +3,17 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-23T08:24:45.782269+00:00
+modified: 2026-11-25T05:42:26.357142+00:00
 relationships:
   related:
   - DEV-725
   - DEV-780
   - DEV-783
+  - DEV-411
+  - DEV-604
+  - DEV-767
 comments:
 - date: 2026-11-22T18:46:53.150110+00:00
   author: claude
@@ -79,6 +82,19 @@ comments:
 - date: 2026-11-23T08:24:45.782269+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261123T082249.243Z-93 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082249.243Z-93 why.'
+- date: 2026-11-25T05:42:12.022116+00:00
+  author: claude
+  text: |-
+    Review: blocking. The new gate runs before the "landed reworked" check, so a merge job whose agent landed the work on main itself now fails, and says the branch stays unmerged.
+
+    - **Bug:** in `ensure_branch_merged` the gate (`crates/lotar-agent/src/services/agent_job_service.rs:5207-5218`) returns `Err` before `reworked_landing` (`:5224`, DEV-411) runs. Take a merge agent that resolves a conflict and commits the reworked fix to main itself (`TKO-1 ...` commits, branch left as it was) without reporting `--check "<cmd>=passed"`. Before this change the job completed ("landed its work reworked as ..."). Now it fails with "LoTaR leaves agent/TKO-1 unmerged", while main already holds the work. That's a false message, and the retry can't recover: its new `main_head_at_start` hides the reworked commits. The same goes for the first-round failed-check gate. `docs/help/agent.md` still says a reworked landing counts as merged.
+    - **Proof:** I added a scratch test in a detached copy (removed afterwards). Main gains a conflicting `TKO-1` commit, there are no reports, and `required = ["npm run -s smoke"]`. The result is `Err("Merge job finished, but no report ... names `npm run -s smoke` passed ...")`. With `required = []` the result is `Ok("agent/TKO-1 conflicts with the main checkout, but this job landed its work reworked as ...")`.
+    - **Fix:** the gate holds back only lotar's own `git merge --ff-only`. Run it after the `reworked_landing` check, or check `reworked_landing` first and return it as landed. Add a test: a reworked landing with required checks that were never reported still completes.
+    - **Also, same gate:** a commit-only retry (`commit_retry`, DEV-604) gets a new `started_at` (`:5888`) and a new head commit. The paused run's `passed` reports then don't count, and the retry fails a good merge. Either count reports since the first run's start, or skip the gate on a commit retry.
+    - **Rebase needed:** the branch conflicts with main `903809073` in two places: the `hand_off_prompt` call (main now uses `prompt.prepend("Merge hand-off", ...)`, DEV-767) and the merge-job paragraph of `docs/help/agent.md`. Both are small.
+    - **Holds:** the conflict hand-off with no passed report stays unmerged. The hand-off prompt names the exact `--check` flags. A pass reported on the branch commit counts. The takeover branch fallback and the DEV-725 failed-check case work as described. Done-when bullet 2 is met outside the code: DEV-725 is Done, `v0.15.6` is on origin, and lotar 0.15.6 is installed.
+    - **Reran:** `npm ci` passed. `npm run -s build:web` passed. `cargo nextest run --cargo-profile dev -p lotar-agent -E 'test(/merge|hand_off|takeover|taken_over/)'`: 18 of 18 passed, including all 8 new tests. `npm run -s lint:agent` passed. I didn't run the full `test:agent` or smoke.
+    - No UI changes. No stray files. One commit, `6a37dafe0`.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
@@ -103,6 +119,7 @@ tags:
 - health
 - review-returned
 - job-paused
+- review-returned-twice
 custom_fields:
   finding: comms:merge-lands-while-agent-waits
 history:
@@ -210,3 +227,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T05:42:12.022116+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:42:12.290374+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-780","DEV-783"]}'
+    new: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767"]}'
+- at: 2026-11-25T05:42:12.632751+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned, job-paused
+    new: health, review-returned, job-paused, review-blocked
+- at: 2026-11-25T05:42:26.357142+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-returned, job-paused, review-blocked
+    new: health, review-returned, job-paused, review-returned-twice

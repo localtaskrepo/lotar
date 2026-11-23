@@ -116,6 +116,9 @@ impl ReferenceService {
             let name = entry.file_name().to_string_lossy();
             !(name == ".git" || name == ".tasks" || name == "target" || name == "node_modules")
         });
+        // Global excludes come from git with a timeout (DEV-812); a git that
+        // does not answer only adds names to the suggestions.
+        let _ = crate::utils::git::apply_global_excludes(&mut builder, repo_root);
 
         for entry in builder.build() {
             if results.len() >= limit {
