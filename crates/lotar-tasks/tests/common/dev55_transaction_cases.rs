@@ -207,6 +207,38 @@ fn nonparticipating_writers_refuse_while_a_journal_is_pending() {
 }
 
 #[test]
+fn a_journal_for_another_project_does_not_block_writers_here() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    write_global_config(&tasks_dir, "");
+
+    let mut storage = Storage::new(&tasks_dir);
+    let journaled =
+        TaskService::create(&mut storage, TaskCreate { title: "Journaled".to_string(), project: Some("TEST".to_string()), ..TaskCreate::default() }).unwrap();
+    let other =
+        TaskService::create(&mut storage, TaskCreate { title: "Other".to_string(), project: Some("OTHER".to_string()), ..TaskCreate::default() }).unwrap();
+
+    // A journal that writes only TEST files, as another process's transaction
+    // in flight leaves it (DEV-823).
+    fault::fail_journal_removal_times(2);
+    TaskService::update(&mut storage, &journaled.id, TaskUpdate { description: Some("pending change".to_string()), ..TaskUpdate::default() }).unwrap_err();
+    assert!(tasks_dir.join(crate::storage::transaction::JOURNAL_FILE_NAME).exists());
+
+    // A non-participating writer in OTHER (raw edit, e.g. a comment) goes ahead.
+    let mut edited = storage.get(&other.id, "OTHER").unwrap();
+    edited.description = Some("comment in another project".to_string());
+    storage.edit(&other.id, &edited).unwrap();
+    assert!(std::fs::read_to_string(task_path(&tasks_dir, &other.id)).unwrap().contains("comment in another project"));
+
+    // The journal is untouched and still refuses writers in TEST.
+    assert!(tasks_dir.join(crate::storage::transaction::JOURNAL_FILE_NAME).exists());
+    let mut sneaky = storage.get(&journaled.id, "TEST").unwrap();
+    sneaky.description = Some("sneaky edit".to_string());
+    let refusal = storage.edit(&journaled.id, &sneaky).err().map(|err| err.to_string());
+    assert!(refusal.as_deref().is_some_and(|text| text.contains("pending task/sprint transaction journal")), "{refusal:?}");
+}
+
+#[test]
 fn cleanup_failure_leaves_caller_records_and_files_unchanged() {
     use crate::services::sprint_integrity;
 

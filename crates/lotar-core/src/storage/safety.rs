@@ -134,20 +134,25 @@ pub fn with_storage_lock<T, E: From<std::io::Error>>(target_dir: &Path, lock_nam
 }
 
 /// Fail closed when a pending multi-file transaction journal exists for the
-/// workspace this directory belongs to (DEV-55 review L3). Checked after the
-/// advisory lock is acquired, never before, so a journal cannot appear or be
-/// recovered around the check: journals are only created by writers that hold
-/// this same lock, and recovery runs while holding it. Refusing here keeps
+/// workspace this directory belongs to and journals a file inside this
+/// directory (DEV-55 review L3). Checked after the advisory lock is acquired,
+/// never before, so a journal cannot appear or be recovered around the check.
+/// A transaction holds the task lock of every project it journals (and the
+/// sprints lock), so a journal that touches the directory whose task or
+/// sprint lock we now hold belongs to a crashed writer. A journal for other
+/// directories may be another process's live transaction (DEV-823) and its
+/// rollback never restores files here, so it does not apply. An unreadable
+/// journal is treated as touching every directory. Refusing keeps
 /// non-participating writers (task comments, direct sprint edits, scan
 /// creation) from mutating files a pending rollback would need to restore.
 /// Lock-less config writes remain outside this guard and are documented as
 /// such.
 fn refuse_under_pending_transaction(target_dir: &Path) -> std::io::Result<()> {
-    let Some(root) = target_dir.parent() else {
+    let (Some(root), Some(owner)) = (target_dir.parent(), target_dir.file_name().and_then(|name| name.to_str())) else {
         return Ok(());
     };
     let journal = root.join(crate::storage::transaction::JOURNAL_FILE_NAME);
-    if journal.is_file() {
+    if crate::storage::transaction::pending_journal_touches(&journal, owner) {
         return Err(std::io::Error::other(PendingJournalRefusal(format!(
             "A pending task/sprint transaction journal exists at {}; a crashed multi-file mutation is waiting to be rolled back. Run any task create/update, sprint assignment, or sprint cleanup operation to trigger recovery, then retry this change",
             journal.display()

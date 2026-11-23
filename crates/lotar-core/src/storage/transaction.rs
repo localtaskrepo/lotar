@@ -611,6 +611,21 @@ fn peek_pending_journal_projects(root: &Path, journal_path: &Path) -> LoTaRResul
     Ok(projects.into_iter().collect())
 }
 
+/// Whether a pending journal lists a write under the top-level tasks-root
+/// entry `owner` (a project prefix or `@sprints`). A missing journal touches
+/// nothing; an unreadable or unparsable one fails closed and touches all.
+pub(crate) fn pending_journal_touches(journal_path: &Path, owner: &str) -> bool {
+    let raw = match fs::read_to_string(journal_path) {
+        Ok(raw) => raw,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return false,
+        Err(_) => return true,
+    };
+    let Ok(journal) = serde_json::from_str::<PendingJournal>(&raw) else {
+        return true;
+    };
+    journal.version != JOURNAL_VERSION || journal.writes.iter().any(|write| write.path.split('/').next() == Some(owner))
+}
+
 /// Walk the path components below `root` and refuse any symlinked component,
 /// mirroring journal path validation for production staging (review L3b).
 fn validate_components_not_symlinks(root: &Path, relative: &str) -> LoTaRResult<()> {
