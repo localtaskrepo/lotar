@@ -1,7 +1,7 @@
-//! DEV-361: the background queue worker notices an upgrade (here the way
-//! Homebrew does it: a symlink moves to a new versioned copy), takes no new
-//! entries, and once its running job ends a new worker starts the next one
-//! from the upgraded binary.
+//! DEV-361, DEV-806: the background queue worker notices an upgrade (here
+//! the way Homebrew does it: a symlink moves to a new versioned copy), takes
+//! no new entries and hands the queue to a worker from the upgraded binary,
+//! which starts the next job while the old worker's job still runs.
 #![cfg(unix)]
 
 use crate::common;
@@ -34,8 +34,30 @@ fn wait_for_lines(path: &Path, count: usize) -> Vec<String> {
     }
 }
 
+/// Wait until the workers exited: they write the queue file as they end, and
+/// a write after the fixture is gone leaves its folder behind.
+fn wait_for_exit(pids: &[String]) {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    for pid in pids {
+        while Command::new("kill").args(["-0", pid]).stderr(std::process::Stdio::null()).status().is_ok_and(|s| s.success()) {
+            assert!(Instant::now() < deadline, "worker {pid} did not exit");
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+}
+
+/// Ends the jobs when dropped, also when the test fails: else they wait for
+/// a file in a removed folder forever.
+struct Release(std::path::PathBuf);
+
+impl Drop for Release {
+    fn drop(&mut self) {
+        let _ = std::fs::write(&self.0, "");
+    }
+}
+
 #[test]
-fn worker_restarts_from_the_upgraded_binary_between_jobs() {
+fn upgraded_worker_starts_queued_jobs_while_the_old_worker_drains() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path().to_path_buf();
     let install_root = root.join("install");
@@ -43,6 +65,7 @@ fn worker_restarts_from_the_upgraded_binary_between_jobs() {
     let pids = root.join("worker-pids");
     // Each job runs until the test creates `release`.
     let release = root.join("release");
+    let _release = Release(release.clone());
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
@@ -68,12 +91,15 @@ fn worker_restarts_from_the_upgraded_binary_between_jobs() {
     assert!(lotar().args(["agent", "run", "TEST-1", "go", "--agent", "slow"]).status().unwrap().success());
     let first = wait_for_lines(&pids, 1);
 
-    // Upgrade while TEST-1 runs, then queue TEST-2 for the busy worker.
+    // Upgrade while TEST-1 runs, then queue TEST-2: it starts before TEST-1
+    // ends, on a worker other than the one TEST-1 runs on.
     install(&install_root, "0.2.0");
     std::thread::sleep(Duration::from_millis(800));
     assert!(lotar().args(["agent", "run", "TEST-2", "go", "--agent", "slow"]).status().unwrap().success());
-    std::fs::write(&release, "").unwrap();
 
     let both = wait_for_lines(&pids, 2);
     assert_ne!(first[0], both[1], "the worker started before the upgrade also ran the next job");
+
+    std::fs::write(&release, "").unwrap();
+    wait_for_exit(&both);
 }

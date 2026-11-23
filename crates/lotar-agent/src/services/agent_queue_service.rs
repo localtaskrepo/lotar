@@ -663,16 +663,20 @@ impl AgentQueueService {
         // Entries a worker that died took: this worker starts them.
         restore_taken(tasks_dir)?;
 
-        // After an upgrade, take no new entries: once the running jobs end,
-        // this worker exits and the next one starts from the new build
-        // (DEV-361).
+        // After an upgrade, take no new entries and hand the queue to a
+        // worker from the new build at once (DEV-361, DEV-806): this one
+        // only finishes its running jobs, then exits.
         let upgraded = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&upgraded);
         crate::utils::binary_watch::spawn_watcher(move || flag.store(true, Ordering::SeqCst));
+        let mut lock_file = Some(lock_file);
         let result = (|| {
             let mut exhausted_error = None;
             loop {
                 let upgraded = upgraded.load(Ordering::SeqCst);
+                if upgraded && let Some(lock) = lock_file.take() {
+                    hand_off_queue(tasks_dir, lock);
+                }
                 // Jobs of a worker or server that exited before they ended
                 // run here from now on (DEV-378).
                 if !upgraded {
@@ -725,12 +729,16 @@ impl AgentQueueService {
             }
             thread::sleep(Duration::from_millis(WORKER_POLL_MS));
         }
-        // Entries a failed queue write left taken go back for the next worker.
-        let _ = restore_taken(tasks_dir);
-        // An entry queued while this worker was exiting saw the lock held and
-        // spawned no worker; start the next one now (DEV-279).
-        let _ = lock_file.unlock();
-        drop(lock_file);
+        // A worker that handed the queue on leaves the taken entries to the
+        // next one: they may be that worker's, mid-start.
+        if let Some(lock) = lock_file {
+            // Entries a failed queue write left taken go back for the next worker.
+            let _ = restore_taken(tasks_dir);
+            // An entry queued while this worker was exiting saw the lock held and
+            // spawned no worker; start the next one now (DEV-279).
+            let _ = lock.unlock();
+        }
+        // Also when the worker it handed the queue to did not start.
         if pending_count(tasks_dir).unwrap_or(0) > 0 {
             let _ = Self::ensure_worker(tasks_dir);
         }
@@ -834,6 +842,18 @@ fn entries_wait_for(
             "starting with the worker's next round".to_string()
         })
         .collect()
+}
+
+/// Give up the worker lock after an upgrade and, with entries queued, start
+/// a worker from the upgraded binary to run them while this one finishes
+/// its jobs (DEV-806). Taken entries are settled by now: entries are taken
+/// and settled within one pass.
+fn hand_off_queue(tasks_dir: &Path, lock: std::fs::File) {
+    let _ = lock.unlock();
+    drop(lock);
+    if pending_count(tasks_dir).unwrap_or(0) > 0 {
+        let _ = AgentQueueService::ensure_worker(tasks_dir);
+    }
 }
 
 /// True when workers are enabled and no worker holds this tasks directory's lock.
