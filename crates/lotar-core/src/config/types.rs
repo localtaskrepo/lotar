@@ -536,7 +536,8 @@ pub struct AgentMemoryGateConfig {
     /// Unset: on on macOS, off elsewhere.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub enabled: Option<bool>,
-    /// Swap use, in percent of the swap total, from which new jobs wait.
+    /// Swap use, in percent of the swap total, from which new jobs wait while
+    /// little memory is free (DEV-819).
     #[serde(default = "default_memory_gate_max_swap_percent")]
     pub max_swap_percent: u8,
     /// How long memory has to stay normal before held jobs start.

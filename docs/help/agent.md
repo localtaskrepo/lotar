@@ -505,14 +505,14 @@ The queue worker drains pending entries and waits for dispatched jobs, including
 
 ### Memory gate
 
-LoTaR starts no new job while the machine is short of memory: macOS reports memory pressure (`sysctl kern.memorystatus_vm_pressure_level` is warn or critical), or swap use is over `agent.memory_gate.max_swap_percent` of the swap total (default 85%). Either one holds new jobs; running jobs go on, and so do jobs taken over from a process that died.
+LoTaR starts no new job while the machine is short of memory: macOS reports memory pressure (`sysctl kern.memorystatus_vm_pressure_level` is warn or critical), or swap use is over `agent.memory_gate.max_swap_percent` of the swap total (default 85%) while less than 20% of memory is free (`kern.memorystatus_level` on macOS, `MemAvailable` on Linux). Either one holds new jobs; running jobs go on, and so do jobs taken over from a process that died. Full swap with 20% or more memory free holds nothing: macOS keeps pages in swap long after a shortage and frees swap slowly or only at a restart. Where free memory can't be read, full swap alone holds.
 
 - The queue worker takes no entry while the gate holds: entries stay queued with their attempts unchanged, and no ticket gets a comment. In `lotar serve` a new job waits as `queued`, and its waiting reason names the memory hold.
 - While held, the queue reads memory again every 30 s. Held jobs start once memory has been normal for `agent.memory_gate.settle_seconds` (default 120); short of memory again during that time, the wait starts over. A job is never failed or retried for this.
-- `lotar agent queue` and `lotar agent list-jobs` say why jobs wait and since when, for example `waiting for memory: swap 9.4 of 10.0 GB used (94%, limit 85%) (held since 2026-11-16T21:30:00Z)`. With `--format json` both print `memory_hold`.
+- `lotar agent queue` and `lotar agent list-jobs` say why jobs wait and since when, for example `waiting for memory: swap 9.4 of 10.0 GB used (94%, limit 85%, 12% of memory free) (held since 2026-11-16T21:30:00Z)`. With `--format json` both print `memory_hold`.
 - A memory reading that fails holds nothing; `lotar agent queue` warns about it.
 - `lotar serve` writes each hold's start and end once to its stderr (its log under launchd), whichever process decided it: `[lotar] memory hold started: <reason>, since <time>` and `[lotar] memory hold ended: <reason>, since <time>, until <time>`, with the last short-of-memory reason. It reads the shared state file every 30 s, so a hold that started and ended in between still gets both lines. A failed reading ends a hold at its time. A server started during a hold logs its start; one that ended before the server started is not logged again.
-- On by default on macOS, off elsewhere. `agent.memory_gate.enabled: true` turns it on elsewhere too; on Linux it then reads swap from `/proc/meminfo` (there is no pressure level there).
+- On by default on macOS, off elsewhere. `agent.memory_gate.enabled: true` turns it on elsewhere too; on Linux it then reads swap and free memory from `/proc/meminfo` (there is no pressure level there).
 
 ```yaml
 # .tasks/config.yml
@@ -523,7 +523,7 @@ agent:
     settle_seconds: 120
 ```
 
-The last reading is kept next to the agent queue (`memory-gate-<hash>.json`), so the worker, `lotar serve` and `lotar agent queue` share it. A hold or failed reading that no process read again for 60 s (the worker and `lotar serve` stopped) is not shown as current: `lotar agent queue` and `lotar agent list-jobs` then read memory themselves, without saving it. Tests set `LOTAR_MEMORY_READING` to replace the reading: `normal`, or for example `pressure=warn,swap=9.5/10` (swap in GB).
+The last reading is kept next to the agent queue (`memory-gate-<hash>.json`), so the worker, `lotar serve` and `lotar agent queue` share it. A hold or failed reading that no process read again for 60 s (the worker and `lotar serve` stopped) is not shown as current: `lotar agent queue` and `lotar agent list-jobs` then read memory themselves, without saving it. Tests set `LOTAR_MEMORY_READING` to replace the reading: `normal`, or for example `pressure=warn,swap=9.5/10,free=12` (swap in GB, free memory in percent; without `free` it is unknown).
 
 Cancelling a dispatched job requests termination immediately, but cancellation automation and reassignment wait until process/output teardown and context persistence finish. The job retains its capacity slot through finalization, so a replacement is queued safely and cancellation automation runs once. Cancelling an undispatched queued job finalizes immediately.
 

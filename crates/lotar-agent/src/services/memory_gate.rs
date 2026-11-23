@@ -1,5 +1,7 @@
 //! The agent queue starts no new job while the machine is short of memory
-//! (DEV-623): macOS reports memory pressure, or swap is nearly full.
+//! (DEV-623): macOS reports memory pressure, or swap is nearly full while
+//! little memory is free. macOS keeps pages in swap long after a shortage,
+//! so full swap with free memory holds nothing (DEV-819).
 //!
 //! The last reading and the hold it found are kept next to the queue file,
 //! so the queue worker, `lotar serve` and `lotar agent queue` in another
@@ -19,6 +21,8 @@ const OPEN_RECHECK_SECS: u64 = 5;
 /// again; `status` reads it itself (DEV-645).
 const STALE_AFTER_SECS: u64 = 2 * HELD_RECHECK_SECS;
 const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
+/// Full swap holds only while less memory than this is free, in percent.
+pub const SWAP_HOLD_FREE_PERCENT: u8 = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pressure {
@@ -33,6 +37,9 @@ pub struct MemoryReading {
     pub pressure: Option<Pressure>,
     pub swap_used: u64,
     pub swap_total: u64,
+    /// Free memory in percent of RAM (`kern.memorystatus_level`,
+    /// `MemAvailable`); `None` where unknown.
+    pub free_percent: Option<u8>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -256,10 +263,12 @@ fn short_of_memory(reading: &MemoryReading, config: &AgentMemoryGateConfig) -> O
         Some(Pressure::Normal) | None => {}
     }
     let limit = u128::from(config.max_swap_percent);
-    if reading.swap_total > 0 && u128::from(reading.swap_used) * 100 > limit * u128::from(reading.swap_total) {
+    let free_is_low = reading.free_percent.is_none_or(|free| free < SWAP_HOLD_FREE_PERCENT);
+    if free_is_low && reading.swap_total > 0 && u128::from(reading.swap_used) * 100 > limit * u128::from(reading.swap_total) {
         let percent = (u128::from(reading.swap_used) * 100 + u128::from(reading.swap_total) / 2) / u128::from(reading.swap_total);
         let (used, total) = (reading.swap_used as f64 / GIB, reading.swap_total as f64 / GIB);
-        reasons.push(format!("swap {used:.1} of {total:.1} GB used ({percent}%, limit {limit}%)"));
+        let free = reading.free_percent.map(|free| format!(", {free}% of memory free")).unwrap_or_default();
+        reasons.push(format!("swap {used:.1} of {total:.1} GB used ({percent}%, limit {limit}%{free})"));
     }
     (!reasons.is_empty()).then(|| reasons.join("; "))
 }
@@ -301,7 +310,8 @@ fn load(path: &Path) -> GateState {
 }
 
 /// `LOTAR_MEMORY_READING` replaces the system's reading, for tests:
-/// `normal`, or `pressure=warn,swap=9.5/10` (swap in GB).
+/// `normal`, or `pressure=warn,swap=9.5/10,free=12` (swap in GB, free
+/// memory in percent; without `free` it is unknown).
 fn read_memory() -> Result<MemoryReading, String> {
     if let Ok(fake) = std::env::var("LOTAR_MEMORY_READING") {
         return parse_fake(&fake);
@@ -312,7 +322,7 @@ fn read_memory() -> Result<MemoryReading, String> {
 #[cfg(target_os = "macos")]
 fn read_system() -> Result<MemoryReading, String> {
     let output = std::process::Command::new("/usr/sbin/sysctl")
-        .args(["-n", "kern.memorystatus_vm_pressure_level", "vm.swapusage"])
+        .args(["-n", "kern.memorystatus_vm_pressure_level", "vm.swapusage", "kern.memorystatus_level"])
         .output()
         .map_err(|err| format!("sysctl did not run: {err}"))?;
     if !output.status.success() {
@@ -332,9 +342,10 @@ fn read_system() -> Result<MemoryReading, String> {
     Err("lotar reads no memory state on this system".to_string())
 }
 
-/// `sysctl -n kern.memorystatus_vm_pressure_level vm.swapusage`: the level
-/// (1 normal, 2 warn, 4 critical), then
-/// `total = 9216.00M  used = 7894.81M  free = 1321.19M  (encrypted)`.
+/// `sysctl -n kern.memorystatus_vm_pressure_level vm.swapusage
+/// kern.memorystatus_level`: the level (1 normal, 2 warn, 4 critical), then
+/// `total = 9216.00M  used = 7894.81M  free = 1321.19M  (encrypted)`, then
+/// free memory in percent.
 #[cfg(any(target_os = "macos", test))]
 fn parse_sysctl(output: &str) -> Result<MemoryReading, String> {
     let mut lines = output.lines().map(str::trim).filter(|line| !line.is_empty());
@@ -349,7 +360,9 @@ fn parse_sysctl(output: &str) -> Result<MemoryReading, String> {
         let rest = swap.split_once(key).map(|(_, rest)| rest.trim_start()).ok_or_else(|| format!("vm.swapusage has no '{key}': {swap}"))?;
         parse_size(rest.split_whitespace().next().unwrap_or_default()).ok_or_else(|| format!("vm.swapusage: unreadable size after '{key}': {swap}"))
     };
-    Ok(MemoryReading { pressure: Some(pressure), swap_used: size_after("used =")?, swap_total: size_after("total =")? })
+    let free = lines.next().ok_or("sysctl printed no kern.memorystatus_level")?;
+    let free_percent = Some(free.parse::<u8>().map_err(|_| format!("unknown kern.memorystatus_level '{free}'"))?.min(100));
+    Ok(MemoryReading { pressure: Some(pressure), swap_used: size_after("used =")?, swap_total: size_after("total =")?, free_percent })
 }
 
 /// `9216.00M` in bytes.
@@ -380,11 +393,15 @@ fn parse_meminfo(meminfo: &str) -> Result<MemoryReading, String> {
             .ok_or_else(|| format!("/proc/meminfo has no {key}"))
     };
     let (total, free) = (kib("SwapTotal")?, kib("SwapFree")?);
-    Ok(MemoryReading { pressure: None, swap_used: total.saturating_sub(free), swap_total: total })
+    let free_percent = match (kib("MemTotal"), kib("MemAvailable")) {
+        (Ok(ram), Ok(available)) if ram > 0 => u8::try_from(u128::from(available.min(ram)) * 100 / u128::from(ram)).ok(),
+        _ => None,
+    };
+    Ok(MemoryReading { pressure: None, swap_used: total.saturating_sub(free), swap_total: total, free_percent })
 }
 
 fn parse_fake(raw: &str) -> Result<MemoryReading, String> {
-    let mut reading = MemoryReading { pressure: Some(Pressure::Normal), swap_used: 0, swap_total: 0 };
+    let mut reading = MemoryReading { pressure: Some(Pressure::Normal), swap_used: 0, swap_total: 0, free_percent: None };
     for part in raw.split(',').map(str::trim).filter(|part| !part.is_empty() && *part != "normal") {
         match part.split_once('=') {
             Some(("pressure", "normal")) => reading.pressure = Some(Pressure::Normal),
@@ -399,6 +416,10 @@ fn parse_fake(raw: &str) -> Result<MemoryReading, String> {
                 let (used, total) = ((used * GIB) as u64, (total * GIB) as u64);
                 reading.swap_used = used;
                 reading.swap_total = total;
+            }
+            Some(("free", free)) => {
+                let free = free.trim().parse::<u8>().ok().filter(|free| *free <= 100).ok_or_else(|| format!("LOTAR_MEMORY_READING: bad free '{free}'"))?;
+                reading.free_percent = Some(free);
             }
             _ => return Err(format!("LOTAR_MEMORY_READING: unknown reading '{part}'")),
         }
@@ -442,6 +463,20 @@ mod tests {
         // The configured share wins over the default.
         let strict = AgentMemoryGateConfig { max_swap_percent: 50, ..config() };
         assert!(hold_of(&decide(&GateState::default(), reading("swap=6/10"), at(0), &strict)).is_some());
+    }
+
+    #[test]
+    fn full_swap_holds_only_while_little_memory_is_free() {
+        // macOS keeps pages in swap after a shortage: full swap with free
+        // memory and normal pressure holds nothing (DEV-819).
+        assert!(hold_of(&decide(&GateState::default(), reading("swap=3.6/4,free=63"), at(0), &config())).is_none());
+        assert!(hold_of(&decide(&GateState::default(), reading("swap=3.6/4,free=20"), at(0), &config())).is_none());
+        let low = decide(&GateState::default(), reading("swap=3.6/4,free=19"), at(0), &config());
+        assert_eq!(hold_of(&low).unwrap().reason, "swap 3.6 of 4.0 GB used (90%, limit 85%, 19% of memory free)");
+        // A held queue whose memory is free again settles and starts.
+        let settling = decide(&low, reading("swap=3.6/4,free=63"), at(30), &config());
+        assert!(hold_of(&settling).unwrap().reason.starts_with("memory is normal again since "));
+        assert!(hold_of(&decide(&settling, reading("swap=3.6/4,free=63"), at(150), &config())).is_none());
     }
 
     #[test]
@@ -552,13 +587,16 @@ mod tests {
 
     #[test]
     fn parses_sysctl_output() {
-        let reading = parse_sysctl("2\ntotal = 9216.00M  used = 7894.81M  free = 1321.19M  (encrypted)\n").unwrap();
+        let reading = parse_sysctl("2\ntotal = 9216.00M  used = 7894.81M  free = 1321.19M  (encrypted)\n71\n").unwrap();
         assert_eq!(reading.pressure, Some(Pressure::Warn));
+        assert_eq!(reading.free_percent, Some(71));
         assert_eq!(reading.swap_total, 9216 * 1024 * 1024);
         assert_eq!(reading.swap_used / (1024 * 1024), 7894);
-        let none = parse_sysctl("1\ntotal = 0.00M  used = 0.00M  free = 0.00M  (encrypted)\n").unwrap();
-        assert_eq!(none, MemoryReading { pressure: Some(Pressure::Normal), swap_used: 0, swap_total: 0 });
-        assert_eq!(parse_sysctl("4\ntotal = 1.00G  used = 1.00G  free = 0.00M").unwrap().pressure, Some(Pressure::Critical));
+        let none = parse_sysctl("1\ntotal = 0.00M  used = 0.00M  free = 0.00M  (encrypted)\n90\n").unwrap();
+        assert_eq!(none, MemoryReading { pressure: Some(Pressure::Normal), swap_used: 0, swap_total: 0, free_percent: Some(90) });
+        assert_eq!(parse_sysctl("4\ntotal = 1.00G  used = 1.00G  free = 0.00M\n5").unwrap().pressure, Some(Pressure::Critical));
+        assert!(parse_sysctl("1\ntotal = 1.00G  used = 1.00G  free = 0.00M").is_err());
+        assert!(parse_sysctl("1\ntotal = 1.00G  used = 1.00G  free = 0.00M\nlots").is_err());
         assert!(parse_sysctl("").is_err());
         assert!(parse_sysctl("x\ntotal = 1M used = 1M").is_err());
         assert!(parse_sysctl("1\nsomething else").is_err());
@@ -566,8 +604,11 @@ mod tests {
 
     #[test]
     fn parses_proc_meminfo() {
-        let reading = parse_meminfo("MemTotal:       16000000 kB\nSwapTotal:       2097148 kB\nSwapFree:        1048576 kB\n").unwrap();
-        assert_eq!(reading, MemoryReading { pressure: None, swap_used: (2_097_148 - 1_048_576) * 1024, swap_total: 2_097_148 * 1024 });
+        let reading =
+            parse_meminfo("MemTotal:       16000000 kB\nMemAvailable:    4000000 kB\nSwapTotal:       2097148 kB\nSwapFree:        1048576 kB\n").unwrap();
+        assert_eq!(reading, MemoryReading { pressure: None, swap_used: (2_097_148 - 1_048_576) * 1024, swap_total: 2_097_148 * 1024, free_percent: Some(25) });
+        // Without MemAvailable free memory is unknown, and full swap alone holds.
+        assert_eq!(parse_meminfo("SwapTotal: 2 kB\nSwapFree: 1 kB\n").unwrap().free_percent, None);
         assert!(parse_meminfo("MemTotal: 1 kB\n").is_err());
     }
 

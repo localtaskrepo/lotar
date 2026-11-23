@@ -5,7 +5,7 @@ type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-24T20:03:06.454346+00:00
-modified: 2026-11-25T12:22:20.927757+00:00
+modified: 2026-11-25T23:06:15.475102+00:00
 relationships:
   related:
   - DEV-300
@@ -73,6 +73,50 @@ comments:
     - Not proven: the cause on the owner's machine is still a hypothesis. If the first `lotar sync check` on the live config passes the new check and still returns 401, the cause lies elsewhere and needs a new ticket
     - Note, no ticket: an email with non-ASCII letters (`josé@…`) is now refused too, as "Done when" asks
     - No stray files, no second branch. Tickets filed: none
+- date: 2026-11-25T23:06:15.475102+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s lint:agent` failed:
+    ```
+      process didn't exit successfully: `/opt/homebrew/bin/sccache rustc --crate-name bitflags --edition=2021 /Users/mallox/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitflags-2.13.2/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat,unused-externs-silent,diagnostic-short --crate-type lib --emit=dep-info,metadata -C opt-level=2 -C embed-bitcode=no -C debug-assertions=on --cfg 'feature="std"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("arbitrary", "bytemuck", "example_generated", "serde", "serde_core", "std"))' -C metadata=5872efb08d79ae2a -C extra-filename=-77696a73ec83d4af --out-dir '/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-848/target/debug/build/bitflags/77696a73ec83d4af/out' -C strip=debuginfo --cap-lints allow --force-warn=unused_crate_dependencies` (exit status: 254)
+    error: could not compile `memchr` (lib)
+
+    Caused by:
+      process didn't exit successfully: `/opt/homebrew/bin/sccache rustc --crate-name memchr --edition=2021 /Users/mallox/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat,unused-externs-silent,diagnostic-short --crate-type lib --emit=dep-info,metadata -C opt-level=2 -C embed-bitcode=no -C debug-assertions=on --cfg 'feature="alloc"' --cfg 'feature="default"' --cfg 'feature="std"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("alloc", "core", "default", "libc", "logging", "rustc-dep-of-std", "std", "use_std"))' -C metadata=2bfec89245bea3e3 -C extra-filename=-5847d2d5e80b7767 --out-dir '/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-848/target/debug/build/memchr/5847d2d5e80b7767/out' -C strip=debuginfo --cap-lints allow --force-warn=unused_crate_dependencies` (exit status: 254)
+    error: could not compile `itoa` (lib)
+
+    Caused by:
+      process didn't exit successfully: `/opt/homebrew/bin/sccache rustc --crate-name itoa --edition=2021 /Users/mallox/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/itoa-1.0.19/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat,unused-externs-silent,diagnostic-short --crate-type lib --emit=dep-info,metadata -C opt-level=2 -C embed-bitcode=no -C debug-assertions=on --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("no-panic"))' -C metadata=36b43c64b2f6e663 -C extra-filename=-d611982c192b9cb7 --out-dir '/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-848/target/debug/build/itoa/d611982c192b9cb7/out' -C strip=debuginfo --cap-lints allow --force-warn=unused_crate_dependencies` (exit status: 254)
+    sccache: encountered fatal error
+    sccache: error: Failed to create temp dir
+    sccache: caused by: No such file or directory (os error 2) at path "/var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/lotar-rust-temp-PUUk3H/sccacheCdsZtZ"
+    error: could not compile `unicode-ident` (lib)
+
+    Caused by:
+      process didn't exit successfully: `/opt/homebrew/bin/sccache rustc --crate-name unicode_ident --edition=2021 /Users/mallox/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.27/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat,unused-externs-silent,diagnostic-short --crate-type lib --emit=dep-info,metadata,link -C opt-level=2 -C embed-bitcode=no -C debug-assertions=on --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=70b8f77df4a62a60 -C extra-filename=-fbbd0380f40f0848 --out-dir '/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-848/target/debug/build/unicode-ident/fbbd0380f40f0848/out' -C strip=debuginfo --cap-lints allow --force-warn=unused_crate_dependencies` (exit status: 254)
+    sccache: encountered fatal error
+    sccache: error: Failed to create temp dir
+    sccache: caused by: No such file or directory (os error 2) at path "/var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/lotar-rust-temp-PUUk3H/sccacheF5S6fw"
+    error: could not compile `pin-project-lite` (lib)
+
+    Caused by:
+      process didn't exit successfully: `/opt/homebrew/bin/sccache rustc --crate-name pin_project_lite --edition=2018 /Users/mallox/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pin-project-lite-0.2.18/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat,unused-externs-silent,diagnostic-short --crate-type lib --emit=dep-info,metadata -C opt-level=2 -C embed-bitcode=no -C debug-assertions=on --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=0e283db3fdfe6dee -C extra-filename=-db9fb72305ed3945 --out-dir '/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-848/target/debug/build/pin-project-lite/db9fb72305ed3945/out' -C strip=debuginfo --cap-lints allow --force-warn=unused_crate_dependencies` (exit status: 254)
+    sccache: encountered fatal error
+    sccache: error: Failed to create temp dir
+    sccache: caused by: No such file or directory (os error 2) at path "/var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/lotar-rust-temp-PUUk3H/sccache51EHYt"
+    error: could not compile `autocfg` (lib)
+
+    Caused by:
+      process didn't exit successfully: `/opt/homebrew/bin/sccache rustc --crate-name autocfg --edition=2015 /Users/mallox/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat,unused-externs-silent,diagnostic-short --crate-type lib --emit=dep-info,metadata,link -C opt-level=2 -C embed-bitcode=no -C debug-assertions=on --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=58828f05ccfcf12e -C extra-filename=-15323947185700eb --out-dir '/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-848/target/debug/build/autocfg/15323947185700eb/out' -C strip=debuginfo --cap-lints allow --force-warn=unused_crate_dependencies` (exit status: 254)
+    ```.
+
+    - Rebased `agent/DEV-848` onto `main` (`998d36e2dc3b`): `b24e1a3b395a`
+    - The install `npm ci` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d4edb4cd314d39fbe0fcb99cb68949c3d001274e5c8a91e9f7560539b8217
 description: |-
@@ -211,3 +255,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T23:06:15.475102+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: lotar task edit -D - saves a lone - as the description instead of reading stdin
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:22:19.506908+00:00
-modified: 2026-11-25T22:40:09.944664+00:00
+modified: 2026-11-25T23:05:14.260207+00:00
 relationships:
   related:
   - DEV-776
@@ -13,6 +13,7 @@ relationships:
   - DEV-832
   - DEV-791
   - DEV-809
+  - DEV-845
 comments:
 - date: 2026-11-24T19:18:09.426255+00:00
   author: automation
@@ -170,6 +171,30 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-25T23:05:04.583929+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `998d36e2d` is on `main` and `origin/main`.
+
+    - Main moved on to `99c261083` (DEV-845) after lotar's run: rebased again without conflict, `6b98cd4cf`
+    - Reran on the rebased commit: `npm ci`, `lint:agent`, `test:agent`, `smoke`, all passed
+    - lotar's smoke failure (`tests/ui.sync-scope.smoke.spec.ts` "editor saves global edits…", waiting for `remote-dialog-choice`) passed in the full rerun; it's already in the `wall-clock` group and the diff doesn't touch the UI, so I read it as load flakiness
+    - Amended the main checkout's pending `.tasks` changes into the merge commit, as the merge steps say
+    - No rule or config files changed: no `lotar trust` needed
+  report:
+    commits:
+    - hash: 998d36e2d
+      what: -D - reads the description from stdin in add, task add and task edit
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 411 of 411, incl. ui.sync-scope that timed out in lotar's run
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac862ff1db012f6c60ec944f429edcf793a121169e64009b3e22ffd95e959d446
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0
@@ -189,7 +214,6 @@ description: |-
   - [ ] A test covers add and edit.
 tags:
 - agent
-- job-paused
 history:
 - at: 2026-11-24T17:22:19.773370+00:00
   actor: claude
@@ -319,3 +343,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T23:05:04.583929+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T23:05:05.217331+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-776","DEV-818","DEV-832","DEV-791","DEV-809"]}'
+    new: '{"related":["DEV-776","DEV-818","DEV-832","DEV-791","DEV-809","DEV-845"]}'
+- at: 2026-11-25T23:05:14.260207+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: agent, job-paused
+    new: agent

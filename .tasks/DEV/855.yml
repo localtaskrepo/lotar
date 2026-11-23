@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-24T21:39:09.103486+00:00
-modified: 2026-11-25T22:12:12.513679+00:00
+modified: 2026-11-25T23:16:33.412388+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-31
@@ -26,6 +26,9 @@ comments:
     - harnessmux 0.3.0 `errors_of` (`src/backend/t3.rs`) keeps only `type: error` items, so lotar gets `RateLimited` with `resets_at: None` and waits the default hour.
     - `usage_limit::of_failures` already prefers a failure's `resets_at`, and still ignores the agent's reply (DEV-711).
     - Filed HARN-31 (finding `agent-jobs:t3-limit-notice-reset`). Next here: bump harnessmux to its patch release and add a test that a t3 limit failure with `resets_at` pauses until that time.
+- date: 2026-11-25T23:16:33.412388+00:00
+  author: claude
+  text: 'Stalled since 2026-11-25T22:12Z with no lotar job: the live check restarted @fix-retry, its prerequisites are done (lotar rule "Prerequisites done: continue the waiting ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae62a87351aceefc08e381281dfb92af0b04239bbe4ef6d135c49d6cf3e112f84
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aef83f80acc839a4d7f09243dd7af7e36aef01d903c74244e1c1fdcf59d5f736b
@@ -33,7 +36,6 @@ description: 'Found 2026-11-24 (DEV-832): DEV-811''s t3 jobs on 2026-11-23 pause
 tags:
 - health
 - fix-retried
-- waits
 custom_fields:
   finding: agent-jobs:limit-reset-in-message
 history:
@@ -105,3 +107,13 @@ history:
   - field: priority
     old: Medium
     new: High
+- at: 2026-11-25T23:16:31.999494+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried, waits
+    new: health, fix-retried
+- at: 2026-11-25T23:16:33.412388+00:00
+  actor: claude
+  changes:
+  - field: comment_added
