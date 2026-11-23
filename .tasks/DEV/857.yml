@@ -1,16 +1,17 @@
 title: T3 thread row says Finished while the thread waits on background work
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T22:44:15.700672+00:00
-modified: 2026-11-25T15:17:47.516942+00:00
+modified: 2026-11-25T17:12:39.002278+00:00
 relationships:
   depends_on:
   - DEV-849
   related:
   - DEV-849
+  - DEV-729
 comments:
 - date: 2026-11-25T12:39:40.114035+00:00
   author: claude
@@ -25,15 +26,173 @@ comments:
 - date: 2026-11-25T15:17:47.516942+00:00
   author: claude
   text: 'Stalled since 2026-11-25T14:08Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-25T17:03:48.103569+00:00
+  author: claude
+  text: |-
+    Fixed: a T3 thread waiting on background work shows Running, not Finished.
+
+    - Branch fast-forwarded to main `d4084d484` (has DEV-849's `t3_state.rs`).
+    - `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs`: non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` → `running`; a pending question (`pendingRequestCount`) still wins → `waiting`.
+    - Test `a_completed_thread_waiting_on_background_work_runs` covers each field, empty/false → `finished`, and the question-wins case.
+    - `docs/help/agent.md` T3 Code threads section says so.
+    - Commit `8d58511cf`.
+  report:
+    commits:
+    - hash: 8d58511cf
+      what: from_shown maps background waits to running, tests, help
+    checks:
+    - command: cargo nextest run -p lotar-agent t3_state
+      result: passed
+      reason: 7 tests
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs full suites
+    - command: npm test
+      result: not_run
+      reason: merge runs full suites
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs full suites
+    next: Merge agent lands agent/DEV-857
+- date: 2026-11-25T17:08:02.940607+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix misses the state T3 really reports: a thread on `t3_background_wait` has status `waiting`, not `completed`, so the row still says "Waits for an answer".
+
+    - Reviewed `8d58511cf` (`main..HEAD`, only commit; the ticket branch has nothing newer).
+    - `crates/lotar-agent/src/services/agent_job_service/t3_state.rs:96`: `status == "waiting"` → `waiting` is checked before the new `waits_on_background_work` (line 98). T3 shows such a thread with `"status":"waiting"` plus `pendingBackgroundTasks`/`blockedOnThreadWait`. Sources: harnessmux `src/backend/t3.rs:580` (`resumes = status == "waiting" && …`), harnessmux HARN-3 changelog and `tests/cli.rs:979`, and lotar's own fake T3 `crates/lotar-lib/tests/dev503_harness_jobs_test.rs:887` (DEV-729: `status=waiting tasks='["npm test"]'`).
+    - So the new path only fires for `completed` + background work, the ticket's wording but not what T3 sends. The real case still shows a question the owner doesn't have.
+    - Fix: in `from_shown`, give background work priority over `status == "waiting"` (only `pendingRequestCount > 0` should win), e.g. `if t3_thread_waits(shown) {waiting} else if active || waits_on_background_work(shown) {running} else if status == "waiting" {waiting} …`. Add test rows with `"status":"waiting"` + `pendingBackgroundTasks` → `running`, `"status":"waiting"` + `blockedOnThreadWait: true` → `running`, and `waiting` + pending question → `waiting`. The test should fail on `8d58511cf`.
+    - Also fix `docs/help/agent.md:186` to match ("ended its turn waiting" is right; nothing else to change if the behaviour does).
+    - Reran: `npm ci` passed; `cargo nextest run -p lotar-agent t3_state` passed, 7 tests. That passing test doesn't cover the real case.
+    - UI: the diff changes no page, component or style, only which existing label shows. I didn't start the app because the logic is wrong. After the rework, a screenshot of the Show logs row reading Running for a background-waiting thread would confirm it.
+- date: 2026-11-25T17:10:51.589597+00:00
+  author: automation
+  text: The fix agent's job job-20261125T170818.337Z-60 failed (lotar agent logs job-20261125T170818.337Z-60); @fix-retry retries it on branch agent/DEV-857.
+- date: 2026-11-25T17:11:03.380004+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261125T171048.140Z-61 failed again (lotar agent logs job-20261125T171048.140Z-61). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-25T17:11:33.966493+00:00
+  author: claude
+  text: |-
+    Review finding fixed: a thread T3 shows `waiting` with background work now reads Running.
+
+    - Review read HEAD `8d58511cf`: valid round.
+    - `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs`: order is now pending question (`pendingRequestCount > 0`) → waiting, then `activeRunId` or background work (`pendingBackgroundTasks`, `blockedOnThreadWait`) → running, then plain `status: waiting` → waiting.
+    - Test `a_thread_waiting_on_background_work_runs` gains `waiting` + `pendingBackgroundTasks` → running, `waiting` + `blockedOnThreadWait` → running, `waiting` + question → waiting. The two running rows failed on `8d58511cf` (`left: "waiting", right: "running"`).
+    - `docs/help/agent.md:186` already says "ended its turn waiting … shows Running"; unchanged.
+    - Amended to `595990440`.
+  report:
+    commits:
+    - hash: '595990440'
+      what: background work beats status waiting in from_shown, tests, help
+    checks:
+    - command: cargo nextest run -p lotar-agent t3_state
+      result: passed
+      reason: 7 tests; new rows failed before the fix
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs full suites
+    - command: npm test
+      result: not_run
+      reason: merge runs full suites
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs full suites
+    - command: UI screenshot
+      result: not_run
+      reason: label logic only, no page change
+    next: Review again
+- date: 2026-11-25T17:12:12.060818+00:00
+  author: triage
+  text: |-
+    No retry needed: the thread already did the rework, so the failed-job question is moot. Sent on to review.
+
+    - Job `job-20261125T171048.140Z-61` failed only because `t3 thread show` couldn't read the thread (`agent_job_failed`: runner exit 1). It was not a work error.
+    - The thread finished the rework itself at 17:11:33 (`595990440` on `agent/DEV-857`, tests and clippy passed), and its hand-off says "next: Review again".
+    - Set Reviewing, assignee @review.
+- date: 2026-11-25T17:12:39.002278+00:00
+  author: claude
+  text: |-
+    Fixed the review finding: a thread T3 shows as `waiting` with background work now reads Running.
+
+    - `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs`: only a pending question (`pendingRequestCount > 0`) wins; then `activeRunId` or background work (`pendingBackgroundTasks`, `blockedOnThreadWait`) gives `running`; only then does `status == "waiting"` give `waiting`.
+    - Test `a_thread_waiting_on_background_work_runs` adds rows for `waiting` + tasks → running, `waiting` + `blockedOnThreadWait` → running, `waiting` + question → waiting, and plain `waiting` → waiting. The first two fail on `8d58511cf`.
+    - Built on the uncommitted change the failed retry left in the worktree, and amended the branch's commit (unpushed) to `794094f97`.
+    - `docs/help/agent.md:186` already describes this ("ended its turn waiting … shows Running"), so it's unchanged.
+    - Description now has a "## Done when" checklist.
+    - No page, component or style changed, only which existing label shows, so no screenshots.
+  report:
+    commits:
+    - hash: 794094f97
+      what: background work wins over T3 status waiting
+    checks:
+    - command: cargo nextest run -p lotar-agent t3_state
+      result: passed
+      reason: 7 tests
+    - command: cargo clippy -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check t3_state.rs
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: merge runs full suites
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs full suites
+    next: Review on another model
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a8fde63d3da51b14097b1f1ced5fc01af6d027e69cfab0dfe58d128c01170e4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aca14a4616e87559135993edbeda6ad81addd1ad1c831e53eae92da62ad605282
 description: |-
-  Found in the DEV-849 review: `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` maps T3 status `completed` with no `activeRunId` to `finished`. A thread that ended its turn on `t3_background_wait` (non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` in `t3 thread show --json`) is still working: its lotar job ends only after the wake run. The row then says Finished while the job runs.
+  Found in the DEV-849 review: `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` maps T3 status `completed` with no `activeRunId` to `finished`. A thread that ended its turn on `t3_background_wait` (non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` in `t3 thread show --json`) is still working: its lotar job ends only after the wake run. The row then says Finished while the job runs. T3 really shows such a thread as `status: waiting` (review 2026-11-25), sometimes `completed`.
 
-  Done when: such a thread shows Running (or a 'waits on background work' state), with a unit test on `from_shown`.
+  ## Done when
+  - [ ] Status `waiting` or `completed` with non-empty `pendingBackgroundTasks` shows Running.
+  - [ ] Status `waiting` or `completed` with `blockedOnThreadWait: true` shows Running.
+  - [ ] A pending question (`pendingRequestCount > 0`) wins over background work: Waits for an answer.
+  - [ ] `waiting` with no background work and no question still shows Waits for an answer; `completed` with none shows Finished.
+  - [ ] Unit test on `from_shown` covers each row and fails on `8d58511cf`.
+  - [ ] `docs/help/agent.md` T3 Code threads section matches.
 tags:
 - agent
 - ui
+- review-returned
+- fix-retried
 history:
 - at: 2026-11-24T22:44:16.379275+00:00
   actor: claude
@@ -96,6 +255,134 @@ history:
     old: Blocked
     new: InProgress
 - at: 2026-11-25T15:17:47.516942+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:01:40.392811+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a8fde63d3da51b14097b1f1ced5fc01af6d027e69cfab0dfe58d128c01170e4
+- at: 2026-11-25T17:03:48.103569+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:03:58.278403+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-25T17:08:02.940607+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:08:03.211630+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849"],"related":["DEV-849"]}'
+    new: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-729"]}'
+- at: 2026-11-25T17:08:03.538098+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, review-blocked
+- at: 2026-11-25T17:08:18.038739+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, ui, review-blocked
+    new: agent, ui, review-returned
+- at: 2026-11-25T17:10:33.601564+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T17:10:47.830603+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: agent, ui, review-returned
+    new: agent, ui, review-returned, fix-retried
+- at: 2026-11-25T17:10:51.589597+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:10:56.840757+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aca14a4616e87559135993edbeda6ad81addd1ad1c831e53eae92da62ad605282
+- at: 2026-11-25T17:11:02.903535+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-25T17:11:03.380004+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:11:33.966493+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:12:10.595225+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-849 review: `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` maps T3 status `completed` with no `activeRunId` to `finished`. A thread that ended its turn on `t3_background_wait` (non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` in `t3 thread show --json`) is still working: its lotar job ends only after the wake run. The row then says Finished while the job runs.
+
+      Done when: such a thread shows Running (or a 'waits on background work' state), with a unit test on `from_shown`.
+    new: |-
+      Found in the DEV-849 review: `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` maps T3 status `completed` with no `activeRunId` to `finished`. A thread that ended its turn on `t3_background_wait` (non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` in `t3 thread show --json`) is still working: its lotar job ends only after the wake run. The row then says Finished while the job runs. T3 really shows such a thread as `status: waiting` (review 2026-11-25), sometimes `completed`.
+
+      ## Done when
+      - [ ] Status `waiting` or `completed` with non-empty `pendingBackgroundTasks` shows Running.
+      - [ ] Status `waiting` or `completed` with `blockedOnThreadWait: true` shows Running.
+      - [ ] A pending question (`pendingRequestCount > 0`) wins over background work: Waits for an answer.
+      - [ ] `waiting` with no background work and no question still shows Waits for an answer; `completed` with none shows Finished.
+      - [ ] Unit test on `from_shown` covers each row and fails on `8d58511cf`.
+      - [ ] `docs/help/agent.md` T3 Code threads section matches.
+- at: 2026-11-25T17:12:12.060818+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:12:17.795714+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-25T17:12:23.983819+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+- at: 2026-11-25T17:12:30.123401+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-25T17:12:39.002278+00:00
   actor: claude
   changes:
   - field: comment_added

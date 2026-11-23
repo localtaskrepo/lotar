@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-24T16:20:40.092908+00:00
-modified: 2026-11-25T16:26:14.653409+00:00
+modified: 2026-11-25T17:17:50.542892+00:00
 relationships:
   related:
   - DEV-626
   - DEV-835
   - DEV-769
   - DEV-800
+  - DEV-810
 comments:
 - date: 2026-11-24T19:11:03.814040+00:00
   author: automation
@@ -349,3 +350,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-626","DEV-835","DEV-769"]}'
     new: '{"related":["DEV-626","DEV-835","DEV-769","DEV-800"]}'
+- at: 2026-11-25T17:17:50.542892+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-835","DEV-769","DEV-800"]}'
+    new: '{"related":["DEV-626","DEV-835","DEV-769","DEV-800","DEV-810"]}'

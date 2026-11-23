@@ -1,11 +1,11 @@
 title: 'lotar add misses worktrees created with git worktree add --relative-paths: their ID can repeat (DEV-802)'
-status: HelpNeeded
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-23T04:27:34.695967+00:00
-modified: 2026-11-25T05:36:12.394630+00:00
+modified: 2026-11-25T17:07:11.043477+00:00
 relationships:
   related:
   - DEV-802
@@ -16,6 +16,7 @@ relationships:
   - DEV-801
   - DEV-767
   - DEV-768
+  - DEV-789
 comments:
 - date: 2026-11-23T07:49:27.544311+00:00
   author: claude
@@ -187,8 +188,32 @@ comments:
 - date: 2026-11-25T05:36:11.415578+00:00
   author: mallox
   text: 'Answer: land (Land both commits now, as a known DEV-801 flake) (answered in INBOX-706)'
+- date: 2026-11-25T17:06:56.323578+00:00
+  author: automation
+  text: The fix agent's job job-20261125T170645.850Z-161 failed (lotar agent logs job-20261125T170645.850Z-161); @fix-retry retries it on branch agent/DEV-825.
+- date: 2026-11-25T17:07:10.393156+00:00
+  author: claude
+  text: |-
+    Ready to land: no code change, as mallox decided in INBOX-706 (land both commits now, as a known DEV-801 flake).
+
+    - Branch `agent/DEV-825` is unchanged and clean: `54e806f30` (DEV-802) + `e6442860b` (this fix), on top of `main` `c72189e40`.
+    - `main` has `d4084d484` (DEV-789) since then; the merge rebases onto it.
+    - Last merge run: all 2490 Rust tests passed; only the DEV-801 leftover-temp-folder guard failed. Evidence is on DEV-801.
+    - Landing this also lands DEV-802's commit.
+  report:
+    commits:
+    - hash: e6442860b
+      what: DEV-825 fix (relative gitdir lines resolve against the admin folder)
+    - hash: 54e806f30
+      what: DEV-802, which this fix builds on
+    checks:
+    - command: npm run -s test:agent
+      result: failed
+      reason: all 2490 passed; DEV-801 temp-folder guard trips, landing as known flake per owner
+    next: Merge agent lands 54e806f30 and e6442860b on main as a known DEV-801 flake
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a14eb294736299ddcfa1a4a685c83a62e6a240e9dccc5e2e91215857e91deab
 description: |-
   Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
 
@@ -201,6 +226,7 @@ description: |-
   - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: review:DEV-802-relative-worktree-paths
 history:
@@ -386,3 +412,37 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-25T17:06:49.289513+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-25T17:06:50.155678+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a14eb294736299ddcfa1a4a685c83a62e6a240e9dccc5e2e91215857e91deab
+- at: 2026-11-25T17:06:55.716518+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-25T17:06:56.323578+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:07:10.393156+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:07:11.043477+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768"]}'
+    new: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768","DEV-789"]}'

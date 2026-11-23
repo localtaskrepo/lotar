@@ -1,15 +1,16 @@
 title: 'Proposal: finding bundles: a health bundle starts its fix agent when created, so later findings of the day start new bundles'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-25T05:05:15.164063+00:00
-modified: 2026-11-25T05:33:42.893388+00:00
+modified: 2026-11-25T17:07:36.884481+00:00
 relationships:
   related:
   - DEV-800
   - standards:STD-299
+  - DEV-384
 comments:
 - date: 2026-11-25T05:05:31.886292+00:00
   author: claude
@@ -32,6 +33,42 @@ comments:
 - date: 2026-11-25T05:33:42.121870+00:00
   author: mallox
   text: 'Answer: message (A new finding is sent to the running job; the merge check covers every key) (answered in INBOX-715)'
+- date: 2026-11-25T17:06:45.008407+00:00
+  author: automation
+  text: The fix agent's job job-20261125T170139.505Z-160 failed (lotar agent logs job-20261125T170139.505Z-160); @fix-retry retries it on branch agent/DEV-864.
+- date: 2026-11-25T17:07:36.562079+00:00
+  author: claude
+  text: |-
+    Done: a finding joins the day's bundle while its fix job runs, and the job gets it as a message (owner's answer "message").
+
+    - `FindingService::open_bundle` (`crates/lotar-lib/src/services/finding_service.rs`) now takes an `InProgress` bundle when a fix job runs on it that can take a message (session runner, not a merge job, not the job filing the report).
+    - `lotar add --bundle` tells that job first (`tell_running_job`, the finding's section as its next turn), then adds the finding. Job can't take it: a new bundle, as before, so no job closes a finding it didn't see.
+    - `Reviewing` and `Merging` bundles still take none. The merge's `finding_check` already runs on every key.
+    - Decision recorded in the description; `docs/help/add.md` Bundles updated.
+    - New tests in `crates/lotar-lib/tests/dev800_finding_bundle_test.rs`. The path where the message actually arrives isn't tested end to end (it needs a live agent session); it reuses DEV-384's `tell_running_job`.
+  report:
+    commits:
+    - hash: 78263b6a8
+      what: a running fix job's bundle takes the day's new findings, told by message
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev800
+      result: passed
+    - command: cargo nextest run -p lotar-lib finding
+      result: passed
+    - command: cargo clippy --workspace --all-targets
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: rustfmt, clippy and prettier on the changed files ran; the merge runs the suite
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change; the merge runs it
+    next: 'After release: check that one day of agent findings gives about one health bundle per repo (Done when, item 2)'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1b755a5ab91c95e3b823fcce51ab6579ef57c31453ec859b3d0d1fbc4d71942
 description: |-
   `lotar add --finding <key> --bundle health` (DEV-800) puts a new finding into the day's open bundle only while no agent job holds it. With the shared rules, a health bundle starts its fix agent as soon as it is created, so a bundle will rarely collect more than one finding. STD-299's goal, one health ticket per repo per day, then isn't met for findings agents file.
 
@@ -48,12 +85,17 @@ description: |-
   - A new finding reaches the running job: the job gets it as a message, and the merge's `finding_check` runs on every key.
   - Keep one ticket per finding for agent-filed findings, and bundle only the daily run (that is how it works today).
 
+  ## Decision
+
+  - 2026-11-25, owner (via INBOX-715): "A new finding is sent to the running job; the merge check covers every key".
+
   ## Done when
 
-  - [ ] The owner picked one option, and it is recorded here in his words.
+  - [x] The owner picked one option, and it is recorded here in his words.
   - [ ] Agent findings of one day give about one bundle per repo with the standards rules in place.
 tags:
 - proposal
+- fix-retried
 history:
 - at: 2026-11-25T05:05:15.494355+00:00
   actor: claude
@@ -81,3 +123,85 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-25T17:01:42.779515+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-25T17:01:43.344560+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1b755a5ab91c95e3b823fcce51ab6579ef57c31453ec859b3d0d1fbc4d71942
+- at: 2026-11-25T17:06:44.241527+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: proposal
+    new: proposal, fix-retried
+- at: 2026-11-25T17:06:45.008407+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:07:28.070495+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      `lotar add --finding <key> --bundle health` (DEV-800) puts a new finding into the day's open bundle only while no agent job holds it. With the shared rules, a health bundle starts its fix agent as soon as it is created, so a bundle will rarely collect more than one finding. STD-299's goal, one health ticket per repo per day, then isn't met for findings agents file.
+
+      ## Cause
+
+      - `.tasks/DEV/automation.yml` "Health: start the fix agent" runs `on: created` for tag `health`. "Health: fix agent lifecycle" sets `InProgress` on `job_started`.
+      - `FindingService::open_bundle` (`crates/lotar-lib/src/services/finding_service.rs`) skips a bundle in `InProgress`, `Reviewing` or `Merging`. The next report of the day starts a new bundle, and that one starts its own fix agent.
+      - Agents file their findings spread over the day (about 55 in 72 h, STD-299). So only reports that come in while the job waits in the queue are bundled.
+      - DEV-800's tests pass because they run without automation rules.
+
+      ## Options (owner decides)
+
+      - A bundle's fix agent starts later, like the flaky list (STD-301): for example the daily `repos.ts --report` run, or a set time after the bundle was created.
+      - A new finding reaches the running job: the job gets it as a message, and the merge's `finding_check` runs on every key.
+      - Keep one ticket per finding for agent-filed findings, and bundle only the daily run (that is how it works today).
+
+      ## Done when
+
+      - [ ] The owner picked one option, and it is recorded here in his words.
+      - [ ] Agent findings of one day give about one bundle per repo with the standards rules in place.
+    new: |-
+      `lotar add --finding <key> --bundle health` (DEV-800) puts a new finding into the day's open bundle only while no agent job holds it. With the shared rules, a health bundle starts its fix agent as soon as it is created, so a bundle will rarely collect more than one finding. STD-299's goal, one health ticket per repo per day, then isn't met for findings agents file.
+
+      ## Cause
+
+      - `.tasks/DEV/automation.yml` "Health: start the fix agent" runs `on: created` for tag `health`. "Health: fix agent lifecycle" sets `InProgress` on `job_started`.
+      - `FindingService::open_bundle` (`crates/lotar-lib/src/services/finding_service.rs`) skips a bundle in `InProgress`, `Reviewing` or `Merging`. The next report of the day starts a new bundle, and that one starts its own fix agent.
+      - Agents file their findings spread over the day (about 55 in 72 h, STD-299). So only reports that come in while the job waits in the queue are bundled.
+      - DEV-800's tests pass because they run without automation rules.
+
+      ## Options (owner decides)
+
+      - A bundle's fix agent starts later, like the flaky list (STD-301): for example the daily `repos.ts --report` run, or a set time after the bundle was created.
+      - A new finding reaches the running job: the job gets it as a message, and the merge's `finding_check` runs on every key.
+      - Keep one ticket per finding for agent-filed findings, and bundle only the daily run (that is how it works today).
+
+      ## Decision
+
+      - 2026-11-25, owner (via INBOX-715): "A new finding is sent to the running job; the merge check covers every key".
+
+      ## Done when
+
+      - [x] The owner picked one option, and it is recorded here in his words.
+      - [ ] Agent findings of one day give about one bundle per repo with the standards rules in place.
+- at: 2026-11-25T17:07:36.562079+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:07:36.884481+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","standards:STD-299"]}'
+    new: '{"related":["DEV-800","standards:STD-299","DEV-384"]}'

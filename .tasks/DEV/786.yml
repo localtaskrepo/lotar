@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-fable'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-25T12:34:10.506186+00:00
+modified: 2026-11-25T17:11:04.198417+00:00
 relationships:
   related:
   - DEV-725
@@ -388,6 +388,68 @@ comments:
 - date: 2026-11-25T12:34:10.506186+00:00
   author: automation
   text: 'The queued @review job didn''t start: DEV-786 is assigned to @fix now.'
+- date: 2026-11-25T17:07:18.550248+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261125T170657.328Z-162 failed again (lotar agent logs job-20261125T170657.328Z-162). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-25T17:07:43.807550+00:00
+  author: triage
+  text: |-
+    Answer: fix-fable (Retry with @fix-fable)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261125T170657.328Z-162 ended 'The t3 runner exited with code 1' (could not read the T3 thread right after start); same error as job-187 on 2026-11-22, which a plain @fix retry got past. Ticket has retry-fix, so fix-fable. Work left: attach the missing screenshot set from the last review.
+  answer:
+    to: 2026-11-25T17:07:18.550248+00:00
+    choice:
+    - fix-fable
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261125T170657.328Z-162 ended ''The t3 runner exited with code 1'' (could not read the T3 thread right after start); same error as job-187 on 2026-11-22, which a plain @fix retry got past. Ticket has retry-fix, so fix-fable. Work left: attach the missing screenshot set from the last review.'
+- date: 2026-11-25T17:11:04.198417+00:00
+  author: claude
+  text: |-
+    Review finding fixed: the full before/after screenshot set of the current queue card is attached. No code change, so no new commit.
+
+    - **Before:** `main` at the branch base `855ff6f46` (DEV-771's card): `dev786-card-before-{light,dark}-{1920,1440,390}.png`
+    - **After:** `ba43e9632`: `dev786-card-after-{light,dark}-{1920,1440,390}.png`, plus `dev786-card-after-moved-{light,dark}-1440.png` after `POST /api/agent-queue/move` `{DEMO-1, first}` (Low fix on top, "Kept in place")
+    - Same scratch workspace for both: 5 DEMO tickets (High merge, High fix, 2× Medium review, Low fix), queued with `lotar agent run` and the worker off. Before lists them by arrival; after by priority then kind, with place, kind chip, priority and the four move buttons
+    - I read all images: no clipping or contrast problems in dark mode, the 390 px rows wrap cleanly, and the disabled arrows on the first and last rows show
+    - The 2026-11-22 `dev786-before/after-*` files show the removed panel; ignore them
+    - **For the merge:** `main` has moved to `d4084d484`. `git merge-tree` now conflicts in `crates/lotar-lib/tests/integration.rs`, `docs/help/agent.md`, `view/__tests__/AgentJobs.spec.ts`, `view/api/client.ts`. I didn't rebase (this job may not rewrite history). `view/pages/AgentJobs.vue` merges cleanly
+  report:
+    commits:
+    - hash: ba43e9632
+      what: unchanged, the reviewed commit
+    checks:
+    - command: screenshots before/after 1920/1440/390 light+dark
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: no code changed; the merge runs them
+    next: Review the new dev786-card-* screenshots; the merge must rebase onto main (conflicts below)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -410,6 +472,21 @@ references:
 - attachment: dev786-queue-card.a0a9ed8f560e9ec83145cab7fc718d39.webp
 - attachment: dev786-queue-card-dark.3c1db1b5e8bfba61bb8155811e81a0fa.webp
 - attachment: dev786-queue-card-phone.3d1c8a0eda6d9df5c26af99e235865c2.webp
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85be01b13e29b35842b127dece24976507cc5b1ffdeb414d08d6f9be5fbec4f9
+- attachment: dev786-card-after-dark-1440.e6cf18e4b68fdf0347982c790a58afa1.png
+- attachment: dev786-card-after-dark-1920.5b10205453da6f82fa823121101fe354.png
+- attachment: dev786-card-after-dark-390.0e5683dd0bc7ff54e31c441c2e81756e.png
+- attachment: dev786-card-after-light-1440.ff1069d22a260aebd6c7dbffc0c33029.png
+- attachment: dev786-card-after-light-1920.1b0dd0bb92aedad2250a177fb2772fbb.png
+- attachment: dev786-card-after-light-390.dd345678fa506200978ee20d86ca711a.png
+- attachment: dev786-card-after-moved-dark-1440.a9d466eb3989521a1305764f59facfd4.png
+- attachment: dev786-card-after-moved-light-1440.45c4b0707621bc0d27205a21173e62a4.png
+- attachment: dev786-card-before-dark-1440.4e208524cd7351caa0e7aba767a161a1.png
+- attachment: dev786-card-before-dark-1920.d0fb818718e9f2c73942a94f502edcab.png
+- attachment: dev786-card-before-dark-390.6f1e6c706376e4d8a3e04c516a90c57f.png
+- attachment: dev786-card-before-light-1440.a27e25e65ee9251f151e08520703735e.png
+- attachment: dev786-card-before-light-1920.69ccc638c759d77228d954449bb0bb43.png
+- attachment: dev786-card-before-light-390.d20de8714096d4c97c3e45c4df2eb2cc.png
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
 
@@ -445,6 +522,7 @@ tags:
 - review-returned
 - job-paused
 - review-returned-twice
+- retry-fable
 history:
 - at: 2026-11-22T03:06:54.686868+00:00
   actor: claude
@@ -914,5 +992,119 @@ history:
     new: '@fix'
 - at: 2026-11-25T12:34:10.506186+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:07:11.911695+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-25T17:07:12.936451+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85be01b13e29b35842b127dece24976507cc5b1ffdeb414d08d6f9be5fbec4f9
+- at: 2026-11-25T17:07:18.147925+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-25T17:07:18.550248+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:07:43.807550+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:07:43.807595+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix-fable'
+- at: 2026-11-25T17:07:45.351928+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice
+    new: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice, retry-fable
+- at: 2026-11-25T17:10:48.858168+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-dark-1440.e6cf18e4b68fdf0347982c790a58afa1.png
+- at: 2026-11-25T17:10:48.912069+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-dark-1920.5b10205453da6f82fa823121101fe354.png
+- at: 2026-11-25T17:10:48.967181+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-dark-390.0e5683dd0bc7ff54e31c441c2e81756e.png
+- at: 2026-11-25T17:10:49.024313+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-light-1440.ff1069d22a260aebd6c7dbffc0c33029.png
+- at: 2026-11-25T17:10:49.076402+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-light-1920.1b0dd0bb92aedad2250a177fb2772fbb.png
+- at: 2026-11-25T17:10:49.139592+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-light-390.dd345678fa506200978ee20d86ca711a.png
+- at: 2026-11-25T17:10:49.190954+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-moved-dark-1440.a9d466eb3989521a1305764f59facfd4.png
+- at: 2026-11-25T17:10:49.247033+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-after-moved-light-1440.45c4b0707621bc0d27205a21173e62a4.png
+- at: 2026-11-25T17:10:49.300173+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-before-dark-1440.4e208524cd7351caa0e7aba767a161a1.png
+- at: 2026-11-25T17:10:49.352986+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-before-dark-1920.d0fb818718e9f2c73942a94f502edcab.png
+- at: 2026-11-25T17:10:49.406307+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-before-dark-390.6f1e6c706376e4d8a3e04c516a90c57f.png
+- at: 2026-11-25T17:10:49.459217+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-before-light-1440.a27e25e65ee9251f151e08520703735e.png
+- at: 2026-11-25T17:10:49.515319+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-before-light-1920.69ccc638c759d77228d954449bb0bb43.png
+- at: 2026-11-25T17:10:49.572480+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-card-before-light-390.d20de8714096d4c97c3e45c4df2eb2cc.png
+- at: 2026-11-25T17:11:04.198417+00:00
+  actor: claude
   changes:
   - field: comment_added

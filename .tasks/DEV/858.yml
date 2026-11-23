@@ -3,14 +3,17 @@ status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: claude
 created: 2026-11-24T22:44:17.550162+00:00
-modified: 2026-11-25T15:17:42.023836+00:00
+modified: 2026-11-25T17:15:06.499622+00:00
 relationships:
   depends_on:
   - DEV-849
+  - DEV-872
   related:
   - DEV-849
+  - DEV-872
+  - TEST-1
 comments:
 - date: 2026-11-25T12:40:26.825930+00:00
   author: claude
@@ -26,14 +29,123 @@ comments:
 - date: 2026-11-25T15:17:42.023836+00:00
   author: claude
   text: 'Stalled since 2026-11-25T14:08Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-25T17:06:56.632881+00:00
+  author: automation
+  text: The fix agent's job job-20261125T140809.214Z-57 failed (lotar agent logs job-20261125T140809.214Z-57); @fix-retry retries it on branch agent/DEV-858.
+- date: 2026-11-25T17:08:45.708245+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261125T170652.971Z-59 failed again (lotar agent logs job-20261125T170652.971Z-59). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-25T17:09:57.644296+00:00
+  author: triage
+  text: |-
+    Waits for DEV-872: both fix jobs failed on the t3 CLI, not on the work.
+
+    - `job-20261125T140809.214Z-57` and `job-20261125T170652.971Z-59` died in 6 to 8 s: could not read the thread with `t3 thread show`.
+    - `~/.t3/bin/t3 thread show <thread>` prints `ServerOwnsDatabaseError`: the running T3 server owns `/Users/mallox/.t3/userdata`.
+    - Continues when DEV-872 is done ("Prerequisites done").
+- date: 2026-11-25T17:14:04.920088+00:00
+  author: claude
+  text: |-
+    REST test for `GET /api/jobs/t3-thread` added; it passes.
+
+    - Branch fast-forwarded to `main` (`d4084d484`, has DEV-849's `d3bed079b`).
+    - New test `the_t3_thread_route_answers_each_jobs_thread_and_refuses_other_jobs` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`, on the fake `t3`: three t3 jobs and one `command` job of TEST-1.
+    - Two jobs of the ticket answer 200 with their own threads `thread-0` and `thread-1`, state `finished`.
+    - A thread `t3 thread show` fails on answers 200 `unavailable` with t3's error as the reason.
+    - The `command` job and a missing id answer 400; an unknown job answers 404.
+    - No product code changed.
+  report:
+    commits:
+    - hash: 9305ce413
+      what: REST test for GET /api/jobs/t3-thread
+    checks:
+    - command: cargo nextest run --cargo-profile dev the_t3_thread_route
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests -- -D warnings
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: test-only change, the merge runs it
+    next: Merge agent lands agent/DEV-858 on main
+- date: 2026-11-25T17:15:06.499622+00:00
+  author: claude
+  text: |-
+    REST test for `GET /api/jobs/t3-thread` added; no production code changed.
+
+    - `the_t3_thread_route_answers_each_jobs_thread_and_refuses_other_jobs` at the end of `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`, on the fake `t3`
+    - Two t3 jobs of one ticket (fix, rework): 200, `thread-0` / `thread-1`, own links, `finished` / `completed`
+    - Review job whose thread was removed from the fake T3: 200 `unavailable`, reason ends with t3's `No thread thread-2`
+    - Command job: 400 "runs on command, not in a T3 Code thread"; missing `id`: 400; `job-unknown-1`: 404 "Job 'job-unknown-1' not found"
+    - "Done when" now lists these as checkboxes
+    - `-p lotar-lib` alone can't run these tests (they need the `lotar` binary); use `--workspace`
+  report:
+    commits:
+    - hash: 9305ce413
+      what: REST test for GET /api/jobs/t3-thread
+    checks:
+    - command: cargo nextest run --workspace --test integration dev503
+      result: passed
+      reason: 54 of 54
+    - command: rustfmt --edition 2024 --check crates/lotar-lib/tests/dev503_harness_jobs_test.rs
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests
+      result: passed
+      reason: no warnings
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: test-only change, the merge runs the full suites (DEV-797)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b1c83e2cf0d2436f0b72ea63e6750f769de0de33c35f3204adaa0b9888d2d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad158317efeb4c09caef52d93f060c84098ee0ec393e83112798470246e9fa9e3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A008fc82fbca2290200a5087eb98a48d25fb2b2b77db1f4a489f774478f3610cd
 description: |-
   Found in the DEV-849 review: the endpoint in `crates/lotar-lib/src/routes/jobs.rs` has unit tests for parsing and mapping and a UI test, but no REST test. The 400 for a non-t3 job, 404 for an unknown job, and Unavailable from a failing `t3` were only checked by hand.
 
-  Done when: an integration test (the fake t3 in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` fits) covers those three answers and two jobs of one ticket that resolve to two threads.
+  ## Done when
+
+  An integration test in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`, on its fake `t3`, calls `GET /api/jobs/t3-thread?id=<job>` and checks:
+
+  - [ ] Two t3 jobs of one ticket: each answers 200 with its own `thread_id` and link, and T3 Code's state of that thread.
+  - [ ] A t3 job whose `t3 thread show` fails: 200 with `state: unavailable` and t3's error as `reason` (no 5xx).
+  - [ ] A job of another runner (command): 400 naming the runner; a missing `id`: 400.
+  - [ ] An unknown job id: 404 `Job '<id>' not found`.
+  - [ ] No production code changes; the test passes with `cargo nextest run --workspace --test integration dev503`.
 tags:
 - agent
+- fix-retried
 history:
 - at: 2026-11-24T22:44:18.166402+00:00
   actor: claude
@@ -96,6 +208,111 @@ history:
     old: Blocked
     new: InProgress
 - at: 2026-11-25T15:17:42.023836+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:06:47.205080+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad158317efeb4c09caef52d93f060c84098ee0ec393e83112798470246e9fa9e3
+- at: 2026-11-25T17:06:52.617983+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: agent
+    new: agent, fix-retried
+- at: 2026-11-25T17:06:56.632881+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:08:36.948445+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A008fc82fbca2290200a5087eb98a48d25fb2b2b77db1f4a489f774478f3610cd
+- at: 2026-11-25T17:08:44.123896+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-25T17:08:45.708245+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:09:42.570977+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849"],"related":["DEV-849"]}'
+    new: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-872"]}'
+- at: 2026-11-25T17:09:53.625163+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-872"]}'
+    new: '{"depends_on":["DEV-849","DEV-872"],"related":["DEV-849","DEV-872"]}'
+- at: 2026-11-25T17:09:56.847643+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-25T17:09:57.644296+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:10:07.090280+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-25T17:14:04.920088+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:14:05.500875+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849","DEV-872"],"related":["DEV-849","DEV-872"]}'
+    new: '{"depends_on":["DEV-849","DEV-872"],"related":["DEV-849","DEV-872","TEST-1"]}'
+- at: 2026-11-25T17:14:36.888293+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-849 review: the endpoint in `crates/lotar-lib/src/routes/jobs.rs` has unit tests for parsing and mapping and a UI test, but no REST test. The 400 for a non-t3 job, 404 for an unknown job, and Unavailable from a failing `t3` were only checked by hand.
+
+      Done when: an integration test (the fake t3 in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` fits) covers those three answers and two jobs of one ticket that resolve to two threads.
+    new: |-
+      Found in the DEV-849 review: the endpoint in `crates/lotar-lib/src/routes/jobs.rs` has unit tests for parsing and mapping and a UI test, but no REST test. The 400 for a non-t3 job, 404 for an unknown job, and Unavailable from a failing `t3` were only checked by hand.
+
+      ## Done when
+
+      An integration test in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`, on its fake `t3`, calls `GET /api/jobs/t3-thread?id=<job>` and checks:
+
+      - [ ] Two t3 jobs of one ticket: each answers 200 with its own `thread_id` and link, and T3 Code's state of that thread.
+      - [ ] A t3 job whose `t3 thread show` fails: 200 with `state: unavailable` and t3's error as `reason` (no 5xx).
+      - [ ] A job of another runner (command): 400 naming the runner; a missing `id`: 400.
+      - [ ] An unknown job id: 404 `Job '<id>' not found`.
+      - [ ] No production code changes; the test passes with `cargo nextest run --workspace --test integration dev503`.
+- at: 2026-11-25T17:14:36.964543+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-25T17:15:06.499622+00:00
   actor: claude
   changes:
   - field: comment_added

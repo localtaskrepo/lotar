@@ -1,11 +1,11 @@
 title: 'Agents page: a finished tool call replaces the job card''s last message, unlike the server'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T08:06:40.134808+00:00
-modified: 2026-11-25T16:26:14.651713+00:00
+modified: 2026-11-25T17:07:11.042747+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -16,6 +16,8 @@ relationships:
   - DEV-866
   - DEV-774
   - DEV-800
+  - DEV-781
+  - DEV-825
 comments:
 - date: 2026-11-22T13:46:52.546394+00:00
   author: claude
@@ -132,6 +134,32 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-789` onto `main` conflicts in `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-789` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-25T17:01:31.179175+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `d4084d484` is on `main` and `origin/main`.
+
+    - **Rebase conflict** in `view/pages/AgentJobs.vue` (`updateFromEvent`, `last_message`): DEV-774 on main added `kind !== 'agent_job_plan'`, this branch added "a completed tool keeps the line". These are separate conditions, so I kept both in one expression. The comment names DEV-766, DEV-774 and DEV-789.
+    - **Main moved during the checks** (DEV-800 landed). The second rebase was clean, giving `85e5efa89`, so all checks ran again on it.
+    - **Checks on `85e5efa89`:** `npm ci`, `npm run -s lint:agent`, `npm run -s test:agent` (Rust 2522, UI 1604) and `npm run -s smoke` (410/410) all passed.
+    - **Smoke flake on the first rebase (`408c701ff`):** at load average about 20, 2 tests timed out: `ui.relationships` (Dependencies checkbox) and `api.review-policy` (reviewer active-job gate, which left a temp folder). `ui.panel-safety` also had an unhandled rejection. All 3 files passed alone (29/29), and the next full smoke passed 410/410. None of these files is touched by this change. Same pattern as DEV-781.
+    - **`.tasks` changes** in the main checkout were amended into the commit (`d79bf634c..d4084d484`). No rules or config changed, so no `lotar trust` was needed.
+    - **Push:** the main checkout was clean, and the only unpushed commit was this one.
+  report:
+    commits:
+    - hash: d4084d484
+      what: DEV-789 fix, rebased onto main and pushed
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2522/2522, UI 1604/1604, release, hooks
+    - command: npm run -s smoke
+      result: passed
+      reason: 410/410
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbec1b9366a3e727602217837d75843415ce7d4c239dc0ded79a4911ff97aad0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8cf00dfcf8a49abc2ffc9d2aac60765537ab121463ce2db3a7b3264007c1ba3a
@@ -167,8 +195,6 @@ description: |-
 tags:
 - agent
 - ui
-- review-returned
-- job-paused
 history:
 - at: 2026-11-22T08:06:42.114577+00:00
   actor: claude
@@ -440,3 +466,28 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774"]}'
     new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774","DEV-800"]}'
+- at: 2026-11-25T17:01:31.179175+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:01:31.556747+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774","DEV-800"]}'
+    new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774","DEV-800","DEV-781"]}'
+- at: 2026-11-25T17:01:38.918156+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: agent, ui, review-returned, job-paused
+    new: agent, ui
+- at: 2026-11-25T17:07:11.042747+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774","DEV-800","DEV-781"]}'
+    new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774","DEV-800","DEV-781","DEV-825"]}'

@@ -37,7 +37,8 @@ describe('Scan page scanner settings', () => {
                     await expect
                         .poll(async () => fs.readFile(globalPath, 'utf8'), { timeout: 10_000 })
                         .toMatch(/enable_mentions: false/);
-                    expect(await fs.readFile(globalPath, 'utf8')).toContain('[A-Z]{2,5}-\\d+');
+                    // Only the changed key is rewritten; the hand-written pattern stays (DEV-811).
+                    expect(await fs.readFile(globalPath, 'utf8')).toContain('  - "[A-Z]{2,5}-\\\\d+"\n');
                     const projectConfig = await fs.readFile(
                         path.join(workspace.tasksDir, 'SCAN', 'config.yml'),
                         'utf8',

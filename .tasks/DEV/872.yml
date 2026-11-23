@@ -1,0 +1,43 @@
+title: 't3 thread show fails: ServerOwnsDatabaseError, t3 job runner exits 1 right after start'
+status: Todo
+priority: Medium
+type: Feature
+reporter: triage
+assignee: '@fix'
+created: 2026-11-25T17:09:40.877284+00:00
+modified: 2026-11-25T17:10:22.102089+00:00
+relationships:
+  blocks:
+  - DEV-858
+  - DEV-810
+  related:
+  - DEV-858
+description: 'Found: fix jobs on DEV-858 (job-20261125T140809.214Z-57, job-20261125T170652.971Z-59) failed in 6 to 8 s: ''could not read the T3 Code thread ... with t3 thread show''. Check: ~/.t3/bin/t3 thread show <thread> prints ServerOwnsDatabaseError: another T3 Code process owns /Users/mallox/.t3/userdata and the CLI would change its schema (t3 v0.1.12). Likely the running T3 server and the bundled CLI differ in version after an app update. Done when: t3 thread show on a live job thread prints the thread, and a t3 job on a test ticket gets past start.'
+tags:
+- health
+custom_fields:
+  finding: infra:t3-cli:server-owns-database
+history:
+- at: 2026-11-25T17:09:42.571645+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-858"]}'
+- at: 2026-11-25T17:09:44.364470+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-25T17:09:53.630541+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-858"]}'
+    new: '{"blocks":["DEV-858"],"related":["DEV-858"]}'
+- at: 2026-11-25T17:10:22.102089+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-858"],"related":["DEV-858"]}'
+    new: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858"]}'

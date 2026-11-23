@@ -70,9 +70,10 @@ fn a_detected_name_replaces_only_the_name_line() {
 
 #[test]
 fn a_change_the_patch_cannot_express_falls_back_to_canonical_yaml() {
-    let existing = "# dropped\nproject:\n  name: PRJ\n";
+    // The name is spelled `project.id`: patching in `project.name` would spell it twice.
+    let existing = "# dropped\nproject:\n  id: PRJ\n";
     let mut cfg = lotar::config::normalization::parse_project_from_yaml_str("PRJ", existing).unwrap();
-    cfg.default_assignee = Some("alice".to_string());
+    cfg.project_name = "My Project".to_string();
     assert_eq!(
         lotar::config::normalization::to_project_yaml_preserving("PRJ", Some(existing), &cfg),
         lotar::config::normalization::to_canonical_project_yaml(&cfg)

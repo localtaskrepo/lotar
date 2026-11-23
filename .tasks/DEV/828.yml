@@ -1,11 +1,11 @@
 title: 'JSON comment lists leave deleted comments out without their #N, so counting positions picks the wrong comment for --edit/--delete'
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-23T07:19:10.376712+00:00
-modified: 2026-11-25T06:18:05.088808+00:00
+modified: 2026-11-25T17:17:15.746197+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -107,6 +107,78 @@ comments:
 - date: 2026-11-24T16:30:39.233374+00:00
   author: automation
   text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c of the job job-20261123T085811.410Z-114 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-25T17:11:40.867699+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261125T171032.471Z-166 failed again (lotar agent logs job-20261125T171032.471Z-166). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-25T17:12:46.869069+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261125T171032.471Z-166 failed at start, 'could not read the T3 Code thread with t3 thread show', the t3 runner exited with code 1. Prerequisites LOCA-601 and DEV-809 are Done.
+  answer:
+    to: 2026-11-25T17:11:40.867699+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261125T171032.471Z-166 failed at start, ''could not read the T3 Code thread with t3 thread show'', the t3 runner exited with code 1. Prerequisites LOCA-601 and DEV-809 are Done.'
+- date: 2026-11-25T17:17:15.746197+00:00
+  author: claude
+  text: |-
+    JSON comment lists now give each comment its stored `number`, the `#N` that `--edit/--delete/--restore` take.
+
+    - DEV-809 is on `main` (`8180a5e1e`); branch fast-forwarded to `d4084d484` first
+    - `lotar --format json comment <ID>` items (also with `--deleted`) and `lotar --format json show <ID>` `comments` carry `number`; deleted ones stay out as before (`crates/lotar-lib/src/cli/handlers/comment.rs` `numbered_comment_json`, `task/show.rs`)
+    - REST and MCP unchanged: they keep every comment, so the index already matches
+    - Test `json_lists_number_comments_as_stored`: delete #2 of three, JSON lists 1 and 3; it failed before the fix
+    - `docs/help/comment.md` says so
+  report:
+    commits:
+    - hash: 4aa38189b
+      what: JSON comment items carry number
+    checks:
+    - command: cargo nextest run --cargo-profile dev dev809_comment_delete_test show
+      result: passed
+      reason: 40 tests
+    - command: cargo clippy --profile dev -p lotar-lib --all-targets
+      result: passed
+    - command: npx prettier --check docs/help/comment.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs it
+    - command: npm test
+      result: not_run
+      reason: merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it
+    next: merge agent runs the full suites and lands agent/DEV-828
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60
@@ -120,6 +192,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2424047f55c22b3e7d55d2fd811e0c0dae99072428b934d18b548ef7acd05f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0858c1b7cd77d94aa690da353b582acbd4d782034a9a9ae54c3d2b3df9cc4847
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A612fe8a46e05ce59bfef51e0cca7d5ccfe612b752039a4d4fd43857373f45aad
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad14b0684e914c8f624ed083a849b1c8ac1a6ee9d35ca64165b736b67c8086582
 description: |-
   Found in the DEV-809 review (2026-11-22).
 
@@ -132,6 +205,7 @@ description: |-
 tags:
 - job-paused
 - fix-retried
+- retry-fix
 history:
 - at: 2026-11-23T07:19:13.361734+00:00
   actor: claude
@@ -348,3 +422,47 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T17:11:03.266956+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-25T17:11:03.829659+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad14b0684e914c8f624ed083a849b1c8ac1a6ee9d35ca64165b736b67c8086582
+- at: 2026-11-25T17:11:21.252388+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-25T17:11:40.867699+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:12:46.869069+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:12:46.869111+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-25T17:13:08.207469+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: job-paused, fix-retried
+    new: job-paused, fix-retried, retry-fix
+- at: 2026-11-25T17:17:15.746197+00:00
+  actor: claude
+  changes:
+  - field: comment_added

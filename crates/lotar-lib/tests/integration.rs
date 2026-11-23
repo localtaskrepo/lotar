@@ -190,6 +190,7 @@ mod dev771_jobs_route_shows_the_queue_test;
 mod dev800_finding_bundle_test;
 mod dev809_comment_delete_test;
 mod dev80_env_ownership_test;
+mod dev811_config_set_comments_test;
 mod dev82_contract_semantics_test;
 mod dev89_cli_add_transaction_test;
 mod dev92_cli_soft_delete_test;

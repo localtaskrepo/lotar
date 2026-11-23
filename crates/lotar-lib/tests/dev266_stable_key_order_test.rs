@@ -54,6 +54,7 @@ fn config_alias_maps_keep_a_sorted_order_across_writes() {
         let text = std::fs::read_to_string(fixtures.tasks_root.join("config.yml")).unwrap();
         seen.push(keys_under(&text, "branch.type_aliases"));
     }
-    assert_eq!(seen[0], ["chore", "epic", "feat", "fix", "spike"]);
+    // An unrelated write leaves the hand-written map as it is (DEV-811).
+    assert_eq!(seen[0], ["spike", "fix", "feat", "epic", "chore"]);
     assert!(seen.windows(2).all(|w| w[0] == w[1]), "{seen:?}");
 }

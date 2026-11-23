@@ -30,6 +30,7 @@ pub mod source_labels;
 pub mod trust;
 pub mod types;
 pub mod validation;
+pub(crate) mod yaml_patch;
 
 // Re-export main types for public API
 pub use manager::ConfigManager;

@@ -394,6 +394,16 @@ pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(),
 /// `PreserveExisting` presence read below only ever sees a file that
 /// parse-verified callers already accepted.
 pub fn save_global_config_with_port(tasks_dir: &Path, config: &GlobalConfig, port_intent: ServerPortSaveIntent) -> Result<(), ConfigError> {
+    write_global_config(tasks_dir, config, port_intent, true)
+}
+
+/// Replace the global config file with canonical YAML of `config`, dropping
+/// its comments and unknown keys (`config init --force`).
+pub fn overwrite_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(), ConfigError> {
+    write_global_config(tasks_dir, config, ServerPortSaveIntent::PreserveExisting, false)
+}
+
+fn write_global_config(tasks_dir: &Path, config: &GlobalConfig, port_intent: ServerPortSaveIntent, patch: bool) -> Result<(), ConfigError> {
     let config_path = crate::utils::paths::global_config_path(tasks_dir);
 
     // Ensure the tasks directory exists
@@ -406,9 +416,13 @@ pub fn save_global_config_with_port(tasks_dir: &Path, config: &GlobalConfig, por
         ServerPortSaveIntent::PreserveExisting => crate::config::persistence::config_file_server_port(&config_path, "global config").ok().flatten().is_some(),
     };
 
-    // Serialize in canonical nested format
-    let config_yaml =
-        crate::config::normalization::to_canonical_global_yaml_with(config, crate::config::normalization::GlobalYamlOptions { explicit_server_port });
+    // Patch the file the user wrote; canonical nested format otherwise (DEV-811).
+    let existing = if patch { fs::read_to_string(&config_path).ok() } else { None };
+    let config_yaml = crate::config::normalization::to_global_yaml_preserving(
+        existing.as_deref(),
+        config,
+        crate::config::normalization::GlobalYamlOptions { explicit_server_port },
+    );
 
     // Agent profiles are command sources (DEV-259): keep a trusted
     // workspace trusted across LoTaR's own config writes.
@@ -424,6 +438,16 @@ pub fn save_global_config_with_port(tasks_dir: &Path, config: &GlobalConfig, por
 
 /// Save updated project configuration to tasks_dir/{project}/config.yml
 pub fn save_project_config(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig) -> Result<(), ConfigError> {
+    write_project_config(tasks_dir, project_prefix, config, true)
+}
+
+/// Replace the project's config file with canonical YAML of `config`,
+/// dropping its comments and unknown keys (`config init --force`).
+pub fn overwrite_project_config(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig) -> Result<(), ConfigError> {
+    write_project_config(tasks_dir, project_prefix, config, false)
+}
+
+fn write_project_config(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig, patch: bool) -> Result<(), ConfigError> {
     if let Err(e) = crate::storage::safety::validate_project_prefix(project_prefix) {
         return Err(ConfigError::IoError(e));
     }
@@ -433,8 +457,8 @@ pub fn save_project_config(tasks_dir: &Path, project_prefix: &str, config: &Proj
     // Ensure the project directory exists
     fs::create_dir_all(&project_dir).map_err(|e| ConfigError::IoError(format!("Failed to create project directory: {}", e)))?;
 
-    // Serialize in canonical nested format
-    let config_yaml = crate::config::normalization::to_canonical_project_yaml(config);
+    let config_yaml =
+        if patch { preserving_project_yaml(tasks_dir, project_prefix, config) } else { crate::config::normalization::to_canonical_project_yaml(config) };
 
     crate::config::trust::TrustService::rewrite(tasks_dir, || crate::storage::safety::atomic_write_file(&config_path, &config_yaml))
         .map_err(|e| ConfigError::IoError(format!("Failed to write project config: {}", e)))?;
@@ -446,10 +470,10 @@ pub fn save_project_config(tasks_dir: &Path, project_prefix: &str, config: &Proj
     Ok(())
 }
 
-/// The YAML an automatic write of `config` puts in the project's config file:
-/// the file on disk with only the changed members and name patched in, so
-/// hand-written comments survive (DEV-407).
-pub fn auto_written_project_yaml(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig) -> String {
+/// The YAML a write of `config` puts in the project's config file: the file
+/// on disk with only the changed keys patched in, so hand-written comments and
+/// formatting survive (DEV-407, DEV-811).
+pub fn preserving_project_yaml(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig) -> String {
     let existing = fs::read_to_string(crate::utils::paths::project_config_path(tasks_dir, project_prefix)).ok();
     crate::config::normalization::to_project_yaml_preserving(project_prefix, existing.as_deref(), config)
 }

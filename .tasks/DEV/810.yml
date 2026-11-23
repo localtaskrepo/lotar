@@ -1,14 +1,15 @@
 title: 'Kept T3 Code threads of done tickets stay unsettled: 56 completed job threads in the sidebar on 0.15.6'
-status: HelpNeeded
+status: Blocked
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix-fable'
+assignee: '@fix'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-25T05:37:18.429177+00:00
+modified: 2026-11-25T17:17:57.231149+00:00
 relationships:
   depends_on:
   - local:LOCA-601
+  - DEV-872
   related:
   - DEV-747
   - DEV-752
@@ -18,6 +19,8 @@ relationships:
   - DEV-833
   - DEV-778
   - DEV-849
+  - DEV-774
+  - DEV-836
 comments:
 - date: 2026-11-22T21:22:50.394391+00:00
   author: claude
@@ -372,6 +375,85 @@ comments:
     choice:
     - fix-fable
     note: (answered in INBOX-701)
+- date: 2026-11-25T17:09:33.031553+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261125T170831.017Z-163 failed again (lotar agent logs job-20261125T170831.017Z-163). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-25T17:10:59.048420+00:00
+  author: triage
+  text: |-
+    Blocked on DEV-872: the t3 runner can't read its thread, so retrying another profile fails the same way.
+
+    - Job `job-20261125T170831.017Z-163` (@fix-fable) died in seconds: `could not read the T3 Code thread ... with t3 thread show`, then `The t3 runner exited with code 1`.
+    - Cause (infrastructure, not the work): `~/.t3/bin/t3 thread list` fails with `ServerOwnsDatabaseError` (CLI v0.1.12 doesn't match the running T3 Code server). DEV-872 tracks it.
+    - The worktree is clean at `c7741b49e` (checks passed 2026-11-24); remaining work is review and merge.
+    - Per `docs/decisions/2026-11-15-inbox-triage.md` (standards): this ticket continues when DEV-872 is done ("Prerequisites done").
+- date: 2026-11-25T17:11:00.024612+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-872. It starts once they are done.'
+- date: 2026-11-25T17:17:50.119333+00:00
+  author: claude
+  text: |-
+    Ready for review: the fix is rebased onto main as `b7f520caf` and its tests pass.
+
+    - **Rebase:** `c7741b49e` no longer merged: 31 newer commits on main touched `kept.rs` and `docs/help/agent.md` (DEV-836, DEV-849, DEV-774). I rebased and resolved both. Main's `settle_superseded` (DEV-836) now reads the job id from the fix's optional `job` field; the docs paragraph keeps both texts.
+    - **Review finding (test passed without the fix):** fixed. With main's `kept.rs` and `resumed.rs` put back, all 3 new tests fail, the reused-session one with `left: ["thread-1"]`, `right: ["thread-1", "thread-0"]`. With the fix: 56 of 56 in `dev503_harness_jobs_test`.
+    - **Leftovers removed:** the worktree had staged debug changes from an earlier session (main's old `kept.rs`/`resumed.rs` and a `panic!("DEBUG …")` in the test). Committed at the job's end they would have undone the fix. I restored the three files to the commit; the worktree is clean.
+    - **Why this job shows as failed:** `t3 thread show` fails with `ServerOwnsDatabaseError`, so the runner exited 1 after 6 s while this thread kept working. That is DEV-872 (open), and it asked the retry question again at 17:09Z. No retry is needed for DEV-810.
+    - **Not done here:** `npm run lint`, `npm test`, `npm run smoke` (merge runs them), and the count after the release, which needs the owner's OK.
+  report:
+    commits:
+    - hash: b7f520caf
+      what: the fix, rebased onto main 1c2a4b (was c7741b49e)
+    checks:
+    - command: cargo nextest run --cargo-profile dev -p lotar-lib --test integration dev503_harness_jobs_test
+      result: passed
+      reason: 56 of 56
+    - command: the 3 new tests against main's kept.rs and resumed.rs
+      result: passed
+      reason: all 3 fail without the fix
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: rustfmt --check and prettier --check on the changed files
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites once (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: same
+    - command: npm run smoke
+      result: not_run
+      reason: same
+    next: Review b7f520caf, then merge. The open retry question comes from DEV-872, not from this work.
+- date: 2026-11-25T17:17:57.231149+00:00
+  author: claude
+  text: 'Correction to my hand-off comment: `b7f520caf` is rebased onto main `d4084d484`. The hash `1c2a4b` I wrote there is wrong.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
@@ -388,6 +470,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75016bc3a7e986d168c7c233798bace1bc1cddaca3762b8dee0115cc6ea077c2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8e7f03fca9fb2e315c36ef63f93bf2d4a3fc44c5de856ef55ed21df8e84d88f3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A93efbf3043cc8f88842f92b54d1bdb9f9224d1cfd00ffd4b602328de85b44f80
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A031b0d341593563131407ad4e61a142dc25461ebf4358f69dfdff0696637e2a9
 description: |-
   Found 2026-11-22 13:30 PST (chief of staff, owner: 't3 still has a lot of open threads. We're on the new version of lotar so I hope this can be cleaned up now?'). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads ('<ID> fix: ...', '<ID> review: ...'), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing 'Threads to settle' lists 42). DEV-747's look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says 'Settled' or 'was not settled'. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else 'no harnessmux session holds it'. The chief of staff can't settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job's log or session record is gone (find them from T3's thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner's OK.
 
@@ -809,3 +892,67 @@ history:
   - field: assignee
     old: mallox
     new: '@fix-fable'
+- at: 2026-11-25T17:09:25.312656+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-25T17:09:26.449206+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A031b0d341593563131407ad4e61a142dc25461ebf4358f69dfdff0696637e2a9
+- at: 2026-11-25T17:09:32.101485+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-fable'
+    new: mallox
+- at: 2026-11-25T17:09:33.031553+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:10:22.100142+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849"]}'
+- at: 2026-11-25T17:10:22.837948+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-25T17:10:59.048420+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:10:59.705203+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-25T17:11:00.024612+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:17:50.119333+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T17:17:50.541573+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836"]}'
+- at: 2026-11-25T17:17:57.231149+00:00
+  actor: claude
+  changes:
+  - field: comment_added

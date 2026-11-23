@@ -669,7 +669,7 @@ impl TaskService {
         if !changed {
             return Ok((None, planned_members));
         }
-        let yaml = crate::config::operations::auto_written_project_yaml(tasks_root, project, &project_config);
+        let yaml = crate::config::operations::preserving_project_yaml(tasks_root, project, &project_config);
         Ok((Some(yaml), planned_members))
     }
 
@@ -2281,7 +2281,7 @@ impl TaskService {
 
         match plan {
             Some((project_config, effective)) => {
-                let yaml = crate::config::operations::auto_written_project_yaml(tasks_root, project, &project_config);
+                let yaml = crate::config::operations::preserving_project_yaml(tasks_root, project, &project_config);
                 config.members = effective;
                 Ok((config, Some(yaml)))
             }

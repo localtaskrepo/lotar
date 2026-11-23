@@ -167,7 +167,7 @@ fn init_global(
         let template = crate::config::normalization::parse_global_from_yaml_str(&yaml).map_err(|e| format!("Agent template is invalid: {}", e))?;
         builder::apply_agent_template_global(&mut cfg, template, overrides);
     }
-    ConfigManager::save_global_config(tasks_root, &cfg).map_err(|e| e.to_string())?;
+    crate::config::operations::overwrite_global_config(tasks_root, &cfg).map_err(|e| e.to_string())?;
     renderer.emit_success(format_args!("Global configuration initialized at: {}", global_path.display()));
 
     scaffolds::apply(tasks_root, None, scaffolds, args.force, renderer)?;
@@ -201,7 +201,7 @@ fn write_project_config(
         return Err("Generated project configuration failed validation".to_string());
     }
 
-    ConfigManager::save_project_config(tasks_root, prefix, cfg).map_err(|e| e.to_string())?;
+    crate::config::operations::overwrite_project_config(tasks_root, prefix, cfg).map_err(|e| e.to_string())?;
     renderer.emit_success(format_args!("Project '{}' initialized at: {}", project_name, path.display()));
     Ok(())
 }

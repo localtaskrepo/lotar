@@ -55,7 +55,7 @@ Behavior:
 - `--copy-from` merges non-identity fields from an existing project (pass its prefix).
 - `--global` writes `.tasks/config.yml` only. Combine with overrides to set workspace-wide defaults.
 - `--dry-run` prints the resolved plan (paths and scaffolds) without touching disk.
-- `--force` overwrites existing config / scaffold files.
+- `--force` overwrites existing config / scaffold files: the config is written fresh in canonical form, so its old comments and unknown keys are gone.
 - Prefix syntax and destination safety are checked even with `--force` and before creating a missing tasks directory. Absolute paths, traversal, and symlinked config destinations are rejected; force only bypasses collision/overwrite checks.
 - Initialization preserves existing normalized global settings when setting the default project. An unreadable or malformed existing global config aborts initialization rather than being replaced with defaults.
 
@@ -75,7 +75,7 @@ Details:
 - Conflicts reference real task IDs; tasks that were already invalid before the change do not block unrelated updates.
 - An empty value in project scope clears that override precisely (e.g., `lotar config set agent_worktree_dir '' --project=ENG` removes only that setting and preserves the other worktree settings).
 - Fields that only make sense globally (`server.port`, `default_project`, sprint defaults) are automatically treated as global even if `--global` is not passed.
-- Writes are lockless and atomic per file: the candidate is validated first and the whole change lands in one atomic file replace. This is not a cross-writer transaction — a concurrent external editor can still race the final replace. Accepted writes rewrite the file in canonical form (comments and unknown keys are dropped); rejected changes leave the bytes untouched.
+- Writes are lockless and atomic per file: the candidate is validated first and the whole change lands in one atomic file replace. This is not a cross-writer transaction — a concurrent external editor can still race the final replace. Accepted writes rewrite only the keys whose value changed: comments, key order, spelling and the formatting of other keys stay (a changed flow list such as `[a, b]` stays a flow list), and a new key joins its section or the end of the file. Comment lines inside a section, also at column 0, stay where they are; a block list that only loses items or gains them at its end keeps its other item lines and the comments between them. When the file can't be patched into exactly the new configuration (a field spelled two ways, say `project.id` next to `project.name`), the write falls back to canonical form, which drops comments and unknown keys. Rejected changes leave the bytes untouched.
 
 ### templates
 List available workflow presets and legacy template aliases.
@@ -201,7 +201,7 @@ Notes:
 LoTaR accepts shipped flat fields (such as `default_project`, `default_assignee`, and `server_port`), dotted keys, and nested sections in YAML. Canonical nested/dotted fields take precedence over their flat equivalents regardless of YAML key order. Conflicting dotted and nested definitions of the same path are rejected. Internally, values are canonicalized to sections such as server, default, project, members, review, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.
 
 - Config roots must be mappings; empty or comment-only files still mean built-in defaults. Invalid recognized field types are errors, including invalid values shadowed by another representation. Init aborts before creating project files or rewriting an existing global config when these checks fail.
-- Canonical rewrites retain supported config fields, including `agent.context_extension`, `agent.logs_dir`, and the global-only `web_ui_path`. They are not lossless YAML edits: comments, formatting, and unknown keys (including unknown nested keys and fields unsupported in the selected scope) are not retained. Review the normalization preview before rewriting configs containing extensions.
+- Canonical rewrites retain supported config fields, including `agent.context_extension`, `agent.logs_dir`, and the global-only `web_ui_path`. They are not lossless YAML edits (`config set` and other writes patch the file instead, see above): comments, formatting, and unknown keys (including unknown nested keys and fields unsupported in the selected scope) are not retained. Review the normalization preview before rewriting configs containing extensions.
 
 - When a config file only uses built-in defaults the canonical writer produces a short comment instead of redundant YAML. Modify a value (for example `lotar config set server.port 9000 --global`) and rerun `lotar config normalize --write` to emit the corresponding section.
 - Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`).
