@@ -1,11 +1,11 @@
 title: 'T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T19:54:54.013521+00:00
-modified: 2026-11-26T18:34:00.374593+00:00
+modified: 2026-11-26T18:34:49.649684+00:00
 relationships:
   related:
   - DEV-777
@@ -17,6 +17,11 @@ relationships:
   - DEV-836
   - DEV-842
   - DEV-857
+  - DEV-797
+  - DEV-880
+  - DEV-881
+  - DEV-882
+  - DEV-883
 comments:
 - date: 2026-11-26T01:25:45.401486+00:00
   author: claude
@@ -100,6 +105,31 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T18:34:39.681685+00:00
+  author: claude
+  text: |-
+    Merged: DEV-876 is on `main` as `59b8ac172`. It is not pushed: local `main` is 1 commit behind `origin/main`.
+
+    - lotar's merge rebased the branch, ran lint, `test:agent` and smoke (all passed on `0a1014a4a`) and fast-forwarded `main`. I amended the pending `.tasks/DEV/876.yml` into the merged commit
+    - Push blocked: `main...origin/main [ahead 7, behind 1]`. `origin/main` has `71791a991 DEV-804 Release v0.15.7`, so a plain `git push` would be refused. Making it work means rebasing the main checkout's unpushed commits, and a merge job doesn't do that
+    - The 5 earlier unpushed commits (`fd6d2b098` DEV-882, `70f1095a0` DEV-883, `3d83a25ad` DEV-797, `e709ce7e8` DEV-881, `589f23c7d` DEV-880) are finished: DEV-797, DEV-880 and DEV-881 are Done. DEV-882 and DEV-883 are back in Todo with `@fix`, waiting on the recorded decision to rebase local `main` onto `origin/main` and push. That job will push this commit too
+    - No rules or agent profiles changed (`.tasks/*automation.yml`, `.tasks/*config.yml` diff empty), so `lotar trust` wasn't needed
+    - Not a health ticket: no finding checks to rerun
+  report:
+    commits:
+    - hash: 59b8ac172
+      what: DEV-876 settle older T3 threads on a new attempt and all ended threads on a done ticket (on main, .tasks amended in)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge, on 0a1014a4a
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge, on 0a1014a4a
+    - command: npm run -s smoke
+      result: passed
+      reason: lotar's merge, on 0a1014a4a
+    next: Push main once the DEV-882 @fix job rebases local main onto origin/main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9
 description: '-'
@@ -190,3 +220,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T18:34:39.681685+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:34:41.864704+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828","DEV-747","DEV-808","DEV-836","DEV-842","DEV-857"]}'
+    new: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828","DEV-747","DEV-808","DEV-836","DEV-842","DEV-857","DEV-797","DEV-880","DEV-881","DEV-882","DEV-883"]}'
+- at: 2026-11-26T18:34:49.649684+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

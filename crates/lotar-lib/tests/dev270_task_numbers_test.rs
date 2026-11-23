@@ -99,6 +99,7 @@ fn git(dir: &std::path::Path, args: &[&str]) {
 // DEV-802: a worktree's .tasks copy predates tickets added in the main
 // checkout; a ticket filed in the worktree must not reuse their IDs, and
 // one the main checkout files next must not reuse the worktree's.
+// DEV-825: a worktree added with --relative-paths counts too.
 #[test]
 fn checkouts_of_one_repository_get_distinct_ids() {
     let fixtures = TestFixtures::new();
@@ -118,4 +119,11 @@ fn checkouts_of_one_repository_get_distinct_ids() {
     assert!(out.contains("DEV-3"), "{out}");
     let out = ok(&main, &["add", "main again", "-p", "DEV"]);
     assert!(out.contains("DEV-4"), "{out}");
+
+    let relative = root.join("worktrees/DEV-2");
+    git(&main, &["worktree", "add", "-q", "--relative-paths", "-b", "agent/DEV-2", relative.to_str().unwrap()]);
+    let out = ok(&relative, &["add", "filed in the relative worktree", "-p", "DEV"]);
+    assert!(out.contains("DEV-5"), "{out}");
+    let out = ok(&worktree, &["add", "worktree again", "-p", "DEV"]);
+    assert!(out.contains("DEV-6"), "{out}");
 }

@@ -1,11 +1,11 @@
 title: After the usage-limit reset, T3 Code resumed 2-4 sessions per job in the same worktree
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-26T17:48:49.098241+00:00
+modified: 2026-11-26T18:41:16.278781+00:00
 relationships:
   related:
   - DEV-777
@@ -251,6 +251,10 @@ comments:
 - date: 2026-11-26T16:57:45.234844+00:00
   author: claude
   text: 'Stalled since 2026-11-26T07:28Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T18:41:15.997013+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-832` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7ed476434fcb4e018626487ba8c6d2a47dc50f277c86920bab74a5e08d2a6b29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6399386a6cea6eeb5ad94b21639914a2a3cbeac4c6d5e80ec5a4bd8b60b2deb
@@ -261,8 +265,6 @@ releases:
 description: 'Found 2026-11-24 ~08:00 PT, after the weekly limit reset: ListAgents lists four ''DEV-811 rework'' sessions (2b0465, 876756, 25d2e3, c8b9a8) busy at once in .lotar-worktrees/lotar/DEV-811, and also 2-5 copies for DEV-777, DEV-778, DEV-796, DEV-800, DEV-824, DEV-828, DEV-830, DEV-831 and STD-328. They edit the same files at once: on DEV-811 one session changed yaml_patch.rs between another''s read and its write. Check: after a resume, count the live sessions per job (ListAgents or ps of claude --add-dir <worktree>). Done: one session per job resumes, with a test.'
 tags:
 - health
-- job-paused
-- merge-retried
 custom_fields:
   finding: agent-jobs:duplicate-resume
 history:
@@ -523,3 +525,16 @@ history:
   changes:
   - field: releases
     new: '#12'
+- at: 2026-11-26T18:41:15.997013+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:41:16.278781+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused, merge-retried
+    new: health

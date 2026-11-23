@@ -4,7 +4,7 @@ priority: Low
 type: Bug
 reporter: claude
 created: 2026-11-23T04:27:34.695967+00:00
-modified: 2026-11-26T16:55:46.882561+00:00
+modified: 2026-11-26T18:58:33.781007+00:00
 relationships:
   related:
   - DEV-802
@@ -295,10 +295,49 @@ comments:
     - The failed run was infrastructure (opgate down, git couldn't sign), not the branch. `opgate status` lists the agent key again.
     - Landing was decided by mallox in INBOX-706 (land despite the DEV-801 flake); re-running a merge after an infra stop is the standing rule (`docs/decisions/2026-11-15-inbox-triage.md`).
     - Set to Merging, assignee cleared, for the merge rule.
+- date: 2026-11-26T18:58:32.735505+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    279d3423c DEV-875 Smoke 'shows the prompt and settings a finished job ran with behind its Instructions button' failed once in the full suite
+    589f23c7d DEV-880 Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log's visible area
+    e709ce7e8 DEV-881 Status feed: a small standard endpoint with each instance's running jobs, queue and who it waits on
+    3d83a25ad DEV-797 Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time
+    70f1095a0 DEV-883 A bad value in the home config's agents block drops every agent profile, and config validate still passes
+    fd6d2b098 DEV-882 Record memory-gate holds and each job's queued time in the job records
+    ```.
+
+    - Rebased `agent/DEV-825` onto `main` (`279d3423c426`): `9af09aaa3057`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-825` onto `main` (`59b8ac172063`): `2b97feeb1188`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `2b97feeb1188`
+    - Amended the pending `.tasks` changes into the merged commit: `5be54a48eb18`
+  report:
+    commits:
+    - hash: 59b8ac172
+      what: 'DEV-876 T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
+    - hash: 2b97feeb1
+      what: 'DEV-825 lotar add misses worktrees created with git worktree add --relative-paths: their ID can repeat (DEV-802)'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a14eb294736299ddcfa1a4a685c83a62e6a240e9dccc5e2e91215857e91deab
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82adc9f2c69d8345b461a52f391213e96b97bf88d19728c98d78c39fe0aa27a5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A57b5b78fa0f5ca3535da35b47c472f5e28b7449f95244be1abb3506c857d71c3
 description: |-
   Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
 
@@ -615,3 +654,12 @@ history:
   changes:
   - field: assignee
     old: '@fix'
+- at: 2026-11-26T18:58:32.735505+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:58:33.781007+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A57b5b78fa0f5ca3535da35b47c472f5e28b7449f95244be1abb3506c857d71c3

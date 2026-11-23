@@ -1,6 +1,6 @@
 //! Exercise the production readers with ordinary entry-path names, not protected
 //! Git markers. No Git processes or checkout metadata are touched by these cases.
-use super::{metadata_dirs, read_branch_at, read_remotes_at};
+use super::{checkout_tops, metadata_dirs, read_branch_at, read_remotes_at};
 use std::fs;
 use std::path::PathBuf;
 
@@ -219,4 +219,32 @@ fn metadata_directory_symlinks_keep_normal_behavior() {
     std::os::unix::fs::symlink(&f.normal_entry, &entry).unwrap();
     assert_eq!(read_branch_at(&entry).as_deref(), Some("feature/shared"));
     assert_eq!(read_remotes_at(&entry), remotes());
+}
+
+// DEV-825: `git worktree add --relative-paths` writes the gitdir line
+// relative to the admin folder; it must not resolve against the cwd.
+#[test]
+fn checkout_tops_resolve_relative_gitdir_lines_against_the_admin_folder() {
+    let tmp = tempfile::tempdir().unwrap();
+    let main = tmp.path().join("main");
+    let worktrees = main.join(".git/worktrees");
+    let relative = tmp.path().join("relative wt");
+    let absolute = tmp.path().join("absolute wt");
+    for (name, line) in [
+        ("relative", "../../../../relative wt/.git\n".to_string()),
+        ("absolute", format!("{}\n", absolute.join(".git").display())),
+        ("empty", "\n".to_string()),
+        ("gone", "../../../../gone/.git\n".to_string()),
+    ] {
+        fs::create_dir_all(worktrees.join(name)).unwrap();
+        fs::write(worktrees.join(name).join("gitdir"), line).unwrap();
+    }
+    fs::create_dir_all(&relative).unwrap();
+    fs::create_dir_all(&absolute).unwrap();
+    let canonical = |path: &PathBuf| fs::canonicalize(path).unwrap();
+    let mut tops = checkout_tops(&main);
+    tops.sort();
+    let mut expected = vec![canonical(&main), canonical(&relative), canonical(&absolute)];
+    expected.sort();
+    assert_eq!(tops, expected);
 }

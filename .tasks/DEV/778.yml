@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T00:05:08.801449+00:00
-modified: 2026-11-25T16:28:01.890111+00:00
+modified: 2026-11-26T18:53:17.558783+00:00
 relationships:
   depends_on:
   - DEV-762
@@ -26,6 +26,7 @@ relationships:
   - DEV-802
   - DEV-816
   - DEV-840
+  - DEV-905
 comments:
 - date: 2026-11-22T03:35:49.249990+00:00
   author: claude
@@ -918,3 +919,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-26T18:53:17.558783+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601","DEV-840"],"blocks":["DEV-841"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774","DEV-782","DEV-785","DEV-802","DEV-816","DEV-840"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601","DEV-840"],"blocks":["DEV-841"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774","DEV-782","DEV-785","DEV-802","DEV-816","DEV-840","DEV-905"]}'

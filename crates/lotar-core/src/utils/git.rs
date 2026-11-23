@@ -388,7 +388,8 @@ pub fn commit_url_prefix(remote: &str) -> Option<String> {
 /// The top folder of every checkout of the repository `repo_root` belongs
 /// to: the main checkout and each linked worktree, `repo_root` included.
 /// Read from Git's metadata files, so no `git` process runs; missing or
-/// pruned worktrees are left out.
+/// pruned worktrees are left out. A relative `gitdir` line resolves against
+/// its admin folder, not the process's working directory.
 pub fn checkout_tops(repo_root: &Path) -> Vec<PathBuf> {
     let Some((_, common_dir)) = metadata_dirs(&repo_root.join(".git")) else {
         return vec![];
@@ -401,7 +402,10 @@ pub fn checkout_tops(repo_root: &Path) -> Vec<PathBuf> {
     }
     let admins = fs::read_dir(common_dir.join("worktrees")).into_iter().flatten().flatten();
     for admin in admins {
-        let top = metadata_line(&admin.path().join("gitdir")).and_then(|line| Path::new(&line).parent().and_then(|top| fs::canonicalize(top).ok()));
+        // Git 2.48+ writes the line relative to the admin folder for
+        // worktrees added with --relative-paths (DEV-825).
+        let admin = admin.path();
+        let top = metadata_line(&admin.join("gitdir")).filter(|line| !line.is_empty()).and_then(|line| fs::canonicalize(admin.join(line).parent()?).ok());
         if let Some(top) = top.filter(|top| top.is_dir() && !tops.contains(top)) {
             tops.push(top);
         }

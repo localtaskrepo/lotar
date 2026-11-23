@@ -5,12 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T17:20:58.415465+00:00
-modified: 2026-11-24T22:23:10.962358+00:00
+modified: 2026-11-26T18:53:17.560539+00:00
 relationships:
   depends_on:
   - DEV-778
   related:
   - DEV-778
+  - DEV-905
 comments:
 - date: 2026-11-24T19:17:54.385564+00:00
   author: automation
@@ -140,3 +141,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T18:53:17.560539+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-778"],"related":["DEV-778"]}'
+    new: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905"]}'
