@@ -1,11 +1,11 @@
 title: 'Agents page: Instructions opened while a job''s logs load closes when the log arrives'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T01:18:52.353749+00:00
-modified: 2026-11-27T00:41:40.327039+00:00
+modified: 2026-11-27T02:30:27.605840+00:00
 relationships:
   related:
   - DEV-875
@@ -13,6 +13,9 @@ relationships:
   - DEV-865
   - DEV-880
   - DEV-913
+  - DEV-796
+  - DEV-893
+  - DEV-894
 comments:
 - date: 2026-11-26T06:15:21.322835+00:00
   author: claude
@@ -106,6 +109,33 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-888` onto `main` conflicts in `view/__tests__/AgentJobs.spec.ts`; lotar aborted the rebase, `agent/DEV-888` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-27T02:30:19.917268+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `8f5ff2780` on main.
+
+    - **Conflict:** `view/__tests__/AgentJobs.spec.ts`, the `api/client` mock list. Main added `moveAgentQueueEntry`, this branch added `getAgentJobInputs`. Kept both.
+    - **Rebases:** main moved three times during the checks (DEV-894/906/907, then DEV-796/850/891/892/869, then DEV-893). Each time the rebase ran clean and I reran lint, tests and smoke on the new hash. All passed every time.
+    - **Landed:** `git merge --ff-only` worked on the 4th try. I amended the pending `.tasks` edits (`DEV/893.yml`, `DEV/896.yml`) into the commit, then pushed `80e85d64e..8f5ff2780`.
+    - **Trust:** not needed; the merge changes no rules or config.
+    - **Finding:** the ticket's check (hold `/api/jobs/logs`, open Instructions, panel stays open) is the smoke test in `smoke/tests/ui.agent-jobs.smoke.spec.ts`. It passed.
+  report:
+    commits:
+    - hash: 8f5ff2780
+      what: Instructions panel stays open when the job log arrives (on main, pushed)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 414 tests
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: no DEV-888 finding; 4 findings are other tickets' (DEV-841 branch, DEV-654, DEV-279, automation.yml drift)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A038063cbc62a9008d25ebe42791e04e1b9b8bb44d87c11815642b1e7f481e2cf
 - attachment: DEV-888-before.53340ace512ce77337a1963f3be62ff4.png
@@ -127,8 +157,6 @@ description: 'Found: in DEV-875, while a job card''s logs load, `view/pages/Agen
 tags:
 - health
 - ui
-- review-returned
-- job-paused
 custom_fields:
   finding: ui:agent-jobs-instructions-remount
 history:
@@ -344,3 +372,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T02:30:19.917268+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T02:30:20.209522+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913"]}'
+    new: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913","DEV-796","DEV-893","DEV-894"]}'
+- at: 2026-11-27T02:30:27.605840+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, ui, review-returned, job-paused
+    new: health, ui

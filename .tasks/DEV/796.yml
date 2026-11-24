@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-27T01:59:50.842376+00:00
+modified: 2026-11-27T02:30:20.207874+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -29,6 +29,7 @@ relationships:
   - DEV-886
   - DEV-916
   - DEV-861
+  - DEV-888
 comments:
 - date: 2026-11-22T18:51:51.656944+00:00
   author: claude
@@ -1308,3 +1309,9 @@ history:
   - field: tags
     old: proposal, job-paused, fix-retried, review-returned
     new: proposal
+- at: 2026-11-27T02:30:20.207874+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916","DEV-861"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916","DEV-861","DEV-888"]}'

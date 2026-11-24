@@ -5,12 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T07:06:01.774631+00:00
-modified: 2026-11-27T02:07:27.324182+00:00
+modified: 2026-11-27T02:30:20.210106+00:00
 relationships:
   depends_on:
   - DEV-883
   related:
   - DEV-883
+  - DEV-888
 comments:
 - date: 2026-11-26T16:53:00.199462+00:00
   author: claude
@@ -213,3 +214,9 @@ history:
   - field: tags
     old: health, job-paused
     new: health
+- at: 2026-11-27T02:30:20.210106+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-883"],"related":["DEV-883"]}'
+    new: '{"depends_on":["DEV-883"],"related":["DEV-883","DEV-888"]}'

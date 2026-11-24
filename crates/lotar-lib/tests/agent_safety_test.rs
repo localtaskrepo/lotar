@@ -1227,7 +1227,7 @@ mod git_required {
         fs::set_permissions(trash.join(".tasks"), fs::Permissions::from_mode(0o755)).unwrap();
         let next = worktrees.join("next");
         git(root, &["worktree", "add", "-q", "-b", "agent/next", next.to_str().unwrap()]);
-        lotar::services::agent_job_service::remove_worktree_dir(root, &next).unwrap();
+        lotar::services::agent_job_service::remove_worktree_dir(root, &next, &project_config(&fixture)).unwrap();
         assert!(!next.exists() && !trash.exists(), "the next removal deletes the trash beside it");
     }
 
@@ -1631,6 +1631,10 @@ fn a_leftover_folder_with_only_build_output_gives_way_to_the_worktree() {
     assert_eq!(fs::read_to_string(leftover.join("notes.md")).unwrap(), "not build output", "other files stay");
 }
 
+fn project_config(fixture: &TestFixtures) -> lotar::config::types::ResolvedConfig {
+    lotar::config::resolution::config_for_project(&fixture.tasks_root, Some("SAFE")).unwrap()
+}
+
 /// DEV-762: `agent.worktree.build_root` set to a folder outside the
 /// repository, on the volume of the main checkout.
 fn with_build_root(fixture: &TestFixtures) -> tempfile::TempDir {
@@ -1680,7 +1684,7 @@ fn a_build_root_holds_the_worktrees_build_until_the_worktree_goes() {
     assert_eq!(fs::read_dir(&dir).unwrap().count(), 0, "the build is gone");
 
     fs::write(dir.join("app"), "built").unwrap();
-    lotar::services::agent_job_service::remove_worktree_dir(root, worktree).unwrap();
+    lotar::services::agent_job_service::remove_worktree_dir(root, worktree, &project_config(&fixture)).unwrap();
     assert!(!worktree.exists() && !dir.exists(), "the worktree's build goes with it");
     assert!(builds.path().join(root.file_name().unwrap()).exists(), "other tickets' builds stay");
 }
@@ -1698,4 +1702,82 @@ fn a_build_root_needs_target_ignored_as_a_link() {
     assert!(!fs::symlink_metadata(&target).is_ok_and(|meta| meta.is_symlink()), "no link git would list as untracked");
     assert_eq!(fs::read_dir(builds.path()).unwrap().count(), 0);
     assert!(job_note(&job, "needs `target` git-ignored as a link").is_some());
+}
+
+/// DEV-778: a removal cut off before it deleted the worktree's build in the
+/// build root (here a build it can't delete) leaves the folder with no link
+/// to it, and a cleanup cut off leaves its parked folder. The next
+/// `lotar agent worktree cleanup` and the next removal delete them; the
+/// builds of a live worktree and of one being added stay.
+#[test]
+fn leftover_builds_in_the_build_root_go_with_the_next_removal_or_cleanup() {
+    common::require_git();
+    let (fixture, ticket) = cloned_build_setup();
+    let root = fixture.get_temp_path();
+    fs::write(root.join(".gitignore"), "/target\n").unwrap();
+    git(root, &["commit", "-qam", "Ignore target links too"]);
+    let builds = with_build_root(&fixture);
+    let config = project_config(&fixture);
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    let worktree = Path::new(job.worktree_path.as_deref().unwrap()).to_path_buf();
+    let repo_dir = builds.path().join(root.file_name().unwrap());
+    let orphan = repo_dir.join(&ticket);
+    fs::create_dir_all(orphan.join("debug")).unwrap();
+    fs::write(orphan.join("debug/app"), "built").unwrap();
+    fs::set_permissions(orphan.join("debug"), fs::Permissions::from_mode(0o555)).unwrap();
+    let parked = repo_dir.join(format!(".{ticket}.lotar-cleanup-job-1"));
+    fs::create_dir_all(&parked).unwrap();
+    fs::write(parked.join("app"), "built").unwrap();
+    let next = root.join("worktrees").join("next");
+    git(root, &["worktree", "add", "-q", "-b", "agent/next", next.to_str().unwrap()]);
+    fs::create_dir_all(repo_dir.join("next")).unwrap();
+    std::os::unix::fs::symlink(repo_dir.join("next"), next.join("target")).unwrap();
+    // `git worktree add` made the folder, but doesn't list it yet.
+    fs::create_dir_all(worktree.with_file_name("adding")).unwrap();
+    fs::create_dir_all(repo_dir.join("adding")).unwrap();
+
+    let failed = lotar::services::agent_job_service::remove_worktree_dir(root, &worktree, &config);
+    assert!(failed.is_err_and(|err| err.to_string().contains("deleting its build in the build root failed")));
+    assert!(!worktree.exists() && orphan.join("debug/app").exists(), "the build outlives its worktree");
+
+    fs::set_permissions(orphan.join("debug"), fs::Permissions::from_mode(0o755)).unwrap();
+    let output = Command::new(crate::common::lotar_bin())
+        .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "agent", "worktree", "cleanup"])
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(!orphan.exists() && !parked.exists(), "cleanup deletes the leftover build and the parked one");
+    assert!(repo_dir.join("next").exists() && repo_dir.join("adding").exists(), "live builds stay");
+
+    let gone = repo_dir.join("gone");
+    fs::create_dir_all(&gone).unwrap();
+    lotar::services::agent_job_service::remove_worktree_dir(root, &next, &config).unwrap();
+    assert!(!gone.exists() && !repo_dir.join("next").exists(), "the next removal sweeps too");
+    assert!(repo_dir.join("adding").exists(), "a worktree being added keeps its build");
+}
+
+/// DEV-778: a job's end parks the ticket's build in the build root to
+/// delete it; parked folders a cut-off cleanup left go with the next one.
+#[test]
+fn ending_a_job_deletes_the_tickets_parked_builds_in_the_build_root() {
+    common::require_git();
+    let (fixture, ticket) = build_output_setup("exit 0");
+    let root = fixture.get_temp_path();
+    fs::write(root.join(".gitignore"), "/target\nkeep/\n").unwrap();
+    git(root, &["commit", "-qam", "Ignore target links too"]);
+    let builds = with_build_root(&fixture);
+    let repo_dir = builds.path().join(root.file_name().unwrap());
+    let parked = repo_dir.join(format!(".{ticket}.lotar-cleanup-job-1"));
+    fs::create_dir_all(&parked).unwrap();
+    let other = repo_dir.join(".OTHER-1.lotar-cleanup-job-1");
+    fs::create_dir_all(&other).unwrap();
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    assert!(deleted_note(&job), "the job log says what was deleted");
+    assert_eq!(fs::read_dir(repo_dir.join(&ticket)).unwrap().count(), 0, "the build folder empties");
+    assert!(!parked.exists(), "the leftover parked build goes");
+    assert!(other.exists(), "another ticket's cleanup isn't this job's");
 }

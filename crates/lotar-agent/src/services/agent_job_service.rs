@@ -1922,6 +1922,67 @@ pub fn build_root_dir(repo_root: &std::path::Path, worktree: &std::path::Path) -
     .then_some(dir)
 }
 
+/// The suffix part of a build root folder `remove_build_output` parked to
+/// delete: `.<worktree folder>.lotar-cleanup-<job>`.
+const PARKED_BUILD_MARKER: &str = ".lotar-cleanup-";
+
+/// Delete what a cut-off removal or cleanup left in the repository's build
+/// root folder (DEV-778): parked `.<name>.lotar-cleanup-<job>` folders and
+/// `<name>` folders of worktrees that are gone. It sweeps the folder of
+/// `agent.worktree.build_root` and the one a removed worktree's `target`
+/// linked to (`linked`), when they differ. A folder stays while a worktree
+/// of the repository (the main checkout included) is named after it, links
+/// `target` to it, or is being added (its folder exists in
+/// `agent.worktree.dir` or beside a listed worktree); when git can't list
+/// the worktrees, nothing goes. A failed delete is a warning.
+pub fn sweep_build_root(repo_root: &std::path::Path, config: &ResolvedConfig, linked: Option<&std::path::Path>) {
+    let Some(repo_name) = repo_root.file_name() else {
+        return;
+    };
+    let mut dirs: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(Some(root)) = resolve_build_root(repo_root, config.agent_worktree.build_root.as_deref()) {
+        dirs.push(root.join(repo_name));
+    }
+    if let Some(dir) = linked.and_then(std::path::Path::parent).filter(|dir| dir.file_name() == Some(repo_name)) {
+        dirs.push(dir.to_path_buf());
+    }
+    let dirs: Vec<_> = dirs.into_iter().filter_map(|dir| fs::canonicalize(dir).ok()).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+    if dirs.is_empty() {
+        return;
+    }
+    let Ok(worktrees) = worktree_paths(repo_root) else {
+        return;
+    };
+    let names: std::collections::HashSet<_> = worktrees.iter().filter_map(|path| path.file_name()).collect();
+    let builds: std::collections::HashSet<_> = worktrees.iter().filter_map(|path| fs::canonicalize(path.join("target")).ok()).collect();
+    let worktree_root = resolve_worktree_root(repo_root, config.agent_worktree.dir.as_deref()).ok();
+    let places: std::collections::HashSet<_> = worktrees.iter().filter_map(|path| path.parent()).chain(worktree_root.as_deref()).collect();
+    for dir in dirs {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name();
+            if !fs::symlink_metadata(&path).is_ok_and(|meta| meta.is_dir()) {
+                continue;
+            }
+            let leftover = match name.to_string_lossy().strip_prefix('.') {
+                Some(hidden) => hidden.contains(PARKED_BUILD_MARKER),
+                None => {
+                    !names.contains(name.as_os_str()) && !builds.contains(&path) && !places.iter().any(|place| fs::symlink_metadata(place.join(&name)).is_ok())
+                }
+            };
+            if leftover
+                && let Err(err) = fs::remove_dir_all(&path)
+                && err.kind() != std::io::ErrorKind::NotFound
+            {
+                eprintln!("[lotar][warn] Could not delete the leftover build {}: {err}", path.display());
+            }
+        }
+    }
+}
+
 /// A command (`cargo clean`) deleted the worktree's `target` link instead
 /// of what it points to: empty the build root folder and link it again.
 pub fn relink_build_root_dir(worktree: &std::path::Path, dir: &std::path::Path) -> std::io::Result<()> {
@@ -2946,14 +3007,14 @@ fn reworked_landing(repo_root: &std::path::Path, start: &str, branch: &str, tick
 /// `delete_branch` is set. The branch's commits are in the main checkout,
 /// possibly rebased, which `git branch -d` would refuse. A failure is
 /// logged: the worktree stays for a later cleanup.
-fn remove_worktree(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, delete_branch: bool, prefix: &str) {
-    if let Err(err) = remove_worktree_dir(repo_root, path) {
+fn remove_worktree(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, delete_branch: bool, config: &ResolvedConfig) {
+    if let Err(err) = remove_worktree_dir(repo_root, path, config) {
         eprintln!("[lotar][warn] Could not remove the worktree {}: {err}", path.display());
         return;
     }
     if delete_branch
         && let Some(branch) = branch
-        && let Err(err) = delete_landed_branch(repo_root, prefix, branch)
+        && let Err(err) = delete_landed_branch(repo_root, &config.agent_worktree.branch_prefix, branch)
     {
         eprintln!("[lotar][warn] Could not delete the branch {branch}: {err}");
     }
@@ -2970,7 +3031,16 @@ const REMOVED_WORKTREE_SUFFIX: &str = ".lotar-removed";
 /// folder aside, then git's entry goes, then the renamed folder; cut off,
 /// that leaves a folder of trash, which the next removal next to it
 /// deletes. A locked worktree stays, as with git.
-pub fn remove_worktree_dir(repo_root: &std::path::Path, path: &std::path::Path) -> LoTaRResult<()> {
+/// Then it sweeps the build root as `config` sets it, whatever the removal
+/// did (DEV-778).
+pub fn remove_worktree_dir(repo_root: &std::path::Path, path: &std::path::Path, config: &ResolvedConfig) -> LoTaRResult<()> {
+    let linked = fs::canonicalize(path).ok().and_then(|target| build_root_dir(repo_root, &target));
+    let removed = remove_linked_worktree(repo_root, path, linked.as_deref());
+    sweep_build_root(repo_root, config, linked.as_deref());
+    removed
+}
+
+fn remove_linked_worktree(repo_root: &std::path::Path, path: &std::path::Path, build: Option<&std::path::Path>) -> LoTaRResult<()> {
     let target = fs::canonicalize(path).map_err(LoTaRError::IoError)?;
     let common = verified_common_dir(repo_root).map_err(LoTaRError::IoError)?;
     let git_dir = git_stdout(&target, &["rev-parse", "--absolute-git-dir"])?;
@@ -2990,7 +3060,6 @@ pub fn remove_worktree_dir(repo_root: &std::path::Path, path: &std::path::Path) 
             let _ = fs::remove_dir_all(entry.path());
         }
     }
-    let build = build_root_dir(repo_root, &target);
     let trash = parent.join(format!(".{}{REMOVED_WORKTREE_SUFFIX}", name.to_string_lossy()));
     fs::rename(&target, &trash).map_err(LoTaRError::IoError)?;
     if let Err(err) = fs::remove_dir_all(&git_dir) {
@@ -3026,12 +3095,14 @@ pub fn missing_worktree_entry(repo_root: &std::path::Path, path: &std::path::Pat
 
 /// Delete the git entry `missing_worktree_entry` finds for `path`, as
 /// `git worktree prune` would, and the folder `remove_worktree_dir`
-/// renamed it to (DEV-723); whether there was an entry.
-pub fn prune_missing_worktree(repo_root: &std::path::Path, path: &std::path::Path) -> LoTaRResult<bool> {
+/// renamed it to (DEV-723); whether there was an entry. Then the build
+/// root is swept, as after `remove_worktree_dir` (DEV-778).
+pub fn prune_missing_worktree(repo_root: &std::path::Path, path: &std::path::Path, config: &ResolvedConfig) -> LoTaRResult<bool> {
     let Some(entry) = missing_worktree_entry(repo_root, path) else {
         return Ok(false);
     };
     fs::remove_dir_all(entry).map_err(LoTaRError::IoError)?;
+    sweep_build_root(repo_root, config, None);
     if let (Some(parent), Some(name)) = (path.parent(), path.file_name()) {
         let trash = parent.join(format!(".{}{REMOVED_WORKTREE_SUFFIX}", name.to_string_lossy()));
         if let Err(err) = fs::remove_dir_all(&trash)
@@ -3136,6 +3207,16 @@ fn detached_from(worktree: &std::path::Path) -> Option<String> {
 fn detached_ticket_record(worktree: &std::path::Path) -> Option<std::path::PathBuf> {
     let output = git_command(worktree).args(["rev-parse", "--absolute-git-dir"]).current_dir(worktree).output().ok()?;
     output.status.success().then(|| std::path::PathBuf::from(String::from_utf8_lossy(&output.stdout).trim()).join("lotar-ticket-branch"))
+}
+
+/// Every worktree git lists for the repository, the main checkout and
+/// prunable ones included.
+fn worktree_paths(repo_root: &std::path::Path) -> LoTaRResult<Vec<std::path::PathBuf>> {
+    let output = git_command(repo_root).args(["worktree", "list", "--porcelain"]).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
+    if !output.status.success() {
+        return Err(LoTaRError::ValidationError(format!("git worktree list failed: {}", String::from_utf8_lossy(&output.stderr).trim())));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).lines().filter_map(|line| line.strip_prefix("worktree ")).map(std::path::PathBuf::from).collect())
 }
 
 /// The repository's worktrees other than the main checkout, each with the
@@ -3268,7 +3349,7 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
     let delete_branches = config.agent_worktree.cleanup_delete_branches;
     for worktree in worktrees.iter().filter(|worktree| worktree.ticket_branch == branch) {
         // Its branch then goes with the idle branches below.
-        if prune_missing_worktree(&repo_root, &worktree.path).unwrap_or(false) {
+        if prune_missing_worktree(&repo_root, &worktree.path, &config).unwrap_or(false) {
             continue;
         }
         let Ok(removal) = check_done_worktree_cleanup(&repo_root, worktree, ticket_id, config.agent_worktree.cleanup_ignored_files) else {
@@ -3277,7 +3358,7 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
         // A superseded branch kept without its worktree still holds its commit.
         let keeps_commit = !worktree.detached && !delete_branches;
         if keeps_commit || removal.archive(&repo_root).is_ok() {
-            remove_worktree(&repo_root, &worktree.path, (!worktree.detached).then_some(worktree.branch.as_str()), delete_branches, branch_prefix);
+            remove_worktree(&repo_root, &worktree.path, (!worktree.detached).then_some(worktree.branch.as_str()), delete_branches, &config);
         }
     }
     if delete_branches {
@@ -3356,13 +3437,7 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
             record_and_emit(state, "agent_job_progress", Some(note));
         }
     } else {
-        remove_worktree(
-            &repo_root,
-            &target.path,
-            target.branch.as_deref(),
-            config.agent_worktree.cleanup_delete_branches,
-            &config.agent_worktree.branch_prefix,
-        );
+        remove_worktree(&repo_root, &target.path, target.branch.as_deref(), config.agent_worktree.cleanup_delete_branches, config);
     }
     drop(claim);
     flush_event_log();
@@ -3420,7 +3495,11 @@ fn remove_build_output(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
     for (index, path) in paths.iter().enumerate() {
         // `target` linked to the build root (DEV-762): its folder empties, the link stays.
         if let Some(dir) = build_dir.as_ref().filter(|_| std::path::Path::new(path) == std::path::Path::new("target")) {
-            let parked = dir.with_file_name(format!(".{}.lotar-cleanup-{job_id}", dir.file_name().unwrap_or_default().to_string_lossy()));
+            let parked_prefix = format!(".{}{PARKED_BUILD_MARKER}", dir.file_name().unwrap_or_default().to_string_lossy());
+            // Parked by an earlier cleanup cut off before its delete (DEV-778).
+            let leftovers = dir.parent().and_then(|parent| fs::read_dir(parent).ok()).into_iter().flatten().flatten();
+            moved.extend(leftovers.filter(|entry| entry.file_name().to_string_lossy().starts_with(&parked_prefix)).map(|entry| entry.path()));
+            let parked = dir.with_file_name(format!("{parked_prefix}{job_id}"));
             if fs::rename(dir, &parked).is_ok() {
                 moved.push(parked);
                 removed.push(path.as_str());

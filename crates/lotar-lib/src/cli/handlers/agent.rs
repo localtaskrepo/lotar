@@ -760,6 +760,19 @@ impl AgentHandler {
         let config = config_manager.get_resolved_config();
 
         let worktrees = list_agent_worktrees(resolver, config)?;
+        let project_config = |ticket_id: &str| {
+            ticket_id
+                .rsplit_once('-')
+                .and_then(|(project, _)| crate::config::resolution::config_for_project(&resolver.path, Some(project)).ok())
+                .unwrap_or_else(|| config.clone())
+        };
+        // What removals cut off left in the build root, the last
+        // worktree's included (DEV-778).
+        if !args.dry_run
+            && let Some(repo_root) = crate::utils::git::find_repo_root(&resolver.path)
+        {
+            agent_job_service::sweep_build_root(&repo_root, config, None);
+        }
 
         // Filter to worktrees that should be removed
         let to_remove: Vec<_> = worktrees
@@ -811,7 +824,7 @@ impl AgentHandler {
                     removed.push(wt.ticket_id.clone());
                     continue;
                 }
-                match agent_job_service::prune_missing_worktree(&repo_root, path) {
+                match agent_job_service::prune_missing_worktree(&repo_root, path, &project_config(&wt.ticket_id)) {
                     Ok(_) => {
                         renderer.emit_success(format!("Pruned missing worktree: {} ({})", wt.ticket_id, wt.path));
                         removed.push(wt.ticket_id.clone());
@@ -823,11 +836,8 @@ impl AgentHandler {
                 }
                 continue;
             }
-            let allow_ignored = wt
-                .ticket_id
-                .rsplit_once('-')
-                .and_then(|(project, _)| crate::config::resolution::config_for_project(&resolver.path, Some(project)).ok())
-                .map_or(config.agent_worktree.cleanup_ignored_files, |c| c.agent_worktree.cleanup_ignored_files);
+            let wt_config = project_config(&wt.ticket_id);
+            let allow_ignored = wt_config.agent_worktree.cleanup_ignored_files;
             let removal = if wt.is_done {
                 agent_job_service::check_done_worktree_cleanup(&repo_root, &wt.worktree, &wt.ticket_id, allow_ignored)
             } else {
@@ -855,7 +865,7 @@ impl AgentHandler {
                 continue;
             }
 
-            match agent_job_service::remove_worktree_dir(&repo_root, std::path::Path::new(&wt.path)) {
+            match agent_job_service::remove_worktree_dir(&repo_root, std::path::Path::new(&wt.path), &wt_config) {
                 Ok(()) => {
                     renderer.emit_success(format!("Removed worktree: {} ({})", wt.ticket_id, wt.path));
 
