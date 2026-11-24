@@ -355,13 +355,18 @@ impl AgentHandler {
     }
 
     fn list_jobs(args: &AgentListJobsArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
-        // New jobs that wait for memory have no log yet (DEV-623).
+        // New jobs that wait for memory (DEV-623) or disk space (DEV-837) have no log yet.
         let memory_hold = crate::services::memory_gate::status(&resolver.path).hold;
         let hold_json = memory_hold.as_ref().map(crate::services::memory_gate::MemoryHold::to_json);
-        if let Some(hold) = &memory_hold
-            && !matches!(renderer.format, OutputFormat::Json)
-        {
-            renderer.emit_info(format_args!("Queue: new jobs wait for memory: {}", hold.describe()));
+        let disk_hold = crate::services::disk_gate::status(&resolver.path);
+        let disk_json = disk_hold.as_ref().map(crate::services::disk_gate::DiskHold::to_json);
+        if !matches!(renderer.format, OutputFormat::Json) {
+            if let Some(hold) = &memory_hold {
+                renderer.emit_info(format_args!("Queue: new jobs wait for memory: {}", hold.describe()));
+            }
+            if let Some(hold) = &disk_hold {
+                renderer.emit_info(format_args!("Queue: new jobs wait for disk space: {}", hold.describe()));
+            }
         }
         // A paused queue says so (DEV-604).
         let pause = AgentQueueService::pause_state(&resolver.path);
@@ -371,7 +376,7 @@ impl AgentHandler {
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "pause": pause }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "disk_hold": disk_json, "pause": pause }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found (agent logging is off).");
@@ -382,7 +387,7 @@ impl AgentHandler {
 
         if job_ids.is_empty() {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "pause": pause }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "disk_hold": disk_json, "pause": pause }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found.");
@@ -413,7 +418,7 @@ impl AgentHandler {
         }
 
         if matches!(renderer.format, OutputFormat::Json) {
-            renderer.emit_json(&serde_json::json!({ "jobs": jobs, "memory_hold": hold_json, "pause": pause }));
+            renderer.emit_json(&serde_json::json!({ "jobs": jobs, "memory_hold": hold_json, "disk_hold": disk_json, "pause": pause }));
             return Ok(());
         }
 
@@ -507,6 +512,7 @@ impl AgentHandler {
                         "reason": reason,
                         "memory_hold": memory.hold.as_ref().map(crate::services::memory_gate::MemoryHold::to_json),
                         "memory_error": memory.error,
+                        "disk_hold": overview.disk.as_ref().map(crate::services::disk_gate::DiskHold::to_json),
                         "pause": overview.pause,
                         "running_jobs": stats.running,
                         "queued_jobs": stats.queued,

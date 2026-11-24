@@ -689,6 +689,9 @@ pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: Global
     if keys.has("agent_memory_gate") || override_config.agent_memory_gate != defaults.agent_memory_gate {
         base.agent_memory_gate = override_config.agent_memory_gate;
     }
+    if keys.has("agent_disk_gate") || override_config.agent_disk_gate != defaults.agent_disk_gate {
+        base.agent_disk_gate = override_config.agent_disk_gate;
+    }
     if keys.has("agent_job_history") || override_config.agent_job_history != defaults.agent_job_history {
         base.agent_job_history = override_config.agent_job_history;
     }
@@ -886,6 +889,9 @@ pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override
     }
     if keys.has("agent_memory_gate") || override_config.agent_memory_gate != defaults.agent_memory_gate {
         resolved.agent_memory_gate = override_config.agent_memory_gate;
+    }
+    if keys.has("agent_disk_gate") || override_config.agent_disk_gate != defaults.agent_disk_gate {
+        resolved.agent_disk_gate = override_config.agent_disk_gate;
     }
     if keys.has("agent_job_history") || override_config.agent_job_history != defaults.agent_job_history {
         resolved.agent_job_history = override_config.agent_job_history;
@@ -1268,6 +1274,7 @@ impl ResolvedConfig {
             agent_worktree: global.agent_worktree,
             agent_merge: global.agent_merge,
             agent_memory_gate: global.agent_memory_gate,
+            agent_disk_gate: global.agent_disk_gate,
             agent_job_history: global.agent_job_history,
             remotes: global.remotes,
             ui: crate::config::types::UiSettings {

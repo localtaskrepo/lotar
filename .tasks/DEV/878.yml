@@ -1,11 +1,11 @@
 title: 'Automation service: expand_comment took append_automation_comment''s doc comment'
-status: Blocked
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T20:00:38.684959+00:00
-modified: 2026-11-26T02:07:56.868855+00:00
+modified: 2026-11-26T07:02:36.426925+00:00
 relationships:
   depends_on:
   - DEV-852
@@ -20,8 +20,36 @@ comments:
     - `main` has no `expand_comment`; `append_automation_comment` keeps its doc comment there (`crates/lotar-agent/src/services/automation_service.rs:3044`)
     - The flaw is in `01daa6380` on `agent/DEV-852` (status Merging), lines 3072-3089
     - No change made on `agent/DEV-878`; once DEV-852 is on main, rebase onto it and move the doc block back onto `append_automation_comment`
+- date: 2026-11-26T07:02:26.768372+00:00
+  author: claude
+  text: |-
+    Fixed: the "Append a comment to a task ..." doc comment sits on `append_automation_comment` again.
+
+    - Rebased `agent/DEV-878` onto main, which now holds DEV-852 (`2e49a88db`)
+    - `crates/lotar-agent/src/services/automation_service.rs`: `expand_comment` keeps only its own two-line doc (DEV-852); the four-line block moved down onto `append_automation_comment`
+    - Comment-only change, no behavior change; commit `9fb6cb5e7`
+  report:
+    commits:
+    - hash: 9fb6cb5e7
+      what: move the doc block back onto append_automation_comment
+    checks:
+    - command: rustfmt --edition 2024 --check crates/lotar-agent/src/services/automation_service.rs
+      result: passed
+    - command: cargo check -p lotar-agent
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: comment-only change, the merge runs it
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Merge agent lands agent/DEV-878
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3c730bbb7b1de4ce7ab9712e9d8588f04853f7bcbb2aaf3b61803817d42ba0f6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad67dcfc1511141da2aef79713adc8daaf01e68bd00130b47d7a3ce91fe74b2c9
 description: |-
   Found in the DEV-852 review.
 
@@ -75,3 +103,27 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-26T07:01:05.496117+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T07:01:06.100376+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad67dcfc1511141da2aef79713adc8daaf01e68bd00130b47d7a3ce91fe74b2c9
+- at: 2026-11-26T07:02:26.768372+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:02:36.426925+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,11 +1,11 @@
 title: 'Rule builder: a comment map without a question is called ''comments with a question'''
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T20:00:39.778177+00:00
-modified: 2026-11-26T02:07:57.404894+00:00
+modified: 2026-11-26T07:04:10.920081+00:00
 relationships:
   depends_on:
   - DEV-852
@@ -20,8 +20,34 @@ comments:
     - The "comments with a question are currently YAML-only" reason exists only on `agent/DEV-852` (`01daa6380`, `view/utils/automationRules.ts:791`); main (`530c77fd9`) has no comment-map check at all
     - DEV-852 is in Merging; once it's on main, this branch rebases and gives a `comment` map without `question` its own reason, plus a test in `view/__tests__/automationRules.spec.ts`
     - No changes or commits on `agent/DEV-879`
+- date: 2026-11-26T07:04:01.012999+00:00
+  author: claude
+  text: |-
+    A `comment` map without `question` now says "comments written as a map are currently YAML-only".
+
+    - Rebased `agent/DEV-879` onto main (`eb9b383f7`, has DEV-852 `2e49a88db`)
+    - `view/utils/automationRules.ts`: the reason says "with a question" only when the map has `question`, else "written as a map"
+    - Kept it YAML-only rather than editing it in the builder: the builder would save it back as a plain string, not in the same form
+    - Test: `view/__tests__/automationRules.spec.ts` "keeps comment maps without a question yaml-only…" (failed before the fix, passes now)
+    - `docs/help/automation.md`: the builder note now names any `comment` map, not only questions
+  report:
+    commits:
+    - hash: f06d6093a
+      what: comment map without question gets its own YAML-only reason
+    checks:
+    - command: npx vitest run view/__tests__/automationRules.spec.ts
+      result: passed
+    - command: vue-tsc --project view/tsconfig.json --noEmit
+      result: passed
+    - command: oxlint + prettier --check on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
+    next: Merge agent lands agent/DEV-879
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8550d9ef314bccf32436fc0a30369bbe508616d4599363b7b3e2c9fe2fd6d8ec
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92224bf0efbfeddca815d33ded1caf820d6f85e3deae5190bfcc8bae1a3c8f34
 description: |-
   Found in the DEV-852 review.
 
@@ -76,3 +102,27 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-26T07:02:38.065944+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T07:02:38.602094+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92224bf0efbfeddca815d33ded1caf820d6f85e3deae5190bfcc8bae1a3c8f34
+- at: 2026-11-26T07:04:01.012999+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:04:10.920081+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

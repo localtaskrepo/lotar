@@ -566,6 +566,36 @@ const fn default_memory_gate_settle_seconds() -> u64 {
     120
 }
 
+/// When the agent queue holds new jobs because the disk is nearly full
+/// (DEV-837): `agent.disk_gate` in the global config. Applies to jobs that
+/// run in job worktrees.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentDiskGateConfig {
+    /// Free space, in GB, on the volume of the job worktrees (the build
+    /// root's when set) under which new jobs wait. 0 turns the gate off.
+    #[serde(default = "default_disk_gate_min_free_gb")]
+    pub min_free_gb: u64,
+    /// Under the floor, the cargo build profiles of worktrees with no
+    /// running job and no build or commit for this long are removed first.
+    #[serde(default = "default_disk_gate_idle_hours")]
+    pub idle_hours: u64,
+}
+
+impl Default for AgentDiskGateConfig {
+    fn default() -> Self {
+        Self { min_free_gb: default_disk_gate_min_free_gb(), idle_hours: default_disk_gate_idle_hours() }
+    }
+}
+
+const fn default_disk_gate_min_free_gb() -> u64 {
+    60
+}
+
+const fn default_disk_gate_idle_hours() -> u64 {
+    6
+}
+
 /// How long job logs are kept (DEV-693): `agent.job_history` in the global
 /// config. Jobs of open tickets and running jobs are always kept.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -1146,6 +1176,8 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub agent_memory_gate: AgentMemoryGateConfig,
     #[serde(default)]
+    pub agent_disk_gate: AgentDiskGateConfig,
+    #[serde(default)]
     pub agent_job_history: AgentJobHistoryConfig,
 
     /// Web UI branding (DEV-218): default theme, display name, and logo/icon
@@ -1262,6 +1294,8 @@ pub struct ResolvedConfig {
     pub agent_merge: Option<AgentMergeConfig>,
     #[serde(default)]
     pub agent_memory_gate: AgentMemoryGateConfig,
+    #[serde(default)]
+    pub agent_disk_gate: AgentDiskGateConfig,
     #[serde(default)]
     pub agent_job_history: AgentJobHistoryConfig,
 
@@ -1525,6 +1559,7 @@ impl Default for GlobalConfig {
             agent_worktree: AgentWorktreeConfig::default(),
             agent_merge: None,
             agent_memory_gate: AgentMemoryGateConfig::default(),
+            agent_disk_gate: AgentDiskGateConfig::default(),
             agent_job_history: AgentJobHistoryConfig::default(),
             ui_theme: None,
             ui_name: None,

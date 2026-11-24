@@ -2,6 +2,7 @@ use crate::api_types::{AgentJobCreateRequest, AgentParkedTicket, AgentQueueOverv
 use crate::config::manager::ConfigManager;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::AgentJobService;
+use crate::services::disk_gate::DiskHold;
 use crate::services::memory_gate::MemoryHold;
 use crate::utils::time::{self, Rfc3339};
 use fs2::FileExt;
@@ -218,6 +219,11 @@ impl AgentQueueEntry {
             carried_outcome,
             not_before: None,
         }
+    }
+
+    /// Whether its job would start as a merge job, which the disk gate lets pass (DEV-837).
+    fn starts_as_merge_job(&self, tasks_dir: &Path) -> bool {
+        AgentJobService::starts_as_merge_job(tasks_dir, &self.ticket_id, (!self.agent.is_empty()).then_some(self.agent.as_str()))
     }
 
     fn request(&self) -> AgentJobCreateRequest {
@@ -447,9 +453,14 @@ impl AgentQueueService {
     }
 
     /// The worker's state and, with entries queued, what they wait for.
-    /// `memory_hold` is the caller's one reading of the memory gate, so
-    /// the reason and the hold it shows beside it agree (DEV-681).
-    pub fn worker_state(tasks_dir: &Path, pending: &[AgentQueueEntry], memory_hold: Option<&MemoryHold>) -> (WorkerState, Option<String>) {
+    /// `memory_hold` and `disk_hold` are the caller's one reading of the
+    /// gates, so the reason and the hold it shows beside it agree (DEV-681).
+    pub fn worker_state(
+        tasks_dir: &Path,
+        pending: &[AgentQueueEntry],
+        memory_hold: Option<&MemoryHold>,
+        disk_hold: Option<&DiskHold>,
+    ) -> (WorkerState, Option<String>) {
         let pause = Self::pause_state(tasks_dir);
         if !Self::is_worker_running(tasks_dir) {
             if pending.is_empty() {
@@ -465,6 +476,9 @@ impl AgentQueueService {
         }
         if let Some(hold) = memory_hold {
             return (WorkerState::Active, Some(format!("waiting for memory: {}", hold.describe())));
+        }
+        if let Some(hold) = disk_hold {
+            return (WorkerState::Active, Some(format!("waiting for disk space: {}", hold.describe())));
         }
         if let Some(at) = pending.iter().map(AgentQueueEntry::waiting_until).collect::<Option<Vec<_>>>().and_then(|times| times.into_iter().min()) {
             return (WorkerState::Active, Some(format!("waiting for a provider's usage limit to reset; the next job runs at {at}")));
@@ -497,9 +511,11 @@ impl AgentQueueService {
         let parked = Self::list_parked(tasks_dir)?;
         let taken = read_state(tasks_dir).map(|state| state.taken).unwrap_or_default();
         let memory = crate::services::memory_gate::status(tasks_dir);
+        let disk = crate::services::disk_gate::status(tasks_dir);
         let pause = Self::pause_state(tasks_dir);
-        let (state, reason) = Self::worker_state(tasks_dir, &pending, memory.hold.as_ref());
-        let waits_for = entries_wait_for(tasks_dir, state, &pending, &taken, pause.as_ref(), memory.hold.as_ref());
+        let (state, reason) = Self::worker_state(tasks_dir, &pending, memory.hold.as_ref(), disk.as_ref());
+        let holds = Holds { memory: memory.hold.as_ref(), disk: disk.as_ref() };
+        let waits_for = entries_wait_for(tasks_dir, state, &pending, &taken, pause.as_ref(), holds);
         Ok(QueueOverview {
             stats: Self::queue_stats(tasks_dir, &pending),
             state,
@@ -507,6 +523,7 @@ impl AgentQueueService {
             pending: pending.into_iter().zip(waits_for).collect(),
             parked,
             memory,
+            disk,
             pause,
         })
     }
@@ -682,9 +699,14 @@ impl AgentQueueService {
                     // Threads T3 Code runs again with no job (DEV-626).
                     AgentJobService::adopt_resumed_t3_threads(tasks_dir);
                 }
-                // Short of memory: entries stay queued, unchanged (DEV-623).
+                // Short of memory or disk: entries stay queued, unchanged
+                // (DEV-623, DEV-837). Under the disk floor, idle builds go
+                // first, here and not under the job registry's lock; merge
+                // entries still start, as a merge frees its worktree.
                 if !upgraded && pending_count(tasks_dir)? > 0 && crate::services::memory_gate::check(tasks_dir).is_none() {
-                    let entries = dequeue_startable(tasks_dir)?;
+                    crate::services::disk_gate::clean(tasks_dir);
+                    let disk_held = crate::services::disk_gate::check(tasks_dir).is_some();
+                    let entries = dequeue_startable(tasks_dir, disk_held)?;
                     for entry in entries {
                         match start_entry(tasks_dir, entry.clone()) {
                             Ok(()) => settle_taken(tasks_dir, &entry, None)?,
@@ -753,6 +775,8 @@ pub struct QueueOverview {
     pub pending: Vec<(AgentQueueEntry, String)>,
     pub parked: Vec<ParkedEntry>,
     pub memory: crate::services::memory_gate::GateStatus,
+    /// Why new jobs in job worktrees wait for disk space (DEV-837).
+    pub disk: Option<DiskHold>,
     pub pause: Option<QueuePause>,
 }
 
@@ -788,16 +812,24 @@ impl QueueOverview {
     }
 }
 
+/// The memory and disk gates' holds, as one reading shows them.
+#[derive(Clone, Copy, Default)]
+struct Holds<'a> {
+    memory: Option<&'a MemoryHold>,
+    disk: Option<&'a DiskHold>,
+}
+
 /// What each of the `pending` entries waits for, in the order the worker's
-/// round checks it: a worker, memory, a usage limit's reset, the pause, a
-/// free slot, the ticket's running job (DEV-771). `taken` entries start.
+/// round checks it: a worker, memory, disk space, a usage limit's reset, the
+/// pause, a free slot, the ticket's running job (DEV-771). `taken` entries
+/// start.
 fn entries_wait_for(
     tasks_dir: &Path,
     state: WorkerState,
     pending: &[AgentQueueEntry],
     taken: &[AgentQueueEntry],
     pause: Option<&QueuePause>,
-    memory_hold: Option<&MemoryHold>,
+    holds: Holds<'_>,
 ) -> Vec<String> {
     if state != WorkerState::Active {
         return vec!["waiting for a queue worker; start one with `lotar agent queue resume`".to_string(); pending.len()];
@@ -812,8 +844,11 @@ fn entries_wait_for(
             if taken.iter().any(|item| same_entry(item, entry)) {
                 return "starting".to_string();
             }
-            if let Some(hold) = memory_hold {
+            if let Some(hold) = holds.memory {
                 return format!("waiting for memory: {}", hold.describe());
+            }
+            if let Some(hold) = holds.disk.filter(|_| !entry.starts_as_merge_job(tasks_dir)) {
+                return format!("waiting for disk space: {}", hold.describe());
             }
             if let Some(at) = entry.waiting_until() {
                 return format!("waiting for a provider's usage limit to reset at {at}");
@@ -1017,7 +1052,8 @@ fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry, err: &LoTaRError)
 /// Take the entries that have a free slot, in queue order; the others stay
 /// queued (DEV-630). While the queue is paused, the entries it holds stay,
 /// except one when its next try is due (DEV-604).
-fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
+/// `disk_held`: the disk gate holds, so only merge entries start (DEV-837).
+fn dequeue_startable(tasks_dir: &Path, disk_held: bool) -> LoTaRResult<Vec<AgentQueueEntry>> {
     let mut entries = Ok(Vec::new());
     with_locked_queue(tasks_dir, |state| {
         let mut slots = match job_slots(tasks_dir, &state.pending, AgentJobService::active_jobs()) {
@@ -1034,7 +1070,7 @@ fn dequeue_startable(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
         let mut keep = Vec::new();
         for entry in std::mem::take(&mut state.pending) {
             // A job paused on a usage limit waits for the reset (DEV-584).
-            if entry.waiting_until().is_some() {
+            if entry.waiting_until().is_some() || (disk_held && !entry.starts_as_merge_job(tasks_dir)) {
                 keep.push(entry);
                 continue;
             }
@@ -1469,13 +1505,39 @@ mod tests {
             ..Default::default()
         };
         assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
-        let entries = dequeue_startable(&tasks_dir).unwrap();
+        let entries = dequeue_startable(&tasks_dir, false).unwrap();
         assert_eq!(entries[0].model.as_deref(), Some("haiku"));
         assert_eq!(entries[0].effort.as_deref(), Some("low"));
 
         // Entries written before these fields existed still load.
         let legacy: AgentQueueEntry = serde_json::from_str(r#"{"ticket_id":"TEST-2","agent":"a","prompt":"p","queued_at":"now","attempts":0}"#).unwrap();
         assert!(legacy.model.is_none() && legacy.effort.is_none());
+    }
+
+    /// DEV-837: while the disk gate holds, only merge entries start: a
+    /// merge frees its ticket's worktree.
+    #[test]
+    fn under_the_disk_floor_only_merge_entries_start() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        for (ticket, agent) in [("TEST-1", "implement"), ("TEST-2", "merge")] {
+            let req = AgentJobCreateRequest { ticket_id: ticket.into(), prompt: "p".into(), agent: Some(agent.into()), ..Default::default() };
+            assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+        }
+        let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+        let disk =
+            DiskHold { reason: "41.5 GB free on the job worktrees' disk, under the floor of 60 GB".into(), since: "2026-11-25T00:00:00Z".parse().unwrap() };
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending, &[], None, Holds { memory: None, disk: Some(&disk) });
+        assert!(why[0].starts_with("waiting for disk space: "), "{why:?}");
+        assert!(!why[1].contains("disk"), "{why:?}");
+
+        let taken: Vec<String> = dequeue_startable(&tasks_dir, true).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(taken, ["TEST-2"]);
+        let taken: Vec<String> = dequeue_startable(&tasks_dir, false).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        assert_eq!(taken, ["TEST-1"], "the held entry starts once the disk gate opens");
     }
 
     fn entry(ticket: &str) -> AgentQueueEntry {
@@ -1514,15 +1576,15 @@ mod tests {
         assert!(AgentQueueService::holding(&tasks_dir, false).is_some(), "a full disk holds every job");
         let order: Vec<String> = AgentQueueService::list_pending(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
         assert_eq!(order, ["TEST-3", "TEST-2", "TEST-1"], "each paused job's retry goes first");
-        assert!(dequeue_startable(&tasks_dir).unwrap().is_empty(), "the worker takes no held entry");
+        assert!(dequeue_startable(&tasks_dir, false).unwrap().is_empty(), "the worker takes no held entry");
 
         // The next try is due: one entry, the first, starts, and the next
         // try moves on.
         let due = time::now_rfc3339();
         with_locked_queue(&tasks_dir, |state| state.pause.as_mut().unwrap().next_try_at = due.clone()).unwrap();
-        let taken: Vec<String> = dequeue_startable(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        let taken: Vec<String> = dequeue_startable(&tasks_dir, false).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
         assert_eq!(taken, ["TEST-3"]);
-        assert!(dequeue_startable(&tasks_dir).unwrap().is_empty(), "one try per interval");
+        assert!(dequeue_startable(&tasks_dir, false).unwrap().is_empty(), "one try per interval");
 
         // DEV-742: a try that outlasts the interval keeps the next one back
         // until its job ends.
@@ -1534,14 +1596,14 @@ mod tests {
         crate::services::agent_active_jobs::register(&tasks_dir, &record);
         let due = time::now_rfc3339();
         with_locked_queue(&tasks_dir, |state| state.pause.as_mut().unwrap().next_try_at = due.clone()).unwrap();
-        assert!(dequeue_startable(&tasks_dir).unwrap().is_empty(), "the try's job still runs");
+        assert!(dequeue_startable(&tasks_dir, false).unwrap().is_empty(), "the try's job still runs");
         crate::services::agent_active_jobs::unregister(&tasks_dir, "job-4");
-        let taken: Vec<String> = dequeue_startable(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        let taken: Vec<String> = dequeue_startable(&tasks_dir, false).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
         assert_eq!(taken, ["TEST-2"], "its job ended: the next try is due");
 
         assert_eq!(AgentQueueService::end_pause(&tasks_dir, false).map(|pause| pause.reason), Some(PauseReason::Disk));
         assert!(AgentQueueService::pause_state(&tasks_dir).is_none());
-        assert_eq!(dequeue_startable(&tasks_dir).unwrap().len(), 1, "the held entries start");
+        assert_eq!(dequeue_startable(&tasks_dir, false).unwrap().len(), 1, "the held entries start");
     }
 
     #[test]
@@ -1624,7 +1686,7 @@ mod tests {
             ..Default::default()
         };
         assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
-        let entries = dequeue_startable(&tasks_dir).unwrap();
+        let entries = dequeue_startable(&tasks_dir, false).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].ticket_id, "TEST-1", "padded alias canonicalized");
     }
@@ -1685,7 +1747,7 @@ mod tests {
             let _ = AgentQueueService::enqueue(&tasks_dir, req).unwrap();
         }
 
-        let drained = dequeue_startable(&tasks_dir).unwrap();
+        let drained = dequeue_startable(&tasks_dir, false).unwrap();
         assert_eq!(drained.len(), 2);
         assert_eq!(pending_count(&tasks_dir).unwrap(), 1);
     }
@@ -1710,7 +1772,7 @@ mod tests {
             let _ = AgentQueueService::enqueue(&tasks_dir, req).unwrap();
         }
 
-        let drained: Vec<_> = dequeue_startable(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
+        let drained: Vec<_> = dequeue_startable(&tasks_dir, false).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
         assert_eq!(drained, ["GLA-1", "GLB-1", "GLB-2"], "GLA gets one slot, the global limit 3 in all");
         assert_eq!(pending_count(&tasks_dir).unwrap(), 2);
 
@@ -1765,21 +1827,24 @@ mod tests {
         let stats = AgentQueueService::queue_stats(&tasks_dir, &pending);
         assert_eq!((stats.running, stats.queued, stats.max_parallel), (1, 4, Some(2)), "the other process's job and the configured limit count");
 
-        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending, &taken, None, None);
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending, &taken, None, Holds::default());
         assert_eq!(why[0], "starting");
         assert_eq!(why[1], "waiting for a provider's usage limit to reset at 2999-01-01T00:00:00Z");
         assert_eq!(why[2], "waiting for its ticket's running job job-elsewhere", "WFA-1 takes the second slot");
         assert_eq!(why[3], "waiting for a free slot (2 of the global agent.worktree.max_parallel_jobs 2 running)");
 
         let hold = MemoryHold { reason: "swap 9.5 of 10.0 GB used".into(), since: "2026-11-21T00:00:00Z".parse().unwrap() };
-        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending[1..], &[], None, Some(&hold));
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending[1..], &[], None, Holds { memory: Some(&hold), disk: None });
         assert!(why.iter().all(|why| why.starts_with("waiting for memory: swap 9.5 of 10.0 GB used")), "{why:?}");
+        let disk = DiskHold { reason: "41.5 GB free on the job worktrees' disk, under the floor of 60 GB".into(), since: hold.since };
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending[1..], &[], None, Holds { memory: None, disk: Some(&disk) });
+        assert!(why.iter().all(|why| why.starts_with("waiting for disk space: 41.5 GB free")), "{why:?}");
 
         let pause = AgentQueueService::pause(&tasks_dir, PauseReason::Disk, "No space left on device", "job-9", &entry("WFA-9")).unwrap();
-        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending[2..], &[], Some(&pause), None);
+        let why = entries_wait_for(&tasks_dir, WorkerState::Active, &pending[2..], &[], Some(&pause), Holds::default());
         assert!(why.iter().all(|why| why.starts_with("waiting for the paused queue: the disk is full since")), "{why:?}");
 
-        let why = entries_wait_for(&tasks_dir, WorkerState::Stopped, &pending, &[], None, None);
+        let why = entries_wait_for(&tasks_dir, WorkerState::Stopped, &pending, &[], None, Holds::default());
         assert!(why.iter().all(|why| why.contains("lotar agent queue resume")), "{why:?}");
         crate::services::agent_active_jobs::unregister(&tasks_dir, &elsewhere.job_id);
     }
@@ -1802,13 +1867,13 @@ mod tests {
         }
 
         // A worker takes both and dies before it starts their jobs.
-        assert_eq!(dequeue_startable(&tasks_dir).unwrap().len(), 2);
+        assert_eq!(dequeue_startable(&tasks_dir, false).unwrap().len(), 2);
         let listed: Vec<_> = AgentQueueService::list_pending(&tasks_dir).unwrap().into_iter().map(|entry| entry.ticket_id).collect();
         assert_eq!(listed, ["TKN-1", "TKN-2"], "taken entries are still queued");
 
         // The next worker takes them again, in their order.
         restore_taken(&tasks_dir).unwrap();
-        let entries = dequeue_startable(&tasks_dir).unwrap();
+        let entries = dequeue_startable(&tasks_dir, false).unwrap();
         assert_eq!(entries.iter().map(|entry| entry.ticket_id.as_str()).collect::<Vec<_>>(), ["TKN-1", "TKN-2"]);
 
         // A removed entry is not queued again by its retry.
@@ -1838,7 +1903,7 @@ mod tests {
 
         let err = LoTaRError::ValidationError("runner missing".to_string());
         for attempt in 0..=MAX_ATTEMPTS {
-            let entry = dequeue_startable(&tasks_dir).unwrap().remove(0);
+            let entry = dequeue_startable(&tasks_dir, false).unwrap().remove(0);
             assert_eq!(requeue_entry(&tasks_dir, entry, &err).unwrap(), attempt < MAX_ATTEMPTS);
         }
 

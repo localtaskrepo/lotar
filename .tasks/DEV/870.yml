@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T11:03:31.428115+00:00
-modified: 2026-11-26T01:57:57.745753+00:00
+modified: 2026-11-26T06:58:49.724259+00:00
 relationships:
   related:
   - DEV-845
@@ -59,8 +59,36 @@ comments:
     - **Blocking 1, conflict:** `git merge-tree --write-tree main HEAD` reports a conflict in `crates/lotar-agent/src/services/agent_job_service.rs`. Main's `start_job_inner` (main `:386`) now does `user_prompt = fill_ticket_title(req.prompt.trim(), &task.title)` at create, and the branch moved that block into `PromptInputs::build`. Fix: rebase onto main.
     - **Blocking 2, Done when item 1 is not met:** after the rebase, `PendingJob.user_prompt` already has the title from create filled in. `PendingJob::current_prompt` (`agent_job_service.rs:195`) rebuilds from it, so a rule prompt like `"${{ticket.id}} ${{ticket.title}}"` still starts with the old title. The fix agent's own comment names this as open. Fix: keep the raw request in `PendingJob`, or read it from `state.request`. Then fill it with `fill_ticket_title(raw, &task.title)` in `current_prompt`, and pass that text to `run_job` as its `user_prompt` too, so `context_messages` match. Extend the test with a request that contains `${{ticket.title}}`.
     - Not blocking: the test calls `current_prompt` directly, not through `process_pending_queue`. Without the fix it doesn't compile (the method doesn't exist), so there was no run that failed before the fix.
+- date: 2026-11-26T06:58:42.319200+00:00
+  author: claude
+  text: |-
+    Fixed both review findings. The branch is rebased onto main, and a queued job now fills `${{ticket.title}}` with the title the ticket has when the job starts.
+
+    - **Blocking 1 (conflict):** rebased onto main `eb9b383f7`. Main's prompt building, including the `job_reporter` line for T3 notes, now lives in `PromptInputs::build` (`crates/lotar-agent/src/services/agent_job_service.rs`).
+    - **Blocking 2 (old title in the request text):** `PendingJob` keeps the raw `request`. `PromptInputs::build` fills the title itself and returns the prompt together with the filled request text. `process_pending_queue` passes both to `run_job`. If the ticket can't be read when the job starts, the job falls back to the prompt and request text built at create.
+    - Test `a_job_from_the_pending_queue_builds_its_prompt_when_it_starts` now queues `"${{ticket.id}} ${{ticket.title}}: do the thing"`, renames the ticket, and checks that the started prompt and request text have the new title. With the old rebuild from the filled `user_prompt`, the test fails.
+    - Commit `dad9f916b` (amended, signed).
+  report:
+    commits:
+    - hash: dad9f916b
+      what: rebuild a queued job's prompt and request text at start, rebased onto main
+    checks:
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45021289cd79c488d60288becfc5eda4ec7b52ab4dbb85e9b913bbd7438a6255
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abed1e95d9797f676018a0044af5a06f3f9362e18bf65da817c118b352cadead9
 description: |-
   Found: reviewing DEV-845. `AgentJobService::create` (`crates/lotar-agent/src/services/agent_job_service.rs:499`) builds the whole prompt (ticket context, filled `${{ticket.title}}`) and stores it in `PendingJob`; `process_pending_queue` (`:6176`) starts it with that text, so a job held there (memory hold, slot wait, paused queue) gets the title and context from when it was queued. DEV-845 covers the persistent queue only.
   Check: rename a ticket while its job waits in the in-process pending queue; the started prompt shows the old title.
@@ -148,3 +176,27 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-26T06:54:52.791620+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T06:54:53.401387+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abed1e95d9797f676018a0044af5a06f3f9362e18bf65da817c118b352cadead9
+- at: 2026-11-26T06:58:42.319200+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:58:49.724259+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

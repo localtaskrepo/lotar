@@ -1,16 +1,18 @@
 title: 'Agents page: top Queued takes the larger of this process''s queued jobs and the queue file''s tickets, the Queued tab adds them'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T05:09:26.871873+00:00
-modified: 2026-11-26T04:56:17.584902+00:00
+modified: 2026-11-26T06:55:27.457463+00:00
 relationships:
   related:
   - DEV-798
   - DEV-871
   - DEV-887
+  - DEV-850
+  - DEV-857
 comments:
 - date: 2026-11-25T14:02:58.149433+00:00
   author: claude
@@ -66,6 +68,33 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-865` onto `main` conflicts in `docs/help/agent.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-865` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T06:55:18.574358+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `eb9b383f7` on `main`.
+
+    - Conflicts with DEV-798 (`c7d2dd4d6`), which had already made the Queued tab count queued jobs + `queue.pending`: I kept main's `AgentJobs.vue` (it also applies the search filter) and added DEV-865's top-count sentence to main's `docs/help/agent.md` paragraph
+    - `AgentJobs.spec.ts` auto-merged inconsistently (tab expected `3` with a queued job added); I set it to `4`, as DEV-865's commit had it
+    - Main moved twice during the checks (DEV-857, DEV-850); I rebased each time. The full suites passed on the commit rebased onto DEV-857. DEV-850 only added `docs/research/inline-transcript-review.md`, so I reran lint only, not test/smoke
+    - Amended the main checkout's pending ticket edits (`.tasks/DEV/850.yml`, `799.yml`) into the commit, as step 4 says
+    - No rule or config files changed: `lotar trust` not needed
+  report:
+    commits:
+    - hash: eb9b383f7
+      what: DEV-865 queued count = this process's jobs + queue-file tickets; pushed to main
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+      reason: on final rebase
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2560 Rust, 1622 Vitest, node suites, on 9088035dc (before DEV-850, which only added a research doc)
+    - command: npm run -s smoke
+      result: passed
+      reason: 411, on 9088035dc
+    next: 'None: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9ec040da7165f66ae7f20beab25592efd7239b25810382cf64cb6177d4cf70ed
 - attachment: after-dark-1440.f5c3d0549f2cecff8883f0c457c143a9.png
@@ -304,3 +333,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T06:55:18.574358+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:55:18.837528+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-798","DEV-871","DEV-887"]}'
+    new: '{"related":["DEV-798","DEV-871","DEV-887","DEV-850","DEV-857"]}'
+- at: 2026-11-26T06:55:27.457463+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

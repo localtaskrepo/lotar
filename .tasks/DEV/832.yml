@@ -1,11 +1,11 @@
 title: After the usage-limit reset, T3 Code resumed 2-4 sessions per job in the same worktree
-status: Reviewing
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-26T03:44:13.369847+00:00
+modified: 2026-11-26T07:28:32.691450+00:00
 relationships:
   related:
   - DEV-777
@@ -30,6 +30,8 @@ relationships:
   - DEV-844
   - DEV-856
   - DEV-862
+  - DEV-896
+  - DEV-833
 comments:
 - date: 2026-11-24T16:07:52.652624+00:00
   author: claude
@@ -225,6 +227,27 @@ comments:
       result: passed
       reason: 47, after rebase onto DEV-844 (docs/help/trust.md, one line)
     next: 'none: merged and pushed'
+- date: 2026-11-26T07:28:19.910165+00:00
+  author: claude
+  text: |-
+    Review: passed. The branch's only commit is already on main as `5d3223431`, so merging it again changes nothing.
+
+    - `git log main..HEAD` holds only `4e62ab6f4`. It adds the 33-line test `a_t3_jobs_retry_after_a_usage_limit_continues_the_paused_thread` to `crates/lotar-lib/tests/dev584_usage_limit_pause_test.rs`. `git diff 4e62ab6f4 5d3223431 -- crates` is empty: main's commit is the same change plus the `.tasks/DEV/844.yml` edit the merge agent folded in.
+    - `git merge-tree --write-tree main HEAD` gives main's own tree (`e83a2b247`). No second copy of the fix lands, and there are no stray files.
+    - The code fix (the retry continues the paused T3 thread, `agent_job_service.rs:3710`) reached main in `46fb767aa` (DEV-833). The earlier review on 2026-11-25 checked it, including that the test fails without it.
+    - Done when "one session per job resumes, with a test": the test covers it. The live check (count sessions after a real reset) needs a real limit reset and wasn't run.
+    - Reran on this worktree: `npm ci` passed; `cargo nextest run -p lotar-lib --test integration -E 'test(/dev584/)'` passed 6 of 6. Worktree left clean.
+    - Filed [DEV-896](https://lotar.pyxzl.net/task/DEV-896): after the merge agent landed this ticket, its job's end moved it from InProgress to Reviewing, so already-merged work was sent back for review.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev584/)'
+      result: passed
+      reason: 6 of 6, the new test included
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: full suites run at merge; merge agent ran them on 5d3223431
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7ed476434fcb4e018626487ba8c6d2a47dc50f277c86920bab74a5e08d2a6b29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6399386a6cea6eeb5ad94b21639914a2a3cbeac4c6d5e80ec5a4bd8b60b2deb
@@ -441,3 +464,28 @@ history:
   - field: relationships
     old: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856"]}'
     new: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856","DEV-862"]}'
+- at: 2026-11-26T07:28:03.094891+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856","DEV-862"]}'
+    new: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856","DEV-862","DEV-896"]}'
+- at: 2026-11-26T07:28:19.910165+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:28:20.226899+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856","DEV-862","DEV-896"]}'
+    new: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856","DEV-862","DEV-896","DEV-833"]}'
+- at: 2026-11-26T07:28:32.691450+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

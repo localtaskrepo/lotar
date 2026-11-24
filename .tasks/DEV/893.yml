@@ -1,0 +1,20 @@
+title: config validate prints 'Global configuration is valid' right after the invalid home config error
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T07:06:01.774631+00:00
+modified: 2026-11-26T07:06:02.628617+00:00
+relationships:
+  related:
+  - DEV-883
+description: 'Found (DEV-883 review): with a ~/.lotar whose agents.bad.stall_timeout_seconds is notanumber, `lotar config validate` prints `❌ Invalid home config (~/.lotar): …` and then `✅ Global configuration is valid` before failing with exit 1. The success line contradicts the error above it. Check: HOME=<tmp> with that .lotar, run lotar config validate. Done: no ''Global configuration is valid'' line when the home config fails to parse (crates/lotar-lib/src/cli/handlers/config/validate.rs:43-61).'
+tags:
+- health
+history:
+- at: 2026-11-26T07:06:02.628617+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

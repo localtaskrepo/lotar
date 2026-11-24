@@ -1,11 +1,14 @@
 title: 'Status feed: a small standard endpoint with each instance''s running jobs, queue and who it waits on'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T21:43:44.403743+00:00
-modified: 2026-11-26T02:07:18.899077+00:00
+modified: 2026-11-26T07:01:03.140499+00:00
+relationships:
+  related:
+  - DEV-797
 comments:
 - date: 2026-11-26T02:07:06.711209+00:00
   author: claude
@@ -43,6 +46,19 @@ comments:
       result: not_run
       reason: no UI change; the merge runs it
     next: Review, then merge; then the staff aggregator page can read the feed
+- date: 2026-11-26T07:00:53.147347+00:00
+  author: claude
+  text: |-
+    Review: passed. `GET /api/status` in `7e1d92369` does everything "Done when" asks and nothing more.
+
+    - Read: the diff (11 files), the ticket, the fix agent's comment, `AGENTS.md`, and the code it relies on: `api_events::subscribe/emit`, the file watcher's `emit_watched_task` (`web_server.rs:1347`, started for every `serve` at `:193`), `AgentQueueService::overview` (the same source `lotar agent queue` uses) and `agent_active_jobs::list` (it drops dead owner pids).
+    - Done when: name and base URL (`ui.name`/folder, `server.public_url`/`Host`), running jobs with `job_url` (`/agents?job=` is a route `AgentJobs.vue` handles), the queue with count, held and reason, and the entries with what each waits for. The waiting list covers HelpNeeded and Blocked tickets with assignee, `since` and link. `version: 1`. `openapi.json`, `serve.md#status-feed`, `api_types.rs` and `types.ts` agree. No UI, no aggregation.
+    - Cheap per call: no ticket scan per call. The waiting list is updated ticket by ticket from task events; a full read runs only after a project or config change, or every 15 minutes.
+    - Staff on the same Mac: `http://localhost:<port>/api/status`, fetched server-side. Links use `public_url` (`https://lotar.pyxzl.net` in this repo's config), so they open from the phone too.
+    - Reran: `npm ci` passed; `cargo nextest run --test integration -E 'test(dev881) | test(openapi) | test(dev771) | test(contract)'` passed (74 tests); `cargo clippy -p lotar-lib -p lotar-core --all-targets` and `prettier --check` on the changed files passed. The worktree is clean afterwards.
+    - Merge note: main is 4 commits ahead, and `git merge-tree` shows a conflict only in the `mod` list of `crates/lotar-lib/tests/integration.rs` (one line each side). The rebase keeps both lines.
+    - Not run: `npm run lint`, `npm test`, `npm run smoke` (the merge runs them, DEV-797). No UI change, so no screenshots needed.
+    - No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85ab6982e8b10a529998e720ae87709922febb25e5570efd75bed6f19ac4f22d
 description: |-
@@ -83,3 +99,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T07:00:53.147347+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:00:53.415429+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-797"]}'
+- at: 2026-11-26T07:01:03.140499+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

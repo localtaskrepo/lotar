@@ -1,11 +1,11 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-26T06:25:01.447814+00:00
+modified: 2026-11-26T07:08:46.785171+00:00
 relationships:
   blocks:
   - DEV-801
@@ -23,6 +23,9 @@ relationships:
   - DEV-873
   - DEV-884
   - DEV-880
+  - DEV-853
+  - DEV-881
+  - DEV-882
 comments:
 - date: 2026-11-22T21:30:02.840094+00:00
   author: claude
@@ -191,6 +194,42 @@ comments:
       result: not_run
       reason: the merge runs it
     next: 'Merge: rebased on main already, no conflicts expected'
+- date: 2026-11-26T06:59:44.277210+00:00
+  author: claude
+  text: |-
+    Review: passed. The fold onto DEV-784's socket lock (INBOX-730) does what Done when asks; no findings, no tickets filed.
+
+    Read: `164c930dd` (`git diff main...HEAD`), Done when, the fix comments and the owner's answer, AGENTS.md, `scripts/check-lock.mjs`, `watch.rs`, main's `.tasks/DEV/automation.yml` and standards' `configs/lotar/automation.yml`.
+
+    - **Hand-off keeps the lock:** `merge.rs` keeps the lock on `Merge.lock`. A failing `self.check(..)?` hands off with it via `Outcome::HandOff(summary, lock)`. After a round it is freed (`self.lock = None`), so a hand-off after the checks takes the lock anew.
+    - **Merge agent takes it:** `run_job` calls `merge_agent_check_lock` after `start_job` and before the agent starts. The job shows as running, and `JobWatch` (stall) only starts with the agent, so the wait is no stall. A cancel returns `Err` and the job ends as cancelled.
+    - **Lock already held:** a merge started under `LOTAR_CHECK_LOCK_HELD=1` doesn't wait (`HeldAbove`). Its agent still gets the "Check lock" note and the env.
+    - **Prompts:** main already has the targeted-test text in both automation files (fix, rework, review, merge). The merge prompt doesn't name the lock, but the "Check lock" note lotar adds to the merge agent's prompt covers it.
+    - **Git hooks:** unchanged (`.githooks` not in the diff).
+    - **The file lock items in Done when** (`checks.lock`) were replaced by the owner's fold decision, so they don't apply.
+    - **Merge note:** `main` moved on again. `git merge-tree` shows one conflict in `agent_job_service.rs`: DEV-853 (`c7d2b1663`) changed `job_env(..)` to take `&profile, runner_kind`. To resolve it, keep main's call and add the `mut env` plus the `HELD_ENV` insert. The worktree is unchanged.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: LOTAR_CHECK_LOCK_HELD=1 cargo nextest run -p lotar-lib --test integration -E 'test(dev797) or test(dev605) or test(dev783)'
+      result: passed
+      reason: 25 passed
+    - command: cargo nextest run -p lotar-agent check_lock merge
+      result: passed
+      reason: 12 passed
+    - command: node --test scripts/tests/check-lock.test.mjs
+      result: passed
+      reason: 5 passed
+    - command: npm run test:agent
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'Merge: rebase on main resolves one mechanical conflict in agent_job_service.rs (job_env signature, DEV-853)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
@@ -489,3 +528,34 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884"]}'
     new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880"]}'
+- at: 2026-11-26T06:59:44.277210+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:59:44.543200+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880"]}'
+    new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853"]}'
+- at: 2026-11-26T06:59:53.017698+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-26T07:00:53.414544+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853"]}'
+    new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881"]}'
+- at: 2026-11-26T07:08:46.785171+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881"]}'
+    new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882"]}'

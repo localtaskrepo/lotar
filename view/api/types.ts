@@ -1339,6 +1339,13 @@ export interface AgentMemoryGateConfig {
     settle_seconds: number
 }
 
+/** `agent.disk_gate` (DEV-837, global only): new worktree jobs wait while free disk is under the floor. */
+export interface AgentDiskGateConfig {
+    /** 0: off. */
+    min_free_gb: number
+    idle_hours: number
+}
+
 /** `agent.job_history` (DEV-693, global only): how long job logs are kept. */
 export interface AgentJobHistoryConfig {
     keep_days: number
@@ -1447,6 +1454,7 @@ export interface ResolvedConfigDTO {
     agent_worktree?: AgentWorktreeConfig
     agent_merge?: AgentMergeConfig | null
     agent_memory_gate?: AgentMemoryGateConfig
+    agent_disk_gate?: AgentDiskGateConfig
     agent_job_history?: AgentJobHistoryConfig
     sprint_defaults?: SprintDefaultsConfig
     sprint_notifications?: { enabled: boolean }

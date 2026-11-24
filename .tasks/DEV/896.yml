@@ -1,0 +1,26 @@
+title: 'A merge agent that lands a ticket in InProgress sends it to Reviewing: DEV-832 went back to review after it was on main'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T07:28:02.692146+00:00
+modified: 2026-11-26T07:28:03.494387+00:00
+relationships:
+  related:
+  - DEV-832
+description: 'Found 2026-11-26 on DEV-832: merge failed → assignee @fix, tag merge-retried; the fix job ended and set status Merging → InProgress (02:41Z); lotar''s own merge then failed smoke, the merge agent landed `5d3223431` on main and origin (03:23Z), and its job''s end moved InProgress → Reviewing, @review. A review job then ran on work already on main (branch `agent/DEV-832` holds only a copy of `5d3223431` without the .tasks edit). Check: `lotar task timeline DEV-832` lines from 00:04Z to 07:25Z. Done when: a job that lands the branch on main ends the ticket at Done (or the step after merging), whatever status it ran in, with a test.'
+tags:
+- health
+history:
+- at: 2026-11-26T07:28:03.095980+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-832"]}'
+- at: 2026-11-26T07:28:03.494387+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

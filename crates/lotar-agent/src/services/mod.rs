@@ -11,6 +11,7 @@ pub mod agent_runner;
 pub mod automation_matching;
 pub mod automation_service;
 pub mod automation_validation;
+pub mod disk_gate;
 pub mod memory_gate;
 pub mod t3_claude_settings;
 pub mod t3_thread_api;

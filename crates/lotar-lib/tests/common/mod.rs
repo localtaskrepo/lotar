@@ -248,6 +248,11 @@ pub fn reset_lotar_test_environment() {
     unsafe {
         std::env::set_var("LOTAR_MEMORY_READING", "normal");
     }
+    // The disk gate (DEV-837) likewise when the disk is nearly full.
+    let _guard = env_mutex::lock_var("LOTAR_DISK_FREE_GB");
+    unsafe {
+        std::env::set_var("LOTAR_DISK_FREE_GB", "1000");
+    }
 }
 
 /// Create an isolated temp directory without mutating the process

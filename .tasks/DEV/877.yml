@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-26T01:26:30.696723+00:00
+modified: 2026-11-26T06:58:09.929265+00:00
 relationships:
   related:
   - DEV-849
@@ -25,6 +25,9 @@ comments:
       3. **No typed result**: do only the events half; that part of the ticket becomes WontDo.
     - The Done when in the description has the rest; only the result line waits on this.
     - No code changed yet; no commits on `agent/DEV-877`.
+- date: 2026-11-26T06:58:09.164379+00:00
+  author: mallox
+  text: 'Answer: summary (Summary only: {summary} becomes the job''s last message; outcomes still come from the ticket) (answered in INBOX-760)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
 description: |-
@@ -108,3 +111,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-26T06:58:09.164379+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:58:09.929265+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

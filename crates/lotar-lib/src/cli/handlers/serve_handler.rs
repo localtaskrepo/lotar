@@ -301,17 +301,19 @@ impl CommandHandler for ServeHandler {
                 std::thread::sleep(std::time::Duration::from_secs(30));
             }
         });
-        // Memory holds the queue worker or this server decided, in this
-        // server's log (DEV-827): the worker's stderr goes nowhere.
+        // Memory and disk holds and the disk gate's cleanups, whichever
+        // process decided them, in this server's log (DEV-827, DEV-837): the
+        // worker's stderr goes nowhere.
         let tasks_dir = resolver.path.clone();
         std::thread::spawn(move || {
-            use crate::services::memory_gate::{HELD_RECHECK_SECS, HoldLog};
-            let mut log = HoldLog::new(&tasks_dir);
+            use crate::services::{disk_gate, memory_gate};
+            let mut memory = memory_gate::HoldLog::new(&tasks_dir);
+            let mut disk = disk_gate::HoldLog::new(&tasks_dir);
             loop {
-                for line in log.poll(&tasks_dir) {
+                for line in memory.poll(&tasks_dir).into_iter().chain(disk.poll(&tasks_dir)) {
                     eprintln!("{line}");
                 }
-                std::thread::sleep(std::time::Duration::from_secs(HELD_RECHECK_SECS));
+                std::thread::sleep(std::time::Duration::from_secs(memory_gate::HELD_RECHECK_SECS.min(disk_gate::HELD_RECHECK_SECS)));
             }
         });
         // Entries a killed worker left behind start now, not at the next

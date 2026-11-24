@@ -1,0 +1,22 @@
+title: Job prompt's Comments section points agents at the full lotar show for all comments, beside the block's --brief
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T07:11:26.742561+00:00
+modified: 2026-11-26T07:11:27.646375+00:00
+relationships:
+  related:
+  - DEV-884
+description: |-
+  Found in the DEV-884 review: `crates/lotar-agent/src/services/agent_job_service.rs:1525` writes "All of them: `lotar show <ID>`" into the job prompt, while the LoTaR CLI block now names `show <ID> --brief` and `--comment <N>`. An agent that follows the Comments line reads every comment in full again.
+
+  ## Done when
+  - [ ] The Comments line names `lotar show <ID> --brief` (and `--comment <N>` for one in full) instead of the full `lotar show <ID>`; the prompt test asserts it.
+history:
+- at: 2026-11-26T07:11:27.646375+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

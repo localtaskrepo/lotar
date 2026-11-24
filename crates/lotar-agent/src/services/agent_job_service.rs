@@ -426,8 +426,11 @@ impl AgentJobService {
             return Err(LoTaRError::ValidationError(format!("Ticket '{ticket_id}' already has an active job: {}", hold.describe())));
         }
 
-        // Short of memory: the job waits as queued (DEV-623).
-        let memory_hold = matches!(mode, JobStartMode::RespectLimits) && crate::services::memory_gate::check(tasks_dir).is_some();
+        // Short of memory (DEV-623) or of disk (DEV-837): the job waits as
+        // queued. A merge job passes the disk gate: a merged ticket's
+        // worktree goes, which frees disk.
+        let memory_hold = matches!(mode, JobStartMode::RespectLimits)
+            && (crate::services::memory_gate::check(tasks_dir).is_some() || (!is_merge_job && crate::services::disk_gate::check(tasks_dir).is_some()));
         let should_queue: bool;
         {
             let registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
@@ -631,13 +634,16 @@ impl AgentJobService {
     /// `None` once it runs (DEV-525). A waiting job has no log yet and
     /// `lotar agent queue` doesn't list it, so its ticket has to say so.
     pub fn waiting_reason(job_id: &str) -> Option<String> {
-        let (tasks_dir, commits) = {
+        let (tasks_dir, commits, is_merge_job) = {
             let registry = JOB_REGISTRY.lock().ok()?;
             let pending = registry.pending_queue.iter().find(|pending| pending.job_id == job_id)?;
-            (pending.tasks_dir.clone(), pending.commits)
+            (pending.tasks_dir.clone(), pending.commits, pending.is_merge_job)
         };
         if let Some(hold) = crate::services::memory_gate::status(&tasks_dir).hold {
             return Some(format!("it waits for memory: {}", hold.describe()));
+        }
+        if let Some(hold) = crate::services::disk_gate::status(&tasks_dir).filter(|_| !is_merge_job) {
+            return Some(format!("it waits for disk space: {}", hold.describe()));
         }
         if let Some(pause) = AgentQueueService::holding(&tasks_dir, commits) {
             return Some(format!("it waits while the queue is {}", pause.summary()));
@@ -1805,7 +1811,7 @@ fn same_volume(_a: &std::path::Path, _b: &std::path::Path) -> bool {
 
 /// `agent.worktree.build_root` (DEV-762) resolved as `agent.worktree.dir`:
 /// absolute, or relative to the main checkout's parent folder.
-fn resolve_build_root(repo_root: &std::path::Path, configured: Option<&str>) -> LoTaRResult<Option<std::path::PathBuf>> {
+pub(crate) fn resolve_build_root(repo_root: &std::path::Path, configured: Option<&str>) -> LoTaRResult<Option<std::path::PathBuf>> {
     let Some(raw) = configured.map(str::trim).filter(|raw| !raw.is_empty()) else {
         return Ok(None);
     };
@@ -2406,11 +2412,11 @@ pub fn tell_running_job(job: &crate::services::agent_active_jobs::ActiveJob, mes
     job.session_id.as_deref().is_some_and(|name| crate::services::agent_runner::send_to_session(name, message))
 }
 
-fn resolve_repo_root(tasks_dir: &std::path::Path) -> Option<std::path::PathBuf> {
+pub(crate) fn resolve_repo_root(tasks_dir: &std::path::Path) -> Option<std::path::PathBuf> {
     crate::utils::git::find_repo_root(tasks_dir)
 }
 
-fn resolve_worktree_root(repo_root: &std::path::Path, configured: Option<&str>) -> LoTaRResult<std::path::PathBuf> {
+pub(crate) fn resolve_worktree_root(repo_root: &std::path::Path, configured: Option<&str>) -> LoTaRResult<std::path::PathBuf> {
     let base = repo_root.parent().unwrap_or(repo_root);
     if let Some(raw) = configured {
         let trimmed = raw.trim();
@@ -2431,7 +2437,7 @@ fn resolve_worktree_root(repo_root: &std::path::Path, configured: Option<&str>) 
     Ok(base.join(".lotar-worktrees").join(repo_name))
 }
 
-fn sanitize_worktree_token(raw: &str) -> String {
+pub(crate) fn sanitize_worktree_token(raw: &str) -> String {
     let mut out = String::new();
     for ch in raw.trim().chars() {
         if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
@@ -2443,7 +2449,7 @@ fn sanitize_worktree_token(raw: &str) -> String {
     if out.is_empty() { "ticket".to_string() } else { out }
 }
 
-fn build_worktree_branch(prefix: &str, suffix: &str) -> String {
+pub(crate) fn build_worktree_branch(prefix: &str, suffix: &str) -> String {
     let trimmed = prefix.trim();
     let mut normalized = if trimmed.is_empty() { "agent/".to_string() } else { trimmed.to_string() };
     if !normalized.ends_with('/') {
@@ -6256,14 +6262,17 @@ fn process_pending_queue() {
         loop {
             let merge_busy = has_dispatched_merge_job(&registry);
             // A config that can't be read keeps the job waiting.
-            // Short of memory, the job waits too; the queue watch reads
-            // memory again every 30 s (DEV-623). A paused queue holds the
+            // Short of memory or disk, the job waits too (a merge job passes
+            // the disk gate); the queue watch reads them again every 30 s
+            // (DEV-623, DEV-837). The disk gate only reads here: the watch
+            // removes idle builds outside this lock. A paused queue holds the
             // jobs in its scope until it ends, but one of them takes its due
             // try when no queue entry waits for it (DEV-604).
             let next = registry.pending_queue.iter().position(|pending| {
                 !(pending.is_merge_job && merge_busy)
                     && matches!(slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id), Ok(None))
                     && crate::services::memory_gate::check(&pending.tasks_dir).is_none()
+                    && (pending.is_merge_job || crate::services::disk_gate::check(&pending.tasks_dir).is_none())
                     && (AgentQueueService::holding(&pending.tasks_dir, pending.commits).is_none()
                         || AgentQueueService::take_held_try(&pending.tasks_dir, &pending.ticket_id, pending.commits, |ticket| {
                             registry.active_by_ticket.contains_key(ticket) && !registry.pending_queue.iter().any(|queued| queued.ticket_id == ticket)
@@ -6331,6 +6340,14 @@ fn watch_pending_queue() {
     thread::spawn(move || {
         loop {
             thread::sleep(QUEUE_WATCH_INTERVAL);
+            // Idle builds go before the disk gate holds, outside the lock (DEV-837).
+            let disk_gated: HashSet<std::path::PathBuf> = JOB_REGISTRY
+                .lock()
+                .map(|registry| registry.pending_queue.iter().filter(|pending| !pending.is_merge_job).map(|pending| pending.tasks_dir.clone()).collect())
+                .unwrap_or_default();
+            for tasks_dir in disk_gated {
+                crate::services::disk_gate::clean(&tasks_dir);
+            }
             process_pending_queue();
             if waiting() {
                 continue;
@@ -6360,6 +6377,17 @@ fn has_active_merge_job(registry: &JobRegistry) -> bool {
 
 fn is_merge_job_candidate(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> bool {
     task.status.as_str().eq_ignore_ascii_case("Merging") || is_merge_profile(agent_profile)
+}
+
+impl AgentJobService {
+    /// Whether a queued job for the ticket would start as a merge job: its
+    /// profile is `merge` or its ticket is in Merging.
+    pub fn starts_as_merge_job(tasks_dir: &std::path::Path, ticket_id: &str, agent_profile: Option<&str>) -> bool {
+        is_merge_profile(agent_profile)
+            || Storage::try_open(tasks_dir)
+                .and_then(|storage| TaskService::get(&storage, ticket_id, None).ok())
+                .is_some_and(|task| is_merge_job_candidate(&task, agent_profile))
+    }
 }
 
 /// The tag a blocking review sets; a rework removes it.

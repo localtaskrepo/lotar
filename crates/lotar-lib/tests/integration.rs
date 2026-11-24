@@ -192,6 +192,7 @@ mod dev809_comment_delete_test;
 mod dev80_env_ownership_test;
 mod dev811_config_set_comments_test;
 mod dev82_contract_semantics_test;
+mod dev837_disk_gate_test;
 mod dev842_description_from_stdin_test;
 mod dev852_rule_question_comment_test;
 mod dev89_cli_add_transaction_test;

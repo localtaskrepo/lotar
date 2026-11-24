@@ -1,15 +1,16 @@
 title: 'Job prompts tell agents to run lotar --format json show, which prints every comment and the history: the largest Bash output in job sessions'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T22:18:53.793616+00:00
-modified: 2026-11-26T02:14:53.658198+00:00
+modified: 2026-11-26T07:11:48.463224+00:00
 relationships:
   related:
   - DEV-797
   - DEV-852
+  - DEV-895
 comments:
 - date: 2026-11-26T02:14:43.270837+00:00
   author: claude
@@ -41,6 +42,18 @@ comments:
       result: not_run
       reason: the merge runs them (DEV-797)
     next: review on another model, then merge
+- date: 2026-11-26T07:11:40.308731+00:00
+  author: claude
+  text: |-
+    Review: passed. `73273bccb` does what "Done when" asks; one minor follow-up filed (DEV-895).
+
+    - Read: the diff (10 files), the ticket, the fix comment, DEV-797/DEV-852, AGENTS.md. Main has no newer commits to the touched files; `git merge-tree main HEAD` is clean.
+    - `npm ci` passed.
+    - Reran: `cargo nextest run -p lotar-lib --test integration dev18` (11 passed), `instructions_expand_to_literal_ticket_values`, `cargo nextest run --workspace skill help_` (22 passed), `cargo clippy --workspace --all-targets` (clean), `rustfmt --check` on the changed Rust files (clean).
+    - Tried by hand on a scratch workspace: `--brief` cuts multibyte text at 200 characters, a comment ending in a newline gets no `…`, `--comment 0|9` exits 1 with the range and prints nothing on stdout, `--brief --comment` exits 1 with "cannot be used with", and the JSON error form works.
+    - Callers: `standards/scripts/repos.ts` reads the full `--format json show`, which is unchanged. No other `--format json show` is left in lotar, standards or staff.
+    - Minor, filed as DEV-895: `agent_job_service.rs:1525` still tells agents "All of them: `lotar show <ID>`" (the fix agent also noted this).
+    - Worktree left clean; no files changed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeff1cfbe31fb12cdfad7876478dd3aca9edb62d4210eb869e49435fa4f8c35dd
 description: |-
@@ -138,3 +151,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T07:11:27.048980+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-797","DEV-852"]}'
+    new: '{"related":["DEV-797","DEV-852","DEV-895"]}'
+- at: 2026-11-26T07:11:40.308731+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:11:48.463224+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

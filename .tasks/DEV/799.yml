@@ -1,11 +1,11 @@
 title: 'Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-26T06:54:43.236364+00:00
+modified: 2026-11-26T06:54:50.606229+00:00
 relationships:
   related:
   - DEV-464
@@ -433,3 +433,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T06:54:50.606229+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

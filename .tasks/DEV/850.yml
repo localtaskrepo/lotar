@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Research
 reporter: codex
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-26T06:51:45.508328+00:00
+modified: 2026-11-26T06:57:25.157077+00:00
 relationships:
   related:
   - DEV-849
@@ -14,6 +14,7 @@ relationships:
   - DEV-860
   - DEV-887
   - DEV-889
+  - DEV-865
 comments:
 - date: 2026-11-24T20:22:41.002771+00:00
   author: automation
@@ -131,6 +132,17 @@ comments:
       result: passed
     - command: npm run -s smoke
       result: passed
+- date: 2026-11-26T06:57:23.579600+00:00
+  author: mallox
+  text: |-
+    Answer: expand (Load on open only)
+
+    (answered in INBOX-765)
+  answer:
+    to: 2026-11-24T21:24:58.053239+00:00
+    choice:
+    - expand
+    note: (answered in INBOX-765)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
@@ -304,3 +316,19 @@ history:
   - field: tags
     old: agent, ui, job-paused, review-returned
     new: agent, ui
+- at: 2026-11-26T06:55:18.836236+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887","DEV-889"]}'
+    new: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887","DEV-889","DEV-865"]}'
+- at: 2026-11-26T06:57:23.579600+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:57:25.157077+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

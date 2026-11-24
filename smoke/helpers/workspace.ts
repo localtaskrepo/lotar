@@ -86,6 +86,8 @@ export class SmokeWorkspace {
             LOTAR_AGENT_QUEUE_DIR: path.join(this.root, '.agent-queue'),
             // The memory gate (DEV-623) would hold jobs on a busy machine.
             LOTAR_MEMORY_READING: 'normal',
+            // The disk gate (DEV-837) on a nearly full disk.
+            LOTAR_DISK_FREE_GB: '1000',
             LOTAR_IGNORE_ENV_TASKS_DIR: '0',
             LOTAR_TEST_MODE: '0',
             LOTAR_TASKS_DIR: this.tasksDir,

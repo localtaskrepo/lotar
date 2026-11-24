@@ -1,14 +1,15 @@
 title: lotar trust --status shows a structured run command as a JSON blob with its default fields
-status: Merging
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-26T06:25:09.948755+00:00
+modified: 2026-11-26T07:25:26.733166+00:00
 relationships:
   related:
   - DEV-847
+  - DEV-873
 comments:
 - date: 2026-11-25T20:15:17.945536+00:00
   author: claude
@@ -55,6 +56,33 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-869` onto `main` conflicts in `crates/lotar-lib/src/cli/handlers/trust.rs`; lotar aborted the rebase, `agent/DEV-869` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T07:25:18.099484+00:00
+  author: claude
+  text: |-
+    Not merged: smoke keeps failing on a known UI flake, not on this work. Land it anyway?
+
+    - Rebase conflict in `crates/lotar-lib/src/cli/handlers/trust.rs` resolved: kept DEV-847's `run: null` filter and this ticket's structured-run parsing; both unit tests kept. Main moved once more, and that rebase was clean: `agent/DEV-869` = `6c501d7ed`
+    - `npm ci`, `lint:agent`, `test:agent` passed on the rebased commit
+    - `npm run -s smoke` failed in 3 of 4 runs, each time on `ui.relationships` "preserves plot height … delayed root reload" (identical 262 px shift, DEV-873, closed as not reproducible; I added the evidence there). Once it also failed on `ui.agent-jobs` "permission question" (45 s timeout, load ~13). It passed once in full and once alone
+    - The branch only changes `trust.rs` and `docs/help/trust.md`; neither test touches trust
+    - Main checkout untouched, nothing pushed, not trusted (no rules changed)
+
+    Question: fast-forward main to `6c501d7ed` despite the unrelated smoke flake, or hold until DEV-873 is fixed?
+  report:
+    commits:
+    - hash: 6c501d7ed
+      what: DEV-869 rebased onto main eb9b383f7 (not merged)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+      reason: 3 of 4 runs, unrelated UI tests (DEV-873 flake; once also agent-jobs permission question timeout)
+    next: 'Owner: land 6c501d7ed despite the unrelated smoke flake, or wait for DEV-873 fix'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
 description: |-
@@ -141,3 +169,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T07:25:17.612256+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-847"]}'
+    new: '{"related":["DEV-847","DEV-873"]}'
+- at: 2026-11-26T07:25:18.099484+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:25:26.733166+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

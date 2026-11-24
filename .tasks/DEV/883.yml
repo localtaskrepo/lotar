@@ -1,11 +1,14 @@
 title: A bad value in the home config's agents block drops every agent profile, and config validate still passes
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T02:12:07.259532+00:00
+modified: 2026-11-26T07:06:28.575756+00:00
+relationships:
+  related:
+  - DEV-893
 comments:
 - date: 2026-11-26T02:11:58.070807+00:00
   author: claude
@@ -40,6 +43,37 @@ comments:
       result: not_run
       reason: merge runs full suites
     next: Review, then merge
+- date: 2026-11-26T07:06:20.559482+00:00
+  author: claude
+  text: |-
+    Review: passed. `73ef3fa65` does what the ticket asks; one minor follow-up filed.
+
+    - Read: ticket, fix comment, diff (5 files), AGENTS.md. Main's newer commits don't touch these files. repos.json has no install step for lotar
+    - Done when: `config validate` exits 1 and names `agents.bad.stall_timeout_seconds` without the value. `config show` warns on stderr that the home config is ignored and keeps stdout valid JSON. The ticket offered "fails loudly" as an option, so this is within scope
+    - Error-path walk (`normalization.rs:274`) only runs when parsing fails. It falls back to the old generic message when more than one key is bad. Values stay out of messages
+    - Validate's home check respects `home_config_honored()` (inside `load_home_config`), so tests stay hermetic
+    - Tests: the unit test and the CLI test pass. Before the fix, validate never read `~/.lotar`, so the CLI test could not pass on main
+    - No UI change, no stray files, a single branch
+    - Minor, filed as [DEV-893](https://lotar.pyxzl.net/task/DEV-893): validate still prints `✅ Global configuration is valid` right after the home config error (`validate.rs:43-61`)
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-core names_the_agent_profile_and_key
+      result: passed
+    - command: cargo nextest run -p lotar-lib test_config_validate_fails_on_unparsable_home_agent_profile
+      result: passed
+    - command: ticket check (HOME=tmp, config validate + --format json config show)
+      result: passed
+    - command: rustfmt --edition 2024 --check on changed files
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs it (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it; no UI change
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5c0e14fefe77d3359acb346194b4cf06156d9ad0840605fb0ea326fa090959f
 description: 'Found (STD-360): in a home .lotar whose agents block sets stall_timeout_seconds: notanumber on one profile, lotar --format json config show lists no agent_profiles at all, and lotar config validate prints ''Global configuration is valid''. A one-character typo in one profile silently removes all of them, so no job starts. Check: HOME=<tmp> with that .lotar, run lotar config validate and lotar --format json config show. Done: validate names the profile and key and fails, and the other profiles still load (or the load fails loudly).'
@@ -77,3 +111,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T07:06:02.071153+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-893"]}'
+- at: 2026-11-26T07:06:20.559482+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:06:28.575756+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

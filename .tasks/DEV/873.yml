@@ -4,13 +4,14 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-25T17:59:45.630098+00:00
-modified: 2026-11-26T01:15:00.720102+00:00
+modified: 2026-11-26T07:25:17.612647+00:00
 relationships:
   related:
   - DEV-799
   - DEV-819
   - DEV-872
   - DEV-797
+  - DEV-869
 comments:
 - date: 2026-11-26T01:14:50.615571+00:00
   author: claude
@@ -22,6 +23,14 @@ comments:
     - From the ticket's numbers: `plotTop` +262 while `documentHeight` grew only 147. That fits the window scrolling to the top (262 to 0) better than content showing up above the plot.
     - If it comes back: log `windowY` and the page's child heights in the failure message (the test already prints `before` and `pending`).
     - Full `npm run smoke` not run here: the merge runs it (DEV-797).
+- date: 2026-11-26T07:25:17.281194+00:00
+  author: claude
+  text: |-
+    Reproduces again during the DEV-869 merge: same 262 px `plotTop` shift.
+
+    - Failed in 3 of 4 full `npm run -s smoke` runs on `0e78bed6b`+DEV-869 and `eb9b383f7`+DEV-869 (rebased `6c501d7ed`, which only changes `trust.rs`/`docs/help/trust.md`); same numbers each time: `plotTop` 79.9 -> 341.9, `documentHeight` 1370 -> 1517, `top` 2196 -> 0
+    - Passes alone: `npm run -s test:smoke:quick -- tests/ui.relationships.smoke.spec.ts -t "preserves plot height"`
+    - Machine load ~13 during the runs
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2047b5bca257970a7c7dcdd461b6ab41265cf35e0e13fa1452803bf835b82425
 description: |-
@@ -87,3 +96,13 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-26T07:25:17.281194+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:25:17.612647+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-799","DEV-819","DEV-872","DEV-797"]}'
+    new: '{"related":["DEV-799","DEV-819","DEV-872","DEV-797","DEV-869"]}'
