@@ -1,11 +1,11 @@
 title: 'docs/help/trust.md: the sentence on a run skipped while lotar trust replays is missing its verb'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T17:30:03.578015+00:00
-modified: 2026-11-24T22:14:05.869138+00:00
+modified: 2026-11-24T23:42:05.577765+00:00
 relationships:
   depends_on:
   - DEV-821
@@ -98,3 +98,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-24T23:42:05.577765+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress

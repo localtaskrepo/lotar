@@ -1,11 +1,11 @@
 title: 'T3''s usage-limit resume restarts every paused job thread of one ticket at once: 10 on STD-328 in one worktree'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T16:20:40.092908+00:00
-modified: 2026-11-24T22:55:14.411493+00:00
+modified: 2026-11-25T02:12:18.510110+00:00
 relationships:
   related:
   - DEV-626
@@ -79,9 +79,43 @@ comments:
 - date: 2026-11-24T22:55:14.411493+00:00
   author: claude
   text: 'Stalled since 2026-11-24T22:22Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-25T02:12:06.130080+00:00
+  author: claude
+  text: |-
+    Review finding fixed: with a queued job, the newest resumed thread runs and lotar stops the others.
+
+    - The review read HEAD `dbdedd4a6` (it quoted `resumed.rs:203`).
+    - `resumed.rs` `on_ticket`: a queued entry that is no usage-limit retry no longer returns early. The newest thread is left for the queued job to wait on, and each other thread is stopped with the comment `… beside the thread <link> that the ticket's queued job waits for. lotar stopped it …`.
+    - New test `a_queued_job_waits_for_the_newest_resumed_thread_and_the_others_are_stopped` in `dev626_resumed_t3_threads_test.rs`: two running threads plus a queued entry give `thread.stop t1` only, no takeover, and the entry stays queued.
+    - `docs/help/agent.md`: the "Left alone too…" line now describes this.
+    - Amended into `c561b9721`, signed.
+  report:
+    commits:
+    - hash: c561b9721
+      what: one thread per ticket at a limit resume, also with a queued job
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev626
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration t3
+      result: passed
+    - command: cargo clippy -p lotar-agent -p lotar-lib --all-targets -D warnings
+      result: passed
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6e1b6cd8ad7b5209381a5abaeda94bee06a34b3812d95b9f2cf16bf0f890292f
 description: 'Found: on 2026-11-24 at 16:00 UTC, T3 Code''s limit-resume message (''Continue where you left off.'') restarted 10 STD-328 fix threads from jobs filed hourly on 2026-11-23 (07:51 to 18:30). All of them run Opus in /Users/mallox/Development/.lotar-worktrees/standards/STD-328, with no lotar job (lotar agent list-jobs shows only failed jobs). lotar commented ''Stop it in T3 Code'', but nobody acts on that, and the threads would race on one worktree and on its dependency updates. DEV-626 (Done) covered resume after a restart, not resume after a limit. Check: t3_thread_list titleContains STD-328 shows several threads running at once. Done when a limit resume runs at most one thread per ticket (the newest tracked job, or none while the ticket is Blocked), and lotar''s job retries don''t leave a T3 thread behind that T3 can resume later.'
 tags:
 - health
@@ -214,3 +248,21 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T02:10:16.887430+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6e1b6cd8ad7b5209381a5abaeda94bee06a34b3812d95b9f2cf16bf0f890292f
+- at: 2026-11-25T02:12:06.130080+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T02:12:18.510110+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

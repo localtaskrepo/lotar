@@ -1,0 +1,33 @@
+title: 'An answer that sets an agent assignee starts no job: STD-336 sat on @fix with no job'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T23:49:30.471883+00:00
+modified: 2026-11-24T23:49:31.080208+00:00
+relationships:
+  related:
+  - DEV-576
+description: |-
+  Found (STD-343): the triage answered STD-336's retry question with `lotar --tasks-dir ~/Development/standards/.tasks comment STD-336 --answer fix` at 2026-11-24 23:13Z. The option's set changed the assignee mallox -> @fix (timeline), but `lotar agent list-jobs` in standards shows no job between job-20261124T231242.639Z-51 (failed 23:12) and a manual restart at 23:46. Assigning an agent profile should start its job (DEV-576). A guess to check: `maybe_queue_agent_on_assignment` (crates/lotar-agent/src/services/automation_service.rs) only enqueues outside server mode and doesn't call `AgentQueueService::ensure_worker`, as `tell_agent` does; or the answer path skips it.
+
+  Check: in a temp repo with an agent profile, ask a question whose option sets assignee=@<profile>, answer it with comment --answer from another directory with --tasks-dir; a job is queued or running and a worker runs.
+
+  Done: the answer starts the job (or comments why it waits). standards' live check now restarts such a ticket (STD-343), so this is no longer a silent stall.
+tags:
+- health
+custom_fields:
+  finding: bug:answer-assign-no-job
+history:
+- at: 2026-11-24T23:49:30.786285+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-576"]}'
+- at: 2026-11-24T23:49:31.080208+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

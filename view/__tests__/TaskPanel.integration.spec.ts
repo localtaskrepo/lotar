@@ -820,7 +820,11 @@ describe('TaskPanel references manual link add', () => {
 
         const referenceItem = wrapper
             .findAll('.task-panel__reference-item')
-            .find((item) => item.text().includes('https://example.com/foo'))
+            .find((item) =>
+                item
+                    .findAll('a.task-panel__reference-link')
+                    .some((link) => link.attributes('href') === 'https://example.com/foo'),
+            )
         expect(referenceItem).toBeTruthy()
 
         const removeButton = referenceItem!.find('button[aria-label="Remove link"]')

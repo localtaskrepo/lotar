@@ -79,7 +79,7 @@ test('the Developer ID signs by default, LOTAR_SIGNING_IDENTITY wins over it', (
 test('a missing default identity falls back to ad hoc with a warning', () => {
     const { sign, warning } = chooseIdentity(undefined, []);
     assert.equal(sign, '-');
-    assert.match(warning, new RegExp(DEFAULT_IDENTITY.replace(/[()]/g, '\\$&')));
+    assert.ok(warning.includes(DEFAULT_IDENTITY), warning);
     assert.match(warning, /firewall and file-access grants again/);
 });
 

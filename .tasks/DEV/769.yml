@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-24T22:51:31.046260+00:00
+modified: 2026-11-25T02:23:07.617481+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -18,6 +18,7 @@ relationships:
   - DEV-849
   - DEV-859
   - DEV-774
+  - DEV-805
 comments:
 - date: 2026-11-24T19:37:14.500501+00:00
   author: automation
@@ -114,9 +115,84 @@ comments:
     - **My screenshots:** I served the worktree build on a copy of `.tasks` with automation removed, then opened two real Claude jobs (`job-20261124T173855.041Z-13`, a review; `job-20261123T054906.949Z-70`, a failed merge) in light and dark mode at 1920, 1440 and 390 px. The views, counts, folded groups, the failed call opening with its output, the result card, `/agents?job=` and the 390 px layout all look right. There were no console errors.
     - **Scope:** the diff matches the plan. No stray files; the other session's `AgentJobLogCall.vue`, `AgentJobLogRow.vue` and `AgentJobLogText.vue` are not in the commit. The plan's checkboxes are still unticked.
     - **Filed:** [DEV-859](https://lotar.pyxzl.net/task/DEV-859). A search match inside a call's output is counted but stays hidden in the folded call.
+- date: 2026-11-25T02:22:56.230798+00:00
+  author: claude
+  text: |-
+    Rework done: screenshots attached, the invalid CSS fixed, commit amended as `cc5a852c9`.
+
+    - **Screenshots:** 42 attached, named `before-…` and `after-…`, each in light and dark at 1920, 1440 and 390 px. Before is the installed lotar 0.15.6, after is this branch, both served on a copy of `.tasks` with `DEV/automation.yml` removed and a scratch queue dir
+    - What they show: `/agents` with the review job `job-20261124T173855.041Z-13` (DEV-805) open: `agents-all`, `agents-problems`, `agents-tools-open` (a group opened), `agents-list` (search, agent and ticket filters), and `task-thread` (the thread on `/task/DEV-805`). Before has only `agents-all` and `task-thread`, the old UI has no views or filters
+    - I read a sample myself (dark tools group at 1440, Problems in light at 1920, thread and list at 390): no layout problems; no page errors during the runs
+    - **Invalid CSS:** `view/components/AgentJobLog.vue` `.log-group__calls` now has `margin: 0 6px 4px;`, so the calls' left rule lines up with the row padding and the 4 px bottom gap applies
+    - **Verification limit (Done when):** real Claude logs from 0.15.6 show each call as `RUN Terminal` without its command, as the screenshots show. That comes from the data: DEV-774 (`504d8b538`) isn't released. Whether you "see which commands ran" on a real log can only be checked once a release with DEV-774 records a job
+    - No guidance correction
+  report:
+    commits:
+    - hash: cc5a852c9
+      what: DEV-769 job log viewer, amended with the CSS fix
+    checks:
+    - command: prettier --check view/components/AgentJobLog.vue
+      result: passed
+    - command: npm run lint:frontend
+      result: passed
+    - command: eslint view/components/AgentJobLog.vue
+      result: passed
+    - command: npm run test:ui:agent AgentJobLog.spec.ts agentJobLogLayout.spec.ts
+      result: passed
+      reason: 10 tests
+    - command: npm run test:smoke:quick:agent smoke/tests/ui.agent-jobs.smoke.spec.ts
+      result: passed
+      reason: 14 tests, after build:web and cargo build --bins
+    - command: npm run lint, npm test, npm run smoke (full)
+      result: not_run
+      reason: one CSS line changed; the merge runs the full suites
+    next: Review again; the commands in tool rows can be checked once a release with DEV-774 records a job
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3782d973becd57a97aa257e515afcecccd9e0478079cf346f1915e85e07bdb1
+- attachment: before-agents-all-light-1440.fedec56a83ece043bda5d6155a6ec4c7.png
+- attachment: after-agents-all-dark-1440.055170431e3a81a9f6aaa96699b20125.png
+- attachment: after-agents-all-dark-1920.b76ad65c76aa024c73ef5b19271b0154.png
+- attachment: after-agents-all-dark-390.b2d312ad02b7a860937ffa57be07c724.png
+- attachment: after-agents-all-light-1440.a10efed42a463fee8743153e3717dfc2.png
+- attachment: after-agents-all-light-1920.bde304cd91cabfa29b465758d84d6bc8.png
+- attachment: after-agents-all-light-390.5e81f2fc4574c42cad8d4ca1a52bca0d.png
+- attachment: after-agents-list-dark-1440.f4cbea35d30eff8076ca1ecf5ef2ce99.png
+- attachment: after-agents-list-dark-1920.27dc44e19774a27f74ae0a2f552a7d2e.png
+- attachment: after-agents-list-dark-390.e5c39807a510cf952672d78bbadf3f09.png
+- attachment: after-agents-list-light-1440.7b482efce890bf96af011036b0edfc4e.png
+- attachment: after-agents-list-light-1920.ea6fdc104f77699d0905ced87125c0de.png
+- attachment: after-agents-list-light-390.8a8a4b6d580c2f32012b4629c1fa866c.png
+- attachment: after-agents-problems-dark-1440.15b38aa2e145238c040460667ed1385c.png
+- attachment: after-agents-problems-dark-1920.82c0cd62938d6f4f2d1c7a1ebcb7e442.png
+- attachment: after-agents-problems-dark-390.233de86af7bba9260dc4f0200c954f72.png
+- attachment: after-agents-problems-light-1440.ab2665cd0d2ed1e5038df938f5af7aac.png
+- attachment: after-agents-problems-light-1920.541ac71704f484881524574771984cf6.png
+- attachment: after-agents-problems-light-390.ca1a057633d8fd38a10b75611b6d5026.png
+- attachment: after-agents-tools-open-dark-1440.61f7d24304a62e880dae647d541b4ea9.png
+- attachment: after-agents-tools-open-dark-1920.87155ec44a48d7e466c900a69977bfc4.png
+- attachment: after-agents-tools-open-dark-390.b5dabeb6373ee16331bae52c4733ed39.png
+- attachment: after-agents-tools-open-light-1440.3ba16c75846ca071607ac7ecf68db61f.png
+- attachment: after-agents-tools-open-light-1920.448ad4a13ec8ee21ed0f06cbd2a46c0a.png
+- attachment: after-agents-tools-open-light-390.c3fac2f1dacac7267798eb885fb7c39a.png
+- attachment: after-task-thread-dark-1440.49a6a1a5f150da475b29aa52f226b087.png
+- attachment: after-task-thread-dark-1920.c0fefed4fd1747ec3a1b03f702d317d4.png
+- attachment: after-task-thread-dark-390.f439efe3c35a084f6959583c0ed84411.png
+- attachment: after-task-thread-light-1440.45dc687890708635dd257bed090c3e2f.png
+- attachment: after-task-thread-light-1920.d2b329b2d7c580121021517ae7191d60.png
+- attachment: after-task-thread-light-390.b2242ad31ce3808f94577275158ce2ff.png
+- attachment: before-agents-all-dark-1440.168e63fb773124b4050ef1cac8c4f9a9.png
+- attachment: before-agents-all-dark-1920.ecd3eee67269de4997177850909c479e.png
+- attachment: before-agents-all-dark-390.bb7de10b98b46c314523d961907664ae.png
+- attachment: before-agents-all-light-1920.92829b01d6fa6570b236243ee4024039.png
+- attachment: before-agents-all-light-390.a31f005bf8fa58ec5d13d62ce24eaaee.png
+- attachment: before-task-thread-dark-1440.e56003f1c9405016d213dfd4b3cfbb43.png
+- attachment: before-task-thread-dark-1920.63c60f63f6a5f43063d2217d80650a65.png
+- attachment: before-task-thread-dark-390.c824cec78f75054f817eeacd84c39dd7.png
+- attachment: before-task-thread-light-1440.030b58b432e931a02dadab9c8b8cd3e0.png
+- attachment: before-task-thread-light-1920.ed555052d04da73d6df0e501ac631db1.png
+- attachment: before-task-thread-light-390.0106ba3fd48ff038292e49959b220c59.png
 description: |-
   The job log viewer (`view/components/AgentJobLog.vue`, used by `view/pages/AgentJobs.vue` and the task panel thread in `view/components/task-panel/TaskPanelTimelineTab.vue`) is one flat list with no filter or search. The owner asked on 2026-11-21 to "look at some of the project logs to see what else could maybe be done to make it easier to understand what's going [on], how to filter down to the data you need, and be smart about the UI and UX".
 
@@ -297,3 +373,243 @@ history:
   - field: tags
     old: ui, web-ui, job-paused, review-blocked
     new: ui, web-ui, job-paused, review-returned
+- at: 2026-11-25T02:10:16.751655+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T02:10:17.296880+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3782d973becd57a97aa257e515afcecccd9e0478079cf346f1915e85e07bdb1
+- at: 2026-11-25T02:22:13.249296+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-agents-all-light-1440.fedec56a83ece043bda5d6155a6ec4c7.png
+- at: 2026-11-25T02:22:17.184822+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-all-dark-1440.055170431e3a81a9f6aaa96699b20125.png
+- at: 2026-11-25T02:22:17.232573+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-all-dark-1920.b76ad65c76aa024c73ef5b19271b0154.png
+- at: 2026-11-25T02:22:17.276488+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-all-dark-390.b2d312ad02b7a860937ffa57be07c724.png
+- at: 2026-11-25T02:22:17.319481+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-all-light-1440.a10efed42a463fee8743153e3717dfc2.png
+- at: 2026-11-25T02:22:17.360204+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-all-light-1920.bde304cd91cabfa29b465758d84d6bc8.png
+- at: 2026-11-25T02:22:17.404037+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-all-light-390.5e81f2fc4574c42cad8d4ca1a52bca0d.png
+- at: 2026-11-25T02:22:17.446462+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-list-dark-1440.f4cbea35d30eff8076ca1ecf5ef2ce99.png
+- at: 2026-11-25T02:22:17.489317+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-list-dark-1920.27dc44e19774a27f74ae0a2f552a7d2e.png
+- at: 2026-11-25T02:22:17.532916+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-list-dark-390.e5c39807a510cf952672d78bbadf3f09.png
+- at: 2026-11-25T02:22:17.575876+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-list-light-1440.7b482efce890bf96af011036b0edfc4e.png
+- at: 2026-11-25T02:22:17.615738+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-list-light-1920.ea6fdc104f77699d0905ced87125c0de.png
+- at: 2026-11-25T02:22:17.656681+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-list-light-390.8a8a4b6d580c2f32012b4629c1fa866c.png
+- at: 2026-11-25T02:22:17.694853+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-problems-dark-1440.15b38aa2e145238c040460667ed1385c.png
+- at: 2026-11-25T02:22:17.735775+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-problems-dark-1920.82c0cd62938d6f4f2d1c7a1ebcb7e442.png
+- at: 2026-11-25T02:22:17.776385+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-problems-dark-390.233de86af7bba9260dc4f0200c954f72.png
+- at: 2026-11-25T02:22:17.816409+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-problems-light-1440.ab2665cd0d2ed1e5038df938f5af7aac.png
+- at: 2026-11-25T02:22:17.857748+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-problems-light-1920.541ac71704f484881524574771984cf6.png
+- at: 2026-11-25T02:22:17.898982+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-problems-light-390.ca1a057633d8fd38a10b75611b6d5026.png
+- at: 2026-11-25T02:22:17.941020+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-tools-open-dark-1440.61f7d24304a62e880dae647d541b4ea9.png
+- at: 2026-11-25T02:22:17.980968+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-tools-open-dark-1920.87155ec44a48d7e466c900a69977bfc4.png
+- at: 2026-11-25T02:22:18.024588+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-tools-open-dark-390.b5dabeb6373ee16331bae52c4733ed39.png
+- at: 2026-11-25T02:22:18.065937+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-tools-open-light-1440.3ba16c75846ca071607ac7ecf68db61f.png
+- at: 2026-11-25T02:22:18.105919+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-tools-open-light-1920.448ad4a13ec8ee21ed0f06cbd2a46c0a.png
+- at: 2026-11-25T02:22:18.146033+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-agents-tools-open-light-390.c3fac2f1dacac7267798eb885fb7c39a.png
+- at: 2026-11-25T02:22:18.187408+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-task-thread-dark-1440.49a6a1a5f150da475b29aa52f226b087.png
+- at: 2026-11-25T02:22:18.227963+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-task-thread-dark-1920.c0fefed4fd1747ec3a1b03f702d317d4.png
+- at: 2026-11-25T02:22:18.268219+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-task-thread-dark-390.f439efe3c35a084f6959583c0ed84411.png
+- at: 2026-11-25T02:22:18.308311+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-task-thread-light-1440.45dc687890708635dd257bed090c3e2f.png
+- at: 2026-11-25T02:22:18.349308+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-task-thread-light-1920.d2b329b2d7c580121021517ae7191d60.png
+- at: 2026-11-25T02:22:18.389246+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-task-thread-light-390.b2242ad31ce3808f94577275158ce2ff.png
+- at: 2026-11-25T02:22:18.430117+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-agents-all-dark-1440.168e63fb773124b4050ef1cac8c4f9a9.png
+- at: 2026-11-25T02:22:18.473365+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-agents-all-dark-1920.ecd3eee67269de4997177850909c479e.png
+- at: 2026-11-25T02:22:18.514472+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-agents-all-dark-390.bb7de10b98b46c314523d961907664ae.png
+- at: 2026-11-25T02:22:18.555333+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-agents-all-light-1920.92829b01d6fa6570b236243ee4024039.png
+- at: 2026-11-25T02:22:18.595024+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-agents-all-light-390.a31f005bf8fa58ec5d13d62ce24eaaee.png
+- at: 2026-11-25T02:22:18.636314+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-task-thread-dark-1440.e56003f1c9405016d213dfd4b3cfbb43.png
+- at: 2026-11-25T02:22:18.676118+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-task-thread-dark-1920.63c60f63f6a5f43063d2217d80650a65.png
+- at: 2026-11-25T02:22:18.716345+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-task-thread-dark-390.c824cec78f75054f817eeacd84c39dd7.png
+- at: 2026-11-25T02:22:18.756206+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-task-thread-light-1440.030b58b432e931a02dadab9c8b8cd3e0.png
+- at: 2026-11-25T02:22:18.796434+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-task-thread-light-1920.ed555052d04da73d6df0e501ac631db1.png
+- at: 2026-11-25T02:22:18.835078+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-task-thread-light-390.0106ba3fd48ff038292e49959b220c59.png
+- at: 2026-11-25T02:22:56.230798+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T02:22:56.606359+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805"]}'
+- at: 2026-11-25T02:23:07.617481+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

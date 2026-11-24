@@ -90,9 +90,6 @@ impl Storage {
     /// failing closed when more than one project/root stores that number.
     pub fn resolve_numeric_id(&self, numeric_id: &str) -> Result<(String, Task), TaskLookupError> {
         let location = identity::resolve_numeric(&self.root_path, numeric_id)?;
-        if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
-            eprintln!("[lotar][debug]   matched numeric={} as {} under {}", numeric_id, location.full_id(), location.root.display());
-        }
         let task = StorageSearch::load_task_file(&location.file).ok_or_else(|| TaskLookupError::NotFound(location.full_id()))?;
         Ok((location.full_id(), task))
     }

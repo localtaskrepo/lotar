@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import { itemAt } from '../utils/lookup'
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import IconGlyph from './IconGlyph.vue'
 import ThemePreview from './ThemePreview.vue'
 import {
@@ -141,7 +141,7 @@ const props = withDefaults(
   },
 )
 
-const uid = `theme-select-${Math.random().toString(36).slice(2, 8)}`
+const uid = `theme-select-${useId()}`
 const listId = `${uid}-list`
 const UNSET = '__unset__'
 

@@ -144,7 +144,7 @@ describe.concurrent('CLI task relationships smoke', () => {
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
             const refs = Array.isArray(yaml.references) ? yaml.references : [];
             // References use { link: "url" } format (not kind/value)
-            expect(refs.some((r: any) => r.link?.includes('example.com'))).toBe(true);
+            expect(refs.some((r: any) => r.link === 'https://example.com/issue/123')).toBe(true);
         } finally {
             await workspace.dispose();
         }

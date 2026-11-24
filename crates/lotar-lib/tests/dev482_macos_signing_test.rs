@@ -58,11 +58,11 @@ fn sign_macos_signs_with_the_fixed_identity_and_fails_without_secrets() {
     let steps = sign["steps"].as_sequence().unwrap();
     let check = &steps[0];
     assert_eq!(check["name"].as_str(), Some("Check signing secrets"));
-    for secret in
+    for name in
         ["MACOS_DEVELOPER_ID_P12_BASE64", "MACOS_DEVELOPER_ID_P12_PASSWORD", "APPLE_NOTARY_KEY_P8_BASE64", "APPLE_NOTARY_KEY_ID", "APPLE_NOTARY_ISSUER_ID"]
     {
-        let referenced = check["env"].as_mapping().unwrap().values().any(|v| v.as_str() == Some(&format!("${{{{ secrets.{secret} }}}}")));
-        assert!(referenced, "secret check misses {secret}");
+        let referenced = check["env"].as_mapping().unwrap().values().any(|v| v.as_str() == Some(&format!("${{{{ secrets.{name} }}}}")));
+        assert!(referenced, "secret check misses {name}");
     }
     assert!(check["run"].as_str().unwrap().contains("exit 1"));
 

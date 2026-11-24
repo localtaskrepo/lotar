@@ -1,11 +1,11 @@
 title: 'lotar trust didn''t replay one skipped run: the owner''s inbox answer on INBOX-646 was never relayed'
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T01:32:44.631216+00:00
-modified: 2026-11-24T23:12:09.700487+00:00
+modified: 2026-11-24T23:42:05.048223+00:00
 relationships:
   blocks:
   - DEV-844
@@ -13,6 +13,7 @@ relationships:
   - DEV-800
   - DEV-833
   - DEV-844
+  - DEV-805
 comments:
 - date: 2026-11-23T05:48:29.430406+00:00
   author: claude
@@ -171,14 +172,37 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-24T23:41:58.963060+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `1a5e2dede` on `main`.
+
+    - The earlier `test:agent` failure was not this work. `embedded_web_ui_test` left an empty `.tmpXXXX/.tasks` folder behind (I reproduced it on its binary alone). Main has since fixed it in `1ebc9245a` (DEV-805).
+    - Rebased onto `1ebc9245a` without conflicts, then ran `npm ci`, `lint:agent`, `test:agent` and `smoke` again: all passed, no files left in the temp folder.
+    - Fast-forwarded `main`, folded the `.tasks` changes into the merged commit, and pushed `1ebc9245a..1a5e2dede`.
+    - No rules or agent profiles changed, so I didn't run `lotar trust`.
+  report:
+    commits:
+    - hash: 1a5e2dede
+      what: trust-file lock, replay after a late skip, test, docs
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2490 Rust tests, UI, release, hooks
+    - command: npm run -s smoke
+      result: passed
+      reason: 409 tests
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa1a190e7422c8e7d2071a5abd86df9bbd32d86b9e9a51ec33ed03931587b295d
 description: |-
   Found 2026-11-22: in standards, the rule 'Inbox: the owner's answer goes to the source' was skipped (repo untrusted after a rules change) on INBOX-637 (22:00:46Z), INBOX-650 (22:02:02), INBOX-646 (22:03:58), INBOX-641 (22:04:56) and INBOX-639 (22:05:20). After lotar trust, four got the comment 'ran ... after lotar trust' and were relayed. INBOX-646 got none: no 'ran', 'failed' or 'didn't run' comment, and lotar trust --status lists no skipped runs left, so the run was dropped silently and the owner's answer never reached DEV-800 for about 3.5 hours. Guess: two processes (lotar serve and the CLI, or two serves) wrote skipped_runs in the trust file at about the same time and one write lost the other's entry, or trust ran between the skip and its write. I replayed it by hand at 01:40Z (the rule's command with the ticket's values).
 
   Done when: a skipped run recorded while another process writes the trust file (another skip, or lotar trust) is never lost; a test with concurrent skips and a trust in between shows each skipped run replayed or reported exactly once.
-tags:
-- job-paused
 history:
 - at: 2026-11-23T01:32:44.907908+00:00
   actor: claude
@@ -259,3 +283,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-24T23:41:58.963060+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T23:41:59.212284+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-844"],"related":["DEV-800","DEV-833","DEV-844"]}'
+    new: '{"blocks":["DEV-844"],"related":["DEV-800","DEV-833","DEV-844","DEV-805"]}'
+- at: 2026-11-24T23:42:05.048223+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused
+    new: ''

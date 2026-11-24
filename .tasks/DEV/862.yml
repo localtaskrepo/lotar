@@ -1,0 +1,15 @@
+title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T02:16:34.229598+00:00
+modified: 2026-11-25T02:16:34.607507+00:00
+description: 'Owner 2026-11-24: "maybe that''s a trigger we should have in general when we run out of credit, that there''s a cleanup process"; he picked ''File both''. Nothing on the Mac stores the Claude five-hour window''s usage or reset time: T3 shows it (18:00 on 2026-11-24) but saves it nowhere, the claude CLI has no usage command. lotar''s jobs run Claude through the Agent SDK/ACP and get its rate-limit events (used share, resetsAt); Codex reports account/rateLimits. Save the newest reading per provider (and account) where scripts can read it, and show it with `lotar usage` (--format json): provider, used percent per window, resets_at, read_at. Standards'' out-of-credit schedule builds on it.'
+history:
+- at: 2026-11-25T02:16:34.607507+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

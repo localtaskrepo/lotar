@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:12:34.614201+00:00
-modified: 2026-11-24T23:28:46.553992+00:00
+modified: 2026-11-25T02:22:56.607343+00:00
 relationships:
   depends_on:
   - DEV-763
@@ -19,6 +19,8 @@ relationships:
   - DEV-806
   - DEV-833
   - DEV-840
+  - DEV-821
+  - DEV-769
 comments:
 - date: 2026-11-23T00:54:01.640535+00:00
   author: claude
@@ -327,3 +329,15 @@ history:
   - field: tags
     old: job-paused
     new: ''
+- at: 2026-11-24T23:41:59.211760+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774","DEV-768","DEV-806","DEV-833","DEV-840"]}'
+    new: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774","DEV-768","DEV-806","DEV-833","DEV-840","DEV-821"]}'
+- at: 2026-11-25T02:22:56.607343+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774","DEV-768","DEV-806","DEV-833","DEV-840","DEV-821"]}'
+    new: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774","DEV-768","DEV-806","DEV-833","DEV-840","DEV-821","DEV-769"]}'

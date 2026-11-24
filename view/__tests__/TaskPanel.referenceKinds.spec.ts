@@ -309,7 +309,11 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
         expect(fileRow!.find('.task-panel__reference-kind').attributes('title')).toBe('Repository file reference')
 
         // Links and code refs keep their existing rendering.
-        const linkRow = items.find((item) => item.text().includes('https://example.com/spec'))
+        const linkRow = items.find((item) =>
+            item
+                .findAll('a.task-panel__reference-link')
+                .some((link) => link.attributes('href') === 'https://example.com/spec'),
+        )
         expect(linkRow).toBeTruthy()
         expect(linkRow!.find('a.task-panel__reference-link').attributes('href')).toBe('https://example.com/spec')
         const codeRow = items.find((item) => item.text().includes('src/lib.rs#10-12'))
