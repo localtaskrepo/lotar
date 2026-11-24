@@ -383,28 +383,50 @@ impl TemplateContext {
         result
     }
 
-    fn expand_inner(&self, input: &str) -> String {
-        let mut result = String::with_capacity(input.len());
-        let mut rest = input;
-        while let Some(start) = rest.find("${{") {
-            result.push_str(&rest[..start]);
-            let after_open = &rest[start + 3..];
-            if let Some(end) = after_open.find("}}") {
-                let key = after_open[..end].trim();
-                if let Some(value) = self.lookup(key) {
-                    result.push_str(&value);
-                }
-                // Unknown key → empty string (no output)
-                rest = &after_open[end + 2..];
-            } else {
-                // No closing `}}` — output the literal `${{` and move on
-                result.push_str("${{");
-                rest = after_open;
-            }
-        }
-        result.push_str(rest);
-        result
+    /// Expand a queued agent job's prompt, leaving `${{ticket.title}}` for
+    /// [`fill_ticket_title`] when the job starts: a job can wait in the queue
+    /// for hours, and its commit message must carry the title the ticket has
+    /// then, as its "Ticket context" does (DEV-845).
+    pub fn expand_for_queued_job(&self, input: &str) -> String {
+        replace_placeholders(input, |key, placeholder| if key == TICKET_TITLE { Some(placeholder.to_string()) } else { self.lookup(key) })
     }
+
+    fn expand_inner(&self, input: &str) -> String {
+        replace_placeholders(input, |key, _| self.lookup(key))
+    }
+}
+
+const TICKET_TITLE: &str = "ticket.title";
+
+/// Fill the `${{ticket.title}}` that [`TemplateContext::expand_for_queued_job`]
+/// left in a job's prompt with the ticket's title at the job's start; other
+/// text stays as it is.
+pub fn fill_ticket_title(input: &str, title: &str) -> String {
+    replace_placeholders(input, |key, placeholder| Some(if key == TICKET_TITLE { title.to_string() } else { placeholder.to_string() }))
+}
+
+/// Replace each `${{key}}` in `input` with what `value` returns for the
+/// trimmed key and the whole placeholder; `None` drops the placeholder.
+fn replace_placeholders(input: &str, value: impl Fn(&str, &str) -> Option<String>) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(start) = rest.find("${{") {
+        result.push_str(&rest[..start]);
+        let after_open = &rest[start + 3..];
+        if let Some(end) = after_open.find("}}") {
+            let key = after_open[..end].trim();
+            if let Some(value) = value(key, &rest[start..start + 3 + end + 2]) {
+                result.push_str(&value);
+            }
+            rest = &after_open[end + 2..];
+        } else {
+            // No closing `}}` — output the literal `${{` and move on
+            result.push_str("${{");
+            rest = after_open;
+        }
+    }
+    result.push_str(rest);
+    result
 }
 
 /// A short-form `run` script plus the environment variables its template
@@ -529,6 +551,19 @@ mod tests {
         ctx.set("ticket.id", "PROJ-1");
         ctx.set("ticket.title", "Fix bug");
         assert_eq!(ctx.expand("Working on ${{ticket.id}}: ${{ticket.title}}"), "Working on PROJ-1: Fix bug");
+    }
+
+    /// DEV-845: a queued job's prompt takes the title the ticket has when
+    /// the job starts, not the one it had when the rule queued it.
+    #[test]
+    fn a_queued_job_prompt_fills_the_title_when_the_job_starts() {
+        let mut ctx = TemplateContext::new();
+        ctx.set("ticket.id", "PROJ-1");
+        ctx.set("ticket.title", "first");
+        let queued = ctx.expand_for_queued_job("Commit \"${{ticket.id}} ${{ ticket.title }}\" ${{unknown}}${{ticket.id");
+        assert_eq!(queued, "Commit \"PROJ-1 ${{ ticket.title }}\" ${{ticket.id");
+        assert_eq!(fill_ticket_title(&queued, "Real ${{ticket.id}} title"), "Commit \"PROJ-1 Real ${{ticket.id}} title\" ${{ticket.id");
+        assert_eq!(fill_ticket_title("Keep ${{agent.job_id}}", "T"), "Keep ${{agent.job_id}}");
     }
 
     #[test]

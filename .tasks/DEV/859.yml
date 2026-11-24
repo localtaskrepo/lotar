@@ -1,11 +1,11 @@
 title: 'Job log search: a match inside a folded tool call''s output is counted but not shown'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T22:50:59.233215+00:00
-modified: 2026-11-25T20:19:40.944985+00:00
+modified: 2026-11-25T21:38:58.835187+00:00
 relationships:
   depends_on:
   - DEV-769
@@ -115,6 +115,36 @@ comments:
       - I read the fix agent's 12 attachments (`dev859-{before,after}-{light,dark}-{1920,1440,390}`). Before: "2 matches" with both calls folded. After: both calls open and `npm` highlighted, including line 16.
       - My own: this branch's build, served on a scratch workspace in `/tmp/dev859-review` with a hand-written log, light and dark at 1920, 1440 and 390 px, plus a shot after clearing the search. I saw no visual problem.
     - Findings: none. The missing scroll to a match is already filed as [DEV-880](https://lotar.pyxzl.net/task/DEV-880) (Todo). I filed no new tickets.
+- date: 2026-11-25T21:38:57.891843+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-859` is in `main`.
+
+    - Rebased `agent/DEV-859` onto `main` (`5e8271ac1180`): `44e3a0a42fcb`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-859` onto `main` (`b372deae77c8`): `280624a25ab2`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `280624a25ab2`
+    - Amended the pending `.tasks` changes into the merged commit: `22f3333bcf23`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: b372deae7
+      what: DEV-847 lotar trust --status lists rules without a run command as 'runs null'
+    - hash: 22f3333bc
+      what: 'DEV-859 Job log search: a match inside a folded tool call''s output is counted but not shown'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeed1b8c40422a5b7f27406f340918a1036ad58cc6146e101d17e6114deca44ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa559fdc5ea5ed7a48ec62c809edbd1978e27914e153885f7e6e01e9e191bd960
@@ -143,7 +173,6 @@ description: |-
 tags:
 - ui
 - web-ui
-- review-returned
 history:
 - at: 2026-11-24T22:51:00.186554+00:00
   actor: claude
@@ -354,3 +383,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T21:38:57.891843+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T21:38:58.835187+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: ui, web-ui, review-returned
+    new: ui, web-ui

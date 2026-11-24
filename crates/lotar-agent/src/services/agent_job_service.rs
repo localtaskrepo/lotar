@@ -383,7 +383,7 @@ impl AgentJobService {
             return Err(LoTaRError::ValidationError("Merge agent jobs require agent.worktree.enabled=true so merges run on isolated branches.".to_string()));
         }
 
-        let user_prompt = req.prompt.trim().to_string();
+        let user_prompt = crate::automation::template::fill_ticket_title(req.prompt.trim(), &task.title);
         if user_prompt.is_empty() {
             return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
         }

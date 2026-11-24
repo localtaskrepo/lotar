@@ -3092,7 +3092,7 @@ impl AgentRunSettings {
             effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
             provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
             session: agent.session,
-            prompt: agent.prompt.as_ref().map(|prompt| tmpl.expand(prompt)).filter(|prompt| !prompt.trim().is_empty()),
+            prompt: agent.prompt.as_ref().map(|prompt| tmpl.expand_for_queued_job(prompt)).filter(|prompt| !prompt.trim().is_empty()),
             thread_name: thread_name_template(agent.thread_name.as_deref()),
         }
     }
@@ -4121,6 +4121,19 @@ mod dev21_cross_root_dependency_tests {
         let tasks = root.join(".tasks");
         std::fs::create_dir_all(&tasks).unwrap();
         std::fs::write(tasks.join("config.yml"), format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n")).unwrap();
+    }
+
+    /// DEV-845: a rule's job prompt keeps `${{ticket.title}}` until the job
+    /// starts, so a job that waited in the queue commits with the ticket's
+    /// title then; the other variables are filled in when the rule runs.
+    #[test]
+    fn a_rule_job_prompt_leaves_the_title_for_the_job_start() {
+        let agent = crate::automation::types::AutomationAgentAction {
+            prompt: Some("Commit \"${{ticket.id}} ${{ticket.title}}\" (was ${{ticket.status}})".to_string()),
+            ..Default::default()
+        };
+        let run = AgentRunSettings::from_action(&agent, &TemplateContext::from_task(&dependent_dto("PX-2", &[])));
+        assert_eq!(run.prompt.as_deref(), Some("Commit \"PX-2 ${{ticket.title}}\" (was Todo)"));
     }
 
     fn dependent_dto(id: &str, deps: &[&str]) -> TaskDTO {

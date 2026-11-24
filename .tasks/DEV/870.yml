@@ -1,18 +1,66 @@
 title: 'A job held in the in-process pending queue starts with the prompt built at create: an old title and ticket context'
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T11:03:31.428115+00:00
-modified: 2026-11-25T11:03:33.249354+00:00
+modified: 2026-11-25T21:42:43.168206+00:00
 relationships:
   related:
   - DEV-845
+comments:
+- date: 2026-11-25T21:42:33.214544+00:00
+  author: claude
+  text: |-
+    Fixed: a job that waited in the in-process pending queue now builds its prompt from the ticket when it starts.
+
+    - `PromptInputs::build` (`crates/lotar-agent/src/services/agent_job_service.rs`) holds the prompt building that `start_job_inner` used to do inline; create calls it, and so does `PendingJob::current_prompt` in the spawned start thread of `process_pending_queue`.
+    - The job keeps its runner, profile and config from create: only the prompt (ticket context, comments, instructions, notes) is rebuilt.
+    - If the ticket or instructions can't be read at the start, the job starts with the prompt built at create.
+    - Test `a_job_from_the_pending_queue_builds_its_prompt_when_it_starts`: renames the ticket while its job is held for memory and checks the new title. It fails without the fix.
+    - Docs: `docs/help/agent.md` (max_parallel_jobs paragraph).
+    - With DEV-845 (`agent/DEV-845`, Merging): the stored `user_prompt` is already filled with the title from create. When the branches are combined, `current_prompt` should fill `${{ticket.title}}` from the raw request with the current title.
+  report:
+    commits:
+    - hash: '3818258e2'
+      what: rebuild a pending-queue job's prompt from the ticket when it starts
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(agent_job_service)'
+      result: passed
+      reason: 97 tests
+    - command: new test fails with the old behaviour
+      result: passed
+      reason: checked by reverting current_prompt
+    - command: cargo clippy -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check agent_job_service.rs
+      result: passed
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs it (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it
+    next: 'Review, then merge. If DEV-845 lands first: move its fill_ticket_title onto user_prompt in PendingJob::current_prompt too'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45021289cd79c488d60288becfc5eda4ec7b52ab4dbb85e9b913bbd7438a6255
 description: |-
   Found: reviewing DEV-845. `AgentJobService::create` (`crates/lotar-agent/src/services/agent_job_service.rs:499`) builds the whole prompt (ticket context, filled `${{ticket.title}}`) and stores it in `PendingJob`; `process_pending_queue` (`:6176`) starts it with that text, so a job held there (memory hold, slot wait, paused queue) gets the title and context from when it was queued. DEV-845 covers the persistent queue only.
   Check: rename a ticket while its job waits in the in-process pending queue; the started prompt shows the old title.
   Done: a job from the pending queue builds its prompt from the ticket when it starts.
+
+  ## Done when
+  - [ ] A job that waited in the in-process pending queue (memory hold, slot wait, paused queue, busy merge slot) starts with a prompt built from the ticket as it is at the start: its "Ticket context" (title, status, description, relationships, comments) and the request text with `${{ticket.title}}` filled from the current title (with DEV-845).
+  - [ ] The job keeps its settings from create (runner, profile, config): only the prompt is rebuilt.
+  - [ ] A job that starts at once is unchanged: one prompt, built at create.
+  - [ ] Rebuilding fails at the start (ticket unreadable, instructions file gone): the job starts with the prompt built at create, not lost.
+  - [ ] A test renames the ticket while its job waits in the pending queue and sees the new title in the started prompt.
 history:
 - at: 2026-11-25T11:03:32.324643+00:00
   actor: claude
@@ -25,3 +73,46 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T21:39:18.022166+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T21:39:18.821623+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45021289cd79c488d60288becfc5eda4ec7b52ab4dbb85e9b913bbd7438a6255
+- at: 2026-11-25T21:40:05.312704+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found: reviewing DEV-845. `AgentJobService::create` (`crates/lotar-agent/src/services/agent_job_service.rs:499`) builds the whole prompt (ticket context, filled `${{ticket.title}}`) and stores it in `PendingJob`; `process_pending_queue` (`:6176`) starts it with that text, so a job held there (memory hold, slot wait, paused queue) gets the title and context from when it was queued. DEV-845 covers the persistent queue only.
+      Check: rename a ticket while its job waits in the in-process pending queue; the started prompt shows the old title.
+      Done: a job from the pending queue builds its prompt from the ticket when it starts.
+    new: |-
+      Found: reviewing DEV-845. `AgentJobService::create` (`crates/lotar-agent/src/services/agent_job_service.rs:499`) builds the whole prompt (ticket context, filled `${{ticket.title}}`) and stores it in `PendingJob`; `process_pending_queue` (`:6176`) starts it with that text, so a job held there (memory hold, slot wait, paused queue) gets the title and context from when it was queued. DEV-845 covers the persistent queue only.
+      Check: rename a ticket while its job waits in the in-process pending queue; the started prompt shows the old title.
+      Done: a job from the pending queue builds its prompt from the ticket when it starts.
+
+      ## Done when
+      - [ ] A job that waited in the in-process pending queue (memory hold, slot wait, paused queue, busy merge slot) starts with a prompt built from the ticket as it is at the start: its "Ticket context" (title, status, description, relationships, comments) and the request text with `${{ticket.title}}` filled from the current title (with DEV-845).
+      - [ ] The job keeps its settings from create (runner, profile, config): only the prompt is rebuilt.
+      - [ ] A job that starts at once is unchanged: one prompt, built at create.
+      - [ ] Rebuilding fails at the start (ticket unreadable, instructions file gone): the job starts with the prompt built at create, not lost.
+      - [ ] A test renames the ticket while its job waits in the pending queue and sees the new title in the started prompt.
+- at: 2026-11-25T21:42:33.214544+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T21:42:43.168206+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

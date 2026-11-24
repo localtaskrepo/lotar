@@ -1,0 +1,20 @@
+title: 'Status feed: a small standard endpoint with each instance''s running jobs, queue and who it waits on'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T21:43:44.403743+00:00
+description: |-
+  Owner by voice 2026-11-25 13:40 PST (as the voice assistant relayed it): "Status overview: each lotar instance exposes a small standard status feed (running jobs, queue, waiting on whom) without knowing about other instances; a thin aggregator, starting as a page in the staff app, reads all the feeds and links into each instance's UI. No pluggable lotar UI for now." And: "File the lotar status feed endpoint as the first step."
+
+  This ticket is that first step. The aggregator page comes after it, in staff (filed there, waiting for this one). No ticket covered it before (searched every repo's open tickets 2026-11-25).
+
+  ## Done when
+  - [ ] A read-only REST endpoint (e.g. GET /api/status) returns one small JSON document for this instance: its name and base URL; the running jobs (ticket, title, profile, started, link to the job in this instance's UI); the queue (count and entries in start order with kind and ticket, as `lotar agent queue` shows them; whether it is held and why, e.g. memory pressure); and what waits on whom (tickets HelpNeeded or Blocked, with assignee, the question's date and a link).
+  - [ ] It knows nothing about other instances and needs no configuration; every link in it is absolute, so an aggregator can link straight into this instance's UI.
+  - [ ] A version field so the format can grow; the format is written down in docs (openapi.json and docs/help agree), short enough for another tool to implement against.
+  - [ ] Cheap to call every minute: it reads only what's already in memory or the queue state, no full ticket scan per call.
+  - [ ] Access as the other API endpoints; say in the hand-off how the staff connector on the same Mac should reach it.
+  - [ ] Tests cover an instance with running jobs, a held queue and a HelpNeeded ticket.
+  - [ ] No pluggable UI, no aggregation in lotar (owner: "No pluggable lotar UI for now").
