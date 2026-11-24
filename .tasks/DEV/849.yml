@@ -5,7 +5,7 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-24T20:03:54.609056+00:00
-modified: 2026-11-24T22:44:54.704717+00:00
+modified: 2026-11-25T12:34:09.782283+00:00
 relationships:
   related:
   - DEV-600
@@ -121,6 +121,9 @@ comments:
     **Filed (minor)**
     - [DEV-857](https://lotar.pyxzl.net/task/DEV-857): a thread whose turn ended on `t3_background_wait` (`completed`, background tasks pending) shows Finished while its job still runs.
     - [DEV-858](https://lotar.pyxzl.net/task/DEV-858): no REST test for `GET /api/jobs/t3-thread` (400, 404, unavailable, two threads on one ticket).
+- date: 2026-11-25T12:34:09.782283+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-849 is assigned to @merge now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e0db82872d44ab0b81b1b5b68502ee7eca89b778890794d33dcf9a65d1af387
 - attachment: dev849-after-dark-1440.a06743fc5f201453633522383d19975e.png
@@ -329,3 +332,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T12:34:09.782283+00:00
+  actor: automation
+  changes:
+  - field: comment_added

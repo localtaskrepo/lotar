@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-24T16:34:28.930701+00:00
-modified: 2026-11-24T21:54:18.938505+00:00
+modified: 2026-11-25T12:25:28.224415+00:00
 relationships:
   related:
   - DEV-623
@@ -14,6 +14,7 @@ relationships:
   - DEV-812
   - DEV-815
   - DEV-604
+  - DEV-827
 comments:
 - date: 2026-11-24T16:34:46.203543+00:00
   author: claude
@@ -89,6 +90,20 @@ comments:
       result: not_run
       reason: the merge runs it
     next: 'Merge; once live, watch ''lotar agent queue'' for disk_hold: the Mac had 38-63 GB free today, under the 60 GB floor'
+- date: 2026-11-25T12:25:13.117678+00:00
+  author: claude
+  text: |-
+    Review: blocking. The gate works in tests, but the cleanup runs under the job registry lock, and its log lines don't reach the server log.
+
+    Read: `git log main..HEAD` (`745324679`, one commit) and its diff, the ticket and comments, DEV-623/DEV-827, AGENTS.md, main's newer commits to the touched files. Reran: `npm ci` (ok); `cargo nextest run --workspace -E 'test(disk_gate) | test(dev837) | test(entries_wait_for) | test(config_validation) | test(fields)'`: 91 passed. It rebases onto main without conflicts (`git merge-tree`).
+
+    **Blocking**
+    - **The cleanup runs while the registry lock is held.** `crates/lotar-agent/src/services/agent_job_service.rs:6159` calls `disk_gate::check` inside `process_pending_queue`, which holds the `JOB_REGISTRY` lock. Under the floor, `check` runs `git worktree list` and `remove_dir_all` over idle `target/` profiles (`disk_gate.rs:134-141`), up to 168 GB at once. Meanwhile every `update_job` of the running jobs blocks, and so do the API and enqueue. Fix: run the cleanup outside the lock, for example in the queue worker's loop (`agent_queue_service.rs:695`) or a thread of its own. Inside the lock, only read the saved hold.
+    - **"Server log names the hold and the removed profiles" doesn't hold.** `disk_gate.rs:139,147-148` write with `eprintln!` in whichever process ran `check`. That is usually the detached queue worker, whose stderr is `Stdio::null()` (`agent_queue_service.rs:1286-1287`). DEV-827 (`5e53e427c`, on main after this branch's base) fixed exactly this for the memory gate: the gate keeps the hold's start and end in its state file, and `lotar serve` logs them (`HoldLog` in `serve_handler.rs`). Fix: do the same for the disk gate, holds and removed profiles included, with a test like DEV-827's.
+
+    **Also worth fixing in the rework**
+    - **The gate holds more jobs than the ticket asks.** It holds every job when `agent.worktree.enabled` is on, including merge jobs and jobs in a worktree that already exists. The ticket says "no job that creates a worktree". Holding merges is counterproductive: a merged ticket's worktree gets cleaned up, which frees disk. Either let merge jobs pass (`pending.is_merge_job`) or ask the owner.
+    - **"Starts once space is back" is only unit-tested** (`decide` in `under_the_floor_holds_until_space_is_back`). `dev837_disk_gate_test` only flushes the queue. That's acceptable if noted; better, extend the test to show the job start.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e50ed7331f1c1454dca4b704bafbafba48f76bd1261bfe3101c6502de1904c3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65e86708fd02583215565a3ac4f491a402a9da97617e83ef5e45676fece55760
@@ -116,6 +131,7 @@ description: |-
 tags:
 - proposal
 - job-paused
+- review-returned
 history:
 - at: 2026-11-24T16:34:29.644380+00:00
   actor: claude
@@ -194,3 +210,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T12:25:13.117678+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:25:13.374895+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604"]}'
+    new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827"]}'
+- at: 2026-11-25T12:25:13.682692+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal, job-paused
+    new: proposal, job-paused, review-blocked
+- at: 2026-11-25T12:25:28.224415+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: proposal, job-paused, review-blocked
+    new: proposal, job-paused, review-returned

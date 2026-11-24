@@ -1,11 +1,11 @@
 title: A job queued for a hard-deleted ticket runs on the new ticket that reuses its ID, with the deleted ticket's title in its prompt
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-24T22:21:34.760865+00:00
+modified: 2026-11-25T12:36:27.120185+00:00
 relationships:
   related:
   - DEV-786
@@ -69,6 +69,18 @@ comments:
 - date: 2026-11-24T21:50:19.669740+00:00
   author: automation
   text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502 of the job job-20261124T191813.228Z-39 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-25T12:36:17.573665+00:00
+  author: claude
+  text: |-
+    Review: passed. `0dde35870` does what "Done when" asks, with no stray files, and it rebases cleanly onto main (`git merge-tree` shows no conflicts; main is 14 commits ahead).
+
+    - **Read:** the diff `main...HEAD` (6 files), the ticket and the fix comment, the `@fix` and `@work` prompts in `.tasks/DEV/automation.yml`, the worker loop in `agent_queue_service.rs`, and the last 3 commits on main for each touched file.
+    - **Cause confirmed:** the rule prompts start with `Work ticket ${{ticket.id}} ("${{ticket.title}}")` and contain the `"${{ticket.id}} ${{ticket.title}}"` commit order. Before this fix they were filled in at queue time. Now `expand_keeping_ticket` (`automation_service.rs:3087`) leaves them for `expand_ticket_only` in `start_job_inner` (`agent_job_service.rs:381`).
+    - **Queue:** `ticket_created` is set on enqueue, park, pause and `requeue_first`, and `unpark` carries it. When a new ticket reuses an ID, its enqueue replaces the stale entry. `start_entry` drops an entry whose ticket is gone or was re-created: it returns `Ok`, so the worker settles the entry without spending retries, and it writes the stderr line and an automation comment. Old entries without the field are not checked.
+    - **Failed before the fix:** the queue tests use the new field and functions, so they could not have passed before. The integration test would have failed before: the old start code didn't expand the prompt, so the literal `${{ticket.id}}` stayed in it.
+    - **Rerun, all passed:** `npm ci`. `cargo nextest run -p lotar-agent -E 'test(agent_queue_service) | test(template) | test(automation_service)'` (57 tests). `cargo nextest run -p lotar-lib --test integration -E 'test(agent_automation_integration_test)'` (60 tests). `cargo clippy -p lotar-agent --all-targets -- -D warnings`, plus `rustfmt --check` and `prettier --check` on the changed files.
+    - **Note, not blocking:** `a_jobs_prompt_shows_the_tickets_title_when_the_job_starts` passes a hand-written placeholder prompt to `start_job_with_tasks_dir` instead of going rule → queue → start. Together with the unit test `a_rules_prompt_keeps_the_tickets_values_for_the_jobs_start`, the whole chain is still covered.
+    - No UI changes. No tickets filed. No guidance correction.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
@@ -221,3 +233,16 @@ history:
     new: Reviewing
   - field: assignee
     new: '@review-claude'
+- at: 2026-11-25T12:36:17.573665+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:36:27.120185+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

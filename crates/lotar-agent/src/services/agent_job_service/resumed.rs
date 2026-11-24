@@ -358,6 +358,7 @@ fn adopt(
                 request: None,
                 commit_retry: None,
                 carried_outcome: None,
+                after_limit: false,
                 commits: super::job_commits_with(&config, &profile, AgentRunnerKind::T3),
             },
         );

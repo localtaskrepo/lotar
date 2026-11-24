@@ -1,17 +1,18 @@
 title: Memory gate holds leave no trace in the server log once they clear
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T05:02:58.468147+00:00
-modified: 2026-11-24T21:24:39.809685+00:00
+modified: 2026-11-25T12:25:13.374015+00:00
 relationships:
   depends_on:
   - local:LOCA-601
   related:
   - DEV-819
   - DEV-791
+  - DEV-837
 comments:
 - date: 2026-11-23T08:26:18.817426+00:00
   author: automation
@@ -254,6 +255,30 @@ comments:
       result: passed
       reason: test:smoke:agent, 408 tests
     next: Review on another model, then merge
+- date: 2026-11-25T12:22:09.111917+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-827` is in `main`.
+
+    - Rebased `agent/DEV-827` onto `main` (`d3c11b78c2fd`): `303be2a2fe6c`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `303be2a2fe6c`
+    - Amended the pending `.tasks` changes into the merged commit: `5e53e427cd27`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 5e53e427c
+      what: DEV-827 Memory gate holds leave no trace in the server log once they clear
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada52c8b96cffe88ac9adc396fde47d6d31408da0e59509a8b82387efb6fa247f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa168b4ac98b80b1ff56db08bc2d25da35f89b26d91d1262bbe0c662cf50a3842
@@ -285,9 +310,6 @@ description: |-
   - [ ] Serve started during a hold logs its start once; an ended hold from before serve started is not logged again.
   - [ ] Gate disabled: no lines. A missing or unreadable state file: no lines, no error.
   - [ ] Covered by unit tests in `memory_gate.rs`.
-tags:
-- job-paused
-- fix-retried
 history:
 - at: 2026-11-23T05:02:58.750765+00:00
   actor: claude
@@ -621,3 +643,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T12:22:09.111917+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:22:09.898887+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused, fix-retried
+    new: ''
+- at: 2026-11-25T12:25:13.374015+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837"]}'

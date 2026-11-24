@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-25T05:36:17.268502+00:00
+modified: 2026-11-25T12:34:10.506186+00:00
 relationships:
   related:
   - DEV-725
@@ -385,6 +385,9 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-705)
+- date: 2026-11-25T12:34:10.506186+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-786 is assigned to @fix now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -909,3 +912,7 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-25T12:34:10.506186+00:00
+  actor: automation
+  changes:
+  - field: comment_added

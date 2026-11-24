@@ -76,6 +76,18 @@ pub fn of_failures(failures: &[Failure], now: Timestamp) -> Option<UsageLimit> {
     of_failures_in(failures, now, &TimeZone::system())
 }
 
+/// The reset time the first line of `texts` that names a limit and a time
+/// gives (DEV-833): T3 Code's error says only "Try again later", the agent's
+/// own reply in the thread names the reset. Only for a limit the runner
+/// reported: an agent's words alone pause no job.
+pub fn reset_named_in<'a>(texts: impl IntoIterator<Item = &'a str>, now: Timestamp) -> Option<Timestamp> {
+    reset_named_in_zone(texts, now, &TimeZone::system())
+}
+
+fn reset_named_in_zone<'a>(texts: impl IntoIterator<Item = &'a str>, now: Timestamp, zone: &TimeZone) -> Option<Timestamp> {
+    texts.into_iter().flat_map(str::lines).map(str::trim).filter(|line| LIMIT.is_match(line)).find_map(|line| reset_time(line, now, zone))
+}
+
 /// A failure typed as a limit is one, with its `resets_at`, else the time its
 /// text names; one of any other kind (none, sign-in, overload, context,
 /// transport) is a limit when its text names one. harnessmux 0.2.0 doesn't say
@@ -185,6 +197,14 @@ mod tests {
 
     fn berlin() -> TimeZone {
         TimeZone::get("Europe/Berlin").expect("zone")
+    }
+
+    #[test]
+    fn a_reset_named_beside_a_limit_without_one_is_found_in_the_agents_reply() {
+        let texts = ["Working on it.", "Claude API rate limit reached. Try again later.", "You've hit your 5-hour limit · resets 1pm (America/Los_Angeles)"];
+        let reset = reset_named_in_zone(texts, now(), &berlin()).expect("reset");
+        assert_eq!(reset, "2026-11-18T21:00:00Z".parse::<Timestamp>().expect("timestamp"));
+        assert_eq!(reset_named_in_zone(["resets 1pm, the docs say", "Claude API rate limit reached. Try again later."], now(), &berlin()), None);
     }
 
     #[test]

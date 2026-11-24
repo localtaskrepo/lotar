@@ -163,6 +163,9 @@ struct AgentJobState {
     commit_retry: Option<CommitRetry>,
     /// The status and assignee change of the paused job this one retries.
     carried_outcome: Option<CarriedOutcome>,
+    /// The job retries one paused on a usage limit (DEV-833): a t3 job
+    /// continues that job's thread, however long it was idle.
+    after_limit: bool,
     /// The job commits, so a signing pause holds it ([`job_commits_with`]).
     commits: bool,
 }
@@ -283,21 +286,23 @@ impl AgentJobService {
     }
 
     pub fn start_job_with_tasks_dir_mode(req: AgentJobCreateRequest, tasks_dir: &std::path::Path, mode: JobStartMode) -> LoTaRResult<AgentJob> {
-        Self::start_job_inner(req, tasks_dir, mode, None, None)
+        Self::start_job_inner(req, tasks_dir, mode, None, None, false)
     }
 
     /// Start a job the queue worker took from the queue: right away, and
     /// with `commit_retry` only the commit a paused job couldn't make
     /// (DEV-604).
     /// A paused job's retry also gets the status and assignee change that
-    /// job recorded.
+    /// job recorded; `after_limit` when it retries a job paused on a usage
+    /// limit.
     pub(crate) fn start_queued_job(
         req: AgentJobCreateRequest,
         tasks_dir: &std::path::Path,
         commit_retry: Option<CommitRetry>,
         carried_outcome: Option<CarriedOutcome>,
+        after_limit: bool,
     ) -> LoTaRResult<AgentJob> {
-        Self::start_job_inner(req, tasks_dir, JobStartMode::Immediate, commit_retry, carried_outcome)
+        Self::start_job_inner(req, tasks_dir, JobStartMode::Immediate, commit_retry, carried_outcome, after_limit)
     }
 
     /// Whether the job `req` asks for commits, so a signing pause holds it.
@@ -319,6 +324,7 @@ impl AgentJobService {
         mode: JobStartMode,
         commit_retry: Option<CommitRetry>,
         carried_outcome: Option<CarriedOutcome>,
+        after_limit: bool,
     ) -> LoTaRResult<AgentJob> {
         let ticket_id = req.ticket_id.trim().to_string();
         if ticket_id.is_empty() {
@@ -484,6 +490,7 @@ impl AgentJobService {
                     request: Some(req.clone()),
                     commit_retry,
                     carried_outcome,
+                    after_limit,
                     commits,
                 },
             );
@@ -2263,6 +2270,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 request: job.request.clone(),
                 commit_retry: None,
                 carried_outcome: None,
+                after_limit: false,
                 commits: true,
             },
         );
@@ -3676,7 +3684,14 @@ fn run_job(
     // to resume; a new one with a handoff is cheaper (DEV-603).
     let mut handoff_from = None;
     let mut handoff_why = "it was idle too long";
-    if let Some(record) = continued.as_ref()
+    // A t3 job's retry after a usage limit continues the paused job's thread
+    // however long it waited: T3 Code resumes that thread's paused turn at
+    // the reset, so a new thread would run beside it (DEV-833).
+    let after_limit =
+        runner_kind == AgentRunnerKind::T3 && JOB_REGISTRY.lock().is_ok_and(|registry| registry.jobs.get(&job_id).is_some_and(|state| state.after_limit));
+    if after_limit && let Some(record) = continued.as_ref() {
+        session_reason = Some(format!("Continuing the session {}: this job retries one paused on a usage limit, in the same T3 Code thread.", record.name));
+    } else if let Some(record) = continued.as_ref()
         && let Some(idle) = idle_since(&record.last_used)
     {
         let limit = profile.continue_within_minutes.unwrap_or(DEFAULT_CONTINUE_WITHIN_MINUTES);
@@ -5762,14 +5777,34 @@ fn pause_cause(job_id: &str, note: Option<&str>) -> Option<(PauseReason, String)
 /// tool calls are its words, and a failed job that only talked about a rate
 /// limit fails.
 fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) -> Option<(String, String)> {
-    let (mut request, ticket_id, runner, errors) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+    let (mut request, ticket_id, runner, errors, session) = JOB_REGISTRY.lock().ok().and_then(|registry| {
         let state = registry.jobs.get(job_id)?;
-        Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.runner.clone(), state.runner_errors.clone()))
+        Some((
+            state.request.clone()?,
+            state.record.ticket_id.clone(),
+            state.record.runner.clone(),
+            state.runner_errors.clone(),
+            state.record.session_id.clone(),
+        ))
     })?;
     let now = Timestamp::now();
-    let limit = crate::services::usage_limit::of_failures(&errors, now)?;
+    let mut limit = crate::services::usage_limit::of_failures(&errors, now)?;
+    // T3 Code's error names no reset; the agent's reply in the thread does
+    // ("resets 1pm (America/Los_Angeles)"), so the retry waits for it rather
+    // than every hour (DEV-833).
+    if limit.resets_at.is_none() {
+        limit.resets_at = crate::services::usage_limit::reset_named_in(failure_texts(job_id, None).iter().map(String::as_str), now);
+    }
     let resumes_at = limit.resume_at(now).to_rfc3339();
     request.ticket_id = ticket_id;
+    // T3 Code pauses the thread's turn and resumes it at the reset by
+    // itself: the retry runs in that thread, so each retry while the limit
+    // lasts doesn't leave one more thread that comes back then (DEV-833).
+    let same_thread = runner == AgentRunnerKind::T3.as_str()
+        && session.is_some_and(|name| crate::services::agent_runner::registry().load(&name).is_ok_and(|record| record.agent_session.is_some()));
+    if same_thread {
+        request.session = Some(AgentSession::Continue);
+    }
     save_retry(tasks_dir, job_id, &request.ticket_id, |carried| {
         let mut retry = AgentQueueEntry::retry_of(&request, None, carried);
         retry.not_before = Some(resumes_at.clone());
@@ -5782,7 +5817,8 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
         (Some(_), None) => "after the reset".to_string(),
         (None, None) => "after the default wait (the provider named no reset time)".to_string(),
     };
-    let note = format!("Paused, not failed: {provider} hit its usage limit ({}). The job runs again on {profile} at {resumes_at}, {when}.", limit.line);
+    let thread = if same_thread { ", in the same T3 Code thread" } else { "" };
+    let note = format!("Paused, not failed: {provider} hit its usage limit ({}). The job runs again on {profile}{thread} at {resumes_at}, {when}.", limit.line);
     Some((note, resumes_at))
 }
 
@@ -7018,6 +7054,7 @@ mod tests {
             request: None,
             commit_retry: None,
             carried_outcome: None,
+            after_limit: false,
             commits: true,
         }
     }

@@ -1,17 +1,61 @@
 title: Agents page shows ∞ Max parallel when max_parallel_jobs is 0
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T21:51:57.586081+00:00
-modified: 2026-11-24T21:51:58.244041+00:00
+modified: 2026-11-25T12:29:20.853494+00:00
 relationships:
   related:
   - DEV-786
+comments:
+- date: 2026-11-25T12:29:13.106780+00:00
+  author: claude
+  text: |-
+    Agents page now shows **0 · Max parallel (paused)** when `max_parallel_jobs: 0`; ∞ only without a limit.
+
+    - Cause: `view/pages/AgentJobs.vue` used `max_parallel || '∞'`; now `?? '∞'` plus a "(paused)" label at 0.
+    - Backend already sends `max_parallel: 0` (checked `GET /api/jobs` on a scratch workspace with this branch's build).
+    - Test: `view/__tests__/AgentJobs.spec.ts` "Max parallel stat (DEV-856)" covers 0, null, 3.
+    - Side finding, not changed: in my first try the home config `~/.lotar` hid the workspace's limit (API sent no `max_parallel`); with a clean `HOME` it was 0. Home overriding is by design, so no ticket.
+    - Screenshots (light/dark at 1920, 1440, 390), before → after at 1440: [before light](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=before-light-1440.138e34621a73d702ae5737c688806e3b.png) → [after light](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=after-light-1440.8fdcee9b2e4e0ad827af50331e2dd39e.png); [before dark 390](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=before-dark-390.0fa00f956175e1c4ecf2684658d270b2.png) → [after dark 390](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=after-dark-390.59220118598a304f7c140db1748358d0.png). All 12 are attached to the ticket.
+  report:
+    commits:
+    - hash: e0acc2e12
+      what: Max parallel shows 0 (paused) for a limit of 0, ∞ only without a limit
+    checks:
+    - command: npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: 35 tests, new DEV-856 cases failed before the fix
+    - command: npx vue-tsc --project view/tsconfig.json --noEmit
+      result: passed
+    - command: npx oxlint view/pages/AgentJobs.vue
+      result: passed
+    - command: npx prettier --check (changed files)
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs them (owner 2026-11-22, DEV-797)
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf60b30ed4a67281a3f39110a272f893c81c4283b2171edf2435a5653374a502
+- attachment: after-dark-1440.d1dec48293928efef4b00a4826c616d0.png
+- attachment: after-dark-1920.d1a10b65fda623b6fc6d326cf93d1e97.png
+- attachment: after-dark-390.59220118598a304f7c140db1748358d0.png
+- attachment: after-light-1440.8fdcee9b2e4e0ad827af50331e2dd39e.png
+- attachment: after-light-1920.8c63ee29a8fc9c28e5978775088c7a51.png
+- attachment: after-light-390.5a2b2f8bb1bb1f1c61ace12eaa80d4a1.png
+- attachment: before-dark-1440.fd1a777037b8b9d2bd4609b0c6d383dd.png
+- attachment: before-dark-1920.a1346d7a32a18cf2bc0f705caac708f5.png
+- attachment: before-dark-390.0fa00f956175e1c4ecf2684658d270b2.png
+- attachment: before-light-1440.138e34621a73d702ae5737c688806e3b.png
+- attachment: before-light-1920.ad0753945bac448d022f5eef67a562c1.png
+- attachment: before-light-390.621a4496c868705eef333ced428385dd.png
 description: 'Found while taking DEV-786 screenshots: with agent.worktree.max_parallel_jobs: 0 (new jobs paused) the Agents page header shows ''∞ Max parallel'', because AgentJobs.vue renders `queueStats.max_parallel || ''∞''`. Check: set the limit to 0, open /agents. Done: the header shows 0 (paused), and ∞ only when no limit is set.'
 tags:
 - health
+- ui
 custom_fields:
   finding: ui-check:agents-max-parallel
 history:
@@ -26,3 +70,93 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T12:22:21.728554+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T12:22:22.548211+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf60b30ed4a67281a3f39110a272f893c81c4283b2171edf2435a5653374a502
+- at: 2026-11-25T12:28:55.382506+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, ui
+- at: 2026-11-25T12:28:55.440813+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1440.d1dec48293928efef4b00a4826c616d0.png
+- at: 2026-11-25T12:28:55.478949+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1920.d1a10b65fda623b6fc6d326cf93d1e97.png
+- at: 2026-11-25T12:28:55.516915+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-390.59220118598a304f7c140db1748358d0.png
+- at: 2026-11-25T12:28:55.557387+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1440.8fdcee9b2e4e0ad827af50331e2dd39e.png
+- at: 2026-11-25T12:28:55.598042+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1920.8c63ee29a8fc9c28e5978775088c7a51.png
+- at: 2026-11-25T12:28:55.641504+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-390.5a2b2f8bb1bb1f1c61ace12eaa80d4a1.png
+- at: 2026-11-25T12:28:55.680406+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1440.fd1a777037b8b9d2bd4609b0c6d383dd.png
+- at: 2026-11-25T12:28:55.719663+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1920.a1346d7a32a18cf2bc0f705caac708f5.png
+- at: 2026-11-25T12:28:55.762862+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-390.0fa00f956175e1c4ecf2684658d270b2.png
+- at: 2026-11-25T12:28:55.801944+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1440.138e34621a73d702ae5737c688806e3b.png
+- at: 2026-11-25T12:28:55.840143+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1920.ad0753945bac448d022f5eef67a562c1.png
+- at: 2026-11-25T12:28:55.878579+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-390.621a4496c868705eef333ced428385dd.png
+- at: 2026-11-25T12:29:13.106780+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:29:20.853494+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

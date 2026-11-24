@@ -896,7 +896,8 @@ printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","ac
 /// sign-in with the pairing code `pair-1`, and `/mcp`. `t3_thread_launch` makes thread `thread-<n>` in its
 /// `existing_worktree` (the same thread for a repeated `clientRequestId`) and `t3_thread_send` gives a thread a run;
 /// the fake `t3 thread show` does it. `t3_thread_organize` fails with the text in `organize-error` while that file is
-/// there; else it marks the thread settled. Each tool call is logged to `t3-mcp.log` (`<tool> <arguments>`). A WebSocket on `/ws` takes T3 Code's
+/// there; else it marks the thread settled. `t3_thread_read` gives the thread's latest run the error in `limit-<id>` while
+/// that file is there. Each tool call is logged to `t3-mcp.log` (`<tool> <arguments>`). A WebSocket on `/ws` takes T3 Code's
 /// internal rename command (DEV-619), logs it there as `ws_rename <payload>` and answers success; while `ws-refuse` is
 /// there, `/ws` answers 404. Returns the origin.
 fn fake_t3_server(dir: &Path, project: &Path) -> String {
@@ -1002,6 +1003,17 @@ fn fake_t3_server(dir: &Path, project: &Path) -> String {
                                 }
                             }
                             "t3_thread_send" => Ok(run(arguments["threadId"].as_str().unwrap(), "send", None)),
+                            "t3_thread_read" => {
+                                let id = arguments["threadId"].as_str().unwrap_or_default();
+                                let items = std::fs::read_to_string(dir.join(format!("limit-{id}"))).map_or_else(
+                                    |_| serde_json::json!([]),
+                                    |text| {
+                                        let run = std::fs::read_to_string(threads.join(id).join("latest")).unwrap_or_default();
+                                        serde_json::json!([{"type": "error", "runId": run.trim(), "text": text.trim()}])
+                                    },
+                                );
+                                Ok(serde_json::json!({"items": items}))
+                            }
                             "t3_thread_organize" => std::fs::read_to_string(dir.join("organize-error")).map_or_else(
                                 |_| {
                                     let _ = std::fs::write(threads.join(arguments["threadId"].as_str().unwrap_or_default()).join("settled"), "");
@@ -1469,6 +1481,34 @@ fn a_thread_with_an_active_run_or_a_question_holds_the_ticket() {
         .failure()
         .stderr(predicate::str::contains("the T3 Code thread thread-0 of the job job-").and(predicate::str::contains(" waits for an answer")));
     assert_eq!(std::fs::read_to_string(root.join("t3.log")).unwrap().lines().count(), 1, "no second thread started");
+}
+
+/// DEV-833: each retry of a t3 job paused on a usage limit started one more thread, and T3 Code resumed every one of
+/// them at the reset, in the same worktree. The retry now sends its turn to the paused job's thread, also when it
+/// waited longer than `continue_within_minutes`.
+#[test]
+fn a_t3_jobs_retry_after_a_usage_limit_continues_its_thread() {
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", "    continue_within_minutes: 0\n")]);
+    let root = fixtures.get_temp_path();
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let _wait = EnvVarGuard::set("LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS", "1");
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    std::fs::write(root.join("limit-thread-0"), "Claude API rate limit reached. Try again later.").unwrap();
+    let _ = run_t3(&fixtures, "fix");
+    let tasks_dir = fixtures.tasks_root.clone();
+    let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+    let retry = pending.iter().find(|entry| entry.ticket_id == "TEST-1").unwrap_or_else(|| panic!("the job is queued again: {pending:?}"));
+    assert_eq!(retry.session, Some(lotar::config::types::AgentSession::Continue), "{retry:?}");
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    std::fs::remove_file(root.join("limit-thread-0")).unwrap();
+    AgentQueueService::run_worker(&tasks_dir).unwrap();
+    wait_for_jobs_to_end(&tasks_dir);
+    assert_eq!(mcp_calls(root, "t3_thread_launch").len(), 1, "one thread for the ticket");
+    let sends = mcp_calls(root, "t3_thread_send");
+    assert_eq!(sends.len(), 1, "{sends:?}");
+    assert_eq!(sends[0]["threadId"], "thread-0", "the retry's turn goes to the paused job's thread");
+    assert!(job_logs(&fixtures).contains("in the same T3 Code thread"), "{}", job_logs(&fixtures));
 }
 
 /// DEV-600: a queue entry held by an earlier job's T3 Code thread waited without a word, retrying every few hundred

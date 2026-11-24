@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:42:37.579831+00:00
-modified: 2026-11-25T05:40:04.669866+00:00
+modified: 2026-11-25T12:25:28.619349+00:00
 relationships:
   related:
   - DEV-824
@@ -138,6 +138,9 @@ comments:
       result: passed
       reason: no [scanning:open]; the other findings belong to other checks
     next: 'None: the count is 0 after CodeQL scanned 903809073'
+- date: 2026-11-25T12:25:28.619349+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-838 is assigned to @merge now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A689e19b6ca434ecd9efbb258cb37a9453c44b16777c05bb7706c7bbaf0460e43
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5d55e5c1efc528a26267f309fba529309fc5f8a5feb7af032cfcd079d3b7a35
@@ -273,3 +276,7 @@ history:
   - field: tags
     old: health, job-paused
     new: health
+- at: 2026-11-25T12:25:28.619349+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:45:46.748448+00:00
-modified: 2026-11-25T07:57:40.412527+00:00
+modified: 2026-11-25T12:25:29.396915+00:00
 relationships:
   depends_on:
   - DEV-767
@@ -231,6 +231,9 @@ comments:
     - command: npm run -s smoke
       result: passed
       reason: 118 files, 410 tests
+- date: 2026-11-25T12:25:29.396915+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-807 is assigned to @merge now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7634167f076e693f0f795dd8049d362219ce29257a5b94c01e6c6f883cf9fb6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb2a4fbb9313d916e73cdfd8edc690423c01f31b484b04aba6ba5dd7dfd467ce
@@ -557,3 +560,7 @@ history:
   - field: tags
     old: agent, ui, job-paused, review-returned
     new: agent, ui
+- at: 2026-11-25T12:25:29.396915+00:00
+  actor: automation
+  changes:
+  - field: comment_added

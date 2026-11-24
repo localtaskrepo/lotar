@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-24T23:28:36.963560+00:00
+modified: 2026-11-25T12:32:15.790228+00:00
 relationships:
   blocks:
   - DEV-782
@@ -86,6 +86,18 @@ comments:
     - Its `lotar serve` started a queue worker (own process group). The worker outlived the killed server and recreated `.tasks` in the removed `TempDir`. It leaked 4 out of 4 runs alone, with sccache already running.
     - Fix: `.env("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1")` on the serve command. Afterwards: 0 out of 3 alone, and a full `npm run -s test:agent` with an empty temp folder.
     - When you rebase, keep both fixes. They touch different files.
+- date: 2026-11-25T12:32:01.030376+00:00
+  author: claude
+  text: |-
+    Review: blocking. The dev732 test still leaves a folder in the temp folder in about half its runs.
+
+    - Read: `git diff main...HEAD` (`53c39bfc2`), the ticket and its comments, dev733 (the pattern the fix copies), the DEV-805 fix `1ebc9245a` on main, and `agent_queue_service.rs` (the worker's exit path).
+    - Reran: `npm ci` passed. `node --test scripts/tests/rust-test-runner.test.mjs` passed 48/48. Through the runner, a build error stops before the tests, as claimed.
+    - **Leak, `crates/lotar-lib/tests/dev732_worker_leaves_its_launchers_folder_test.rs:74-90`:** in 3 runs of `node scripts/rust-test-runner.mjs --agent -E 'test(/a_worker_started_from_another_folder/)'`, 1 failed with `tests left 1 entries in the temp folder: .lotar-test-scratch`. In 6 runs of `TMPDIR=<fresh> cargo nextest run -E 'test(/a_worker_started_from_another_folder/)'`, 3 left `.lotar-test-scratch/<pid>/.tmpXXXXXX/queue/agent-queue/queue-<hash>.json` with `"pending": []`. dev733 left nothing in 6 of 6 runs.
+    - **Cause, `crates/lotar-agent/src/services/agent_queue_service.rs:729-731`:** at exit the worker unlocks its worker lock and then calls `pending_count(tasks_dir)`. That goes through `with_locked_queue` (`:1143`), which runs `create_dir_all` and writes the queue file. `agent queue` reports `idle` as soon as the lock is free (`is_worker_running`, `:414`), so the test's wait ends before this last write, and the write recreates the removed `TempDir`. The same race exists in dev733; it just loses it less often.
+    - **Fix:** make the read-only `pending_count`, at least at worker exit, use `read_state` (`:1164`), which neither creates folders nor writes. A removed worktree's queue folder then stays removed in real use too. Add a test that runs the dev732 test, or the worker's exit, and checks that nothing is left. The alternative, waiting in the test for the worker process to end, leaves dev733 and other worker tests exposed.
+    - Fine as is: the `--no-run` step in `scripts/rust-test-runner.mjs:557-565` and its two tests. The second build finishes in about 0.1 s.
+    - Not run: a full `npm run -s test:agent` under load. The single test already shows that "Done" doesn't hold.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
@@ -97,6 +109,7 @@ tags:
 - health
 - job-paused
 - fix-retried
+- review-returned
 custom_fields:
   finding: test:rust-temp-leftover
 history:
@@ -223,3 +236,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T12:32:01.030376+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:32:01.965793+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, job-paused, fix-retried
+    new: health, job-paused, fix-retried, review-blocked
+- at: 2026-11-25T12:32:15.790228+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, job-paused, fix-retried, review-blocked
+    new: health, job-paused, fix-retried, review-returned

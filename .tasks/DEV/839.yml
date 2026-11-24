@@ -1,14 +1,15 @@
 title: 'betterleaks: tests/fixtures/agent-streams/copilot-edit.jsonl apiCallId values match generic-api-key'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T16:42:38.212660+00:00
-modified: 2026-11-24T22:26:25.598652+00:00
+modified: 2026-11-25T12:35:56.578615+00:00
 relationships:
   related:
   - DEV-503
+  - DEV-519
 comments:
 - date: 2026-11-24T19:12:36.503135+00:00
   author: automation
@@ -60,6 +61,18 @@ comments:
       result: not_run
       reason: config-only change, the merge runs the suites
     next: Review, then the merge agent lands 53fd47716 and reruns the betterleaks sweep on main
+- date: 2026-11-25T12:35:47.678327+00:00
+  author: claude
+  text: |-
+    Review: passed. Commit `53fd47716` does what "Done when" asks: the history sweep reports no leaks, and the allowlist is narrow and has a comment.
+
+    - Read: the diff (only `.gitleaks.toml`, +11 lines), the ticket and its comments, related DEV-503 and DEV-519, AGENTS.md, and the recent history of `.gitleaks.toml` on main. Main hasn't changed the file since, so the commit rebases cleanly
+    - DEV-519 removed an older allowlist for the whole directory, which named the `crates/lotar-lib/...` path. The new one covers the old `tests/fixtures/...` path, and only `generic-api-key` on `apiCallId` matches. It doesn't contradict DEV-519
+    - Standards `configs/gitleaks/base.toml`: "Allowlists stay in each repo, narrow and documented". Lines 1-41 still match the shared base apart from the copy header
+    - Reran `betterleaks git --config .gitleaks.toml --redact .` (betterleaks 1.10.1): no leaks. With main's config: 8 leaks
+    - My own scratch-repo test: an `apiCallId` in the fixture dir is allowed. The same value in `other/`, an `apiKey` key in the fixture dir, and a `token` next to an allowed `apiCallId` on the same line all still fire
+    - `npm ci` ran. lint, test and smoke weren't rerun: this is a scanner config change and the merge runs them
+    - No findings, no tickets filed, no stray files. No durable guidance finding
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb05412bdd614deae4fbbce7434e92817be71817849e10680d39089e3c7ef9cd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A246b69a28e09213bdf866f311ded790e80b05882e8b28b3e2357cb1e2843d10e
@@ -135,3 +148,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T12:35:47.678327+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:35:48.799441+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-503"]}'
+    new: '{"related":["DEV-503","DEV-519"]}'
+- at: 2026-11-25T12:35:56.578615+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

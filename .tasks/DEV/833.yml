@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:04:39.624520+00:00
-modified: 2026-11-25T09:13:47.839277+00:00
+modified: 2026-11-25T12:29:44.321446+00:00
 relationships:
   related:
   - DEV-800
@@ -161,6 +161,9 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-25T12:29:44.321446+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-833 is assigned to @merge now.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad283ffe4e392d92106338ccab22b08a4b58c2c5b994c8bd7ae8f3843fcb2a4ab
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6ec0824c6fa32269749b2e873e5be78b09bbec46fad2a03e83785b28054990f0
@@ -324,6 +327,10 @@ history:
     old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843","DEV-740","DEV-767","DEV-770","DEV-774"]}'
     new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843","DEV-740","DEV-767","DEV-770","DEV-774","DEV-805"]}'
 - at: 2026-11-25T09:13:47.839277+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:29:44.321446+00:00
   actor: automation
   changes:
   - field: comment_added
