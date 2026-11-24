@@ -85,6 +85,21 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
 
+    // GET /api/jobs/t3-thread -> a t3 job's T3 Code thread and its state now (DEV-849)
+
+    api_server.register_handler("GET", "/api/jobs/t3-thread", |req: &HttpRequest| {
+        let id = match req.query.get("id") {
+            Some(v) if !v.trim().is_empty() => v.clone(),
+            _ => return bad_request("Missing job id".into()),
+        };
+        let resolver = try_response!(resolve_tasks_dir());
+        match crate::services::agent_job_service::AgentJobService::t3_thread_in(&resolver.path, &id) {
+            Some(Ok(thread)) => ok_json(200, json!({"data": {"thread": thread}})),
+            Some(Err(err)) => bad_request(err),
+            None => not_found(format!("Job '{}' not found", id)),
+        }
+    });
+
     // POST /api/jobs/cancel -> cancel agent job
 
     api_server.register_handler("POST", "/api/jobs/cancel", |req: &HttpRequest| {

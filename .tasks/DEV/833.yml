@@ -1,11 +1,11 @@
 title: 'Agent jobs: a ticket paused on a usage limit resumes as several sessions at once in one worktree'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:04:39.624520+00:00
-modified: 2026-11-25T12:29:44.321446+00:00
+modified: 2026-11-25T12:42:12.466652+00:00
 relationships:
   related:
   - DEV-800
@@ -27,6 +27,8 @@ relationships:
   - DEV-770
   - DEV-774
   - DEV-805
+  - DEV-827
+  - DEV-835
 comments:
 - date: 2026-11-24T16:05:45.622823+00:00
   author: claude
@@ -164,13 +166,40 @@ comments:
 - date: 2026-11-25T12:29:44.321446+00:00
   author: automation
   text: 'The queued @review job didn''t start: DEV-833 is assigned to @merge now.'
+- date: 2026-11-25T12:38:49.373690+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `46fb767aa` on `main`.
+
+    - lotar's merge stopped on `test:agent`: 7 UI tests failed because vitest workers timed out (`Timeout waiting for worker to respond`) under load ~25. The fix changes no UI.
+    - My UI rerun waited 90 min for the machine's check lock (held by DEV-827's Rust suite) and gave up. The next rerun passed: 1598/1598.
+    - Main moved on (DEV-827 `5e53e427c`). The rebase was clean and `package-lock.json` is unchanged, so I skipped `npm ci`. All checks reran on `e9d1344c3`: `lint:agent`, `test:agent` (Rust 2503/2503, UI 1598/1598, release, hooks) and `smoke` (410/410) passed.
+    - Fast-forwarded the main checkout, amended the pending `.tasks` changes into the commit and pushed `5e53e427c..46fb767aa`.
+    - No rules or configs changed, so no `lotar trust`.
+    - Live check: no job worktree has more than one claude session now. The proof needs the released binary.
+  report:
+    commits:
+    - hash: 46fb767aa
+      what: retry after a usage limit continues the paused job's T3 Code thread (rebased onto DEV-827, .tasks amended in)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: rerun on e9d1344c3; first run's 7 UI failures were vitest workers that never started under load ~25, UI rerun 1598/1598
+    - command: npm run -s smoke
+      result: passed
+      reason: 410/410
+    - command: ps/lsof one session per worktree
+      result: passed
+      reason: no worktree has more than one claude session now; the fixed binary isn't released yet
+    next: 'Release: queued retries from the old binary still open a new thread'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad283ffe4e392d92106338ccab22b08a4b58c2c5b994c8bd7ae8f3843fcb2a4ab
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6ec0824c6fa32269749b2e873e5be78b09bbec46fad2a03e83785b28054990f0
 description: 'Found: at the 2026-11-24 08:00 limit reset, 4 Claude sessions of T3 Code (pids 89463, 89961, 1066, 93866, each --add-dir the DEV-800 worktree, 3 of them --resume of earlier threads) worked on DEV-800 at the same time and edited the same files (two added the same FINDING_BUNDLE_FIELD constant twice in crates/lotar-core/src/utils/custom_fields.rs). The hourly retries while paused (sessions lotar-95e687-DEV-800-fix.20261123T091544Z .. T181801Z) seem to each come back. Check: ps aux | grep claude, lsof -a -p <pid> -d cwd: more than one session per job worktree. Done: one ticket resumes as one session.'
 tags:
 - health
-- job-paused
 custom_fields:
   finding: agent-jobs:paused-resume-duplicates
 history:
@@ -334,3 +363,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T12:38:49.373690+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:38:50.302325+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843","DEV-740","DEV-767","DEV-770","DEV-774","DEV-805"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843","DEV-740","DEV-767","DEV-770","DEV-774","DEV-805","DEV-827"]}'
+- at: 2026-11-25T12:39:04.466254+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health
+- at: 2026-11-25T12:42:12.466652+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843","DEV-740","DEV-767","DEV-770","DEV-774","DEV-805","DEV-827"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843","DEV-740","DEV-767","DEV-770","DEV-774","DEV-805","DEV-827","DEV-835"]}'

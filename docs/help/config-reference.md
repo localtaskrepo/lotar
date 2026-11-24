@@ -7,7 +7,7 @@ CLI > env > project > home > global > defaults (commands without a project skip 
 
 ## Canonical keys (nested)
 - server.port: number (default 8080)
-- server.public_url: string (unset by default) — the address people open the web UI at, like `https://lotar.example.com`. When set, `lotar show` and `lotar add` print each ticket's link `<public_url>/task/<ID>` (the link the web UI's "copy link" builds), and the task JSON of `show`, `add`, `list`, REST and MCP has it as `url`. Unset, no link is printed or returned. It must start with `http://` or `https://` and have no `?` or `#`; a trailing `/` is dropped.
+- server.public_url: string (unset by default) — the address people open the web UI at, like `https://lotar.example.com`. When set, `lotar show` and `lotar add` print each ticket's link `<public_url>/task/<ID>` (the link the web UI's "copy link" builds), the task JSON of `show`, `add`, `list`, REST and MCP has it as `url`, and an agent job's prompt has it as `- Link:` under the ticket's ID (so a T3 Code thread links back to its ticket). Unset, no link is printed or returned. It must start with `http://` or `https://` and have no `?` or `#`; a trailing `/` is dropped.
 - default.project: string (default project prefix)
 - default.assignee: string
 - default.reporter: string

@@ -1,15 +1,32 @@
 title: Tests leave lotar agent workers and wait loops running after the test run ends
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-25T02:10:53.945390+00:00
+modified: 2026-11-25T13:39:50.915818+00:00
 relationships:
   related:
   - DEV-767
-description: 'Found 2026-11-24 18:10 PST: 12 orphaned processes under /var/folders/*/T/lotar-rust-temp-*/.lotar-test-scratch/, from 4 test runs whose cargo test process had exited (oldest from 2026-11-22 18:18, DEV-767''s job worktree). Each run left a ''lotar --tasks-dir <scratch>/.tasks agent worker'' (ppid 1) plus its job shell, a ''sh -c ... while [ ! -f <scratch>/release ]; do sleep 0.05; done'' loop that forks sleep about 20 times a second until reboot. Tests that start a worker or a job with a release file must stop the worker and remove or release the loops on drop, also when the test fails or times out. Killed by the chief of staff with the owner''s OK (2026-11-22, ''Kill and file'').'
+comments:
+- date: 2026-11-25T13:39:50.915818+00:00
+  author: automation
+  text: The fix agent's job job-20261125T124326.639Z-150 failed (lotar agent logs job-20261125T124326.639Z-150); @fix-retry retries it on branch agent/DEV-861.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
+description: |-
+  Found 2026-11-24 18:10 PST: 12 orphaned processes under /var/folders/*/T/lotar-rust-temp-*/.lotar-test-scratch/, from 4 test runs whose cargo test process had exited (oldest from 2026-11-22 18:18, DEV-767's job worktree). Each run left a 'lotar --tasks-dir <scratch>/.tasks agent worker' (ppid 1) plus its job shell, a 'sh -c ... while [ ! -f <scratch>/release ]; do sleep 0.05; done' loop that forks sleep about 20 times a second until reboot. Tests that start a worker or a job with a release file must stop the worker and remove or release the loops on drop, also when the test fails or times out. Killed by the chief of staff with the owner's OK (2026-11-22, 'Kill and file').
+
+  ## Done when
+
+  - [ ] Every test job or fake-git loop that waits for a release file (`while [ ! -f ... ]` with no bound) in `crates/lotar-lib/tests` also ends as soon as the test process is gone (`common::while_this_test_runs()`), whichever comes first: the release file or the test's end.
+  - [ ] This holds when the test passes, fails, panics in a drop, or nextest kills it on a timeout: no Drop needs to run.
+  - [ ] With its loops ended, a detached `lotar agent worker` has no running job and exits on its own (its existing idle exit); queued entries it still starts end at once for the same reason.
+  - [ ] A test shows a loop built with the helper ends once its owning process is gone, without the release file.
+  - [ ] The changed tests still pass (targeted nextest run).
+tags:
+- fix-retried
 history:
 - at: 2026-11-25T02:10:53.640703+00:00
   actor: claude
@@ -22,3 +39,42 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T12:43:42.796610+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T12:43:43.365423+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
+- at: 2026-11-25T12:44:53.407749+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found 2026-11-24 18:10 PST: 12 orphaned processes under /var/folders/*/T/lotar-rust-temp-*/.lotar-test-scratch/, from 4 test runs whose cargo test process had exited (oldest from 2026-11-22 18:18, DEV-767''s job worktree). Each run left a ''lotar --tasks-dir <scratch>/.tasks agent worker'' (ppid 1) plus its job shell, a ''sh -c ... while [ ! -f <scratch>/release ]; do sleep 0.05; done'' loop that forks sleep about 20 times a second until reboot. Tests that start a worker or a job with a release file must stop the worker and remove or release the loops on drop, also when the test fails or times out. Killed by the chief of staff with the owner''s OK (2026-11-22, ''Kill and file'').'
+    new: |-
+      Found 2026-11-24 18:10 PST: 12 orphaned processes under /var/folders/*/T/lotar-rust-temp-*/.lotar-test-scratch/, from 4 test runs whose cargo test process had exited (oldest from 2026-11-22 18:18, DEV-767's job worktree). Each run left a 'lotar --tasks-dir <scratch>/.tasks agent worker' (ppid 1) plus its job shell, a 'sh -c ... while [ ! -f <scratch>/release ]; do sleep 0.05; done' loop that forks sleep about 20 times a second until reboot. Tests that start a worker or a job with a release file must stop the worker and remove or release the loops on drop, also when the test fails or times out. Killed by the chief of staff with the owner's OK (2026-11-22, 'Kill and file').
+
+      ## Done when
+
+      - [ ] Every test job or fake-git loop that waits for a release file (`while [ ! -f ... ]` with no bound) in `crates/lotar-lib/tests` also ends as soon as the test process is gone (`common::while_this_test_runs()`), whichever comes first: the release file or the test's end.
+      - [ ] This holds when the test passes, fails, panics in a drop, or nextest kills it on a timeout: no Drop needs to run.
+      - [ ] With its loops ended, a detached `lotar agent worker` has no running job and exits on its own (its existing idle exit); queued entries it still starts end at once for the same reason.
+      - [ ] A test shows a loop built with the helper ends once its owning process is gone, without the release file.
+      - [ ] The changed tests still pass (targeted nextest run).
+- at: 2026-11-25T13:39:50.214371+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-25T13:39:50.915818+00:00
+  actor: automation
+  changes:
+  - field: comment_added

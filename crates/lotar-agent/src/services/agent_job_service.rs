@@ -31,6 +31,7 @@ mod kept;
 mod merge;
 mod resumed;
 mod run_inputs;
+mod t3_state;
 mod tools;
 mod watch;
 
@@ -1463,6 +1464,10 @@ fn build_prompt(
     out.section("Ticket context");
     out.push_str("Ticket context:\n");
     out.push_str(&format!("- ID: {}\n", task.id));
+    // Every turn's prompt carries it, so a T3 Code thread links back to the ticket (DEV-849).
+    if let Some(url) = task.url.as_deref() {
+        out.push_str(&format!("- Link: {url}\n"));
+    }
     out.push_str(&format!("- Title: {}\n", task.title));
     out.push_str(&format!("- Status: {}\n", task.status));
     out.push_str(&format!("- Priority: {}\n", task.priority));
@@ -6669,6 +6674,15 @@ mod tests {
         let prompt = build_prompt(&task, "ship it", None, BRIEF, None, None, None).text;
         assert!(prompt.contains("TEST-1"));
         assert!(prompt.contains("ship it"));
+        assert!(!prompt.contains("- Link:"), "no public URL, no link: {prompt}");
+    }
+
+    /// DEV-849: with `server.public_url` set, the ticket context links the ticket, after its ID.
+    #[test]
+    fn build_prompt_links_the_ticket_when_a_public_url_is_set() {
+        let task = crate::api_types::TaskDTO { url: Some("https://lotar.example.com/task/TEST-1".to_string()), ..sample_task() };
+        let prompt = build_prompt(&task, "ship it", None, BRIEF, None, None, None).text;
+        assert!(prompt.contains("- ID: TEST-1\n- Link: https://lotar.example.com/task/TEST-1\n- Title: Test task\n"), "{prompt}");
     }
 
     #[test]

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:21:29.504789+00:00
-modified: 2026-11-25T05:05:56.774015+00:00
+modified: 2026-11-25T13:24:17.601610+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -241,6 +241,12 @@ comments:
     - **Not blocking, needs the owner (DEV-864):** "Health: start the fix agent" starts the fix agent as soon as a health ticket is created, and job_started sets `InProgress`. So a bundle usually takes no more findings after its first, and agent findings spread over the day still get about one ticket each. The tests pass because they run without these rules. Before standards switches to `--bundle health`, the owner should pick how bundles start their fix agent.
     - **Minor (DEV-863):** no test covers the merge's `finding_check`, before this change or after, and it now loops once per key (`merge.rs`, `fn finding_check`).
     - **Filed:** [DEV-864](https://lotar.pyxzl.net/task/DEV-864) (HelpNeeded, question to mallox), [DEV-863](https://lotar.pyxzl.net/task/DEV-863).
+- date: 2026-11-25T13:24:17.601610+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-800` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-800` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3ebf16ff34582047edf563b966469b7a92d4ed540d3faa3d9306e482871e5d3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3a03ec4dedd1c78405b0b9c07c48b204cac1cc5303fded5ca8cebf2acf89a9bd
@@ -663,5 +669,9 @@ history:
     new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834","DEV-798","DEV-824","DEV-863","DEV-864"]}'
 - at: 2026-11-25T05:05:56.774015+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T13:24:17.601610+00:00
+  actor: automation
   changes:
   - field: comment_added

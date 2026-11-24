@@ -249,6 +249,7 @@
               </div>
 
               <div v-if="isLogsOpen(job.id)" class="log-panel">
+                <AgentT3Thread v-if="job.runner === 't3'" :job-id="job.id" />
                 <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
                 <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
                 <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
@@ -332,6 +333,7 @@ import type {
 } from '../api/types'
 import AgentJobLog from '../components/AgentJobLog.vue'
 import AgentRunInputs from '../components/AgentRunInputs.vue'
+import AgentT3Thread from '../components/AgentT3Thread.vue'
 import AgentRunDialog from '../components/AgentRunDialog.vue'
 import AgentSetupPanel from '../components/AgentSetupPanel.vue'
 import MarkdownContent from '../components/MarkdownContent.vue'

@@ -54,6 +54,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/jobs/cancel-all -> { data: AgentJobCancelAllResponse }
 - GET  /api/jobs/logs?id=JOB_ID -> { data: AgentJobLogsResponse }; the whole thread: the job's saved log (each event keeps its live `sequence`) joined with the events this server holds
 - GET  /api/jobs/inputs?id=JOB_ID -> { data: AgentJobInputsResponse }; the prompt and settings the job's run started with, `inputs: null` when its log has none ([run inputs](agent.md#run-inputs))
+- GET  /api/jobs/t3-thread?id=JOB_ID -> { data: AgentJobT3ThreadResponse }; a `t3` job's T3 Code thread and its state now (`running`, `waiting`, `finished`, `failed`, `stopped`, `unknown`, `unavailable` with `reason`), apart from the job's status; 400 for other runners ([T3 Code threads](agent.md#t3-code-threads))
 - GET  /api/automation/show[?project=PREFIX] -> { data: AutomationInspectResponse }
 - POST /api/automation/set (AutomationSetRequest) -> { data: AutomationSetResponse }
 - POST /api/sprints/create (SprintCreateRequest) -> { data: SprintCreateResponse }; configured sprint defaults apply unless `skip_defaults: true` (see `applied_defaults`)

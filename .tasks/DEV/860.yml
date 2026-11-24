@@ -1,14 +1,20 @@
 title: 'An answer that sets an agent assignee starts no job: STD-336 sat on @fix with no job'
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-24T23:49:30.471883+00:00
-modified: 2026-11-24T23:49:31.080208+00:00
+modified: 2026-11-25T13:07:40.912522+00:00
 relationships:
   related:
   - DEV-576
+comments:
+- date: 2026-11-25T13:07:40.912522+00:00
+  author: automation
+  text: The fix agent's job job-20261125T124231.908Z-149 failed (lotar agent logs job-20261125T124231.908Z-149); @fix-retry retries it on branch agent/DEV-860.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae97157ffb604bb7fcfc52baba1b3bbc0834c21f614f80ba1935c9098e6ebea9f
 description: |-
   Found (STD-343): the triage answered STD-336's retry question with `lotar --tasks-dir ~/Development/standards/.tasks comment STD-336 --answer fix` at 2026-11-24 23:13Z. The option's set changed the assignee mallox -> @fix (timeline), but `lotar agent list-jobs` in standards shows no job between job-20261124T231242.639Z-51 (failed 23:12) and a manual restart at 23:46. Assigning an agent profile should start its job (DEV-576). A guess to check: `maybe_queue_agent_on_assignment` (crates/lotar-agent/src/services/automation_service.rs) only enqueues outside server mode and doesn't call `AgentQueueService::ensure_worker`, as `tell_agent` does; or the answer path skips it.
 
@@ -17,6 +23,7 @@ description: |-
   Done: the answer starts the job (or comments why it waits). standards' live check now restarts such a ticket (STD-343), so this is no longer a silent stall.
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: bug:answer-assign-no-job
 history:
@@ -31,3 +38,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T12:43:03.823327+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T12:43:04.631141+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae97157ffb604bb7fcfc52baba1b3bbc0834c21f614f80ba1935c9098e6ebea9f
+- at: 2026-11-25T13:07:40.331322+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-25T13:07:40.912522+00:00
+  actor: automation
+  changes:
+  - field: comment_added

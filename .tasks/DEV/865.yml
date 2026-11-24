@@ -1,14 +1,66 @@
 title: 'Agents page: top Queued takes the larger of this process''s queued jobs and the queue file''s tickets, the Queued tab adds them'
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T05:09:26.871873+00:00
-modified: 2026-11-25T05:09:27.580605+00:00
+modified: 2026-11-25T14:03:08.122942+00:00
 relationships:
   related:
   - DEV-798
+  - DEV-871
+comments:
+- date: 2026-11-25T14:02:58.149433+00:00
+  author: claude
+  text: |-
+    Queued now adds this process's queued jobs to the queue file's tickets, at the top and in the tab.
+
+    - `agent_queue_service.rs`: `queue_stats` adds the counts (new `combined_stats`, Rust test `queued_adds_this_process_jobs_to_the_queue_file_tickets`); running still takes the larger count, because the job records include this process's running jobs
+    - `AgentJobs.vue`: the Queued tab counts queued jobs + `queue.pending`. It no longer counts the jobs waiting for prerequisites, which the docs say "don't count as queued". The tab still lists them
+    - `AgentJobs.spec.ts`: 1 queued job + 3 tickets + 1 prerequisite job gives 4 at the top and 4 in the tab
+    - `docs/help/agent.md`: states the rule for the top count and the tab
+    - Browser check: scratch `lotar serve` with 1 running job, 1 queued job and 3 tickets in the queue file. Before: top 3, tab 4. After: 4 and 4 (screenshots attached: `before-*`/`after-*`, light/dark, 1920/1440/390)
+    - Not fixable here: `lotar agent queue` still says 3. The server's queued job exists only in the server's memory, and no other process can see it. I changed "Done when" to match and filed DEV-871
+    - Also seen, not changed: the wait reason reads "2 of the global max_parallel_jobs 1 running" while only 1 job runs
+  report:
+    commits:
+    - hash: 99ef012b3
+      what: Queued adds this process's queued jobs to the queue file's tickets; the tab counts the same
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(queued_adds) | test(each_waiting_entry)'
+      result: passed
+    - command: npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: 32 tests
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+      reason: no warnings
+    - command: npx vue-tsc --noEmit -p view
+      result: passed
+    - command: oxlint, eslint, prettier --check on changed files
+      result: passed
+    - command: browser check, scratch lotar serve, before and after
+      result: passed
+      reason: before 3 top / 4 tab, after 4 / 4
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: targeted checks only, the merge runs them (DEV-797)
+    next: Review; DEV-871 covers the CLI not seeing jobs queued in lotar serve's memory
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9ec040da7165f66ae7f20beab25592efd7239b25810382cf64cb6177d4cf70ed
+- attachment: after-dark-1440.f5c3d0549f2cecff8883f0c457c143a9.png
+- attachment: after-dark-1920.c92a8dba6f627115096f0408581d8d4f.png
+- attachment: after-dark-390.d4899576a45c6af045990a200625d32c.png
+- attachment: after-light-1440.531ba6befaa5f68d9083b8b693f429eb.png
+- attachment: after-light-1920.9f897c649a6bfb10547f4455a7a79ba6.png
+- attachment: after-light-390.2a9ebf670e8f4a9ca2d249e71a4ba287.png
+- attachment: before-dark-1440.4b80faa0451f7785db585d7bc16547b9.png
+- attachment: before-dark-1920.3c1be3beb02d428f36dc3462cf52015a.png
+- attachment: before-dark-390.81951b23d07c9b6b5724bfd23b0f76e3.png
+- attachment: before-light-1440.a61858ece3481bb2a4e288828960c2c6.png
+- attachment: before-light-1920.28407d10d3b9158c93b0cda9129b2cc8.png
+- attachment: before-light-390.4d1ab47afda6c5ec6bb2949d369efe6e.png
 description: |-
   Found in the review of DEV-798.
 
@@ -19,7 +71,16 @@ description: |-
 
   Check: 1 queued job in this process and 3 tickets in the queue file give the same Queued count at the top, in the tab and in `lotar agent queue`.
 
-  Done when: `queue_stats` adds the two counts (or the docs give the one rule both follow); a Rust test and a Vitest cover it.
+  ## Done when
+
+  One rule for every surface: Queued = this process's queued jobs + the tickets waiting in the queue file. Jobs waiting for prerequisites don't count (`docs/help/agent.md`: "Jobs waiting for prerequisites don't count as queued"); the tabs still list them.
+
+  - [ ] `AgentQueueService::queue_stats` adds the two counts instead of taking the larger: a server with 1 queued job and 3 queue-file tickets gives `queue_stats.queued` 4 in `GET /api/jobs`
+  - [ ] `lotar agent queue` follows the same rule in its own process, which has no queued jobs: it shows the 3 queue-file tickets. Jobs queued in another process's memory (`lotar serve`) aren't visible to it: follow-up ticket
+  - [ ] Agents page: the Queued tab counts this process's queued jobs + the queue's `pending` tickets, not the jobs waiting for prerequisites, so it equals the top Queued for the same response
+  - [ ] Without a queue overview in the response (`queue` missing), the tab counts this process's queued jobs only, as before
+  - [ ] `docs/help/agent.md` states the rule for the top count and the tab
+  - [ ] A Rust test (1 queued job in the registry + 3 pending entries → 4) and a Vitest (tab count = top count, prerequisites not counted) cover it
 tags:
 - ui
 history:
@@ -34,3 +95,170 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T13:55:15.322599+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T13:55:15.813177+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9ec040da7165f66ae7f20beab25592efd7239b25810382cf64cb6177d4cf70ed
+- at: 2026-11-25T13:56:18.771624+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-798.
+
+      - `crates/lotar-agent/src/services/agent_queue_service.rs:486`: `stats.queued = stats.queued.max(pending.len())` takes the larger count
+      - `view/pages/AgentJobs.vue:409`: the Queued tab adds this process's queued jobs to the queue file's waiting tickets
+      - The two lists don't overlap (`registry.pending_queue` holds jobs already started from the queue), so with 1 queued job and 3 waiting tickets the top shows 3 Queued and the tab shows 4
+      - `docs/help/agent.md` says the tab counts "as the Queued count at the top does"
+
+      Check: 1 queued job in this process and 3 tickets in the queue file give the same Queued count at the top, in the tab and in `lotar agent queue`.
+
+      Done when: `queue_stats` adds the two counts (or the docs give the one rule both follow); a Rust test and a Vitest cover it.
+    new: |-
+      Found in the review of DEV-798.
+
+      - `crates/lotar-agent/src/services/agent_queue_service.rs:486`: `stats.queued = stats.queued.max(pending.len())` takes the larger count
+      - `view/pages/AgentJobs.vue:409`: the Queued tab adds this process's queued jobs to the queue file's waiting tickets
+      - The two lists don't overlap (`registry.pending_queue` holds jobs already started from the queue), so with 1 queued job and 3 waiting tickets the top shows 3 Queued and the tab shows 4
+      - `docs/help/agent.md` says the tab counts "as the Queued count at the top does"
+
+      Check: 1 queued job in this process and 3 tickets in the queue file give the same Queued count at the top, in the tab and in `lotar agent queue`.
+
+      ## Done when
+
+      One rule for every surface: Queued = this process's queued jobs + the tickets waiting in the queue file. Jobs waiting for prerequisites don't count (`docs/help/agent.md`: "Jobs waiting for prerequisites don't count as queued"); the tabs still list them.
+
+      - [ ] `AgentQueueService::queue_stats` adds the two counts instead of taking the larger: 1 queued job + 3 queue-file tickets give `queued` 4 in `lotar agent queue` (text and `queued_jobs` in JSON) and `GET /api/jobs` `queue_stats`
+      - [ ] Agents page: the Queued tab counts this process's queued jobs + the queue's `pending` tickets, not the jobs waiting for prerequisites, so it equals the top Queued for the same response
+      - [ ] Without a queue overview in the response (`queue` missing), the tab counts this process's queued jobs only, as before
+      - [ ] `docs/help/agent.md` states the rule for the top count and the tab
+      - [ ] A Rust test (1 queued job in the registry + 3 pending entries → 4) and a Vitest (tab count = top count, prerequisites not counted) cover it
+- at: 2026-11-25T14:02:30.750703+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-798.
+
+      - `crates/lotar-agent/src/services/agent_queue_service.rs:486`: `stats.queued = stats.queued.max(pending.len())` takes the larger count
+      - `view/pages/AgentJobs.vue:409`: the Queued tab adds this process's queued jobs to the queue file's waiting tickets
+      - The two lists don't overlap (`registry.pending_queue` holds jobs already started from the queue), so with 1 queued job and 3 waiting tickets the top shows 3 Queued and the tab shows 4
+      - `docs/help/agent.md` says the tab counts "as the Queued count at the top does"
+
+      Check: 1 queued job in this process and 3 tickets in the queue file give the same Queued count at the top, in the tab and in `lotar agent queue`.
+
+      ## Done when
+
+      One rule for every surface: Queued = this process's queued jobs + the tickets waiting in the queue file. Jobs waiting for prerequisites don't count (`docs/help/agent.md`: "Jobs waiting for prerequisites don't count as queued"); the tabs still list them.
+
+      - [ ] `AgentQueueService::queue_stats` adds the two counts instead of taking the larger: 1 queued job + 3 queue-file tickets give `queued` 4 in `lotar agent queue` (text and `queued_jobs` in JSON) and `GET /api/jobs` `queue_stats`
+      - [ ] Agents page: the Queued tab counts this process's queued jobs + the queue's `pending` tickets, not the jobs waiting for prerequisites, so it equals the top Queued for the same response
+      - [ ] Without a queue overview in the response (`queue` missing), the tab counts this process's queued jobs only, as before
+      - [ ] `docs/help/agent.md` states the rule for the top count and the tab
+      - [ ] A Rust test (1 queued job in the registry + 3 pending entries → 4) and a Vitest (tab count = top count, prerequisites not counted) cover it
+    new: |-
+      Found in the review of DEV-798.
+
+      - `crates/lotar-agent/src/services/agent_queue_service.rs:486`: `stats.queued = stats.queued.max(pending.len())` takes the larger count
+      - `view/pages/AgentJobs.vue:409`: the Queued tab adds this process's queued jobs to the queue file's waiting tickets
+      - The two lists don't overlap (`registry.pending_queue` holds jobs already started from the queue), so with 1 queued job and 3 waiting tickets the top shows 3 Queued and the tab shows 4
+      - `docs/help/agent.md` says the tab counts "as the Queued count at the top does"
+
+      Check: 1 queued job in this process and 3 tickets in the queue file give the same Queued count at the top, in the tab and in `lotar agent queue`.
+
+      ## Done when
+
+      One rule for every surface: Queued = this process's queued jobs + the tickets waiting in the queue file. Jobs waiting for prerequisites don't count (`docs/help/agent.md`: "Jobs waiting for prerequisites don't count as queued"); the tabs still list them.
+
+      - [ ] `AgentQueueService::queue_stats` adds the two counts instead of taking the larger: a server with 1 queued job and 3 queue-file tickets gives `queue_stats.queued` 4 in `GET /api/jobs`
+      - [ ] `lotar agent queue` follows the same rule in its own process, which has no queued jobs: it shows the 3 queue-file tickets. Jobs queued in another process's memory (`lotar serve`) aren't visible to it: follow-up ticket
+      - [ ] Agents page: the Queued tab counts this process's queued jobs + the queue's `pending` tickets, not the jobs waiting for prerequisites, so it equals the top Queued for the same response
+      - [ ] Without a queue overview in the response (`queue` missing), the tab counts this process's queued jobs only, as before
+      - [ ] `docs/help/agent.md` states the rule for the top count and the tab
+      - [ ] A Rust test (1 queued job in the registry + 3 pending entries → 4) and a Vitest (tab count = top count, prerequisites not counted) cover it
+- at: 2026-11-25T14:02:31.097428+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-798"]}'
+    new: '{"related":["DEV-798","DEV-871"]}'
+- at: 2026-11-25T14:02:46.613919+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1440.f5c3d0549f2cecff8883f0c457c143a9.png
+- at: 2026-11-25T14:02:46.659965+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1920.c92a8dba6f627115096f0408581d8d4f.png
+- at: 2026-11-25T14:02:46.705103+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-390.d4899576a45c6af045990a200625d32c.png
+- at: 2026-11-25T14:02:46.752836+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1440.531ba6befaa5f68d9083b8b693f429eb.png
+- at: 2026-11-25T14:02:46.802430+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1920.9f897c649a6bfb10547f4455a7a79ba6.png
+- at: 2026-11-25T14:02:46.849378+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-390.2a9ebf670e8f4a9ca2d249e71a4ba287.png
+- at: 2026-11-25T14:02:46.894110+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1440.4b80faa0451f7785db585d7bc16547b9.png
+- at: 2026-11-25T14:02:46.939812+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1920.3c1be3beb02d428f36dc3462cf52015a.png
+- at: 2026-11-25T14:02:46.983874+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-390.81951b23d07c9b6b5724bfd23b0f76e3.png
+- at: 2026-11-25T14:02:47.026414+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1440.a61858ece3481bb2a4e288828960c2c6.png
+- at: 2026-11-25T14:02:47.070911+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1920.28407d10d3b9158c93b0cda9129b2cc8.png
+- at: 2026-11-25T14:02:47.115704+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-390.4d1ab47afda6c5ec6bb2949d369efe6e.png
+- at: 2026-11-25T14:02:58.149433+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T14:03:08.122942+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,15 +1,47 @@
 title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-25T02:16:34.607507+00:00
+modified: 2026-11-25T13:24:09.600579+00:00
+comments:
+- date: 2026-11-25T13:24:09.600579+00:00
+  author: automation
+  text: The fix agent's job job-20261125T130744.230Z-151 failed (lotar agent logs job-20261125T130744.230Z-151); @fix-retry retries it on branch agent/DEV-862.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
 description: 'Owner 2026-11-24: "maybe that''s a trigger we should have in general when we run out of credit, that there''s a cleanup process"; he picked ''File both''. Nothing on the Mac stores the Claude five-hour window''s usage or reset time: T3 shows it (18:00 on 2026-11-24) but saves it nowhere, the claude CLI has no usage command. lotar''s jobs run Claude through the Agent SDK/ACP and get its rate-limit events (used share, resetsAt); Codex reports account/rateLimits. Save the newest reading per provider (and account) where scripts can read it, and show it with `lotar usage` (--format json): provider, used percent per window, resets_at, read_at. Standards'' out-of-credit schedule builds on it.'
+tags:
+- fix-retried
 history:
 - at: 2026-11-25T02:16:34.607507+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T13:07:48.220596+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T13:07:48.897841+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
+- at: 2026-11-25T13:24:09.024327+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-25T13:24:09.600579+00:00
+  actor: automation
+  changes:
+  - field: comment_added

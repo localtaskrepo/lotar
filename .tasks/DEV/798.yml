@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T19:10:25.728494+00:00
-modified: 2026-11-25T05:09:55.768629+00:00
+modified: 2026-11-25T14:06:27.841690+00:00
 relationships:
   depends_on:
   - DEV-771
@@ -212,6 +212,38 @@ comments:
     - `npm ci` passed. `npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobs.spec.ts`: 33 passed. With the old `AgentJobs.vue`, the new test fails (`expected '0' to be '4'`), so the test proves the bug. The file is restored and the tree is clean
     - My own screenshots (Vite UI with a mocked `/api/jobs` in the ticket's state, scratch `lotar serve` for the rest): light and dark at 1920, 1440 and 390 px all show tabs `All 4 · Running 0 · Queued 3` and top `3 Queued`. No visible problems
     - Minor, filed: [DEV-865](https://lotar.pyxzl.net/task/DEV-865). The top Queued takes the larger of this process's queued jobs and the queue file's tickets (`agent_queue_service.rs:486`), while the tab adds them. With jobs and tickets both waiting, the help's "as the top does" stops holding. This predates DEV-798
+- date: 2026-11-25T14:06:21.359218+00:00
+  author: claude
+  text: |-
+    Rework: the screenshot finding is fixed; the 12 before/after screenshots are attached. The code is unchanged, so the commit stays `42046bfde` and there was nothing to amend.
+
+    - Review read `42046bfde`, which is HEAD
+    - State as the ticket's check: 3 waiting tickets, 1 prerequisite wait, no jobs (Vite UI with a mocked `/api/jobs`, scratch `lotar serve` for the rest). Before = `AgentJobs.vue` from `42046bfde~1`, restored afterwards; tree clean
+    - **Before** (all 6): tabs `All 0 · Running 0 · Queued 4`, top `3 Queued`
+    - **After** (all 6): tabs `All 4 · Running 0 · Queued 3`, top `3 Queued`; I looked at light 1440 and dark 390: no layout problems
+    - Before: ![light 1920](attachment:DEV-798-before-light-1920.361d76984342d15b1f044ee238039337.png) ![light 1440](attachment:DEV-798-before-light-1440.dac20d65b31cc280d27743fe3eefa0f7.png) ![light 390](attachment:DEV-798-before-light-390.eac4b5842492c155156f266da1b5623b.png) ![dark 1920](attachment:DEV-798-before-dark-1920.846e23c5170f5e29de97ffed56204f62.png) ![dark 1440](attachment:DEV-798-before-dark-1440.948e0240a29f2f54749b9997edd51a29.png) ![dark 390](attachment:DEV-798-before-dark-390.43c8239febbabe5cd422830f3df59ab7.png)
+    - After: ![light 1920](attachment:DEV-798-after-light-1920.4c3d8f3254f68462472bd0e4b360b24e.png) ![light 1440](attachment:DEV-798-after-light-1440.3c1cdb7d65fa93fb7c8c62f090d56f12.png) ![light 390](attachment:DEV-798-after-light-390.84d31853286018bd233386617481fc81.png) ![dark 1920](attachment:DEV-798-after-dark-1920.dd45c44dc1cea0c8f428f062dd641af5.png) ![dark 1440](attachment:DEV-798-after-dark-1440.58655bd05ff2063e8dbddb1bc0216d2e.png) ![dark 390](attachment:DEV-798-after-dark-390.5802e01bdcd7db0bcbf83ce1efc3ab13.png)
+  report:
+    commits:
+    - hash: 42046bfde
+      what: tab counts follow the top Queued rule (unchanged this round)
+    checks:
+    - command: npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: 33 tests
+    - command: screenshots before/after, light/dark, 1920/1440/390
+      result: passed
+      reason: 12 attached
+    - command: npm run lint
+      result: not_run
+      reason: no code changed this round; the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: no code changed this round
+    - command: npm run smoke
+      result: not_run
+      reason: no code changed this round
+    next: 'Review again: screenshots attached, code unchanged'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f2cf92fa6872f2c564eefe71cdf3f838044e29cd640d405d056eb3a11d82d3b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77140068723ec150f5d9f0e01ad962d4aec2578c1a4725d7c5a0232c48bd8cb2
@@ -226,6 +258,19 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A079172024a173c373d791497ba374852d2b9b0b779b3335146bc36a1a1ec12e4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac47d5ee5c8bb1759be217289abeea4d2be3375a1e2c6cf86b7c3acf44f504a95
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A282af62e1ae24b4eccf7996593c756fff4c82446c2912aa5247507b28b08df17
+- attachment: DEV-798-before-light-1920.361d76984342d15b1f044ee238039337.png
+- attachment: DEV-798-before-light-1440.dac20d65b31cc280d27743fe3eefa0f7.png
+- attachment: DEV-798-before-light-390.eac4b5842492c155156f266da1b5623b.png
+- attachment: DEV-798-before-dark-1920.846e23c5170f5e29de97ffed56204f62.png
+- attachment: DEV-798-before-dark-1440.948e0240a29f2f54749b9997edd51a29.png
+- attachment: DEV-798-before-dark-390.43c8239febbabe5cd422830f3df59ab7.png
+- attachment: DEV-798-after-light-1920.4c3d8f3254f68462472bd0e4b360b24e.png
+- attachment: DEV-798-after-light-1440.3c1cdb7d65fa93fb7c8c62f090d56f12.png
+- attachment: DEV-798-after-light-390.84d31853286018bd233386617481fc81.png
+- attachment: DEV-798-after-dark-1920.dd45c44dc1cea0c8f428f062dd641af5.png
+- attachment: DEV-798-after-dark-1440.58655bd05ff2063e8dbddb1bc0216d2e.png
+- attachment: DEV-798-after-dark-390.5802e01bdcd7db0bcbf83ce1efc3ab13.png
 description: |-
   Found in the review of DEV-771 (branch agent/DEV-771, 3333807b1): with 3 tickets in the on-disk queue the All tab shows 'All 0' above the **Waiting in the queue** card listing them (view/pages/AgentJobs.vue:401 counts jobs only). The Queued tab counts jobs waiting for prerequisites too (AgentJobs.vue:406), while the Queued count at the top and docs/help/agent.md say they don't count as queued.
 
@@ -556,3 +601,87 @@ history:
   - field: tags
     old: ui, job-paused, fix-retried, review-blocked
     new: ui, job-paused, fix-retried, review-returned
+- at: 2026-11-25T14:03:12.962288+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T14:03:13.535374+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A282af62e1ae24b4eccf7996593c756fff4c82446c2912aa5247507b28b08df17
+- at: 2026-11-25T14:05:54.351737+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-before-light-1920.361d76984342d15b1f044ee238039337.png
+- at: 2026-11-25T14:05:54.407134+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-before-light-1440.dac20d65b31cc280d27743fe3eefa0f7.png
+- at: 2026-11-25T14:05:54.457027+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-before-light-390.eac4b5842492c155156f266da1b5623b.png
+- at: 2026-11-25T14:05:54.504720+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-before-dark-1920.846e23c5170f5e29de97ffed56204f62.png
+- at: 2026-11-25T14:05:54.553236+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-before-dark-1440.948e0240a29f2f54749b9997edd51a29.png
+- at: 2026-11-25T14:05:54.604593+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-before-dark-390.43c8239febbabe5cd422830f3df59ab7.png
+- at: 2026-11-25T14:05:54.655909+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-after-light-1920.4c3d8f3254f68462472bd0e4b360b24e.png
+- at: 2026-11-25T14:05:54.706615+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-after-light-1440.3c1cdb7d65fa93fb7c8c62f090d56f12.png
+- at: 2026-11-25T14:05:54.756759+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-after-light-390.84d31853286018bd233386617481fc81.png
+- at: 2026-11-25T14:05:54.805949+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-after-dark-1920.dd45c44dc1cea0c8f428f062dd641af5.png
+- at: 2026-11-25T14:05:54.863230+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-after-dark-1440.58655bd05ff2063e8dbddb1bc0216d2e.png
+- at: 2026-11-25T14:05:54.913859+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-798-after-dark-390.5802e01bdcd7db0bcbf83ce1efc3ab13.png
+- at: 2026-11-25T14:06:21.359218+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T14:06:27.841690+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

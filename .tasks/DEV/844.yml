@@ -1,11 +1,11 @@
 title: 'docs/help/trust.md: the sentence on a run skipped while lotar trust replays is missing its verb'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T17:30:03.578015+00:00
-modified: 2026-11-24T23:42:05.577765+00:00
+modified: 2026-11-25T12:43:25.882295+00:00
 relationships:
   depends_on:
   - DEV-821
@@ -29,13 +29,46 @@ comments:
 - date: 2026-11-24T22:14:05.869138+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-821. It starts once they are done.'
+- date: 2026-11-25T12:43:17.054561+00:00
+  author: claude
+  text: |-
+    Fixed: the sentence now says the run "is replayed right after its skip is recorded".
+
+    - DEV-821 is on main; rebased `agent/DEV-844` onto `46fb767aa`
+    - `docs/help/trust.md:45` matches `automation_service.rs` (replays after `report_skipped_run`, DEV-821)
+    - Added a "## Done when" section to the description
+  report:
+    commits:
+    - hash: 5729f3ceb
+      what: docs/help/trust.md sentence gets its verb
+    checks:
+    - command: npx prettier --check docs/help/trust.md
+      result: passed
+    - command: grep -rn 'already replaying' docs
+      result: passed
+      reason: only the fixed line
+    - command: npm run lint
+      result: not_run
+      reason: docs-only, the merge runs it
+    - command: npm test
+      result: not_run
+      reason: docs-only
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b6334253d092bdb815a9d1ea20b967ac4eb05f37759228370c057cc8771dd06
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac453b498fe330d5e1884e94989ba616bf8ec22980d0162e238ebb1c3c9c827df
-description: 'Found in the DEV-821 review: docs/help/trust.md:45 reads ''A run skipped while `lotar trust` was already replaying runs right after its skip is recorded.'' It means: such a run is replayed right after its skip is recorded (crates/lotar-agent/src/services/automation_service.rs:2668). Done when the sentence says that.'
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5edee8e588ed26789db25142ef7eb97f6a65979f35e2bc5984bfee9529e513b1
+description: |-
+  Found in the DEV-821 review: docs/help/trust.md:45 reads 'A run skipped while `lotar trust` was already replaying runs right after its skip is recorded.' It means: such a run is replayed right after its skip is recorded (crates/lotar-agent/src/services/automation_service.rs, after report_skipped_run: DEV-821).
+
+  ## Done when
+  - [ ] `docs/help/trust.md` Skipped runs section reads: "A run skipped while `lotar trust` was already replaying runs is replayed right after its skip is recorded."
+  - [ ] No other doc carries the old wording (`grep -rn 'already replaying' docs`).
 tags:
 - job-paused
-- waits
 history:
 - at: 2026-11-24T17:30:04.341226+00:00
   actor: claude
@@ -104,3 +137,38 @@ history:
   - field: status
     old: Blocked
     new: InProgress
+- at: 2026-11-25T12:42:29.433136+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5edee8e588ed26789db25142ef7eb97f6a65979f35e2bc5984bfee9529e513b1
+- at: 2026-11-25T12:43:04.570709+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found in the DEV-821 review: docs/help/trust.md:45 reads ''A run skipped while `lotar trust` was already replaying runs right after its skip is recorded.'' It means: such a run is replayed right after its skip is recorded (crates/lotar-agent/src/services/automation_service.rs:2668). Done when the sentence says that.'
+    new: |-
+      Found in the DEV-821 review: docs/help/trust.md:45 reads 'A run skipped while `lotar trust` was already replaying runs right after its skip is recorded.' It means: such a run is replayed right after its skip is recorded (crates/lotar-agent/src/services/automation_service.rs, after report_skipped_run: DEV-821).
+
+      ## Done when
+      - [ ] `docs/help/trust.md` Skipped runs section reads: "A run skipped while `lotar trust` was already replaying runs is replayed right after its skip is recorded."
+      - [ ] No other doc carries the old wording (`grep -rn 'already replaying' docs`).
+- at: 2026-11-25T12:43:17.054561+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:43:20.026186+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused, waits
+    new: job-paused
+- at: 2026-11-25T12:43:25.882295+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

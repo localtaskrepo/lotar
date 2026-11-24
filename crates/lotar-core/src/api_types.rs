@@ -777,6 +777,37 @@ pub struct AgentJob {
     pub question: Option<AgentJobQuestion>,
 }
 
+/// The T3 Code thread of a `t3` job and its state as T3 Code reports it now (DEV-849). This is
+/// T3 Code's state, separate from the job's outcome and the ticket's status, and reading it changes
+/// neither.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobT3Thread {
+    /// The thread the job ran in, as its log records it; none for a job that recorded no thread.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_id: Option<String>,
+    /// The thread's web link in T3 Code, as the job recorded it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+    /// The T3 Code environment in the recorded link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment_id: Option<String>,
+    /// running, waiting (for an answer), finished, failed, stopped, unknown (a status lotar doesn't
+    /// know) or unavailable (no thread recorded, T3 Code doesn't answer, or the thread is gone).
+    pub state: String,
+    /// The thread's status as T3 Code names it (`running`, `completed`, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub t3_status: Option<String>,
+    /// Why the state is unavailable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// When T3 Code last changed the thread.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    /// When lotar asked T3 Code (a cached answer keeps the time it was asked).
+    pub checked_at: String,
+}
+
 /// One tool call of an agent job (DEV-766): an `agent_job_tool` log entry at its start (`running`) and one at its end
 /// (`completed` or `failed`), with the same `id`. The end entry holds everything known about the call.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -1264,6 +1295,13 @@ pub struct AgentJobLogsResponse {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobInputsResponse {
     pub inputs: Option<AgentJobRunInputs>,
+}
+
+/// `GET /api/jobs/t3-thread` (DEV-849).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobT3ThreadResponse {
+    pub thread: AgentJobT3Thread,
 }
 
 /// The prompt and settings a job's run started with (DEV-767), written to its log as the first turn goes out.

@@ -476,6 +476,43 @@
         }
       }
     },
+    "/api/jobs/t3-thread": {
+      "get": {
+        "summary": "Get a t3 agent job's T3 Code thread and its state now",
+        "description": "The T3 Code thread the job's log records (its last session start, else its end status) and what `t3 thread show` on this machine says about it now (DEV-849). Each job resolves to its own thread, so the jobs of a ticket that ran several threads each show theirs. One `t3` call per thread every 10 seconds at most, cut off after 10 seconds. This is T3 Code's state, separate from the job's status and the ticket's: reading it changes neither. `state` is `unavailable`, with a `reason`, when the job recorded no thread, T3's CLI is missing, the T3 Code server doesn't answer or doesn't know the thread. 400 for a job of another runner.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobT3ThreadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/jobs/cancel": {
       "post": {
         "summary": "Cancel agent job",
@@ -11057,6 +11094,68 @@
           "inputs"
         ]
       },
+      "AgentJobT3ThreadResponse": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/AgentJobT3Thread"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "AgentJobT3Thread": {
+        "type": "object",
+        "description": "The T3 Code thread of a t3 job and its state as T3 Code reports it now, separate from the job's outcome and the ticket's status.",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "description": "The thread the job ran in, as its log records it; absent for a job that recorded no thread."
+          },
+          "link": {
+            "type": "string",
+            "description": "The thread's web link in T3 Code, as the job recorded it."
+          },
+          "environment_id": {
+            "type": "string",
+            "description": "The T3 Code environment in the recorded link."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "waiting",
+              "finished",
+              "failed",
+              "stopped",
+              "unknown",
+              "unavailable"
+            ],
+            "description": "waiting: the thread waits for an answer. unknown: a T3 Code status lotar doesn't know (see t3_status). unavailable: see reason."
+          },
+          "t3_status": {
+            "type": "string",
+            "description": "The thread's status as T3 Code names it (running, completed, failed, ...)."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the state is unavailable."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When T3 Code last changed the thread."
+          },
+          "checked_at": {
+            "type": "string",
+            "description": "When lotar asked T3 Code; a cached answer keeps the time it was asked."
+          }
+        },
+        "required": [
+          "state",
+          "checked_at"
+        ]
+      },
       "AgentJobRunInputs": {
         "type": "object",
         "properties": {
@@ -11329,6 +11428,17 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AgentJobInputsResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobT3ThreadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobT3ThreadResponse"
           }
         },
         "required": [

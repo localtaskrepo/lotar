@@ -3,15 +3,16 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-24T16:08:21.742893+00:00
-modified: 2026-11-24T22:27:00.412861+00:00
+modified: 2026-11-25T12:42:25.429244+00:00
 relationships:
   related:
   - DEV-604
   - DEV-740
   - DEV-832
   - DEV-836
+  - DEV-833
 comments:
 - date: 2026-11-24T19:10:54.135862+00:00
   author: automation
@@ -61,6 +62,26 @@ comments:
       result: not_run
       reason: targeted checks only, the merge runs the suites (DEV-797)
     next: Review, then merge
+- date: 2026-11-25T12:42:11.704516+00:00
+  author: claude
+  text: |-
+    Review: blocking. The pause works, but the owner gets no notice that he has to sign in again (Done when #3).
+
+    What I read and reran:
+    - `9dc30834c`, the only commit beyond `main`: its diff, the ticket, DEV-604 and DEV-740, `docs/help/agent.md`, and the `job_paused` rule in `.tasks/DEV/automation.yml` and the standards `configs/lotar/automation.yml`
+    - `npm ci`: passed
+    - `cargo nextest run -p lotar-agent` (pause, login, provider, entries_wait): 9 passed
+    - `cargo nextest run -p lotar-lib --test integration` (dev604, list_jobs, agent_queue): 5 passed. It needs a fresh `cargo build` and the `LOTAR_*` variables cleared
+    - `cargo clippy -p lotar-agent -p lotar-lib --tests`: clean
+
+    Blocking:
+    1. **No notice for the owner.** `docs/help/agent.md:255` calls the `job_paused` rules "its one notice". That rule only tags and comments the ticket, and its text says "Nobody needs to act" (`.tasks/DEV/automation.yml:905`). That is wrong for a login pause: nothing happens until he runs `claude auth login`. The rule also can't tell an auth pause from a usage limit, and it can't tell the job that opened the pause from one that joined it. So the queue just waits, retrying every 10 min, and he only learns about it from `list-jobs`. Fix: when `AgentQueueService::pause` opens a new auth pause (not when a job joins one), send one owner notice that names the provider and the command to sign in. That could be a dedicated event, or a pause variable (`agent.pause_reason`, and whether this job opened the pause) that a rule can match. Then fix the docs line.
+    2. **No test that runs a job through to the pause.** `a_runner_login_failure_names_its_pause` and `a_login_pause_holds_its_providers_jobs_until_one_completes` test the helpers. Nothing checks the `finalize_job` wiring (`agent_job_service.rs:5576`): a `TurnFailed` auth failure should end the job `paused`, with no `job_failed` rules and no retry tag. That is the bug the ticket reports. Fix: add a test like the dev604 ones, with a runner whose turn fails with `auth_required` or "Claude could not authenticate".
+    3. **An assertion that can no longer fail.** `crates/lotar-lib/tests/dev604_queue_pauses_test.rs:328` still checks `["pause"].is_null()`. After the rename that key is always missing, so the check always passes. Fix: check that `["pauses"]` is an empty array, as the other tests in that file now do.
+
+    Also:
+    - The branch conflicts with `main` in `agent_job_service.rs` and `resumed.rs`: `46fb767aa` (DEV-833) and others changed them. Rebase onto `main` during the rework
+    - The JSON key change from `pause` to `pauses`: nothing in `view/`, the smoke tests or the standards scripts reads `pause`. That is fine
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ff06e8317883aa88fd31e0eb8d7df2aa53ee9d651f0dbc2a23a0118cdec8a29
@@ -90,6 +111,7 @@ description: |-
 tags:
 - health
 - job-paused
+- review-returned
 custom_fields:
   finding: comms:auth-expiry-retry-storm
 history:
@@ -170,3 +192,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T12:42:11.704516+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:42:12.468120+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836"]}'
+    new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833"]}'
+- at: 2026-11-25T12:42:13.096725+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, job-paused
+    new: health, job-paused, review-blocked
+- at: 2026-11-25T12:42:25.429244+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, job-paused, review-blocked
+    new: health, job-paused, review-returned

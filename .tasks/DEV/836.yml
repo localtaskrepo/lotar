@@ -1,11 +1,11 @@
 title: 'T3''s usage-limit resume restarts every paused job thread of one ticket at once: 10 on STD-328 in one worktree'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-24T16:20:40.092908+00:00
-modified: 2026-11-25T02:12:18.510110+00:00
+modified: 2026-11-25T13:24:29.161605+00:00
 relationships:
   related:
   - DEV-626
@@ -112,6 +112,31 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review again
+- date: 2026-11-25T12:42:25.934031+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-836 is assigned to @merge now.'
+- date: 2026-11-25T13:24:20.262194+00:00
+  author: claude
+  text: |-
+    Stalled twice at the same step: the live check restarted the review (lotar rule "Answered in the thread: review on Codex") at 2026-11-24T22:55Z, and it stalled again. Retry with @fix-fable, take it over, or WontDo?
+
+    Options:
+    - fix-fable: Retry with @fix-fable
+    - owner: I take it over
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: owner
+      label: I take it over
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660
@@ -266,3 +291,23 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T12:42:25.934031+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T13:24:20.262194+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T13:24:21.094935+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+- at: 2026-11-25T13:24:29.161605+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: mallox

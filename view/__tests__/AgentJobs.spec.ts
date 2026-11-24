@@ -23,6 +23,7 @@ vi.mock('../api/client', () => ({
         getTask: vi.fn(),
         runAgentJob: vi.fn(),
         addAgentProfile: vi.fn(),
+        getAgentJobT3Thread: vi.fn(),
     },
 }))
 
@@ -529,6 +530,38 @@ describe('AgentJobs log sequence join', () => {
     function occurrences(text: string, needle: string) {
         return text.split(needle).length - 1
     }
+
+    it('shows the T3 Code thread row only for a t3 job (DEV-849)', async () => {
+        const t3Job = job('job-logs-t3', { agent: 'logs-t3', runner: 't3', created_at: '2026-10-08T10:20:03.000Z' })
+        listJobs(logJobA, t3Job)
+        ;(api.getAgentJobLogs as any).mockImplementation((id: string) =>
+            Promise.resolve({ job: id === t3Job.id ? t3Job : logJobA, events: [] }),
+        )
+        ;(api.getAgentJobT3Thread as any).mockResolvedValue({
+            thread: {
+                thread_id: 'thread-1',
+                link: 'https://t3.example.com/threads/env-1/thread-1',
+                environment_id: 'env-1',
+                state: 'running',
+                t3_status: 'running',
+                checked_at: '2026-10-08T10:20:04.000Z',
+            },
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            await clickLogsToggle(wrapper, 'logs-t3')
+
+            expect(cardFor(wrapper, 'logs-alpha').find('[data-testid="agent-t3-thread"]').exists()).toBe(false)
+            const row = cardFor(wrapper, 'logs-t3').get('[data-testid="agent-t3-thread"]')
+            expect(row.get('[data-testid="agent-t3-thread-state"]').text()).toBe('Running')
+            expect(row.get('a').attributes('href')).toBe('https://t3.example.com/threads/env-1/thread-1')
+            expect(api.getAgentJobT3Thread).toHaveBeenCalledTimes(1)
+            expect(api.getAgentJobT3Thread).toHaveBeenCalledWith('job-logs-t3')
+        } finally {
+            wrapper.unmount()
+        }
+    })
 
     it('fetches persisted history on open even when live events already initialized a partial cache', async () => {
         // Reproduces the smoke failure shape: broadcast events initialized a

@@ -1952,6 +1952,28 @@ export interface AgentJobLogsResponse {
     events: AgentJobLogEntry[]
 }
 
+/** `GET /api/jobs/t3-thread` (DEV-849). */
+export interface AgentJobT3ThreadResponse {
+    thread: AgentJobT3Thread
+}
+
+/** A t3 job's T3 Code thread and its state now: T3 Code's state, not the job's or the ticket's. */
+export interface AgentJobT3Thread {
+    thread_id?: string
+    /** The thread's web link in T3 Code, as the job recorded it. */
+    link?: string
+    environment_id?: string
+    state: 'running' | 'waiting' | 'finished' | 'failed' | 'stopped' | 'unknown' | 'unavailable'
+    /** The thread's status as T3 Code names it. */
+    t3_status?: string
+    /** Why the state is unavailable. */
+    reason?: string
+    /** When T3 Code last changed the thread. */
+    updated_at?: string
+    /** When lotar asked T3 Code. */
+    checked_at: string
+}
+
 /** `GET /api/jobs/inputs` (DEV-767): `null` when the job's log has no record. */
 export interface AgentJobInputsResponse {
     inputs: AgentJobRunInputs | null

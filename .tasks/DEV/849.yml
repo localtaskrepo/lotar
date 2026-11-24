@@ -5,8 +5,11 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-24T20:03:54.609056+00:00
-modified: 2026-11-25T12:34:09.782283+00:00
+modified: 2026-11-25T12:40:25.532251+00:00
 relationships:
+  blocks:
+  - DEV-857
+  - DEV-858
   related:
   - DEV-600
   - DEV-810
@@ -336,3 +339,15 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T12:39:39.226667+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769","DEV-857","DEV-858"]}'
+    new: '{"blocks":["DEV-857"],"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769","DEV-857","DEV-858"]}'
+- at: 2026-11-25T12:40:25.532251+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-857"],"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769","DEV-857","DEV-858"]}'
+    new: '{"blocks":["DEV-857","DEV-858"],"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769","DEV-857","DEV-858"]}'

@@ -12,6 +12,7 @@ import type {
     AgentJobCreateResponse,
     AgentJobListResponse,
     AgentJobInputsResponse,
+    AgentJobT3ThreadResponse,
     AgentJobLogsResponse,
     AgentJobMessageRequest,
     AgentJobMessageResponse,
@@ -512,6 +513,10 @@ export const api = {
     /** DEV-767: the prompt and settings the job's run started with. */
     getAgentJobInputs(id: string): Promise<AgentJobInputsResponse> {
         return get('/api/jobs/inputs', { id })
+    },
+    /** DEV-849: a t3 job's T3 Code thread and its state now. */
+    getAgentJobT3Thread(id: string): Promise<AgentJobT3ThreadResponse> {
+        return get('/api/jobs/t3-thread', { id })
     },
     sendAgentJobMessage(payload: AgentJobMessageRequest): Promise<AgentJobMessageResponse> {
         return post('/api/jobs/message', payload)

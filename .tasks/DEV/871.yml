@@ -1,0 +1,35 @@
+title: lotar agent queue doesn't count the jobs queued in lotar serve's memory
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T14:02:30.792755+00:00
+modified: 2026-11-25T14:02:31.383425+00:00
+relationships:
+  related:
+  - DEV-865
+description: |-
+  Found in DEV-865.
+
+  - A job queued in a process's registry (`registry.pending_queue`, e.g. a run started from the Agents page while the slots are full) lives only in that process's memory
+  - `lotar agent queue` and every other process count the queue file's tickets and the running jobs' records (`agent_active_jobs`), not those queued jobs
+  - Checked: `lotar serve` with 1 running and 1 queued job plus 3 queue-file tickets: the Agents page shows 4 Queued, `lotar agent queue` shows 3
+
+  ## Done when
+
+  - [ ] Every process counts the jobs queued in other processes for the same tasks directory (for example as records next to the running jobs' ones), so the CLI and the page show the same Queued
+  - [ ] A dead process's queued records don't count
+  - [ ] Rust test covers it
+history:
+- at: 2026-11-25T14:02:31.097880+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-865"]}'
+- at: 2026-11-25T14:02:31.383425+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

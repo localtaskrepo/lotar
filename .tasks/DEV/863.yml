@@ -1,14 +1,20 @@
 title: 'Agent merge: no test covers finding_check, which now runs once per key of a bundle'
-status: Todo
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-25T05:05:13.706118+00:00
-modified: 2026-11-25T05:05:14.856122+00:00
+modified: 2026-11-25T13:55:08.987744+00:00
 relationships:
   related:
   - DEV-800
+comments:
+- date: 2026-11-25T13:55:08.987744+00:00
+  author: automation
+  text: The fix agent's job job-20261125T133951.608Z-153 failed (lotar agent logs job-20261125T133951.608Z-153); @fix-retry retries it on branch agent/DEV-863.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac1446514f0f23bb72421194b0e5e77c99111bf6d4c506a370fdeea3db377d9d9
 description: |-
   The merge's `finding_check` (`crates/lotar-agent/src/services/agent_job_service/merge.rs`, `fn finding_check`) has no test. Since DEV-800 it runs once per key of a bundle ticket and stops at the first key the check still lists. Found in the review of DEV-800: `grep -rn finding_check crates smoke` finds only the code and its config type.
 
@@ -16,6 +22,8 @@ description: |-
 
   - [ ] A test with a ticket that has two finding keys: a check that lists neither passes the merge, and a check that still lists the second key hands off with that key named.
   - [ ] A ticket without a finding key, or with no `finding_check` set, skips the check.
+tags:
+- fix-retried
 history:
 - at: 2026-11-25T05:05:14.057536+00:00
   actor: claude
@@ -28,3 +36,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T13:39:54.464279+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T13:39:54.942255+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac1446514f0f23bb72421194b0e5e77c99111bf6d4c506a370fdeea3db377d9d9
+- at: 2026-11-25T13:55:08.455050+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ''
+    new: fix-retried
+- at: 2026-11-25T13:55:08.987744+00:00
+  actor: automation
+  changes:
+  - field: comment_added

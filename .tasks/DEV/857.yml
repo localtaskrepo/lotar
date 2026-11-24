@@ -1,14 +1,26 @@
 title: T3 thread row says Finished while the thread waits on background work
-status: Todo
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T22:44:15.700672+00:00
-modified: 2026-11-24T22:44:16.963130+00:00
+modified: 2026-11-25T12:39:48.763670+00:00
 relationships:
+  depends_on:
+  - DEV-849
   related:
   - DEV-849
+comments:
+- date: 2026-11-25T12:39:40.114035+00:00
+  author: claude
+  text: |-
+    Waits for DEV-849 to land on main: the code to fix isn't there yet.
+
+    - `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` (`from_shown`) exists only on `agent/DEV-849` (`ad0e78fce`), which is still in Merging; `main` (`46fb767aa`) lacks it.
+    - Plan once it lands: `from_shown` maps `completed` with non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` to Running, plus a unit test per field.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
 description: |-
   Found in the DEV-849 review: `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` maps T3 status `completed` with no `activeRunId` to `finished`. A thread that ended its turn on `t3_background_wait` (non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` in `t3 thread show --json`) is still working: its lotar job ends only after the wake run. The row then says Finished while the job runs.
 
@@ -16,6 +28,7 @@ description: |-
 tags:
 - agent
 - ui
+- waits
 history:
 - at: 2026-11-24T22:44:16.379275+00:00
   actor: claude
@@ -28,3 +41,36 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T12:39:12.503659+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T12:39:13.250869+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
+- at: 2026-11-25T12:39:39.227728+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849"]}'
+    new: '{"depends_on":["DEV-849"],"related":["DEV-849"]}'
+- at: 2026-11-25T12:39:40.045700+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, waits
+- at: 2026-11-25T12:39:40.114035+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:39:48.763670+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

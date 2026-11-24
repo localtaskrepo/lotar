@@ -5,11 +5,13 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-25T05:34:14.731221+00:00
+modified: 2026-11-25T13:24:39.629142+00:00
 relationships:
   depends_on:
   - DEV-766
   - DEV-767
+  blocks:
+  - DEV-859
   related:
   - harnessmux:HARN-15
   - DEV-768
@@ -203,6 +205,12 @@ comments:
     - **Done when:** the same limit as before. Real logs show `RUN Terminal` without the command until a release includes DEV-774 (`504d8b538`)
     - **Not run:** the full `npm run lint`, `npm test` and `npm run smoke`. The merge runs them
     - No new tickets. The hidden search match in a folded call is already DEV-859
+- date: 2026-11-25T12:39:07.356357+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-769 is assigned to @merge now.'
+- date: 2026-11-25T13:24:39.629142+00:00
+  author: claude
+  text: 'Stalled since 2026-11-25T12:42Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
@@ -811,3 +819,27 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T12:39:07.356357+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T12:42:24.101895+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805"]}'
+- at: 2026-11-25T13:24:36.698029+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-25T13:24:37.434282+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-25T13:24:39.629142+00:00
+  actor: claude
+  changes:
+  - field: comment_added
