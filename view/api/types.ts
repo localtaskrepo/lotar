@@ -515,7 +515,8 @@ export interface JobOutcome {
 /** How `/api/tasks/add` handled a `finding` report. */
 export interface FindingReport {
     created: boolean
-    state: 'new' | 'recurred' | 'open' | 'suppressed'
+    /** `bundled` only from `lotar add --bundle` (DEV-800). */
+    state: 'new' | 'recurred' | 'open' | 'suppressed' | 'bundled'
     /** The new ticket, or the existing one that already reports the finding. */
     id: string
 }

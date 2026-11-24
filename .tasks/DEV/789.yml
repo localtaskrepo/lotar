@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T08:06:40.134808+00:00
-modified: 2026-11-25T05:29:52.075081+00:00
+modified: 2026-11-25T14:39:50.296074+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -125,6 +125,12 @@ comments:
     - **Rebase conflict for the merge:** since the base, main changed the same line in `view/pages/AgentJobs.vue` (`updateFromEvent`, `last_message`): DEV-774 (`504d8b538`) also skips `agent_job_plan` there. `git merge-tree` reports a conflict. Fix: keep both conditions (`kind !== 'agent_job_thought' && kind !== 'agent_job_plan' && !(kind === 'agent_job_tool' && payload.tool?.status === 'completed') && payload.message`). `useAgentActivity.ts` merges cleanly. Plan events don't reach its message rule.
     - **Not rerun:** the Rust suite, `npm run smoke` and the full UI suite. The change is UI-only and has been the same commit since the last review's full UI run (1569 passed).
     - **Filed:** [DEV-866](https://lotar.pyxzl.net/task/DEV-866), not part of this change. `lotar serve` reads the value of `--web-ui-path` or `--allow-host` as the port when no port comes before it (`crates/lotar-lib/src/cli/preprocess.rs:237`).
+- date: 2026-11-25T14:39:50.296074+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-789` onto `main` conflicts in `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-789` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbec1b9366a3e727602217837d75843415ce7d4c239dc0ded79a4911ff97aad0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8cf00dfcf8a49abc2ffc9d2aac60765537ab121463ce2db3a7b3264007c1ba3a
@@ -423,3 +429,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T14:39:50.296074+00:00
+  actor: automation
+  changes:
+  - field: comment_added

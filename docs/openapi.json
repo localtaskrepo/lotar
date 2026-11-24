@@ -10119,7 +10119,8 @@
               "new",
               "recurred",
               "open",
-              "suppressed"
+              "suppressed",
+              "bundled"
             ]
           },
           "id": {

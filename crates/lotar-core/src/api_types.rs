@@ -498,6 +498,9 @@ pub enum FindingState {
     Open,
     /// The newest ticket with the key was closed as won't do; nothing changed.
     Suppressed,
+    /// No open ticket had the key; it was added to the open bundle ticket of
+    /// the day (`lotar add --bundle`, DEV-800).
+    Bundled,
 }
 
 /// What a finding report did: the `finding` object of `/api/tasks/add`,
@@ -525,6 +528,7 @@ impl FindingReport {
             FindingState::Open if self.commented => format!("{} already reports finding {key}; added this report as a comment", self.id),
             FindingState::Open => format!("{} already reports finding {key}; seen again with nothing new, no comment added", self.id),
             FindingState::Suppressed => format!("{} reported finding {key} and was closed as won't do; nothing created", self.id),
+            FindingState::Bundled => format!("Added finding {key} to {}, today's bundle", self.id),
         }
     }
 }

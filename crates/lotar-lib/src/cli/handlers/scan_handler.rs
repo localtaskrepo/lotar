@@ -210,6 +210,7 @@ impl CommandHandler for ScanHandler {
                                 tags: inline_attrs.tags,
                                 fields: inline_attrs.fields,
                                 finding: None,
+                                bundle: None,
                                 relationships: Default::default(),
                                 dry_run: false,
                                 explain: false,

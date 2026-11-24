@@ -435,7 +435,7 @@ agent:
 4. Pending changes of the tasks directory in the main checkout are amended into the merged commit while it is still main's tip.
 5. When the merge changed rules, agent profiles or `agent.merge` of a trusted repository, lotar trusts them again (`lotar trust`); an untrusted one stays untrusted.
 6. With `push: true`, it pushes when the main checkout is clean and its unpushed commits are all this merge's. It never passes `--no-verify`.
-7. For a ticket with a finding key, `finding_check` runs in the main checkout with the key in `LOTAR_FINDING`; its output must no longer contain `[<key>]`.
+7. For a ticket with a finding key, `finding_check` runs in the main checkout with the key in `LOTAR_FINDING`; its output must no longer contain `[<key>]`. A bundle ticket ([`lotar add --bundle`](add.md#bundles)) runs it once per key.
 
 lotar comments the outcome with a report (the commits landed, the checks) and the job completes, so `job_completed` rules close the ticket; no agent starts. A step that needs judgment stops there: a rebase conflict (lotar aborts the rebase), a failed install, a check that fails on its rerun too, a dirty worktree or checks that changed files, a fast-forward git refuses, unpushed commits of others, no upstream or a refused push, a failed trust, a finding check that still lists the finding. lotar comments why, and the merge agent starts in a new session (`fresh`, whatever the rule or profile says) on the profile's model, with lotar's comment before its prompt; work lotar landed already stays landed. The job then ends as any merge job does.
 

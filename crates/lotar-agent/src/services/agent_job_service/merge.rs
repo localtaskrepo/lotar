@@ -405,42 +405,41 @@ impl Merge<'_> {
         }
     }
 
-    /// For a ticket with a finding key: the finding check must no longer
-    /// list it.
+    /// For a ticket with finding keys: the finding check must no longer
+    /// list any of them. It runs once per key; a bundle (DEV-800) has several.
     fn finding_check(&mut self) -> Result<(), Stop> {
         let Some(command) = self.settings.finding_check.as_deref().map(str::trim).filter(|command| !command.is_empty()) else {
             return Ok(());
         };
         let storage = crate::storage::manager::Storage::new(self.tasks_dir);
-        let key = crate::services::task_service::TaskService::get(&storage, self.ticket_id, None)
+        let keys = crate::services::task_service::TaskService::get(&storage, self.ticket_id, None)
             .ok()
             .and_then(|task| crate::utils::custom_fields::extract_value_strings(&task.custom_fields, crate::utils::custom_fields::FINDING_FIELD))
-            .and_then(|keys| keys.into_iter().next());
-        let Some(key) = key else {
-            return Ok(());
-        };
-        self.progress(&format!("Running the finding check `{command}` for `[{key}]`"));
+            .unwrap_or_default();
         let root = self.repo_root.clone();
-        let ran = run_shell(self.job_id, command, &root, &[("LOTAR_FINDING", key.as_str())])?;
-        let listed = format!("[{key}]");
-        match ran {
-            Ok((_, output)) if !output.contains(&listed) => {
-                self.checks.push(ReportCheck { command: command.to_string(), result: "passed".to_string(), ..ReportCheck::default() });
-                self.done.push(format!("The finding check `{command}` no longer lists `{listed}`"));
-                Ok(())
+        for key in keys.iter().map(|key| key.trim()).filter(|key| !key.is_empty()) {
+            self.progress(&format!("Running the finding check `{command}` for `[{key}]`"));
+            let ran = run_shell(self.job_id, command, &root, &[("LOTAR_FINDING", key)])?;
+            let listed = format!("[{key}]");
+            match ran {
+                Ok((_, output)) if !output.contains(&listed) => {
+                    self.checks.push(ReportCheck { command: command.to_string(), result: "passed".to_string(), ..ReportCheck::default() });
+                    self.done.push(format!("The finding check `{command}` no longer lists `{listed}`"));
+                }
+                Ok((_, output)) => {
+                    self.checks.push(ReportCheck {
+                        command: command.to_string(),
+                        result: "failed".to_string(),
+                        reason: Some(format!("still lists {listed}")),
+                        ..ReportCheck::default()
+                    });
+                    let line = output.lines().find(|line| line.contains(&listed)).unwrap_or_default().trim();
+                    return Err(hand_off(format!("the finding check `{command}` still lists `{listed}`: {line}")));
+                }
+                Err(err) => return Err(hand_off(format!("the finding check `{command}` could not run: {err}"))),
             }
-            Ok((_, output)) => {
-                self.checks.push(ReportCheck {
-                    command: command.to_string(),
-                    result: "failed".to_string(),
-                    reason: Some(format!("still lists {listed}")),
-                    ..ReportCheck::default()
-                });
-                let line = output.lines().find(|line| line.contains(&listed)).unwrap_or_default().trim();
-                Err(hand_off(format!("the finding check `{command}` still lists `{listed}`: {line}")))
-            }
-            Err(err) => Err(hand_off(format!("the finding check `{command}` could not run: {err}"))),
         }
+        Ok(())
     }
 
     fn progress(&self, message: &str) {

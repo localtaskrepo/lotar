@@ -201,6 +201,13 @@ pub struct AddArgs {
     #[serde(default)]
     pub finding: Option<String>,
 
+    /// With --finding and no open ticket for the key: add the report to the
+    /// project's open ticket of this bundle created today (for example
+    /// `health`), or start one
+    #[arg(long, value_name = "NAME", requires = "finding")]
+    #[serde(default)]
+    pub bundle: Option<String>,
+
     /// Links stored with the new task (DEV-494)
     #[command(flatten)]
     #[serde(flatten)]
@@ -670,6 +677,11 @@ pub struct TaskAddArgs {
     #[arg(long, value_name = "KEY")]
     #[serde(default)]
     pub finding: Option<String>,
+
+    /// Add the finding to today's bundle (see `lotar add --bundle`)
+    #[arg(long, value_name = "NAME", requires = "finding")]
+    #[serde(default)]
+    pub bundle: Option<String>,
 
     /// Links stored with the new task (DEV-494)
     #[command(flatten)]

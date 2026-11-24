@@ -1,11 +1,11 @@
 title: REST test for GET /api/jobs/t3-thread (400, 404, unavailable)
-status: Blocked
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T22:44:17.550162+00:00
-modified: 2026-11-25T14:08:09.695700+00:00
+modified: 2026-11-25T15:17:42.023836+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -23,6 +23,9 @@ comments:
 - date: 2026-11-25T14:08:09.695700+00:00
   author: automation
   text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-858 yet. Agent job job-20261125T140809.214Z-57 is queued: it waits for memory: memory is normal again since 2026-11-25T14:08:03Z; held jobs start after 120 s of normal memory (held since 2026-11-25T14:07:33Z).'
+- date: 2026-11-25T15:17:42.023836+00:00
+  author: claude
+  text: 'Stalled since 2026-11-25T14:08Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b1c83e2cf0d2436f0b72ea63e6750f769de0de33c35f3204adaa0b9888d2d
 description: |-
@@ -84,5 +87,15 @@ history:
     new: agent
 - at: 2026-11-25T14:08:09.695700+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T15:17:39.553350+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-25T15:17:42.023836+00:00
+  actor: claude
   changes:
   - field: comment_added

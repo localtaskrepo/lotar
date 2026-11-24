@@ -71,6 +71,7 @@ impl CommandHandler for TaskHandler {
                     tags: add_args.tags,
                     fields: add_args.fields,
                     finding: add_args.finding,
+                    bundle: add_args.bundle,
                     relationships: add_args.relationships,
                     dry_run: false,
                     explain: false,

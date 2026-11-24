@@ -78,6 +78,7 @@ IDs take the forms of [`lotar task relationships add`](./task.md#edit-categories
 
 ### Report a problem once
 - `--finding <KEY>` - A stable key for the problem (one line, at most 200 characters), for agents and scripts that check repositories and report what they find. See [Findings](#findings).
+- `--bundle <NAME>` - With `--finding`: a report whose key has no ticket yet joins the project's open ticket of bundle `NAME` created today instead of a ticket of its own. See [Bundles](#bundles).
 
 ### Global Options
 - `--format <FORMAT>` - Output format: text or json
@@ -144,6 +145,24 @@ The newest ticket of the project with that key decides what happens. The command
 - Automation rules on `created` run only when a ticket is created; the comment on an open ticket runs `commented` rules.
 - REST (`/api/tasks/add`) and MCP (`task_create`) take the same key as `finding`; see [API quick reference](api-quick-reference.md) and [MCP tools](mcp-tools.md#task_create).
 - Done means the project's done states (`issue.done_states`, or the inferred ones: see [Done States](config.md#done-states)). A won't-do state is recognized by its name, done or not.
+
+### Bundles
+
+A check that finds many small problems a day can collect them in one ticket per day. Add `--bundle` with a name, the same for all reports that belong together:
+
+```bash
+lotar add "Leftover worktrees in lotar" --finding worktrees:lotar --bundle health -D "3 worktrees have no running job"
+lotar add "CI red on main" --finding ci:lotar --bundle health -D "The lint job fails"
+```
+
+- The first report of the day starts the bundle ticket: title `Health 2026-11-24: Leftover worktrees in lotar`, its `finding_bundle` field `health:2026-11-24`, the description an intro and one section per finding (`## <title>`, the description, ``Finding: `<key>` ``).
+- A later report that day with a key no ticket has yet adds its key to the bundle's `finding` list and its section to the description, and counts it in the title (`... and 1 more`). JSON: `{"created": false, "state": "bundled", "id": "DEV-12"}`. A key fixed before (done) also relates the done ticket.
+- Keys keep their meaning per key: a key already in a ticket (the bundle or another one) follows the table above, so a repeat goes to the bundle as a comment, and a won't-do bundle suppresses all its keys. `lotar list finding=ci:lotar` finds the bundle, `lotar list finding_bundle=health:2026-11-24` the bundle of that day.
+- A bundle takes new findings only while it is open and no agent job works on it: in `InProgress`, `Reviewing` or `Merging` (by name), done or won't do, the report starts a new bundle ticket the same day, so a fix job never closes a finding it didn't see. The newest open bundle of the day takes the next report.
+- The next day starts a new bundle. The date is the local date of the machine that runs `lotar add`.
+- Joining holds the finding lock like creating, so two agents at the same moment end up in one bundle.
+- `--bundle` is CLI only; REST and MCP reports still get a ticket each.
+- The merge job's `finding_check` ([agent merge](agent.md)) runs once per key of a bundle; each must be gone.
 
 ## Similar open tickets
 

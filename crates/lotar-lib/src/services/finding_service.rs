@@ -6,12 +6,18 @@
 //! ticket suppresses the report, a done ticket gets a new ticket related to
 //! it. The check and the write run under the project's finding lock, so
 //! two reporters of one key at the same moment end up with one ticket.
+//!
+//! A report with a bundle name and no ticket of its own joins the project's
+//! open bundle ticket of the day (DEV-800): its key goes into the bundle's
+//! `finding` list and its title and description become a section of the
+//! bundle's description. A bundle an agent job works on takes no new
+//! findings, so the report starts the next bundle instead.
 
 use std::path::Path;
 use std::time::Duration;
 
 pub use crate::api_types::{FindingReport, FindingState};
-use crate::api_types::{TaskCreate, TaskDTO};
+use crate::api_types::{TaskCreate, TaskDTO, TaskUpdate};
 use crate::config::types::ResolvedConfig;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::automation_service::AutomationService;
@@ -19,7 +25,7 @@ use crate::services::task_service::{CommentContext, CreateOptions, TaskService};
 use crate::storage::layout::ArchiveFilter;
 use crate::storage::manager::Storage;
 use crate::storage::{TaskFilter, TaskId};
-use crate::utils::custom_fields::{FINDING_FIELD, FINDING_SEEN_FIELD};
+use crate::utils::custom_fields::{FINDING_BUNDLE_FIELD, FINDING_FIELD, FINDING_SEEN_FIELD};
 
 /// How a repeated report's comment starts.
 const REPORT_PREFIX: &str = "Reported again by ";
@@ -27,6 +33,10 @@ const REPORT_PREFIX: &str = "Reported again by ";
 /// Status names that mean "decided not to do" (compared without case,
 /// spaces, `-`, `_` and `'`).
 const WONT_DO_NAMES: &[&str] = &["wontdo", "wontfix", "cancelled", "canceled", "rejected", "declined"];
+
+/// Status names of a ticket an agent job works on, compared like
+/// [`WONT_DO_NAMES`]: a bundle in one of them takes no new findings.
+const IN_JOB_NAMES: &[&str] = &["inprogress", "reviewing", "merging"];
 
 /// Titles that share at least this percentage of their words (Dice
 /// coefficient) name the same problem (DEV-562).
@@ -62,6 +72,79 @@ impl FindingService {
             return Err(LoTaRError::ValidationError(format!("Invalid finding key '{key}': use one line of at most 200 characters")));
         }
         Ok(key.to_string())
+    }
+
+    /// A bundle name is one word of at most 50 letters, digits, `-` or `_`.
+    pub fn validate_bundle(raw: &str) -> LoTaRResult<String> {
+        let name = raw.trim();
+        if name.is_empty() || name.chars().count() > 50 || !name.chars().all(|ch| ch.is_alphanumeric() || ch == '-' || ch == '_') {
+            return Err(LoTaRError::ValidationError(format!("Invalid bundle name '{name}': use one word of letters, digits, '-' or '_', at most 50")));
+        }
+        Ok(name.to_string())
+    }
+
+    /// The `finding_bundle` value of today's bundle: `<name>:<YYYY-MM-DD>`.
+    pub fn bundle_of_today(name: &str) -> String {
+        format!("{name}:{}", jiff::ZonedDateTime::now().strftime("%Y-%m-%d"))
+    }
+
+    /// The newest ticket of `project` in bundle `bundle` (a
+    /// [`bundle_of_today`](Self::bundle_of_today) value) that takes new
+    /// findings: not done, not won't do, not archived and not in an agent
+    /// job (InProgress, Reviewing, Merging).
+    pub fn open_bundle(storage: &Storage, project: &str, bundle: &str, config: &ResolvedConfig) -> Option<String> {
+        let done = crate::services::completion::effective_done_statuses(config);
+        let filter = TaskFilter { project: Some(project.to_string()), ..Default::default() };
+        storage
+            .search(&filter)
+            .into_iter()
+            .filter(|(_, task)| {
+                crate::utils::custom_fields::extract_value_strings(&task.custom_fields, FINDING_BUNDLE_FIELD)
+                    .is_some_and(|values| values.iter().any(|value| value.trim() == bundle))
+            })
+            .filter(|(_, task)| {
+                let status = task.status.as_str();
+                !is_wont_do(status) && !is_in_job(status) && !done.contains(&status.to_ascii_lowercase())
+            })
+            .map(|(id, _)| id)
+            .max_by_key(|id| TaskId::parse(id).map(|id| id.number).unwrap_or(0))
+    }
+
+    /// The title and description a new bundle ticket starts with.
+    pub fn new_bundle(bundle: &str, key: &str, title: &str, description: Option<&str>) -> (String, String) {
+        let (name, date) = bundle.split_once(':').unwrap_or((bundle, ""));
+        let intro = format!("Findings filed with `--bundle {name}` on {date}, one section each. Fix each finding the way its section says.");
+        (format!("{} {date}: {title}", capitalized(name)), format!("{intro}\n\n{}", bundle_section(key, title, description)))
+    }
+
+    /// Add a finding to bundle ticket `id`: its key to the `finding` list, a
+    /// section to the description, `related` (a done ticket of the key) to
+    /// the relationships, and the count to the title.
+    pub fn join_bundle(storage: &mut Storage, id: &str, key: &str, title: &str, description: Option<&str>, related: Option<&str>) -> LoTaRResult<TaskDTO> {
+        let task = TaskService::get(storage, id, None)?;
+        let mut keys = crate::utils::custom_fields::extract_value_strings(&task.custom_fields, FINDING_FIELD).unwrap_or_default();
+        keys.push(key.to_string());
+        let mut fields = task.custom_fields.clone();
+        let list = serde_json::Value::Array(keys.iter().map(|key| serde_json::Value::String(key.clone())).collect());
+        fields.insert(FINDING_FIELD.to_string(), crate::types::custom_value_from_json(&list));
+        let mut relationships = task.relationships.clone();
+        if let Some(old) = related
+            && !relationships.related.iter().any(|id| id == old)
+        {
+            relationships.related.push(old.to_string());
+        }
+        let bundle = crate::utils::custom_fields::extract_value_strings(&task.custom_fields, FINDING_BUNDLE_FIELD).and_then(|values| values.into_iter().next());
+        let new_title = bundle.as_deref().and_then(|bundle| counted_title(&task.title, bundle, keys.len()));
+        let body = task.description.as_deref().map(str::trim_end).unwrap_or_default();
+        let section = bundle_section(key, title, description);
+        let patch = TaskUpdate {
+            title: new_title,
+            description: Some(if body.is_empty() { section } else { format!("{body}\n\n{section}") }),
+            custom_fields: Some(fields),
+            relationships: Some(relationships),
+            ..TaskUpdate::default()
+        };
+        TaskService::update(storage, id, patch)
     }
 
     /// Hold the project's finding lock while checking and writing.
@@ -238,9 +321,43 @@ fn similar_words(a: &std::collections::BTreeSet<String>, b: &std::collections::B
     !a.is_empty() && !b.is_empty() && 2 * a.intersection(b).count() * 100 >= SIMILAR_TITLE_PERCENT * (a.len() + b.len())
 }
 
+fn normalized_status(status: &str) -> String {
+    status.chars().filter(|ch| ch.is_alphanumeric()).flat_map(char::to_lowercase).collect()
+}
+
 fn is_wont_do(status: &str) -> bool {
-    let normalized: String = status.chars().filter(|ch| ch.is_alphanumeric()).flat_map(char::to_lowercase).collect();
-    WONT_DO_NAMES.contains(&normalized.as_str())
+    WONT_DO_NAMES.contains(&normalized_status(status).as_str())
+}
+
+fn is_in_job(status: &str) -> bool {
+    IN_JOB_NAMES.contains(&normalized_status(status).as_str())
+}
+
+/// One finding of a bundle: a heading, the description and the key.
+fn bundle_section(key: &str, title: &str, description: Option<&str>) -> String {
+    let description = description.map(str::trim).filter(|text| !text.is_empty());
+    match description {
+        Some(text) => format!("## {title}\n\n{text}\n\nFinding: `{key}`"),
+        None => format!("## {title}\n\nFinding: `{key}`"),
+    }
+}
+
+fn capitalized(name: &str) -> String {
+    let mut chars = name.chars();
+    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
+}
+
+/// A bundle's title for `count` findings: `<Name> <date>: <first> and <n>
+/// more`. `None` when the title no longer starts with `<Name> <date>: `.
+fn counted_title(title: &str, bundle: &str, count: usize) -> Option<String> {
+    let (name, date) = bundle.split_once(':')?;
+    let prefix = format!("{} {date}: ", capitalized(name));
+    let rest = title.strip_prefix(&prefix)?;
+    let first = match rest.rsplit_once(" and ") {
+        Some((first, more)) if more.strip_suffix(" more").is_some_and(|n| !n.is_empty() && n.chars().all(|ch| ch.is_ascii_digit())) => first,
+        _ => rest,
+    };
+    Some(if count > 1 { format!("{prefix}{first} and {} more", count - 1) } else { format!("{prefix}{first}") })
 }
 
 #[cfg(test)]
@@ -265,6 +382,36 @@ mod tests {
         assert!(similar(locked, "Opgate restart while the Mac is locked drops the signing key"));
         assert!(!similar(locked, "opgate fails to start after an update"));
         assert!(!similar("the a", "the a"));
+    }
+
+    #[test]
+    fn in_job_states_are_recognised_by_name() {
+        for status in ["InProgress", "In progress", "Reviewing", "Merging"] {
+            assert!(is_in_job(status), "{status}");
+        }
+        for status in ["Todo", "HelpNeeded", "Done"] {
+            assert!(!is_in_job(status), "{status}");
+        }
+    }
+
+    #[test]
+    fn bundle_titles_count_their_findings() {
+        let bundle = "health:2026-11-24";
+        let (title, description) = FindingService::new_bundle(bundle, "a:x", "Stale worktree", Some("2 left"));
+        assert_eq!(title, "Health 2026-11-24: Stale worktree");
+        assert!(description.ends_with("## Stale worktree\n\n2 left\n\nFinding: `a:x`"), "{description}");
+        assert_eq!(counted_title(&title, bundle, 2).as_deref(), Some("Health 2026-11-24: Stale worktree and 1 more"));
+        assert_eq!(counted_title("Health 2026-11-24: Stale worktree and 1 more", bundle, 3).as_deref(), Some("Health 2026-11-24: Stale worktree and 2 more"));
+        assert_eq!(counted_title("Health 2026-11-24: Cats and dogs", bundle, 2).as_deref(), Some("Health 2026-11-24: Cats and dogs and 1 more"));
+        assert_eq!(counted_title("Renamed by hand", bundle, 2), None);
+    }
+
+    #[test]
+    fn bundle_names_are_one_word() {
+        assert_eq!(FindingService::validate_bundle(" health ").unwrap_or_default(), "health");
+        assert!(FindingService::validate_bundle("health:2026").is_err());
+        assert!(FindingService::validate_bundle("two words").is_err());
+        assert!(FindingService::validate_bundle("").is_err());
     }
 
     #[test]

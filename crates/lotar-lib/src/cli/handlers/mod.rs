@@ -109,13 +109,14 @@ impl AddHandler {
         renderer: &OutputRenderer,
     ) -> Result<AddedTask, String> {
         use crate::services::finding_service::{FindingReport, FindingService, FindingState, Prior};
-        use crate::utils::custom_fields::FINDING_FIELD;
+        use crate::utils::custom_fields::{FINDING_BUNDLE_FIELD, FINDING_FIELD};
         renderer.log_info("add: begin validation and project resolution");
         // Like REST and MCP: no task without a title (DEV-285).
         if args.title.trim().is_empty() {
             return Err("Title cannot be empty.".to_string());
         }
         let finding_key = args.finding.as_deref().map(FindingService::validate_key).transpose().map_err(|e| e.to_string())?;
+        let bundle = args.bundle.as_deref().map(FindingService::validate_bundle).transpose().map_err(|e| e.to_string())?;
         // Create project resolver and validator
         let mut project_resolver = ProjectResolver::new(resolver).map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
         let had_configured_default_project = !project_resolver.get_config().default_project.trim().is_empty();
@@ -476,6 +477,21 @@ impl AddHandler {
                     }
                     Prior::None => finding_state = Some(FindingState::New),
                 }
+                // Today's bundle takes the report, or it starts one (DEV-800).
+                if let Some(name) = bundle.as_deref() {
+                    let today = FindingService::bundle_of_today(name);
+                    if let Some(id) = FindingService::open_bundle(&storage, &project_for_storage, &today, &config) {
+                        let related = task.relationships.related.last().filter(|_| finding_state == Some(FindingState::Recurred)).cloned();
+                        FindingService::join_bundle(&mut storage, &id, key, &task.title, task.description.as_deref(), related.as_deref())
+                            .map_err(|e| e.to_string())?;
+                        let outcome = FindingReport { created: false, state: FindingState::Bundled, id: id.clone(), commented: false };
+                        return Ok(AddedTask { task_id: id, finding: Some((key.to_string(), outcome)) });
+                    }
+                    let (title, description) = FindingService::new_bundle(&today, key, &task.title, task.description.as_deref());
+                    task.title = title;
+                    task.description = Some(description);
+                    task.custom_fields.insert(FINDING_BUNDLE_FIELD.to_string(), crate::types::custom_value_string(today));
+                }
                 task.custom_fields.insert(FINDING_FIELD.to_string(), crate::types::custom_value_string(key));
                 Some(lock)
             }
@@ -483,7 +499,12 @@ impl AddHandler {
         };
         // Agents skip searching before they file (DEV-562): name the open
         // tickets that may already report this problem, and file anyway.
-        let similar = FindingService::similar_open(&storage, &project_for_storage, &task.title, finding_key.as_deref(), &config);
+        // A bundle's title names the day, not one problem.
+        let similar = if bundle.is_some() {
+            Vec::new()
+        } else {
+            FindingService::similar_open(&storage, &project_for_storage, &task.title, finding_key.as_deref(), &config)
+        };
         let task_id = crate::services::task_service::TaskService::commit_prepared_create(
             &storage,
             crate::services::task_service::PreparedTaskCreate {

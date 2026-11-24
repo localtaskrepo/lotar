@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:21:07.483127+00:00
-modified: 2026-11-25T05:25:40.909963+00:00
+modified: 2026-11-25T15:17:24.122528+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -280,6 +280,61 @@ comments:
     - No owner decision touched. No stray files and no second branch.
 
     Tickets filed: none.
+- date: 2026-11-25T15:17:24.122528+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+        267|     it('holds an authorized reviewer change until the running agent jo…
+           |     ^
+        268|         const gate = await createGateFixture('lotar-smoke-review-gate-…
+        269|         try {
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+     FAIL  |wall-clock| tests/ui.attachment-previews.smoke.spec.ts > UI attachment previews (DEV-204) > previews images on cards, in the list and the task panel, and the field toggle hides them
+    TestTimeoutError: Test timed out in 120000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ tests/ui.attachment-previews.smoke.spec.ts:31:5
+         29|
+         30| describe('UI attachment previews (DEV-204)', () => {
+         31|     it('previews images on cards, in the list and the task panel, and …
+           |     ^
+         32|         const workspace = await SmokeWorkspace.create();
+         33|         try {
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+     Test Files  3 failed | 115 passed (118)
+          Tests  3 failed | 407 passed (410)
+       Start at  06:48:34
+       Duration  1728.87s (tests 99%, import 1%)
+
+    error during close Error: Tests left 2 entries in the temp folder; remove them where they are created: lotar-smoke-agents-9oiBCr, lotar-smoke-review-gate-FIaq9N
+        at Object.teardown (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-811/scripts/vitest-temp-guard.mjs:29:19)
+        at TestProject._teardownGlobalSetup (file:///Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-811/node_modules/vitest/dist/chunks/index.ER9afepi.js:6721:100)
+        at file:///Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-811/node_modules/vitest/dist/chunks/cli-api.D6E8EtSi.js:13961:73
+    ```.
+
+    - Rebased `agent/DEV-811` onto `main` (`46fb767aa36f`): `d0bbd2a27312`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-811` onto `main` (`d3bed079bf0c`): `64d4334ade4a`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A508e0ebf43f1f9aaa7b9edc3d8fc73b587c37ed4800680dc69324be71448685a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8435be66684173a210f69bf1ba918360cbe73777913cb48de46ae057dbc10700
@@ -663,3 +718,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T15:17:24.122528+00:00
+  actor: automation
+  changes:
+  - field: comment_added
