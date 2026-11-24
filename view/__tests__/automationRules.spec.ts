@@ -111,7 +111,7 @@ describe('automationRules utilities', () => {
         const state = getEditableRuleState(rule)
 
         expect(state.editable).toBe(false)
-        expect(state.unsupportedReasons).toEqual(['Job error conditions are currently YAML-only.'])
+        expect(state.unsupportedReasons).toEqual(['Job conditions are currently YAML-only.'])
         expect(summarizeAutomationRule(rule).conditions).toEqual(['job error matches rate limit'])
         expect(describeConditions(rule.when).items).toEqual(['job error matches /rate limit/'])
     })
@@ -140,6 +140,14 @@ describe('automationRules utilities', () => {
         expect(summarizeAutomationRule(rule).actions.join(' ')).toContain('ask: What next for ${{ticket.id}}?')
         expect(describeActionSteps(rule.on.created)).toEqual(['ask “What next for ${{ticket.id}}?” (close, keep)'])
         expect(getEditableRuleState({ name: 'Plain', on: { created: { comment: 'hi' } } }).editable).toBe(true)
+    })
+
+    it('describes the queue pause a job opened', () => {
+        const rule = { name: 'Sign in', when: { job: { pause: 'auth' } }, on: { job_paused: { comment: 'sign in' } } }
+
+        expect(getEditableRuleState(rule).unsupportedReasons).toEqual(['Job conditions are currently YAML-only.'])
+        expect(summarizeAutomationRule(rule).conditions).toEqual(['queue pause the job opened = auth'])
+        expect(describeConditions(rule.when).items).toEqual(['queue pause the job opened is auth'])
     })
 
     it('describes tell_agent actions and keeps them yaml-only', () => {

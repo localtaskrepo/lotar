@@ -242,6 +242,8 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         }),
     )
     .unwrap();
@@ -333,6 +335,8 @@ fn setting_the_current_value_back_lets_the_job_completed_rule_decide() {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         }),
     )
     .unwrap();
@@ -509,6 +513,8 @@ fn the_outcome_fires_the_updated_and_assigned_rules() {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         }),
     )
     .unwrap();

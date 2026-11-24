@@ -202,6 +202,9 @@ impl TemplateContext {
         if let Some(ref v) = job.worktree_branch {
             self.set("agent.worktree_branch", v);
         }
+        if let Some(ref v) = job.provider {
+            self.set("agent.provider", v);
+        }
         if let Some(ref usage) = job.usage {
             self.set("agent.usage", &usage.describe());
             if let Some(cost) = usage.cost_usd {
@@ -539,6 +542,8 @@ mod tests {
             }),
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         let ctx = TemplateContext::new().with_job(Some(&job));
         assert_eq!(ctx.expand("${{agent.cost_usd}} / ${{agent.input_tokens}} / ${{agent.output_tokens}} / ${{agent.turns}}"), "0.0123 / 1200 / 300 / 3");

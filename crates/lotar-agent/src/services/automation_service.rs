@@ -286,6 +286,15 @@ pub struct AutomationJobContext {
     /// conditions, DEV-617); `None` for a job that didn't fail.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// The job's provider: its profile's `provider`, else its runner
+    /// (DEV-835), for `${{agent.provider}}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// The queue pause this job opened (`signing`, `disk`, `auth`), for
+    /// `job: { pause: ... }` (DEV-835); `None` when it opened none, also
+    /// when it joined an open one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pause: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -646,7 +655,7 @@ impl AutomationService {
         let rules = if moved { &[][..] } else { automation.automation.rules() };
 
         let active_sprints = compute_active_sprint_ids(&storage);
-        let changes = ChangeSet::job_event(&task, action_context.job.as_ref().and_then(|job| job.error.as_deref()));
+        let changes = ChangeSet::job_event(&task, action_context.job.as_ref());
         let mut actions = Vec::new();
         for (rule_idx, rule) in rules.iter().enumerate() {
             if !matches_rule(rule, &task, &changes, MatchMode::Current, &config, &active_sprints) {
@@ -4411,6 +4420,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
         let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
@@ -4449,6 +4460,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         let lock = crate::storage::safety::acquire_storage_lock(&tasks_dir.join("PX"), "task").unwrap();
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
@@ -4480,6 +4493,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
         drop(held.borrow_mut().take());
@@ -4524,6 +4539,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job)).unwrap_err();
         assert!(err.to_string().contains("kept"), "{err}");
@@ -4574,6 +4591,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         checkpoint_fault::set_disk_full(true);
         let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job("kept"))).unwrap_err();
@@ -4631,6 +4650,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
 
         AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job)).unwrap();
@@ -4696,6 +4717,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).unwrap_err();
         assert!(err.to_string().contains("waits for its end rules"), "{err}");
@@ -4740,6 +4763,8 @@ mod pending_outcome_tests {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         };
         let status = || TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().status.as_str().to_string();
 

@@ -171,9 +171,9 @@ fn a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit() {
     std::fs::write(&ws.broken, "").unwrap();
 
     run(&ws, "TEST-1");
-    let queue = wait_for(&ws, "no signing pause", |queue| queue["pause"]["reason"] == "signing");
-    assert!(queue["pause"]["message"].as_str().is_some_and(|line| line.contains("Couldn't find key in agent")), "{queue}");
-    assert_eq!(queue["pause"]["ticket_id"], "TEST-1", "{queue}");
+    let queue = wait_for(&ws, "no signing pause", |queue| queue["pauses"][0]["reason"] == "signing");
+    assert!(queue["pauses"][0]["message"].as_str().is_some_and(|line| line.contains("Couldn't find key in agent")), "{queue}");
+    assert_eq!(queue["pauses"][0]["ticket_id"], "TEST-1", "{queue}");
     // The queue pauses just before the job's log gets its end.
     wait_for(&ws, "the job doesn't read paused", |_| !jobs(&ws, "TEST-1", "paused").is_empty());
     assert!(jobs(&ws, "TEST-1", "failed").is_empty(), "no job failed");
@@ -188,13 +188,15 @@ fn a_signing_failure_pauses_the_queue_and_its_retry_makes_only_the_commit() {
     assert_eq!(runs(&ws), ["TEST-1"], "the held job didn't run, the paused one didn't run again");
     let queue = json(&ws, &["agent", "queue"]);
     assert!(queued(&queue, "TEST-2"), "{queue}\n{}", job_logs(&ws));
-    assert_eq!(queue["pause"]["reason"], "signing", "{queue}");
+    assert_eq!(queue["pauses"][0]["reason"], "signing", "{queue}");
     let show = json(&ws, &["show", "TEST-1"]);
     assert_eq!(show["status"], "Todo", "the ticket keeps its status: {show}");
     assert!(show["assignee"].is_null(), "and its assignee during the pause: {show}");
 
     std::fs::remove_file(&ws.broken).unwrap();
-    wait_for(&ws, "the queue didn't resume", |queue| queue["pause"].is_null() && !queued(queue, "TEST-2") && queue["running_jobs"] == 0);
+    wait_for(&ws, "the queue didn't resume", |queue| {
+        queue["pauses"].as_array().is_some_and(Vec::is_empty) && !queued(queue, "TEST-2") && queue["running_jobs"] == 0
+    });
     wait_for(&ws, "TEST-2 didn't end", |_| !jobs(&ws, "TEST-2", "completed").is_empty());
     assert_eq!(runs(&ws), ["TEST-1", "TEST-2"], "TEST-1's agent ran once");
     let log = git(&ws.root, &["log", "--format=%s", "agent/TEST-1"]);
@@ -233,8 +235,8 @@ fn a_full_disk_pauses_every_job_until_one_completes() {
     std::fs::write(&ws.broken, "").unwrap();
 
     run(&ws, "TEST-1");
-    let queue = wait_for(&ws, "no disk pause", |queue| queue["pause"]["reason"] == "disk");
-    assert!(queue["pause"]["message"].as_str().is_some_and(|line| line.contains("No space left on device")), "{queue}");
+    let queue = wait_for(&ws, "no disk pause", |queue| queue["pauses"][0]["reason"] == "disk");
+    assert!(queue["pauses"][0]["message"].as_str().is_some_and(|line| line.contains("No space left on device")), "{queue}");
     // Jobs without a worktree commit nothing, yet a full disk holds them.
     run(&ws, "TEST-2");
     std::thread::sleep(Duration::from_secs(1));
@@ -246,7 +248,9 @@ fn a_full_disk_pauses_every_job_until_one_completes() {
     std::fs::write(&release, "").unwrap();
 
     std::fs::remove_file(&ws.broken).unwrap();
-    wait_for(&ws, "the queue didn't resume", |queue| queue["pause"].is_null() && !queued(queue, "TEST-2") && queue["running_jobs"] == 0);
+    wait_for(&ws, "the queue didn't resume", |queue| {
+        queue["pauses"].as_array().is_some_and(Vec::is_empty) && !queued(queue, "TEST-2") && queue["running_jobs"] == 0
+    });
     wait_for(&ws, "TEST-2 didn't end", |_| !jobs(&ws, "TEST-2", "completed").is_empty());
     assert!(!jobs(&ws, "TEST-1", "completed").is_empty(), "the paused job ran again and completed");
     let show = json(&ws, &["show", "TEST-1"]);
@@ -270,7 +274,7 @@ fn waiting_for_a_job_ends_when_it_pauses() {
     assert!(started.elapsed() < Duration::from_secs(30), "it returned when the job paused, not at the timeout: {text}");
     // Let the retry complete, so the worker ends.
     script(&ws.root.join("runner.sh"), "exit 0");
-    wait_for(&ws, "the queue didn't resume", |queue| queue["pause"].is_null() && queue["running_jobs"] == 0);
+    wait_for(&ws, "the queue didn't resume", |queue| queue["pauses"].as_array().is_some_and(Vec::is_empty) && queue["running_jobs"] == 0);
 }
 
 /// A job held in `lotar serve` takes the pause's due try when no queue
@@ -301,7 +305,7 @@ fn a_job_held_in_serve_takes_the_due_try_when_no_queue_entry_waits() {
 
     cli(&["agent", "run", "TEST-1", "go", "--agent", "writer"]);
     let deadline = Instant::now() + Duration::from_secs(30);
-    while cli(&["--format", "json", "agent", "queue"])["pause"]["reason"] != "disk" {
+    while cli(&["--format", "json", "agent", "queue"])["pauses"][0]["reason"] != "disk" {
         assert!(Instant::now() < deadline, "no disk pause");
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -321,5 +325,6 @@ fn a_job_held_in_serve_takes_the_due_try_when_no_queue_entry_waits() {
         assert!(Instant::now() < deadline, "the job held in serve never started: {status}, runs {:?}", runs(&ws));
         std::thread::sleep(Duration::from_millis(100));
     }
-    assert!(cli(&["--format", "json", "agent", "queue"])["pause"].is_null(), "its completion ended the pause");
+    let queue = cli(&["--format", "json", "agent", "queue"]);
+    assert_eq!(queue["pauses"], serde_json::json!([]), "its completion ended the pause: {queue}");
 }

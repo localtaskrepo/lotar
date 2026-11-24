@@ -1241,3 +1241,29 @@ automation:
             command: lotar
             args: [agent, worktree, run, "${{ticket.id}}", --, cargo, clean, --workspace]
             ignore_failure: true
+    # A provider's expired login pauses that provider's jobs (DEV-835): only the job that opened the pause matches
+    # job.pause, so the owner gets one ticket per pause in his inbox, not one per held ticket. Its own ticket, not the
+    # paused one: that one's retry is queued and moves it on when it completes.
+    - name: "Login expired: ask the owner to sign in"
+      when:
+        job: { pause: auth }
+      on:
+        job_paused:
+          run:
+            command: lotar
+            args:
+              - add
+              - "Sign in to ${{agent.provider}} again: its agent jobs wait"
+              - --project
+              - DEV
+              - --type
+              - Chore
+              - --status
+              - HelpNeeded
+              - --assignee
+              - mallox
+              - --tag
+              - owner
+              - -D
+              - "The ${{agent.provider}} login fails, so lotar paused that provider's jobs (job ${{agent.job_id}} on ${{ticket.id}}). Sign in again (claude auth login, codex login); the next try resumes them, every 10 minutes. Then close this ticket."
+            ignore_failure: true

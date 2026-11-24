@@ -71,6 +71,8 @@ fn end_job(assignee_at_start: Option<&str>, moved_to: Option<&str>) -> (String, 
             usage: None,
             assignee_at_start: assignee_at_start.map(str::to_string),
             error: None,
+            provider: None,
+            pause: None,
         }),
     )
     .unwrap();

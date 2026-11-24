@@ -135,6 +135,7 @@ fn lotar(ws: &Workspace) -> Command {
         .env("LOTAR_IGNORE_HOME_CONFIG", "1")
         .env("LOTAR_AGENT_QUEUE_DIR", ws.root.join("queue"))
         .env("LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS", "2")
+        .env("LOTAR_AGENT_PAUSE_RETRY_SECONDS", "1")
         .env("HARNESSMUX_HOME", ws.root.join("harnessmux"))
         .env("T3CODE_HOME", ws.root.join("t3home"))
         .env("LOTAR_DEFAULT_REPORTER", "tester")
@@ -321,4 +322,40 @@ fn a_t3_jobs_retry_after_a_usage_limit_continues_the_paused_thread() {
     let log = lotar(&ws).args(["agent", "logs", &retry]).output().unwrap();
     let log = String::from_utf8_lossy(&log.stdout);
     assert!(log.contains("this job retries one paused on a usage limit, in the same T3 Code thread"), "{log}");
+}
+
+/// An expired login (DEV-835): T3's turn fails on "Claude could not
+/// authenticate" twice. Each job pauses instead of failing, no failure rule
+/// runs, the ticket keeps its status and assignee, and only the job that
+/// opened the login pause matches `job: { pause: auth }`, the owner's one
+/// notice. The retry after the pause's interval completes and ends it.
+#[test]
+fn an_expired_login_pauses_the_job_with_one_notice_until_a_retry_completes() {
+    let ws = workspace_on(FAKE_T3, "[agents.t3]\nkind = \"t3\"\n", "    runner: t3\n    provider: claude\n    model: opus\n");
+    std::fs::write(ws.t3.join("message"), "Provider error: Claude could not authenticate. Run claude auth login.\n").unwrap();
+    std::fs::write(ws.t3.join("limited"), "2").unwrap();
+    std::fs::write(
+        ws._fixtures.tasks_root.join("automation.yml"),
+        "automation:\n  rules:\n    - name: Paused\n      on:\n        job_paused:\n          comment: \"paused: ${{agent.runner}}\"\n    - name: Sign in\n      when:\n        job: { pause: auth }\n      on:\n        job_paused:\n          comment: \"sign in to ${{agent.provider}}\"\n    - name: Failed\n      on:\n        job_failed:\n          set:\n            status: HelpNeeded\n            assignee: owner\n          comment: \"failed\"\n    - name: Completed\n      on:\n        job_completed:\n          set:\n            status: Done\n",
+    )
+    .unwrap();
+    run(&ws);
+    wait_for("the job to pause", || !jobs(&ws, "paused").is_empty());
+    let paused = jobs(&ws, "paused").remove(0);
+    let summary = paused["summary"].as_str().unwrap_or_default();
+    assert!(summary.starts_with("Paused, not failed: the claude login fails (") && summary.contains("Claude could not authenticate"), "{summary}");
+    let show = json(&ws, &["show", "TEST-1"]);
+    assert_eq!((&show["status"], &show["assignee"]), (&"Todo".into(), &"fixer".into()), "the ticket keeps its status and assignee: {show}");
+
+    wait_for("the job to complete", || !jobs(&ws, "completed").is_empty());
+    assert_eq!(jobs(&ws, "paused").len(), 2, "both runs on the expired login paused");
+    assert!(jobs(&ws, "failed").is_empty(), "no job failed");
+    assert_eq!(starts(&ws.t3), 3);
+    wait_for("the completed job's rule", || json(&ws, &["show", "TEST-1"])["status"] == "Done");
+    let comments = comments(&ws);
+    assert_eq!(comments.iter().filter(|text| *text == "paused: t3").count(), 2, "{comments:?}");
+    assert_eq!(comments.iter().filter(|text| *text == "sign in to claude").count(), 1, "one notice, from the job that opened the pause: {comments:?}");
+    assert!(!comments.iter().any(|text| text == "failed"), "no failure rule ran: {comments:?}");
+    let queue = json(&ws, &["agent", "queue"]);
+    assert_eq!(queue["pauses"], serde_json::json!([]), "the retry that completed ended the pause: {queue}");
 }

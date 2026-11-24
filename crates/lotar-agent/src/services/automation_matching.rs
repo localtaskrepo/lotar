@@ -31,6 +31,8 @@ pub(crate) struct ChangeSet {
 struct JobFacts {
     /// Why the job failed; `None` when it didn't.
     error: Option<String>,
+    /// The queue pause it opened; `None` when it opened none.
+    pause: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,10 +116,11 @@ impl ChangeSet {
         Self { comment: Some(facts), ..Self::empty(current) }
     }
 
-    /// No field changes: an agent job of `current` started or ended, and a
-    /// failed one failed for `error`.
-    pub(crate) fn job_event(current: &TaskDTO, error: Option<&str>) -> Self {
-        Self { job: Some(JobFacts { error: error.map(str::to_string) }), ..Self::empty(current) }
+    /// No field changes: an agent job of `current` started or ended; a
+    /// failed one says why, a paused one which queue pause it opened.
+    pub(crate) fn job_event(current: &TaskDTO, job: Option<&crate::services::automation_service::AutomationJobContext>) -> Self {
+        let facts = JobFacts { error: job.and_then(|job| job.error.clone()), pause: job.and_then(|job| job.pause.clone()) };
+        Self { job: Some(facts), ..Self::empty(current) }
     }
 
     fn changed_field(&self, field: &str) -> Option<&FieldChange> {
@@ -408,7 +411,10 @@ fn matches_job(condition: &AutomationJobCondition, changes: &ChangeSet) -> bool 
     let Some(job) = changes.job.as_ref() else {
         return false;
     };
-    condition.error.as_ref().is_none_or(|error_condition| matches_value_condition(error_condition, job.error.clone().map(AutomationValue::String).as_ref()))
+    let matches = |condition: Option<&AutomationFieldCondition>, value: &Option<String>| {
+        condition.is_none_or(|condition| matches_value_condition(condition, value.clone().map(AutomationValue::String).as_ref()))
+    };
+    matches(condition.error.as_ref(), &job.error) && matches(condition.pause.as_ref(), &job.pause)
 }
 
 fn matches_field_map(

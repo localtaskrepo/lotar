@@ -368,15 +368,15 @@ impl AgentHandler {
                 renderer.emit_info(format_args!("Queue: new jobs wait for disk space: {}", hold.describe()));
             }
         }
-        // A paused queue says so (DEV-604).
-        let pause = AgentQueueService::pause_state(&resolver.path);
-        if let Some(pause) = pause.as_ref().filter(|_| !matches!(renderer.format, OutputFormat::Json)) {
+        // A paused queue says so, each pause once (DEV-604, DEV-835).
+        let pauses = AgentQueueService::pauses(&resolver.path);
+        for pause in pauses.iter().filter(|_| !matches!(renderer.format, OutputFormat::Json)) {
             renderer.emit_warning(format!("The agent queue is {}.", pause.summary()));
         }
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "disk_hold": disk_json, "pause": pause }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "disk_hold": disk_json, "pauses": pauses }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found (agent logging is off).");
@@ -387,7 +387,7 @@ impl AgentHandler {
 
         if job_ids.is_empty() {
             if matches!(renderer.format, OutputFormat::Json) {
-                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "disk_hold": disk_json, "pause": pause }));
+                renderer.emit_json(&serde_json::json!({ "jobs": [], "memory_hold": hold_json, "disk_hold": disk_json, "pauses": pauses }));
                 return Ok(());
             }
             renderer.emit_notice("No job logs found.");
@@ -418,7 +418,7 @@ impl AgentHandler {
         }
 
         if matches!(renderer.format, OutputFormat::Json) {
-            renderer.emit_json(&serde_json::json!({ "jobs": jobs, "memory_hold": hold_json, "disk_hold": disk_json, "pause": pause }));
+            renderer.emit_json(&serde_json::json!({ "jobs": jobs, "memory_hold": hold_json, "disk_hold": disk_json, "pauses": pauses }));
             return Ok(());
         }
 
@@ -513,7 +513,7 @@ impl AgentHandler {
                         "memory_hold": memory.hold.as_ref().map(crate::services::memory_gate::MemoryHold::to_json),
                         "memory_error": memory.error,
                         "disk_hold": overview.disk.as_ref().map(crate::services::disk_gate::DiskHold::to_json),
-                        "pause": overview.pause,
+                        "pauses": overview.pauses,
                         "running_jobs": stats.running,
                         "queued_jobs": stats.queued,
                     }));

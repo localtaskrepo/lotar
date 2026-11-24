@@ -513,8 +513,9 @@ function summarizeConditions(when: unknown): string[] {
             continue
         }
         if (key === 'job' && value && typeof value === 'object') {
-            const error = (value as AutomationRecord).error
+            const { error, pause } = value as AutomationRecord
             if (error != null) conditions.push(`job error ${summarizeFieldCondition(error)}`)
+            if (pause != null) conditions.push(`queue pause the job opened ${summarizeFieldCondition(pause)}`)
             continue
         }
         conditions.push(`${key} ${summarizeFieldCondition(value)}`)
@@ -663,7 +664,7 @@ function collectUnsupportedWhenReasons(when: unknown, depth = 0): string[] {
         reasons.push('Comment author conditions are currently YAML-only.')
     }
     if ('job' in record) {
-        reasons.push('Job error conditions are currently YAML-only.')
+        reasons.push('Job conditions are currently YAML-only.')
     }
 
     for (const key of Object.keys(record)) {

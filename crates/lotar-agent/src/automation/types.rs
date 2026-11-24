@@ -196,6 +196,11 @@ pub struct AutomationJobCondition {
     /// error (DEV-617). Jobs that didn't fail have no value (`exists: false`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<AutomationFieldCondition>,
+    /// The queue pause the job opened (DEV-835): `signing`, `disk` or
+    /// `auth`. A job that opened none, also one that joined an open pause,
+    /// has no value (`exists: false`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pause: Option<AutomationFieldCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

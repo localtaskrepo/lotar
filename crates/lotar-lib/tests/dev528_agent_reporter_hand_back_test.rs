@@ -72,6 +72,8 @@ fn fail_job_after_hand_back(reporter: &str, hand_back_to: &str) -> (String, Opti
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         }),
     )
     .unwrap();

@@ -3,7 +3,7 @@ use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, AgentRun
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_context_service::{AgentContextService, build_assistant_message, build_user_message};
 use crate::services::agent_log_service::AgentLogService;
-use crate::services::agent_queue_service::{AgentQueueEntry, AgentQueueService, CarriedOutcome, CommitRetry, PauseReason};
+use crate::services::agent_queue_service::{AgentQueueEntry, AgentQueueService, CarriedOutcome, CommitRetry, JobScope, PauseReason};
 use crate::services::agent_runner::{block_on, build_command, harness_agent, session_name};
 use crate::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService, build_lotar_env};
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
@@ -167,8 +167,9 @@ struct AgentJobState {
     /// The job retries one paused on a usage limit (DEV-833): a t3 job
     /// continues that job's thread, however long it was idle.
     after_limit: bool,
-    /// The job commits, so a signing pause holds it ([`job_commits_with`]).
-    commits: bool,
+    /// Whether it commits and its provider, which say the pauses that hold
+    /// it ([`job_commits_with`], [`job_provider`]).
+    scope: JobScope,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -182,7 +183,7 @@ struct PendingJob {
     user_prompt: String,
     config: ResolvedConfig,
     is_merge_job: bool,
-    commits: bool,
+    scope: JobScope,
 }
 
 struct JobRegistry {
@@ -306,17 +307,19 @@ impl AgentJobService {
         Self::start_job_inner(req, tasks_dir, JobStartMode::Immediate, commit_retry, carried_outcome, after_limit)
     }
 
-    /// Whether the job `req` asks for commits, so a signing pause holds it.
-    /// When that can't be told, it does.
-    pub(crate) fn job_commits(tasks_dir: &std::path::Path, req: &AgentJobCreateRequest) -> bool {
+    /// Whether the job `req` asks for commits (so a signing pause holds it)
+    /// and its provider (so that provider's login pause does). A job whose
+    /// profile can't be read commits, on the run's provider or runner.
+    pub(crate) fn job_scope(tasks_dir: &std::path::Path, req: &AgentJobCreateRequest) -> JobScope {
         let project = crate::storage::TaskId::parse(req.ticket_id.trim()).ok().map(|id| id.project);
-        let Ok(config) = crate::config::resolution::config_for_project(tasks_dir, project.as_deref()) else {
-            return true;
+        let config = crate::config::resolution::config_for_project(tasks_dir, project.as_deref()).ok();
+        let resolved = config.as_ref().and_then(|config| Some((config, resolve_profile(config, req).ok()?)));
+        let Some((config, profile)) = resolved else {
+            let provider = non_blank(req.provider.as_deref()).or_else(|| non_blank(req.runner.as_deref())).unwrap_or_default();
+            return JobScope { commits: true, provider };
         };
-        resolve_profile(&config, req)
-            .ok()
-            .and_then(|profile| profile.runner.parse::<AgentRunnerKind>().ok().map(|kind| job_commits_with(&config, &profile, kind)))
-            .unwrap_or(true)
+        let commits = profile.runner.parse::<AgentRunnerKind>().ok().is_none_or(|kind| job_commits_with(config, &profile, kind));
+        JobScope { commits, provider: job_provider(&profile) }
     }
 
     fn start_job_inner(
@@ -408,10 +411,10 @@ impl AgentJobService {
         let created_at = time::now_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
         let (job_model, job_effort) = (profile.model.clone(), profile.effort.clone());
-        let commits = job_commits_with(&config, &profile, runner_kind);
+        let scope = JobScope { commits: job_commits_with(&config, &profile, runner_kind), provider: job_provider(&profile) };
         // A paused queue holds the job back until it resumes or the job takes
         // its due try (DEV-604). A job the queue worker starts took it there.
-        let held = matches!(mode, JobStartMode::RespectLimits) && AgentQueueService::holding(tasks_dir, commits).is_some();
+        let held = matches!(mode, JobStartMode::RespectLimits) && AgentQueueService::holding(tasks_dir, &scope).is_some();
 
         let has_active_job = |registry: &JobRegistry| {
             registry.active_by_ticket.contains_key(&ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, &ticket_id).is_some()
@@ -496,7 +499,7 @@ impl AgentJobService {
                     commit_retry,
                     carried_outcome,
                     after_limit,
-                    commits,
+                    scope: scope.clone(),
                 },
             );
 
@@ -512,7 +515,7 @@ impl AgentJobService {
                     user_prompt: user_prompt.clone(),
                     config: config.clone(),
                     is_merge_job,
-                    commits,
+                    scope,
                 });
             } else {
                 // Slot available - increment running count
@@ -634,10 +637,10 @@ impl AgentJobService {
     /// `None` once it runs (DEV-525). A waiting job has no log yet and
     /// `lotar agent queue` doesn't list it, so its ticket has to say so.
     pub fn waiting_reason(job_id: &str) -> Option<String> {
-        let (tasks_dir, commits, is_merge_job) = {
+        let (tasks_dir, scope, is_merge_job) = {
             let registry = JOB_REGISTRY.lock().ok()?;
             let pending = registry.pending_queue.iter().find(|pending| pending.job_id == job_id)?;
-            (pending.tasks_dir.clone(), pending.commits, pending.is_merge_job)
+            (pending.tasks_dir.clone(), pending.scope.clone(), pending.is_merge_job)
         };
         if let Some(hold) = crate::services::memory_gate::status(&tasks_dir).hold {
             return Some(format!("it waits for memory: {}", hold.describe()));
@@ -645,7 +648,7 @@ impl AgentJobService {
         if let Some(hold) = crate::services::disk_gate::status(&tasks_dir).filter(|_| !is_merge_job) {
             return Some(format!("it waits for disk space: {}", hold.describe()));
         }
-        if let Some(pause) = AgentQueueService::holding(&tasks_dir, commits) {
+        if let Some(pause) = AgentQueueService::holding(&tasks_dir, &scope) {
             return Some(format!("it waits while the queue is {}", pause.summary()));
         }
         let registry = JOB_REGISTRY.lock().ok()?;
@@ -994,6 +997,8 @@ fn job_context_for(id: &str) -> Option<AutomationJobContext> {
         usage: state.record.usage.clone(),
         assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
         error: state.record.summary.clone().filter(|_| matches!(state.record.status, AgentJobStatus::Failed | AgentJobStatus::Paused)),
+        provider: Some(state.scope.provider.clone()).filter(|provider| !provider.is_empty()),
+        pause: None,
     })
 }
 
@@ -1255,6 +1260,8 @@ fn instruction_template(
         usage: None,
         assignee_at_start: None,
         error: None,
+        provider: None,
+        pause: None,
     };
     let workspace_root = repo_root.unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
     let lotar_bin = current_lotar_binary().map(|bin| bin.to_string_lossy().to_string()).unwrap_or_else(|| "lotar".to_string());
@@ -2294,7 +2301,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 commit_retry: None,
                 carried_outcome: None,
                 after_limit: false,
-                commits: true,
+                scope: JobScope { commits: true, provider: job_provider(&profile) },
             },
         );
         registry.running_count += 1;
@@ -2378,7 +2385,7 @@ fn resume_session_to_end(
                 return;
             }
             match run_again_in_new_session(job_id, tasks_dir) {
-                Some(note) => end_unfinished_job(job_id, ticket_id, format!("{message}. {note}"), true, tasks_dir),
+                Some(note) => end_unfinished_job(job_id, ticket_id, format!("{message}. {note}"), true, None, tasks_dir),
                 None => update_job_failure(job_id, ticket_id, message, tasks_dir),
             }
             return;
@@ -5669,18 +5676,31 @@ fn finalize_job(
     let resumes_at = limit_pause.as_ref().map(|(_, at)| at.clone());
     // A failure every job like this one would hit pauses the queue instead
     // of failing (DEV-604); a job that completes ends a pause it would have hit.
+    // A login the runner reports failing pauses that provider's jobs
+    // (DEV-835); a full disk or signing failure the others.
+    // The pause this job opened, for `job: { pause: ... }` rules: the
+    // owner's one notice of it (DEV-835).
+    let mut opened_pause = None;
     let paused: Option<(Option<PauseReason>, String)> = match limit_pause {
         Some((note, _)) => Some((None, note)),
         None if success => None,
-        None => pause_cause(job_id, failure_reason.as_deref())
-            .and_then(|(reason, line)| pause_queue(job_id, tasks_dir, reason, &line, commit_failed).map(|note| (Some(reason), note))),
+        None => {
+            auth_failure(job_id).map(|line| (PauseReason::Auth, line)).or_else(|| pause_cause(job_id, failure_reason.as_deref())).and_then(|(reason, line)| {
+                let (note, opened) = pause_queue(job_id, tasks_dir, reason, &line, commit_failed && reason != PauseReason::Auth)?;
+                opened_pause = opened.then_some(reason);
+                Some((Some(reason), note))
+            })
+        }
     };
-    let commits = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.commits)).unwrap_or(true);
-    if success && let Some(pause) = AgentQueueService::end_pause(tasks_dir, commits) {
-        let note = format!("This job completed, so the queue's pause ({}, since {}) ended: the jobs it held start.", pause.reason.describe(), pause.since);
-        update_job(job_id, |state| {
-            record_and_emit(state, "agent_job_progress", Some(note.clone()));
-        });
+    let scope = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.scope.clone()));
+    let scope = scope.unwrap_or(JobScope { commits: true, provider: String::new() });
+    if success {
+        for pause in AgentQueueService::end_pause(tasks_dir, &scope) {
+            let note = format!("This job completed, so the queue's pause ({}, since {}) ended: the jobs it held start.", pause.describe(), pause.since);
+            update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+        }
     }
     let pause_note = paused.as_ref().map(|(_, note)| note.clone());
     // Before the job ends: whoever waits for its end reads the ticket then.
@@ -5763,7 +5783,7 @@ fn finalize_job(
         },
     );
 
-    let job_context = job_context_for(job_id);
+    let job_context = job_context_for(job_id).map(|context| AutomationJobContext { pause: opened_pause.map(|reason| reason.as_str().to_string()), ..context });
     let mut registry = JOB_REGISTRY.lock().ok();
     if let Some(ref mut registry) = registry {
         if registry.active_by_ticket.get(ticket_id).is_some_and(|id| id == job_id) {
@@ -5840,6 +5860,28 @@ fn failure_texts(job_id: &str, note: Option<&str>) -> Vec<String> {
             Some(note.map(str::to_string).into_iter().chain(state.record.last_message.clone()).chain(events).collect())
         })
         .unwrap_or_default()
+}
+
+/// Texts of a runner's failure that show its login failing, besides the
+/// ones harnessmux types `auth_required`: T3 Code's and Claude Code's own
+/// words for an expired login (DEV-835).
+const AUTH_FAILURES: [&str; 3] = ["could not authenticate", "authentication required", "login reached its time limit"];
+
+/// The line of the runner's failure report that shows the provider's login
+/// failing, trimmed. Only the runner's reports count (`runner_errors`), not
+/// the agent's messages: an agent that talked about a login error fails.
+fn auth_failure(job_id: &str) -> Option<String> {
+    let errors = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.runner_errors.clone()))?;
+    auth_failure_in(&errors)
+}
+
+fn auth_failure_in(errors: &[harnessmux::Failure]) -> Option<String> {
+    errors.iter().find_map(|failure| {
+        let lower = failure.error.to_lowercase();
+        let auth = failure.kind == harnessmux::FailureKind::AuthRequired || AUTH_FAILURES.iter().any(|text| lower.contains(text));
+        let line = failure.error.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or("the provider's login failed");
+        auth.then(|| line.chars().take(300).collect())
+    })
 }
 
 /// The pause a failed job's output calls for ([`failure_texts`]).
@@ -5936,11 +5978,14 @@ fn save_retry<T, E>(tasks_dir: &std::path::Path, job_id: &str, ticket_id: &str, 
 /// first: with `retry_commit` only its commit, in its worktree. The note
 /// for the job; `None` when it fails as before: it can't be retried (taken
 /// over from another process), the queue can't be paused, or signing
-/// failed a job that doesn't commit, which such a pause wouldn't hold.
-fn pause_queue(job_id: &str, tasks_dir: &std::path::Path, reason: PauseReason, line: &str, retry_commit: bool) -> Option<String> {
-    let (mut request, ticket_id, worktree, branch) = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        let state = registry.jobs.get(job_id).filter(|state| reason.holds(state.commits || state.commit_retry.is_some()))?;
-        Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.worktree_path.clone(), state.record.worktree_branch.clone()))
+/// failed a job that doesn't commit, which such a pause wouldn't hold. A
+/// login pause holds the jobs on the job's provider. Also whether this job
+/// opened the pause, rather than joined an open one.
+fn pause_queue(job_id: &str, tasks_dir: &std::path::Path, reason: PauseReason, line: &str, retry_commit: bool) -> Option<(String, bool)> {
+    let (mut request, ticket_id, worktree, branch, provider) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        let state = registry.jobs.get(job_id).filter(|state| reason != PauseReason::Signing || state.scope.commits || state.commit_retry.is_some())?;
+        let provider = (reason == PauseReason::Auth).then(|| state.scope.provider.clone());
+        Some((state.request.clone()?, state.record.ticket_id.clone(), state.record.worktree_path.clone(), state.record.worktree_branch.clone(), provider))
     })?;
     let commit_retry =
         worktree.filter(|_| retry_commit).map(|worktree_path| CommitRetry { job_id: job_id.to_string(), worktree_path, worktree_branch: branch });
@@ -5948,18 +5993,16 @@ fn pause_queue(job_id: &str, tasks_dir: &std::path::Path, reason: PauseReason, l
     // A status or assignee the agent set during the job (a hand-back) goes
     // with the retry, which applies it when it ends.
     request.ticket_id = ticket_id;
-    let pause = save_retry(tasks_dir, job_id, &request.ticket_id, |carried| {
-        AgentQueueService::pause(tasks_dir, reason, line, job_id, &AgentQueueEntry::retry_of(&request, commit_retry, carried))
+    let (pause, opened) = save_retry(tasks_dir, job_id, &request.ticket_id, |carried| {
+        AgentQueueService::pause(tasks_dir, reason, provider.as_deref(), line, job_id, &AgentQueueEntry::retry_of(&request, commit_retry, carried))
     })?;
-    let scope = match pause.reason {
-        PauseReason::Signing => "the jobs that commit",
-        PauseReason::Disk => "every job",
-    };
-    Some(format!(
-        "Paused, not failed: {} ({line}). The queue holds {scope} and tries one again at {}; this job {retry} first. The first of them that completes ends the pause.",
-        reason.describe(),
+    let note = format!(
+        "Paused, not failed: {} ({line}). The queue holds {} and tries one again at {}; this job {retry} first. The first of them that completes ends the pause.",
+        pause.describe(),
+        pause.scope(),
         pause.next_try_at
-    ))
+    );
+    Some((note, opened))
 }
 
 /// Record the paused job's status and assignee change for its retry, which
@@ -6079,10 +6122,13 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
         .ok()
         .is_some_and(|registry| registry.jobs.get(job_id).is_some_and(|state| matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running)));
     // A worktree that can't be made on a full disk pauses the queue (DEV-604).
-    let pause_note =
-        active.then(|| pause_cause_in([message.as_str()])).flatten().and_then(|(reason, line)| pause_queue(job_id, tasks_dir, reason, &line, false));
-    let paused = pause_note.is_some();
-    end_unfinished_job(job_id, ticket_id, pause_note.unwrap_or(message), paused, tasks_dir);
+    let pause = active
+        .then(|| pause_cause_in([message.as_str()]))
+        .flatten()
+        .and_then(|(reason, line)| pause_queue(job_id, tasks_dir, reason, &line, false).map(|(note, opened)| (note, opened.then_some(reason))));
+    let paused = pause.is_some();
+    let (message, opened) = pause.unwrap_or((message, None));
+    end_unfinished_job(job_id, ticket_id, message, paused, opened, tasks_dir);
 }
 
 /// Queue a taken-over job whose session can't be resumed to run again
@@ -6104,8 +6150,9 @@ fn run_again_in_new_session(job_id: &str, tasks_dir: &std::path::Path) -> Option
 }
 
 /// End a job that didn't finish: failed, or paused when it runs again.
-/// A paused job runs its `job_paused` rules, a failed one its `job_failed` rules.
-fn end_unfinished_job(job_id: &str, ticket_id: &str, message: String, paused: bool, tasks_dir: &std::path::Path) {
+/// A paused job runs its `job_paused` rules, a failed one its `job_failed` rules;
+/// `opened` is the queue pause it opened.
+fn end_unfinished_job(job_id: &str, ticket_id: &str, message: String, paused: bool, opened: Option<PauseReason>, tasks_dir: &std::path::Path) {
     let now = time::now_rfc3339();
     let mut failed = false;
     update_job(job_id, |state| {
@@ -6144,7 +6191,8 @@ fn end_unfinished_job(job_id: &str, ticket_id: &str, message: String, paused: bo
     }
     drop(registry);
     let event = if paused { AutomationEvent::JobPaused } else { AutomationEvent::JobFailed };
-    apply_job_end_rules(job_id, ticket_id, tasks_dir, event, job_context_for(job_id));
+    let job_context = job_context_for(job_id).map(|context| AutomationJobContext { pause: opened.map(|reason| reason.as_str().to_string()), ..context });
+    apply_job_end_rules(job_id, ticket_id, tasks_dir, event, job_context);
 }
 
 /// Runs the rules for the job's end and logs where they moved the ticket,
@@ -6273,8 +6321,8 @@ fn process_pending_queue() {
                     && matches!(slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id), Ok(None))
                     && crate::services::memory_gate::check(&pending.tasks_dir).is_none()
                     && (pending.is_merge_job || crate::services::disk_gate::check(&pending.tasks_dir).is_none())
-                    && (AgentQueueService::holding(&pending.tasks_dir, pending.commits).is_none()
-                        || AgentQueueService::take_held_try(&pending.tasks_dir, &pending.ticket_id, pending.commits, |ticket| {
+                    && (AgentQueueService::holding(&pending.tasks_dir, &pending.scope).is_none()
+                        || AgentQueueService::take_held_try(&pending.tasks_dir, &pending.ticket_id, &pending.scope, |ticket| {
                             registry.active_by_ticket.contains_key(ticket) && !registry.pending_queue.iter().any(|queued| queued.ticket_id == ticket)
                         }))
             });
@@ -6309,6 +6357,17 @@ fn process_pending_queue() {
 fn job_commits_with(config: &ResolvedConfig, profile: &AgentProfileDetail, runner_kind: AgentRunnerKind) -> bool {
     let read_only = runner_kind != AgentRunnerKind::T3 && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
     config.agent_worktree.enabled && !read_only
+}
+
+/// The provider a login pause names for a job: its profile's, else its
+/// runner, the one that signs in (DEV-835). T3 Code's `claudeAgent` signs
+/// in with Claude Code's login, so it is `claude`, as the runner is.
+fn job_provider(profile: &AgentProfileDetail) -> String {
+    match profile.provider.as_deref() {
+        Some("claudeAgent") => "claude".to_string(),
+        Some(provider) => provider.to_string(),
+        None => profile.runner.clone(),
+    }
 }
 
 /// Why a job for the ticket waits under `agent.worktree.max_parallel_jobs`:
@@ -6571,6 +6630,36 @@ mod tests {
         let script = dir.path().join("no-such-script");
         let program = script.to_str().unwrap();
         assert_eq!(start_failure(program, dir.path(), &spawn(program, dir.path())), format!("`{program}` doesn't exist"));
+    }
+
+    /// DEV-835: T3 Code's Claude jobs and headless Claude jobs share one
+    /// login, so one pause.
+    #[test]
+    fn claude_jobs_on_t3_and_headless_share_a_provider() {
+        let t3 = AgentProfileDetail { runner: "t3".into(), provider: Some("claudeAgent".into()), ..Default::default() };
+        let headless = AgentProfileDetail { runner: "claude".into(), ..Default::default() };
+        let codex = AgentProfileDetail { runner: "t3".into(), provider: Some("codex".into()), ..Default::default() };
+        assert_eq!((job_provider(&t3), job_provider(&headless), job_provider(&codex)), ("claude".into(), "claude".into(), "codex".into()));
+    }
+
+    /// DEV-835: a runner failure typed `auth_required`, or one whose text
+    /// names a failed login (T3 Code's, typed `other`), pauses the queue;
+    /// other failures don't.
+    #[test]
+    fn a_runner_login_failure_names_its_pause() {
+        use harnessmux::{Failure, FailureKind};
+        let t3 = "the T3 Code thread's run ended with status 'failed': Provider error: Claude could not authenticate. For subscription login, run `claude auth login`";
+        assert_eq!(auth_failure_in(&[Failure::new(t3, FailureKind::Other)]).as_deref(), Some(t3));
+        assert_eq!(
+            auth_failure_in(&[Failure::new("\nNot logged in · Please run /login\n", FailureKind::AuthRequired)]).as_deref(),
+            Some("Not logged in · Please run /login")
+        );
+        assert_eq!(
+            auth_failure_in(&[Failure::new("Your login reached its time limit", FailureKind::Other)]).as_deref(),
+            Some("Your login reached its time limit")
+        );
+        assert!(auth_failure_in(&[Failure::new("stream disconnected before completion", FailureKind::Transport)]).is_none());
+        assert!(auth_failure_in(&[]).is_none());
     }
 
     /// DEV-604: which failures pause the queue, and the line that says so.
@@ -7167,7 +7256,7 @@ mod tests {
             commit_retry: None,
             carried_outcome: None,
             after_limit: false,
-            commits: true,
+            scope: JobScope { commits: true, provider: String::new() },
         }
     }
 

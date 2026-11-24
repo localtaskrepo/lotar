@@ -392,7 +392,7 @@ fn adopt(
                 commit_retry: None,
                 carried_outcome: None,
                 after_limit: false,
-                commits: super::job_commits_with(&config, &profile, AgentRunnerKind::T3),
+                scope: super::JobScope { commits: super::job_commits_with(&config, &profile, AgentRunnerKind::T3), provider: super::job_provider(&profile) },
             },
         );
         // It counts toward max_parallel_jobs, so queued jobs wait for it.

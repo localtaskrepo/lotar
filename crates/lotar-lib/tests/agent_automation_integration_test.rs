@@ -2125,6 +2125,8 @@ fn clarification_handoff_to_reporter_survives_job_failure() {
             usage: None,
             assignee_at_start: None,
             error: None,
+            provider: None,
+            pause: None,
         }),
     )
     .expect("apply job failure");

@@ -205,6 +205,18 @@ when:
       set: { assignee: "@fix-retry" }
 ```
 
+`job: { pause: ... }` matches the [queue pause](agent.md#paused-queue) a `job_paused` job opened: `auth` (a provider's login fails), `signing` or `disk`. A job that joined an open pause (another ticket's job opened it, or it is a retry that failed the same way) or paused on a usage limit opened none, so it matches only `exists: false`. That makes one notice per pause, not one per held ticket. This rule hands the ticket whose job found an expired login to you, with the provider's name:
+
+```yaml
+- name: Login expired
+  when:
+    job: { pause: auth }
+  on:
+    job_paused:
+      set: { status: HelpNeeded, assignee: mallox }
+      comment: "The ${{agent.provider}} login fails: its jobs wait. Sign in again (claude auth login, codex login); the next try resumes them."
+```
+
 `lotar automation simulate` has no job to check, so a `job` condition doesn't match there.
 
 ### Special assignee placeholders
@@ -464,7 +476,7 @@ Available variables:
 | `ticket.*` | `id`, `title`, `status`, `priority`, `type`, `assignee`, `reporter`, `description`, `due_date`, `effort`, `tags`, `field:<name>` |
 | `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, `release_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
 | `comment.*` | `text`, `author` (available on `commented` events; `author` is empty for a comment without one) |
-| `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the agent reported them |
+| `agent.*` | `job_id`, `runner`, `profile`, `provider` (the profile's `provider`, else its runner), `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the agent reported them |
 | `unblocked.*` | `by` (the prerequisites with their titles: `DEV-1 (Docs), DEV-2 (Release v1.4.0)`) and `ids` (`DEV-1,DEV-2`), on `unblocked` events |
 
 Lists take a selector in square brackets. `[*]` joins every item with ", ", a number picks one item (`[0]` is the first, `[-1]` the last), and `.field` reads a field of each item:
