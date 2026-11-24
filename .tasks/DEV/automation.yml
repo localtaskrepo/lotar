@@ -414,7 +414,9 @@ automation:
                  back.
               3. Run the checks this repo's AGENTS.md names (agent.merge checks in .tasks/config.yml, where set), in
                  your worktree: the full suites, which only the merge runs (owner 2026-11-22, lotar DEV-797). One
-                 fails: hand back.
+                 fails: hand back. Each in the foreground, timeout up to an hour, its exit code unpiped (no | tail).
+                 One still running at the timeout moves to the background: wait for it in foreground until loops on
+                 its output file, never by ending your turn: the job ends with it (STD-330).
                  Skip a check the fix or rework comment says passed on the commit that is still HEAD (the rebase
                  changed nothing: same hash before and after), and name it as skipped in your comment.
               4. git -C <root> merge --ff-only <your branch>. Main moved on: back to step 2. Refused
