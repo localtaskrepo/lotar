@@ -289,3 +289,36 @@ fn a_typed_rate_limit_pauses_the_job_until_its_resets_at() {
     assert!(!comments(&ws).iter().any(|text| text == "failed"), "no failure rule ran: {:?}", comments(&ws));
     assert_eq!(starts(&ws.t3), 1, "the retry waits for the reset");
 }
+
+/// DEV-832: T3 Code resumes each thread it paused on a usage limit after the
+/// reset, so a retry that started its own thread ran beside the paused one
+/// in the same worktree. A t3 job's retry continues the paused job's thread,
+/// also past `continue_within_minutes`: no second thread starts.
+#[test]
+fn a_t3_jobs_retry_after_a_usage_limit_continues_the_paused_thread() {
+    let limited_thread = FAKE_T3.replace(r#"cat "$dir/message" >&2; exit 1; fi"#, r#"echo "Thread t1" >&2; cat "$dir/message" >&2; exit 1; fi"#);
+    let ws = workspace_on(
+        &limited_thread,
+        "[agents.t3]\nkind = \"t3\"\n",
+        "    runner: t3\n    provider: codex\n    model: gpt-5.5\n    session: continue\n    continue_within_minutes: 0\n",
+    );
+    std::fs::write(ws.t3.join("message"), format!("{CLAUDE_LIMIT}\n")).unwrap();
+    std::fs::write(ws.t3.join("limited"), "1").unwrap();
+    run(&ws);
+    wait_for("the retry to end", || {
+        let list = json(&ws, &["agent", "list-jobs"]);
+        list["jobs"].as_array().unwrap().iter().any(|job| job["status"] == "completed" || job["status"] == "failed")
+    });
+    assert_eq!(jobs(&ws, "paused").len(), 1, "the first run paused");
+    assert_eq!(starts(&ws.t3), 1, "the retry started no second thread");
+    let retry = json(&ws, &["agent", "list-jobs"])["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|job| job["status"] != "paused")
+        .and_then(|job| job["id"].as_str().map(str::to_string))
+        .unwrap();
+    let log = lotar(&ws).args(["agent", "logs", &retry]).output().unwrap();
+    let log = String::from_utf8_lossy(&log.stdout);
+    assert!(log.contains("this job retries one paused on a usage limit, in the same T3 Code thread"), "{log}");
+}
