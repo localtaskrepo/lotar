@@ -137,7 +137,8 @@ fn run_commands(content: &str) -> Vec<(String, String, String)> {
             continue;
         };
         for (event, action) in map {
-            if let Some(run) = action.get("run") {
+            // A serialized action without a run command holds `run: null`.
+            if let Some(run) = action.get("run").filter(|run| !run.is_null()) {
                 let command = match run {
                     serde_yaml_ng::Value::String(raw) => raw.clone(),
                     other => serde_json::to_string(other).unwrap_or_default(),
@@ -164,5 +165,25 @@ mod tests {
         let described = describe(tasks).join("\n");
         assert!(described.contains("rule 'hi' on created runs echo hi"), "{described}");
         assert!(described.contains("agent profile 'bot'"), "{described}");
+    }
+
+    /// DEV-847: rules without a run command are not listed as `runs null`.
+    #[test]
+    fn skips_rules_without_a_run_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let tasks = dir.path();
+        std::fs::write(
+            tasks.join("automation.yml"),
+            "automation:\n  rules:\n    - name: hi\n      on:\n        created:\n          run: echo hi\n    - name: tag\n      on:\n        updated:\n          set:\n            tags: [x]\n",
+        )
+        .unwrap();
+        assert_eq!(describe(tasks), vec!["automation.yml: rule 'hi' on created runs echo hi"]);
+
+        std::fs::write(
+            tasks.join("automation.yml"),
+            "automation:\n  rules:\n    - name: tag\n      on:\n        updated:\n          set:\n            tags: [x]\n",
+        )
+        .unwrap();
+        assert_eq!(describe(tasks), vec!["automation.yml: no run commands"]);
     }
 }

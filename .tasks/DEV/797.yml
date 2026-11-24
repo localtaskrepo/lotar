@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-25T18:02:29.257885+00:00
+modified: 2026-11-25T20:38:51.209954+00:00
 relationships:
   blocks:
   - DEV-801
@@ -144,6 +144,9 @@ comments:
     - The other conflicts were mechanical: main already has the prompt text in `.tasks/DEV/automation.yml` (from the standards sync), and `integration.rs` only needed both test modules listed.
     - `git rebase --abort` ran, `agent/DEV-797` is unchanged at `3c444f069`, and no checks ran.
     - Options: (a) rework DEV-797 on top of DEV-784's socket lock, adding only the merge-agent hold, the hand-off and the wait comment, then drop `checks_lock.rs`; (b) replace DEV-784's lock with the file lock; (c) close DEV-797 as covered by DEV-784 and keep only its prompt and doc changes.
+- date: 2026-11-25T20:38:49.983961+00:00
+  author: mallox
+  text: 'Answer: fold (Rework DEV-797 on DEV-784''s socket lock: add only the merge-agent hold, hand-off and wait comment; drop checks_lock.rs) (answered in INBOX-730)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
@@ -389,3 +392,13 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-25T20:38:49.983961+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:38:51.209954+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

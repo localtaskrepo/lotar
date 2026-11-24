@@ -1,11 +1,11 @@
 title: 'Release skill step 4: a minor or major release the owner asked for still makes the agent ask him again'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T08:21:23.478863+00:00
-modified: 2026-11-25T07:59:54.842082+00:00
+modified: 2026-11-25T20:36:44.433151+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -189,6 +189,39 @@ comments:
     - Main has no newer commits to either file since the base `855ff6f46` (latest is `28e3633ec`, DEV-816, already in the base).
     - Reran: `npm ci` passed, `npx prettier --check` on both files passed. Worktree clean. No UI, no test needed (docs only).
     - Findings: none. Tickets filed: none.
+- date: 2026-11-25T20:36:43.128736+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-831` is in `main`.
+
+    - Rebased `agent/DEV-831` onto `main` (`5ce98e18e6f0`): `696632766ef2`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-831` onto `main` (`87f6d2cf1e37`): `243119bdbd99`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `243119bdbd99`
+    - Amended the pending `.tasks` changes into the merged commit: `5e8271ac1180`
+    - Pushed 3 commits to `origin/main`
+  report:
+    commits:
+    - hash: 56de78e33
+      what: 'DEV-769 Agent job log viewer: filters, search, folded tool calls, live status line, and jobs list filters'
+    - hash: 87f6d2cf1
+      what: DEV-822 Automation run fails with ENOENT when --tasks-dir is a bare relative path (.tasks)
+    - hash: 5e8271ac1
+      what: 'DEV-831 Release skill step 4: a minor or major release the owner asked for still makes the agent ask him again'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A41457a4efbab78f4ddd82650de13a05fad1dddda8d5e2647a277ee8017e4f075
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aca5491a9b58dc04788a415f7e6cd6f356656f0c1b00627ed7a16bf13eda6fe5e
@@ -209,9 +242,6 @@ description: |-
 
   ## Done when
   - [ ] Step 4 says that his request for a minor or major release is his OK, and the agent asks only when it picked the bump itself.
-tags:
-- job-paused
-- fix-retried
 history:
 - at: 2026-11-23T08:21:29.964753+00:00
   actor: claude
@@ -508,3 +538,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T20:36:43.128736+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:36:44.433151+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused, fix-retried
+    new: ''
