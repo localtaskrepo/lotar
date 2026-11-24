@@ -1,11 +1,11 @@
 title: After an upgrade the queue says "waiting for the running jobs of their tickets to end" while the old worker only drains
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:41:41.734525+00:00
-modified: 2026-11-25T12:41:44.073716+00:00
+modified: 2026-11-25T23:56:12.014934+00:00
 relationships:
   related:
   - DEV-768
@@ -220,6 +220,10 @@ comments:
     - `git log main..HEAD` is empty: the branch tip `7467c63f5` is already on `main` (now at `5e53e427c`), as the last review comment says ("Merged").
     - `git log HEAD..agent/DEV-806` is empty too, so no reworked version is waiting.
     - No checks reran; no files changed, no tickets filed.
+- date: 2026-11-25T23:56:11.674113+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-806` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aef976c7876a854054b475c5a9226318a9fad013ae23a0079c4514e7fa4f1f110
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A642ef826e6b6f0189e480109c48c8141facb6f82b65050a811ec205dd26a474a
@@ -240,9 +244,6 @@ description: |-
   - [ ] The new worker fails to start (spawn error): the queue shows `stopped`, "start one with `lotar agent queue resume`"; the old worker tries again when its jobs end, as it does today.
   - [ ] Test: `crates/lotar-lib/tests/dev361_worker_restarts_after_upgrade_test.rs` shows the second job starting from the upgraded binary while the first job still runs.
   - [ ] `docs/help/agent.md` says the upgraded worker runs the queue at once and the old one only finishes its jobs.
-tags:
-- job-paused
-- merge-retried
 history:
 - at: 2026-11-22T20:41:42.031686+00:00
   actor: claude
@@ -477,3 +478,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-768","TEST-1","TEST-2","DEV-762","DEV-763","DEV-784","DEV-361","DEV-805"]}'
     new: '{"related":["DEV-768","TEST-1","TEST-2","DEV-762","DEV-763","DEV-784","DEV-361","DEV-805","DEV-832"]}'
+- at: 2026-11-25T23:56:11.674113+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T23:56:12.014934+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused, merge-retried
+    new: ''

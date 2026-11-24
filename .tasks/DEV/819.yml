@@ -1,15 +1,18 @@
 title: Memory gate holds every queue for hours on macOS swap that stays used after memory pressure has passed
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T00:07:07.617585+00:00
-modified: 2026-11-25T22:10:25.827093+00:00
+modified: 2026-11-25T23:52:43.906893+00:00
 relationships:
   related:
   - DEV-623
   - DEV-827
+  - DEV-842
+  - DEV-873
+  - DEV-837
 comments:
 - date: 2026-11-23T01:32:58.854497+00:00
   author: claude
@@ -105,6 +108,34 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-819` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-819` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-25T23:30:26.753419+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `43dbd75da` is on `main` and `origin/main`.
+
+    - Conflict in `docs/help/agent.md` (Memory gate). Main (DEV-827) added the "memory hold started/ended" log bullet; DEV-819 changed the Linux bullet to "reads swap and free memory". These were separate bullets, so I kept both.
+    - I rebased twice: main moved on with DEV-842 (`task edit` code only) before the fast-forward. I reran all checks after the second rebase.
+    - Smoke: "preserves plot height and page/plot scroll through a delayed root reload" failed in 2 of 3 full runs, both times under heavy machine load (load average up to 37). It is the known main flake [DEV-873](https://lotar.pyxzl.net/task/DEV-873). `smoke/tests/ui.relationships.smoke.spec.ts` passed alone, 19/19. DEV-819 doesn't touch the UI.
+    - Amended `.tasks` changes into the merge commit, as step 4 says. `lotar trust` wasn't needed: no rule or config files changed.
+    - The swap workaround (`max_swap_percent: 95` in each repo's `.tasks/config.yml`) can be reverted now that this has shipped.
+  report:
+    commits:
+    - hash: 43dbd75da
+      what: 'DEV-819 memory gate: full swap holds only below 20% free memory (merged, pushed)'
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2545 Rust, 1617 UI and the release and hook tests
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411 on 4ab6ff5d3. On 58eea95e1 the known main flake DEV-873 failed; its file passed alone
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config files changed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a0ceaa47a6640fdc6dc5091e8e1e101051bb83529f4ab09999e77f38275e1c3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A317eced5048001ad3214ea1d73ba8616b72f7057d458d896a0f91bfedca751f3
@@ -115,9 +146,6 @@ description: |-
   Done when: swap use alone no longer holds jobs while the pressure level is normal and free memory is high; for example hold on swap only while swap use is still growing, or only together with low free memory (kern.memorystatus_level). A test with LOTAR_MEMORY_READING covers high, flat swap with normal pressure: jobs start. docs/help/agent.md (Memory gate) says what holds.
 
   Workaround in place: agent.memory_gate.max_swap_percent: 95 in every repo's .tasks/config.yml (owner 2026-11-22). Revert it once this ships.
-tags:
-- job-paused
-- review-returned
 history:
 - at: 2026-11-23T00:07:07.856181+00:00
   actor: claude
@@ -238,3 +266,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T23:30:26.753419+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T23:30:27.094214+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-827"]}'
+    new: '{"related":["DEV-623","DEV-827","DEV-842","DEV-873"]}'
+- at: 2026-11-25T23:30:36.366627+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused, review-returned
+    new: ''
+- at: 2026-11-25T23:52:43.906893+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-827","DEV-842","DEV-873"]}'
+    new: '{"related":["DEV-623","DEV-827","DEV-842","DEV-873","DEV-837"]}'

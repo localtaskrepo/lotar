@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T16:34:28.930701+00:00
-modified: 2026-11-25T12:25:28.224415+00:00
+modified: 2026-11-25T23:52:56.801837+00:00
 relationships:
   related:
   - DEV-623
@@ -15,6 +15,8 @@ relationships:
   - DEV-815
   - DEV-604
   - DEV-827
+  - DEV-885
+  - DEV-819
 comments:
 - date: 2026-11-24T16:34:46.203543+00:00
   author: claude
@@ -104,9 +106,71 @@ comments:
     **Also worth fixing in the rework**
     - **The gate holds more jobs than the ticket asks.** It holds every job when `agent.worktree.enabled` is on, including merge jobs and jobs in a worktree that already exists. The ticket says "no job that creates a worktree". Holding merges is counterproductive: a merged ticket's worktree gets cleaned up, which frees disk. Either let merge jobs pass (`pending.is_merge_job`) or ask the owner.
     - **"Starts once space is back" is only unit-tested** (`decide` in `under_the_floor_holds_until_space_is_back`). `dev837_disk_gate_test` only flushes the queue. That's acceptable if noted; better, extend the test to show the job start.
+- date: 2026-11-25T23:52:43.615989+00:00
+  author: claude
+  text: |-
+    Rework done: the cleanup runs outside the registry lock, `lotar serve` logs disk holds and cleanups, and merge jobs pass the gate. Amended as `27d567117`.
+
+    The review read HEAD `745324679`, which is the commit it named. I rebased onto main (`43dbd75da`) first: by now the branch conflicted in `tests/integration.rs` and `config-reference.md`, and the fix needed DEV-827's `HoldLog`. DEV-819 had dropped the `agent.job_history.*` lines from `config-reference.md`, and I kept them.
+
+    **Blocking: the cleanup ran under the registry lock**
+    - `disk_gate::check` only reads free space and saves the state now. That is the same cost as `memory_gate::check`, which already runs there.
+    - The new `disk_gate::clean` removes idle profiles, at most every 10 min, and only under the floor. It runs in the queue worker's loop (`agent_queue_service.rs`, before the gate is read) and in `watch_pending_queue`, which collects the tasks dirs under the lock and then cleans without it. It clears `checked_at`, so the next `check` reads again at once.
+
+    **Blocking: nothing reached the server log**
+    - The `eprintln!` calls are gone. The state file keeps `last_hold` (start and end) and `last_cleanup` (when, what it removed, free space after).
+    - `disk_gate::HoldLog` writes each of these once, like DEV-827's. The serve thread polls both logs (`serve_handler.rs`).
+    - Test: `hold_log_writes_start_end_and_cleanups_once_each`.
+
+    **Merge jobs were held**
+    - A merge job now passes the gate: profile `merge` or a ticket in Merging (`AgentJobService::starts_as_merge_job`). This covers `start_job`, `process_pending_queue`, `dequeue_startable(…, disk_held)`, `waits_for` and `waiting_reason`.
+    - Test: `under_the_disk_floor_only_merge_entries_start`.
+    - Jobs in an existing worktree still wait. Their next build grows `target/` again, often into a profile the cleanup just removed, and the ticket wants jobs to wait instead of filling the disk.
+
+    **"Starts once space is back" had only a unit test**
+    - `dev837_disk_gate_test` now sets up a git repo, lowers the floor to 40 GB while the job is held, and waits for the job to run and the worker to go idle.
+    - A changed floor makes the gate read again at once (`floor_gb` in the state).
+
+    **Checks**
+    - Docs updated: `docs/help/agent.md#disk-gate`.
+    - sccache's server points at a deleted temp dir, so builds ran with `RUSTC_WRAPPER=`.
+    - Filed DEV-885 for the merge test that fails alone.
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: 27d567117
+      what: 'disk gate, rework: cleanup out of the registry lock, holds and cleanups in the server log, merges pass'
+    checks:
+    - command: cargo clippy --workspace --all-targets -- -D warnings
+      result: passed
+    - command: cargo nextest run --workspace -E 'test(disk) | test(dev837) | test(memory_gate) | test(dev623) | test(dev604) | test(dev827) | test(entries_wait_for) | test(config_validation) | test(fields) | (binary_id(lotar-agent) & test(agent_queue_service)) | test(dev566) | test(merge_job)'
+      result: passed
+      reason: 146 tests
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+      reason: 256 tests
+    - command: cargo nextest run --workspace -E 'test(embedded_web_ui) | test(serve)'
+      result: passed
+      reason: 321 tests, after npm run build:web
+    - command: cargo nextest run --workspace -E 'test(queue) | test(merge) | test(worker)'
+      result: failed
+      reason: 95 of 96 passed; a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge fails alone also without this rework, filed DEV-885
+    - command: npx prettier --check docs/help/agent.md docs/help/config-reference.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e50ed7331f1c1454dca4b704bafbafba48f76bd1261bfe3101c6502de1904c3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65e86708fd02583215565a3ac4f491a402a9da97617e83ef5e45676fece55760
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3157d180840bfbd3c7ccae11947aec16c026163772e4d73af2f8c5f8f14de908
 description: |-
   Each open lotar ticket keeps a job worktree with its own Rust target/ of 4 to 14 GB. On 2026-11-24, 46 such worktrees held 168 GB, and free disk fell from 301 GB to 181 GB in two days (about 65 GB a day). At that pace the Mac drops under the live disk check's 50 GB floor in about two days and fills in about three; the last time it filled was 2026-11-17. The queue already holds jobs while memory is short (DEV-623) but starts jobs regardless of free disk. Found by reliability (2026-11-24).
 
@@ -235,3 +299,39 @@ history:
   - field: tags
     old: proposal, job-paused, review-blocked
     new: proposal, job-paused, review-returned
+- at: 2026-11-25T23:30:41.451512+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T23:30:42.335380+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3157d180840bfbd3c7ccae11947aec16c026163772e4d73af2f8c5f8f14de908
+- at: 2026-11-25T23:52:10.912205+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827"]}'
+    new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885"]}'
+- at: 2026-11-25T23:52:43.615989+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T23:52:43.907390+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885"]}'
+    new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885","DEV-819"]}'
+- at: 2026-11-25T23:52:56.801837+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

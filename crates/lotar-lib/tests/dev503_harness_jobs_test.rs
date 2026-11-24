@@ -22,7 +22,8 @@ use std::time::{Duration, Instant};
 /// `$FAKE_SLOW` sleeps that many seconds before it answers; `$FAKE_RUN` is a shell command it runs in the session's
 /// working directory before it answers. `$FAKE_PREFACE` is a reply chunk it sends as soon as a prompt arrives;
 /// `$FAKE_COST` the cost of each turn, reported as the session's total so far; `$FAKE_NO_RESUME` refuses resume and load
-/// as Claude does when the session's transcript is gone. It offers one config option,
+/// as Claude does when the session's transcript is gone; while the file `$FAKE_NO_INIT` exists it refuses `initialize`.
+/// It offers one config option,
 /// `reasoning_effort` (`high` or `ultra`).
 const FAKE_ACP_AGENT: &str = r#"#!/bin/sh
 turn=0
@@ -44,6 +45,10 @@ while IFS= read -r line; do
   id=$(printf '%s' "$line" | sed -nE 's/.*"id":("[^"]*"|[0-9]+).*/\1/p')
   case "$line" in
     *'"method":"initialize"'*)
+      if [ -n "$FAKE_NO_INIT" ] && [ -f "$FAKE_NO_INIT" ]; then
+        printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32000,"message":"Authentication required"}}\n' "$id"
+        continue
+      fi
       respond "$id" '{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{}}},"agentInfo":{"name":"fake-acp","version":"1.0.0"},"authMethods":[]}' ;;
     *'"method":"session/new"'*)
       cwd=$(printf '%s' "$line" | sed -nE 's/.*"cwd":"([^"]*)".*/\1/p')
@@ -390,6 +395,37 @@ fn a_taken_over_job_whose_session_cant_be_resumed_runs_again() {
     let retry = pending.iter().find(|entry| entry.ticket_id == "TEST-1").unwrap_or_else(|| panic!("the job is queued again: {pending:?}"));
     assert_eq!((retry.agent.as_str(), retry.prompt.as_str()), ("fixer", "Fix it"), "{retry:?}");
     assert_eq!(retry.session, Some(lotar::config::types::AgentSession::Fresh), "{retry:?}");
+}
+
+/// DEV-777: an agent that refuses `initialize` on resume (not `session/resume`) fails the continue job; the session
+/// keeps its name and no new one takes its place.
+#[test]
+fn a_continue_job_whose_agent_refuses_initialize_fails_and_keeps_the_session() {
+    let no_init = TestFixtures::new();
+    let flag = no_init.get_temp_path().join("no-init");
+    let harness = harness("", &[("FAKE_NO_INIT", flag.display().to_string())]);
+    harness.run(&[]).success();
+    std::fs::write(&flag, "").unwrap();
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let req = AgentJobCreateRequest {
+        ticket_id: "TEST-1".into(),
+        prompt: "Rework it".into(),
+        agent: Some("fixer".into()),
+        session: Some(lotar::config::types::AgentSession::Continue),
+        ..Default::default()
+    };
+    let job = AgentJobService::start_job_with_tasks_dir(req, harness.fixtures.tasks_root.as_path()).unwrap().id;
+    wait_for("the job's failure", || status(&job) == "failed");
+    let message = AgentJobService::get_job(&job).and_then(|job| job.last_message).unwrap_or_default();
+    assert!(message.starts_with("Could not start the claude session ") && message.contains("Authentication required"), "{message}");
+    let notes: Vec<String> = AgentJobService::events_for(&job).into_iter().filter_map(|event| event.message).collect();
+    assert!(!notes.iter().any(|note| note.contains("could not be resumed")), "{notes:?}");
+    let log = harness.log();
+    assert_eq!(log.matches("\"method\":\"session/new\"").count(), 1, "no new session: {log}");
+    let sessions = harness.root().join("harnessmux/state/sessions");
+    let files: Vec<String> = std::fs::read_dir(&sessions).unwrap().map(|entry| entry.unwrap().file_name().to_string_lossy().to_string()).collect();
+    assert!(files.iter().any(|file| file.ends_with("-TEST-1-fixer.json")), "the session keeps its name: {files:?}");
+    assert!(!files.iter().any(|file| file.contains("-TEST-1-fixer.20")), "not kept as <name>.<last used>: {files:?}");
 }
 
 /// DEV-757: a session start that fails for another reason than the session (here the agent's program is gone) still

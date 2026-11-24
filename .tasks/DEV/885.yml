@@ -1,0 +1,32 @@
+title: 'Test a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge fails alone: the merge job stays running for 60 s'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T23:52:10.484956+00:00
+modified: 2026-11-25T23:52:11.376459+00:00
+relationships:
+  related:
+  - DEV-748
+  - DEV-837
+description: |-
+  Found: on 2026-11-25, `cargo nextest run --workspace -E 'test(a_check_that_leaves_a_process_running)' --retries 0` fails alone on branch agent/DEV-837 at `dev605_merge_without_agent_test.rs:132` ('the merge job didn't end: running'), with and without the DEV-837 rework (rebased on main 43dbd75da); load average 6-10. So it is not the load flake DEV-748 fixed: the merge waits for the check's background `sleep 600`. Not yet checked on main itself.
+  Check: run the command above in a checkout of main.
+  Done: the test passes alone and in the full suite.
+tags:
+- health
+custom_fields:
+  finding: tests:dev605-background-check
+history:
+- at: 2026-11-25T23:52:10.912607+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-748","DEV-837"]}'
+- at: 2026-11-25T23:52:11.376459+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

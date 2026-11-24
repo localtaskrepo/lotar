@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-25T16:27:51.844537+00:00
+modified: 2026-11-26T00:01:17.685875+00:00
 relationships:
   blocks:
   - DEV-782
@@ -99,9 +99,42 @@ comments:
     - **Fix:** make the read-only `pending_count`, at least at worker exit, use `read_state` (`:1164`), which neither creates folders nor writes. A removed worktree's queue folder then stays removed in real use too. Add a test that runs the dev732 test, or the worker's exit, and checks that nothing is left. The alternative, waiting in the test for the worker process to end, leaves dev733 and other worker tests exposed.
     - Fine as is: the `--no-run` step in `scripts/rust-test-runner.mjs:557-565` and its two tests. The second build finishes in about 0.1 s.
     - Not run: a full `npm run -s test:agent` under load. The single test already shows that "Done" doesn't hold.
+- date: 2026-11-26T00:01:08.684726+00:00
+  author: claude
+  text: |-
+    Fixed the review's leak at its cause: the worker's last check no longer writes the queue.
+
+    - **Finding (dev732 leaks about half its runs):** fixed in the worker, not the test. `agent_queue_service.rs`: after freeing its lock, the worker now checks for queued entries with `waiting_after_exit`, which uses `read_state` and only reads. The old `pending_count` went through `with_locked_queue`, which runs `create_dir_all` and writes the file, so it recreated the removed `TempDir`. A missing queue now just counts as 0. This also closes the same race in dev733.
+    - New unit test `exit_check_leaves_a_removed_queue_folder_removed`: failed with the old call, passes now.
+    - The review's reproduction (fresh `TMPDIR`, dev732 + dev733): nothing left in 10 of 10 runs. Before the fix the review saw 3 of 6 leak.
+    - Amended into `e084e0c2e` (signed). The branch is behind main (DEV-805's fix `1ebc9245a` and others). I didn't rebase; the merge does that.
+  report:
+    commits:
+    - hash: e084e0c2e
+      what: runner builds first; dev732 waits for idle; worker's exit check no longer writes the queue
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(exit_check_leaves)'
+      result: passed
+      reason: failed before the fix, passes after
+    - command: TMPDIR=<fresh> cargo nextest run -E 'test(/a_worker_started_from_another_folder|worker_drops_agent_session/)' x10
+      result: passed
+      reason: nothing left in 10 of 10
+    - command: cargo nextest run -E 'package(lotar-agent) | test(/queue|worker/)'
+      result: passed
+      reason: 271/271
+    - command: npm run -s lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A19b7e7df58faab0fb55f749b008fb42c2737c7944bdd9cf837a6bef8e8f8f402
 description: |-
   Found: the DEV-816 merge check `npm run -s test:agent` (2026-11-23, at 2480/2480 passed, after waiting 5 min for the check lock) failed with `rust-test-runner: error: tests left 1 entries in the temp folder: .tmpGLFMn2`. A rerun on 2026-11-24 passed with nothing left. The `.tmp` + 6 chars name is the tempfile crate's default prefix, so a `tempfile::tempdir()`/`NamedTempFile` was probably dropped while a child process or thread still wrote into it, or was never dropped.
   Check: find the test that creates it, for example by running nextest under load with `--no-fail-fast` and listing the runner's temp folder per test.
@@ -262,3 +295,27 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805"]}'
     new: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805"]}'
+- at: 2026-11-25T23:56:14.730876+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T23:56:15.345089+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A19b7e7df58faab0fb55f749b008fb42c2737c7944bdd9cf837a6bef8e8f8f402
+- at: 2026-11-26T00:01:08.684726+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:01:17.685875+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
