@@ -1,11 +1,11 @@
 title: 'Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-23T08:58:02.516546+00:00
+modified: 2026-11-25T07:39:13.328256+00:00
 relationships:
   related:
   - DEV-464
@@ -89,6 +89,18 @@ comments:
 - date: 2026-11-23T08:58:02.516546+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261123T085659.286Z-113 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085659.286Z-113 why.'
+- date: 2026-11-25T07:23:24.776552+00:00
+  author: claude
+  text: |-
+    Review: passed. The watcher now announces files inside a new folder, which fixes the likely cause the first review found (Linux inotify misses a new `@releases/` folder's first file).
+
+    - Reviewed `74d41a697`, the only commit on `main...HEAD`; the ticket branch has no newer commit. `npm ci` ok.
+    - `crates/lotar-lib/src/web_server.rs:1233-1243`: a directory whose fingerprint changed (new, or recreated after a delete: seeded folders hold marker `1`, deleted ones `0`) adds its entries to the batch, recursively. Fingerprints dedupe files also reported on their own, dot-folders stay skipped, and existing folders aren't rescanned. It covers `@releases/`, `@sprints/` and a new project's first task, as the review asked.
+    - Fail before the fix: with the scan turned off, `watcher_announces_files_inside_a_new_folder` fails (`announced: []`). With it on, the test passes. I put the file back afterwards.
+    - Reran: `cargo nextest run -E 'test(/watch|sse|release/)'` 70 of 70 passed; `vitest --config view/vitest.config.ts useReleases.spec.ts Dependencies.navigation.spec.ts` 5 of 5 passed; `npm run build:smoke`, then `tests/ui.releases.smoke.spec.ts` 3 of 3 runs passed (macOS). `rustfmt --check`, prettier on the 4 files and `cargo clippy -p lotar-lib --all-targets` are clean.
+    - `smoke/tests/ui.releases.smoke.spec.ts` uses `LOTAR_SSE_READY=1`, as `ui.task-move.smoke.spec.ts` already does. The `useReleases.ts` reload on `open`/`ready` is fine and costs one extra list call on page load.
+    - What can't be checked here: Done asks that the test "passes repeatedly in the full suite". The race happens only on Linux, so only the Quality Assurance runs after the merge show that. The fix agent said so in its `next` step.
+    - No UI change, no owner decision touched, no stray files. No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adfb741c2086c10a924409cd5752026c76392856e3a908ac33e047e23a887365e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9da4fd47475753f0b0d0c8242fb2ad47f1fc665533f5957bcb491c2b3c787e4
@@ -201,3 +213,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T07:23:24.776552+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T07:39:13.328256+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

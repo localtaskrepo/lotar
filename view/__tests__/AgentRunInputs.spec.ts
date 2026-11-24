@@ -113,6 +113,43 @@ describe('AgentRunInputs', () => {
         expect(wrapper.find('table').exists()).toBe(false)
     })
 
+    it('loads again after no record, then caches the record', async () => {
+        getInputs.mockResolvedValueOnce({ inputs: null }).mockResolvedValueOnce({ inputs: recorded })
+        const wrapper = mount(AgentRunInputs, { props: { jobId: 'job-1' } })
+        const toggle = wrapper.get('button')
+        await toggle.trigger('click')
+        await flushPromises()
+        expect(wrapper.text()).toContain('Not recorded for this job.')
+
+        await toggle.trigger('click')
+        await toggle.trigger('click')
+        await flushPromises()
+        expect(getInputs).toHaveBeenCalledTimes(2)
+        expect(wrapper.findAll('tr').map((row) => row.text())).toContain('Modelopus')
+
+        await toggle.trigger('click')
+        await toggle.trigger('click')
+        await flushPromises()
+        expect(getInputs).toHaveBeenCalledTimes(2)
+    })
+
+    it('starts no second load while one runs', async () => {
+        let resolve!: (value: { inputs: AgentJobRunInputs | null }) => void
+        getInputs.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+        const wrapper = mount(AgentRunInputs, { props: { jobId: 'job-1' } })
+        const toggle = wrapper.get('button')
+        await toggle.trigger('click')
+        await toggle.trigger('click')
+        await toggle.trigger('click')
+        expect(getInputs).toHaveBeenCalledTimes(1)
+        expect(wrapper.text()).toContain('Loading instructions')
+
+        resolve({ inputs: recorded })
+        await flushPromises()
+        expect(wrapper.findAll('tr').map((row) => row.text())).toContain('Modelopus')
+        expect(getInputs).toHaveBeenCalledTimes(1)
+    })
+
     it('shows a failed load and retries', async () => {
         getInputs.mockRejectedValueOnce(new Error('Server unavailable')).mockResolvedValueOnce({ inputs: null })
         const wrapper = mount(AgentRunInputs, { props: { jobId: 'job-1' } })

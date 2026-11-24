@@ -1,0 +1,22 @@
+title: comment_checks_lock took comment_merge's doc comment
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T07:45:42.688933+00:00
+modified: 2026-11-25T07:45:44.138837+00:00
+relationships:
+  related:
+  - DEV-797
+description: |-
+  Found in the DEV-797 review: `fn comment_checks_lock` was inserted between `comment_merge`'s doc comment and its fn (`crates/lotar-agent/src/services/agent_job_service.rs:3808-3824`). Now `comment_checks_lock` has both doc paragraphs and `comment_merge` none.
+  Done when: "Comment lotar's merge outcome on the ticket, and keep it as the job's last message." sits on `comment_merge` again.
+tags:
+- agent
+history:
+- at: 2026-11-25T07:45:44.138837+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

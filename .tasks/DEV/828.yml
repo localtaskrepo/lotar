@@ -3,8 +3,9 @@ status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
+assignee: '@fix'
 created: 2026-11-23T07:19:10.376712+00:00
-modified: 2026-11-24T16:30:39.233374+00:00
+modified: 2026-11-25T06:18:05.088808+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -131,7 +132,6 @@ description: |-
 tags:
 - job-paused
 - fix-retried
-- waits
 history:
 - at: 2026-11-23T07:19:13.361734+00:00
   actor: claude
@@ -337,3 +337,14 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T06:18:05.047257+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: job-paused, fix-retried, waits
+    new: job-paused, fix-retried
+- at: 2026-11-25T06:18:05.088808+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'

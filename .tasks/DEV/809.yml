@@ -1,11 +1,11 @@
 title: Delete a comment or withdraw a question (soft, kept in history)
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:14:20.898265+00:00
-modified: 2026-11-24T19:09:32.026294+00:00
+modified: 2026-11-25T06:18:04.564780+00:00
 relationships:
   blocks:
   - DEV-828
@@ -116,6 +116,12 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-25T05:45:39.600152+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac27b9c0e3d3dfd1c1825964a70b37a1adddc458708633986e1c840147b967840
 - attachment: dev809-after-dark-1440.d971fa707767d0fbf6be7ccbca942da5.png
@@ -162,7 +168,6 @@ description: |-
   - [ ] Tests for the service, CLI, REST, MCP and UI; `npm run lint`, `npm test`, `npm run smoke` pass.
 tags:
 - ui
-- job-paused
 history:
 - at: 2026-11-22T21:14:21.231389+00:00
   actor: claude
@@ -388,3 +393,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T05:45:39.600152+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T06:18:04.564780+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: ui, job-paused
+    new: ui

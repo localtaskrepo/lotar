@@ -1,11 +1,11 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-23T08:54:50.250175+00:00
+modified: 2026-11-25T07:46:09.273545+00:00
 relationships:
   blocks:
   - DEV-801
@@ -14,6 +14,8 @@ relationships:
   - DEV-780
   - DEV-787
   - DEV-792
+  - DEV-867
+  - DEV-868
 comments:
 - date: 2026-11-22T21:30:02.840094+00:00
   author: claude
@@ -104,6 +106,23 @@ comments:
 - date: 2026-11-23T08:54:50.250175+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261123T085437.865Z-111 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085437.865Z-111 why.'
+- date: 2026-11-25T07:46:00.303397+00:00
+  author: claude
+  text: |-
+    Review: passed. Both earlier blocking findings are fixed in `3c444f069`; two minor follow-ups filed.
+
+    Read: `3c444f069` (diff `main...HEAD`, HEAD = the ticket branch), Done when, the fix and review comments, AGENTS.md, `.githooks/*`, standards' `configs/lotar/automation.yml` (STD-324 landed in `70707838`), and main's newer commits to the same files.
+    Reran: `npm ci` (ok), `npm run lint` (passed), `cargo nextest run -p lotar-agent checks_lock` (2 passed), `cargo nextest run -p lotar-lib --test integration -E 'test(dev797) or test(dev605) or test(dev783)'` (23 passed). The worktree is unchanged.
+
+    - **Cancel from another process:** `checks_lock.rs` wait loop reads `cancel_requested` and ends with `Cancelled`; `a_cancel_from_another_process_ends_the_wait` covers it.
+    - **Merge agent's wait comment:** `comment_checks_lock` comments on the ticket; the test checks the comment.
+    - Done when is met: the lock is taken before the first rebase only when there are checks, a hand-off keeps it, the merge agent takes it otherwise, fix and review jobs never take it, an unavailable lock lets the merge go on, and the prompts, AGENTS.md, testing-strategy and `docs/help/agent.md` all match. The git hooks are unchanged and don't run test or smoke suites.
+    - **Merge note:** `main` moved on. `git merge-tree` shows conflicts in `.tasks/DEV/automation.yml`, `agent_job_service.rs`, `merge.rs` and `integration.rs`, so the merge needs a rebase.
+    - Not a finding, just noise: `AGENTS.md` got unrelated Prettier formatting (the skill table realigned, two continuation lines de-indented). Prettier doesn't check that file.
+
+    Filed (minor):
+    - [DEV-867](https://lotar.pyxzl.net/task/DEV-867): a merge job taken over after lotar exits (`adopt_orphaned_job` → `finish_orphaned_job`) resumes its merge agent without the checks lock.
+    - [DEV-868](https://lotar.pyxzl.net/task/DEV-868): `comment_checks_lock` was inserted under `comment_merge`'s doc comment (`agent_job_service.rs:3808`).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
@@ -279,3 +298,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T07:45:41.456594+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792"]}'
+    new: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867"]}'
+- at: 2026-11-25T07:45:43.145522+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867"]}'
+    new: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868"]}'
+- at: 2026-11-25T07:46:00.303397+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T07:46:09.273545+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

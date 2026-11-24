@@ -1,0 +1,24 @@
+title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T07:45:41.052287+00:00
+modified: 2026-11-25T07:45:42.255522+00:00
+relationships:
+  related:
+  - DEV-797
+description: |-
+  Found in the DEV-797 review: `adopt_orphaned_job` → `finish_orphaned_job` (`crates/lotar-agent/src/services/agent_job_service.rs:2002`, `:2121`) resumes a merge job's agent session (a t3 thread may still run its full suites) but never takes `checks.lock`. The OS freed the lock when the old lotar exited, so a second merge can run its suites beside the adopted one, which DEV-797 forbids ("holds it until the job ends").
+
+  Check: a test that registers an orphaned merge job, holds the lock from outside, and sees the takeover wait (or say it runs without the lock).
+  Done when: a taken-over merge job takes the checks lock before its session goes on (waiting as in DEV-797), or the docs say why it doesn't.
+tags:
+- agent
+history:
+- at: 2026-11-25T07:45:42.255522+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:45:46.748448+00:00
-modified: 2026-11-25T03:11:12.638807+00:00
+modified: 2026-11-25T06:50:11.501966+00:00
 relationships:
   depends_on:
   - DEV-767
@@ -158,6 +158,53 @@ comments:
     - My own run: worktree Vite against a scratch `lotar serve` 0.15.6, with Playwright serving one running job and `/api/jobs/inputs` returning `null`, then a record. In both themes at 1920/1440/390 px: "Not recorded for this job.", then the record after reopening, then a cached reopen. That's 2 fetches each time, and the layout looks fine.
     - Not rerun: `npm run lint`, `npm test`, `npm run smoke` (the merge runs them).
     - No minor findings, no tickets filed.
+- date: 2026-11-25T06:50:11.501966+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+     ❯ listOnTimeout ../node:internal/timers:644:9
+     ❯ process.processTimers ../node:internal/timers:618:7
+     ❯ Pool.schedule ../node_modules/vitest/dist/chunks/index.ER9afepi.js:6037:5
+
+    Caused by: Error: [vitest-pool-runner]: Timeout waiting for worker to respond
+     ❯ Timeout.<anonymous> ../node_modules/vitest/dist/chunks/index.ER9afepi.js:5477:58
+     ❯ listOnTimeout ../node:internal/timers:685:17
+     ❯ process.processTimers ../node:internal/timers:618:7
+
+
+    ⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+    Error: [vitest-pool]: Failed to start threads worker for test files /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-807/view/__tests__/TaskPanel.statusBadge.spec.ts.
+     ❯ ../node_modules/vitest/dist/chunks/index.ER9afepi.js:6037:94
+     ❯ runNextTicks ../node:internal/process/task_queues:65:5
+     ❯ process.processTimers ../node:internal/timers:615:9
+     ❯ Pool.schedule ../node_modules/vitest/dist/chunks/index.ER9afepi.js:6037:5
+
+    Caused by: Error: [vitest-pool-runner]: Timeout waiting for worker to respond
+     ❯ Timeout.<anonymous> ../node_modules/vitest/dist/chunks/index.ER9afepi.js:5477:58
+     ❯ listOnTimeout ../node:internal/timers:685:17
+     ❯ process.processTimers ../node:internal/timers:618:7
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+     Test Files  5 failed | 131 passed (136)
+          Tests  5 failed | 1537 passed (1542)
+         Errors  7 errors
+       Start at  22:45:51
+       Duration  260.28s (tests 72%, environment 22%, transform 3%, import 2%)
+    ```.
+
+    - Rebased `agent/DEV-807` onto `main` (`e53d97ffb76f`): `b56e04a0554a`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7634167f076e693f0f795dd8049d362219ce29257a5b94c01e6c6f883cf9fb6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb2a4fbb9313d916e73cdfd8edc690423c01f31b484b04aba6ba5dd7dfd467ce
@@ -463,3 +510,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T06:50:11.501966+00:00
+  actor: automation
+  changes:
+  - field: comment_added

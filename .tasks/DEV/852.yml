@@ -1,11 +1,11 @@
 title: 'Automation: a rule''s comment can ask a question with options'
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T21:03:41.684865+00:00
-modified: 2026-11-24T21:05:00.745186+00:00
+modified: 2026-11-25T07:48:50.212746+00:00
 relationships:
   blocks:
   - DEV-796
@@ -13,6 +13,8 @@ relationships:
   - DEV-796
   - DEV-488
   - DEV-851
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae300be0eb1776a74acd7f47cd42c1d251db1f4df2ca39cae4f189033f9da6082
 description: |-
   A rule's `comment` action writes plain text only, so a rule that asks a person a choice has to shell out: `run: lotar comment --question ... --option ...`, which needs `lotar trust`. Found while drafting DEV-796 (built-in `agent-team` template): a shipped template can't rely on `run`, so its questions come out as prose without options. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
 
@@ -29,11 +31,18 @@ description: |-
   - `lotar config validate` and the automation validation refuse bad keys, duplicate keys, a `recommended` that is no option, and `set` fields an answer can't set (as `--set` does).
   - `lotar automation simulate` shows the question and its options.
 
+
   ## Done when
 
-  - [ ] A rule with a `comment.question` writes a question comment that `lotar list --has question` finds and `lotar comment --answer <key>` answers, applying the option's `set`
-  - [ ] Invalid questions fail validation with a message naming the rule
-  - [ ] docs/help (automation actions) describe the map form with an example; REST/OpenAPI agree if the automation config shape is exposed there
+  - [ ] `comment: "text"` works as before; `comment: { text }` without `question` writes the same plain comment
+  - [ ] A rule with `comment: { text, question }` writes a question comment by `automation` (no `on.commented` rules fire from it) that `lotar list --has question` finds and `lotar comment --answer <key>` answers, applying the option's `set`
+  - [ ] `text` and each option `label` expand `${{...}}` templates; `key`, `recommended` and `set` values are taken as written
+  - [ ] A `text` that expands to nothing posts nothing, as for a plain comment
+  - [ ] Invalid questions (no options, bad or duplicate key, empty label, `recommended` not an option, a `set` field an answer can't set, an unknown status/priority/type in `set`, an empty `text`, unknown keys in `comment` or `question`) are errors naming the rule, in the automation save (REST/web) and in `lotar config validate` (which now also checks the scope's automation file)
+  - [ ] A rule file edited by hand whose question is invalid fails that action at run time: no comment is written, the error is reported like other failed actions; the rule's other actions keep their usual order
+  - [ ] `lotar automation simulate` lists the question with its options and the recommended one
+  - [ ] The web rule builder shows a rule with a question comment as YAML-only (not editable there) so saving from the builder can't drop the question; rule summaries name the question
+  - [ ] docs/help/automation.md describes the map form with an example; REST/OpenAPI need no change (automation rules travel as YAML text)
 history:
 - at: 2026-11-24T21:03:47.328905+00:00
   actor: claude
@@ -58,3 +67,67 @@ history:
   - field: relationships
     old: '{"related":["DEV-796","DEV-488","DEV-851"]}'
     new: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-488","DEV-851"]}'
+- at: 2026-11-25T07:46:14.312375+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T07:46:15.107392+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae300be0eb1776a74acd7f47cd42c1d251db1f4df2ca39cae4f189033f9da6082
+- at: 2026-11-25T07:48:50.212746+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      A rule's `comment` action writes plain text only, so a rule that asks a person a choice has to shell out: `run: lotar comment --question ... --option ...`, which needs `lotar trust`. Found while drafting DEV-796 (built-in `agent-team` template): a shipped template can't rely on `run`, so its questions come out as prose without options. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
+
+      ## Evidence
+
+      - `crates/lotar-agent/src/automation/types.rs` `AutomationAction.comment: Option<String>`
+      - standards `configs/lotar/automation.yml:671`: `env LOTAR_DEFAULT_REPORTER=automation sh -c 'lotar comment "$1" --question "$2" --option "fix: ..."'`
+      - `CommentQuestion`/`QuestionOption` (with `set`) already exist in `crates/lotar-core/src/types.rs` (DEV-488)
+
+      ## Proposal
+
+      - `comment:` keeps the string form and also takes a map: `{ text, question: { options: [{ key, label, set }], recommended, multiple, other } }`, the same fields `lotar comment --question` writes. `text` and labels take `${{...}}` templates.
+      - The question comment's author is `automation`, as other rule comments.
+      - `lotar config validate` and the automation validation refuse bad keys, duplicate keys, a `recommended` that is no option, and `set` fields an answer can't set (as `--set` does).
+      - `lotar automation simulate` shows the question and its options.
+
+      ## Done when
+
+      - [ ] A rule with a `comment.question` writes a question comment that `lotar list --has question` finds and `lotar comment --answer <key>` answers, applying the option's `set`
+      - [ ] Invalid questions fail validation with a message naming the rule
+      - [ ] docs/help (automation actions) describe the map form with an example; REST/OpenAPI agree if the automation config shape is exposed there
+    new: |-
+      A rule's `comment` action writes plain text only, so a rule that asks a person a choice has to shell out: `run: lotar comment --question ... --option ...`, which needs `lotar trust`. Found while drafting DEV-796 (built-in `agent-team` template): a shipped template can't rely on `run`, so its questions come out as prose without options. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
+
+      ## Evidence
+
+      - `crates/lotar-agent/src/automation/types.rs` `AutomationAction.comment: Option<String>`
+      - standards `configs/lotar/automation.yml:671`: `env LOTAR_DEFAULT_REPORTER=automation sh -c 'lotar comment "$1" --question "$2" --option "fix: ..."'`
+      - `CommentQuestion`/`QuestionOption` (with `set`) already exist in `crates/lotar-core/src/types.rs` (DEV-488)
+
+      ## Proposal
+
+      - `comment:` keeps the string form and also takes a map: `{ text, question: { options: [{ key, label, set }], recommended, multiple, other } }`, the same fields `lotar comment --question` writes. `text` and labels take `${{...}}` templates.
+      - The question comment's author is `automation`, as other rule comments.
+      - `lotar config validate` and the automation validation refuse bad keys, duplicate keys, a `recommended` that is no option, and `set` fields an answer can't set (as `--set` does).
+      - `lotar automation simulate` shows the question and its options.
+
+
+      ## Done when
+
+      - [ ] `comment: "text"` works as before; `comment: { text }` without `question` writes the same plain comment
+      - [ ] A rule with `comment: { text, question }` writes a question comment by `automation` (no `on.commented` rules fire from it) that `lotar list --has question` finds and `lotar comment --answer <key>` answers, applying the option's `set`
+      - [ ] `text` and each option `label` expand `${{...}}` templates; `key`, `recommended` and `set` values are taken as written
+      - [ ] A `text` that expands to nothing posts nothing, as for a plain comment
+      - [ ] Invalid questions (no options, bad or duplicate key, empty label, `recommended` not an option, a `set` field an answer can't set, an unknown status/priority/type in `set`, an empty `text`, unknown keys in `comment` or `question`) are errors naming the rule, in the automation save (REST/web) and in `lotar config validate` (which now also checks the scope's automation file)
+      - [ ] A rule file edited by hand whose question is invalid fails that action at run time: no comment is written, the error is reported like other failed actions; the rule's other actions keep their usual order
+      - [ ] `lotar automation simulate` lists the question with its options and the recommended one
+      - [ ] The web rule builder shows a rule with a question comment as YAML-only (not editable there) so saving from the builder can't drop the question; rule summaries name the question
+      - [ ] docs/help/automation.md describes the map form with an example; REST/OpenAPI need no change (automation rules travel as YAML text)

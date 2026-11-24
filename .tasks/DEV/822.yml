@@ -1,11 +1,11 @@
 title: Automation run fails with ENOENT when --tasks-dir is a bare relative path (.tasks)
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-23T02:40:57.765513+00:00
-modified: 2026-11-24T21:15:13.849171+00:00
+modified: 2026-11-25T07:53:27.210338+00:00
 relationships:
   related:
   - DEV-808
@@ -41,6 +41,17 @@ comments:
 - date: 2026-11-23T08:52:31.881095+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261123T085221.682Z-107 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085221.682Z-107 why.'
+- date: 2026-11-25T07:53:18.166830+00:00
+  author: claude
+  text: |-
+    Review: passed. A run now starts in the workspace root with `--tasks-dir .tasks`.
+
+    - Reviewed `f52bafbb5` (the only commit in `main..HEAD`; no newer ticket-branch commits). It merges cleanly onto main `8180a5e1e` (`git merge-tree`).
+    - Fix in `crates/lotar-core/src/workspace.rs:54,88`: a relative `--tasks-dir` or `LOTAR_TASKS_DIR` is joined to the working folder. The other resolution branches were already absolute, so `resolve_run_cwd` (`crates/lotar-agent/src/services/automation_service.rs:1607`) and the other `tasks_dir.parent()` callers get a real workspace root.
+    - Repro in a scratch git repo with `LOTAR_TRUST_ALL=1`: installed 0.15.6 fails with `IO error: No such file or directory (os error 2)`. The branch build writes `out.txt` holding the workspace path. This confirms the new test `cli_bare_relative_tasks_dir_runs_in_workspace_root` covers a real failure.
+    - Side effect, reviewed and accepted: `config show` now prints the absolute path for a flag or env tasks dir. The two tests that changed for this only follow the new output; no docs quote the old output.
+    - Reran: `npm ci`, the 3 touched tests, `cargo clippy --all-targets --all-features -D warnings`, `cargo fmt --check`, `npm run test:rust:agent` (2479 passed). Not rerun: the UI and JS lint (no frontend change) and `npm run smoke` (the fix agent ran it: 407 passed).
+    - No UI change, no stray files, no owner decision touched. No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccd370f7deef9474d7a8ac5052c860af8776fc0857317e7dd90f1555006eb54
 description: 'Found 2026-11-22 (DEV-808): with lotar 0.15.6, `lotar --tasks-dir .tasks priority AR-1 High` in a workspace whose rule has `run: ''pwd > out.txt''` fails with "Automation rule ''r'' failed on AR-1: IO error: No such file or directory (os error 2)" and the command never runs. `--tasks-dir ./.tasks`, an absolute path and no flag all work. Likely the run''s working folder is the tasks dir''s parent, which is the empty path for `.tasks`. Check: a test with `--tasks-dir .tasks` and a run that writes a file. Done: the run runs in the workspace root.'
@@ -101,3 +112,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-808"]}'
     new: '{"related":["DEV-808","DEV-846"]}'
+- at: 2026-11-25T07:53:18.166830+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T07:53:27.210338+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

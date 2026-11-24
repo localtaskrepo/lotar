@@ -1,17 +1,19 @@
 title: 'Agent jobs: lotar sets the comment author to the job''s agent name (LOTAR_DEFAULT_REPORTER)'
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T21:03:52.499574+00:00
-modified: 2026-11-24T21:05:07.849466+00:00
+modified: 2026-11-25T07:56:41.009329+00:00
 relationships:
   blocks:
   - DEV-796
   related:
   - DEV-796
   - DEV-854
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6bd9f491ce149b694b17e3c83860a5ec42c3891d300777f4c6d15265cd66607
 description: |-
   An agent job's lotar commands record the person who runs lotar as author and reporter, unless the prompt tells the agent to set `LOTAR_DEFAULT_REPORTER`. Our prompts repeat "Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex)" in about 10 rules, and comment conditions (`comment: { author: ... }`) rely on it to tell a person's comment from an agent's. A shipped template (DEV-796, `agent-team`) can't count on every prompt saying it. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
 
@@ -29,9 +31,13 @@ description: |-
 
   ## Done when
 
-  - [ ] A comment an agent job writes without setting the variable itself has the agent's name as author, for a headless and a t3 job
-  - [ ] A profile `env` with `LOTAR_DEFAULT_REPORTER` still wins
-  - [ ] docs/help (agent jobs, environment) say it
+  - [ ] Headless runner (claude, codex, copilot, gemini, ...): the job's environment has `LOTAR_DEFAULT_REPORTER` set to the runner's name, so a `lotar comment` or `lotar add` the agent runs without setting it records that name as author or reporter. A test covers a claude and a codex job's env.
+  - [ ] t3 runner: the job's notes, next to `--tasks-dir`, tell the agent to put `LOTAR_DEFAULT_REPORTER=<name>` in front of every lotar command, with the name from the profile's `provider` (`claudeAgent` -> `claude`, `codex` -> `codex`, another id as it is, lowercased). No `provider` (T3's default model): the note asks for the agent's own name (claude, codex). A test covers both.
+  - [ ] `command` runner: no name is set (it is any program, not an agent); its comments keep the person's name unless its profile `env` sets one.
+  - [ ] Which value wins: the profile's `env: { LOTAR_DEFAULT_REPORTER: ... }` (headless: left in the env; t3: the note names that value) > the job's agent name > a `LOTAR_DEFAULT_REPORTER` the lotar process that runs the job inherited > the project's `default.reporter`. A prompt's own `LOTAR_DEFAULT_REPORTER=... lotar ...` or `--author`/`--reporter` still wins per command. A test covers the profile env winning.
+  - [ ] Nothing new can fail: a profile without `env` or a ticket that can't be read gets the same name; no ticket or job read decides it.
+  - [ ] docs/help/agent.md (job environment, t3 runner) and docs/help/environment.md say it.
+  - [ ] Out of scope (open, the owner decides with DEV-796): whether `@agent` in a `comment.author` condition matches these names.
 history:
 - at: 2026-11-24T21:04:01.602897+00:00
   actor: claude
@@ -50,3 +56,62 @@ history:
   - field: relationships
     old: '{"related":["DEV-796","DEV-854"]}'
     new: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-854"]}'
+- at: 2026-11-25T07:54:20.954591+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T07:54:21.861698+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6bd9f491ce149b694b17e3c83860a5ec42c3891d300777f4c6d15265cd66607
+- at: 2026-11-25T07:56:41.009329+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      An agent job's lotar commands record the person who runs lotar as author and reporter, unless the prompt tells the agent to set `LOTAR_DEFAULT_REPORTER`. Our prompts repeat "Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex)" in about 10 rules, and comment conditions (`comment: { author: ... }`) rely on it to tell a person's comment from an agent's. A shipped template (DEV-796, `agent-team`) can't count on every prompt saying it. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
+
+      ## Evidence
+
+      - `crates/lotar-agent/src/services/agent_job_service.rs` `job_env`: sets `LOTAR_AUTOMATION_EVENT`, `LOTAR_BIN`, `PATH`, no reporter
+      - standards `configs/lotar/automation.yml:28`, `:107`, `:167`, `:249`, `:328` and more: the same sentence in each prompt
+      - A T3 Code thread doesn't get the job's environment (each job prompt says to add `--tasks-dir`), so the env alone doesn't reach t3 jobs
+
+      ## Proposal
+
+      - Headless runners: `job_env` sets `LOTAR_DEFAULT_REPORTER` to the runner's agent name (`claude`, `codex`, ...), unless the profile's `env` sets it.
+      - t3 runner: lotar's job instructions name the variable with that value, as they name `--tasks-dir`.
+      - The name is the agent (provider), not the profile, so existing `comment.author` conditions on `claude`/`codex` keep working. Open: whether `@agent` in a `comment.author` condition should then also match these names, so `@user` means "a person" (DEV-796's draft lists runner names by hand).
+
+      ## Done when
+
+      - [ ] A comment an agent job writes without setting the variable itself has the agent's name as author, for a headless and a t3 job
+      - [ ] A profile `env` with `LOTAR_DEFAULT_REPORTER` still wins
+      - [ ] docs/help (agent jobs, environment) say it
+    new: |-
+      An agent job's lotar commands record the person who runs lotar as author and reporter, unless the prompt tells the agent to set `LOTAR_DEFAULT_REPORTER`. Our prompts repeat "Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex)" in about 10 rules, and comment conditions (`comment: { author: ... }`) rely on it to tell a person's comment from an agent's. A shipped template (DEV-796, `agent-team`) can't count on every prompt saying it. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
+
+      ## Evidence
+
+      - `crates/lotar-agent/src/services/agent_job_service.rs` `job_env`: sets `LOTAR_AUTOMATION_EVENT`, `LOTAR_BIN`, `PATH`, no reporter
+      - standards `configs/lotar/automation.yml:28`, `:107`, `:167`, `:249`, `:328` and more: the same sentence in each prompt
+      - A T3 Code thread doesn't get the job's environment (each job prompt says to add `--tasks-dir`), so the env alone doesn't reach t3 jobs
+
+      ## Proposal
+
+      - Headless runners: `job_env` sets `LOTAR_DEFAULT_REPORTER` to the runner's agent name (`claude`, `codex`, ...), unless the profile's `env` sets it.
+      - t3 runner: lotar's job instructions name the variable with that value, as they name `--tasks-dir`.
+      - The name is the agent (provider), not the profile, so existing `comment.author` conditions on `claude`/`codex` keep working. Open: whether `@agent` in a `comment.author` condition should then also match these names, so `@user` means "a person" (DEV-796's draft lists runner names by hand).
+
+      ## Done when
+
+      - [ ] Headless runner (claude, codex, copilot, gemini, ...): the job's environment has `LOTAR_DEFAULT_REPORTER` set to the runner's name, so a `lotar comment` or `lotar add` the agent runs without setting it records that name as author or reporter. A test covers a claude and a codex job's env.
+      - [ ] t3 runner: the job's notes, next to `--tasks-dir`, tell the agent to put `LOTAR_DEFAULT_REPORTER=<name>` in front of every lotar command, with the name from the profile's `provider` (`claudeAgent` -> `claude`, `codex` -> `codex`, another id as it is, lowercased). No `provider` (T3's default model): the note asks for the agent's own name (claude, codex). A test covers both.
+      - [ ] `command` runner: no name is set (it is any program, not an agent); its comments keep the person's name unless its profile `env` sets one.
+      - [ ] Which value wins: the profile's `env: { LOTAR_DEFAULT_REPORTER: ... }` (headless: left in the env; t3: the note names that value) > the job's agent name > a `LOTAR_DEFAULT_REPORTER` the lotar process that runs the job inherited > the project's `default.reporter`. A prompt's own `LOTAR_DEFAULT_REPORTER=... lotar ...` or `--author`/`--reporter` still wins per command. A test covers the profile env winning.
+      - [ ] Nothing new can fail: a profile without `env` or a ticket that can't be read gets the same name; no ticket or job read decides it.
+      - [ ] docs/help/agent.md (job environment, t3 runner) and docs/help/environment.md say it.
+      - [ ] Out of scope (open, the owner decides with DEV-796): whether `@agent` in a `comment.author` condition matches these names.

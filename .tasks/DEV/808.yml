@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T21:11:09.195177+00:00
-modified: 2026-11-23T02:47:21.536517+00:00
+modified: 2026-11-25T05:43:36.155551+00:00
 relationships:
   depends_on:
   - DEV-812
@@ -51,8 +51,6 @@ description: |-
   - [x] Test: dev278 `run_commands_time_out` fails before the change (no comment) and passes after.
   - [ ] The nested comment returns within seconds while git hangs: that is DEV-812's git timeout. This ticket depends on DEV-812 for it; check it once DEV-812 lands.
   - [x] npm run lint, npm test, npm run smoke pass.
-tags:
-- waits
 history:
 - at: 2026-11-22T21:11:09.477794+00:00
   actor: claude
@@ -167,3 +165,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-25T05:43:36.155551+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: waits
+    new: ''

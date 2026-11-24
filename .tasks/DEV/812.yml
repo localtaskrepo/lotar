@@ -1,11 +1,11 @@
 title: 'File viewer hangs forever when a git call hangs: git children have no timeout'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:53:12.043089+00:00
-modified: 2026-11-24T19:00:45.366589+00:00
+modified: 2026-11-25T05:43:34.006299+00:00
 relationships:
   blocks:
   - DEV-808
@@ -358,6 +358,37 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-25T05:43:33.655434+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-812` is in `main`.
+
+    - Rebased `agent/DEV-812` onto `main` (`6c2aa4916e94`): `aaa019ec0663`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-812` onto `main` (`90380907364b`): `4fd1625845aa`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `4fd1625845aa`
+    - Amended the pending `.tasks` changes into the merged commit: `e53d97ffb76f`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: '903809073'
+      what: 'DEV-838 Code scanning: AssigneePicker ids from Vue useId (alert #36)'
+    - hash: e53d97ffb
+      what: 'DEV-812 File viewer hangs forever when a git call hangs: git children have no timeout'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abd8a3d74b5d576a0f613d6baed1c7bc8a33dcde7a18ac90585f463926f291532
 description: |-
@@ -382,8 +413,6 @@ description: |-
   - [ ] Global excludes lookup finds nothing set, git is missing or git errors: git's default (`$XDG_CONFIG_HOME/git/ignore`, else `~/.config/git/ignore`) applies, as before.
   - [ ] With `HOME` pointing at a folder whose `.gitconfig` is a FIFO nobody writes, `/api/files/resolve` and `/api/files/content` answer within a few seconds (automated test).
   - [ ] With a normal git config, file links and the file viewer work as before, globally ignored files stay hidden (tests).
-tags:
-- job-paused
 history:
 - at: 2026-11-22T21:53:12.327786+00:00
   actor: claude
@@ -595,3 +624,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T05:43:33.655434+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:43:34.006299+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused
+    new: ''

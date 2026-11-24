@@ -61,14 +61,12 @@ const open = ref(false)
 const loading = ref(false)
 const error = ref('')
 const inputs = ref<AgentJobRunInputs | null>(null)
-const loaded = ref(false)
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
     inputs.value = (await api.getAgentJobInputs(props.jobId)).inputs
-    loaded.value = true
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Could not load the instructions'
   } finally {
@@ -76,9 +74,11 @@ async function load() {
   }
 }
 
+// No record yet (a queued job, or one still in its worktree setup) loads again on the next open: the first turn
+// writes it. A record stays cached.
 function toggle() {
   open.value = !open.value
-  if (open.value && !loaded.value && !loading.value) void load()
+  if (open.value && !inputs.value && !loading.value) void load()
 }
 
 async function copy(text: string, what: string) {
