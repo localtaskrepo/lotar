@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T22:44:15.700672+00:00
-modified: 2026-11-25T12:39:48.763670+00:00
+modified: 2026-11-25T14:08:08.398496+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -19,6 +19,9 @@ comments:
 
     - `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` (`from_shown`) exists only on `agent/DEV-849` (`ad0e78fce`), which is still in Merging; `main` (`46fb767aa`) lacks it.
     - Plan once it lands: `from_shown` maps `completed` with non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` to Running, plus a unit test per field.
+- date: 2026-11-25T14:08:08.398496+00:00
+  author: automation
+  text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-857 yet. Agent job job-20261125T140807.897Z-56 is queued: it waits for memory: memory is normal again since 2026-11-25T14:08:03Z; held jobs start after 120 s of normal memory (held since 2026-11-25T14:07:33Z).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
 description: |-
@@ -28,7 +31,6 @@ description: |-
 tags:
 - agent
 - ui
-- waits
 history:
 - at: 2026-11-24T22:44:16.379275+00:00
   actor: claude
@@ -74,3 +76,13 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-25T14:08:07.602768+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent, ui, waits
+    new: agent, ui
+- at: 2026-11-25T14:08:08.398496+00:00
+  actor: automation
+  changes:
+  - field: comment_added

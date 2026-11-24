@@ -4420,6 +4420,14 @@ fn run_session(
         let _ = block_on(session.cancel());
         return RunEnd::Stopped;
     }
+    if launch.runner_kind == AgentRunnerKind::T3 {
+        let own = crate::services::agent_runner::registry().load(launch.name).ok().and_then(|record| record.agent_session);
+        for note in kept::settle_superseded(tasks_dir, ticket_id, own.as_deref()) {
+            update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+        }
+    }
     if let Some(title) = t3_rename_to {
         let t3_env: Vec<(String, String)> =
             table.get(launch.agent).map(|spec| spec.env.clone()).unwrap_or_default().into_iter().chain(t3_profile_env).collect();

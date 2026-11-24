@@ -1,11 +1,13 @@
-//! Renames a T3 Code thread through the T3 Code server's internal WebSocket
-//! API, since the `t3` CLI can't (DEV-619). T3 Code doesn't document this API
-//! and can change it in any release: the owner chose it anyway and checks it
-//! after each T3 Code update (2026-11-17, "Implement with the internal API").
+//! Renames, settles and stops T3 Code threads through the T3 Code server's
+//! internal WebSocket API, since the `t3` CLI can't (DEV-619, DEV-836). T3 Code
+//! doesn't document this API and can change it in any release: the owner chose
+//! it anyway and checks it after each T3 Code update (2026-11-17, "Implement
+//! with the internal API").
 //!
 //! The route is the one T3 Code's own app takes: a short-lived bearer session
 //! from `t3 auth session issue`, a WebSocket to `/ws`, and the RPC
-//! `orchestration.dispatchCommand` with a `thread.metadata.update` command.
+//! `orchestration.dispatchCommand` with a `thread.metadata.update`,
+//! `thread.settle` or `thread.stop` command.
 
 use std::io::ErrorKind;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -22,11 +24,34 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 /// Rename `thread` to `title`. `program` is the `t3` CLI, `env` its
 /// environment; the error says which step failed.
 pub(crate) fn rename_thread(program: &Path, env: &[(String, String)], cwd: &Path, thread: &str, title: &str) -> Result<(), String> {
+    send(program, env, cwd, &rename_command(thread, title))
+}
+
+/// Move `thread` to T3 Code's Settled group. T3 Code never resumes a settled
+/// thread at a usage limit's reset: settling turns its auto-resume off.
+pub(crate) fn settle_thread(program: &Path, env: &[(String, String)], cwd: &Path, thread: &str) -> Result<(), String> {
+    send(program, env, cwd, &command("thread.settle", thread))
+}
+
+/// Stop the run `thread` is running, as T3 Code's Stop button does.
+pub(crate) fn stop_thread(program: &Path, env: &[(String, String)], cwd: &Path, thread: &str, reason: &str) -> Result<(), String> {
+    let mut stop = command("thread.stop", thread);
+    stop["reason"] = serde_json::Value::from(reason);
+    send(program, env, cwd, &stop)
+}
+
+fn send(program: &Path, env: &[(String, String)], cwd: &Path, command: &serde_json::Value) -> Result<(), String> {
     let origin = server_origin(env)?;
     let (session_id, token) = issue_session(program, env, cwd)?;
-    let renamed = dispatch(&origin, &token, &rename_command(thread, title));
+    let sent = dispatch(&origin, &token, command);
     revoke_session(program, env, cwd, &session_id);
-    renamed
+    sent
+}
+
+/// A command of `kind` on `thread`, with an id no other command has.
+fn command(kind: &str, thread: &str) -> serde_json::Value {
+    let millis = jiff::Timestamp::now().as_millisecond();
+    serde_json::json!({"type": kind, "commandId": format!("lotar:{kind}:{thread}:{millis}"), "threadId": thread})
 }
 
 /// The command T3 Code's app sends when someone renames a thread.
@@ -58,7 +83,7 @@ fn server_origin(env: &[(String, String)]) -> Result<String, String> {
 
 /// A bearer session that may only operate threads, for two minutes.
 fn issue_session(program: &Path, env: &[(String, String)], cwd: &Path) -> Result<(String, String), String> {
-    let args = ["auth", "session", "issue", "--scope", "orchestration:operate", "--ttl", "2m", "--label", "lotar thread rename", "--json"];
+    let args = ["auth", "session", "issue", "--scope", "orchestration:operate", "--ttl", "2m", "--label", "lotar thread command", "--json"];
     let output = t3(program, env, cwd, &args)?;
     let issued: serde_json::Value = serde_json::from_slice(&output).map_err(|err| format!("`t3 auth session issue` printed no JSON: {err}"))?;
     let field = |name: &str| issued.get(name).and_then(serde_json::Value::as_str).map(str::to_string);
@@ -87,6 +112,7 @@ fn t3(program: &Path, env: &[(String, String)], cwd: &Path, args: &[&str]) -> Re
 
 /// Send `command` as `orchestration.dispatchCommand` and wait for its answer.
 fn dispatch(origin: &str, token: &str, command: &serde_json::Value) -> Result<(), String> {
+    let kind = command.get("type").and_then(serde_json::Value::as_str).unwrap_or("command");
     let url = format!("{}/ws?orchestrationProtocol=2", origin.trim_end_matches('/').replacen("http", "ws", 1));
     let mut request = url.as_str().into_client_request().map_err(|err| format!("bad T3 Code server address {url}: {err}"))?;
     let bearer = HeaderValue::from_str(&format!("Bearer {token}")).map_err(|err| format!("unusable session token: {err}"))?;
@@ -102,18 +128,18 @@ fn dispatch(origin: &str, token: &str, command: &serde_json::Value) -> Result<()
     stream.set_read_timeout(Some(TIMEOUT)).and_then(|()| stream.set_write_timeout(Some(TIMEOUT))).map_err(|err| err.to_string())?;
     let (mut socket, _) = tungstenite::client(request, stream).map_err(|err| format!("T3 Code's server refused the WebSocket: {err}"))?;
     let request = serde_json::json!({"_tag": "Request", "id": "1", "tag": "orchestration.dispatchCommand", "payload": command, "headers": []});
-    socket.send(Message::text(request.to_string())).map_err(|err| format!("could not send the rename: {err}"))?;
+    socket.send(Message::text(request.to_string())).map_err(|err| format!("could not send {kind}: {err}"))?;
     let started = Instant::now();
     let answer = loop {
         if started.elapsed() > TIMEOUT {
-            break Err("T3 Code's server didn't answer the rename".to_string());
+            break Err(format!("T3 Code's server didn't answer {kind}"));
         }
         let text = match socket.read() {
             Ok(Message::Text(text)) => text,
             Ok(Message::Close(_)) => break Err("T3 Code's server closed the WebSocket before it answered".to_string()),
             Ok(_) => continue,
             Err(tungstenite::Error::Io(err)) if matches!(err.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
-                break Err("T3 Code's server didn't answer the rename".to_string());
+                break Err(format!("T3 Code's server didn't answer {kind}"));
             }
             Err(err) => break Err(format!("the WebSocket to T3 Code's server failed: {err}")),
         };
@@ -122,7 +148,7 @@ fn dispatch(origin: &str, token: &str, command: &serde_json::Value) -> Result<()
             Some("Ping") => {
                 let _ = socket.send(Message::text(r#"{"_tag":"Pong"}"#));
             }
-            Some("Exit") if message.get("requestId").and_then(serde_json::Value::as_str) == Some("1") => break exit_result(&message),
+            Some("Exit") if message.get("requestId").and_then(serde_json::Value::as_str) == Some("1") => break exit_result(kind, &message),
             Some("Defect") => break Err(format!("T3 Code's server failed: {}", message.get("defect").unwrap_or(&serde_json::Value::Null))),
             _ => {}
         }
@@ -132,14 +158,14 @@ fn dispatch(origin: &str, token: &str, command: &serde_json::Value) -> Result<()
 }
 
 /// `Ok` for a `Success` exit, else the failure T3 Code gave.
-fn exit_result(message: &serde_json::Value) -> Result<(), String> {
+fn exit_result(kind: &str, message: &serde_json::Value) -> Result<(), String> {
     let exit = message.get("exit").unwrap_or(&serde_json::Value::Null);
     if exit.get("_tag").and_then(serde_json::Value::as_str) == Some("Success") {
         return Ok(());
     }
     let cause = exit.get("cause").unwrap_or(exit);
     let message = cause.as_array().and_then(|causes| causes.iter().find_map(|cause| cause.pointer("/error/message")?.as_str()));
-    Err(format!("T3 Code refused the rename: {}", message.map_or_else(|| cause.to_string(), str::to_string)))
+    Err(format!("T3 Code refused {kind}: {}", message.map_or_else(|| cause.to_string(), str::to_string)))
 }
 
 #[cfg(test)]
@@ -149,13 +175,13 @@ mod tests {
     #[test]
     fn a_success_exit_renamed_the_thread_and_a_failure_says_why() {
         let success = serde_json::json!({"_tag": "Exit", "requestId": "1", "exit": {"_tag": "Success", "value": {"sequence": 7}}});
-        assert_eq!(exit_result(&success), Ok(()));
+        assert_eq!(exit_result("thread.settle", &success), Ok(()));
         let failure = serde_json::json!({"_tag": "Exit", "requestId": "1", "exit": {"_tag": "Failure", "cause": [
             {"_tag": "Fail", "error": {"_tag": "OrchestrationV2DispatchCommandError", "message": "No orchestration projection exists for thread t9."}}
         ]}});
-        assert_eq!(exit_result(&failure), Err("T3 Code refused the rename: No orchestration projection exists for thread t9.".to_string()));
+        assert_eq!(exit_result("thread.settle", &failure), Err("T3 Code refused thread.settle: No orchestration projection exists for thread t9.".to_string()));
         let unknown = serde_json::json!({"_tag": "Exit", "requestId": "1", "exit": {"_tag": "Failure", "cause": {"_tag": "Die"}}});
-        assert!(exit_result(&unknown).is_err_and(|err| err.contains("Die")));
+        assert!(exit_result("thread.stop", &unknown).is_err_and(|err| err.contains("Die")));
     }
 
     #[test]
@@ -202,6 +228,22 @@ mod tests {
         let request = server.join().unwrap();
         assert_eq!(request["tag"], "orchestration.dispatchCommand");
         assert_eq!(request["payload"]["title"], "TEST-1 merge: Title");
+    }
+
+    #[test]
+    fn settle_and_stop_are_dispatched_as_the_commands_t3s_app_sends() {
+        let settle = command("thread.settle", "mcp:abc");
+        assert_eq!(settle["type"], "thread.settle");
+        assert_eq!(settle["threadId"], "mcp:abc");
+        assert!(settle["commandId"].as_str().is_some_and(|id| id.starts_with("lotar:thread.settle:mcp:abc:")));
+        let (origin, server) = fake_server(serde_json::json!({"_tag": "Success", "value": {"sequence": 8}}));
+        assert_eq!(dispatch(&origin, "secret", &settle), Ok(()));
+        assert_eq!(server.join().unwrap()["payload"]["type"], "thread.settle");
+        let (origin, server) =
+            fake_server(serde_json::json!({"_tag": "Failure", "cause": [{"_tag": "Fail", "error": {"message": "Thread mcp:abc is archived."}}]}));
+        let refused = dispatch(&origin, "secret", &command("thread.stop", "mcp:abc"));
+        assert_eq!(refused, Err("T3 Code refused thread.stop: Thread mcp:abc is archived.".to_string()));
+        server.join().unwrap();
     }
 
     #[test]

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T22:44:17.550162+00:00
-modified: 2026-11-25T12:40:32.727431+00:00
+modified: 2026-11-25T14:08:09.695700+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -20,6 +20,9 @@ comments:
     - `GET /api/jobs/t3-thread` exists only on `agent/DEV-849` (`3fa5b6b88`), which is in Merging; `main` (`46fb767aa`) has no such route in `crates/lotar-lib/src/routes/jobs.rs`.
     - Writing the REST test on main would test nothing; on top of `agent/DEV-849` it would tie this commit to an unmerged branch.
     - Added `depends-on DEV-849` and tag `waits`; I continue here when DEV-849 is on main.
+- date: 2026-11-25T14:08:09.695700+00:00
+  author: automation
+  text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-858 yet. Agent job job-20261125T140809.214Z-57 is queued: it waits for memory: memory is normal again since 2026-11-25T14:08:03Z; held jobs start after 120 s of normal memory (held since 2026-11-25T14:07:33Z).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b1c83e2cf0d2436f0b72ea63e6750f769de0de33c35f3204adaa0b9888d2d
 description: |-
@@ -28,7 +31,6 @@ description: |-
   Done when: an integration test (the fake t3 in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` fits) covers those three answers and two jobs of one ticket that resolve to two threads.
 tags:
 - agent
-- waits
 history:
 - at: 2026-11-24T22:44:18.166402+00:00
   actor: claude
@@ -74,3 +76,13 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-25T14:08:08.922861+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent, waits
+    new: agent
+- at: 2026-11-25T14:08:09.695700+00:00
+  actor: automation
+  changes:
+  - field: comment_added

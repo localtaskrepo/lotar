@@ -73,6 +73,35 @@ pub(super) fn settle_now(tasks_dir: &Path) {
     }
 }
 
+/// Settle the failed threads of the ticket's earlier jobs as a new `t3` job
+/// starts on it, all but `own`, the thread the job continues; the notes for
+/// its log (DEV-836). T3 Code resumes a thread a usage limit failed at the
+/// limit's reset, also when a later job, such as the limited job's retry,
+/// took its work over; a settled thread it never resumes.
+pub(super) fn settle_superseded(tasks_dir: &Path, ticket_id: &str, own: Option<&str>) -> Vec<String> {
+    let Some(earlier) = threads(tasks_dir).remove(ticket_id) else { return Vec::new() };
+    let earlier: Vec<Thread> = earlier.into_iter().filter(|thread| Some(thread.thread.as_str()) != own).collect();
+    if earlier.is_empty() {
+        return Vec::new();
+    }
+    let Some((program, env, cwd)) = super::t3_cli(tasks_dir) else { return Vec::new() };
+    let Some(listed) = resumed::list_threads(&program, &env, &cwd, tasks_dir) else { return Vec::new() };
+    let mut notes = Vec::new();
+    for thread in &earlier {
+        let Some(shown) = listed.get(&thread.thread).filter(|shown| !shown.settled && shown.status == "failed") else { continue };
+        let link = shown.link.as_deref().unwrap_or(&thread.thread);
+        let note = match crate::services::t3_thread_api::settle_thread(&program, &env, &cwd, &thread.thread) {
+            Ok(()) => format!("Settled the T3 Code thread {link} of the job {}, which failed, so T3 Code doesn't resume it beside this job.", thread.job_id),
+            Err(err) => format!(
+                "Could not settle the T3 Code thread {link} of the job {}, which failed, so T3 Code may resume it beside this job: {err}",
+                thread.job_id
+            ),
+        };
+        notes.push(note);
+    }
+    notes
+}
+
 /// Settle each ticket's kept threads, those `listed` shows unsettled and
 /// completed: all of them on a done ticket, else those of jobs that ended
 /// before the job of a settled thread.

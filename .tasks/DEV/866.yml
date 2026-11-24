@@ -1,14 +1,41 @@
 title: lotar serve reads the value of --web-ui-path or --allow-host as the port when no port comes before it
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T05:29:21.102795+00:00
-modified: 2026-11-25T05:29:21.811707+00:00
+modified: 2026-11-25T14:14:27.262054+00:00
 relationships:
   related:
   - DEV-789
+comments:
+- date: 2026-11-25T14:14:19.135057+00:00
+  author: claude
+  text: |-
+    `serve` keeps the values of `--web-ui-path` and `--allow-host` with a space, also before `--port`.
+
+    - `normalize_serve_args` now reads value options from one list `SERVE_VALUE_OPTIONS` (`crates/lotar-lib/src/cli/preprocess.rs`), which adds `--allow-host` and `--web-ui-path`; the other serve options are flags
+    - New test `keeps_web_ui_path_and_allow_host_values_when_port_missing`
+    - Manual: `lotar serve --tasks-dir … --web-ui-path /tmp/web --allow-host tasks.example --port 1` now parses and gets as far as the bind
+  report:
+    commits:
+    - hash: 7e45eea7d
+      what: serve value options listed in one table, incl. --allow-host and --web-ui-path
+    checks:
+    - command: cargo nextest run -p lotar-lib --lib preprocess
+      result: passed
+    - command: cargo nextest run --workspace serve
+      result: passed
+      reason: 320 of 321; serve_sends_the_embedded_index_page needs npm run build:web (not built here)
+    - command: cargo clippy -p lotar-lib --all-targets
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: merge runs them (DEV-797)
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af7c853bc72540dd8dd160e793ee215ee636fb7378dea9f82c7f46d1dfbc0eb6d
 description: |-
   ## Found
 
@@ -39,3 +66,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T14:10:48.172614+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T14:10:48.951486+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af7c853bc72540dd8dd160e793ee215ee636fb7378dea9f82c7f46d1dfbc0eb6d
+- at: 2026-11-25T14:14:19.135057+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T14:14:27.262054+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,9 +1,11 @@
 //! T3 Code threads that run again after their job ended (DEV-626). T3 Code
 //! resumes the turns a restart cut off, and a turn it paused for a usage
 //! limit; an answer in a thread starts a new turn. No lotar job follows such
-//! a thread, so its outcome never reached the ticket. T3's CLI can't stop a
-//! thread, so lotar takes the newest one of a ticket over as a job, which
-//! ends like any other, and comments on the others.
+//! a thread, so its outcome never reached the ticket. lotar takes the newest
+//! one of a ticket over as a job, which ends like any other, and stops the
+//! others through T3 Code's internal API (DEV-836): at a usage limit's reset
+//! T3 Code resumes every limited thread, and a ticket's threads share one
+//! worktree. A Blocked ticket's threads are all stopped.
 
 use super::{
     AgentJobRecord, AgentJobService, AgentJobState, AgentJobStatus, JOB_REGISTRY, RunningJobSlot, active_record_of, is_merge_job_candidate, make_job_id,
@@ -165,8 +167,8 @@ pub(super) fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path,
 
 /// The ticket's running threads, newest job's first: the first is taken over
 /// when no job runs or waits for the ticket and no thread of it waits for an
-/// answer, the others get a comment. Under the ticket's lock, so one process
-/// handles them, once per run.
+/// answer, or left to the job queued for it; the others are stopped. On a Blocked ticket all are stopped. Under
+/// the ticket's lock, so one process handles them, once per run.
 fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: &Path, env: &[(String, String)], cwd: &Path) {
     let Some(_lock) = crate::services::agent_active_jobs::lock_resumed_threads(tasks_dir, ticket_id) else {
         return;
@@ -182,19 +184,33 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
     if threads.is_empty() || ticket_done_state(tasks_dir, ticket_id) == Some(true) {
         return;
     }
-    let busy = AgentJobService::has_active_job_in(tasks_dir, ticket_id)
-        || crate::services::agent_active_jobs::orphaned(tasks_dir).iter().any(|job| crate::storage::identity::aliases_match(&job.ticket_id, ticket_id));
-    // A queued job waits for the thread (DEV-600); the owner or a rule chose
-    // it. A job's retry after a usage limit doesn't: T3 Code resumed the
-    // paused job's own turn after the reset, so the thread is taken over
-    // and the retry goes (DEV-584).
-    let limit_retries = if busy { None } else { limit_retries(tasks_dir, ticket_id) };
-    if !busy && limit_retries.is_none() && queued(tasks_dir, ticket_id) {
+    // A Blocked ticket waits for another one: none of its threads runs.
+    if super::ticket_state(tasks_dir, ticket_id).is_some_and(|(status, _)| status.eq_ignore_ascii_case("blocked")) {
+        for resumed in threads {
+            if crate::services::agent_active_jobs::first_look_at_run(tasks_dir, &resumed.thread, &resumed.run) {
+                stop(tasks_dir, ticket_id, &resumed, &format!("while {ticket_id} is Blocked"), program, env, cwd);
+            }
+        }
         return;
     }
+    let busy = AgentJobService::has_active_job_in(tasks_dir, ticket_id)
+        || crate::services::agent_active_jobs::orphaned(tasks_dir).iter().any(|job| crate::storage::identity::aliases_match(&job.ticket_id, ticket_id));
+    // A queued job waits for the newest thread (DEV-600), and the others are
+    // stopped; the owner or a rule chose it. A job's retry after a usage
+    // limit doesn't: T3 Code resumed the paused job's own turn after the
+    // reset, so the thread is taken over and the retry goes (DEV-584).
+    let limit_retries = if busy { None } else { limit_retries(tasks_dir, ticket_id) };
+    let waited_for = !busy && limit_retries.is_none() && queued(tasks_dir, ticket_id);
     let mut threads = threads.into_iter();
     let mut beside = waiting.first().filter(|_| !busy).map(|held| format!("the thread {} that waits for an answer", held.shown()));
+    if waited_for
+        && beside.is_none()
+        && let Some(first) = threads.next()
+    {
+        beside = Some(format!("the thread {} that the ticket's queued job waits for", first.shown()));
+    }
     if !busy
+        && !waited_for
         && beside.is_none()
         && let Some(first) = threads.next()
     {
@@ -209,15 +225,18 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
                 }
                 beside = Some(format!("the thread {} that the job {job_id} took over", first.shown()));
             }
-            Err(why) => comment(
-                tasks_dir,
-                ticket_id,
-                &format!(
-                    "T3 Code runs the thread {} of the job {} again, with no lotar job, and lotar can't take it over: {why}. Stop it in T3 Code, or let it finish and move the ticket on yourself.",
-                    first.shown(),
-                    first.job_id
-                ),
-            ),
+            Err(why) => {
+                comment(
+                    tasks_dir,
+                    ticket_id,
+                    &format!(
+                        "T3 Code runs the thread {} of the job {} again, with no lotar job, and lotar can't take it over: {why}. Stop it in T3 Code, or let it finish and move the ticket on yourself.",
+                        first.shown(),
+                        first.job_id
+                    ),
+                );
+                beside = Some(format!("the thread {} that lotar could not take over", first.shown()));
+            }
         }
     }
     let beside = beside.unwrap_or_else(|| {
@@ -228,14 +247,28 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
     });
     for resumed in threads {
         if crate::services::agent_active_jobs::first_look_at_run(tasks_dir, &resumed.thread, &resumed.run) {
-            let text = format!(
-                "T3 Code runs the thread {} of the job {} again, beside {beside}. lotar can't stop a T3 Code thread (T3's CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.",
-                resumed.shown(),
-                resumed.job_id
-            );
-            comment(tasks_dir, ticket_id, &text);
+            stop(tasks_dir, ticket_id, &resumed, &format!("beside {beside}"), program, env, cwd);
         }
     }
+}
+
+/// Stop a thread T3 Code runs again `why` ("beside the job …"), and comment
+/// what lotar did: a ticket runs one thread at a time (DEV-836).
+fn stop(tasks_dir: &Path, ticket_id: &str, resumed: &Resumed, why: &str, program: &Path, env: &[(String, String)], cwd: &Path) {
+    let reason = format!("lotar runs one thread of {ticket_id} at a time, none while it is Blocked");
+    let text = match crate::services::t3_thread_api::stop_thread(program, env, cwd, &resumed.thread, &reason) {
+        Ok(()) => format!(
+            "T3 Code ran the thread {} of the job {} again, {why}. lotar stopped it: a ticket runs one thread at a time, none while it is Blocked.",
+            resumed.shown(),
+            resumed.job_id
+        ),
+        Err(err) => format!(
+            "T3 Code runs the thread {} of the job {} again, {why}. lotar takes over only one thread per ticket and could not stop this one ({err}): stop it in T3 Code.",
+            resumed.shown(),
+            resumed.job_id
+        ),
+    };
+    comment(tasks_dir, ticket_id, &text);
 }
 
 /// The harnessmux session whose agent session is `thread`.

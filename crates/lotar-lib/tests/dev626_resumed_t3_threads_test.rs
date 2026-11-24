@@ -1,6 +1,8 @@
 //! DEV-626: a T3 Code thread that runs again after its job ended (T3 Code resumed a turn a restart cut off) is taken
 //! over as a job, whose end rules run once; a second running thread of the ticket gets a comment, and a thread that
 //! waits for an answer is left alone. A shell script stands in for T3's CLI.
+//! DEV-836: lotar stops a second running thread, and every thread of a Blocked ticket, and a new job settles the
+//! failed threads of the ticket's earlier jobs, through a fake of T3 Code's internal WebSocket API.
 #![cfg(unix)]
 
 use crate::common::TestFixtures;
@@ -13,7 +15,8 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 /// `t3 thread start` names the thread after `thread-id` and prints "Started."; `thread show <id>` prints
-/// `show-<id>.json`; `thread list` prints `list.json`. Every call goes to `calls`.
+/// `show-<id>.json`; `thread list` prints `list.json`; `auth session issue` prints a session. Every call goes to
+/// `calls`.
 const FAKE_T3: &str = r#"#!/bin/sh
 dir=$(dirname "$0")
 echo "$1 $2" >> "$dir/calls"
@@ -22,6 +25,7 @@ case "$1 $2" in
   "thread send") cat > /dev/null; echo "Sent." ;;
   "thread show") cat "$dir/show-$3.json" ;;
   "thread list") cat "$dir/list.json" ;;
+  "auth session") [ "$3" = issue ] && echo '{"sessionId":"s1","token":"secret"}' ;;
 esac
 "#;
 
@@ -50,8 +54,11 @@ fn harness() -> Harness {
     std::fs::write(home.join("config/agents.toml"), format!("[agents.t3]\nkind = \"t3\"\ncommand = [\"{}\"]\n", script.display())).unwrap();
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        "default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fixer:\n    runner: t3\n  other:\n    runner: t3\n",
+        "default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Blocked, Done]\nagents:\n  fixer:\n    runner: t3\n  other:\n    runner: t3\n",
     );
+    // T3 Code's server, which the internal API reaches, runs only where a test starts its fake.
+    let t3_home = root.join("t3-home");
+    std::fs::create_dir_all(t3_home.join("userdata")).unwrap();
     let rule_ran = dir.join("rule-ran");
     std::fs::write(
         fixtures.tasks_root.join("automation.yml"),
@@ -63,6 +70,7 @@ fn harness() -> Harness {
     .unwrap();
     let guards = vec![
         EnvVarGuard::set("HARNESSMUX_HOME", home.to_string_lossy().as_ref()),
+        EnvVarGuard::set("T3CODE_HOME", t3_home.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
         EnvVarGuard::set("LOTAR_TRUST_ALL", "1"),
@@ -99,6 +107,39 @@ impl Harness {
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(self.fixtures.get_temp_path()).args(["agent", "run", "TEST-1", "Fix it", "--agent", agent, "--wait"]);
         cmd.assert().success();
+    }
+
+    /// Start a fake of T3 Code's server: its `/ws` answers each command with success and logs its payload in
+    /// `commands`.
+    fn serve_t3(&self) {
+        use std::io::Write as _;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let runtime = serde_json::json!({"origin": format!("http://{}", listener.local_addr().unwrap())});
+        let home = self.fixtures.get_temp_path().join("t3-home/userdata/server-runtime.json");
+        std::fs::write(home, runtime.to_string()).unwrap();
+        let log = self.dir.join("commands");
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut socket) = stream.map_err(|_| ()).and_then(|stream| tungstenite::accept(stream).map_err(|_| ())) else { continue };
+                if let Ok(tungstenite::Message::Text(text)) = socket.read() {
+                    let request: serde_json::Value = serde_json::from_str(text.as_str()).unwrap();
+                    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&log).unwrap();
+                    writeln!(file, "{}", request["payload"]).unwrap();
+                    let answer = serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Success", "value": {"sequence": 1}}});
+                    let _ = socket.send(tungstenite::Message::text(answer.to_string()));
+                    let _ = socket.read();
+                }
+            }
+        });
+    }
+
+    /// The commands the fake T3 Code server took, as `<type> <thread>`.
+    fn commands(&self) -> Vec<String> {
+        let log = std::fs::read_to_string(self.dir.join("commands")).unwrap_or_default();
+        log.lines()
+            .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+            .map(|command| format!("{} {}", command["type"].as_str().unwrap(), command["threadId"].as_str().unwrap()))
+            .collect()
     }
 
     fn calls(&self) -> String {
@@ -359,4 +400,105 @@ fn a_thread_t3_code_resumes_is_left_to_a_queued_job_that_is_no_usage_limit_retry
 
     assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none(), "no job takes it over");
     assert_eq!(AgentQueueService::list_pending(&tasks_dir).unwrap().len(), 1, "the queued job stays");
+}
+
+/// DEV-836: with a queued job, the newest resumed thread is left for the job to wait on and the others are stopped.
+#[test]
+fn a_queued_job_waits_for_the_newest_resumed_thread_and_the_others_are_stopped() {
+    use lotar::services::agent_queue_service::AgentQueueService;
+    let harness = harness();
+    harness.run_job("other", "t1");
+    harness.run_job("fixer", "t2");
+    harness.serve_t3();
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    let _worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let request =
+        lotar::api_types::AgentJobCreateRequest { ticket_id: "TEST-1".into(), prompt: "Fix it".into(), agent: Some("fixer".into()), ..Default::default() };
+    AgentQueueService::enqueue(&tasks_dir, request).unwrap();
+
+    harness.list(&[("t1", "running"), ("t2", "running")]);
+    harness.show("t1", "running", Some("r2"), 0, "Working.");
+    harness.show("t2", "running", Some("r2"), 0, "Working.");
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+
+    assert_eq!(harness.commands(), ["thread.stop t1"], "only the older thread is stopped");
+    let stopped = harness.task().comments.into_iter().find(|comment| comment.text.contains("lotar stopped it")).expect("a comment on the stopped thread");
+    assert!(
+        stopped.text.contains(&link("t1")) && stopped.text.contains(&format!("the thread {} that the ticket's queued job waits for", link("t2"))),
+        "{}",
+        stopped.text
+    );
+    assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none(), "no job takes it over");
+    assert_eq!(AgentQueueService::list_pending(&tasks_dir).unwrap().len(), 1, "the queued job stays");
+}
+
+/// DEV-836: at a usage limit's reset T3 Code resumes every limited thread of the ticket; lotar takes over the newest
+/// and stops the others, which share its worktree.
+#[test]
+fn lotar_stops_a_second_running_thread_of_the_ticket() {
+    let harness = harness();
+    harness.run_job("other", "t1");
+    harness.run_job("fixer", "t2");
+    harness.serve_t3();
+
+    harness.list(&[("t1", "running"), ("t2", "running")]);
+    harness.show("t1", "running", Some("r2"), 0, "Working.");
+    harness.show("t2", "running", Some("r2"), 0, "Working.");
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+
+    assert_eq!(harness.commands(), ["thread.stop t1"]);
+    let stopped = harness.task().comments.into_iter().find(|comment| comment.text.contains("lotar stopped it")).expect("a comment on the stopped thread");
+    assert!(stopped.text.contains(&link("t1")) && stopped.text.contains(&link("t2")), "{}", stopped.text);
+    assert_eq!(harness.comments_with("stop it in T3 Code"), 0);
+
+    let job = lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").expect("the newest thread is taken over");
+    harness.show("t2", "completed", None, 0, "Finished.");
+    wait_for_end(&job.job_id);
+}
+
+/// DEV-836: a Blocked ticket waits for another one, so lotar takes none of its threads over and stops them all.
+#[test]
+fn every_thread_of_a_blocked_ticket_is_stopped_and_none_is_taken_over() {
+    let harness = harness();
+    harness.run_job("other", "t1");
+    harness.run_job("fixer", "t2");
+    let patch = lotar::api_types::TaskUpdate { status: Some("Blocked".to_string()), ..Default::default() };
+    TaskService::update(&mut harness.fixtures.create_storage(), "TEST-1", patch).unwrap();
+    harness.serve_t3();
+
+    harness.list(&[("t1", "running"), ("t2", "running")]);
+    harness.show("t1", "running", Some("r2"), 0, "Working.");
+    harness.show("t2", "running", Some("r2"), 0, "Working.");
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+
+    assert!(lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_none(), "no job takes a thread over");
+    let mut commands = harness.commands();
+    commands.sort();
+    assert_eq!(commands, ["thread.stop t1", "thread.stop t2"]);
+    assert_eq!(harness.comments_with("while TEST-1 is Blocked. lotar stopped it"), 2, "{:?}", harness.task().comments);
+    assert_eq!(harness.task().status.as_str(), "Blocked");
+}
+
+/// DEV-836: a job's retry runs in a new thread; T3 Code would still resume the limited job's failed thread at the
+/// limit's reset, so the new job settles it.
+#[test]
+fn a_new_job_settles_the_failed_thread_of_an_earlier_job_on_the_ticket() {
+    let harness = harness();
+    harness.run_job("fixer", "t1");
+    harness.run_job("fixer", "t2");
+    harness.serve_t3();
+    harness.list(&[("t1", "failed"), ("t2", "completed")]);
+
+    harness.run_job("fixer", "t3");
+
+    assert_eq!(harness.commands(), ["thread.settle t1"], "only the failed thread is settled");
+    let logs = harness.fixtures.tasks_root.join("@agent-logs");
+    let noted = std::fs::read_dir(&logs)
+        .unwrap()
+        .flatten()
+        .map(|entry| std::fs::read_to_string(entry.path()).unwrap_or_default())
+        .any(|log| log.lines().any(|line| line.contains("Settled the T3 Code thread") && line.contains(&link("t1"))));
+    assert!(noted, "the new job's log says which thread it settled");
 }
