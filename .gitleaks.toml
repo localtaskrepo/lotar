@@ -39,3 +39,14 @@ description = "references to a secret, not the secret: {env}NAME lookups"
 regexTarget = "line"
 targetRules = ["generic-password"]
 regexes = ['''password"?\s*[:=]\s*"\{env\}[A-Z0-9_]+"''']
+
+# lotar only, not from the shared rules: the Copilot CLI stream fixture (tests/fixtures/agent-streams, removed in
+# DEV-503, still in history: 830761fe5, 27308a291) records Copilot's apiCallId, a base64 request ID, not a secret.
+# generic-api-key fires on it (DEV-839). Only an apiCallId match in that directory is allowed (condition AND).
+[[allowlists]]
+description = "Copilot apiCallId request IDs in the agent stream fixtures"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^tests/fixtures/agent-streams/''']
+regexTarget = "match"
+regexes = ['''^apiCallId"\s*:\s*"[A-Za-z0-9+/=]+"$''']

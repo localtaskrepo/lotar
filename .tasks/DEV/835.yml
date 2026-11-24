@@ -1,11 +1,11 @@
 title: 'An expired provider login fails every job into retries, owner questions and inbox triage: pause that provider''s queue like a signing failure (DEV-604)'
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T16:08:21.742893+00:00
-modified: 2026-11-26T00:29:39.823506+00:00
+modified: 2026-11-26T00:45:02.176859+00:00
 relationships:
   related:
   - DEV-604
@@ -82,6 +82,43 @@ comments:
     Also:
     - The branch conflicts with `main` in `agent_job_service.rs` and `resumed.rs`: `46fb767aa` (DEV-833) and others changed them. Rebase onto `main` during the rework
     - The JSON key change from `pause` to `pauses`: nothing in `view/`, the smoke tests or the standards scripts reads `pause`. That is fine
+- date: 2026-11-26T00:44:50.545282+00:00
+  author: claude
+  text: |-
+    Rework done: the owner now gets one notice per login pause; all 3 review findings fixed, rebased onto `main`.
+
+    - Review read `9dc30834c`, which was HEAD: no re-review needed first
+    - **1. Owner notice.** New rule condition `job: { pause: auth }` (also `signing`, `disk`). Only the job that opens a pause matches it; jobs that join it, and retries that fail the same way, don't. `AgentQueueService::pause` now returns whether the job opened the pause. New variable `${{agent.provider}}`
+    - New DEV rule "Login expired: ask the owner to sign in" (`.tasks/DEV/automation.yml`): it files one ticket, HelpNeeded, assigned to mallox, tag `owner`, naming the provider and `claude auth login`. It's a separate ticket, because the paused ticket's queued retry moves that one on. It's a `run` rule, so it needs `lotar trust`
+    - Docs: `docs/help/agent.md` Notices no longer says "its one notice"; `docs/help/automation.md` documents `job: { pause }` and `agent.provider`. The UI's rule text describes the condition
+    - **2. End-to-end test.** `an_expired_login_pauses_the_job_with_one_notice_until_a_retry_completes` (`dev584_usage_limit_pause_test.rs`): a fake T3 fails twice on "Claude could not authenticate". Both jobs pause, no `job_failed` rule runs, the ticket keeps its status and assignee, there is exactly 1 notice comment, the third try completes and the pause ends
+    - **3. Dead assertion.** `dev604_queue_pauses_test.rs` now checks `pauses == []`
+    - Rebase: conflicts in `agent_job_service.rs` and `resumed.rs` (DEV-833's `after_limit`): kept both
+    - No guidance correction: nothing durable found
+  report:
+    commits:
+    - hash: 2df8d1a05
+      what: 'login pause, job: { pause } condition, agent.provider, owner notice rule; rebased onto main'
+    checks:
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+      reason: 254 tests
+    - command: cargo nextest run --workspace --test integration dev584 dev604 list_jobs agent_queue dev320 dev528 agent_automation
+      result: passed
+      reason: 84 tests, LOTAR_* cleared, fresh cargo build
+    - command: npm run lint
+      result: passed
+      reason: after npm ci (the worktree had prettier 3.9.10, the lock says 3.10.1)
+    - command: npm run test:ui
+      result: passed
+      reason: 1618 tests
+    - command: npm test
+      result: not_run
+      reason: targeted checks only, the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: no UI page changed; the merge runs it
+    next: 'Owner: lotar trust, so the new run rule in .tasks/DEV/automation.yml may run. Standards configs/lotar/automation.yml needs the same rule for the other repos once this ships'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ff06e8317883aa88fd31e0eb8d7df2aa53ee9d651f0dbc2a23a0118cdec8a29
@@ -235,3 +272,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A352edfd1f3632d5e987af7b932a3512056876182c8a61cbdd0f55f2a67cdd250
+- at: 2026-11-26T00:44:50.545282+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:45:02.176859+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

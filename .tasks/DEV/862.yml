@@ -5,7 +5,10 @@ type: Feature
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-25T22:12:12.566849+00:00
+modified: 2026-11-26T00:48:14.068200+00:00
+relationships:
+  related:
+  - DEV-584
 comments:
 - date: 2026-11-25T13:24:09.600579+00:00
   author: automation
@@ -20,7 +23,20 @@ comments:
     - Caveats: the endpoint is undocumented and may change. It needs Claude Code's OAuth token from the login Keychain. Whether an agent or lotar may read that token is the owner's call (credentials rules, opgate). Without his OK, keep the readings from jobs as planned.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
-description: 'Owner 2026-11-24: "maybe that''s a trigger we should have in general when we run out of credit, that there''s a cleanup process"; he picked ''File both''. Nothing on the Mac stores the Claude five-hour window''s usage or reset time: T3 shows it (18:00 on 2026-11-24) but saves it nowhere, the claude CLI has no usage command. lotar''s jobs run Claude through the Agent SDK/ACP and get its rate-limit events (used share, resetsAt); Codex reports account/rateLimits. Save the newest reading per provider (and account) where scripts can read it, and show it with `lotar usage` (--format json): provider, used percent per window, resets_at, read_at. Standards'' out-of-credit schedule builds on it.'
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
+description: |-
+  Owner 2026-11-24: "maybe that's a trigger we should have in general when we run out of credit, that there's a cleanup process"; he picked 'File both'. Nothing on the Mac stores the Claude five-hour window's usage or reset time: T3 shows it (18:00 on 2026-11-24) but saves it nowhere, the claude CLI has no usage command. lotar's jobs run Claude through the Agent SDK/ACP and get its rate-limit events (used share, resetsAt); Codex reports account/rateLimits. Save the newest reading per provider (and account) where scripts can read it, and show it with `lotar usage` (--format json): provider, used percent per window, resets_at, read_at. Standards' out-of-credit schedule builds on it.
+
+  ## Done when
+
+  - [ ] A job's agent that reports a usage window (claude-agent-acp's `_claude/rateLimit`, harnessmux `Usage.rate_limit`) saves it: provider, account, window (`five_hour`, `seven_day`, ...), status (`allowed`, `allowed_warning`, `rejected`), used percent (utilization × 100, null when the agent gives none), `resets_at`, `read_at`, the job id.
+  - [ ] A job paused on a usage limit (DEV-584) saves a `rejected` reading with the reset time it waits for, for every runner (Codex and T3 Code report no windows today, so this is their only reading). The window comes from the text ("5-hour" → `five_hour`, "weekly" → `seven_day`), else null.
+  - [ ] One reading per provider, account and window; the newest `read_at` wins. An unchanged reading rewrites the file at most once a minute (Claude sends one per update).
+  - [ ] Provider: the runner (`claude`, `codex`); for `t3` the profile's provider (`claudeAgent` → `claude`, `codex` → `codex`), `t3` when unset. Account: the profile's `CLAUDE_CONFIG_DIR` (claude) or `CODEX_HOME` (codex) env value, null for the default login.
+  - [ ] The file is `usage.json` in lotar's machine-wide state dir, next to the agent queue (`LOTAR_AGENT_QUEUE_DIR`, else `$XDG_RUNTIME_DIR/lotar`, else `~/Library/Caches/lotar` on macOS), written under a lock and atomically, so every repo's server shares it. A failed write warns and never fails or pauses the job.
+  - [ ] `lotar usage` lists the readings (provider, account, window, used, status, resets at, read at), from any directory, no tasks dir needed. `--format json` gives `{"file": ..., "readings": [...]}` with the fields above. No file: empty list, exit 0. Unreadable or malformed file: error naming the file, exit 1.
+  - [ ] `docs/help/usage.md` (linked from the help index) says what is recorded, from which runners, where, and what is not (no reading while no job runs; the OAuth usage poll is the owner's call, see the comment of 2026-11-25).
+  - [ ] Tests: the reading from a Usage event and from a paused failure, newest wins per key, provider and account naming, the CLI's empty, text, JSON and malformed-file output.
 tags:
 - fix-retried
 history:
@@ -63,3 +79,32 @@ history:
   - field: priority
     old: Medium
     new: High
+- at: 2026-11-26T00:45:08.694159+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
+- at: 2026-11-26T00:48:13.519227+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Owner 2026-11-24: "maybe that''s a trigger we should have in general when we run out of credit, that there''s a cleanup process"; he picked ''File both''. Nothing on the Mac stores the Claude five-hour window''s usage or reset time: T3 shows it (18:00 on 2026-11-24) but saves it nowhere, the claude CLI has no usage command. lotar''s jobs run Claude through the Agent SDK/ACP and get its rate-limit events (used share, resetsAt); Codex reports account/rateLimits. Save the newest reading per provider (and account) where scripts can read it, and show it with `lotar usage` (--format json): provider, used percent per window, resets_at, read_at. Standards'' out-of-credit schedule builds on it.'
+    new: |-
+      Owner 2026-11-24: "maybe that's a trigger we should have in general when we run out of credit, that there's a cleanup process"; he picked 'File both'. Nothing on the Mac stores the Claude five-hour window's usage or reset time: T3 shows it (18:00 on 2026-11-24) but saves it nowhere, the claude CLI has no usage command. lotar's jobs run Claude through the Agent SDK/ACP and get its rate-limit events (used share, resetsAt); Codex reports account/rateLimits. Save the newest reading per provider (and account) where scripts can read it, and show it with `lotar usage` (--format json): provider, used percent per window, resets_at, read_at. Standards' out-of-credit schedule builds on it.
+
+      ## Done when
+
+      - [ ] A job's agent that reports a usage window (claude-agent-acp's `_claude/rateLimit`, harnessmux `Usage.rate_limit`) saves it: provider, account, window (`five_hour`, `seven_day`, ...), status (`allowed`, `allowed_warning`, `rejected`), used percent (utilization × 100, null when the agent gives none), `resets_at`, `read_at`, the job id.
+      - [ ] A job paused on a usage limit (DEV-584) saves a `rejected` reading with the reset time it waits for, for every runner (Codex and T3 Code report no windows today, so this is their only reading). The window comes from the text ("5-hour" → `five_hour`, "weekly" → `seven_day`), else null.
+      - [ ] One reading per provider, account and window; the newest `read_at` wins. An unchanged reading rewrites the file at most once a minute (Claude sends one per update).
+      - [ ] Provider: the runner (`claude`, `codex`); for `t3` the profile's provider (`claudeAgent` → `claude`, `codex` → `codex`), `t3` when unset. Account: the profile's `CLAUDE_CONFIG_DIR` (claude) or `CODEX_HOME` (codex) env value, null for the default login.
+      - [ ] The file is `usage.json` in lotar's machine-wide state dir, next to the agent queue (`LOTAR_AGENT_QUEUE_DIR`, else `$XDG_RUNTIME_DIR/lotar`, else `~/Library/Caches/lotar` on macOS), written under a lock and atomically, so every repo's server shares it. A failed write warns and never fails or pauses the job.
+      - [ ] `lotar usage` lists the readings (provider, account, window, used, status, resets at, read at), from any directory, no tasks dir needed. `--format json` gives `{"file": ..., "readings": [...]}` with the fields above. No file: empty list, exit 0. Unreadable or malformed file: error naming the file, exit 1.
+      - [ ] `docs/help/usage.md` (linked from the help index) says what is recorded, from which runners, where, and what is not (no reading while no job runs; the OAuth usage poll is the owner's call, see the comment of 2026-11-25).
+      - [ ] Tests: the reading from a Usage event and from a paused failure, newest wins per key, provider and account naming, the CLI's empty, text, JSON and malformed-file output.
+- at: 2026-11-26T00:48:14.068200+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-584"]}'

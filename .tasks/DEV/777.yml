@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-26T00:03:50.329610+00:00
+modified: 2026-11-26T00:33:43.707885+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -25,6 +25,7 @@ relationships:
   - DEV-845
   - DEV-847
   - DEV-859
+  - DEV-848
 comments:
 - date: 2026-11-22T02:54:19.137208+00:00
   author: claude
@@ -821,3 +822,9 @@ history:
   - field: tags
     old: backend, merge-retried, job-paused, fix-retried
     new: backend
+- at: 2026-11-26T00:33:43.707885+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876","DEV-769","DEV-819","DEV-831","DEV-842","DEV-845","DEV-847","DEV-859"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876","DEV-769","DEV-819","DEV-831","DEV-842","DEV-845","DEV-847","DEV-859","DEV-848"]}'

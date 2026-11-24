@@ -1,11 +1,11 @@
 title: 'docs/help/trust.md: the sentence on a run skipped while lotar trust replays is missing its verb'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T17:30:03.578015+00:00
-modified: 2026-11-25T12:43:25.882295+00:00
+modified: 2026-11-26T00:36:17.747301+00:00
 relationships:
   depends_on:
   - DEV-821
@@ -57,6 +57,18 @@ comments:
       result: not_run
       reason: docs-only
     next: Review, then merge
+- date: 2026-11-26T00:36:06.722279+00:00
+  author: claude
+  text: |-
+    Review: passed — the one-line fix in `5729f3ceb` does what "Done when" asks and nothing else.
+
+    - Diff: `docs/help/trust.md:45` only; it now reads "…already replaying runs is replayed right after its skip is recorded." Same text as "Done when" asks
+    - Claim holds: `crates/lotar-agent/src/services/automation_service.rs:2672-2677` calls `rerun_skipped_runs` right after `report_skipped_run` when the repo is trusted again (DEV-821)
+    - `grep -rn 'already replaying' docs`: only the fixed line is left
+    - `npx prettier --check docs/help/trust.md`: passed
+    - Main moved to `a458c2224` since the base `46fb767aa`, but no commit there touches `trust.md` or the replay code, so a rebase is clean
+    - No stray files, no second branch; this is a docs-only change, so no test or UI review is needed
+    - Nothing filed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b6334253d092bdb815a9d1ea20b967ac4eb05f37759228370c057cc8771dd06
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac453b498fe330d5e1884e94989ba616bf8ec22980d0162e238ebb1c3c9c827df
@@ -172,3 +184,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T00:36:06.722279+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:36:17.747301+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

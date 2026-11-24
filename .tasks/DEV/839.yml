@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:42:38.212660+00:00
-modified: 2026-11-25T12:35:56.578615+00:00
+modified: 2026-11-26T00:35:37.430573+00:00
 relationships:
   related:
   - DEV-503
@@ -73,6 +73,56 @@ comments:
     - My own scratch-repo test: an `apiCallId` in the fixture dir is allowed. The same value in `other/`, an `apiKey` key in the fixture dir, and a `token` next to an allowed `apiCallId` on the same line all still fire
     - `npm ci` ran. lint, test and smoke weren't rerun: this is a scanner config change and the merge runs them
     - No findings, no tickets filed, no stray files. No durable guidance finding
+- date: 2026-11-26T00:35:37.430573+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+         ✓ shows externally edited tasks after background updates 2057ms
+     ✓ |wall-clock| tests/ui.panel-safety.smoke.spec.ts (1 test) 2422ms
+       ✓ UI panel scope safety (1)
+         ✓ blocks create during pending and failed project config, then submits refreshed defaults 2421ms
+
+    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+     FAIL  |wall-clock| tests/ui.sync-scope.smoke.spec.ts > UI sync scope isolation (DEV-67) > editor saves global edits without leaking into the project config
+    TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+    Call log:
+      - waiting for locator('[data-testid="remote-dialog-choice"]') to be visible
+
+     ❯ tests/ui.sync-scope.smoke.spec.ts:577:32
+        575|
+        576|                     await remoteRow(page, 'inherited-jira').getByRole(…
+        577|                     await page.waitForSelector('[data-testid="remote-d…
+           |                                ^
+        578|                     await page.getByRole('button', { name: 'Edit in Gl…
+        579|                     await expect
+     ❯ helpers/ui.ts:112:20
+     ❯ withBrowser helpers/ui.ts:92:20
+     ❯ tests/ui.sync-scope.smoke.spec.ts:573:17
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+     Test Files  1 failed | 117 passed (118)
+          Tests  1 failed | 410 passed (411)
+       Start at  16:22:27
+       Duration  789.18s (tests 95%, import 4%, transform 1%)
+    ```.
+
+    - Rebased `agent/DEV-839` onto `main` (`1d326e6e4283`): `2f17e2120e30`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb05412bdd614deae4fbbce7434e92817be71817849e10680d39089e3c7ef9cd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A246b69a28e09213bdf866f311ded790e80b05882e8b28b3e2357cb1e2843d10e
@@ -167,3 +217,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T00:35:37.430573+00:00
+  actor: automation
+  changes:
+  - field: comment_added

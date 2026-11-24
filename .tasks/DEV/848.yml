@@ -1,14 +1,16 @@
 title: Jira sync check returns 401 for inline scoped token
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-24T20:03:06.454346+00:00
-modified: 2026-11-25T23:06:15.475102+00:00
+modified: 2026-11-26T00:33:53.722812+00:00
 relationships:
   related:
   - DEV-300
+  - DEV-777
+  - DEV-819
 comments:
 - date: 2026-11-24T20:04:10.740443+00:00
   author: automation
@@ -117,6 +119,33 @@ comments:
     - command: npm run -s lint:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T00:33:43.455491+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `a458c2224` is on `main` and `origin/main`.
+
+    - lotar's lint failure was the environment, not the work: the running sccache server points at a deleted temp dir (`lotar-rust-temp-PUUk3H`). All checks were rerun with `RUSTC_WRAPPER=`. Until that server restarts, other merges will hit the same error
+    - The first `npm ci` left `node_modules/.bin/vitest` missing; a second `npm ci` fixed it
+    - Main moved twice during the checks (`43dbd75da` DEV-819, `1d326e6e4` DEV-777), with no shared files. Each time I rebased cleanly and reran install, lint, test and smoke; the last run was on `7f1a40ab3`
+    - Fast-forwarded the main checkout and amended the pending `.tasks` changes into it: `a458c2224`
+    - No rule or config files changed, so no `lotar trust` was needed. Not a health ticket
+  report:
+    commits:
+    - hash: a458c2224
+      what: DEV-848 refuse tokens/emails with spaces, control or non-ASCII characters before any sync request
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: rerun with RUSTC_WRAPPER= (sccache temp dir gone)
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2547 Rust, 1617 UI, release, hooks
+    - command: npm run -s smoke
+      result: passed
+      reason: 411 tests
+    - command: npm ci
+      result: passed
+    next: 'Owner: run lotar sync check against the live jira.default profile; a refusal names the bad character in the inline token'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d4edb4cd314d39fbe0fcb99cb68949c3d001274e5c8a91e9f7560539b8217
 description: |-
@@ -142,7 +171,6 @@ description: |-
   Keep real credentials out of prompts, tests, logs, fixtures, and ticket comments. Honor the credential-file guard and leave the user's live config alone during isolated diagnostics.
 tags:
 - backend
-- job-paused
 custom_fields:
   finding: jira-sync:inline-scoped-token-401
 history:
@@ -259,3 +287,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T00:33:43.455491+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:33:43.709479+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-300"]}'
+    new: '{"related":["DEV-300","DEV-777","DEV-819"]}'
+- at: 2026-11-26T00:33:53.722812+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: backend, job-paused
+    new: backend
