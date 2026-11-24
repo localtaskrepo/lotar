@@ -73,6 +73,25 @@
         </button>
       </div>
 
+      <div v-if="jobs.length" class="job-filters" role="search" aria-label="Find jobs">
+        <UiInput
+          v-model="jobSearch"
+          type="search"
+          class="job-filters__search"
+          placeholder="Search ticket, title or summary"
+          aria-label="Search jobs"
+        />
+        <UiSelect v-model="profileFilter" aria-label="Agent or runner">
+          <option value="">All agents</option>
+          <option v-for="option in profileOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </UiSelect>
+        <UiSelect v-model="ticketFilter" aria-label="Ticket">
+          <option value="">All tickets</option>
+          <option v-for="id in ticketSuggestions" :key="id" :value="id">{{ id }}</option>
+        </UiSelect>
+        <button v-if="hasJobFilters" type="button" class="link-button" @click="clearJobFilters">Clear</button>
+      </div>
+
       <UiCard v-if="showQueue && queue" class="queue-card" data-testid="agent-queue" aria-label="Waiting in the queue">
         <div class="queue-card__header">
           <h2 class="queue-card__title">Waiting in the queue</h2>
@@ -127,11 +146,13 @@
 
       <UiEmptyState
         v-else-if="!filteredJobs.length && !showQueue"
-        :title="activeTab === 'all' ? 'No agent jobs yet' : `No ${activeTab} jobs`"
+        :title="hasJobFilters ? 'No jobs match' : activeTab === 'all' ? 'No agent jobs yet' : `No ${activeTab} jobs`"
         :description="
-          activeTab === 'all'
-            ? 'Assign a ticket to an agent profile (for example @implement), or use Run agent to start a job.'
-            : 'Jobs with this status will show up here.'
+          hasJobFilters
+            ? 'Change the search or the filters to see more jobs.'
+            : activeTab === 'all'
+              ? 'Assign a ticket to an agent profile (for example @implement), or use Run agent to start a job.'
+              : 'Jobs with this status will show up here.'
         "
       />
 
@@ -169,7 +190,13 @@
           </div>
 
           <div class="ticket-group-jobs">
-            <article v-for="job in group.jobs" :key="job.id" class="job-card" :class="`job-${job.status}`">
+            <article
+              v-for="job in group.jobs"
+              :id="`job-${job.id}`"
+              :key="job.id"
+              class="job-card"
+              :class="`job-${job.status}`"
+            >
               <div class="job-card__top">
                 <div class="job-card__identity">
                   <span class="status-chip" :class="`status-${job.status}`">{{ job.status }}</span>
@@ -206,7 +233,7 @@
                 }}</span>
               </div>
 
-              <div v-if="job.last_message" class="job-summary">
+              <div v-if="job.last_message && !isLogsOpen(job.id)" class="job-summary">
                 <p v-if="isToolLine(job.last_message)" class="job-summary__text job-summary__text--tool">
                   {{ job.last_message }}
                 </p>
@@ -253,8 +280,11 @@
                 <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
                 <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
                 <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
-                <AgentJobLog v-else :entries="logsByJob[job.id] || []" />
-                <AgentRunInputs :job-id="job.id" />
+                <AgentJobLog v-else :entries="logsByJob[job.id] || []" :job="job" instructions viewer="agents" />
+                <AgentRunInputs
+                  v-if="logsLoading[job.id] || logsError[job.id] || !(logsByJob[job.id] || []).length"
+                  :job-id="job.id"
+                />
 
                 <form v-if="canMessage(job)" class="job-message" @submit.prevent="sendMessage(job.id)">
                   <UiInput
@@ -318,7 +348,7 @@
 
 <script setup lang="ts">
 import PageHeader from '../components/PageHeader.vue'
-import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import { formatDateTime, formatRelativeTime } from '../utils/date'
 import type {
@@ -352,6 +382,7 @@ import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiInput from '../components/UiInput.vue'
 import UiModal from '../components/UiModal.vue'
+import UiSelect from '../components/UiSelect.vue'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 
@@ -403,26 +434,71 @@ async function refreshQueue() {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
+// Search and filters next to the status tabs; the tabs count what they leave.
+const jobSearch = ref('')
+const profileFilter = ref('')
+const ticketFilter = ref('')
+const hasJobFilters = computed(() => !!(jobSearch.value.trim() || profileFilter.value || ticketFilter.value))
+function clearJobFilters() {
+  jobSearch.value = ''
+  profileFilter.value = ''
+  ticketFilter.value = ''
+}
+
+// "@review" for a profile's jobs, "runner:claude" for jobs run without one.
+const profileKey = (job: AgentJob) => (job.agent ? `@${job.agent}` : `runner:${job.runner}`)
+const profileOptions = computed(() =>
+  [...new Set(jobs.value.map(profileKey))]
+    .sort()
+    .map((value) => ({ value, label: value.startsWith('@') ? value : value.slice('runner:'.length) })),
+)
+
+const searchedJobs = computed(() => {
+  const query = jobSearch.value.trim().toLowerCase()
+  return jobs.value.filter((job) => {
+    if (profileFilter.value && profileKey(job) !== profileFilter.value) return false
+    if (ticketFilter.value && job.ticket_id !== ticketFilter.value) return false
+    if (!query) return true
+    const text = [
+      job.ticket_id,
+      ticketInfo.value[job.ticket_id]?.title,
+      job.summary,
+      job.last_message,
+      job.agent,
+      job.runner,
+    ]
+    return text.some((value) => value?.toLowerCase().includes(query))
+  })
+})
+
 const tabs = computed(() => [
-  { value: 'all' as const, label: 'All', count: jobs.value.length },
-  { value: 'running' as const, label: 'Running', count: jobs.value.filter((j) => j.status === 'running').length },
+  { value: 'all' as const, label: 'All', count: searchedJobs.value.length },
+  {
+    value: 'running' as const,
+    label: 'Running',
+    count: searchedJobs.value.filter((j) => j.status === 'running').length,
+  },
   {
     value: 'queued' as const,
     label: 'Queued',
-    count: jobs.value.filter((j) => j.status === 'queued').length + queueWaiting.value,
+    count: searchedJobs.value.filter((j) => j.status === 'queued').length + queueWaiting.value,
   },
-  { value: 'completed' as const, label: 'Completed', count: jobs.value.filter((j) => j.status === 'completed').length },
+  {
+    value: 'completed' as const,
+    label: 'Completed',
+    count: searchedJobs.value.filter((j) => j.status === 'completed').length,
+  },
   {
     value: 'failed' as const,
     label: 'Failed',
-    count: jobs.value.filter(isFailedJob).length,
+    count: searchedJobs.value.filter(isFailedJob).length,
   },
 ])
 
 const filteredJobs = computed(() => {
-  if (activeTab.value === 'all') return jobs.value
-  if (activeTab.value === 'failed') return jobs.value.filter(isFailedJob)
-  return jobs.value.filter((j) => j.status === activeTab.value)
+  if (activeTab.value === 'all') return searchedJobs.value
+  if (activeTab.value === 'failed') return searchedJobs.value.filter(isFailedJob)
+  return searchedJobs.value.filter((j) => j.status === activeTab.value)
 })
 
 const groupedJobs = computed(() => {
@@ -922,7 +998,27 @@ onMounted(async () => {
   }, QUEUE_POLL_MS)
   void loadProfiles()
   await refresh()
+  await openLinkedJob()
 })
+
+// `/agents?job=<id>` (the log's Link) opens that job's log, also when the job
+// joins the list later (a job another process runs shows up after the first load).
+const linkedJob = ref(new URLSearchParams(window.location.search).get('job'))
+watch(
+  () => jobs.value.length,
+  () => void openLinkedJob(),
+)
+
+async function openLinkedJob() {
+  const id = linkedJob.value
+  if (!id || !jobs.value.some((job) => job.id === id)) return
+  linkedJob.value = null
+  activeTab.value = 'all'
+  clearJobFilters()
+  if (!isLogsOpen(id)) await toggleLogs(id)
+  await nextTick()
+  document.getElementById(`job-${id}`)?.scrollIntoView?.({ block: 'start' })
+}
 
 onBeforeUnmount(() => {
   if (clock) clearInterval(clock)
@@ -1075,6 +1171,18 @@ onBeforeUnmount(() => {
 .profile-chip__meta {
   color: var(--color-muted);
   font-size: 12px;
+}
+
+.job-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-filters__search {
+  flex: 1 1 16rem;
+  min-width: 0;
 }
 
 .filter-tabs {

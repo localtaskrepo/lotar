@@ -1,11 +1,11 @@
 title: 'docs/help/automation.md job_paused: a taken-over t3 job that can''t resume its session fails (DEV-738), not named there'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:27:28.533467+00:00
-modified: 2026-11-25T07:40:09.527918+00:00
+modified: 2026-11-25T19:50:54.846180+00:00
 relationships:
   related:
   - DEV-738
@@ -85,6 +85,38 @@ comments:
     - Main's later changes to `agent.md` (`4dcde021e`, `7467c63f5`, `855ff6f46`) don't touch that section. Main's `sse.md` change (`504d8b538`, `agent_job_tool`/`agent_job_plan`) is on other lines. `git merge-tree main HEAD` merges cleanly.
     - Reran: `npm ci` passed, `npx prettier --check` on the 3 files passed. Docs only, so no UI review and no lint, test or smoke run needed.
     - No minor findings, no tickets filed
+- date: 2026-11-25T19:50:54.485683+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-803` is in `main`.
+
+    - Rebased `agent/DEV-803` onto `main` (`ede5d109f863`): `b4aa171191ae`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-803` onto `main` (`3206ee0a58e2`): `9249c11b6b27`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `9249c11b6b27`
+    - Amended the pending `.tasks` changes into the merged commit: `5ce98e18e6f0`
+    - The merge changed rules, agent profiles or `agent.merge`: ran `lotar trust`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: 3206ee0a5
+      what: Copy configs/lotar/automation.yml from standards (repo health)
+    - hash: 5ce98e18e
+      what: 'DEV-803 docs/help/automation.md job_paused: a taken-over t3 job that can''t resume its session fails (DEV-738), not named there'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A403495f232f793ff0dd6be6046a5ba2fa34cf84d94311e60290786b09dd57251
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87107c8b9f73647db9021bfb49bef370260407e08906c0e13e8ff081abf38875
@@ -97,8 +129,6 @@ description: |-
   - [ ] Docs-only checks: links and consistency with docs/help/agent.md.
 tags:
 - docs
-- review-returned
-- job-paused
 history:
 - at: 2026-11-22T19:27:28.813678+00:00
   actor: claude
@@ -207,3 +237,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T19:50:54.485683+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T19:50:54.846180+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: docs, review-returned, job-paused
+    new: docs

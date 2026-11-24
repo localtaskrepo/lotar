@@ -86,9 +86,8 @@
                 >
               </div>
               <MarkdownContent
-                v-if="item.entry.job.summary || item.entry.job.last_message"
-                class="timeline__text"
-                :class="{ 'timeline__text--clamped': !openThreads[item.entry.job.id] }"
+                v-if="(item.entry.job.summary || item.entry.job.last_message) && !openThreads[item.entry.job.id]"
+                class="timeline__text timeline__text--clamped"
                 :source="item.entry.job.summary || item.entry.job.last_message || ''"
                 task-references
               />
@@ -104,8 +103,21 @@
                 <UiLoader v-if="threadLoading[item.entry.job.id]" size="sm">Loading thread…</UiLoader>
                 <p v-else-if="threadErrors[item.entry.job.id]" class="error">{{ threadErrors[item.entry.job.id] }}</p>
                 <p v-else-if="!(threads[item.entry.job.id] || []).length" class="muted">The thread is empty.</p>
-                <AgentJobLog v-else :entries="threads[item.entry.job.id] || []" />
-                <AgentRunInputs :job-id="item.entry.job.id" />
+                <AgentJobLog
+                  v-else
+                  :entries="threads[item.entry.job.id] || []"
+                  :job="item.entry.job"
+                  instructions
+                  viewer="task"
+                />
+                <AgentRunInputs
+                  v-if="
+                    threadLoading[item.entry.job.id] ||
+                    threadErrors[item.entry.job.id] ||
+                    !(threads[item.entry.job.id] || []).length
+                  "
+                  :job-id="item.entry.job.id"
+                />
               </div>
             </div>
           </li>

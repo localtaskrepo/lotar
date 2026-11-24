@@ -315,6 +315,13 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
 
                         const settings = page.getByRole('table', { name: 'Settings' });
                         await settings.waitFor({ state: 'visible', timeout: 15_000 });
+                        // The button sits in the log's header, the panel full width below it (DEV-769).
+                        expect(await page.locator('.job-log__header .run-inputs__panel').count()).toBe(0);
+                        const header = await page.locator('.job-log__header').boundingBox();
+                        const panel = await page.locator('.job-log > .run-inputs__panel').boundingBox();
+                        expect(header && panel).toBeTruthy();
+                        expect(panel!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
+                        expect(Math.abs(panel!.width - header!.width)).toBeLessThan(2);
                         const setting = (name: string) =>
                             settings
                                 .locator('tr')
@@ -327,7 +334,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         const request = page.locator('details', { hasText: 'User request' });
                         await request.locator('summary').click();
                         expect(await request.locator('pre').textContent()).toContain('Inputs smoke request');
-                        expect(await page.locator('.run-inputs details summary').allTextContents()).toEqual(
+                        expect(await page.locator('.run-inputs__panel details summary').allTextContents()).toEqual(
                             expect.arrayContaining([expect.stringContaining('Agent instructions')]),
                         );
                         await page.getByRole('button', { name: 'Copy prompt', exact: true }).waitFor();
@@ -370,7 +377,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
-    it('starts a job from the Run agent dialog and shows the ticket it ran on', async () => {
+    it('starts a job from the Run agent dialog and shows the ticket it ran on', async ({ expect }) => {
         const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-run-dialog-');
 
         try {
@@ -922,6 +929,80 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     );
                     await waitForText(page, '.log-panel', 'Finished elsewhere');
                     await waitForText(page, '.job-card', 'completed');
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+            await agents.dispose();
+        }
+    });
+
+    it('filters the log, folds its tool calls and shows what a running job does (DEV-769)', async ({ expect }) => {
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-log-view-');
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml) },
+        });
+        try {
+            const task = await workspace.addTask('Job log views', { args: ['-p', 'UIAG'] });
+            const server = await startLotarServer(workspace);
+            const log = path.join(workspace.root, '.logs', 'job-log-view-1.jsonl');
+            const at = new Date().toISOString();
+            const line = (value: Record<string, unknown>) => `${JSON.stringify(value)}\n`;
+            const event = (kind: string, sequence: number, fields: Record<string, unknown> = {}) =>
+                line({ type: 'event', kind, at, sequence, ...fields });
+            const tool = (sequence: number, id: string, status: string, input: string, output?: string) =>
+                event('agent_job_tool', sequence, {
+                    message: 'Terminal',
+                    tool: { id, kind: 'execute', title: 'Terminal', status, input, started_at: at, output },
+                });
+            try {
+                await fs.outputFile(
+                    log,
+                    line({
+                        type: 'header',
+                        job_id: 'job-log-view-1',
+                        ticket_id: task.id,
+                        runner: 'claude',
+                        created_at: at,
+                        agent_profile: 'mock',
+                    }) +
+                        line({ type: 'status', status: 'running', at }) +
+                        event('agent_job_started', 1) +
+                        event('agent_job_progress', 2, { message: 'Session lotar-x (`harnessmux attach lotar-x`).' }) +
+                        event('agent_job_progress', 3, { message: 'Wrote .claude/settings.local.json in /tmp/x' }) +
+                        tool(4, 'a', 'completed', 'git status') +
+                        tool(5, 'b', 'completed', 'cargo build') +
+                        tool(6, 'c', 'failed', 'npm test', 'parser test FAILED') +
+                        event('agent_job_message', 7, { message: 'One test fails; fixing the parser.' }) +
+                        tool(8, 'd', 'running', 'npm run smoke'),
+                );
+                await withPage(`${server.url}/agents?job=job-log-view-1`, async (page) => {
+                    // The link opens the job's log.
+                    await waitForText(page, '.log-panel', 'One test fails');
+                    const panel = page.locator('.log-panel');
+                    await expect
+                        .poll(() => panel.locator('.log-group--tools .log-group__text').first().textContent())
+                        .toBe('3 commands · 1 failed');
+                    await expect.poll(() => panel.locator('.log-group--setup').count()).toBe(1);
+                    await expect
+                        .poll(() => panel.getByTestId('job-log-live').textContent())
+                        .toContain('Running npm run smoke');
+
+                    await panel.getByRole('button', { name: /^Problems/ }).click();
+                    await expect.poll(() => panel.locator('.tool-call__what').allTextContents()).toEqual(['npm test']);
+                    await expect.poll(() => panel.locator('.tool-call__pre').textContent()).toBe('parser test FAILED');
+
+                    await panel.getByRole('button', { name: /^Conversation/ }).click();
+                    await expect.poll(() => panel.locator('.tool-call').count()).toBe(0);
+                    await expect.poll(() => panel.locator('.log-list').textContent()).toContain('fixing the parser');
+
+                    await panel.getByRole('button', { name: /^All/ }).click();
+                    await panel.getByRole('searchbox', { name: 'Search the log' }).fill('cargo');
+                    await expect
+                        .poll(() => panel.locator('.tool-call__what').allTextContents())
+                        .toEqual(['cargo build']);
                 });
             } finally {
                 await server.stop();

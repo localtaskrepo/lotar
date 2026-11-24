@@ -1085,14 +1085,14 @@ describe('AgentJobs page context and actions', () => {
             const toggle = wrapper.findAll('button').find((button) => button.text() === 'Show logs')!
             await toggle.trigger('click')
             await flushPromises()
-            const rows = wrapper
-                .findAll('.log-row')
-                .map((row) => [row.find('.log-kind').text(), row.find('.log-message').text()])
-            expect(rows).toEqual([
-                ['Tool', 'Bash: npm test'],
-                ['Tool', 'Read: src/a.rs'],
-                ['Agent', 'All green.'],
+            // Old "Tool: …" lines between two messages fold into one row, each call inside it.
+            const group = wrapper.get('details.log-group--tools')
+            expect(group.get('.log-group__text').text()).toBe('2 tool calls')
+            expect(group.findAll('.tool-call__what').map((what) => what.text())).toEqual([
+                'Bash: npm test',
+                'Read: src/a.rs',
             ])
+            expect(wrapper.get('.log-list').text()).toContain('All green.')
         } finally {
             wrapper.unmount()
         }
@@ -1124,6 +1124,58 @@ describe('AgentJobs page context and actions', () => {
             await flushPromises()
             expect(line()).toBe('Bash: npm test failed')
         } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('filters the jobs list by search, agent and ticket next to the status tabs', async () => {
+        ;(api.listAgentJobs as any).mockResolvedValue({
+            jobs: [
+                job('job-a', { ticket_id: 'DEV-1', agent: 'review', last_message: 'Parser reviewed' }),
+                job('job-b', { ticket_id: 'DEV-2', agent: 'fix', created_at: '2026-10-08T10:00:05.000Z' }),
+                job('job-c', {
+                    ticket_id: 'DEV-2',
+                    agent: null,
+                    runner: 'codex',
+                    created_at: '2026-10-08T10:00:06.000Z',
+                }),
+            ],
+            queue_stats: null,
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            const cards = () => wrapper.findAll('article.job-card').map((card) => card.attributes('id'))
+            expect(cards()).toHaveLength(3)
+
+            await wrapper.get('input[aria-label="Search jobs"]').setValue('reviewed')
+            expect(cards()).toEqual(['job-job-a'])
+            expect(wrapper.findAll('.filter-tab')[0]?.text()).toBe('All 1')
+
+            await wrapper.get('button.link-button').trigger('click')
+            await wrapper.get('select[aria-label="Agent or runner"]').setValue('runner:codex')
+            expect(cards()).toEqual(['job-job-c'])
+
+            await wrapper.get('select[aria-label="Agent or runner"]').setValue('')
+            await wrapper.get('select[aria-label="Ticket"]').setValue('DEV-2')
+            expect(cards().sort((a, b) => String(a).localeCompare(String(b)))).toEqual(['job-job-b', 'job-job-c'])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('opens the log of the job its link names', async () => {
+        window.history.replaceState(null, '', '/agents?job=job-linked')
+        ;(api.listAgentJobs as any).mockResolvedValue({ jobs: [job('job-linked')], queue_stats: null })
+        ;(api.getAgentJobLogs as any).mockResolvedValue({
+            job: job('job-linked'),
+            events: [{ kind: 'agent_job_message', sequence: 1, at: '2026-10-08T10:00:01.000Z', message: 'Linked.' }],
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            await flushPromises()
+            expect(wrapper.get('.log-list').text()).toContain('Linked.')
+        } finally {
+            window.history.replaceState(null, '', '/')
             wrapper.unmount()
         }
     })
