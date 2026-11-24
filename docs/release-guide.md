@@ -104,7 +104,8 @@ release ticket is in its own release.
    compatibility", owner 2026-11-11), and a patch release ships without asking him ("Only minor
    changes need my okay. Patch level updates can always be done", 2026-11-22). A minor or major
    bump only when he asks for or approves it (v0.14.0: "create a release now with a minor bump",
-   2026-11-12). The release notes are written by the workflow from the commit list
+   2026-11-12); his request is the approval, so ask him only about a minor or major bump you
+   picked yourself. The release notes are written by the workflow from the commit list
    ([Automation Overview](#automation-overview)).
 2. Run the full quality gates locally:
    ```bash

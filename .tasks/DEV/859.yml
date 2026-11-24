@@ -1,11 +1,11 @@
 title: 'Job log search: a match inside a folded tool call''s output is counted but not shown'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-24T22:50:59.233215+00:00
-modified: 2026-11-25T20:09:58.323517+00:00
+modified: 2026-11-25T20:19:40.944985+00:00
 relationships:
   depends_on:
   - DEV-769
@@ -69,9 +69,67 @@ comments:
       - `npx vitest run --config smoke/vitest.config.ts smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'filters the log, folds'`: passed.
     - My own screenshots, taken with a temporary spec that I removed afterwards (scratch folder `/tmp/dev859-shots`): light and dark mode at 1920, 1440 and 390 px. I saw no visual problem. After a search for `npm`, `make test` opens with its whole 21-line output; clearing the search folds the group again.
     - Minor, filed as [DEV-880](https://lotar.pyxzl.net/task/DEV-880): the log doesn't scroll to the match, so a match deep in a long output stays below the log's visible area.
+- date: 2026-11-25T20:15:00.640155+00:00
+  author: claude
+  text: |-
+    Review finding fixed: before and after screenshots attached; no code change, commit stays `9e05afd76`.
+
+    - Review read HEAD `9e05afd76`, the current commit.
+    - 12 attachments on the ticket, the Agents page job log searched for `npm` (in two calls' output only), light and dark at 1920, 1440, 390 px:
+      - Before (main's components): `dev859-before-{light,dark}-{1920,1440,390}`: "2 matches", both calls folded.
+      - After: `dev859-after-{light,dark}-{1920,1440,390}`: both calls open, `npm` highlighted, including the match on line 16 of a clipped output, no "Show all".
+    - Scenario: a scratch workspace with a hand-written job log (`.tasks/@agent-logs/job-shots-1.jsonl`), not the DEV backlog. After shots use "Full height" so both matches are in view; scrolling to a match is DEV-880.
+  report:
+    commits:
+    - hash: 9e05afd76
+      what: unchanged; search opens each tool call whose input or output holds the query
+    checks:
+    - command: node scripts/ticket-screenshot.mjs (12 shots, scratch workspace, lotar serve built from main's components, then from 9e05afd76)
+      result: passed
+      reason: before shows both calls folded, after shows both outputs with npm highlighted
+    - command: targeted Vitest and smoke
+      result: not_run
+      reason: no code changed since the review reran them (45 passed, smoke passed)
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
+    next: Review again
+- date: 2026-11-25T20:19:33.695434+00:00
+  author: claude
+  text: |-
+    Review: passed. `9e05afd76` does what "Done when" asks, and the screenshots the last review asked for are attached and correct.
+
+    - Reviewed `9e05afd76`, the only commit in `main..HEAD`; `agent/DEV-859` has nothing newer. Main has no newer commits to the touched files.
+    - The change is 4 files: `view/components/AgentJobToolCall.vue` (a `query` prop opens a matching call and shows the whole output when the only match is past the first 12 lines), `view/components/AgentJobLog.vue` (passes the query to the call), a Vitest and a smoke test. No stray files.
+    - Done when:
+      - A call whose output matches opens, grouped or alone, with the word highlighted: Vitest, smoke and my browser run.
+      - A match only past line 12 shows the whole output with no "Show all" button (`matchClipped`).
+      - Calls without a match stay folded, the failed call stays open, and clearing the search folds them again: checked in the browser at all 6 sizes.
+      - A Vitest and a smoke test cover it.
+    - Reran:
+      - `npm ci`: ok.
+      - `npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobLog.spec.ts view/__tests__/AgentJobs.spec.ts`: 45 passed.
+      - The new Vitest with main's two components: fails (`expected [false,false] to deeply equal [true,true]`). I put the files back.
+      - `npm run build:web && cargo build --bins`, then `npx vitest run --config smoke/vitest.config.ts smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'filters the log, folds'`: passed.
+    - Screenshots:
+      - I read the fix agent's 12 attachments (`dev859-{before,after}-{light,dark}-{1920,1440,390}`). Before: "2 matches" with both calls folded. After: both calls open and `npm` highlighted, including line 16.
+      - My own: this branch's build, served on a scratch workspace in `/tmp/dev859-review` with a hand-written log, light and dark at 1920, 1440 and 390 px, plus a shot after clearing the search. I saw no visual problem.
+    - Findings: none. The missing scroll to a match is already filed as [DEV-880](https://lotar.pyxzl.net/task/DEV-880) (Todo). I filed no new tickets.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeed1b8c40422a5b7f27406f340918a1036ad58cc6146e101d17e6114deca44ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa559fdc5ea5ed7a48ec62c809edbd1978e27914e153885f7e6e01e9e191bd960
+- attachment: dev859-before-light-1920.5bee633d8bcb72731f94e024f17619d2.webp
+- attachment: dev859-before-light-1440.6a9a0d85e6e888034c3f294ac45686bf.webp
+- attachment: dev859-before-light-390.830153eb384f9b400f9cb363c094c3c9.webp
+- attachment: dev859-before-dark-1920.de10f75ff54a3fe2fd338dd490089a15.webp
+- attachment: dev859-before-dark-1440.e50f46d6d388ff499ed7dbb98ac99021.webp
+- attachment: dev859-before-dark-390.873f9bfeadaa99e86d2fad6171cbf185.webp
+- attachment: dev859-after-light-1920.7aa00f0fe57e7b48824a34e9db8c2fe2.webp
+- attachment: dev859-after-light-1440.02bd4143a1d6d419953b8bf992bc975f.webp
+- attachment: dev859-after-light-390.b59995f21966ed40d8fffef0fd0485ce.webp
+- attachment: dev859-after-dark-1920.07aad0abebc379db8095af95e97a19c6.webp
+- attachment: dev859-after-dark-1440.5cab86c86e02085e4bedf9aad2861eac.webp
+- attachment: dev859-after-dark-390.86cf8ea4d64db521b5bbe89f990c9cd0.webp
 description: |-
   Found in the DEV-769 review: searching a job log for a word that only appears in a tool call's output (for example `npm`) opens the Tools group and counts "3 matches", but each call stays folded, so its output and the highlight are hidden. `groupOpen` in `view/components/AgentJobLog.vue` opens the group; `view/components/AgentJobToolCall.vue` opens a call only when it failed.
 
@@ -204,3 +262,95 @@ history:
   - field: tags
     old: ui, web-ui, review-blocked
     new: ui, web-ui, review-returned
+- at: 2026-11-25T20:11:29.342977+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T20:13:57.270268+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-before-light-1920.5bee633d8bcb72731f94e024f17619d2.webp
+- at: 2026-11-25T20:13:58.775673+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-before-light-1440.6a9a0d85e6e888034c3f294ac45686bf.webp
+- at: 2026-11-25T20:14:00.231811+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-before-light-390.830153eb384f9b400f9cb363c094c3c9.webp
+- at: 2026-11-25T20:14:01.800555+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-before-dark-1920.de10f75ff54a3fe2fd338dd490089a15.webp
+- at: 2026-11-25T20:14:03.361789+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-before-dark-1440.e50f46d6d388ff499ed7dbb98ac99021.webp
+- at: 2026-11-25T20:14:04.857271+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-before-dark-390.873f9bfeadaa99e86d2fad6171cbf185.webp
+- at: 2026-11-25T20:14:35.875016+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-after-light-1920.7aa00f0fe57e7b48824a34e9db8c2fe2.webp
+- at: 2026-11-25T20:14:37.631897+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-after-light-1440.02bd4143a1d6d419953b8bf992bc975f.webp
+- at: 2026-11-25T20:14:39.399940+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-after-light-390.b59995f21966ed40d8fffef0fd0485ce.webp
+- at: 2026-11-25T20:14:41.154243+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-after-dark-1920.07aad0abebc379db8095af95e97a19c6.webp
+- at: 2026-11-25T20:14:42.868039+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-after-dark-1440.5cab86c86e02085e4bedf9aad2861eac.webp
+- at: 2026-11-25T20:14:44.599075+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev859-after-dark-390.86cf8ea4d64db521b5bbe89f990c9cd0.webp
+- at: 2026-11-25T20:15:00.640155+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:15:08.310028+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-25T20:19:33.695434+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:19:40.944985+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -21,8 +21,10 @@ this is the order and the gates. Comment each step's result on the release ticke
    `gh run list --workflow "Quality Assurance" --commit <sha>`.
 4. **Signed tag, pushed.** Pushing a tag publishes the release. A patch release (only Z
    changes) goes out without asking ("Only minor changes need my okay. Patch level updates
-   can always be done", owner 2026-11-22). A minor or major release waits for his OK: ask him
-   first (a HelpNeeded question on the release ticket when you can't ask directly). Then
+   can always be done", owner 2026-11-22). A minor or major release needs his OK: his request
+   for it is that OK (v0.14.0: "create a release now with a minor bump"). Ask him only when you
+   picked the minor or major bump yourself (a HelpNeeded question on the release ticket when
+   you can't ask directly). Then
    `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`, then
    `lotar release release X.Y.Z`.
 5. **Release workflow green**: every job of the Release run for the tag succeeded

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-25T19:54:54.337532+00:00
+modified: 2026-11-25T20:15:43.540979+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -294,6 +294,12 @@ comments:
 - date: 2026-11-24T21:31:12.073359+00:00
   author: automation
   text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A12e15d70337811904e15781d831cdcf5c5bf2b46978884b44729003105686e97 of the job job-20261124T210010.317Z-88 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T213111.978Z-99: DEV-777 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-25T20:15:43.540979+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-777` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-777` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0a7852970afa0266056fb48bf89fa0fd177b850a6e9b43958fbb0a2c9930ee39
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75a6d2ce35fd6bba59cd70aa8ab5c6579794cbcc6a508ad1ea655ac420701bf
@@ -761,3 +767,7 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767"]}'
     new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876"]}'
+- at: 2026-11-25T20:15:43.540979+00:00
+  actor: automation
+  changes:
+  - field: comment_added

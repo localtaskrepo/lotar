@@ -1,15 +1,58 @@
 title: lotar trust --status shows a structured run command as a JSON blob with its default fields
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-25T08:19:54.577482+00:00
+modified: 2026-11-25T20:15:27.766939+00:00
 relationships:
   related:
   - DEV-847
-description: 'Found while reviewing DEV-847: a rule with `run: {command: echo, args: [x]}` is listed as `runs {"command":"echo","args":["x"],"env":{},"cwd":null,"ignore_failure":false,"wait":true}`. `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` prints the serialized AutomationRunCommand with every default. Check: `lotar trust --status` in a repo with a structured run rule. Done: it reads like the command line (`echo x`), plus only the settings that differ from the default (env, cwd).'
+comments:
+- date: 2026-11-25T20:15:17.945536+00:00
+  author: claude
+  text: |-
+    `lotar trust --status` now lists `run: {command: echo, args: [x]}` as `runs echo x`.
+
+    - `describe_run_command` in `crates/lotar-lib/src/cli/handlers/trust.rs`: command and args, single-quoting empty words or ones with whitespace or quotes
+    - Non-default settings follow in parentheses: `env` (sorted), `cwd`, `ignore_failure`, `no wait`, `timeout`
+    - String `run` unchanged; `--format json` `commands` gets the same strings
+    - One sentence on the format in `docs/help/trust.md`
+    - Unit tests cover plain, quoted and non-default cases, plus a structured rule through `describe`
+  report:
+    commits:
+    - hash: d29944678
+      what: list a structured run as its command line plus non-default settings
+    checks:
+    - command: 'cargo nextest run -p lotar-lib --lib trust::'
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration dev259
+      result: passed
+    - command: cargo clippy -p lotar-lib --all-targets -- -D warnings
+      result: passed
+    - command: lotar trust --status on a scratch repo
+      result: passed
+      reason: prints runs echo x (cwd sub)
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review on another model, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
+description: |-
+  Found while reviewing DEV-847: a rule with `run: {command: echo, args: [x]}` is listed as `runs {"command":"echo","args":["x"],"env":{},"cwd":null,"ignore_failure":false,"wait":true}`. `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` prints the serialized AutomationRunCommand with every default. Check: `lotar trust --status` in a repo with a structured run rule.
+
+  Owner's words: "it reads like the command line (`echo x`), plus only the settings that differ from the default (env, cwd)".
+
+  ## Done when
+
+  - [ ] `lotar trust --status` and `lotar trust` list `run: {command: echo, args: [x]}` as `runs echo x`, with no JSON and no default fields.
+  - [ ] An argument that is empty or holds whitespace or quotes is shown single-quoted (`echo 'a b'`), so the line reads like a shell command line.
+  - [ ] Settings that differ from the default follow in parentheses, in this order: `env` (sorted `KEY=value`), `cwd`, `ignore_failure`, `no wait` (for `wait: false`), `timeout`; e.g. `runs echo x (env A=1, cwd sub)`. A setting at its default is left out.
+  - [ ] A string `run` still shows as written (`runs echo hi`); a file that doesn't parse still shows `(file does not parse)`.
+  - [ ] `--format json` lists the same strings in `commands`.
+  - [ ] A unit test in `trust.rs` covers the plain, quoted and non-default cases.
 history:
 - at: 2026-11-25T08:19:54.296572+00:00
   actor: claude
@@ -22,3 +65,45 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T20:11:48.487708+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T20:11:51.273752+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
+- at: 2026-11-25T20:12:23.464734+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found while reviewing DEV-847: a rule with `run: {command: echo, args: [x]}` is listed as `runs {"command":"echo","args":["x"],"env":{},"cwd":null,"ignore_failure":false,"wait":true}`. `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` prints the serialized AutomationRunCommand with every default. Check: `lotar trust --status` in a repo with a structured run rule. Done: it reads like the command line (`echo x`), plus only the settings that differ from the default (env, cwd).'
+    new: |-
+      Found while reviewing DEV-847: a rule with `run: {command: echo, args: [x]}` is listed as `runs {"command":"echo","args":["x"],"env":{},"cwd":null,"ignore_failure":false,"wait":true}`. `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` prints the serialized AutomationRunCommand with every default. Check: `lotar trust --status` in a repo with a structured run rule.
+
+      Owner's words: "it reads like the command line (`echo x`), plus only the settings that differ from the default (env, cwd)".
+
+      ## Done when
+
+      - [ ] `lotar trust --status` and `lotar trust` list `run: {command: echo, args: [x]}` as `runs echo x`, with no JSON and no default fields.
+      - [ ] An argument that is empty or holds whitespace or quotes is shown single-quoted (`echo 'a b'`), so the line reads like a shell command line.
+      - [ ] Settings that differ from the default follow in parentheses, in this order: `env` (sorted `KEY=value`), `cwd`, `ignore_failure`, `no wait` (for `wait: false`), `timeout`; e.g. `runs echo x (env A=1, cwd sub)`. A setting at its default is left out.
+      - [ ] A string `run` still shows as written (`runs echo hi`); a file that doesn't parse still shows `(file does not parse)`.
+      - [ ] `--format json` lists the same strings in `commands`.
+      - [ ] A unit test in `trust.rs` covers the plain, quoted and non-default cases.
+- at: 2026-11-25T20:15:17.945536+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T20:15:27.766939+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
