@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T19:27:28.533467+00:00
-modified: 2026-11-22T22:01:02.456312+00:00
+modified: 2026-11-23T09:04:24.083098+00:00
 relationships:
   related:
   - DEV-738
   - DEV-739
   - DEV-788
   - DEV-802
+  - DEV-763
 comments:
 - date: 2026-11-22T22:00:48.592556+00:00
   author: claude
@@ -34,8 +35,47 @@ comments:
       result: not_run
       reason: docs-only change
     next: Review, then merge
+- date: 2026-11-23T04:13:04.372696+00:00
+  author: claude
+  text: |-
+    Review: blocking. The changed `job_paused` line now contradicts itself.
+
+    - `docs/help/automation.md:230`: the new sentence ends "…their `job_failed` rules run." The old next sentence follows unchanged: "No `job_failed` rule runs then; the job's retry runs the end rules." Its "then" now reads as the `t3` and nothing-to-run-again failures, where `job_failed` does run. Fix: put "No `job_failed` rule runs then; the job's retry runs the end rules." straight after "…runs again in a new one.", then the `t3` sentence. For example: "…runs again in a new one. No `job_failed` rule runs then; the job's retry runs the end rules. A `t3` job fails there instead (…), and so does a job with nothing to run again: their `job_failed` rules run. `job: { error: ... }` …"
+    - Otherwise correct: the facts match `docs/help/agent.md:230` (Jobs whose process died) on main. The `docs/help/sse.md:50` and `docs/developers/sse.md:41` notes are right and read fine.
+    - Main's later `agent.md` change (`f95414e5a` DEV-763, list-running) doesn't touch the section this line relies on. The anchors `#usage-limits`, `#paused-queue` and `#jobs-whose-process-died` exist.
+    - Reran: `npm ci` (passed) and `npx prettier --check` on the 3 files (passed). Docs only, so no UI review and no lint/test/smoke needed. One commit, `d5ebdcfde`, with no stray files.
+- date: 2026-11-23T07:20:33.911526+00:00
+  author: claude
+  text: |-
+    Review finding fixed: `job_paused` line no longer contradicts itself
+
+    - Review read `d5ebdcfde`, which was HEAD, so the finding applied
+    - `docs/help/automation.md:230`: moved "No `job_failed` rule runs then; the job's retry runs the end rules." up, straight after "…runs again in a new one.", ahead of the `t3` sentence, as the review suggested
+    - `sse.md` notes unchanged (review found them right)
+    - Amended into one signed commit `208a5c196`
+  report:
+    commits:
+    - hash: 208a5c196
+      what: job_paused sentence order fixed (amended d5ebdcfde)
+    checks:
+    - command: npx prettier --check docs/help/automation.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: docs only
+    - command: npm test
+      result: not_run
+      reason: docs only
+    - command: npm run smoke
+      result: not_run
+      reason: docs only
+    next: Review again
+- date: 2026-11-23T09:04:24.083098+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T090410.351Z-117 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T090410.351Z-117 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A403495f232f793ff0dd6be6046a5ba2fa34cf84d94311e60290786b09dd57251
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87107c8b9f73647db9021bfb49bef370260407e08906c0e13e8ff081abf38875
 description: |-
   Found in the DEV-738 review (filed there as DEV-788 in its worktree, an ID main already had, see DEV-802): docs/help/automation.md:230 (job_paused, from DEV-739) says a taken-over job that can't resume its session runs again in a new one, 'a job with nothing to run again fails'. Since DEV-738 (e343b4e33, on main) a t3 job fails there too, so its job_failed rules run, not job_paused. Check: read the job_paused line against docs/help/agent.md (Jobs whose process died).
 
@@ -45,6 +85,8 @@ description: |-
   - [ ] Docs-only checks: links and consistency with docs/help/agent.md.
 tags:
 - docs
+- review-returned
+- job-paused
 history:
 - at: 2026-11-22T19:27:28.813678+00:00
   actor: claude
@@ -81,3 +123,62 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-23T04:13:04.372696+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:13:11.857355+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-738","DEV-739","DEV-788","DEV-802"]}'
+    new: '{"related":["DEV-738","DEV-739","DEV-788","DEV-802","DEV-763"]}'
+- at: 2026-11-23T04:13:28.698717+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: docs
+    new: docs, review-blocked
+- at: 2026-11-23T04:13:52.813008+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: docs, review-blocked
+    new: docs, review-returned
+- at: 2026-11-23T07:20:16.374399+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T07:20:19.349738+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87107c8b9f73647db9021bfb49bef370260407e08906c0e13e8ff081abf38875
+- at: 2026-11-23T07:20:33.911526+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:20:41.953753+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T09:04:24.004277+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: docs, review-returned
+    new: docs, review-returned, job-paused
+- at: 2026-11-23T09:04:24.083098+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,18 +1,25 @@
 title: 'Agent jobs: check whether T3 and ACP jobs get stuck or leave processes behind'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:23:21.712446+00:00
-modified: 2026-11-22T20:14:20.506173+00:00
+modified: 2026-11-23T06:12:32.297287+00:00
 relationships:
+  blocks:
+  - DEV-805
   related:
   - DEV-755
   - DEV-770
   - DEV-725
   - DEV-729
   - DEV-805
+  - DEV-780
+  - DEV-771
+  - DEV-797
+  - DEV-803
+  - DEV-806
 comments:
 - date: 2026-11-21T21:21:12.590813+00:00
   author: claude
@@ -50,6 +57,52 @@ comments:
     - **Reran:** `npm ci` passed, `npm run lint` passed. With nextest I ran `dev763`, `dev279`, `dev320` and `cli_noop_mutations` in lotar-lib (19 passed) and `agent_active_jobs` in lotar-agent (3 passed).
     - **Not rerun:** the full `npm test` and `npm run smoke`. The fix agent reports both as passed.
     - **Minor, filed:** [DEV-805](https://lotar.pyxzl.net/task/DEV-805). With `--all`, the wrapper rows show `-` as their folder, and `docs/help/agent.md` still says only this folder's wrappers are listed.
+- date: 2026-11-23T02:18:17.584593+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/ThemeSelect-BnffuL2s.js                 8.19 kB │ gzip:   3.01 kB
+    target/web/assets/useTaskStore-CjGeS8P6.js               11.05 kB │ gzip:   4.05 kB
+    target/web/assets/css-D8M8GYaw.js                        12.03 kB │ gzip:   4.30 kB
+    target/web/assets/AutomationView-BsOY5GI8.js             12.31 kB │ gzip:   4.34 kB
+    target/web/assets/Preferences-CE6RT9ru.js                13.99 kB │ gzip:   4.58 kB
+    target/web/assets/Dependencies-p0AFKRd-.js               16.10 kB │ gzip:   6.21 kB
+    target/web/assets/ScanView-BSPiLjk2.js                   16.54 kB │ gzip:   5.50 kB
+    target/web/assets/Calendar-C0xARt3f.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CX443Y8V.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-TBtDqkQf.js                  25.87 kB │ gzip:   8.77 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-CinwyI-m.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-CzYU1Ow2.js                      47.85 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-LVHYGkHY.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-ugyk1aPA.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-DfWYORyb.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-CGcF2nGk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-AdOIdUyW.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 31.96s
+    compressed 1930KiB -> 580KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-763/crates/lotar-core)
+       Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-763/crates/lotar-agent)
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-763/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-763/crates/lotar-lib)
+    ```.
+
+    - Rebased `agent/DEV-763` onto `main` (`2b825e211db9`): `8fa6e8036365`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ac80fce578d49cd6af0680151dbd45f0fa3adbe1305fd23d0db8488ee866016
 description: |-
@@ -202,3 +255,49 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-23T00:54:01.092305+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805"]}'
+    new: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805"]}'
+- at: 2026-11-23T02:18:17.584593+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:29:27.109720+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-23T02:30:57.602852+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805"]}'
+    new: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780"]}'
+- at: 2026-11-23T03:18:31.245745+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780"]}'
+    new: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771"]}'
+- at: 2026-11-23T03:32:08.555131+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771"]}'
+    new: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771","DEV-797"]}'
+- at: 2026-11-23T04:13:11.854845+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771","DEV-797"]}'
+    new: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771","DEV-797","DEV-803"]}'
+- at: 2026-11-23T06:12:32.297287+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771","DEV-797","DEV-803"]}'
+    new: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771","DEV-797","DEV-803","DEV-806"]}'

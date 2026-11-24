@@ -1,0 +1,353 @@
+title: 'In an agent job, lotar commands in a scratch folder write to the real backlog: the job''s LOTAR_TASKS_DIR wins over the folder''s .tasks'
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix-retry'
+created: 2026-11-22T22:45:30.423583+00:00
+modified: 2026-11-24T21:12:29.763419+00:00
+relationships:
+  related:
+  - DEV-789
+  - DEV-771
+  - DEV-798
+  - DEV-802
+  - DEV-842
+  - DEV-843
+comments:
+- date: 2026-11-23T03:18:23.004479+00:00
+  author: claude
+  text: |-
+    It happened again in the DEV-771 review job (2026-11-22).
+
+    - In a scratch folder outside the repo, `lotar add` went to the real backlog and created DEV-824..826 (assigned `@fix` by `agent run`). They were never in the real queue, and I deleted them within minutes
+    - Workaround: set `LOTAR_TASKS_DIR` and `LOTAR_WORKSPACE_ROOT` to the scratch folder. The scratch repo also needs `LOTAR_TRUST_ALL=1` before `agent run` queues anything
+- date: 2026-11-23T04:28:09.732030+00:00
+  author: claude
+  text: |-
+    Hit again by the DEV-802 review job: scratch `lotar add` in `/tmp` went to the real backlog.
+
+    - Created DEV-825 ("first") and DEV-826 ("main again") in the main checkout's `.tasks/DEV`; both untracked, unreferenced, removed within a minute.
+    - Workaround used: `env -u LOTAR_TASKS_DIR -u LOTAR_WORKSPACE_ROOT lotar ...`.
+- date: 2026-11-23T04:46:40.948879+00:00
+  author: claude
+  text: |-
+    Fixed: `npm run seed:test-tasks` now always seeds its own folder, even inside an agent job.
+
+    - `scripts/demo/workspace.mjs`: new `seedEnvironment(dir)` drops every inherited `LOTAR_*` (`LOTAR_TASKS_DIR`, `LOTAR_WORKSPACE_ROOT`, `LOTAR_PROJECT`, ...) and sets `LOTAR_TASKS_DIR=<dir>/.tasks`; `demoEnvironment` builds on it
+    - `scripts/generate-test-tasks.mjs`: the add/enrich calls and `--serve` use `seedEnvironment`, `--demo --serve` uses `demoEnvironment`. `--dir` is resolved to an absolute path (a relative one would have pointed lotar at `<dir>/<dir>/.tasks`)
+    - New `scripts/tests/seed-test-tasks.test.mjs`: runs the script with a stub lotar and a decoy backlog. Added as `npm run test:seed` (with the existing `demo-workspace.test.mjs`, which nothing ran before) in `npm test`, `test:agent` and CI `ui_tests`
+    - `AGENTS.md`: in a job, scratch `lotar` commands need `env -u LOTAR_TASKS_DIR -u LOTAR_WORKSPACE_ROOT` or `--tasks-dir`
+    - No UI change. Guidance: the AGENTS.md line above is the only guidance change
+  report:
+    commits:
+    - hash: 4cf6a8cd7
+      what: seeder ignores inherited LOTAR_TASKS_DIR, test, AGENTS.md note
+    checks:
+    - command: npm run test:seed
+      result: passed
+      reason: 4/4; the new test fails on the old script (lotar saw the decoy backlog and LOTAR_PROJECT=DEV)
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2470 Rust, 1567 UI, Node suites
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 407/407
+    - command: real-binary seed with decoy LOTAR_TASKS_DIR
+      result: passed
+      reason: 5 tasks in the seed dir, decoy empty
+    next: Review, then merge
+- date: 2026-11-23T08:25:30.883765+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082459.290Z-95 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082459.290Z-95 why.'
+- date: 2026-11-24T17:23:01.837284+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code fix is correct, but the commit and the ticket each need one fix before merge.
+
+    **Blocking**
+    - Commit `4cf6a8cd7` has the subject `DEV-818 Example ticket for the Agents page`. That is the title of the deleted ticket that had this ID before (see DEV-843), not this ticket's title. On main it would stay wrong for good. Fix: `git commit --amend` the subject to `DEV-818 In an agent job, lotar commands in a scratch folder write to the real backlog: the job's LOTAR_TASKS_DIR wins over the folder's .tasks` and keep the body.
+    - The ticket's description is now `-`. The fix job's edit at 2026-11-23 04:34Z replaced the Found / Done when text: `-D -` stores a literal dash and doesn't read stdin (DEV-842). The comment says the Done when was "tightened", but it is gone. Fix: restore the old text from `lotar task timeline DEV-818` (the 04:34Z description change). Use `-D "<text>"`, not `-D -`, and tick both boxes.
+
+    **Checked, fine**
+    - Diff `main...HEAD`: 7 files, only the seeder, its test, `package.json`/CI wiring, `AGENTS.md` and `docs/developers/testing.md`. No stray files and no second branch. It merges cleanly onto main `504d8b538`.
+    - Done when 1: `seedEnvironment` in `scripts/demo/workspace.mjs:26` covers the add and enrich calls and `--serve` in `scripts/generate-test-tasks.mjs:140,239`. `--demo --serve` uses `demoEnvironment` (`:167`). `screenshots.mjs` behaves as before.
+    - Done when 2: the new `AGENTS.md` line is right. In this job, `--tasks-dir <dir>/.tasks` won over the job's `LOTAR_TASKS_DIR` (tried).
+    - `npm ci`: ok. `npm run test:seed`: 4/4 passed.
+    - Failing test first: with the old `generate-test-tasks.mjs`, the new test fails (lotar saw the decoy backlog and `LOTAR_PROJECT=DEV`).
+    - Real binary in this job's environment: `generate-test-tasks.mjs --count 4` put 4 tasks in the seed folder. The real backlog stayed at 1335 files.
+    - `prettier --check` and `oxlint` on the 3 changed scripts: clean. The Prettier warnings on `package.json` and `ci.yml` are already on main, and `fmt:js:check` doesn't cover those files.
+    - Not rerun: full `lint:agent`, `test:agent`, `test:smoke:agent` (the fix agent reports them passed). No UI change, so no UI review.
+
+    **Filed (minor)**
+    - DEV-842: `lotar task edit/add -D -` saves `-` instead of reading stdin.
+    - DEV-843: a queued job for a hard-deleted ticket runs on the ticket that reuses its ID, with the old title in its prompt.
+- date: 2026-11-24T21:00:14.449790+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21c093248c4aae62a7aad5cd3e16a2804c2430af1d91e5ceeadf55daad4f3035 of the job job-20261124T191823.423Z-40 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T210014.411Z-90: DEV-818 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:01:13.368770+00:00
+  author: claude
+  text: |-
+    Both review findings fixed; ready for review again.
+
+    - Review read HEAD `4cf6a8cd7`: it was current.
+    - Commit subject: amended (signed) to the ticket title, body kept. New hash `ac57aa8c1`; `git diff 4cf6a8cd7 ac57aa8c1` is empty, so the code is the reviewed code.
+    - Description: restored from the 04:34Z timeline entry via `task edit -D "<text>"`, both Done when boxes ticked. Relationships unchanged.
+    - `npm run test:seed`: 4/4 passed.
+  report:
+    commits:
+    - hash: ac57aa8c1
+      what: seeder ignores inherited LOTAR_*, AGENTS.md line (subject fixed, tree same as 4cf6a8cd7)
+    checks:
+    - command: npm run test:seed
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: commit message only changed; tree identical to the reviewed 4cf6a8cd7
+    - command: npm test
+      result: not_run
+      reason: tree unchanged; the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: tree unchanged; the merge runs the full suites
+    next: Review again, then merge
+- date: 2026-11-24T21:01:15.698454+00:00
+  author: claude
+  text: |-
+    Both review findings fixed; review read HEAD `4cf6a8cd7`, so this round counts.
+
+    - Commit subject: amended (signed, hooks on) to the ticket title, body kept. New hash `059bf9016`; `git diff 4cf6a8cd7 059bf9016` is empty
+    - Description: already back to the Found / Done when text from the 04:34Z timeline entry, both boxes ticked; checked with `lotar show DEV-818`
+    - `npm run test:seed`: 4/4 passed
+  report:
+    commits:
+    - hash: 059bf9016
+      what: seeder ignores inherited LOTAR_TASKS_DIR, test, AGENTS.md note (subject fixed)
+    checks:
+    - command: npm run test:seed
+      result: passed
+      reason: 4/4
+    - command: git diff 4cf6a8cd7 059bf9016
+      result: passed
+      reason: empty, the amend changed only the message
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: code unchanged since the passing runs on 4cf6a8cd7; the merge runs them
+    next: Review again, then merge
+- date: 2026-11-24T21:12:29.763419+00:00
+  author: automation
+  text: The fix agent's job job-20261124T210014.411Z-90 failed (lotar agent logs job-20261124T210014.411Z-90); @fix-retry retries it on branch agent/DEV-818.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74c5c58c601ef694fbd19e11ae4f6f12cd58806b6677fd57ec8aa945025e70c5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21c093248c4aae62a7aad5cd3e16a2804c2430af1d91e5ceeadf55daad4f3035
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7feb52b860f4446b6e8cc9eec1771469a9c51b9975e416f5b5e91b9942206808
+description: |-
+  Found in the review of DEV-789.
+
+  ## Found
+
+  An agent job exports `LOTAR_TASKS_DIR=<main checkout>/.tasks`, and it wins over a folder's own `.tasks`. So a `lotar add` that an agent runs in a scratch folder for a manual check creates real DEV tickets. Without a project config, those tickets also get the default `@fix` assignee.
+
+  - DEV-789 review: `lotar add` in `/tmp/...` created DEV-818 (assignee `@fix`). I hard-deleted it before a job started.
+  - DEV-771: the same thing created DEV-798..801 (its comment of 2026-11-22).
+  - Check: `cd <dir with .tasks/config.yml> && lotar list` inside a job lists DEV; `env -u LOTAR_TASKS_DIR lotar list` lists the folder.
+  - `scripts/generate-test-tasks.mjs` (`npm run seed:test-tasks`, which AGENTS.md names for manual scenarios) spawns lotar with `{ ...process.env }`, so in a job it would seed into the real backlog too.
+
+  ## Done when
+
+  - [x] `npm run seed:test-tasks` (both its `lotar add` calls and `--serve`) ignores an inherited `LOTAR_TASKS_DIR`, with a test.
+  - [x] The guidance for manual scenarios (AGENTS.md or testing-strategy) says that in a job, scratch `lotar` commands need `env -u LOTAR_TASKS_DIR` or `--tasks-dir`.
+tags:
+- agent
+- health
+- job-paused
+- review-returned
+- fix-retried
+history:
+- at: 2026-11-22T22:45:47.518686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789","DEV-771"]}'
+    new: '{"related":["DEV-789","DEV-771","DEV-798"]}'
+- at: 2026-11-22T22:45:53.158643+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T03:18:23.004479+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:28:09.732030+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:28:11.408465+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789","DEV-771","DEV-798"]}'
+    new: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802","DEV-825","DEV-826"]}'
+- at: 2026-11-23T04:30:39.493162+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802","DEV-825","DEV-826"]}'
+    new: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802","DEV-825"]}'
+- at: 2026-11-23T04:30:47.710393+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802","DEV-825"]}'
+    new: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802"]}'
+- at: 2026-11-23T04:33:37.469440+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T04:33:39.578896+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74c5c58c601ef694fbd19e11ae4f6f12cd58806b6677fd57ec8aa945025e70c5
+- at: 2026-11-23T04:34:30.549356+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-789.
+
+      ## Found
+
+      An agent job exports `LOTAR_TASKS_DIR=<main checkout>/.tasks`, and it wins over a folder's own `.tasks`. So a `lotar add` that an agent runs in a scratch folder for a manual check creates real DEV tickets. Without a project config, those tickets also get the default `@fix` assignee.
+
+      - DEV-789 review: `lotar add` in `/tmp/...` created DEV-818 (assignee `@fix`). I hard-deleted it before a job started.
+      - DEV-771: the same thing created DEV-798..801 (its comment of 2026-11-22).
+      - Check: `cd <dir with .tasks/config.yml> && lotar list` inside a job lists DEV; `env -u LOTAR_TASKS_DIR lotar list` lists the folder.
+      - `scripts/generate-test-tasks.mjs` (`npm run seed:test-tasks`, which AGENTS.md names for manual scenarios) spawns lotar with `{ ...process.env }`, so in a job it would seed into the real backlog too.
+
+      ## Done when
+
+      - [ ] `npm run seed:test-tasks` (both its `lotar add` calls and `--serve`) ignores an inherited `LOTAR_TASKS_DIR`, with a test.
+      - [ ] The guidance for manual scenarios (AGENTS.md or testing-strategy) says that in a job, scratch `lotar` commands need `env -u LOTAR_TASKS_DIR` or `--tasks-dir`.
+    new: '-'
+- at: 2026-11-23T04:46:40.948879+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:47:09.056507+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:25:30.686594+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, health
+    new: agent, health, job-paused
+- at: 2026-11-23T08:25:30.883765+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:22:19.773075+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802"]}'
+    new: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802","DEV-842"]}'
+- at: 2026-11-24T17:22:39.294217+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802","DEV-842"]}'
+    new: '{"related":["DEV-789","DEV-771","DEV-798","DEV-802","DEV-842","DEV-843"]}'
+- at: 2026-11-24T17:23:01.837284+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:23:02.107273+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, health, job-paused
+    new: agent, health, job-paused, review-blocked
+- at: 2026-11-24T17:23:20.818254+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, health, job-paused, review-blocked
+    new: agent, health, job-paused, review-returned
+- at: 2026-11-24T19:18:24.880059+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T19:18:25.754272+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21c093248c4aae62a7aad5cd3e16a2804c2430af1d91e5ceeadf55daad4f3035
+- at: 2026-11-24T20:18:30.382839+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7feb52b860f4446b6e8cc9eec1771469a9c51b9975e416f5b5e91b9942206808
+- at: 2026-11-24T21:00:14.449790+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:00:36.078380+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: '-'
+    new: |-
+      Found in the review of DEV-789.
+
+      ## Found
+
+      An agent job exports `LOTAR_TASKS_DIR=<main checkout>/.tasks`, and it wins over a folder's own `.tasks`. So a `lotar add` that an agent runs in a scratch folder for a manual check creates real DEV tickets. Without a project config, those tickets also get the default `@fix` assignee.
+
+      - DEV-789 review: `lotar add` in `/tmp/...` created DEV-818 (assignee `@fix`). I hard-deleted it before a job started.
+      - DEV-771: the same thing created DEV-798..801 (its comment of 2026-11-22).
+      - Check: `cd <dir with .tasks/config.yml> && lotar list` inside a job lists DEV; `env -u LOTAR_TASKS_DIR lotar list` lists the folder.
+      - `scripts/generate-test-tasks.mjs` (`npm run seed:test-tasks`, which AGENTS.md names for manual scenarios) spawns lotar with `{ ...process.env }`, so in a job it would seed into the real backlog too.
+
+      ## Done when
+
+      - [x] `npm run seed:test-tasks` (both its `lotar add` calls and `--serve`) ignores an inherited `LOTAR_TASKS_DIR`, with a test.
+      - [x] The guidance for manual scenarios (AGENTS.md or testing-strategy) says that in a job, scratch `lotar` commands need `env -u LOTAR_TASKS_DIR` or `--tasks-dir`.
+- at: 2026-11-24T21:01:13.368770+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:01:15.698454+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:12:26.241772+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: agent, health, job-paused, review-returned
+    new: agent, health, job-paused, review-returned, fix-retried
+- at: 2026-11-24T21:12:29.763419+00:00
+  actor: automation
+  changes:
+  - field: comment_added

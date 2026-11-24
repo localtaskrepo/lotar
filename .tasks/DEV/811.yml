@@ -1,14 +1,279 @@
 title: lotar config set drops every YAML comment in the project config it rewrites
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T21:21:07.483127+00:00
-modified: 2026-11-22T21:21:07.811181+00:00
+modified: 2026-11-24T21:39:09.459425+00:00
+relationships:
+  depends_on:
+  - local:LOCA-601
+  related:
+  - DEV-266
+  - DEV-407
+  - DEV-832
+  - DEV-834
+  - DEV-833
+  - DEV-855
+comments:
+- date: 2026-11-23T03:03:10.100714+00:00
+  author: claude
+  text: |-
+    `config set` (and every config write) now rewrites only the keys that changed; comments and other keys' formatting stay.
+
+    - New `crates/lotar-core/src/config/yaml_patch.rs`: diffs the canonical YAML before/after and patches just those keys into the file text. Keeps the key line and its comment, item indent, flow lists (`[cargo, clean, --workspace]`), and dotted/flat spellings; new keys join their section.
+    - Safe fallback to the old canonical rewrite when the patched file doesn't parse back to exactly the new config, or a field would be spelled twice (`project.id` + `project.name`).
+    - Used by `save_project_config` and the global save (`server.port` pin is checked too); replaces DEV-407's members/name-only patch.
+    - Tests: `dev811_config_set_comments_test.rs` (project + global), unit tests in `yaml_patch.rs`. Updated three tests that asserted the old canonical rewrite: DEV-266 key order (a hand-written map now keeps its order), the DEV-407 fallback case, and the `ui.scan-settings` smoke test (keeps the quoted pattern).
+    - `docs/help/config.md` updated. No guidance correction.
+  report:
+    commits:
+    - hash: 32b98d922
+      what: DEV-811 config writes patch only the changed keys
+    checks:
+    - command: 'repro: config set issue.types on a copy of .tasks/DEV/config.yml, then diff'
+      result: passed
+      reason: 'only ''- Spike'' added; INBOX copy: only ''priority: High'' added'
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2477 Rust, 1567 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 406/407 on the full run; ui.scan-settings failed on an assertion tied to the old canonical rewrite, fixed and rerun alone (passed)
+    next: Review, then merge
+- date: 2026-11-23T07:07:16.082351+00:00
+  author: claude
+  text: |-
+    Review: blocking. The reported case is fixed, but two common comment placements still drop every comment in the file, and `config init --force` no longer overwrites.
+
+    Read: commit `32b98d922` (`git diff main...HEAD`, 11 files), DEV-266, DEV-407, `docs/help/config.md`, every caller of `save_project_config`/`save_global_config`. It merges cleanly onto main (`108a6996c`, 4 commits ahead).
+
+    Reran:
+    - `npm ci`: passed
+    - `npm run -s lint:agent`: passed
+    - `cargo nextest run -p lotar-core yaml_patch`: 5/5 passed
+    - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev811|dev407|dev266|config/)'`: 273/273 passed
+    - Ticket check on a copy of the real DEV config: only `- Spike` added, owner comments and `waiting_run: [cargo, clean, --workspace]` kept
+    - Not rerun: full `npm test` and smoke, since the review is blocking
+
+    **1. A comment the scan doesn't expect makes the patch fail, and the write falls back to canonical YAML: all comments in the file are gone.** Both cases are valid YAML:
+    - A comment between list items at the key's indent (`issue.types` uses this layout):
+      `issue:\n  types:\n  - Bug\n  # chore next\n  - Chore` → `config set issue.types Bug,Chore,Feature` drops every comment.
+    - A comment at column 0 inside a nested section:
+      `agent:\n  worktree:\n# owner: 3\n    max_parallel_jobs: 3 # owner` → `config set agent_worktree_max_parallel_jobs 4` drops every comment. This also happens when the changed key is a plain scalar.
+    - Where: `crates/lotar-core/src/config/yaml_patch.rs:156-159` (`find_entry`). A comment line at the entry's indent or less ends the entry. The remaining items, or the nested keys, then count as outside it, the patched text gets a duplicate, verify rejects it, and the canonical fallback runs.
+    - Fix: skip comment-only lines when finding where an entry ends. Only a content line at the entry's indent or less (other than `- item`) should end it, and trailing comment and blank lines then belong to the next key. Add both layouts to the `yaml_patch.rs` tests.
+
+    **2. `lotar config init --project=PRJ --force` no longer overwrites the file.** It now goes through the patch, so old comments and unknown keys stay. In a scratch repo, `# old comment: max 3 (owner)` and `foo_unknown: 1` survived `config init --force`, and the stale comment now sits above reset values.
+    - Where: `crates/lotar-lib/src/cli/handlers/config/init/mod.rs:204` (and `:170` global), via `save_project_config` in `crates/lotar-core/src/config/operations.rs:440`.
+    - `docs/help/config.md:58` says "`--force` overwrites existing config", and DEV-811 asked only about `config set`.
+    - Fix: write canonical YAML on init, for example with a save variant that skips the patch, plus a test.
+
+    Note: this job's environment sets `LOTAR_TASKS_DIR` to the main checkout, so my first probe wrote to `.tasks/config.yml` and `.tasks/DEV/config.yml` there. I removed exactly my three lines. The uncommitted `agent.memory_gate.max_swap_percent: 95` in `.tasks/config.yml` belongs to someone else and is left as it was. The patch kept that edit and the owner comments, which is more evidence the main path works.
+- date: 2026-11-23T08:55:41.885542+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085509.723Z-112 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085509.723Z-112 why.'
+- date: 2026-11-23T19:04:37.578101+00:00
+  author: automation
+  text: The fix agent's job job-20261123T190420.668Z-409 failed (lotar agent logs job-20261123T190420.668Z-409); @fix-retry retries it on branch agent/DEV-811.
+- date: 2026-11-23T19:04:58.940976+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T190440.662Z-410 failed again (lotar agent logs job-20261123T190440.662Z-410). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:06:04.844959+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude sign-in ticket LOCA-601; no retry choice is needed.
+
+    - Jobs `job-20261123T190420.668Z-409` and `job-20261123T190440.662Z-410` both stopped before work: the login expired and cannot be renewed.
+    - Earlier job `job-20261123T085509.723Z-112` hit the weekly limit, resetting November 24 at 08:00 America/Los_Angeles; signing in may leave that separate limit in effect.
+    - Applied the infrastructure rule in `standards/docs/decisions/2026-11-15-inbox-triage.md`: depends on `local:LOCA-601`, Blocked, unassigned. Its authentication checks close the prerequisite and Prerequisites done resumes this work; no owner confirmation reply is needed.
+- date: 2026-11-23T19:06:05.704181+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:06:08.867922+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-811 yet. DEV-811 waits for local:LOCA-601.'
+- date: 2026-11-24T16:00:09.496216+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A057bb2f58f2b58391377a5acbb4d1d4d6c81c17221081027f650455f19c943c1 of the job job-20261123T125631.349Z-247 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T160009.486Z-2: DEV-811 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:02:22.548487+00:00
+  author: claude
+  text: |-
+    Session `b58f50c6` stepped back without changes: 4 Claude sessions resumed in this worktree at 08:00 and work on DEV-811 together.
+
+    - `ps` shows sessions `fb129108`, `d9e4ddfe`, `165bd66f` and `b58f50c6`, all in `.lotar-worktrees/lotar/DEV-811`, all started 08:00.
+    - One of them already has uncommitted fixes for both review findings in `yaml_patch.rs`, `operations.rs` and `config/init/mod.rs`. This session left them alone.
+    - Review read HEAD `32b98d922`, so the findings are current.
+    - Possible lotar bug: after the usage-limit reset, the old job threads resumed side by side (see the automation comment at 16:00 about job-247).
+- date: 2026-11-24T16:03:05.266393+00:00
+  author: claude
+  text: |-
+    Session 2b0465 stepped back: four rework sessions are editing this worktree at once (filed DEV-832).
+
+    - Review read HEAD `32b98d922`, so its findings stand.
+    - Finding 2 is done but not committed: `overwrite_project_config`/`overwrite_global_config` in `crates/lotar-core/src/config/operations.rs` write canonical YAML, and `config init` calls them (`init/mod.rs:170,204`). It hasn't been compiled and has no test yet.
+    - Another session is fixing finding 1 in `yaml_patch.rs` `find_entry`.
+    - Sent sessions `876756`, `25d2e3` and `c8b9a8` the details; one of them commits and writes the hand-off.
+- date: 2026-11-24T16:14:37.102779+00:00
+  author: claude
+  text: |-
+    Another session stepped back without changes: session (pid `84657`) is finishing the rework and is running `npm run lint:agent` now.
+
+    - Review read HEAD `32b98d922`, so its findings stand.
+    - Uncommitted fixes for both findings are in `yaml_patch.rs`, `operations.rs`, `config/init/mod.rs` and `dev811_config_set_comments_test.rs`. Left untouched.
+    - Duplicate parallel sessions are already filed as DEV-832.
+- date: 2026-11-24T16:19:22.019542+00:00
+  author: claude
+  text: |-
+    Session pid `51863` takes over the rework; other sessions in this worktree please step back.
+
+    - The session that held it (pid `84657`) is gone since the 08:18 restart; its uncommitted fixes are still in the worktree, and I finish and commit them.
+    - Lock: `dev811-rework.lock` in the worktree's git dir.
+- date: 2026-11-24T16:19:38.211394+00:00
+  author: claude
+  text: |-
+    Session pid `61654` takes over the rework: the finishing session (pid `84657`) is gone without committing.
+
+    - Uncommitted fixes for both findings still in the worktree; this session checks, tests and amends them. Other sessions: please step back.
+- date: 2026-11-24T16:19:51.482277+00:00
+  author: claude
+  text: |-
+    Session `0568e1` stepped back without changes: 4 rework sessions started in this worktree again at 16:18 UTC (DEV-832).
+
+    - The earlier lead (pid `84657`) is gone and didn't commit. The uncommitted fixes for both findings are still in `yaml_patch.rs`, `operations.rs`, `config/init/mod.rs` and `dev811_config_set_comments_test.rs`.
+    - The oldest new session, `a030fa`, leads: it finishes the checks, amends `32b98d922` and writes the hand-off. I told `48ea86` and `5338b1` to step back.
+    - Review read HEAD `32b98d922`, so its findings stand.
+- date: 2026-11-24T16:19:53.173881+00:00
+  author: claude
+  text: |-
+    Session pid `61654` steps back without edits: the oldest session (`a030fa`) leads and commits.
+
+    - My takeover comment above no longer holds.
+    - Review note for the lead: the uncommitted diff has no test for global `config init --force` (only the project case).
+- date: 2026-11-24T16:28:53.549218+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261124T160009.486Z-2 failed again (lotar agent logs job-20261124T160009.486Z-2). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-24T16:29:17.623710+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f of the job job-20261123T180350.095Z-390 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T162917.541Z-8: DEV-811 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:29:19.147814+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3305605ebc3e22d2a18d006ef065f46ac1470cdeaac6cddfeb459efadb0c40d5 of the job job-20261123T170332.704Z-375 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f that the job job-20261124T162917.541Z-8 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:20.215207+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A985f4be191293869fe30c07c01748efbc3ae6432cba27d38e827eb3b8c559652 of the job job-20261123T160311.204Z-342 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f that the job job-20261124T162917.541Z-8 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:22.226318+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1515ea33cdbccfa9a8b0c3db4a6ef5388f3978dda97a1e10b39bb4572fad01fb of the job job-20261123T140236.191Z-276 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f that the job job-20261124T162917.541Z-8 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:25.620551+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8435be66684173a210f69bf1ba918360cbe73777913cb48de46ae057dbc10700 of the job job-20261123T085509.723Z-112 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f that the job job-20261124T162917.541Z-8 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:48:23.762237+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87377ee2e35c212c96c8885d7798dc767e5d888c6844212eafcf4287210ac90d of the job job-20261123T095555.711Z-145 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T164823.717Z-3: DEV-811 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:48:46.537210+00:00
+  author: claude
+  text: |-
+    Both review findings are fixed and amended into one signed commit, `f23ef7081`.
+
+    - Review read HEAD `32b98d922`, so its findings applied.
+    - **1. Comments inside an entry:** `find_entry` in `yaml_patch.rs` skips comment and blank lines at any indent. Comments after the last content line go to the next key. A block list that only drops items or adds them at the end keeps its item lines and the comments between them (`edit_scalar_items`). Both layouts from the review are now tests in `yaml_patch.rs` and `dev811_config_set_comments_test.rs`.
+    - **2. `config init --force`:** new `overwrite_project_config`/`overwrite_global_config` in `operations.rs` write canonical YAML, and `config/init/mod.rs` calls them. Project and global each have a test. `docs/help/config.md` says so.
+    - An automatic job-end commit (`b21023576`, "changes from the fix agent") had landed on the branch. I squashed it into the one DEV-811 commit, with the same tree the checks ran on.
+    - Four sessions resumed in this worktree again (DEV-832). I did the work; the others stepped back.
+    - No guidance correction.
+  report:
+    commits:
+    - hash: f23ef7081
+      what: DEV-811 config writes patch only the changed keys; config init --force writes fresh
+    checks:
+    - command: cargo nextest run -p lotar-core yaml_patch
+      result: passed
+      reason: 8/8
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2483 Rust tests; first run also passed every test but the runner reported one leftover temp entry .tmpKlF8Kl; the config tests leave none, and the rerun was clean
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 407/407
+    next: Review again
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A508e0ebf43f1f9aaa7b9edc3d8fc73b587c37ed4800680dc69324be71448685a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8435be66684173a210f69bf1ba918360cbe73777913cb48de46ae057dbc10700
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87377ee2e35c212c96c8885d7798dc767e5d888c6844212eafcf4287210ac90d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af81a2516e3a521b53355995770fdbb70a09f6a93ae89f71418eeb1871834c5eb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af33ec86924dd85724dd9470eab53b5aa63d7bf647113d826dd55a3b4e4c4c80d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A057bb2f58f2b58391377a5acbb4d1d4d6c81c17221081027f650455f19c943c1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1515ea33cdbccfa9a8b0c3db4a6ef5388f3978dda97a1e10b39bb4572fad01fb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84fb7c6ad6d8d43472465591e4819c5b899eae6bc0579f3c3fb4d93a6ffbae11
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A985f4be191293869fe30c07c01748efbc3ae6432cba27d38e827eb3b8c559652
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3305605ebc3e22d2a18d006ef065f46ac1470cdeaac6cddfeb459efadb0c40d5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aea6c11622088ffe2d4bb3e4a4fc1bab99805d521908749128fc78e5b5aff1783
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb59a72c702edd83c482a3a0f80be8d97da7778eac54a10a0aeb70943dbf378a
 description: 'Found (STD-305, 2026-11-22, lotar 0.15.6): `lotar --project DEV config set issue.types Feature,Bug,Chore,Research` rewrote .tasks/DEV/config.yml and dropped the owner-decision comments on agent.worktree (max_parallel_jobs, waiting_run). It also turned the flow list waiting_run: [cargo, clean, --workspace] into a block list. Same in standards .tasks/INBOX/config.yml. Check: copy a project config with comments into a scratch .tasks, run config set on one key, then diff. Done: config set changes only that key and keeps comments and the formatting of other keys, with a test.'
 tags:
 - health
+- review-returned
+- job-paused
+- fix-retried
 custom_fields:
   finding: config-set:comments
 history:
@@ -17,3 +282,339 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-23T02:48:29.042676+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T02:48:31.963070+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A508e0ebf43f1f9aaa7b9edc3d8fc73b587c37ed4800680dc69324be71448685a
+- at: 2026-11-23T03:03:10.100714+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T03:03:10.470105+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-266","DEV-407"]}'
+- at: 2026-11-23T03:03:29.309649+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T07:07:16.082351+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:07:16.899991+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-23T07:07:30.961318+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-23T08:55:27.376376+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T08:55:38.575744+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8435be66684173a210f69bf1ba918360cbe73777913cb48de46ae057dbc10700
+- at: 2026-11-23T08:55:41.712979+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, job-paused
+- at: 2026-11-23T08:55:41.885542+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:56:02.397976+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87377ee2e35c212c96c8885d7798dc767e5d888c6844212eafcf4287210ac90d
+- at: 2026-11-23T10:56:13.889491+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af81a2516e3a521b53355995770fdbb70a09f6a93ae89f71418eeb1871834c5eb
+- at: 2026-11-23T11:56:26.911231+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af33ec86924dd85724dd9470eab53b5aa63d7bf647113d826dd55a3b4e4c4c80d
+- at: 2026-11-23T12:56:40.726235+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A057bb2f58f2b58391377a5acbb4d1d4d6c81c17221081027f650455f19c943c1
+- at: 2026-11-23T14:02:52.429425+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1515ea33cdbccfa9a8b0c3db4a6ef5388f3978dda97a1e10b39bb4572fad01fb
+- at: 2026-11-23T15:03:06.973821+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A84fb7c6ad6d8d43472465591e4819c5b899eae6bc0579f3c3fb4d93a6ffbae11
+- at: 2026-11-23T16:03:28.366108+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A985f4be191293869fe30c07c01748efbc3ae6432cba27d38e827eb3b8c559652
+- at: 2026-11-23T17:03:45.485109+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3305605ebc3e22d2a18d006ef065f46ac1470cdeaac6cddfeb459efadb0c40d5
+- at: 2026-11-23T18:04:16.695856+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f
+- at: 2026-11-23T19:04:34.988154+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aea6c11622088ffe2d4bb3e4a4fc1bab99805d521908749128fc78e5b5aff1783
+- at: 2026-11-23T19:04:36.120539+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, review-returned, job-paused
+    new: health, review-returned, job-paused, fix-retried
+- at: 2026-11-23T19:04:37.578101+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:04:57.308860+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb59a72c702edd83c482a3a0f80be8d97da7778eac54a10a0aeb70943dbf378a
+- at: 2026-11-23T19:04:58.298421+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:04:58.940976+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:05:59.726775+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-266","DEV-407"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407"]}'
+- at: 2026-11-23T19:06:00.339047+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:06:04.844959+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:06:05.464154+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T19:06:05.704181+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:06:08.867922+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:06:18.386855+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:00:09.460349+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:00:09.496216+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:00:10.752371+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T16:02:22.548487+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:02:55.030954+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832"]}'
+- at: 2026-11-24T16:03:05.266393+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:33.081878+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834"]}'
+- at: 2026-11-24T16:05:46.362206+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833"]}'
+- at: 2026-11-24T16:14:37.102779+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:22.019542+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:38.211394+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:51.482277+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:53.173881+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:28:27.263643+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-24T16:28:53.549218+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:17.329307+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T16:29:17.623710+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:19.147814+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:20.215207+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:20.352501+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T16:29:22.226318+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:25.620551+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:39.115612+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T16:48:23.662820+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+- at: 2026-11-24T16:48:23.762237+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:48:25.849834+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T16:48:46.537210+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:49:03.846727+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T21:39:09.459425+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833","DEV-855"]}'

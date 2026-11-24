@@ -1,0 +1,26 @@
+title: 'Job log search: a match inside a folded tool call''s output is counted but not shown'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T22:50:59.233215+00:00
+modified: 2026-11-24T22:51:00.186554+00:00
+relationships:
+  related:
+  - DEV-769
+description: |-
+  Found in the DEV-769 review: searching a job log for a word that only appears in a tool call's output (for example `npm`) opens the Tools group and counts "3 matches", but each call stays folded, so its output and the highlight are hidden. `groupOpen` in `view/components/AgentJobLog.vue` opens the group; `view/components/AgentJobToolCall.vue` opens a call only when it failed.
+
+  Fix: while a search is active, open each call whose input or output contains the query.
+
+  Done when: searching for a word that appears only in a call's output shows that output with the word highlighted. A Vitest or smoke test covers it.
+tags:
+- ui
+- web-ui
+history:
+- at: 2026-11-24T22:51:00.186554+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

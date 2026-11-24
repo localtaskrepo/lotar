@@ -1,0 +1,216 @@
+title: 'T3''s usage-limit resume restarts every paused job thread of one ticket at once: 10 on STD-328 in one worktree'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T16:20:40.092908+00:00
+modified: 2026-11-24T22:55:14.411493+00:00
+relationships:
+  related:
+  - DEV-626
+  - DEV-835
+  - DEV-769
+comments:
+- date: 2026-11-24T19:11:03.814040+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191057.251Z-26 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191057.251Z-26 why.'
+- date: 2026-11-24T20:46:41.727216+00:00
+  author: codex
+  text: |-
+    Before the 13:00 Pacific reset on Nov 24, T3's local projection showed 81 unsettled threads armed for that timestamp. Joining the armed run to the latest failed run showed 38 same-title, same-worktree pairs, each with five items in both failed runs. The same issue is therefore armed for another reset, even on tickets that hit the limit before generating useful work. LoTaR had 58 queued entries when checked at 12:39, with retries staggered; T3 can wake its armed threads separately.
+
+    Treat a settled superseded attempt as ineligible, and preserve one queue-owned path per ticket and its phase. Also prevent an already-started limited thread from being duplicated by the fallback retry when T3 has the true reset time but LoTaR's error string carries only a generic 429.
+- date: 2026-11-24T21:13:21.779294+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d of the job job-20261124T191057.251Z-26 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:21:28.660252+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660 of the job job-20261124T201104.034Z-59 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:35:04.105942+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660 of the job job-20261124T201104.034Z-59 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T213504.043Z-36: DEV-836 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:35:06.549137+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d of the job job-20261124T191057.251Z-26 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660 that the job job-20261124T213504.043Z-36 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:41:53.998708+00:00
+  author: claude
+  text: |-
+    A limit resume now runs one thread per ticket, none on a Blocked ticket, and a job's retry settles the thread it replaces.
+
+    - `resumed.rs`: lotar still takes over the newest resumed thread and now stops the other ones (`thread.stop` over T3's internal API, `t3_thread_api.rs`) instead of commenting "stop it in T3 Code". On a `Blocked` ticket it takes none over and stops them all.
+    - `kept.rs` `settle_superseded` (called from `run_session`): a new `t3` job settles the earlier jobs' `failed` threads, which are unsettled, on its ticket. T3's limit resume skips a thread whose `settledOverride` is `"settled"` (checked in T3 Code's server code), so a retry leaves no thread for T3 to wake later.
+    - I checked the commands in T3 Code's orchestration schema: `thread.stop {threadId, reason?}`, `thread.settle {threadId, expectedLatestRunId?}`.
+    - `docs/help/agent.md` describes the new behavior.
+    - This ticket hit the bug too: T3 resumed both DEV-836 threads (`70c52b10…` from 19:11, `fdff9233…` from 20:11) in this worktree. I asked the older one to stop and kept one commit.
+    - STD-328 now has one thread, waiting on background work, not several running.
+  report:
+    commits:
+    - hash: dbdedd4a6
+      what: stop extra resumed threads, stop all on Blocked, settle superseded failed threads
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev626
+      result: passed
+      reason: 12 tests, 3 new
+    - command: cargo nextest run -p lotar-agent t3_thread_api
+      result: passed
+    - command: cargo clippy -p lotar-agent -p lotar-lib --all-targets
+      result: passed
+    - command: rustfmt + prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    - command: live limit reset
+      result: not_run
+      reason: needs the next T3 usage-limit reset after merge
+    next: Review, then merge; after the next limit reset check t3_thread_list titleContains <ticket> shows one running thread per ticket
+- date: 2026-11-24T22:22:35.461304+00:00
+  author: claude
+  text: |-
+    Review: blocking. One path still leaves every resumed thread of a ticket running: a ticket with a queued job.
+
+    - **Finding:** `crates/lotar-agent/src/services/agent_job_service/resumed.rs:203` returns before anything is stopped when the ticket has a queued entry that is no usage-limit retry. At a limit reset, all N resumed threads then keep running in the one worktree, which is the bug this ticket is about. "Done when" asks for at most one thread per ticket. `docs/help/agent.md:191` documents this gap ("Left alone too are the threads of a ticket with a queued entry"). **Fix:** in that branch, keep the newest thread for the queued job to wait on and `stop()` the rest. Add a test next to `a_thread_t3_code_resumes_is_left_to_a_queued_job_that_is_no_usage_limit_retry` (`crates/lotar-lib/tests/dev626_resumed_t3_threads_test.rs:387`) with two running threads plus a queued entry, and update the doc line.
+    - **Verified:** T3 Code's limit resume skips settled threads. Its server SQL in `app.asar` filters `json_extract(t.payload_json, '$.settledOverride') IS NOT 'settled'`, so `settle_superseded` (`kept.rs`) works as claimed.
+    - **Checked, fine:** the newest thread is taken over and the others are stopped. A Blocked ticket has all its threads stopped; the name check matches `automation_service.rs:3450`. A thread that waits for an answer holds the ticket and the others are stopped. A retry that races T3's resume ends with one thread either way: the failed thread is settled first, or the resumed one is taken over and the retry is dropped. The new tests' asserts would fail on main.
+    - **Reran:** `npm ci` passed. `cargo nextest run -p lotar-lib --test '*' -E 'test(/dev626|resumed_t3/)'`: 12 passed. `cargo nextest run -p lotar-agent -E 'test(/t3_thread_api|kept|resumed/)'`: 10 passed. `cargo clippy -p lotar-agent --all-targets`: clean.
+    - **Not rerun:** the full lint, test and smoke suites, which the merge runs. Nobody has seen this work at a real T3 limit reset.
+    - No UI changes, so no screenshots needed. No stray files, one commit (`dbdedd4a6`).
+- date: 2026-11-24T22:55:14.411493+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T22:22Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660
+description: 'Found: on 2026-11-24 at 16:00 UTC, T3 Code''s limit-resume message (''Continue where you left off.'') restarted 10 STD-328 fix threads from jobs filed hourly on 2026-11-23 (07:51 to 18:30). All of them run Opus in /Users/mallox/Development/.lotar-worktrees/standards/STD-328, with no lotar job (lotar agent list-jobs shows only failed jobs). lotar commented ''Stop it in T3 Code'', but nobody acts on that, and the threads would race on one worktree and on its dependency updates. DEV-626 (Done) covered resume after a restart, not resume after a limit. Check: t3_thread_list titleContains STD-328 shows several threads running at once. Done when a limit resume runs at most one thread per ticket (the newest tracked job, or none while the ticket is Blocked), and lotar''s job retries don''t leave a T3 thread behind that T3 can resume later.'
+tags:
+- health
+- job-paused
+- review-returned
+custom_fields:
+  finding: duplicate-threads:limit-resume
+history:
+- at: 2026-11-24T16:20:41.550566+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-626"]}'
+- at: 2026-11-24T16:20:43.544264+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:11:00.993138+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:11:01.481003+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d
+- at: 2026-11-24T19:11:03.781775+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:11:03.814040+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:11:05.379458+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660
+- at: 2026-11-24T20:46:41.727216+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:05:48.005280+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626"]}'
+    new: '{"related":["DEV-626","DEV-835"]}'
+- at: 2026-11-24T21:08:02.706925+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-835"]}'
+    new: '{"related":["DEV-626","DEV-835","DEV-769"]}'
+- at: 2026-11-24T21:13:21.779294+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:21:28.660252+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:35:04.105942+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:35:06.549137+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:41:53.998708+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:42:17.676454+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T22:22:35.461304+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:22:35.643830+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, job-paused
+    new: health, job-paused, review-blocked
+- at: 2026-11-24T22:22:51.189657+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, job-paused, review-blocked
+    new: health, job-paused, review-returned
+- at: 2026-11-24T22:55:12.147394+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T22:55:12.324056+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T22:55:12.766118+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T22:55:14.411493+00:00
+  actor: claude
+  changes:
+  - field: comment_added

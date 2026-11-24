@@ -1,0 +1,331 @@
+title: Link LoTaR tickets and T3 threads both ways and show live T3 state on jobs
+status: Merging
+priority: Medium
+type: Feature
+reporter: codex
+assignee: '@merge'
+created: 2026-11-24T20:03:54.609056+00:00
+modified: 2026-11-24T22:44:54.704717+00:00
+relationships:
+  related:
+  - DEV-600
+  - DEV-810
+  - DEV-832
+  - DEV-850
+  - DEV-769
+  - DEV-857
+  - DEV-858
+comments:
+- date: 2026-11-24T20:04:11.028174+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T200407.409Z-3 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T200407.409Z-3 why.'
+- date: 2026-11-24T20:55:14.372391+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T20:22Z with no lotar job: the live check restarted @fix as the next turn of its thread, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T21:13:14.302808+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e0db82872d44ab0b81b1b5b68502ee7eca89b778890794d33dcf9a65d1af387 of the job job-20261124T205514.305Z-84 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T211312.716Z-24: DEV-849 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:53:36.161937+00:00
+  author: claude
+  text: |-
+    Done: tickets and T3 threads link both ways, and a t3 job's **Show logs** panel shows its thread's state in T3 Code, in `ad0e78fce`.
+
+    - **Ticket link**: every job prompt has `- Link: <public_url>/task/<ID>` under the ID. A turn that continues an older thread sends it too. Without `server.public_url`, the prompt has only the ID.
+    - **Thread state**: new `GET /api/jobs/t3-thread?id=<job>` runs `t3 thread show`.
+      - States: Running, Waits for an answer, Finished, Failed, Stopped, Unavailable (with the reason).
+      - The thread comes from the job's own log, so each retry shows its own thread.
+      - Limits: one check per thread every 10 s, 10 s timeout.
+      - It never changes the job or the ticket. Jobs that aren't t3 get no row.
+    - **UI**: new `view/components/AgentT3Thread.vue` with an **Open in T3 Code** link. It checks again every 15 s while visible, and on **Refresh**. A failed check keeps the last answer.
+    - **Docs**: `agent.md` (T3 Code threads), `config-reference.md`, `api-quick-reference.md`, `openapi.json`.
+    - **Live check** (built binary, test workspace):
+      - This job's real thread: `running`, with its link and environment.
+      - A thread T3 doesn't have: Unavailable, "Thread … is no longer available."
+      - A job that recorded no thread: Unavailable, with the reason.
+      - A CLI job: 400. An unknown job: 404.
+    - **Limit**: the T3 CLI has no environment flag. It asks this Mac's T3 Code server, the one t3 jobs start their threads on. The recorded environment is used only for the link.
+
+    Screenshots (test workspace, all three jobs with logs open):
+
+    | | before | after |
+    |---|---|---|
+    | light 1920 | [before](https://lotar.pyxzl.net/api/attachments/get?path=dev849-before-light-1920.b4fc8e6220ec0f29e221cb93023c31a4.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=dev849-after-light-1920.b8eea81c6dae01b2a5d338346636497e.png) |
+    | light 1440 | [before](https://lotar.pyxzl.net/api/attachments/get?path=dev849-before-light-1440.dd4022bc1f1a8238a7558ac5b898b5f6.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=dev849-after-light-1440.002675e4eecd26ac6c32bb90175d0659.png) |
+    | light 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=dev849-before-light-390.29efdb2e49cc79f2c542efca74a3ffb0.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=dev849-after-light-390.004540008a69c2c64e8a7ad790548978.png) |
+    | dark 1920 | [before](https://lotar.pyxzl.net/api/attachments/get?path=dev849-before-dark-1920.7a70fc6e0bdfa727de1266d723de0575.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=dev849-after-dark-1920.f89c927db1eac36cd0303b7aa66b941f.png) |
+    | dark 1440 | [before](https://lotar.pyxzl.net/api/attachments/get?path=dev849-before-dark-1440.26cf37e5822f262be174b046763725cd.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=dev849-after-dark-1440.a06743fc5f201453633522383d19975e.png) |
+    | dark 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=dev849-before-dark-390.d5b180a7706f939be7b3a528ef393cda.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=dev849-after-dark-390.815cc94fc5737e35cdca9cc673de5994.png) |
+
+    DEV-769 also changes `AgentJobs.vue`: whichever branch lands second keeps the T3 row at the top of the logs panel, or moves it into AgentJobLog's `#actions` slot.
+  report:
+    commits:
+    - hash: ad0e78fce
+      what: DEV-849 Link LoTaR tickets and T3 threads both ways and show live T3 state on jobs
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(t3_state) | test(build_prompt)'
+      result: passed
+      reason: 10 tests
+    - command: cargo clippy -p lotar-agent -p lotar-core -p lotar-lib --all-targets --all-features -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check <changed .rs>
+      result: passed
+    - command: vue-tsc --project view/tsconfig.json --noEmit
+      result: passed
+    - command: oxlint + eslint + prettier --check <changed view files>
+      result: passed
+    - command: vitest AgentT3Thread.spec.ts AgentJobs.spec.ts
+      result: passed
+      reason: 36 tests
+    - command: live GET /api/jobs/t3-thread against the real T3 thread
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: targeted checks only, the merge runs the full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: targeted checks only, the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: targeted checks only, the merge runs the full suites (DEV-797)
+    next: Review ad0e78fce and the screenshots, then merge; rebase over DEV-769 if it lands first
+- date: 2026-11-24T22:25:41.305962+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T21:53Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T22:44:45.793576+00:00
+  author: claude
+  text: |-
+    Review: passed. `ad0e78fce` does what "Done when" asks; two minor follow-ups are filed (DEV-857, DEV-858).
+
+    **Read**
+    - `git diff main...HEAD` (14 files; `main` is 2 commits ahead and doesn't touch these files), the ticket, the fix comment, `AGENTS.md`, `docs/help/agent.md`.
+    - Ticket link: the job reads its ticket with `TaskService::get`, which fills `url` from `server.public_url`, so every turn's prompt has `- Link:` under the ID. A turn that continues an older thread goes through the same `build_prompt`.
+    - Thread state only reads (`t3 thread show --json --messages 0`) and changes neither the job nor the ticket. API types, `types.ts`, `openapi.json` and the help pages agree.
+
+    **Reran**
+    - `npm ci`: passed.
+    - `cargo nextest run -p lotar-agent -E 'test(t3_state) | test(build_prompt)'`: 10 passed.
+    - `cargo nextest run -p lotar-lib -E 'test(jobs) & test(t3)'`: 11 passed.
+    - `vitest --config view/vitest.config.ts AgentT3Thread.spec.ts AgentJobs.spec.ts`: 36 passed.
+    - Live check: this branch's `lotar serve` on a scratch workspace with copies of DEV-849's real job logs.
+      - Two t3 jobs resolved to two different real threads (`4e0d…`, `38f9…`), both `finished`. The fix agent's check had seen `4e0d…` as `running`, so the state change shows up, and the ticket stayed `Reviewing`.
+      - A claude job got 400; an unknown job got 404.
+    - I checked `t3 thread show` output on 0.1.11 by hand. It has the fields the parser reads (`status`, `activeRunId`, `pendingRequestCount`, `link`, `updatedAt`). A thread T3 doesn't have gives "…is no longer available."
+
+    **Screenshots**
+    - I read the fix agent's before and after sets (all 12 attached). They look right.
+    - My own after set, light and dark at 1920, 1440 and 390 px, with real threads: the row reads well in both themes, the chip shows its state as text, and the row wraps cleanly at 390 px. No problems.
+
+    **Not verified**
+    - The `- Link:` line inside a real T3 thread. Every existing thread was started by the installed 0.15.6, so the first t3 job after install should show it.
+
+    **Filed (minor)**
+    - [DEV-857](https://lotar.pyxzl.net/task/DEV-857): a thread whose turn ended on `t3_background_wait` (`completed`, background tasks pending) shows Finished while its job still runs.
+    - [DEV-858](https://lotar.pyxzl.net/task/DEV-858): no REST test for `GET /api/jobs/t3-thread` (400, 404, unavailable, two threads on one ticket).
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e0db82872d44ab0b81b1b5b68502ee7eca89b778890794d33dcf9a65d1af387
+- attachment: dev849-after-dark-1440.a06743fc5f201453633522383d19975e.png
+- attachment: dev849-after-dark-1920.f89c927db1eac36cd0303b7aa66b941f.png
+- attachment: dev849-after-dark-390.815cc94fc5737e35cdca9cc673de5994.png
+- attachment: dev849-after-light-1440.002675e4eecd26ac6c32bb90175d0659.png
+- attachment: dev849-after-light-1920.b8eea81c6dae01b2a5d338346636497e.png
+- attachment: dev849-after-light-390.004540008a69c2c64e8a7ad790548978.png
+- attachment: dev849-before-dark-1440.26cf37e5822f262be174b046763725cd.png
+- attachment: dev849-before-dark-1920.7a70fc6e0bdfa727de1266d723de0575.png
+- attachment: dev849-before-dark-390.d5b180a7706f939be7b3a528ef393cda.png
+- attachment: dev849-before-light-1440.dd4022bc1f1a8238a7558ac5b898b5f6.png
+- attachment: dev849-before-light-1920.b4fc8e6220ec0f29e221cb93023c31a4.png
+- attachment: dev849-before-light-390.29efdb2e49cc79f2c542efca74a3ffb0.png
+description: |-
+  A LoTaR ticket already links to its T3 Code job threads. From T3, the ticket ID is easy to spot in the thread title, but getting back to the ticket takes a search. In LoTaR, the job and ticket statuses do not tell you whether the attached T3 thread is running, waiting for you, or finished.
+
+  Ravi approved reciprocal links and live T3 state in LoTaR on 2026-11-24 and asked to queue the work for when credits reset. The GitHub mirror is deferred.
+
+  ## Done when
+
+  - [ ] LoTaR-launched T3 work includes a clickable link to the canonical LoTaR ticket in the job context shown in T3. Cover fresh threads and continuation or retry of a thread that predates the feature. Resolve the URL using the project or deployment's existing public URL configuration, or add a documented setting if needed. Keep the ticket ID usable when no URL is configured. Keep the existing LoTaR-to-T3 link.
+  - [ ] The existing LoTaR Agents job detail shows the linked thread's current T3 state and a way to open it. Use the recorded environment and thread identity so multiple attempts on a ticket resolve to the correct thread. Show useful states for running, waiting for input when known, finished, failed, and unavailable. Display T3 state separately from the LoTaR job outcome and ticket status. A T3 run ending must not change either one.
+  - [ ] Refresh while the relevant job detail is open using a bounded read path supported by T3 Code 0.1.11, through the existing T3 or harnessmux integration where practical. Keep the job view usable when T3 is offline, the thread is gone, or a historical job lacks an identity. Non-T3 jobs keep their existing behavior. Document the freshness and unavailable behavior.
+  - [ ] Verify against a real T3-backed job that the two links open their intended destinations and that a thread state change appears in LoTaR without changing ticket status. Cover retries or multiple threads, an unavailable T3 server, and non-T3 jobs with targeted tests. Attach the UI review screenshots and record the checks that ran.
+
+  ## Starting points
+
+  - `docs/help/agent.md` (T3 Code threads), `crates/lotar-agent/src/services/agent_job_service.rs` (job context and harnessmux session links), and `view/pages/AgentJobs.vue` (job detail).
+  - T3 exposes `t3_thread_read` over MCP and the host CLI provides `t3 thread show`. This investigation verified a live thread read on 0.1.11. DEV-810 was still `InProgress` while its sampled T3 run had failed. See DEV-600 for waiting-for-input handling and DEV-832 for multiple runs around a usage-limit reset.
+tags:
+- agent
+- ui
+- job-paused
+history:
+- at: 2026-11-24T20:03:54.906496+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-600","DEV-810","DEV-832"]}'
+- at: 2026-11-24T20:03:55.210154+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T20:04:08.468253+00:00
+  actor: codex
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T20:04:08.676991+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e0db82872d44ab0b81b1b5b68502ee7eca89b778890794d33dcf9a65d1af387
+- at: 2026-11-24T20:04:10.998512+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, job-paused
+- at: 2026-11-24T20:04:11.028174+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:22:35.767696+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-810","DEV-832"]}'
+    new: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850"]}'
+- at: 2026-11-24T20:55:14.372391+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:13:14.302808+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:53:08.665226+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-after-dark-1440.a06743fc5f201453633522383d19975e.png
+- at: 2026-11-24T21:53:08.746019+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-after-dark-1920.f89c927db1eac36cd0303b7aa66b941f.png
+- at: 2026-11-24T21:53:08.818962+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-after-dark-390.815cc94fc5737e35cdca9cc673de5994.png
+- at: 2026-11-24T21:53:08.878681+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-after-light-1440.002675e4eecd26ac6c32bb90175d0659.png
+- at: 2026-11-24T21:53:08.949085+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-after-light-1920.b8eea81c6dae01b2a5d338346636497e.png
+- at: 2026-11-24T21:53:09.021511+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-after-light-390.004540008a69c2c64e8a7ad790548978.png
+- at: 2026-11-24T21:53:09.085437+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-before-dark-1440.26cf37e5822f262be174b046763725cd.png
+- at: 2026-11-24T21:53:09.236436+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-before-dark-1920.7a70fc6e0bdfa727de1266d723de0575.png
+- at: 2026-11-24T21:53:09.337863+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-before-dark-390.d5b180a7706f939be7b3a528ef393cda.png
+- at: 2026-11-24T21:53:09.455970+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-before-light-1440.dd4022bc1f1a8238a7558ac5b898b5f6.png
+- at: 2026-11-24T21:53:09.516329+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-before-light-1920.b4fc8e6220ec0f29e221cb93023c31a4.png
+- at: 2026-11-24T21:53:09.596985+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev849-before-light-390.29efdb2e49cc79f2c542efca74a3ffb0.png
+- at: 2026-11-24T21:53:36.161937+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:53:36.627480+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850"]}'
+    new: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769"]}'
+- at: 2026-11-24T21:53:51.363657+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T22:25:34.768184+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T22:25:35.833598+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-24T22:25:37.452107+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T22:25:41.305962+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:44:16.378476+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769"]}'
+    new: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769","DEV-857"]}'
+- at: 2026-11-24T22:44:18.165636+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769","DEV-857"]}'
+    new: '{"related":["DEV-600","DEV-810","DEV-832","DEV-850","DEV-769","DEV-857","DEV-858"]}'
+- at: 2026-11-24T22:44:45.793576+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:44:54.704717+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,0 +1,172 @@
+title: 'An expired provider login fails every job into retries, owner questions and inbox triage: pause that provider''s queue like a signing failure (DEV-604)'
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T16:08:21.742893+00:00
+modified: 2026-11-24T22:27:00.412861+00:00
+relationships:
+  related:
+  - DEV-604
+  - DEV-740
+  - DEV-832
+  - DEV-836
+comments:
+- date: 2026-11-24T19:10:54.135862+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191048.213Z-25 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191048.213Z-25 why.'
+- date: 2026-11-24T21:00:17.729896+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f of the job job-20261124T191048.213Z-25 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:05:46.187825+00:00
+  author: claude
+  text: |-
+    Second session in this worktree stood down: another DEV-835 session (d86b61) is already editing it.
+
+    - T3 resumed two Claude sessions into `.lotar-worktrees/lotar/DEV-835` after the usage-limit reset: the bug DEV-832 and DEV-836 track.
+    - I changed no files. The uncommitted diff in `crates/lotar-agent/src/services/agent_queue_service.rs` belongs to the other session, which finishes and hands off the ticket.
+    - Finding for the fix: harnessmux's T3 backend reports the 2026-11-23 failure as kind `other` (`Provider error: Claude could not authenticate`: harnessmux 0.3 has no pattern for that text). So the runner error's text has to match too, not only kind `auth_required`. See the log `job-20261123T190440.662Z-410.jsonl`.
+- date: 2026-11-24T21:21:22.252642+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f of the job job-20261124T191048.213Z-25 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:34:11.304937+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f of the job job-20261124T191048.213Z-25 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:49:41.079439+00:00
+  author: claude
+  text: |-
+    Done: an expired login now pauses that provider's jobs instead of failing each one.
+
+    - Runner failure (not agent text) of kind `auth_required`, or text `could not authenticate` / `Authentication required` / `login reached its time limit`, ends the job `paused`: `job_paused` rules only, no retry tag, no owner question. The 2026-11-23 T3 failures were kind `other` with "Claude could not authenticate", so text matching is needed
+    - The pause holds only jobs on that provider (profile `provider`, else runner; T3 `claudeAgent` = `claude`). One try every 10 min, the first success resumes
+    - The queue now keeps several pauses (one signing/disk + one login per provider); JSON key `pause` → `pauses` in `agent queue` and `list-jobs`. An old state file's `pause` is read in
+    - Tests: `a_login_pause_holds_its_providers_jobs_until_one_completes`, `a_runner_login_failure_names_its_pause`, `claude_jobs_on_t3_and_headless_share_a_provider`, `a_saved_single_pause_reads_as_an_open_pause`
+    - Docs: `docs/help/agent.md` Paused queue
+    - No guidance correction: nothing durable found
+  report:
+    commits:
+    - hash: 9dc30834c
+      what: login pause per provider, queue keeps several pauses
+    checks:
+    - command: cargo nextest run -p lotar-agent (pause, login, auth, queue tests)
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration dev604/list_jobs/agent_queue
+      result: passed
+    - command: cargo clippy -p lotar-agent -p lotar-lib --tests
+      result: passed
+    - command: rustfmt --check, prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: targeted checks only, the merge runs the suites (DEV-797)
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ff06e8317883aa88fd31e0eb8d7df2aa53ee9d651f0dbc2a23a0118cdec8a29
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab163d45f911817cfc6f0f956a14a22c5ac52b3c58625de84e773bf21b6bb297b
+description: |-
+  ## Found (communication review, 2026-11-24)
+
+  On 2026-11-23 from about 19:00Z the Mac's Claude login expired (local LOCA-601). lotar failed each Claude job on "Claude could not authenticate", then ran the failure path for every ticket on its own:
+
+  - 46 failed jobs in the window: lotar 30 (t3), standards 12 (t3) plus 2 headless triage jobs ("Authentication required"), local 4.
+  - Each ticket went fix, then @fix-retry seconds later, then the owner question "Retry with which agent, or WontDo?", then an inbox entry and a triage run: 22 inbox entries (INBOX-666 to INBOX-688), all answered "Blocked on LOCA-601".
+  - STD-334 (standards) looped: six failed jobs and three triage runs between 19:25Z and 19:28Z. The triage's hand-back (Todo, @fix) started a new job that failed on the same login, which asked the owner again.
+  - The owner saw "a bunch of failed threads in t3" (chief of staff thread, 2026-11-23 21:04Z).
+
+  DEV-604 already pauses the queue on a commit-signing failure or a full disk, and DEV-740 pauses on a limit line inside an auth_required failure. A plain auth_required failure with no limit line still fails each job.
+
+  ## Check
+
+  Run a job with a runner whose failure is harnessmux kind auth_required (or text "could not authenticate", "Authentication required", "login reached its time limit"): today it ends failed, runs the job_failed rules and asks the owner.
+
+  ## Done when
+
+  - [ ] An auth_required failure from the runner (not an agent message) ends the job paused with that reason, like DEV-604: no failure rule, no retry tag, no owner question.
+  - [ ] While the pause is open, lotar starts no new job for that provider and tries one job again on a schedule; the first success resumes the queue.
+  - [ ] One notice for the owner per pause (not one per ticket); list-jobs shows the pause and its reason.
+  - [ ] A test covers the auth pause and its resume; docs/help/agent.md says what counts.
+tags:
+- health
+- job-paused
+custom_fields:
+  finding: comms:auth-expiry-retry-storm
+history:
+- at: 2026-11-24T16:08:23.439715+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-604","DEV-740"]}'
+- at: 2026-11-24T16:08:27.967807+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:10:51.315165+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:10:51.767707+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f
+- at: 2026-11-24T19:10:54.101873+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:10:54.135862+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:10:55.725562+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ff06e8317883aa88fd31e0eb8d7df2aa53ee9d651f0dbc2a23a0118cdec8a29
+- at: 2026-11-24T21:00:17.729896+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:05:46.187825+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:05:47.944661+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-740"]}'
+    new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836"]}'
+- at: 2026-11-24T21:21:22.252642+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:34:11.304937+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:49:41.079439+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:26:28.092872+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab163d45f911817cfc6f0f956a14a22c5ac52b3c58625de84e773bf21b6bb297b
+- at: 2026-11-24T22:27:00.412861+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

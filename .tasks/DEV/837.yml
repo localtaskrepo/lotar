@@ -1,0 +1,196 @@
+title: 'Proposal: a disk gate in the queue: no new job worktree while free disk is under a floor, idle builds cleaned first'
+status: Reviewing
+priority: High
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T16:34:28.930701+00:00
+modified: 2026-11-24T21:54:18.938505+00:00
+relationships:
+  related:
+  - DEV-623
+  - DEV-762
+  - DEV-767
+  - DEV-812
+  - DEV-815
+  - DEV-604
+comments:
+- date: 2026-11-24T16:34:46.203543+00:00
+  author: claude
+  text: 'Related: DEV-604 pauses the queue once jobs fail on a full disk; this gate holds new jobs before it fills. LOCA-571 (build root on /Volumes/Builds, unblocked today) caps builds with the volume''s quota.'
+- date: 2026-11-24T16:34:46.855550+00:00
+  author: claude
+  text: |-
+    Add a disk gate to lotar's queue (hold new job worktrees under a free-disk floor, clean idle builds first)?
+
+    Options:
+    - yes: Build the disk gate (recommended)
+    - no: Not now
+  question:
+    options:
+    - key: yes
+      label: Build the disk gate
+    - key: no
+      label: Not now
+    recommended: yes
+- date: 2026-11-24T19:11:24.700150+00:00
+  author: mallox
+  text: |-
+    Answer: yes (Build the disk gate)
+
+    (answered in INBOX-695)
+  answer:
+    to: 2026-11-24T16:34:46.855550+00:00
+    choice:
+    - yes
+    note: (answered in INBOX-695)
+- date: 2026-11-24T19:43:31.344492+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T194325.431Z-53 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T194325.431Z-53 why.'
+- date: 2026-11-24T21:07:09.667453+00:00
+  author: claude
+  text: |-
+    Stopped: a second session is already building the disk gate in this worktree, so I left the work to it.
+
+    - Another `claude --resume` session (pid `65196`, started about 6 minutes after mine) is writing the same feature in `.lotar-worktrees/lotar/DEV-837`: its own `crates/lotar-agent/src/services/disk_gate.rs` (`agent.disk_gate.min_free_gb`, its own `disk-gate-<hash>.json` state, cleanup of idle cargo profiles) plus the config changes in `lotar-core`. It overwrote my first draft of the same file.
+    - I removed only my own leftovers in `agent_job_service.rs` (an unused `remove_idle_build_profiles` and the visibility change on `build_output_removable`). I kept `resolve_repo_root`, `resolve_worktree_root`, `resolve_build_root` and `pub mod disk_gate` as `pub(crate)`/declared, because that session's code uses them.
+    - No commit and no checks from me. That session owns the commit, the checks and the hand-off. Status and assignee are unchanged.
+- date: 2026-11-24T21:21:37.940361+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e50ed7331f1c1454dca4b704bafbafba48f76bd1261bfe3101c6502de1904c3 of the job job-20261124T194325.431Z-53 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212137.911Z-94: DEV-837 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:54:03.512983+00:00
+  author: claude
+  text: |-
+    Disk gate built: no new worktree job while free disk is under `agent.disk_gate.min_free_gb` (default 60); idle builds are cleaned first.
+
+    - New `crates/lotar-agent/src/services/disk_gate.rs`, beside the memory gate. It reads the free space of the build root's volume (else the worktree dir's). Only when `agent.worktree.enabled` is on; `min_free_gb: 0` turns it off.
+    - Under the floor it first removes the cargo profiles (folders in `target/` with a `.fingerprint`) of worktrees with no running job and no build or commit for `agent.disk_gate.idle_hours` (default 6), oldest first, until space is back. It never removes worktrees or other files. It checks again at most every 10 min while held.
+    - Still under: entries stay queued (attempts unchanged), `lotar agent queue` / `list-jobs` show `disk_hold` and `waiting for disk space: …`, and the server log names the hold and the removed profiles.
+    - Tests: `dev837_disk_gate_test` (the queue holds with the disk reason), unit tests for the hold ending at the floor, and the cleanup: running and recent worktrees untouched, uncommitted files kept.
+    - Test envs (`tests/common`, `unit_test_environment.rs`, smoke `workspace.ts`) set `LOTAR_DISK_FREE_GB=1000`. Without it `dev604` was held by this Mac's real disk (38 GB free).
+    - Default 60 GB is built in, so it applies on this Mac with no config edit. Also moved a misplaced `memory_gate.settle_seconds` line in `docs/help/config-reference.md`.
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: '745324679'
+      what: disk gate in the queue, idle build cleanup, config, docs, tests
+    checks:
+    - command: cargo nextest run -p lotar-agent --lib -E 'test(disk_gate) | test(agent_queue_service) | test(memory_gate)'
+      result: passed
+    - command: cargo nextest run --test integration -E 'test(dev837) | test(dev623) | test(config_validation) | test(dev604) | test(list_jobs) | test(worktree)'
+      result: passed
+      reason: 66 tests
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites; the Mac had load ~80
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'Merge; once live, watch ''lotar agent queue'' for disk_hold: the Mac had 38-63 GB free today, under the 60 GB floor'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e50ed7331f1c1454dca4b704bafbafba48f76bd1261bfe3101c6502de1904c3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65e86708fd02583215565a3ac4f491a402a9da97617e83ef5e45676fece55760
+description: |-
+  Each open lotar ticket keeps a job worktree with its own Rust target/ of 4 to 14 GB. On 2026-11-24, 46 such worktrees held 168 GB, and free disk fell from 301 GB to 181 GB in two days (about 65 GB a day). At that pace the Mac drops under the live disk check's 50 GB floor in about two days and fills in about three; the last time it filled was 2026-11-17. The queue already holds jobs while memory is short (DEV-623) but starts jobs regardless of free disk. Found by reliability (2026-11-24).
+
+  ## Evidence
+  - `du -sh ~/Development/@localtaskrepo/.lotar-worktrees/lotar/*`: 46 worktrees with target/, largest DEV-767 14 GB, DEV-815 8.7 GB, DEV-812 7.0 GB. Of those tickets 18 are Reviewing, 8 Blocked, 7 Merging, 4 InProgress, 11 Done.
+  - `df -h /System/Volumes/Data`: 181 GB free on 2026-11-24, 301 GB on 2026-11-22 (standards docs/evidence/reliability.md).
+  - repos.ts --fix removes cargo profiles only from worktrees idle for a day (STD-111), and the live disk check only alerts (local, MIN_FREE_GB 50). With this many open tickets moving every day, neither keeps up.
+  - The build root (DEV-762, on in LOCA-571) moves builds to /Volumes/Builds in the same APFS container: it caps builds with the volume's quota but doesn't slow the growth.
+
+  ## Proposal
+  - A disk gate next to the memory gate: the queue starts no job that creates a worktree while free space on the worktree's volume (the build root's when set) is under a configured floor, e.g. `agent.queue.min_free_disk_gb` (default 60). It holds the job with a reason in the queue and the server log, the same way `memory_hold` does.
+  - Under the floor, before holding, it removes cargo profiles from worktrees of tickets with no running job for at least 6 hours, oldest first (what repos.ts does after a day). It never removes the worktree itself or uncommitted work.
+
+  ## Cost
+  - One lotar fix job of medium size: reuse the memory gate's hold path, plus one cleanup function and its tests.
+  - Jobs wait while the disk is low instead of filling it. A cleaned worktree's next job rebuilds, with sccache warm.
+
+  ## Done when
+  - [ ] With free disk under the floor, `lotar agent queue --format json` shows the next job held with a disk reason, and it starts once space is back.
+  - [ ] The cleanup frees cargo profiles of idle worktrees first, and a test shows a worktree with a running job stays untouched.
+  - [ ] Config and docs name the floor; the default is set on this Mac.
+tags:
+- proposal
+- job-paused
+history:
+- at: 2026-11-24T16:34:29.644380+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815"]}'
+- at: 2026-11-24T16:34:46.203543+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:34:46.499612+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815"]}'
+    new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604"]}'
+- at: 2026-11-24T16:34:46.855550+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:11:24.700150+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:11:25.305514+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T19:43:28.458346+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T19:43:28.945044+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e50ed7331f1c1454dca4b704bafbafba48f76bd1261bfe3101c6502de1904c3
+- at: 2026-11-24T19:43:31.306564+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: proposal
+    new: proposal, job-paused
+- at: 2026-11-24T19:43:31.344492+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:43:33.199322+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65e86708fd02583215565a3ac4f491a402a9da97617e83ef5e45676fece55760
+- at: 2026-11-24T21:07:09.667453+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:21:37.940361+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:54:03.512983+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:54:18.938505+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

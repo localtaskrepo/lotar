@@ -1,0 +1,137 @@
+title: Design inline transcript review on the ticket timeline
+status: Reviewing
+priority: Medium
+type: Research
+reporter: codex
+assignee: '@review-light'
+created: 2026-11-24T20:22:35.470403+00:00
+modified: 2026-11-24T21:25:15.256454+00:00
+relationships:
+  related:
+  - DEV-849
+  - DEV-791
+comments:
+- date: 2026-11-24T20:22:41.002771+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T202237.090Z-4 (research) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T202237.090Z-4 why.'
+- date: 2026-11-24T21:13:46.592765+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c of the job job-20261124T202237.090Z-4 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T211346.387Z-92: DEV-850 goes back to @research, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:24:56.947275+00:00
+  author: claude
+  text: |-
+    Recommendation: read the harnessmux `v:1` event log through a paged reader by job id, loaded on expand, with a typed transcript reference in the job log.
+
+    - Write-up: `docs/research/inline-transcript-review.md` (commit `ed765c1a0`)
+    - Today the job log names its session only in free text. Session names are reused after handoffs (DEV-791), and turns carry no job id, so the right turn of a reused session can only be found by time window (checked on ASP-18 review/merge, session `autospec-c2ad4b-ASP-18-review`, turns 1 and 2)
+    - harnessmux events are documented and the same for Claude, Codex and T3 ([README](https://github.com/localtaskrepo/harnessmux#events), v0.3.0). Native Claude and Codex files are internal, and Claude deletes them after 30 days ([settings](https://code.claude.com/docs/en/settings-reference)), so lotar shouldn't parse them
+    - `Session::send` returns the turn, so lotar can record `{session, agent_session, turn, format, link}` when it sends
+    - New `GET /api/jobs/transcript?id=&after=&limit=`: job id only, never a path, reading only the harnessmux sessions dir. `/api/jobs/logs` stays light
+    - T3 jobs show the replies from the harnessmux log plus Open in T3 (the recorded thread link)
+    - States: loading, expired (summary, commits and checks stay), offline/other machine, unsupported `v`
+    - Not checked: Codex session reuse (no multi-turn Codex session exists); the T3 thread where this was asked was not found
+    - Cost: one ticket, about 3 agent runs (Rust reader and API, UI section, smoke test); no money; low upkeep (one documented format)
+    - harnessmux keeps sessions forever (188 MB after 9 days here): a harnessmux topic, not filed
+  report:
+    commits:
+    - hash: ed765c1a0
+      what: research write-up docs/research/inline-transcript-review.md
+    checks:
+    - command: npx prettier --check docs/research/inline-transcript-review.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: documentation only
+    next: Ravi picks load on expand or prefetch; then file the implementation ticket from the doc's Smallest slice
+- date: 2026-11-24T21:24:58.053239+00:00
+  author: claude
+  text: |-
+    Should a run's conversation load only when you open it, or should the latest run's also preload?
+
+    Options:
+    - expand: Load on open only (recommended)
+    - prefetch: Also preload the latest run
+  question:
+    options:
+    - key: expand
+      label: Load on open only
+    - key: prefetch
+      label: Also preload the latest run
+    recommended: expand
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
+description: |-
+  Ravi asked on 2026-11-24 to use the LoTaR ticket timeline to review the full chain of work across T3 and headless harnessmux jobs. Keep ticket files small by storing references to transcripts and showing the original text in the UI when someone opens a job. Figure out what that should feel like on a phone and what the links can reliably resolve.
+
+  ## What to investigate
+
+  - Use the existing timeline and job log reader as the starting point. Sketch how fix, review, rework and merge attempts would show their outcome, checks, review findings and commit or diff. Show how someone expands a phase to read the conversation and opens the source in T3 when available.
+  - Compare extending existing job and session references with adding a typed transcript reference. Check what identity is already recorded for T3, harnessmux events, Claude Code and OpenAI Codex. Determine whether source kind and format version are enough to choose a reader, and how to identify the exact job or turn when one session serves several attempts. Verify on real retained examples.
+  - Compare loading on expand with limited prefetch for visible details. Evaluate reuse of the authenticated job log endpoint and a bounded, paged reader for other sources. Show loading, expired, offline and unsupported-format states. Keep the timeline useful if the source is unavailable and keep raw transcript data in its existing store.
+  - Check existing retention and access rules. Recommend which compact phase details should remain after logs expire, how mobile reaches a transcript on the machine that owns it, and how the reader limits transcript resolution to known sources. Treat Open in T3 as a link to an existing thread. Evaluate selective import separately as a way to continue a finished headless session.
+
+  ## Done when
+
+  - [ ] Record a recommendation, with source links and a mobile-sized sketch of a ticket with T3 and headless jobs. Show a collapsed phase, an expanded conversation and a missing transcript.
+  - [ ] Exercise the existing read paths on one T3 job and retained Claude Code and Codex headless examples, or record exactly which source could not be verified. Include a reused session and explain how the view gets the right turn.
+  - [ ] Recommend the smallest implementation slice and identify any open choice for Ravi. This ticket is for research and design. Implementation gets its own ticket once the approach is agreed.
+
+  Start with the ticket timeline in `view/components/task-panel/TaskPanelTimelineTab.vue`, job logs in `view/pages/AgentJobs.vue`, and `lotar task timeline <ID> --threads`. DEV-849 covers reciprocal links and live T3 state.
+tags:
+- agent
+- ui
+- job-paused
+history:
+- at: 2026-11-24T20:22:36.316999+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@research'
+- at: 2026-11-24T20:22:38.453484+00:00
+  actor: codex
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T20:22:38.649771+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
+- at: 2026-11-24T20:22:40.973755+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, job-paused
+- at: 2026-11-24T20:22:41.002771+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:13:46.592765+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:24:56.947275+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:24:57.417432+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849"]}'
+    new: '{"related":["DEV-849","DEV-791"]}'
+- at: 2026-11-24T21:24:58.053239+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:25:15.256454+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@research'
+    new: '@review-light'

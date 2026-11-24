@@ -1,0 +1,631 @@
+title: Smoke test 'reports the whole stderr of a child that exits before ready' passes without the stderr wait it guards
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-23T04:07:55.489110+00:00
+modified: 2026-11-24T19:22:11.651116+00:00
+relationships:
+  depends_on:
+  - DEV-788
+  - local:LOCA-601
+  related:
+  - DEV-788
+  - DEV-832
+comments:
+- date: 2026-11-23T06:57:08.693767+00:00
+  author: claude
+  text: |-
+    Waits for DEV-788 to merge: the test and the stderr wait this ticket fixes aren't on main yet.
+
+    - `stderrClosed` and the 'whole stderr' test exist only in `830fe5ba3` on `agent/DEV-788` (DEV-788 is Merging); `git log --all -S stderrClosed` finds nothing on `main`
+    - `agent/DEV-824` is at main (`928cc5a19`) with no commits, so there is nothing to change yet
+    - Next: once DEV-788 lands, rebase onto main, make the test fail without the wait (child that keeps writing stderr after `exit`, e.g. a grandchild holding the pipe) or reword it as a plain regression check
+- date: 2026-11-23T09:32:11.973300+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T093203.359Z-135 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T093203.359Z-135 why.'
+- date: 2026-11-23T18:34:55.237497+00:00
+  author: automation
+  text: The fix agent's job job-20261123T183436.612Z-403 failed (lotar agent logs job-20261123T183436.612Z-403); @fix-retry retries it on branch agent/DEV-824.
+- date: 2026-11-23T18:35:15.996636+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T183456.692Z-404 failed again (lotar agent logs job-20261123T183456.692Z-404). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T18:36:22.016938+00:00
+  author: triage
+  text: |-
+    Blocked on LOCA-601: Claude login expired before either job could work.
+
+    - Jobs `job-20261123T183436.612Z-403` and `job-20261123T183456.692Z-404` both report “this login reached its time limit and cannot be renewed”; neither tested or changed this fix.
+    - Shared prerequisite: `local:LOCA-601` tracks restoring authentication and verifying a fresh job. No duplicate retry question or sign-in ticket.
+    - Infrastructure rule: `standards/docs/decisions/2026-11-15-inbox-triage.md` (owner, 2026-11-15). DEV-824 resumes through Prerequisites done when LOCA-601 is done.
+- date: 2026-11-23T18:36:22.943948+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T18:36:25.970003+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-824 yet. DEV-824 waits for local:LOCA-601.'
+- date: 2026-11-24T16:03:06.914251+00:00
+  author: claude
+  text: |-
+    Duplicate session (33df6b) stepped aside: another DEV-824 job (1e22e5) works in the same worktree (DEV-832).
+
+    - Rebased `agent/DEV-824` onto main (`d4bdbbbf6`, DEV-788 landed); no commit from this session
+    - Finding for the test: a grandchild that writes stderr after the child's exit only makes the test fail without `stderrClosed` if it is `.unref()`ed; without that, `node -e` waits for the grandchild, so 'exit' comes after the line (checked: passed 3/3 with the wait removed)
+    - Briefly removed the wait in `smoke/helpers/server.ts` to check, then `git checkout` restored it; told 1e22e5 its runs from 08:01 to 08:03 may not have had the wait
+- date: 2026-11-24T16:06:42.168435+00:00
+  author: claude
+  text: |-
+    The whole-stderr test now fails without the stderr wait and passes with it.
+
+    - `smoke/tests/harness.server.smoke.spec.ts`: the child starts a grandchild with `.unref()` that keeps the stderr pipe and writes `last stderr line` 300 ms later, then the child exits with code 3. The line always arrives after `exit`. The busy-loop is gone.
+    - Without `.unref()` the child stays alive until the grandchild exits, so the test still passed without the wait. The other DEV-824 job found this too.
+    - I removed `await stderrClosed(child.stderr)` (`smoke/helpers/server.ts:267`): the test failed 4/4 times. With the call back in, it passed every time.
+    - A second DEV-824 job ran in this worktree at the same time (`git rebase main`, brief edits to `server.ts`). It stepped aside, and I redid the checks after it stopped.
+    - Homebrew node 26.13.1_3 broke for a few minutes (`libsimdutf.38.dylib` missing). It works again with 26.13.1_4.
+  report:
+    commits:
+    - hash: 8515dca83
+      what: whole-stderr test uses an unref'd grandchild that writes stderr after the child exits
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t 'whole stderr' (stderrClosed call removed)
+      result: failed
+      reason: expected, 4/4 runs fail without the wait
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts
+      result: passed
+      reason: 15 passed, 5 skipped
+    - command: npx prettier --write + npx oxlint + tsc -p smoke/tsconfig.json + pre-commit hook
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: smoke-test-only change; the merge runs the full suites
+- date: 2026-11-24T16:14:06.219160+00:00
+  author: claude
+  text: |-
+    Resumed job: the fix was already committed; rechecked, ready to merge.
+
+    - `agent/DEV-824` is on main (`d4bdbbbf6`, DEV-788) plus `8515dca83`, signed, worktree clean
+    - The 'whole stderr' test passes again with the wait in place; the 4/4 failures without it are in the comment before this one
+  report:
+    commits:
+    - hash: 8515dca83
+      what: whole-stderr test uses an unref'd grandchild that writes stderr after the child exits
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t 'whole stderr'
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: smoke-test-only change; the merge runs the full suites
+    next: Merge agent lands agent/DEV-824 on main
+- date: 2026-11-24T16:19:54.760233+00:00
+  author: claude
+  text: |-
+    Duplicate run: stood down, a parallel session owns this ticket's work
+
+    - At 08:18 two Claude sessions ran in the `DEV-824` worktree: one resumed `19904ba2…` (made `8515dca83`, a grandchild holds stderr after the child exits), mine started fresh
+    - The other one was temporarily removing `stderrClosed` from `smoke/helpers/server.ts` for its without-wait check, so a second run of that check would corrupt both results
+    - I changed no files, status or assignee; that session's hand-off comment carries the checks
+    - `lotar agent list-jobs` lists no DEV-824 job, so whatever started both sessions isn't visible there
+- date: 2026-11-24T16:20:00.594651+00:00
+  author: claude
+  text: |-
+    Done: the whole-stderr test now fails without the stderr wait; rechecked, ready to merge.
+
+    - `agent/DEV-824` = main (`d4bdbbbf6`, DEV-788) + `8515dca83`, signed, worktree clean
+    - With `await stderrClosed(child.stderr)` removed: `AssertionError: expected false to be true` (line lost); restored with `git checkout`
+    - With it: `harness.server.smoke.spec.ts` 15 passed, 5 skipped
+  report:
+    commits:
+    - hash: 8515dca83
+      what: whole-stderr test uses an unref'd grandchild that writes stderr after the child exits
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts
+      result: passed
+    - command: same test with stderrClosed removed from smoke/helpers/server.ts:267
+      result: passed
+      reason: test fails as intended
+    - command: npx prettier --check smoke/tests/harness.server.smoke.spec.ts
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: smoke-test-only change, the merge runs the full suites
+    next: Merge agent/DEV-824 onto main
+- date: 2026-11-24T16:20:49.852977+00:00
+  author: claude
+  text: |-
+    The 'whole stderr' test now fails without the stderr wait: 3/3 red with it removed, green with it.
+
+    - `smoke/tests/harness.server.smoke.spec.ts:196`: the child spawns an unref'd grandchild that inherits its stderr and writes `last stderr line` 300 ms after the child exits, so the line always comes after `exit`
+    - Replaces the busy-loop that hoped to reorder `exit` and the last output, which passed without the wait
+    - Without `stderrClosed(child.stderr)` (`smoke/helpers/server.ts:267`): `AssertionError: expected false to be true` on the `endsWith('last stderr line')` check, 3 of 3 runs; file restored after
+    - Branch is on main `d4bdbbbf6` (DEV-788 landed), one signed commit `8515dca83`
+  report:
+    commits:
+    - hash: 8515dca83
+      what: the 'whole stderr' test writes its last stderr line from a grandchild after the child exits
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t 'whole stderr'
+      result: passed
+    - command: same test with stderrClosed removed from smoke/helpers/server.ts:267
+      result: failed
+      reason: as intended, 3/3 runs
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts
+      result: passed
+    - command: npx prettier --check, npx oxlint, tsc --project smoke/tsconfig.json
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: smoke-test-only change, the merge runs the full suites
+    next: Merge agent lands agent/DEV-824
+- date: 2026-11-24T16:22:44.610180+00:00
+  author: claude
+  text: |-
+    Ready to merge: the fix was already committed, and I reran the test and it passes.
+
+    - `agent/DEV-824` = main `d4bdbbbf6` + signed `8515dca83`, worktree clean
+    - `Blocked` came from triage when the Claude login expired (LOCA-601), not from this work
+  report:
+    commits:
+    - hash: 8515dca83
+      what: whole-stderr test uses an unref'd grandchild that writes stderr after the child exits
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t 'whole stderr'
+      result: passed
+    - command: same test with stderrClosed removed
+      result: passed
+      reason: fails 3/3 and 4/4 in earlier runs, as intended
+    - command: npm run lint
+      result: not_run
+      reason: smoke spec change only, merge runs full suites
+    - command: npm test
+      result: not_run
+      reason: merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it
+    next: Merge agent/DEV-824 (main d4bdbbbf6 + 8515dca83)
+- date: 2026-11-24T16:22:51.627912+00:00
+  author: claude
+  text: |-
+    Rechecked the committed fix: ready to merge, no new changes.
+
+    - `agent/DEV-824` = main (`d4bdbbbf6`) + `8515dca83`, signed, worktree clean
+    - The 'whole stderr' test fails without `await stderrClosed(child.stderr)` (`smoke/helpers/server.ts:267`, 2/2) and passes with it; file restored by `git checkout`
+    - The first of 16 runs of `smoke/tests/harness.server.smoke.spec.ts` had 1 failing test that I didn't capture; the next 15, 6 of them in parallel, passed. It didn't happen again, so I couldn't name the test or move it to the `wall-clock` group
+  report:
+    commits:
+    - hash: 8515dca83
+      what: whole-stderr test uses an unref'd grandchild that writes stderr after the child exits
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts
+      result: passed
+      reason: 15/15 in 15 of 16 runs, 6 of them in parallel
+    - command: same, -t 'whole stderr', with stderrClosed removed
+      result: failed
+      reason: as intended, 2/2
+    - command: npx prettier --check smoke/tests/harness.server.smoke.spec.ts
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs full suites
+    - command: npm test
+      result: not_run
+      reason: merge runs full suites
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs full suites
+    next: Merge agent/DEV-824
+- date: 2026-11-24T16:29:57.261636+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407c3f9676139a742d5087dd00d92dfdeb03e90e4a5758d968f4d8f5069ee2c3 of the job job-20261123T153349.268Z-334 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T162957.243Z-11: DEV-824 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:30:00.175045+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75b26bcd17159302a0448d21e563fe48a08afe603190d593e4a5b8ab020bec88 of the job job-20261123T143334.995Z-299 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407c3f9676139a742d5087dd00d92dfdeb03e90e4a5758d968f4d8f5069ee2c3 that the job job-20261124T162957.243Z-11 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:01.530074+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A195a7873dda235a4d982e3de530ac501bb490713a8d7b36e787545ab51666004 of the job job-20261123T133258.127Z-266 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407c3f9676139a742d5087dd00d92dfdeb03e90e4a5758d968f4d8f5069ee2c3 that the job job-20261124T162957.243Z-11 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:03.239391+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa47d924f17f42c9562036895c90b404b560afd0540c1fd9ccd41357376e7aef7 of the job job-20261123T103213.049Z-168 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407c3f9676139a742d5087dd00d92dfdeb03e90e4a5758d968f4d8f5069ee2c3 that the job job-20261124T162957.243Z-11 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:05.425347+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9183159929a72f8b9fd25d156524de1b1628ac399b6f7846978613cef8656bd of the job job-20261123T093203.359Z-135 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407c3f9676139a742d5087dd00d92dfdeb03e90e4a5758d968f4d8f5069ee2c3 that the job job-20261124T162957.243Z-11 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:04:39.127515+00:00
+  author: claude
+  text: |-
+    Review: passed. The test now fails without the stderr wait and passes with it, as "Done" asks.
+
+    - Reviewed: `8515dca83`, the only commit in `main..agent/DEV-824`. It changes only `smoke/tests/harness.server.smoke.spec.ts`: an unref'd grandchild holds the stderr pipe and writes `last stderr line` 300 ms after the child exits. The busy-loop is gone.
+    - With `await stderrClosed(child.stderr)` removed from `smoke/helpers/server.ts:267`, `npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t 'whole stderr'` failed 3 of 3 runs (`expected false to be true`). With the call back, it passed 3 of 3. I restored the file with `git checkout`; the worktree is clean.
+    - The whole spec file passed 3 of 3 runs (15 passed, 5 skipped).
+    - The timing margin is wide: `STDERR_DRAIN_MS` is 5 s against the grandchild's 300 ms, so this test shouldn't flake under load.
+    - `npm ci`, `prettier --check`, `oxlint` and `tsc --project smoke/tsconfig.json` on the file passed.
+    - Main has no newer commits to `server.ts` or the spec since `d4bdbbbf6` (DEV-788). There is no second branch, no stray file, and no owner decision involved. Not UI work.
+    - I didn't run the full `npm run lint`, `npm test` or `npm run smoke`; the merge runs them. No tickets filed.
+- date: 2026-11-24T17:35:12.080928+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T17:04Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T19:22:11.651116+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+       Compiling notify v8.2.2
+       Compiling clap_complete v4.6.11
+       Compiling predicates-core v1.0.10
+       Compiling rustls-webpki v0.103.16
+       Compiling pulldown-cmark v0.13.6
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-824/crates/lotar-web-assets)
+       Compiling include_dir v0.7.4
+       Compiling difflib v0.4.0
+       Compiling termtree v0.5.1
+       Compiling wait-timeout v0.2.1
+       Compiling rustls v0.23.46
+       Compiling predicates v3.1.4
+       Compiling predicates-tree v1.0.13
+       Compiling assert_cmd v2.2.2
+       Compiling serde_with v3.24.0
+       Compiling serde_yaml_ng v0.10.0
+       Compiling ureq v3.5.1
+       Compiling agent-client-protocol-schema v1.17.0
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-824/crates/lotar-core)
+       Compiling agent-client-protocol v5.2.0
+       Compiling harnessmux v0.3.0
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-824/crates/lotar-tasks)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-824)
+        Finished `dev` profile [unoptimized] target(s) in 41.27s
+    ────────────
+     Nextest run ID 5aa33d10-4c74-4c77-80cf-890e80a5f46e with nextest profile: default
+        Starting 2488 tests across 14 binaries
+    ────────────
+         Summary [ 232.842s] 2488 tests run: 2488 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmp8DDUxT
+    ```.
+
+    - Rebased `agent/DEV-824` onto `main` (`855ff6f4628f`): `aa90b5b78a84`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa69cbbdd2a44b55d844c8a5f39390563a2376a0791d8fb6760d688388011248d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9183159929a72f8b9fd25d156524de1b1628ac399b6f7846978613cef8656bd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa47d924f17f42c9562036895c90b404b560afd0540c1fd9ccd41357376e7aef7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae25e58393d98747569e9034a3a2d601be435299164e536b6fcb36317e79455f5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac375e64ffc4ffb9f3fa04fcf10d276e55996ec3f0d03737557897b7ca0e72a77
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A195a7873dda235a4d982e3de530ac501bb490713a8d7b36e787545ab51666004
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75b26bcd17159302a0448d21e563fe48a08afe603190d593e4a5b8ab020bec88
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407c3f9676139a742d5087dd00d92dfdeb03e90e4a5758d968f4d8f5069ee2c3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7c444f3c07b08ad77fc5f563a003f23752800594cbb02716cf91791739c56b13
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Affda45e3048e5d634241bc902b9629de1ed00f8394caeeff9421234739b70cb3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2bedcc571ade6a085bbf5786d2a3a74b8b66ed4ff28def6e122e3e4d5ed859ba
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d99e2afbdb832004d993b34b5cb169d42a5559a91561d24175231307c14c7db
+description: 'Found: reviewing DEV-788 (commit 830fe5ba3). The new test in smoke/tests/harness.server.smoke.spec.ts:196 passes 3/3 with the stderrClosed(child.stderr) call in smoke/helpers/server.ts:267 removed, so it does not show the exit-before-stderr race it names. The fix agent said so too. Check: remove that call, run npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t ''whole stderr''. Done: the test fails without the wait (for example a child whose stderr pipe is still written after its exit), or the test is reworded as a plain regression check.'
+tags:
+- health
+- job-paused
+- fix-retried
+custom_fields:
+  finding: review:DEV-788-stderr-test
+history:
+- at: 2026-11-23T04:08:07.972937+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-788"]}'
+- at: 2026-11-23T04:08:20.357098+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T06:56:40.072404+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T06:56:42.534444+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa69cbbdd2a44b55d844c8a5f39390563a2376a0791d8fb6760d688388011248d
+- at: 2026-11-23T06:57:08.189578+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-788"]}'
+    new: '{"depends_on":["DEV-788"],"related":["DEV-788"]}'
+- at: 2026-11-23T06:57:08.647927+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-23T06:57:08.693767+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:57:16.828042+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-23T08:23:12.073487+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, waits
+    new: health
+- at: 2026-11-23T09:32:07.238546+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-23T09:32:08.696618+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9183159929a72f8b9fd25d156524de1b1628ac399b6f7846978613cef8656bd
+- at: 2026-11-23T09:32:11.896533+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-23T09:32:11.973300+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:32:18.962380+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa47d924f17f42c9562036895c90b404b560afd0540c1fd9ccd41357376e7aef7
+- at: 2026-11-23T11:32:30.214827+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae25e58393d98747569e9034a3a2d601be435299164e536b6fcb36317e79455f5
+- at: 2026-11-23T12:32:42.264613+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac375e64ffc4ffb9f3fa04fcf10d276e55996ec3f0d03737557897b7ca0e72a77
+- at: 2026-11-23T13:33:30.334421+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A195a7873dda235a4d982e3de530ac501bb490713a8d7b36e787545ab51666004
+- at: 2026-11-23T14:33:44.834450+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75b26bcd17159302a0448d21e563fe48a08afe603190d593e4a5b8ab020bec88
+- at: 2026-11-23T15:33:59.805298+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407c3f9676139a742d5087dd00d92dfdeb03e90e4a5758d968f4d8f5069ee2c3
+- at: 2026-11-23T16:34:15.350390+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7c444f3c07b08ad77fc5f563a003f23752800594cbb02716cf91791739c56b13
+- at: 2026-11-23T17:34:32.012856+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Affda45e3048e5d634241bc902b9629de1ed00f8394caeeff9421234739b70cb3
+- at: 2026-11-23T18:34:50.904936+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2bedcc571ade6a085bbf5786d2a3a74b8b66ed4ff28def6e122e3e4d5ed859ba
+- at: 2026-11-23T18:34:53.823056+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, job-paused
+    new: health, job-paused, fix-retried
+- at: 2026-11-23T18:34:55.237497+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:35:12.919307+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d99e2afbdb832004d993b34b5cb169d42a5559a91561d24175231307c14c7db
+- at: 2026-11-23T18:35:14.861564+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T18:35:15.996636+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:21.223613+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-788"],"related":["DEV-788"]}'
+    new: '{"depends_on":["DEV-788","local:LOCA-601"],"related":["DEV-788"]}'
+- at: 2026-11-23T18:36:22.016938+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:22.644747+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T18:36:22.911238+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T18:36:22.943948+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:25.970003+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:52.477443+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:02:55.032230+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-788","local:LOCA-601"],"related":["DEV-788"]}'
+    new: '{"depends_on":["DEV-788","local:LOCA-601"],"related":["DEV-788","DEV-832"]}'
+- at: 2026-11-24T16:03:06.914251+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:06:42.168435+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:14:06.219160+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:54.760233+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:20:00.594651+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:20:49.852977+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:22:44.610180+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:22:51.627912+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:57.189258+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:29:57.261636+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:00.175045+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:01.530074+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:03.239391+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:03.355611+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T16:30:05.425347+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:13.295082+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T17:04:39.127515+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:54.903224+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T17:35:09.744777+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-24T17:35:10.247221+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-24T17:35:12.080928+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:22:11.651116+00:00
+  actor: automation
+  changes:
+  - field: comment_added

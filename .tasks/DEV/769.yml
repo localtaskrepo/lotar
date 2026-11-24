@@ -1,10 +1,11 @@
 title: 'Agent job log viewer: filters, search, folded tool calls, live status line, and jobs list filters'
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
+assignee: '@fix'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-21T20:47:26.918055+00:00
+modified: 2026-11-24T22:51:31.046260+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -12,6 +13,110 @@ relationships:
   related:
   - harnessmux:HARN-15
   - DEV-768
+  - DEV-832
+  - DEV-836
+  - DEV-849
+  - DEV-859
+  - DEV-774
+comments:
+- date: 2026-11-24T19:37:14.500501+00:00
+  author: automation
+  text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-769 yet. Agent job job-20261124T193713.829Z-21 is queued: it is waiting for a free slot (4 of DEV''s agent.worktree.max_parallel_jobs 3 running).'
+- date: 2026-11-24T19:41:54.383033+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T193713.829Z-21 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T193713.829Z-21 why.'
+- date: 2026-11-24T21:02:56.736325+00:00
+  author: claude
+  text: |-
+    Picked up: building the log viewer in `view/utils/agentJobLog.ts` (grouping, filters) and `AgentJobLog.vue`.
+
+    - Filters: one-click views **All · Conversation · Tools · lotar · Problems** with counts, plus a **Thinking** toggle (off by default), and a search. Kept per viewer in `localStorage`.
+    - Question entries today carry only `<command> (Yes, No)`; the viewer splits command and options. No tool name is logged for a question, so that part stays as it is (backend change, not in this job).
+    - Jobs list: search (ticket ID, title, last message), agent and runner selects. The ticket filter is the search box (a ticket ID matches).
+- date: 2026-11-24T21:04:04.704108+00:00
+  author: claude
+  text: |-
+    Started: DEV-766 and DEV-767 are in main, building the viewer now.
+
+    - Grouping and filters go in a new `view/utils/agentJobLog.ts`, rendered by `view/components/AgentJobLog.vue`
+    - Filter: one view at a time (All, Conversation, Tools, lotar, Problems) so each is one click, plus a Thinking toggle, off by default
+    - A question shows the tool call that asked for permission: harnessmux sends no tool with the request, so the log takes the newest unfinished call before it
+- date: 2026-11-24T21:08:00.591005+00:00
+  author: claude
+  text: |-
+    Stopped this session: a second Claude session works on DEV-769 in the same worktree. This is the duplicate resume of DEV-832/DEV-836.
+
+    - I found it when it overwrote my `view/utils/agentJobLog.ts`. The two sessions were writing the same files.
+    - I handed the worktree to the other session by message and stopped editing. I made no commits and changed neither status nor assignee.
+    - My uncommitted files are left for it to reuse or delete: `view/components/AgentJobLogCall.vue`, `AgentJobLogRow.vue`, `AgentJobLogText.vue`, and my rewrite of `AgentJobLog.vue` (13:07), which may have replaced its version.
+    - My earlier plan comment is only a proposal. The other session's work decides the design.
+- date: 2026-11-24T21:19:38.228649+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655 of the job job-20261124T193713.829Z-21 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:37:17.047788+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655 of the job job-20261124T193713.829Z-21 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T213716.934Z-37: DEV-769 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T22:00:38.717599+00:00
+  author: claude
+  text: |-
+    Done: the job log viewer has views, search, folded tool calls, a live status line and a result card; the jobs list has filters.
+
+    - Log views (All, Conversation, Tools, lotar, Problems) and a Thinking chip, remembered per viewer; search highlights matches, also in tool output
+    - Tool calls between messages fold into one row (`3 commands · 1 read · 1 failed`); a failed call opens with its output, ANSI stripped; setup notes fold into one row
+    - Running job: live line (`Running <cmd> · 42s`, context %), Jump to latest; one result card at the end; questions show the call that asked
+    - Log header: Instructions button, `Link` to `/agents?job=<id>`, Full height. The link also waits for a job that joins the list later
+    - Jobs list: search, agent/runner and ticket filters
+    - New: `view/utils/agentJobLog.ts`, `view/components/AgentJobToolCall.vue`; tests `view/__tests__/AgentJobLog.spec.ts`, `agentJobLogLayout.spec.ts`, smoke test in `smoke/tests/ui.agent-jobs.smoke.spec.ts`
+    - Smoke fix on the side: two tests in that `describe.concurrent` file used the global `expect.poll` and failed about half the time; they now take `expect` from the test
+    - DEV-849 adds `AgentT3Thread` to the log panel; I told it to put it in the `#actions` slot next to `AgentRunInputs`. Whichever lands second rebases
+    - No guidance correction
+  report:
+    commits:
+    - hash: bdfe13fd9
+      what: log viewer views, search, folded tool calls, live line, result card, jobs list filters
+    checks:
+    - command: npx vitest run --config view/vitest.config.ts
+      result: passed
+      reason: 142 files, 1585 tests
+    - command: npm run test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts smoke/tests/ui.task-timeline
+      result: passed
+      reason: 15 tests, 3 runs in a row
+    - command: prettier --check, oxlint, eslint, vue-tsc, tsc -p smoke on the changed files
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: targeted lint only; the merge runs the full suites
+    - command: npm test (Rust nextest)
+      result: not_run
+      reason: no Rust changes; the merge runs it
+    - command: npm run smoke (full)
+      result: not_run
+      reason: targeted smoke files only; the merge runs it
+    - command: ui-review screenshots (themes, dark mode, phone width)
+      result: not_run
+      reason: not taken in this job
+    - command: 'Done when: a real Claude review log in the viewer'
+      result: not_run
+      reason: no real log checked, only fixtures
+    next: Open a real Claude review job at /agents?job=<id> on a phone and in dark mode, and check the folded tool calls and the live line
+- date: 2026-11-24T22:36:33.460718+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T22:00Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T22:51:20.294352+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code works, but the ticket has no UI screenshots attached, and both the plan and the ui-review rule require them.
+
+    - **Missing screenshots:** the ticket has no attachments (`lotar --format json show DEV-769`: `attachments` is empty). The plan asks for "before and after screenshots attached", in light and dark mode, at 1920, 1440 and 390 px. Fix: take them of `/agents` with a log open (All, Problems and an open Tools group) and of the task panel thread, then attach them.
+    - **Invalid CSS** (fix it in the rework): `view/components/AgentJobLog.vue:612` `margin: 0 6px 4px calc(max-content);` is invalid, so the browser drops the whole line. Fix: give it a real left margin or delete the line.
+    - **Done when, verification limit:** real Claude logs show every call as `Run Terminal` without its command, because the running lotar 0.15.6 does not include DEV-774 (`504d8b538`, no release yet). This is not a bug in this change. The "see which commands ran" part can only be checked once a release with DEV-774 records a job. Say so in the hand-off.
+    - **Reran:** `npm ci` passed. `npm run test:ui:agent` on the four AgentJob specs passed (52 tests). `npm run lint:frontend`, `oxlint`, `eslint` and `prettier --check` on the changed files passed. `test:smoke:quick:agent smoke/tests/ui.agent-jobs.smoke.spec.ts` passed (14 tests) after `build:web` and `cargo build --bins`.
+    - **My screenshots:** I served the worktree build on a copy of `.tasks` with automation removed, then opened two real Claude jobs (`job-20261124T173855.041Z-13`, a review; `job-20261123T054906.949Z-70`, a failed merge) in light and dark mode at 1920, 1440 and 390 px. The views, counts, folded groups, the failed call opening with its output, the result card, `/agents?job=` and the 390 px layout all look right. There were no console errors.
+    - **Scope:** the diff matches the plan. No stray files; the other session's `AgentJobLogCall.vue`, `AgentJobLogRow.vue` and `AgentJobLogText.vue` are not in the commit. The plan's checkboxes are still unticked.
+    - **Filed:** [DEV-859](https://lotar.pyxzl.net/task/DEV-859). A search match inside a call's output is counted but stays hidden in the folded call.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
 description: |-
   The job log viewer (`view/components/AgentJobLog.vue`, used by `view/pages/AgentJobs.vue` and the task panel thread in `view/components/task-panel/TaskPanelTimelineTab.vue`) is one flat list with no filter or search. The owner asked on 2026-11-21 to "look at some of the project logs to see what else could maybe be done to make it easier to understand what's going [on], how to filter down to the data you need, and be smart about the UI and UX".
 
@@ -43,6 +148,8 @@ description: |-
 tags:
 - ui
 - web-ui
+- job-paused
+- review-returned
 history:
 - at: 2026-11-21T20:47:26.221887+00:00
   actor: claude
@@ -56,3 +163,137 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15"]}'
     new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768"]}'
+- at: 2026-11-24T19:37:13.392849+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:37:14.500501+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:41:50.642837+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T19:41:51.736169+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
+- at: 2026-11-24T19:41:54.299230+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: ui, web-ui
+    new: ui, web-ui, job-paused
+- at: 2026-11-24T19:41:54.383033+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:41:58.198289+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
+- at: 2026-11-24T21:02:56.736325+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:04:04.704108+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:08:00.591005+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:08:02.706176+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836"]}'
+- at: 2026-11-24T21:19:38.228649+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:37:17.047788+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:53:36.627065+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849"]}'
+- at: 2026-11-24T22:00:38.717599+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:00:54.567044+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T22:36:27.750275+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T22:36:27.972859+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-24T22:36:28.662885+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T22:36:33.460718+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:50:59.553811+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859"]}'
+- at: 2026-11-24T22:51:20.294352+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:51:20.551099+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774"]}'
+- at: 2026-11-24T22:51:20.874124+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, web-ui, job-paused
+    new: ui, web-ui, job-paused, review-blocked
+- at: 2026-11-24T22:51:31.046260+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, web-ui, job-paused, review-blocked
+    new: ui, web-ui, job-paused, review-returned

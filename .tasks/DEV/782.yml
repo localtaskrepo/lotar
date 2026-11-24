@@ -1,17 +1,25 @@
 title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
-status: Reviewing
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-22T21:52:51.036195+00:00
+modified: 2026-11-24T23:16:01.370906+00:00
 relationships:
   depends_on:
   - DEV-765
+  - DEV-840
+  blocks:
+  - DEV-826
   related:
   - DEV-765
   - DEV-766
+  - DEV-826
+  - DEV-801
+  - DEV-791
+  - DEV-774
+  - DEV-840
+  - DEV-778
 comments:
 - date: 2026-11-22T06:37:21.509101+00:00
   author: claude
@@ -140,11 +148,252 @@ comments:
       result: passed
       reason: 407 tests
     next: Review, then the merge agent rebases onto main
+- date: 2026-11-23T04:28:29.882989+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix works, but the screenshots are missing and the help text names an API route that doesn't exist.
+
+    **Blocking**
+    - **No screenshots.** The ticket is tagged `ui`, and the change alters what the pages show after a reload. On the Agents page, the job's card now shows a framed box "The agent asks: …" with no buttons. Before the fix, that box never appeared. The board and task pill also say **Asks** instead of Working. The owner's rule (2026-11-13, STD-97) asks for before and after screenshots in light and dark mode at 1920, 1440 and 390 px, attached to the ticket. The hand-off says "No page, component or style changed", but what those pages show did change. To fix: take both sets for the Agents page and the board, and attach them.
+    - **Wrong route in the help text.** `docs/help/agent.md:222` names `GET /api/jobs/<id>`, which doesn't exist: the server returns `Route not found`. The real route is `/api/jobs/get?id=`, as in `docs/help/api-quick-reference.md:52` and `docs/openapi.json`. To fix: write `/api/jobs/get` in that sentence.
+
+    **Checked, OK**
+    - The diff `main...799bb8b8a` covers `saved_job_dto` and `logged_question` in `agent_job_service.rs` ~:950, the help text, and `AgentActivityIndicator.spec.ts`. It covers every "Done when" item, and nothing outside the ticket.
+    - Rebased onto main `f95414e5a` (12 commits ahead) in a scratch copy, the commit applies cleanly.
+      - `npm run lint:agent` passes.
+      - The Rust tests (`test:rust:agent`, 2471) and the UI tests (`test:ui:agent`, 1568) pass. `test:release` and `test:hooks` pass too.
+    - `npm run -s test:agent` still exited 1: a test left a temp folder (`.tmpiU1LnI`) behind, at load average 77. That isn't caused by this change; I reported it on the flaky list [DEV-801](https://lotar.pyxzl.net/task/DEV-801).
+    - The test fails without the fix: with `question: None` put back, the `dev782` test fails.
+    - Checked in the running app. I made a scratch workspace with a job log that ends on an `agent_job_question` and a fake record saying another live process runs the job.
+      - `/api/jobs` and `/api/jobs/get` return `question {title, options: [], request: ""}`.
+      - After a reload, the pill says **Asks** in light and dark at all 3 widths.
+      - The Agents card shows the question with no buttons, and its layout is fine.
+    - The `running` check (a live process must hold the job) is correct: a log with no end and no live process is `failed`.
+    - Smoke not rerun: it takes too long under this load. The fix agent reported 407 passed.
+
+    **Filed (minor)**
+    - [DEV-826](https://lotar.pyxzl.net/task/DEV-826): the Agents card shows this question box after a reload but not live. While live, the log follower sends `question: null`.
+- date: 2026-11-23T08:04:03.212987+00:00
+  author: claude
+  text: |-
+    Both review findings fixed on `4f1663f00`; before/after screenshots attached.
+
+    - Review read `799bb8b8a`, which was HEAD, so this round fixed its findings
+    - **Wrong route:** `docs/help/agent.md` now names `GET /api/jobs/get?id=<JOB_ID>`, as `docs/openapi.json` and `api-quick-reference.md` do
+    - **Screenshots:** 36 cropped images attached as `dev782-{before,after}-{agents,board,list}-{light,dark}-{1920,1440,390}.webp`
+      - Scratch workspace seeded with a DEMO job whose log ends on `agent_job_question`, held by another live process (scratch `LOTAR_AGENT_QUEUE_DIR`)
+      - Before = installed `lotar 0.15.6`, after = this branch's debug build, same data
+      - Agents page: after shows the framed "The agent asks: …" box, no buttons; before has none
+      - Task list: pill says **Working** before, **Asks** after
+      - Board card: the pill is icon-only there, so it only changes colour (blue → amber), with the text in its tooltip. That was already how the pill worked, and this fix doesn't change it.
+    - Amended and signed; nothing pushed
+  report:
+    commits:
+    - hash: 4f1663f00
+      what: fix + help route corrected (amends 799bb8b8a)
+    checks:
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: cargo build --bin lotar (with npm run build:web)
+      result: passed
+    - command: curl /api/jobs and /api/jobs/get?id= on the seeded job
+      result: passed
+      reason: both carry question.title, options []
+    - command: npm run lint
+      result: not_run
+      reason: only one help-doc line changed since 799bb8b8a, where lint:agent passed
+    - command: npm test
+      result: not_run
+      reason: same reason; test:agent passed on 799bb8b8a
+    - command: npm run smoke
+      result: not_run
+      reason: same reason; smoke (407) passed on 799bb8b8a
+    next: Review again
+- date: 2026-11-23T09:20:03.388997+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T091843.939Z-125 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T091843.939Z-125 why.'
+- date: 2026-11-24T17:37:55.207492+00:00
+  author: claude
+  text: |-
+    Review: passed. `4f1663f00` does everything "Done when" asks; both findings from the last review are fixed.
+
+    **Read**
+    - Diff `main...4f1663f00`: `logged_question` in `saved_job_dto` (`crates/lotar-agent/src/services/agent_job_service.rs` ~:956), the help sentence (`docs/help/agent.md:222`, now names `/api/jobs/get?id=`), and a new case in `view/__tests__/AgentActivityIndicator.spec.ts`. Nothing outside the ticket.
+    - Main has 23 newer commits, 9 of them touching these files (DEV-766, DEV-774 and others). The fix still holds on top of them: the live view and the DTO both drop the question on any later event.
+    - All 36 screenshots attached by the fix agent: Agents page shows the box with no buttons, the list pill goes from **Working** to **Asks**, the board pill turns amber. No visible problems.
+
+    **Reran** (`npm ci` passed; checks ran on a scratch copy of main with the commit cherry-picked, which applies cleanly)
+    - `cargo nextest run -p lotar-agent dev782`: passes. With `question: None` put back it fails, so the test catches the bug.
+    - `cargo clippy -p lotar-agent --all-targets`, `rustfmt --check` and `prettier --check` on the changed files: clean.
+    - `vitest --config view/vitest.config.ts` on `AgentActivityIndicator.spec.ts` and `AgentJobs.spec.ts`: 34 pass.
+    - Ran the debug build's `lotar serve` on a scratch workspace with a job log ending in `agent_job_question`, held by a live process:
+      - `GET /api/jobs` and `/api/jobs/get?id=` return `question.title` = the message, `options: []`, `request: ""`.
+      - Adding an `agent_job_progress` line sets `question` to null. A new question shows it again. A `status` line sets it to null.
+    - My own screenshots (Agents, list, board; light and dark; 1920, 1440 and 390 px) match the fix agent's. The pill tooltip reads "fix asks: …".
+
+    **Findings**
+    - None blocking. The one gap I found is already filed: DEV-826. Live, the Agents page doesn't show the question box, but after a reload it does. No new tickets.
+
+    **Note**
+    - My first seed command ran with this job's `LOTAR_TASKS_DIR`, so it created a gitignored `.tasks/DEMO/` (2 tickets) in the main checkout. I deleted it right away; nothing tracked was touched.
+- date: 2026-11-24T19:41:12.790311+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+       Compiling percent-encoding v2.3.2
+       Compiling clap_complete v4.6.11
+       Compiling predicates-core v1.0.10
+       Compiling notify v8.2.2
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-782/crates/lotar-web-assets)
+       Compiling pulldown-cmark v0.13.6
+       Compiling include_dir v0.7.4
+       Compiling difflib v0.4.0
+       Compiling rustls-webpki v0.103.16
+       Compiling termtree v0.5.1
+       Compiling wait-timeout v0.2.1
+       Compiling predicates v3.1.4
+       Compiling predicates-tree v1.0.13
+       Compiling rustls v0.23.46
+       Compiling assert_cmd v2.2.2
+       Compiling serde_yaml_ng v0.10.0
+       Compiling agent-client-protocol-schema v1.17.0
+       Compiling ureq v3.5.1
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-782/crates/lotar-core)
+       Compiling agent-client-protocol v5.2.0
+       Compiling harnessmux v0.3.0
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-782/crates/lotar-tasks)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-782)
+        Finished `dev` profile [unoptimized] target(s) in 47.44s
+    ────────────
+     Nextest run ID 25c20495-73e3-4837-9143-f77eb6114ed9 with nextest profile: default
+        Starting 2489 tests across 14 binaries
+    ────────────
+         Summary [ 209.235s] 2489 tests run: 2489 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmp7cxRVu
+    ```.
+
+    - Rebased `agent/DEV-782` onto `main` (`855ff6f4628f`): `7420b075315f`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T22:48:55.709472+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+       Compiling percent-encoding v2.3.2
+       Compiling ring v0.17.14
+       Compiling ctor v1.0.14
+       Compiling unicase v2.10.0
+       Compiling utf8-zero v0.8.1
+       Compiling clap_complete v4.6.12
+       Compiling predicates-core v1.0.10
+       Compiling harnessmux v0.3.0
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-782/crates/lotar-web-assets)
+       Compiling include_dir v0.7.4
+       Compiling termtree v0.5.1
+       Compiling webpki-roots v1.0.12
+       Compiling notify v8.2.2
+       Compiling difflib v0.4.0
+       Compiling rustls-webpki v0.103.17
+       Compiling wait-timeout v0.2.1
+       Compiling pulldown-cmark v0.13.6
+       Compiling predicates-tree v1.0.13
+       Compiling predicates v3.1.4
+       Compiling rustls v0.23.46
+       Compiling assert_cmd v2.2.2
+       Compiling ureq v3.5.2
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-782)
+        Finished `dev` profile [unoptimized] target(s) in 2m 04s
+    ────────────
+     Nextest run ID edba7a50-7e53-49d9-aadd-1ce02ae0b34e with nextest profile: default
+        Starting 2489 tests across 14 binaries
+    ────────────
+         Summary [ 254.178s] 2489 tests run: 2489 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpo61Zez
+    ```.
+
+    - Rebased `agent/DEV-782` onto `main` (`4977538571f0`): `534d707d31ee`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T22:57:08.165846+00:00
+  author: claude
+  text: |-
+    Not merged: `test:agent` keeps failing on the known temp leak DEV-840, not on this work. Land DEV-840 first and then retry this merge, or merge DEV-782 now anyway?
+
+    - Rebased onto main `7467c63f5`: `3a9eef64a`; `npm ci` and `npm run -s lint:agent` passed
+    - `npm run -s test:agent`: 2489/2489 passed, then `rust-test-runner: error: tests left 1 entries in the temp folder: .tmpyhMW8x` (third time on this merge, also `.tmpo61Zez`)
+    - The branch's diff uses no temp files (`saved_job_dto` + a pure DTO test in `agent_job_service.rs`, a help line, a vitest case)
+    - DEV-840 (Reviewing, fix `53c39bfc2` on `agent/DEV-840`) fixes it: the runner builds before setting the fresh `TMPDIR`, and the `dev732` worker test waits for its worker. Pre-starting sccache didn't help here; evidence is on DEV-840
+    - `npm run -s smoke`: not run, because the test check failed first
+- date: 2026-11-24T22:59:42.389359+00:00
+  author: triage
+  text: |-
+    Waits for DEV-840: the merge fails only on the temp-folder leak in the test runner, not on this work.
+
+    - `test:agent` passes 2489/2489, then fails on `.tmpXXXXXX` left behind (three times); the branch uses no temp files
+    - Infrastructure failure (owner 2026-11-15, `docs/decisions/2026-11-15-inbox-triage.md`): retry the merge once DEV-840 is done ("Prerequisites done")
+- date: 2026-11-24T22:59:48.459686+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-840. It starts once they are done.'
+- date: 2026-11-24T22:59:58.611670+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-782 yet. DEV-782 waits for DEV-840.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A213f6f4501a6f08135284814b3c429c20077b295d8c5df00ce09be201fb88dad
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A50f958bdaa784d4118c01f21dcbf17988a72435778df104a80c7d3d4e1197f2d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65ef83e7116702c76bd3e4c058364b8f78158b576ce3b9e0b9b28a24a470b955
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb661f65a5fb9ead619fcdb057c2010392deb346c12d179485068f04de9191b9
+- attachment: dev782-after-agents-dark-1440.1da95aaa638dd8b49f7363b36eff4f36.webp
+- attachment: dev782-after-agents-dark-1920.0d9e16b8ddeb29edcc98f5bf161907b0.webp
+- attachment: dev782-after-agents-dark-390.99a5b8d3fc9051980b228f60ef636b04.webp
+- attachment: dev782-after-agents-light-1440.25e22790a474151d61b2855a613ab048.webp
+- attachment: dev782-after-agents-light-1920.95968f9e2cabb4e4e88aac55741e40c4.webp
+- attachment: dev782-after-agents-light-390.ff355156bc57fc09a21e1e872aa66f79.webp
+- attachment: dev782-after-board-dark-1440.3a804f38a660828bf1e0c4a2852c75fe.webp
+- attachment: dev782-after-board-dark-1920.6becc4f984dbb048c3a320680f3ce4f4.webp
+- attachment: dev782-after-board-dark-390.13e4c35700361e9c0801406302bb48a9.webp
+- attachment: dev782-after-board-light-1440.c32a81ca82d5cb641fcb5a4f58b8bafb.webp
+- attachment: dev782-after-board-light-1920.af71efbdb0a5be818b62e9be4932d6a8.webp
+- attachment: dev782-after-board-light-390.ed10b9e586aac044f24ec2a63d16a81f.webp
+- attachment: dev782-after-list-dark-1440.044ac15dea5c622778314c694a4a1044.webp
+- attachment: dev782-after-list-dark-1920.f2b197b123ab23c6c6888f1df89bb556.webp
+- attachment: dev782-after-list-dark-390.dc3587ecb1782e4a3f3dd376e59b910b.webp
+- attachment: dev782-after-list-light-1440.98f757a8c98424185b1f793bce883690.webp
+- attachment: dev782-after-list-light-1920.82a5d3058488619fba984bef94cd567d.webp
+- attachment: dev782-after-list-light-390.6c20d41fa90163e75935182dccbea6c1.webp
+- attachment: dev782-before-agents-dark-1440.e8eb0fd4019143de8c100b446cd5b168.webp
+- attachment: dev782-before-agents-dark-1920.88292113f1526425e058c53f294b0680.webp
+- attachment: dev782-before-agents-dark-390.6c3d4fb4958ead6b8a9441a84d6e73a0.webp
+- attachment: dev782-before-agents-light-1440.ff4f6ecf908a9adb441e1683499380ad.webp
+- attachment: dev782-before-agents-light-1920.fd5d043e5c9b58010256dbac55d5b215.webp
+- attachment: dev782-before-agents-light-390.c484be5bd2b318fc5a5d88a469e30040.webp
+- attachment: dev782-before-board-dark-1440.99285fad966e86989642013fb43956a1.webp
+- attachment: dev782-before-board-dark-1920.6091fa3849393421c2310675cb8dca48.webp
+- attachment: dev782-before-board-dark-390.a9ba1cb9ef785323fb16241b4fcbb6b1.webp
+- attachment: dev782-before-board-light-1440.4cf5d3d689e99a7526f1123c2ed572ed.webp
+- attachment: dev782-before-board-light-1920.8e97a477dcc12587cb702d9acf6096db.webp
+- attachment: dev782-before-board-light-390.24557892440583f4efd6f75edcae601f.webp
+- attachment: dev782-before-list-dark-1440.c0b0203a63f5dfbbe29ed48b1cd903bb.webp
+- attachment: dev782-before-list-dark-1920.b9defd2d68be1c30d440f5a8b9b117f3.webp
+- attachment: dev782-before-list-dark-390.269292f833b4920f7391e55ed15bb1bc.webp
+- attachment: dev782-before-list-light-1440.f39685712beed818af5a51b10814905d.webp
+- attachment: dev782-before-list-light-1920.e9fe30143a7f0a8a21bd86d84b212c67.webp
+- attachment: dev782-before-list-light-390.002ddb72dd969a55b57065d266eefadf.webp
 description: |-
   Found while reviewing DEV-765.
 
@@ -160,8 +409,6 @@ description: |-
 tags:
 - ui
 - agent
-- fix-retried
-- retry-fix
 history:
 - at: 2026-11-22T02:36:08.788363+00:00
   actor: claude
@@ -329,3 +576,353 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-23T04:27:45.232837+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"related":["DEV-765","DEV-766"]}'
+    new: '{"depends_on":["DEV-765"],"related":["DEV-765","DEV-766","DEV-826"]}'
+- at: 2026-11-23T04:28:01.360807+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"related":["DEV-765","DEV-766","DEV-826"]}'
+    new: '{"depends_on":["DEV-765"],"related":["DEV-765","DEV-766","DEV-826","DEV-801"]}'
+- at: 2026-11-23T04:28:29.882989+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:28:41.484672+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, agent, fix-retried, retry-fix
+    new: ui, agent, fix-retried, retry-fix, review-blocked
+- at: 2026-11-23T04:29:07.261718+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, agent, fix-retried, retry-fix, review-blocked
+    new: ui, agent, fix-retried, retry-fix, review-returned
+- at: 2026-11-23T07:49:43.965110+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"related":["DEV-765","DEV-766","DEV-826","DEV-801"]}'
+    new: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801"]}'
+- at: 2026-11-23T07:52:19.614459+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T07:52:32.453914+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb661f65a5fb9ead619fcdb057c2010392deb346c12d179485068f04de9191b9
+- at: 2026-11-23T08:03:30.713824+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-agents-dark-1440.1da95aaa638dd8b49f7363b36eff4f36.webp
+- at: 2026-11-23T08:03:30.765339+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-agents-dark-1920.0d9e16b8ddeb29edcc98f5bf161907b0.webp
+- at: 2026-11-23T08:03:30.813231+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-agents-dark-390.99a5b8d3fc9051980b228f60ef636b04.webp
+- at: 2026-11-23T08:03:30.862327+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-agents-light-1440.25e22790a474151d61b2855a613ab048.webp
+- at: 2026-11-23T08:03:30.919923+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-agents-light-1920.95968f9e2cabb4e4e88aac55741e40c4.webp
+- at: 2026-11-23T08:03:30.971387+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-agents-light-390.ff355156bc57fc09a21e1e872aa66f79.webp
+- at: 2026-11-23T08:03:31.019776+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-board-dark-1440.3a804f38a660828bf1e0c4a2852c75fe.webp
+- at: 2026-11-23T08:03:31.068002+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-board-dark-1920.6becc4f984dbb048c3a320680f3ce4f4.webp
+- at: 2026-11-23T08:03:31.122936+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-board-dark-390.13e4c35700361e9c0801406302bb48a9.webp
+- at: 2026-11-23T08:03:31.171372+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-board-light-1440.c32a81ca82d5cb641fcb5a4f58b8bafb.webp
+- at: 2026-11-23T08:03:31.218458+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-board-light-1920.af71efbdb0a5be818b62e9be4932d6a8.webp
+- at: 2026-11-23T08:03:31.264707+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-board-light-390.ed10b9e586aac044f24ec2a63d16a81f.webp
+- at: 2026-11-23T08:03:31.311990+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-list-dark-1440.044ac15dea5c622778314c694a4a1044.webp
+- at: 2026-11-23T08:03:31.360110+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-list-dark-1920.f2b197b123ab23c6c6888f1df89bb556.webp
+- at: 2026-11-23T08:03:31.406858+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-list-dark-390.dc3587ecb1782e4a3f3dd376e59b910b.webp
+- at: 2026-11-23T08:03:31.456665+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-list-light-1440.98f757a8c98424185b1f793bce883690.webp
+- at: 2026-11-23T08:03:31.507420+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-list-light-1920.82a5d3058488619fba984bef94cd567d.webp
+- at: 2026-11-23T08:03:31.555753+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-after-list-light-390.6c20d41fa90163e75935182dccbea6c1.webp
+- at: 2026-11-23T08:03:31.603954+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-agents-dark-1440.e8eb0fd4019143de8c100b446cd5b168.webp
+- at: 2026-11-23T08:03:31.651899+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-agents-dark-1920.88292113f1526425e058c53f294b0680.webp
+- at: 2026-11-23T08:03:31.699227+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-agents-dark-390.6c3d4fb4958ead6b8a9441a84d6e73a0.webp
+- at: 2026-11-23T08:03:31.749472+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-agents-light-1440.ff4f6ecf908a9adb441e1683499380ad.webp
+- at: 2026-11-23T08:03:31.799130+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-agents-light-1920.fd5d043e5c9b58010256dbac55d5b215.webp
+- at: 2026-11-23T08:03:31.846816+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-agents-light-390.c484be5bd2b318fc5a5d88a469e30040.webp
+- at: 2026-11-23T08:03:31.897165+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-board-dark-1440.99285fad966e86989642013fb43956a1.webp
+- at: 2026-11-23T08:03:31.948319+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-board-dark-1920.6091fa3849393421c2310675cb8dca48.webp
+- at: 2026-11-23T08:03:32.004816+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-board-dark-390.a9ba1cb9ef785323fb16241b4fcbb6b1.webp
+- at: 2026-11-23T08:03:32.056473+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-board-light-1440.4cf5d3d689e99a7526f1123c2ed572ed.webp
+- at: 2026-11-23T08:03:32.114872+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-board-light-1920.8e97a477dcc12587cb702d9acf6096db.webp
+- at: 2026-11-23T08:03:32.170852+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-board-light-390.24557892440583f4efd6f75edcae601f.webp
+- at: 2026-11-23T08:03:32.221681+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-list-dark-1440.c0b0203a63f5dfbbe29ed48b1cd903bb.webp
+- at: 2026-11-23T08:03:32.269878+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-list-dark-1920.b9defd2d68be1c30d440f5a8b9b117f3.webp
+- at: 2026-11-23T08:03:32.318799+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-list-dark-390.269292f833b4920f7391e55ed15bb1bc.webp
+- at: 2026-11-23T08:03:32.366561+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-list-light-1440.f39685712beed818af5a51b10814905d.webp
+- at: 2026-11-23T08:03:32.421208+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-list-light-1920.e9fe30143a7f0a8a21bd86d84b212c67.webp
+- at: 2026-11-23T08:03:32.477971+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev782-before-list-light-390.002ddb72dd969a55b57065d266eefadf.webp
+- at: 2026-11-23T08:04:03.212987+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:04:15.135953+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T09:20:03.224325+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, agent, fix-retried, retry-fix, review-returned
+    new: ui, agent, fix-retried, retry-fix, review-returned, job-paused
+- at: 2026-11-23T09:20:03.388997+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:08:02.728557+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801"]}'
+    new: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791"]}'
+- at: 2026-11-24T17:37:55.207492+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:37:55.618208+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791"]}'
+    new: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774"]}'
+- at: 2026-11-24T17:38:10.502704+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T19:41:12.790311+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:48:55.709472+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:57:07.723404+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774"]}'
+    new: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840"]}'
+- at: 2026-11-24T22:57:08.165846+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:57:19.427135+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: ui, agent, fix-retried, retry-fix, review-returned, job-paused
+    new: ui, agent
+- at: 2026-11-24T22:57:19.487543+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-24T22:58:26.042305+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840"]}'
+    new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840"]}'
+- at: 2026-11-24T22:58:31.383893+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-24T22:59:42.389359+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:59:46.741454+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T22:59:48.459686+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:59:58.611670+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T23:00:12.772290+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T23:16:01.370906+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840"]}'
+    new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778"]}'

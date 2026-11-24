@@ -1,0 +1,394 @@
+title: 'Repo health 2026-11-22: Commits only on this Mac: branches and 3 more'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-23T07:51:28.704039+00:00
+modified: 2026-11-24T16:22:44.400985+00:00
+relationships:
+  depends_on:
+  - local:LOCA-601
+  related:
+  - DEV-796
+  - DEV-800
+  - DEV-820
+  - DEV-832
+  - DEV-279
+  - DEV-788
+  - DEV-834
+  - DEV-833
+comments:
+- date: 2026-11-23T09:18:20.914631+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T091754.165Z-124 (fix-light) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T091754.165Z-124 why.'
+- date: 2026-11-23T19:22:48.556925+00:00
+  author: automation
+  text: The fix agent's job job-20261123T192232.230Z-427 failed (lotar agent logs job-20261123T192232.230Z-427); @fix-retry retries it on branch agent/DEV-830.
+- date: 2026-11-23T19:23:13.716368+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T192254.687Z-428 failed again (lotar agent logs job-20261123T192254.687Z-428). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:24:26.607606+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude sign-in ticket LOCA-601; no retry decision is needed.
+
+    - Jobs `job-20261123T192232.230Z-427` and `job-20261123T192254.687Z-428` both failed before work: the login reached its time limit and cannot be renewed.
+    - Earlier job `job-20261123T091754.165Z-124` reported the weekly limit resetting November 24 at 08:00 America/Los_Angeles; authentication and quota are separate blockers.
+    - LOCA-601 already defines the owner action and completion checks. DEV-830 is Blocked, unassigned, and depends on `local:LOCA-601`; Prerequisites done resumes it automatically.
+    - Applied the infrastructure rule in `standards/docs/decisions/2026-11-15-inbox-triage.md`. Finished-work pushes are already authorized by `2026-11-12-push-finished-work.md` and `repos.json` (`localtaskrepo/lotar`, `push: true`); the resumed agent must check which work is finished.
+- date: 2026-11-23T19:24:27.496742+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:24:30.859799+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-830 yet. DEV-830 waits for local:LOCA-601.'
+- date: 2026-11-24T16:05:13.686310+00:00
+  author: claude
+  text: |-
+    All four findings are gone; nothing to commit.
+
+    - `[unpushed:branches]`: pushed `d4bdbbbf6` (DEV-788) from main to origin (`push: true` in repos.json, finished work). `git log main --not --remotes` is empty.
+    - `[question:DEV-796]`, `[question:DEV-800]`, `[question:DEV-820]`: no longer listed by `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar`; the tickets moved on since the report.
+    - Other lines the check still lists (worktree cleanup, DEV-279, automation.yml drift) are not part of this ticket.
+- date: 2026-11-24T16:05:22.688391+00:00
+  author: claude
+  text: |-
+    All four findings are gone; no file change needed.
+
+    - `[unpushed:branches]`: pushed the one remaining commit `d4bdbbbf6` (DEV-788, Done) with `git push origin d4bdbbbf6:main` (repos.json `push: true`; finished work only). `git log main --not --remotes` is empty.
+    - `[question:DEV-796]`, `[question:DEV-820]`, `[question:DEV-800]`: triage already set all three to Blocked on LOCA-601 with a comment; none is HelpNeeded any more.
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists none of the four; other findings it lists (worktrees, DEV-279, drift) are not part of this ticket.
+- date: 2026-11-24T16:05:29.263991+00:00
+  author: claude
+  text: |-
+    All 4 findings are gone; nothing to commit.
+
+    - `[unpushed:branches]`: `d4bdbbbf6` (DEV-788, Done) is now on `origin/main`. Another session's push got there first; mine was rejected with "cannot lock ref", and `git ls-remote origin main` shows `d4bdbbbf6`.
+    - `[question:DEV-796]`, `[question:DEV-800]`, `[question:DEV-820]`: all three are now Blocked, so they no longer wait on the owner without a question.
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists none of the four. Its other lines (stale worktrees, `[untracked:DEV-279]`, config drift) are not part of this ticket.
+- date: 2026-11-24T16:07:39.028500+00:00
+  author: claude
+  text: |-
+    All 4 findings are gone, so nothing to change: the check no longer lists them.
+
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists no `[unpushed:branches]`, `[question:DEV-796]`, `[question:DEV-820]` or `[question:DEV-800]`; `git log main --not --remotes` is empty (main is pushed, `main...origin/main`)
+    - DEV-796 now ends on a question to the owner (build `agent-team`: yes / more / no)
+    - DEV-820 and DEV-800 moved on to Blocked (their agents' sessions continue)
+    - No commits on `agent/DEV-830` beyond main, no file changes
+    - Other lines in that run (worktree cleanup, DEV-279, automation.yml drift) are outside this ticket
+- date: 2026-11-24T16:19:53.288283+00:00
+  author: claude
+  text: |-
+    All 4 findings are gone; nothing to commit, closing.
+
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists no `[unpushed:branches]`, `[question:DEV-820]` or `[question:DEV-800]`; `git log main --not --remotes` is empty (`d4bdbbbf6` is on `origin/main`).
+    - DEV-796 no longer shows `[question:DEV-796]`; the check now lists `[inbox:DEV-796]` (HelpNeeded for the owner, but not in his inbox), a different finding outside this ticket.
+    - No commits on `agent/DEV-830` beyond main.
+- date: 2026-11-24T16:22:44.400985+00:00
+  author: claude
+  text: |-
+    All 4 findings are gone; no file change needed.
+
+    - `git log main --not --remotes` in the main checkout is empty (`d4bdbbbf6` is on `origin/main`).
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists no `[unpushed:branches]`, `[question:DEV-796]`, `[question:DEV-800]` or `[question:DEV-820]`.
+    - `agent/DEV-830` has no commits beyond main and no changes.
+    - Other lines in that run (worktree cleanup, `[inbox:DEV-796]`, `[untracked:DEV-279]`, automation.yml drift) are not part of this ticket.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1294c03c4425a5eefc2a4e4e32d6a1aca0bdf4ae196e7ae8bb1a9628035f3a36
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53da03a8a08b7e9c46d49445c1f05a7a5a29ca64c7f49aadc6dbc0d650a75210
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6267dc04ecc00c737b3c813002cce2d22d75f5c4f31e0357e22ae1607beec86
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Add44ea95b35e539e5c817c73e1cea38afb0560aa1ad4b494483bfd0e3712dd11
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6516dcd6b70a5cc24ec8b713398c27f1e3c1fba9779bd86aaaba277dc4a6040
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6eb1ec4d42e899be386d0ac71012c5820269850794825890564c62b6f521bc42
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8f0215d467b9c8d2da8c641ab4f54fbaeeb26d774925d0e6f9d2a0485399ba90
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1375ed0265d996c567bd18b331baf65746b51dbea5b9ed80df757482836ce5ae
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ddbda886e3d21d6f054e5c8f219893aa32d15cb07aeee6d6d1e4e91c2c54ad6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab040d4847a5734d9381640490d17c5bd552a7d8165f9223cf4d9836cb8ddf25
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A32dc3b301a4b6adb7d57e090b26dc502d675fb5f25452adde875b7495eea9f14
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac570000752655b496a5a7a28fe37fcd46aec89cf8a44643da11bdb5ee46b9cf1
+description: |-
+  4 findings of the daily repo-health run on 2026-11-22 (`repos.ts --report`), in one ticket (owner 2026-11-22, STD-299). Fix each the way its section says; the ticket is done when no check command below lists its finding any more.
+
+  ## Commits only on this Mac: branches
+
+  7 commits on no remote, only on this Mac: main 7 (git log <branch> --not --remotes)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+  Done when: git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
+
+  ## Waiting for the owner without a question: DEV-796
+
+  DEV-796 (Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)) is HelpNeeded, but its last comment asks no question: "Answer: explore (Draft the template file and list which of our rules are generic first) (answered in INBOX-642)" (lotar show DEV-796)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-796]` while the problem is there.
+
+  Done when: The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+
+  ## Waiting for the owner without a question: DEV-820
+
+  DEV-820 (agent.worktree.build_root does nothing in repos that ignore target/ (staff, harnessmux, autospec)) is HelpNeeded, but its last comment asks no question: "Answer: repos (Change `target/` to `target` in the 3 repos' .gitignore (LOCA-571 step 4)) (answered in INBOX-662)" (lotar show DEV-820)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-820]` while the problem is there.
+
+  Done when: The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+
+  ## Waiting for the owner without a question: DEV-800
+
+  DEV-800 (Proposal: findings: agents add a health finding to the repo's open bundle of the day instead of a ticket of their own) is HelpNeeded, but its last comment asks no question: "Answer: yes (Yes, build `--bundle` as described, no new field type (recommended)) (answered in INBOX-663)" (lotar show DEV-800)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-800]` while the problem is there.
+
+  Done when: The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: health:2026-11-22
+  finding_seen: 2026-11-23
+history:
+- at: 2026-11-23T07:51:29.017725+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-796","DEV-800","DEV-820"]}'
+- at: 2026-11-23T07:51:29.335404+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-23T09:18:17.626891+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T09:18:19.358649+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1294c03c4425a5eefc2a4e4e32d6a1aca0bdf4ae196e7ae8bb1a9628035f3a36
+- at: 2026-11-23T09:18:20.861855+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, light
+    new: health, light, job-paused
+- at: 2026-11-23T09:18:20.914631+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:19:13.135726+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53da03a8a08b7e9c46d49445c1f05a7a5a29ca64c7f49aadc6dbc0d650a75210
+- at: 2026-11-23T11:19:23.131154+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6267dc04ecc00c737b3c813002cce2d22d75f5c4f31e0357e22ae1607beec86
+- at: 2026-11-23T12:19:35.348984+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Add44ea95b35e539e5c817c73e1cea38afb0560aa1ad4b494483bfd0e3712dd11
+- at: 2026-11-23T13:19:47.801710+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6516dcd6b70a5cc24ec8b713398c27f1e3c1fba9779bd86aaaba277dc4a6040
+- at: 2026-11-23T14:20:07.695359+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6eb1ec4d42e899be386d0ac71012c5820269850794825890564c62b6f521bc42
+- at: 2026-11-23T15:21:42.638182+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8f0215d467b9c8d2da8c641ab4f54fbaeeb26d774925d0e6f9d2a0485399ba90
+- at: 2026-11-23T16:21:57.090979+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1375ed0265d996c567bd18b331baf65746b51dbea5b9ed80df757482836ce5ae
+- at: 2026-11-23T17:22:11.159630+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ddbda886e3d21d6f054e5c8f219893aa32d15cb07aeee6d6d1e4e91c2c54ad6
+- at: 2026-11-23T18:22:28.305619+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab040d4847a5734d9381640490d17c5bd552a7d8165f9223cf4d9836cb8ddf25
+- at: 2026-11-23T19:22:45.619340+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A32dc3b301a4b6adb7d57e090b26dc502d675fb5f25452adde875b7495eea9f14
+- at: 2026-11-23T19:22:46.941995+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix-light'
+    new: '@fix-retry'
+  - field: tags
+    old: health, light, job-paused
+    new: health, light, job-paused, fix-retried
+- at: 2026-11-23T19:22:48.556925+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:23:09.576985+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac570000752655b496a5a7a28fe37fcd46aec89cf8a44643da11bdb5ee46b9cf1
+- at: 2026-11-23T19:23:12.863656+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:23:13.716368+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:24:09.642762+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-796","DEV-800","DEV-820"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820"]}'
+- at: 2026-11-23T19:24:10.266933+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:24:14.853597+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:24:26.607606+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:24:27.239916+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:24:27.496742+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:24:30.859799+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:24:45.797175+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:02:55.033809+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820","DEV-832"]}'
+- at: 2026-11-24T16:05:13.686310+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:15.374182+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820","DEV-832"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820","DEV-832","DEV-279","DEV-788"]}'
+- at: 2026-11-24T16:05:17.836277+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Done
+  - field: assignee
+    new: claude
+- at: 2026-11-24T16:05:18.017080+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, light, job-paused, fix-retried
+    new: health, light
+- at: 2026-11-24T16:05:20.062767+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+- at: 2026-11-24T16:05:22.688391+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:29.263991+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:33.082592+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820","DEV-832","DEV-279","DEV-788"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820","DEV-832","DEV-279","DEV-788","DEV-834"]}'
+- at: 2026-11-24T16:05:46.362830+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820","DEV-832","DEV-279","DEV-788","DEV-834"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-796","DEV-800","DEV-820","DEV-832","DEV-279","DEV-788","DEV-834","DEV-833"]}'
+- at: 2026-11-24T16:07:39.028500+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:53.288283+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:22:44.400985+00:00
+  actor: claude
+  changes:
+  - field: comment_added

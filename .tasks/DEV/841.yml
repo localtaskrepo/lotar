@@ -1,0 +1,142 @@
+title: lotar agent worktree cleanup doesn't sweep a project's own build_root
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T17:20:58.415465+00:00
+modified: 2026-11-24T22:23:10.962358+00:00
+relationships:
+  depends_on:
+  - DEV-778
+  related:
+  - DEV-778
+comments:
+- date: 2026-11-24T19:17:54.385564+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191743.711Z-37 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191743.711Z-37 why.'
+- date: 2026-11-24T21:01:46.409640+00:00
+  author: claude
+  text: |-
+    Waits for DEV-778: the code this fixes isn't on main yet.
+
+    - `sweep_build_root` and its cleanup call (`crates/lotar-lib/src/cli/handlers/agent.rs` ~709) exist only on `agent/DEV-778` (`a66b4c529`, `23d43baef`); DEV-778 is in Merging
+    - Added "Done when" to the description; marked depends-on DEV-778 and tagged `waits`
+    - No code changed, no commits on `agent/DEV-841`
+- date: 2026-11-24T22:23:10.962358+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-778. It starts once they are done.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A44d0364e44e95130a1b473670bcf8e9bd10004deb2ba5f7d03d6fddab04b573d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac4c18a97c8b2f8f8d4f765fd3ee7b97c0634731fb1521c1f15e6bd4f0a361127
+description: |-
+  Found in the DEV-778 review. `AgentHandler` worktree cleanup (`crates/lotar-lib/src/cli/handlers/agent.rs` ~665) calls `sweep_build_root(&repo_root, config, None)` once with the global config only. A project that sets `agent_worktree_build_root` itself (allowed: `dev153_worktree_settings_test::build_root_is_settable`) gets its root swept only through a removed worktree's `target` link, so the last worktree's leftover in that root stays.
+
+  Check: set `agent_worktree_build_root` per project only, leave an orphan `<root>/<repo>/<ticket>` folder with no worktree, run `lotar agent worktree cleanup`: it stays.
+
+  Done: the cleanup's first sweep also covers each project's configured build root (deduplicated), with a test.
+
+  ## Done when
+
+  Builds on DEV-778's `sweep_build_root` (not on main yet).
+
+  - [ ] `lotar agent worktree cleanup` (not `--dry-run`) sweeps, before removing worktrees, the global `agent.worktree.build_root` and every project's own configured `agent.worktree.build_root`, each resolved root once (deduplicated after resolving the path)
+  - [ ] A project without its own value uses the global one; a project's own value wins over the global one for that project, and the global root is still swept
+  - [ ] A project whose config can't be read is skipped; the sweep of the other roots goes on and the cleanup does not fail on it
+  - [ ] What `sweep_build_root` keeps stays as DEV-778 has it (folders of listed worktrees, nothing deleted when git can't list worktrees)
+  - [ ] `--dry-run` deletes nothing
+  - [ ] Test: a project-only `agent_worktree_build_root` with an orphan `<root>/<repo>/<ticket>` folder and no worktree: `lotar agent worktree cleanup` deletes it; a folder of a listed worktree stays
+tags:
+- job-paused
+- waits
+history:
+- at: 2026-11-24T17:20:58.705536+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-778"]}'
+- at: 2026-11-24T17:20:58.979682+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:17:51.082336+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:17:51.645494+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A44d0364e44e95130a1b473670bcf8e9bd10004deb2ba5f7d03d6fddab04b573d
+- at: 2026-11-24T19:17:54.349383+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-24T19:17:54.385564+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:17:57.070041+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac4c18a97c8b2f8f8d4f765fd3ee7b97c0634731fb1521c1f15e6bd4f0a361127
+- at: 2026-11-24T21:01:35.950659+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-778 review. `AgentHandler` worktree cleanup (`crates/lotar-lib/src/cli/handlers/agent.rs` ~665) calls `sweep_build_root(&repo_root, config, None)` once with the global config only. A project that sets `agent_worktree_build_root` itself (allowed: `dev153_worktree_settings_test::build_root_is_settable`) gets its root swept only through a removed worktree's `target` link, so the last worktree's leftover in that root stays.
+
+      Check: set `agent_worktree_build_root` per project only, leave an orphan `<root>/<repo>/<ticket>` folder with no worktree, run `lotar agent worktree cleanup`: it stays.
+
+      Done: the cleanup's first sweep also covers each project's configured build root (deduplicated), with a test.
+    new: |-
+      Found in the DEV-778 review. `AgentHandler` worktree cleanup (`crates/lotar-lib/src/cli/handlers/agent.rs` ~665) calls `sweep_build_root(&repo_root, config, None)` once with the global config only. A project that sets `agent_worktree_build_root` itself (allowed: `dev153_worktree_settings_test::build_root_is_settable`) gets its root swept only through a removed worktree's `target` link, so the last worktree's leftover in that root stays.
+
+      Check: set `agent_worktree_build_root` per project only, leave an orphan `<root>/<repo>/<ticket>` folder with no worktree, run `lotar agent worktree cleanup`: it stays.
+
+      Done: the cleanup's first sweep also covers each project's configured build root (deduplicated), with a test.
+
+      ## Done when
+
+      Builds on DEV-778's `sweep_build_root` (not on main yet).
+
+      - [ ] `lotar agent worktree cleanup` (not `--dry-run`) sweeps, before removing worktrees, the global `agent.worktree.build_root` and every project's own configured `agent.worktree.build_root`, each resolved root once (deduplicated after resolving the path)
+      - [ ] A project without its own value uses the global one; a project's own value wins over the global one for that project, and the global root is still swept
+      - [ ] A project whose config can't be read is skipped; the sweep of the other roots goes on and the cleanup does not fail on it
+      - [ ] What `sweep_build_root` keeps stays as DEV-778 has it (folders of listed worktrees, nothing deleted when git can't list worktrees)
+      - [ ] `--dry-run` deletes nothing
+      - [ ] Test: a project-only `agent_worktree_build_root` with an orphan `<root>/<repo>/<ticket>` folder and no worktree: `lotar agent worktree cleanup` deletes it; a folder of a listed worktree stays
+- at: 2026-11-24T21:01:39.391785+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-778"]}'
+    new: '{"depends_on":["DEV-778"],"related":["DEV-778"]}'
+- at: 2026-11-24T21:01:46.219400+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused
+    new: job-paused, waits
+- at: 2026-11-24T21:01:46.409640+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:23:10.784367+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-24T22:23:10.962358+00:00
+  actor: automation
+  changes:
+  - field: comment_added

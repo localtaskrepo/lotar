@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-04T05:03:03.155331+00:00
-modified: 2026-11-05T23:03:29.959674+00:00
+modified: 2026-11-24T21:19:32.625500+00:00
 relationships:
   related:
   - DEV-289
@@ -14,6 +14,7 @@ relationships:
   - DEV-281
   - DEV-283
   - DEV-301
+  - DEV-848
 comments:
 - date: 2026-11-05T23:03:29.704934+00:00
   text: '1. config show: the text output now prints review.reviewers (when set), plus the sync (reports_dir, write_reports) and agent (context_enabled, context_extension) settings that only JSON showed. New source labels so explicit-only and --explain modes label them. 2. ls/tasks --help: already fixed by DEV-281 (both print the list/task help), no change. 3. changelog: git failures were already reported since DEV-283 (bad ref exits 1 with the git error), no change. 4. Sync auth: a value shaped like a variable name (capitals, digits, _) that is not set is now an error naming the variable, instead of being sent as the token (401); other values are still used literally. The provider unit test was updated; docs/help/sync.md explains it. 5. A sync with failed items now reports status ''partial'' (CLI JSON, REST, MCP, report) and the CLI exits 1 after printing; the Sync page shows ''Some failed''. sync.md, openapi and types.ts were updated. Tests: tests/dev300_cli_sync_followups_test.rs (3, with an in-process failing HTTP stub) plus sync/auth/config suites (109 tests total with DEV-301), clippy and eslint clean.'
@@ -55,3 +56,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-24T21:19:32.625500+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-289","DEV-293","DEV-294","DEV-281","DEV-283","DEV-301"]}'
+    new: '{"related":["DEV-289","DEV-293","DEV-294","DEV-281","DEV-283","DEV-301","DEV-848"]}'

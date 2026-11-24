@@ -1,0 +1,29 @@
+title: REST test for GET /api/jobs/t3-thread (400, 404, unavailable)
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T22:44:17.550162+00:00
+modified: 2026-11-24T22:44:18.637860+00:00
+relationships:
+  related:
+  - DEV-849
+description: |-
+  Found in the DEV-849 review: the endpoint in `crates/lotar-lib/src/routes/jobs.rs` has unit tests for parsing and mapping and a UI test, but no REST test. The 400 for a non-t3 job, 404 for an unknown job, and Unavailable from a failing `t3` were only checked by hand.
+
+  Done when: an integration test (the fake t3 in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` fits) covers those three answers and two jobs of one ticket that resolve to two threads.
+tags:
+- agent
+history:
+- at: 2026-11-24T22:44:18.166402+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-849"]}'
+- at: 2026-11-24T22:44:18.637860+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

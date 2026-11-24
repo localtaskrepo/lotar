@@ -1,0 +1,97 @@
+title: A write in one project refuses while another process's transaction in another project is in flight (workspace-wide journal, per-project lock)
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-23T02:40:59.050764+00:00
+modified: 2026-11-23T08:53:09.838378+00:00
+relationships:
+  related:
+  - DEV-808
+comments:
+- date: 2026-11-23T06:53:44.758425+00:00
+  author: claude
+  text: |-
+    Fixed: a pending journal now only blocks writers in the folders it writes.
+
+    - Cause: `refuse_under_pending_transaction` (`crates/lotar-core/src/storage/safety.rs`) refused on any `.txn-pending.json`, but writers hold only their own folder's lock.
+    - Fix: it reads the journal (`pending_journal_touches` in `transaction.rs`) and refuses only if a write is under the locked folder. A transaction holds the task lock of every project it journals, so such a journal is a crashed one. Other journals may be live, and their rollback never touches this folder. An unreadable journal still refuses everywhere.
+    - Test `a_journal_for_another_project_does_not_block_writers_here` (`dev55_transaction_cases.rs`) failed before the fix and passes now.
+    - Updated `docs/developers/task-model.md`.
+    - Hit along the way: sccache's temp dir was gone (`lotar-rust-temp-*`), so checks ran with `RUSTC_WRAPPER=`.
+  report:
+    commits:
+    - hash: 28f23fefb
+      what: lock-taking writers refuse only when the pending journal writes into their own folder
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent with RUSTC_WRAPPER= (sccache temp dir missing)
+    - command: npm test
+      result: passed
+      reason: test:agent, 2479 Rust tests
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 407 tests
+    - command: 'manual: journal for AAA, lotar comment BBB-1'
+      result: passed
+      reason: comment added, AAA-1 still refused
+    next: Review, then merge
+- date: 2026-11-23T08:53:09.838378+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085252.796Z-108 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085252.796Z-108 why.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad6d87720ac3c91fa1b717273d8d97acda5d66e2be7041353e7ba424919e7f577
+description: 'Found 2026-11-22 (DEV-808): 5 inbox answers posted at once to a `lotar serve` with standards'' INBOX/STD rules. One relay''s `lotar comment STD-1` failed at once with "A pending task/sprint transaction journal exists at <root>/.txn-pending.json; a crashed multi-file mutation is waiting to be rolled back", while the other relays ran. Nothing had crashed. refuse_under_pending_transaction (crates/lotar-core/src/storage/safety.rs) assumes "journals are only created by writers that hold this same lock", but the task lock is per project folder (STD/.task.lock) and the journal is per workspace, so a live transaction from another project''s writer (here INBOX, `lotar status INBOX-n Done`) looks like a crashed one. Check: two processes, one holding a transaction in project A, the other commenting in project B, must both succeed. Done: a live journal makes other writers wait (or doesn''t apply), and only a crashed one is refused.'
+tags:
+- health
+- job-paused
+custom_fields:
+  finding: storage:journal-lock-scope
+history:
+- at: 2026-11-23T02:40:59.465448+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-808"]}'
+- at: 2026-11-23T02:40:59.915976+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T06:42:59.786802+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T06:43:02.702686+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad6d87720ac3c91fa1b717273d8d97acda5d66e2be7041353e7ba424919e7f577
+- at: 2026-11-23T06:53:44.758425+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:53:55.966585+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:53:09.751383+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-23T08:53:09.838378+00:00
+  actor: automation
+  changes:
+  - field: comment_added

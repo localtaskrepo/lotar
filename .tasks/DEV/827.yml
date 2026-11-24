@@ -1,0 +1,623 @@
+title: Memory gate holds leave no trace in the server log once they clear
+status: Merging
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-23T05:02:58.468147+00:00
+modified: 2026-11-24T21:24:39.809685+00:00
+relationships:
+  depends_on:
+  - local:LOCA-601
+  related:
+  - DEV-819
+  - DEV-791
+comments:
+- date: 2026-11-23T08:26:18.817426+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082529.449Z-96 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082529.449Z-96 why.'
+- date: 2026-11-23T18:35:28.854970+00:00
+  author: automation
+  text: The fix agent's job job-20261123T183511.026Z-405 failed (lotar agent logs job-20261123T183511.026Z-405); @fix-retry retries it on branch agent/DEV-827.
+- date: 2026-11-23T18:35:50.341798+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T183530.362Z-406 failed again (lotar agent logs job-20261123T183530.362Z-406). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T18:36:52.690259+00:00
+  author: triage
+  text: |-
+    Blocked on LOCA-601: Claude authentication failed before either attempt did work.
+
+    - Jobs `job-20261123T183511.026Z-405` and `job-20261123T183530.362Z-406` both ended with `this login reached its time limit and cannot be renewed`.
+    - This is the shared Mac login failure, not a failure of the memory-gate change. LOCA-601 tracks login renewal and its verification; no retry choice is needed here.
+    - Added prerequisite `local:LOCA-601`, set `Blocked`, and cleared the assignee. `Prerequisites done` resumes this work when that ticket closes, per `standards/docs/decisions/2026-11-15-inbox-triage.md`.
+- date: 2026-11-23T18:36:53.508425+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T18:36:56.511346+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-827 yet. DEV-827 waits for local:LOCA-601.'
+- date: 2026-11-24T16:30:24.615001+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 of the job job-20261123T173449.278Z-388 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:30:26.710915+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac139b01ae3f699957b330b5173da6cfb88b1ebd4086f2f41e4d0480b0378f45 of the job job-20261123T153412.992Z-335 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:27.818501+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A14002c506975f7dadae6521318804f787a4db5b2750fdd3c575a55108e6d43d5 of the job job-20261123T133341.899Z-267 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:33.383495+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A860c25013579683bc9483b42a35cea61216c2b7330f4f4b4cfb250160792ae62 of the job job-20261123T113147.574Z-200 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:34.554522+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A43a6014e58e6d2e75cc27436fe10c61be5548f8b868c7041779126e49a6f3ae2 of the job job-20261123T103114.034Z-166 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:36.475696+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa168b4ac98b80b1ff56db08bc2d25da35f89b26d91d1262bbe0c662cf50a3842 of the job job-20261123T093028.092Z-133 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:33:13.652708+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e of the job job-20261123T163433.051Z-368 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:33:15.169550+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae54eaaf9d4b812c4d597fd3b73992b9fb289983d1856304c7974e18ab89ba9ac of the job job-20261123T143355.723Z-300 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:53:53.763060+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 of the job job-20261123T173449.278Z-388 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:02:29.522972+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e of the job job-20261123T163433.051Z-368 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:02:29.777392+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac139b01ae3f699957b330b5173da6cfb88b1ebd4086f2f41e4d0480b0378f45 of the job job-20261123T153412.992Z-335 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:02:30.073344+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa168b4ac98b80b1ff56db08bc2d25da35f89b26d91d1262bbe0c662cf50a3842 of the job job-20261123T093028.092Z-133 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:04:25.405239+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae54eaaf9d4b812c4d597fd3b73992b9fb289983d1856304c7974e18ab89ba9ac of the job job-20261123T143355.723Z-300 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:12:45.054533+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1 of the job job-20261123T173449.278Z-388 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:12:53.389355+00:00
+  author: claude
+  text: |-
+    Done: `lotar serve` logs each memory hold's start and end once, whichever process decided it.
+
+    - `check()` now keeps the last ended hold (reason, since, until) and the last short-of-memory reason in the gate state file (`crates/lotar-agent/src/services/memory_gate.rs`); old state files still load.
+    - New `HoldLog` reads only that file; serve polls it every 30 s and prints `[lotar] memory hold started: …` / `memory hold ended: …, since …, until …` to stderr (`serve_handler.rs`), i.e. the launchd server log.
+    - Covers: start+end between two reads, failed reading ends a hold at its time, serve started mid-hold logs start once, earlier ended hold not repeated, gate off / no file gives no lines. Tests in `memory_gate.rs`.
+    - Documented in `docs/help/agent.md`.
+    - Checks: lint, full tests (1568 UI + Rust), smoke 408/408 passed.
+  report:
+    commits:
+    - hash: be2830be8
+      what: serve logs memory hold start and end from the shared gate state
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+    next: Review, then merge
+- date: 2026-11-24T17:24:50.065198+00:00
+  author: claude
+  text: |-
+    Memory holds now show in serve's log: one start line, one end line, with reason and times.
+
+    - `check()` in `crates/lotar-agent/src/services/memory_gate.rs` keeps `held_reason` and the last ended hold (`last_hold`: reason, since, until) in the gate state file
+    - `HoldLog` in serve (`serve_handler.rs`) reads that file every 30 s, reads no memory itself, and writes `[lotar] memory hold started: …` / `… ended: …, since …, until …` to stderr (launchd log)
+    - A hold that starts and ends between reads still gets both lines; a failed reading ends a hold at its time; a hold that ended before serve started is not logged again; gate off or no file: no lines
+    - Known limit: two holds that both start and end between the same two reads log only the later one
+    - Docs: `docs/help/agent.md`
+    - First `npm test` run waited its 30 min on the machine check lock (DEV-791's suite); rerun passed
+  report:
+    commits:
+    - hash: be2830be8
+      what: serve logs memory hold start and end from the shared gate state
+    checks:
+    - command: cargo nextest run -p lotar-agent memory_gate
+      result: passed
+    - command: npm run lint
+      result: passed
+      reason: as npm run -s lint:agent
+    - command: npm test
+      result: passed
+      reason: 2482 Rust, 1568 UI
+    - command: npm run smoke
+      result: passed
+      reason: 408 tests
+    next: Review on another model, then merge
+- date: 2026-11-24T17:24:50.536146+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa168b4ac98b80b1ff56db08bc2d25da35f89b26d91d1262bbe0c662cf50a3842 of the job job-20261123T093028.092Z-133 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:26:06.379047+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e of the job job-20261123T163433.051Z-368 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac139b01ae3f699957b330b5173da6cfb88b1ebd4086f2f41e4d0480b0378f45 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:27:16.636289+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae54eaaf9d4b812c4d597fd3b73992b9fb289983d1856304c7974e18ab89ba9ac of the job job-20261123T143355.723Z-300 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:27:18.479436+00:00
+  author: claude
+  text: |-
+    Memory holds now get a start and an end line in serve's log, whichever process decided them.
+
+    - `check()` keeps the last ended hold (reason, since, until) and the last short-of-memory reason in the gate state file (`crates/lotar-agent/src/services/memory_gate.rs`)
+    - New `HoldLog`: serve reads that file every 30 s, with no memory reading of its own, and writes `[lotar] memory hold started: …` and `… ended: …, since …, until …` to stderr (`serve_handler.rs`)
+    - Each case in Done when has a unit test: a hold that starts and ends between two reads, a failed reading, serve started during a hold or after one ended, gate off, no state file
+    - Documented in `docs/help/agent.md`
+    - The first plain `npm test` was stopped at the 30 min background limit; `npm run test:agent` then passed
+  report:
+    commits:
+    - hash: be2830be8
+      what: serve logs memory hold start and end
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent (npm test)
+      result: passed
+      reason: 2482 Rust, 1568 UI, release, hooks
+    - command: npm run test:smoke:agent (npm run smoke)
+      result: passed
+      reason: 408 tests
+    - command: live serve under real memory pressure
+      result: not_run
+      reason: covered by unit tests
+    next: Review on another model, then merge
+- date: 2026-11-24T17:27:26.280234+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac139b01ae3f699957b330b5173da6cfb88b1ebd4086f2f41e4d0480b0378f45 of the job job-20261123T153412.992Z-335 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:33:01.228611+00:00
+  author: claude
+  text: |-
+    Memory holds now show in serve's log: one start line and one end line each, whichever process decided the hold.
+
+    - `memory_gate.rs`: `check()` keeps `held_reason` (the last short-of-memory reason) and `last_hold` (reason, since, until) in the gate state file. A settled or failed reading fills `last_hold`.
+    - `HoldLog` (polled by serve every 30 s in `serve_handler.rs`) reads only that file and prints `[lotar] memory hold started: <reason>, since <t>` and `... ended: <reason>, since <t>, until <t>` to stderr, which launchd sends to the server log.
+    - Covered: start and end between two reads, a failed reading ends the hold, serve started during a hold logs its start, a hold that ended before serve started is not logged again, gate off or no state file gives no lines. Unit tests are in `memory_gate.rs`.
+    - Known limit: if two whole holds start and end within one 30 s poll, only the second is logged (the file keeps one `last_hold`).
+    - Docs: `docs/help/agent.md` memory gate section.
+  report:
+    commits:
+    - hash: be2830be8
+      what: serve logs memory hold start/end from the gate state file
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2482 Rust, 1568 UI
+    - command: npm run smoke
+      result: passed
+      reason: 408 tests
+    - command: cargo nextest run -p lotar-agent memory_gate
+      result: passed
+      reason: 12 tests
+    next: Review on another model, then merge
+- date: 2026-11-24T17:33:05.675055+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac139b01ae3f699957b330b5173da6cfb88b1ebd4086f2f41e4d0480b0378f45 of the job job-20261123T153412.992Z-335 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T18:56:38.499711+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e of the job job-20261123T163433.051Z-368 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T20:05:16.082364+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T18:56Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T21:14:38.069935+00:00
+  author: claude
+  text: |-
+    Done: `lotar serve` logs each memory hold's start and end once, whichever process decided it.
+
+    - `check()` keeps the last ended hold (reason, since, until) in the gate state file; `HoldLog` in `crates/lotar-agent/src/services/memory_gate.rs` reads it every 30 s from serve (`serve_handler.rs`) and writes `[lotar] memory hold started: …` / `ended: …` to stderr, which is the server log.
+    - Covers holds that start and end between two reads, a failed reading ending a hold, serve started during a hold, an earlier ended hold not logged again, and the gate turned off. Unit tests are in `memory_gate.rs`.
+    - Docs: `docs/help/agent.md` memory gate section.
+    - No other repo reads the gate state file (searched `~/Development/standards`).
+    - First full test run: one test failed because `target/debug/lotar` was missing mid-run (another smoke run was in this worktree). It passes alone, and the full rerun passed.
+  report:
+    commits:
+    - hash: be2830be8
+      what: serve logs memory hold start and end from the gate state file
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2482 Rust + 1568 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 408 tests
+    next: Review on another model, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada52c8b96cffe88ac9adc396fde47d6d31408da0e59509a8b82387efb6fa247f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa168b4ac98b80b1ff56db08bc2d25da35f89b26d91d1262bbe0c662cf50a3842
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A43a6014e58e6d2e75cc27436fe10c61be5548f8b868c7041779126e49a6f3ae2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A860c25013579683bc9483b42a35cea61216c2b7330f4f4b4cfb250160792ae62
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5135c842cc79b21b0e382c7c072f54fbec04275910b9f2805a4d696d5657110b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A14002c506975f7dadae6521318804f787a4db5b2750fdd3c575a55108e6d43d5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae54eaaf9d4b812c4d597fd3b73992b9fb289983d1856304c7974e18ab89ba9ac
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac139b01ae3f699957b330b5173da6cfb88b1ebd4086f2f41e4d0480b0378f45
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae52271fdd1b77b0ad8fe810da184b538890138522de5382fccaafe768ad91c3c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7f0d442eb975996f9aa9c80638bf51a55f27414acd7f1500dc437332c87d47ab
+description: |-
+  Found in DEV-819 (comment for STD-296, the standards reliability role): a memory hold leaves no record once it clears. Log its start and end (reason, since, until) in the server log ~/Library/Logs/lotar-services/<repo>.log.
+
+  Note: the hold is decided by whichever process calls memory_gate::check (lotar serve or the detached queue worker, whose stderr goes to /dev/null), so logging at the transition in check() reaches the server log only when serve sees it. Decide where the line is written.
+
+  ## Decision
+
+  The line is written by `lotar serve`, whichever process decided the hold: `check()` keeps the last ended hold (reason, since, until) in the gate state file, and serve's 30 s background loop reads that file (no memory reading of its own) and writes each start and end to its stderr, which launchd sends to the server log.
+
+  ## Done when
+
+  - [ ] A hold that starts (in serve or the queue worker) gives one line in serve's log: `memory hold started: <reason>, since <time>`.
+  - [ ] Its end gives one line: `memory hold ended: <reason>, since <time>, until <time>`. The reason is the last short-of-memory reason, not the "memory is normal again" settle text.
+  - [ ] A hold that starts and ends between two of serve's reads still gives both lines, once each.
+  - [ ] A failed reading ends a hold too: it is logged as ended with the time of that reading.
+  - [ ] Serve started during a hold logs its start once; an ended hold from before serve started is not logged again.
+  - [ ] Gate disabled: no lines. A missing or unreadable state file: no lines, no error.
+  - [ ] Covered by unit tests in `memory_gate.rs`.
+tags:
+- job-paused
+- fix-retried
+history:
+- at: 2026-11-23T05:02:58.750765+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-819"]}'
+- at: 2026-11-23T05:02:59.021207+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T08:26:07.462971+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T08:26:12.336277+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada52c8b96cffe88ac9adc396fde47d6d31408da0e59509a8b82387efb6fa247f
+- at: 2026-11-23T08:26:18.550877+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T08:26:18.817426+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:30:44.197052+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa168b4ac98b80b1ff56db08bc2d25da35f89b26d91d1262bbe0c662cf50a3842
+- at: 2026-11-23T10:31:43.107081+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A43a6014e58e6d2e75cc27436fe10c61be5548f8b868c7041779126e49a6f3ae2
+- at: 2026-11-23T11:31:54.789045+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A860c25013579683bc9483b42a35cea61216c2b7330f4f4b4cfb250160792ae62
+- at: 2026-11-23T12:32:26.465197+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5135c842cc79b21b0e382c7c072f54fbec04275910b9f2805a4d696d5657110b
+- at: 2026-11-23T13:33:51.201663+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A14002c506975f7dadae6521318804f787a4db5b2750fdd3c575a55108e6d43d5
+- at: 2026-11-23T14:34:05.935006+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae54eaaf9d4b812c4d597fd3b73992b9fb289983d1856304c7974e18ab89ba9ac
+- at: 2026-11-23T15:34:23.497649+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac139b01ae3f699957b330b5173da6cfb88b1ebd4086f2f41e4d0480b0378f45
+- at: 2026-11-23T16:34:44.743952+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad4f08e3484bb7d1e2cb6204c3e80cfad6bd2d279432a48f7977f1fb23903b97e
+- at: 2026-11-23T17:35:01.669339+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1
+- at: 2026-11-23T18:35:25.927172+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae52271fdd1b77b0ad8fe810da184b538890138522de5382fccaafe768ad91c3c
+- at: 2026-11-23T18:35:27.099079+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: job-paused
+    new: job-paused, fix-retried
+- at: 2026-11-23T18:35:28.854970+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:35:46.939310+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7f0d442eb975996f9aa9c80638bf51a55f27414acd7f1500dc437332c87d47ab
+- at: 2026-11-23T18:35:49.814465+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T18:35:50.341798+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:30.426190+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-819"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819"]}'
+- at: 2026-11-23T18:36:30.883593+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T18:36:52.278753+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T18:36:52.690259+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:53.249224+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T18:36:53.508425+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:56.511346+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:02:59.094996+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-819 (comment for STD-296, the standards reliability role): a memory hold leaves no record once it clears. Log its start and end (reason, since, until) in the server log ~/Library/Logs/lotar-services/<repo>.log.
+
+      Note: the hold is decided by whichever process calls memory_gate::check (lotar serve or the detached queue worker, whose stderr goes to /dev/null), so logging at the transition in check() reaches the server log only when serve sees it. Decide where the line is written.
+
+      Done when: a hold's start and end appear once each in the server log, with reason and times; covered by a test.
+    new: |-
+      Found in DEV-819 (comment for STD-296, the standards reliability role): a memory hold leaves no record once it clears. Log its start and end (reason, since, until) in the server log ~/Library/Logs/lotar-services/<repo>.log.
+
+      Note: the hold is decided by whichever process calls memory_gate::check (lotar serve or the detached queue worker, whose stderr goes to /dev/null), so logging at the transition in check() reaches the server log only when serve sees it. Decide where the line is written.
+
+      ## Decision
+
+      The line is written by `lotar serve`, whichever process decided the hold: `check()` keeps the last ended hold (reason, since, until) in the gate state file, and serve's 30 s background loop reads that file (no memory reading of its own) and writes each start and end to its stderr, which launchd sends to the server log.
+
+      ## Done when
+
+      - [ ] A hold that starts (in serve or the queue worker) gives one line in serve's log: `memory hold started: <reason>, since <time>`.
+      - [ ] Its end gives one line: `memory hold ended: <reason>, since <time>, until <time>`. The reason is the last short-of-memory reason, not the "memory is normal again" settle text.
+      - [ ] A hold that starts and ends between two of serve's reads still gives both lines, once each.
+      - [ ] A failed reading ends a hold too: it is logged as ended with the time of that reading.
+      - [ ] Serve started during a hold logs its start once; an ended hold from before serve started is not logged again.
+      - [ ] Gate disabled: no lines. A missing or unreadable state file: no lines, no error.
+      - [ ] Covered by unit tests in `memory_gate.rs`.
+- at: 2026-11-24T16:02:59.273533+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T16:30:24.615001+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:26.710915+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:27.818501+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:33.383495+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:34.554522+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:36.475696+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:33:13.652708+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:33:15.169550+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:53:53.763060+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:02:29.522972+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:02:29.777392+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:02:30.073344+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:25.405239+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:12:45.054533+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:12:53.389355+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:24:50.065198+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:24:50.324519+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791"]}'
+- at: 2026-11-24T17:24:50.536146+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:26:06.379047+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:27:16.636289+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:27:18.479436+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:27:26.280234+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:33:01.228611+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:33:05.675055+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T18:39:39.713507+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T18:39:39.889796+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T18:56:38.499711+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:05:12.547736+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T20:05:12.748570+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-24T20:05:13.223133+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T20:05:16.082364+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:14:38.069935+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:24:39.809685+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

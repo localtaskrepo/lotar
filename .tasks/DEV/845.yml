@@ -1,0 +1,152 @@
+title: 'DEV-825''s fix job prompt rendered ${{ticket.title}} as "first": its commit is "DEV-825 first"'
+status: Reviewing
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T18:56:52.105522+00:00
+modified: 2026-11-24T21:46:08.180246+00:00
+relationships:
+  related:
+  - DEV-825
+  - DEV-3
+  - DEV-563
+  - DEV-747
+comments:
+- date: 2026-11-24T19:37:11.536212+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T193700.763Z-46 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T193700.763Z-46 why.'
+- date: 2026-11-24T21:21:19.109499+00:00
+  author: claude
+  text: |-
+    Fixed: a rule's job prompt now takes the ticket's title when the job starts, not when the rule queued it.
+
+    - Cause: the rule expanded `${{ticket.title}}` at 04:27 on 2026-11-23, when DEV-825 still read "first"; the job started at 07:21 and its Ticket context already showed the real title, but the prompt kept the old one. The title change isn't in the ticket's history, so it happened before the file got tracked (filed from a review worktree).
+    - `TemplateContext::expand_for_queued_job` leaves `${{ticket.title}}` in the prompt; `fill_ticket_title` fills it in `start_job_inner` (`crates/lotar-agent/src/services/agent_job_service.rs`), the path that queued jobs start through too.
+    - Tests: `a_queued_job_prompt_fills_the_title_when_the_job_starts`, `a_rule_job_prompt_leaves_the_title_for_the_job_start`; `docs/help/automation.md` describes it.
+    - Check: `grep "DEV-825 first"` still finds the old session; it is a log of the old run, and DEV-825's commit `3fad61477` still needs its amend at merge.
+  report:
+    commits:
+    - hash: 34c737675
+      what: fill ${{ticket.title}} in a rule's job prompt when the job starts
+    checks:
+    - command: cargo nextest run -p lotar-agent (template, prompt, agent_job_service tests)
+      result: passed
+    - command: cargo clippy -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: npx prettier --check docs/help/automation.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs it (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it
+    next: Review, then merge; amend DEV-825's commit to its real title when it merges
+- date: 2026-11-24T21:22:22.555694+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A866aae813f35da8073eae1d715e02ba1fa7262952a554714981ab78ee1942388 of the job job-20261124T203711.981Z-73 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212222.366Z-96: DEV-845 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:22:25.073811+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acb1cbebeb545bfdc2bcca307b19f8b9296c9f7ff5d0fe03ce112d0035a699ed3 of the job job-20261124T193700.763Z-46 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A866aae813f35da8073eae1d715e02ba1fa7262952a554714981ab78ee1942388 that the job job-20261124T212222.366Z-96 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:45:49.823571+00:00
+  author: claude
+  text: |-
+    Fixed: a queued job's prompt now uses the ticket's title from when the job starts, not from when the rule queued it.
+
+    - **Cause:** the rule filled in the job prompt (`${{ticket.title}}` included) when it queued the job. The "Ticket context" is built later, when the job starts. DEV-825 was queued at 04:27Z, when its title was still "first" (a scratch-looking first version, with no title change in its history), and the job started at 07:20Z. The prompt's "Ticket context" shows the real title, but its commit line says `"DEV-825 first"`.
+    - **Fix:** `AgentRunSettings::from_action` in `automation_service.rs` now leaves `${{ticket.title}}` unfilled, and the job start fills it in from the ticket (`fill_ticket_title`, `template.rs`). Other variables (`previous.*`, `comment.*`, `ticket.status`, ...) are still filled in when the rule runs: the triage prompt needs the status and assignee from that moment.
+    - **Tests:** `a_rule_job_prompt_leaves_the_title_for_the_job_start` and `a_queued_job_prompt_fills_the_title_when_the_job_starts`. Documented in `docs/help/automation.md`.
+    - **DEV-825:** `agent/DEV-825` is still at `879f137c7 "DEV-825 first"`, unpushed. Its merge should amend the title. This job didn't touch that branch.
+  report:
+    commits:
+    - hash: 34c737675
+      what: a rule's job prompt fills in ${{ticket.title}} when the job starts
+    checks:
+    - command: 'cargo nextest run -p lotar-agent (automation_service, agent_job_service, template: 130 tests)'
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration agent_automation_integration_test (59 tests)
+      result: passed
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: rustfmt --check and prettier --check on the changed files
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: left for the merge (DEV-797)
+    next: Review, then merge. Separately, DEV-825's merge gives 879f137c7 its real title (amend, unpushed)
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acb1cbebeb545bfdc2bcca307b19f8b9296c9f7ff5d0fe03ce112d0035a699ed3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A866aae813f35da8073eae1d715e02ba1fa7262952a554714981ab78ee1942388
+description: 'Found: reviewing DEV-825, commit `3fad61477` on `agent/DEV-825` is titled "DEV-825 first". The fix job was told so: its prompt (session `lotar-95e687-DEV-825-fix`) says `message "DEV-825 first"`, where `.tasks/DEV/automation.yml:134` has `"${{ticket.id}} ${{ticket.title}}"`. Other jobs got their full title (DEV-747, DEV-563). DEV-825 was filed from a review worktree on 2026-11-23 and briefly had a scratch-looking relation to DEV-3, so the title the job read may have come from a scratch ticket. Check: `grep -o "DEV-825 first" ~/.local/state/harnessmux/sessions/lotar-95e687-DEV-825-fix.events.jsonl`. Done: the cause is found and fixed, and a job prompt always carries the ticket''s current title. The DEV-825 commit gets its real title when it is merged (unpushed, so an amend).'
+tags:
+- health
+- job-paused
+custom_fields:
+  finding: agent-jobs:commit-title-placeholder
+history:
+- at: 2026-11-24T18:56:52.843046+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-825"]}'
+    new: '{"related":["DEV-825","DEV-3","DEV-563","DEV-747"]}'
+- at: 2026-11-24T18:56:53.134766+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:37:08.281459+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:37:08.916437+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acb1cbebeb545bfdc2bcca307b19f8b9296c9f7ff5d0fe03ce112d0035a699ed3
+- at: 2026-11-24T19:37:11.493033+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:37:11.536212+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:37:14.011451+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A866aae813f35da8073eae1d715e02ba1fa7262952a554714981ab78ee1942388
+- at: 2026-11-24T21:21:19.109499+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:22.555694+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:25.073811+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:45:49.823571+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:46:08.180246+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

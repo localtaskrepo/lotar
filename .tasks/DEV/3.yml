@@ -5,12 +5,13 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.698804+00:00
-modified: 2026-10-31T22:06:39.357515+00:00
+modified: 2026-11-24T18:56:52.840960+00:00
 relationships:
   related:
   - DEV-13
   - DEV-230
   - DEV-293
+  - DEV-845
 comments:
 - date: 2026-09-06T11:21:52.608760+00:00
   text: 'Backlog reconciliation: Remains Todo for CLI list/search filtering by age older than N days. Existing age/stale statistics are not this filter. Specify created versus modified time and boundary semantics. Coordinate DEV-57 query parity and DEV-75 CLI contracts; neither automatically implements this feature.'
@@ -81,3 +82,33 @@ history:
   - field: relationships
     old: '{"related":["DEV-13","DEV-230"]}'
     new: '{"related":["DEV-13","DEV-230","DEV-293"]}'
+- at: 2026-11-23T04:27:41.511491+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-13","DEV-230","DEV-293"]}'
+    new: '{"related":["DEV-13","DEV-230","DEV-293","DEV-825"]}'
+- at: 2026-11-23T04:28:18.091103+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-13","DEV-230","DEV-293","DEV-825"]}'
+    new: '{"related":["DEV-13","DEV-230","DEV-293","DEV-825","DEV-802"]}'
+- at: 2026-11-23T04:29:00.598696+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-13","DEV-230","DEV-293","DEV-825","DEV-802"]}'
+    new: '{"related":["DEV-13","DEV-230","DEV-293","DEV-802"]}'
+- at: 2026-11-23T04:29:50.900427+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-13","DEV-230","DEV-293","DEV-802"]}'
+    new: '{"related":["DEV-13","DEV-230","DEV-293"]}'
+- at: 2026-11-24T18:56:52.840960+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-13","DEV-230","DEV-293"]}'
+    new: '{"related":["DEV-13","DEV-230","DEV-293","DEV-845"]}'

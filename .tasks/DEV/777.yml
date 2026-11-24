@@ -5,12 +5,18 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-22T20:14:32.604944+00:00
+modified: 2026-11-24T21:31:31.616631+00:00
 relationships:
   depends_on:
   - DEV-757
+  - local:LOCA-601
   related:
   - DEV-757
+  - DEV-774
+  - DEV-801
+  - DEV-832
+  - DEV-833
+  - DEV-767
 comments:
 - date: 2026-11-22T02:54:19.137208+00:00
   author: claude
@@ -61,10 +67,250 @@ comments:
       result: passed
       reason: a_continue_job_whose_agent_refuses_initialize_fails_and_keeps_the_session fails with the old Protocol mapping
     next: Merge agent/DEV-777
+- date: 2026-11-23T05:49:26.675460+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-777` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`; lotar aborted the rebase, `agent/DEV-777` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T06:18:04.229905+00:00
+  author: automation
+  text: The merge agent's job job-20261123T054906.949Z-70 failed (lotar agent logs job-20261123T054906.949Z-70); the fix agent retries it on branch agent/DEV-777.
+- date: 2026-11-23T09:03:54.447052+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:\n```\ntarget/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB\ntarget/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB\ntarget/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB\n\n✓ built in 8.37s\n\e[33m[PLUGIN_TIMINGS] \e[0mJavaScript callbacks ran for 6.1s of this 8.3s build (73%).\nThe slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):\n  - plugin vite:vue transform (53%, 4.4s, 307 calls)\nAdditional callback time came from the callbacks below and from callbacks under 1s.\n2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:\n  - plugin vite:css transform (89 calls)\n  - plugin vite:asset load (3 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.\n\ncompressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets\nrust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-802 (pid 69627), since 08:27 UTC\nrust-test-runner: Took the check lock after 19 min\n   Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-777/crates/lotar-core)\n   Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-777/crates/lotar-agent)\n   Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-777/crates/lotar-web-assets)\n   Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-777/crates/lotar-lib)\n   Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-777/crates/lotar-tasks)\n   Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-777)\n    Finished `dev` profile [unoptimized] target(s) in 2m 53s\n────────────\n Nextest run ID 29ff48f2-75ae-48f0-814b-96a5f786a766 with nextest profile: default\n    Starting 2481 tests across 14 binaries\n────────────\n     Summary [ 531.865s] 2481 tests run: 2481 passed, 0 skipped\nrust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpJOwM3X\n```.\n\n- Rebased `agent/DEV-777` onto `main` (`d4bdbbbf62f8`): `3a37517a2101`\n- The check `npm run -s lint:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T09:03:59.511344+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082819.886Z-103 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082819.886Z-103 why.'
+- date: 2026-11-23T19:16:23.919768+00:00
+  author: automation
+  text: The fix agent's job job-20261123T191604.157Z-415 failed (lotar agent logs job-20261123T191604.157Z-415); @fix-retry retries it on branch agent/DEV-777.
+- date: 2026-11-23T19:16:46.217695+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T191625.328Z-416 failed again (lotar agent logs job-20261123T191625.328Z-416). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:18:28.069643+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude login ticket local:LOCA-601; another retry cannot authenticate.
+
+    - Jobs `job-20261123T191604.157Z-415` and `job-20261123T191625.328Z-416` both stopped before work: “this login reached its time limit and cannot be renewed”.
+    - Earlier `job-20261123T082819.886Z-103` hit the weekly limit, resetting November 24 at 08:00 America/Los_Angeles. Restoring login may leave that separate limit in effect.
+    - Following `standards/docs/decisions/2026-11-15-inbox-triage.md`: wait on the existing infrastructure ticket, clear the assignee, and continue through Prerequisites done when its checks pass. No separate owner retry decision is needed.
+    - On resuming, earlier merge/check work remains: `job-20261123T054906.949Z-70` could not fast-forward; the later rebased check passed 2481 tests but rejected leftover temp entry `.tmpJOwM3X`. These are not verified fixed by this triage.
+- date: 2026-11-23T19:18:28.888285+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:18:32.764879+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-777 yet. DEV-777 waits for local:LOCA-601.'
+- date: 2026-11-24T16:00:07.741601+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0938ef4bad7f79b9a610ba0dd108ec45a2e56f3095680064e46ad460a663c0b6 of the job job-20261123T161453.938Z-348 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:11:37.255202+00:00
+  author: claude
+  text: |-
+    Duplicate session stepped back: another DEV-777 thread is already running the checks in this worktree.
+
+    - About 15 T3 threads for DEV-777 resumed at 16:00 UTC after the limit reset; two or more work in `agent/DEV-777` at once (DEV-832, DEV-833)
+    - Branch: one commit on main, `1e5e6d0b4`; no changes from this session
+    - Leftover `.tmpJOwM3X` from the last merge check: `cargo nextest run -p lotar-lib --test integration dev503` with its own TMPDIR passed 51/51 and left nothing, so the new DEV-777 test is not the source as far as this shows
+    - I stopped my own `npm run -s test:agent`; the other session's run (pid `39308`) holds the check lock
+- date: 2026-11-24T16:25:51.867019+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7b74e1e4129880212f3a985d823a3767a4d0324f07ba1b0b72535e160b2ac30d of the job job-20261123T181542.662Z-393 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:25:53.881720+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7753ebe5f6360d06df475d412dcb8ea2448169577569058ba70cb4a600a9568 of the job job-20261123T171523.963Z-378 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:25:54.248841+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1f756a74eae44b2d253b49b6ded7cc9bf530806a2f2b08b0c7d2bb535a183a8c of the job job-20261123T151429.071Z-315 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:25:55.284303+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e4fc647b2ff984de9ca9c11266a22f543dc96336ef7797a36cc9f10ce575c23 of the job job-20261123T141408.310Z-282 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:25:55.922038+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae28d89b69e7138bcb155441a76b39df91926efa2ee152d3b5fbfc32a8d5b5cb3 of the job job-20261123T110412.275Z-183 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:25:56.551293+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4912098bd71d0e8012bf27bedc9afea19000a265adf2f871fff4080cc87a708b of the job job-20261123T100400.364Z-149 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:25:57.148826+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A214129cc725b8e06212b6975380d2020bc5dd7d10fd9b045a9b6fef0da52843e of the job job-20261123T082819.886Z-103 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:38:56.107935+00:00
+  author: claude
+  text: |-
+    Ready for review: all checks pass on `1e5e6d0b4`, which is rebased onto main `d4bdbbbf6`.
+
+    - No code changes in this session. The branch holds the single fix commit
+    - `npm run -s test:agent`: 2481 Rust tests passed, and the runner found no leftover temp entry. The earlier `.tmpJOwM3X` didn't come back, so it was not from this change
+    - UI 1568 and smoke 408 passed. They waited about 12 min for the machine's check lock
+    - The Claude login works again (this job ran), so the wait on local:LOCA-601 no longer blocks this ticket
+  report:
+    commits:
+    - hash: 1e5e6d0b4
+      what: resume falls back only on harnessmux NotResumable; harnessmux 0.3.0
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2481, UI 1568, no temp leftovers
+    - command: npm run -s test:smoke:agent
+      result: passed
+      reason: 408 tests
+    next: Review, then merge agent/DEV-777
+- date: 2026-11-24T17:39:37.870643+00:00
+  author: claude
+  text: |-
+    Correction: main moved to `855ff6f46` during the checks. Rebasing `1e5e6d0b4` onto it conflicts in one file.
+
+    - DEV-774 (`504d8b538`) is on main. It already bumps harnessmux to 0.3.0 and matches only `harnessmux::Error::NotResumable` in `agent_runner.rs:263`, the same line as this branch
+    - `git merge-tree main HEAD`: conflict only in `crates/lotar-agent/src/services/agent_job_service.rs`, which holds this branch's 0.3 field fixes. Resolve by taking main's version
+    - After the rebase, DEV-777 is the new test `a_continue_job_whose_agent_refuses_initialize_fails_and_keeps_the_session` plus its `FAKE_NO_INIT` fake-agent switch and the `docs/help/agent.md` line. The test still has to pass on the rebased branch
+    - I didn't rebase it here: this job doesn't allow rewriting history
+  report:
+    next: 'Merge agent: rebase onto main and take main''s agent_job_service.rs'
+- date: 2026-11-24T21:00:10.334750+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A12e15d70337811904e15781d831cdcf5c5bf2b46978884b44729003105686e97 of the job job-20261124T204304.636Z-79 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T210010.317Z-88: DEV-777 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:12:31.005629+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261124T210010.317Z-88 failed again (lotar agent logs job-20261124T210010.317Z-88). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-24T21:19:52.693986+00:00
+  author: claude
+  text: |-
+    Ready to merge: the fix passes on current main. The branch needs a rebase, and the only conflict is resolved by taking main's version of one file.
+
+    - The wait on local:LOCA-601 is over: Claude jobs sign in again (this one ran)
+    - Main `855ff6f46` already holds the `harnessmux::Error::NotResumable` match and the harnessmux 0.3 bump from DEV-774. Left on top of it: the test `a_continue_job_whose_agent_refuses_initialize_fails_and_keeps_the_session`, its `FAKE_NO_INIT` fake-agent switch and the `docs/help/agent.md` line
+    - Check: I applied main plus exactly those 2 files in this worktree (`git diff --cached main --stat`: 2 files). `cargo nextest run --workspace -E 'test(/dev503_harness_jobs_test/)'`: 53/53 passed. Then I reset the worktree to `1e5e6d0b4`
+    - `-p lotar-lib` alone fails 2 DEV-767 tests (`lotar agent logs --inputs` unknown) because it runs a stale `lotar` binary, as `tests/common/mod.rs:33` warns. That's not a bug
+    - Rebase: `git merge-tree main HEAD` conflicts only in `crates/lotar-agent/src/services/agent_job_service.rs`. Take main's version. I didn't rebase: this job doesn't allow rewriting history
+    - No new commit: no files changed
+  report:
+    commits:
+    - hash: 1e5e6d0b4
+      what: DEV-777 fix, test and docs line (needs rebase onto main)
+    checks:
+    - command: cargo nextest run --workspace -E 'test(/dev503_harness_jobs_test/)' on main 855ff6f46 + DEV-777
+      result: passed
+      reason: 53/53
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: the merge runs them
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'Merge: rebase 1e5e6d0b4 onto main, take main''s agent_job_service.rs in the conflict'
+- date: 2026-11-24T21:30:56.449208+00:00
+  author: claude
+  text: |-
+    Ready to merge: the DEV-777 test passes on top of current main `855ff6f46`. I changed no code and didn't rewrite the branch.
+
+    - Built the rebase result without touching the branch: main's tree plus this branch's diff, minus `Cargo.toml`, `Cargo.lock`, `agent_runner.rs` and `agent_job_service.rs`, which DEV-774 already covers on main. That leaves only `dev503_harness_jobs_test.rs` and `docs/help/agent.md`
+    - `cargo nextest run -p lotar-lib --test integration dev503` on that copy: 53 of 53 passed, including `a_continue_job_whose_agent_refuses_initialize_fails_and_keeps_the_session`
+    - Rebase: the one conflict is in `crates/lotar-agent/src/services/agent_job_service.rs`. Take main's version
+  report:
+    commits:
+    - hash: 1e5e6d0b4
+      what: fix commit, unchanged
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev503 (branch on main 855ff6f46, scratch copy)
+      result: passed
+      reason: 53 of 53
+    - command: npm run lint
+      result: not_run
+      reason: no code change in this job; merge runs full suites
+    - command: npm test
+      result: not_run
+      reason: same
+    - command: npm run smoke
+      result: not_run
+      reason: same
+    next: 'Merge agent: rebase onto main, take main''s agent_job_service.rs in the conflict, run the full suites'
+- date: 2026-11-24T21:31:12.073359+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A12e15d70337811904e15781d831cdcf5c5bf2b46978884b44729003105686e97 of the job job-20261124T210010.317Z-88 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T213111.978Z-99: DEV-777 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0a7852970afa0266056fb48bf89fa0fd177b850a6e9b43958fbb0a2c9930ee39
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75a6d2ce35fd6bba59cd70aa8ab5c6579794cbcc6a508ad1ea655ac420701bf
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac9299f6f929a9e30092b2ee88e5301b86926db8243934153757582270cf65534
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A214129cc725b8e06212b6975380d2020bc5dd7d10fd9b045a9b6fef0da52843e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4912098bd71d0e8012bf27bedc9afea19000a265adf2f871fff4080cc87a708b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae28d89b69e7138bcb155441a76b39df91926efa2ee152d3b5fbfc32a8d5b5cb3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae8d40d92d725db5d011123a94f5ae1eb1b98e1ac7849660bc00edded449f8944
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af9f37249a99f92ad8d769e0665ae35d3d72ae21fac4139340ca3e5eda1945c28
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e4fc647b2ff984de9ca9c11266a22f543dc96336ef7797a36cc9f10ce575c23
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1f756a74eae44b2d253b49b6ded7cc9bf530806a2f2b08b0c7d2bb535a183a8c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0938ef4bad7f79b9a610ba0dd108ec45a2e56f3095680064e46ad460a663c0b6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7753ebe5f6360d06df475d412dcb8ea2448169577569058ba70cb4a600a9568
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7b74e1e4129880212f3a985d823a3767a4d0324f07ba1b0b72535e160b2ac30d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f679053cff4291319622aab7c69cd01c71a9dcee7b9438a41e91955ce01c5a5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70289a6ac85c2cb755275c3f5d6fdd8eb8331fdd6675cfee9939402f867ece8e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6a0c657469e64f57736d65ab25286f98b753dbb913c64520f3ef1c584be4155f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A12e15d70337811904e15781d831cdcf5c5bf2b46978884b44729003105686e97
 description: |-
   Found in the DEV-757 review (2026-11-21).
 
@@ -77,6 +323,9 @@ description: |-
   - [ ] A test with the fake ACP agent refusing `initialize` on resume: the job fails and the session keeps its name
 tags:
 - backend
+- merge-retried
+- job-paused
+- fix-retried
 history:
 - at: 2026-11-21T23:46:55.716106+00:00
   actor: claude
@@ -173,6 +422,322 @@ history:
   - field: comment_added
 - at: 2026-11-22T20:14:32.604944+00:00
   actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T00:23:28.430706+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757"],"related":["DEV-757"]}'
+    new: '{"depends_on":["DEV-757"],"related":["DEV-757","DEV-774"]}'
+- at: 2026-11-23T01:34:55.930598+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T05:49:26.675460+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:18:02.064026+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: backend
+    new: backend, merge-retried
+- at: 2026-11-23T06:18:04.229905+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:28:25.373791+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-23T09:03:54.447052+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:03:54.988346+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A214129cc725b8e06212b6975380d2020bc5dd7d10fd9b045a9b6fef0da52843e
+- at: 2026-11-23T09:03:59.441680+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: backend, merge-retried
+    new: backend, merge-retried, job-paused
+- at: 2026-11-23T09:03:59.511344+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:04:08.327945+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4912098bd71d0e8012bf27bedc9afea19000a265adf2f871fff4080cc87a708b
+- at: 2026-11-23T11:04:20.910020+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae28d89b69e7138bcb155441a76b39df91926efa2ee152d3b5fbfc32a8d5b5cb3
+- at: 2026-11-23T12:04:40.022816+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae8d40d92d725db5d011123a94f5ae1eb1b98e1ac7849660bc00edded449f8944
+- at: 2026-11-23T13:04:56.684611+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af9f37249a99f92ad8d769e0665ae35d3d72ae21fac4139340ca3e5eda1945c28
+- at: 2026-11-23T14:14:26.637146+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7e4fc647b2ff984de9ca9c11266a22f543dc96336ef7797a36cc9f10ce575c23
+- at: 2026-11-23T15:14:44.137584+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1f756a74eae44b2d253b49b6ded7cc9bf530806a2f2b08b0c7d2bb535a183a8c
+- at: 2026-11-23T16:15:18.577591+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0938ef4bad7f79b9a610ba0dd108ec45a2e56f3095680064e46ad460a663c0b6
+- at: 2026-11-23T17:15:38.445714+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7753ebe5f6360d06df475d412dcb8ea2448169577569058ba70cb4a600a9568
+- at: 2026-11-23T18:15:59.764678+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7b74e1e4129880212f3a985d823a3767a4d0324f07ba1b0b72535e160b2ac30d
+- at: 2026-11-23T19:16:19.820460+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f679053cff4291319622aab7c69cd01c71a9dcee7b9438a41e91955ce01c5a5
+- at: 2026-11-23T19:16:22.693774+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: backend, merge-retried, job-paused
+    new: backend, merge-retried, job-paused, fix-retried
+- at: 2026-11-23T19:16:23.919768+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:16:43.677686+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70289a6ac85c2cb755275c3f5d6fdd8eb8331fdd6675cfee9939402f867ece8e
+- at: 2026-11-23T19:16:45.091255+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:16:46.217695+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:17:56.903642+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757"],"related":["DEV-757","DEV-774"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774"]}'
+- at: 2026-11-23T19:17:57.615697+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:18:27.471640+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:18:28.069643+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:28.458826+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:18:28.888285+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:32.764879+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:46.689440+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:00:07.741601+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:01:35.160606+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801"]}'
+- at: 2026-11-24T16:02:55.026314+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832"]}'
+- at: 2026-11-24T16:11:37.255202+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:11:38.382428+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833"]}'
+- at: 2026-11-24T16:25:51.867019+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:25:53.881720+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:25:54.248841+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:25:55.284303+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:25:55.922038+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:25:56.551293+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:25:57.148826+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:38:56.107935+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:39:37.870643+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:03:07.828223+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:43:00.624129+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T19:43:01.668720+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6a0c657469e64f57736d65ab25286f98b753dbb913c64520f3ef1c584be4155f
+- at: 2026-11-24T20:43:10.193737+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A12e15d70337811904e15781d831cdcf5c5bf2b46978884b44729003105686e97
+- at: 2026-11-24T21:00:10.334750+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:12:28.065500+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-24T21:12:31.005629+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:19:52.693986+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:19:53.348413+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767"]}'
+- at: 2026-11-24T21:30:56.449208+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:31:11.815581+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T21:31:12.073359+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:31:18.053100+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T21:31:31.616631+00:00
+  actor: mallox
   changes:
   - field: status
     old: InProgress

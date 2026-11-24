@@ -1,0 +1,169 @@
+title: 'Repo health 2026-11-24: Leftover worktree: /Users/mallox/.t3/worktrees/lotar/agent-DEV-516-ef85343e4b31e350 and 2 more'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-24T19:00:51.208542+00:00
+modified: 2026-11-24T22:08:22.442602+00:00
+relationships:
+  related:
+  - DEV-516
+  - DEV-524
+  - DEV-528
+  - DEV-530
+  - DEV-553
+  - DEV-555
+  - DEV-743
+  - DEV-822
+comments:
+- date: 2026-11-24T19:41:54.539314+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T194145.465Z-49 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T194145.465Z-49 why.'
+- date: 2026-11-24T21:11:30.486250+00:00
+  author: claude
+  text: |-
+    All 3 leftover worktrees removed; nothing lost, no file change needed.
+
+    - `agent-DEV-516-…`: `90672043` (a flaky-test fix) is superseded. Main's `run_merge_without_end_rules` waits for the job to settle (DEV-553, DEV-743) and sets `reporter: reviewer`. DEV-516 is Done.
+    - `agent-DEV-528-…`: `537faefd` added two missing `ActiveJob` fields to a test. `19b654ffb` (DEV-555) fixed the same initializer on main. DEV-528 is Done.
+    - `t3-7bf8931a-…`: `500370cd` (DEV-524) and `388d708f` (DEV-530) are older versions of work that merged later after rebases (`c01dfce3`, DEV-530's hand rebase `3ef8df2af`). Both tickets are Done.
+    - All three worktrees were clean. No T3 thread or open file used them. I removed them with `git worktree remove` (no `--force`).
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists any of the three.
+- date: 2026-11-24T21:15:12.295430+00:00
+  author: claude
+  text: |-
+    Check rerun to the end: none of the 3 worktrees is listed any more.
+
+    - My earlier check run was stopped before it finished; this full run of `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` confirms the fix.
+    - It exits 1 on a different finding, the 3 GB `target` folder in DEV-822's idle worktree, which isn't part of this ticket.
+- date: 2026-11-24T21:16:53.877112+00:00
+  author: claude
+  text: |-
+    Second job on this ticket: nothing left to do. The other job had already fixed it, and I checked its result.
+
+    - On my own, I also found all 4 commits superseded by later versions on main (DEV-516, DEV-528, DEV-524, DEV-530 are Done).
+    - `repos.ts localtaskrepo/lotar` no longer lists the 3 worktrees, and `git worktree list` doesn't show them.
+    - No commits on `agent/DEV-846` beyond main.
+- date: 2026-11-24T22:08:22.442602+00:00
+  author: claude
+  text: |-
+    Third check: still fixed, nothing to do.
+
+    - `repos.ts localtaskrepo/lotar` lists none of the 3 worktrees; `git worktree list` doesn't show them.
+    - No commits on `agent/DEV-846` beyond main; status stays Done, no assignee.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A657879f1112a0a3b08c13e8e2e5b8eac7d28679b95646b7f8ffea8ff640e79a1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A858e31d7a0032d680c0eb43d44ebf745c0a36e7215fb19b807dab208beb5d3f8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4018faefee7a99929dcfbaf7040a25615227d45b6ee8fedcdd78eda29b8ed4b4
+description: |-
+  3 findings of the daily repo-health run on 2026-11-24 (`repos.ts --report`), in one ticket (owner 2026-11-22, STD-299). Fix each the way its section says; the ticket is done when no check command below lists its finding any more.
+
+  ## Leftover worktree: /Users/mallox/.t3/worktrees/lotar/agent-DEV-516-ef85343e4b31e350
+
+  /Users/mallox/.t3/worktrees/lotar/agent-DEV-516-ef85343e4b31e350 (detached): 1 commits not in main; no work since 2026-11-19 (git -C /Users/mallox/.t3/worktrees/lotar/agent-DEV-516-ef85343e4b31e350 status; git -C /Users/mallox/.t3/worktrees/lotar/agent-DEV-516-ef85343e4b31e350 log main..)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[worktree:/Users/mallox/.t3/worktrees/lotar/agent-DEV-516-ef85343e4b31e350]` while the problem is there.
+
+  Done when: The worktree is removed (git worktree remove) and nothing in it was lost: its commits are merged or on a pushed branch, its uncommitted changes committed or dropped with the owner's OK. A worktree a tool still uses stays; say so in a comment and ask the owner (HelpNeeded) whether to keep it.
+
+  ## Leftover worktree: /Users/mallox/.t3/worktrees/lotar/agent-DEV-528-31adf4c56a4e028a
+
+  /Users/mallox/.t3/worktrees/lotar/agent-DEV-528-31adf4c56a4e028a (detached): 1 commits not in main; no work since 2026-11-19 (git -C /Users/mallox/.t3/worktrees/lotar/agent-DEV-528-31adf4c56a4e028a status; git -C /Users/mallox/.t3/worktrees/lotar/agent-DEV-528-31adf4c56a4e028a log main..)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[worktree:/Users/mallox/.t3/worktrees/lotar/agent-DEV-528-31adf4c56a4e028a]` while the problem is there.
+
+  Done when: The worktree is removed (git worktree remove) and nothing in it was lost: its commits are merged or on a pushed branch, its uncommitted changes committed or dropped with the owner's OK. A worktree a tool still uses stays; say so in a comment and ask the owner (HelpNeeded) whether to keep it.
+
+  ## Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-7bf8931a-cc7a5b5ac3eb1714
+
+  /Users/mallox/.t3/worktrees/lotar/t3-7bf8931a-cc7a5b5ac3eb1714 (detached): 2 commits not in main; no work since 2026-11-19 (git -C /Users/mallox/.t3/worktrees/lotar/t3-7bf8931a-cc7a5b5ac3eb1714 status; git -C /Users/mallox/.t3/worktrees/lotar/t3-7bf8931a-cc7a5b5ac3eb1714 log main..)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[worktree:/Users/mallox/.t3/worktrees/lotar/t3-7bf8931a-cc7a5b5ac3eb1714]` while the problem is there.
+
+  Done when: The worktree is removed (git worktree remove) and nothing in it was lost: its commits are merged or on a pushed branch, its uncommitted changes committed or dropped with the owner's OK. A worktree a tool still uses stays; say so in a comment and ask the owner (HelpNeeded) whether to keep it.
+tags:
+- health
+custom_fields:
+  finding: health:2026-11-24
+history:
+- at: 2026-11-24T19:00:52.739645+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:41:50.692535+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:41:51.779243+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A657879f1112a0a3b08c13e8e2e5b8eac7d28679b95646b7f8ffea8ff640e79a1
+- at: 2026-11-24T19:41:54.446407+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:41:54.539314+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:41:57.521622+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A858e31d7a0032d680c0eb43d44ebf745c0a36e7215fb19b807dab208beb5d3f8
+- at: 2026-11-24T21:11:30.486250+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:11:32.198199+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-516","DEV-524","DEV-528","DEV-530","DEV-553","DEV-555","DEV-743"]}'
+- at: 2026-11-24T21:11:33.954128+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-24T21:11:34.045188+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, job-paused
+    new: health
+- at: 2026-11-24T21:11:38.752494+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T21:15:12.295430+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:15:13.849614+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-516","DEV-524","DEV-528","DEV-530","DEV-553","DEV-555","DEV-743"]}'
+    new: '{"related":["DEV-516","DEV-524","DEV-528","DEV-530","DEV-553","DEV-555","DEV-743","DEV-822"]}'
+- at: 2026-11-24T21:16:53.877112+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:07:48.444098+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4018faefee7a99929dcfbaf7040a25615227d45b6ee8fedcdd78eda29b8ed4b4
+- at: 2026-11-24T22:08:22.442602+00:00
+  actor: claude
+  changes:
+  - field: comment_added

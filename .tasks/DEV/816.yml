@@ -1,19 +1,410 @@
 title: 'Release skill and guide: a patch release ships without the owner''s OK, a minor or major one asks him'
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-22T22:24:48.000467+00:00
-modified: 2026-11-22T22:35:23.553850+00:00
+modified: 2026-11-24T23:16:01.373220+00:00
 relationships:
+  blocks:
+  - DEV-831
   related:
   - DEV-804
   - DEV-817
+  - DEV-831
+  - DEV-840
+  - DEV-791
+  - DEV-767
+  - DEV-778
+comments:
+- date: 2026-11-23T04:31:40.179722+00:00
+  author: claude
+  text: |-
+    Patch releases now ship without the owner's OK; minor and major ones still ask him.
+
+    - `.github/skills/release/SKILL.md` step 4: patch tags and pushes without asking, quoting his 2026-11-22 words; minor/major ask first (HelpNeeded when he can't be asked directly). Step 2 now says "minor or major".
+    - `docs/release-guide.md` Pre-Release Checklist step 1: patch by default, ships without asking; minor/major only when he asks for or approves it.
+    - Grep found no other text saying every release needs his OK. Step 1's "ask the owner whether to wait" for a fix not on main is a different question and stays.
+    - Anchors and links unchanged. "## Done when" added to the ticket with checkboxes.
+  report:
+    commits:
+    - hash: 1fd17d58c
+      what: release skill step 2/4 and release guide checklist step 1 follow the patch-without-OK rule
+    checks:
+    - command: npx prettier --check .github/skills/release/SKILL.md docs/release-guide.md
+      result: passed
+    - command: grep release/tag + owner/OK in AGENTS.md docs .github
+      result: passed
+      reason: only the new rule and step 1's ask-whether-to-wait remain
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change, AGENTS.md asks for link and consistency checks only
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: Review, then merge; DEV-804 (v0.15.7) can then ship without waiting for the owner
+- date: 2026-11-23T08:21:55.354569+00:00
+  author: claude
+  text: |-
+    Review: passed. Patch releases ship without asking him, and minor or major releases still ask him first. This matches his 2026-11-22 words and STD-311.
+
+    - Read: commit `1fd17d58c` (it changes only `.github/skills/release/SKILL.md` and `docs/release-guide.md`), the ticket's "Done when" list, DEV-804, DEV-817 (WontDo), standards `docs/decisions/2026-11-22-releases.md`, and the recent commits on main to both files. Nothing on main conflicts with the change.
+    - Done when 1: step 4 tags and pushes a patch without asking and quotes his words. A minor or major release asks him first, with HelpNeeded when he can't be asked directly.
+    - Done when 2: step 2 and the guide's checklist step 1 make the bump a patch by default, and a minor or major only when he asks for or approves it. The release ticket is always titled as a patch (step 8), so "patch unless the owner asks" already means his request wins over the title.
+    - Done when 3: the steps for failures did not change. Step 3 still requires QA green before the tag, checklist step 4 still says the same, and step 5 still re-runs a failed job once and reports it if it fails again.
+    - Done when 4: `grep -rniE "release|tag" AGENTS.md docs .github | grep -iE "owner|OK"` and a search for "owner's OK" found no other text saying every release needs his OK.
+    - Reran: `npm ci` passed. `npx prettier --check` on both files passed. The anchors and links did not change. Lint, test and smoke were not rerun because the change is docs only (AGENTS.md).
+    - Minor finding, filed as [DEV-831](https://lotar.pyxzl.net/task/DEV-831): when he has already asked for a minor release, step 4 still makes the agent ask him again.
+- date: 2026-11-23T09:59:49.306740+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+       Compiling include_dir v0.7.4
+       Compiling difflib v0.4.0
+       Compiling termtree v0.5.1
+       Compiling rustls-webpki v0.103.16
+       Compiling wait-timeout v0.2.1
+       Compiling predicates v3.1.4
+       Compiling predicates-tree v1.0.13
+       Compiling assert_cmd v2.2.2
+       Compiling rustls v0.23.46
+       Compiling image v0.25.10
+       Compiling serde_json v1.0.154
+       Compiling toml_datetime v1.1.3+spec-1.1.0
+       Compiling serde_spanned v1.1.3
+       Compiling toml v1.2.1+spec-1.1.0
+       Compiling serde_yaml_ng v0.10.0
+       Compiling serde_with v3.24.0
+       Compiling ureq v3.5.1
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-core)
+       Compiling agent-client-protocol-schema v1.17.0
+       Compiling agent-client-protocol v5.2.0
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-tasks)
+       Compiling harnessmux v0.2.0
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816)
+        Finished `dev` profile [unoptimized] target(s) in 4m 37s
+    ────────────
+     Nextest run ID 274e36c2-9a2f-4cfe-8bbe-b79a0745e655 with nextest profile: default
+        Starting 2480 tests across 14 binaries
+    ────────────
+         Summary [ 455.267s] 2480 tests run: 2480 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpF3JDHb
+    ```.
+
+    - Rebased `agent/DEV-816` onto `main` (`d4bdbbbf62f8`): `dd48a57e05cb`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T10:00:00.429159+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T092121.174Z-127 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T092121.174Z-127 why.'
+- date: 2026-11-23T11:16:14.679648+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.82s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812 (pid 66795), since 10:49 UTC
+    rust-test-runner: Took the check lock after 6 min
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816)
+        Finished `dev` profile [unoptimized] target(s) in 6.81s
+    ────────────
+     Nextest run ID c87dbb8d-c506-4b08-be72-2585ea266dd3 with nextest profile: default
+        Starting 2480 tests across 14 binaries
+    ────────────
+         Summary [ 491.117s] 2480 tests run: 2480 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpHQw9B4
+    ```.
+
+    - Rebase onto `main` changed nothing (`dd48a57e05cb`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T12:37:13.729772+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.62s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812 (pid 15538), since 12:09 UTC
+    rust-test-runner: Took the check lock after 11 min
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816)
+        Finished `dev` profile [unoptimized] target(s) in 6.99s
+    ────────────
+     Nextest run ID bdb5c48a-a53e-4f40-823e-4ee826080b91 with nextest profile: default
+        Starting 2480 tests across 14 binaries
+    ────────────
+         Summary [ 474.753s] 2480 tests run: 2480 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpLiisX9
+    ```.
+
+    - Rebase onto `main` changed nothing (`dd48a57e05cb`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T14:10:16.436928+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.39s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812 (pid 87813), since 13:30 UTC
+    rust-test-runner: Took the check lock after 19 min
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816)
+        Finished `dev` profile [unoptimized] target(s) in 6.41s
+    ────────────
+     Nextest run ID 26ccc082-5a52-434d-b3fc-1aabf9f5c828 with nextest profile: default
+        Starting 2480 tests across 14 binaries
+    ────────────
+         Summary [ 724.945s] 2480 tests run: 2480 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmplfCK0p
+    ```.
+
+    - Rebase onto `main` changed nothing (`dd48a57e05cb`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T15:27:21.380880+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:\n```\ntarget/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB\ntarget/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB\ntarget/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB\ntarget/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB\ntarget/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB\ntarget/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB\ntarget/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB\ntarget/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB\n\n✓ built in 3.32s\n\e[33m[PLUGIN_TIMINGS] \e[0mJavaScript callbacks ran for 2.3s of this 3.3s build (70%).\nThe slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):\n  - plugin vite:vue transform (61%, 2.0s, 307 calls)\nAdditional callback time came from the callbacks below and from callbacks under 1s.\n1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:\n  - plugin vite:asset load (3 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.\n\ncompressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets\nrust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-802 (pid 84982), since 15:00 UTC\nrust-test-runner: Took the check lock after 4 min\n   Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-web-assets)\n   Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816)\n    Finished `dev` profile [unoptimized] target(s) in 5.53s\n────────────\n Nextest run ID 38ed118d-cece-4e67-b7bb-9e739c7d59a3 with nextest profile: default\n    Starting 2480 tests across 14 binaries\n────────────\n     Summary [ 506.661s] 2480 tests run: 2480 passed, 0 skipped\nrust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmprvay81\n```.\n\n- Rebase onto `main` changed nothing (`dd48a57e05cb`)\n- The check `npm run -s lint:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T16:46:32.585871+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.50s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812 (pid 50264), since 16:12 UTC
+    rust-test-runner: Took the check lock after 10 min
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816)
+        Finished `dev` profile [unoptimized] target(s) in 5.44s
+    ────────────
+     Nextest run ID 0810bf25-9fb1-4f39-95e6-923f220009ad with nextest profile: default
+        Starting 2480 tests across 14 binaries
+    ────────────
+         Summary [ 458.711s] 2480 tests run: 2480 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpN7zhOi
+    ```.
+
+    - Rebase onto `main` changed nothing (`dd48a57e05cb`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T16:18:37.786326+00:00
+  author: automation
+  text: The merge agent's job job-20261124T160015.578Z-433 failed (lotar agent logs job-20261124T160015.578Z-433); the fix agent retries it on branch .
+- date: 2026-11-24T16:44:14.606786+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.61s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/.t3/worktrees/lotar/sec-2026-W47 (pid 5885), since 16:32 UTC
+    rust-test-runner: Took the check lock after 5 min
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-816)
+        Finished `dev` profile [unoptimized] target(s) in 2.01s
+    ────────────
+     Nextest run ID 111fbe4c-26a0-4980-9cec-865bbd5154d3 with nextest profile: default
+        Starting 2480 tests across 14 binaries
+    ────────────
+         Summary [ 236.385s] 2480 tests run: 2480 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpGLFMn2
+    ```.
+
+    - Rebased `agent/DEV-816` onto `main` (`8e6369b3d393`): `3241ef3923bc`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T17:04:48.898080+00:00
+  author: claude
+  text: |-
+    Merged: `28e3633ec` is on main (fast-forward, signed).
+
+    - The first `npm run -s test:agent` failure was not this change: 2480/2480 tests passed, then the runner found `.tmpGLFMn2` left in its temp folder. This change edits docs only.
+    - The rerun passed (2480 Rust tests, UI and script tests, nothing left in the temp folder).
+    - Main had moved on to `3473319ba` (DEV-791). The docs-only commit rebased onto it cleanly, then main fast-forwarded.
+    - The flaky leftover is filed as a health ticket.
+  report:
+    commits:
+    - hash: 28e3633ec
+      what: release skill and guide, patch releases ship without asking
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: the rerun passed; the first run failed only on a flaky temp-folder leftover
+    - command: npm run -s lint:agent
+      result: passed
+      reason: LoTaR's run before the rebase
+    - command: npx prettier --check .github/skills/release/SKILL.md docs/release-guide.md
+      result: passed
+      reason: after the rebase onto DEV-791
+- date: 2026-11-24T17:23:53.369367+00:00
+  author: claude
+  text: |-
+    Review: nothing to review
+
+    - `git log main..agent/DEV-816` is empty: the change, `28e3633ec`, is already on main (fast-forwarded 2026-11-24, see the merge comment).
+    - `agent/DEV-816` holds no other commits that main lacks, so there is no rework to review.
+- date: 2026-11-24T18:13:34.723981+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T17:38Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T19:31:48.882390+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-816` is in `main` already.
+- date: 2026-11-24T19:31:51.408767+00:00
+  author: automation
+  text: 'The queued @review job didn''t start: DEV-816 is assigned to @merge now.'
+- date: 2026-11-24T19:41:18.881836+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-816` is in `main` already.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7caf16d93d900e94ee980dba78bb581cdef0f79576babed2575fefcfb41922e
 description: |-
   Owner 2026-11-22 (chief of staff thread): "Let's change the rule for releasing. Only minor changes need my okay. Patch level updates can always be done". Scope (picker): every repo; a major release asks him too. Shared rule: standards global/AGENTS.md ("publishing but patch releases"), docs/decisions/2026-11-22-releases.md (STD-311).
 
-  Done when: .github/skills/release/SKILL.md step 4 tags and pushes a patch release without asking and asks him only for a minor or major bump; docs/release-guide.md says the same where it says who picks the bump; no other text in the repo says every release needs his OK.
+  ## Done when
+  - [ ] `.github/skills/release/SKILL.md` step 4: a patch release (only Z of vX.Y.Z changes) is tagged, pushed and released without asking; a minor or major one asks him first (HelpNeeded on the release ticket when he can't be asked directly), quoting his words.
+  - [ ] Step 2 and `docs/release-guide.md` (Pre-Release Checklist, step 1): the bump is a patch by default; a minor or major only when he asks for or approves it. When both could apply (he asked for a minor, the ticket title says patch), his request wins.
+  - [ ] A failed step (QA red, tag push refused, Release job fails twice) stops the release and is reported on the release ticket, as before; no tag is pushed before QA is green.
+  - [ ] No other text in AGENTS.md, docs/ or .github/ says every release needs his OK (`grep -rniE "release|tag" ... | grep -iE "owner|OK"`).
 history:
 - at: 2026-11-22T22:24:48.361175+00:00
   actor: claude
@@ -32,3 +423,228 @@ history:
   - field: relationships
     old: '{"related":["DEV-804"]}'
     new: '{"related":["DEV-804","DEV-817"]}'
+- at: 2026-11-23T04:30:33.855345+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T04:31:06.537071+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner 2026-11-22 (chief of staff thread): "Let's change the rule for releasing. Only minor changes need my okay. Patch level updates can always be done". Scope (picker): every repo; a major release asks him too. Shared rule: standards global/AGENTS.md ("publishing but patch releases"), docs/decisions/2026-11-22-releases.md (STD-311).
+
+      Done when: .github/skills/release/SKILL.md step 4 tags and pushes a patch release without asking and asks him only for a minor or major bump; docs/release-guide.md says the same where it says who picks the bump; no other text in the repo says every release needs his OK.
+    new: |-
+      Owner 2026-11-22 (chief of staff thread): "Let's change the rule for releasing. Only minor changes need my okay. Patch level updates can always be done". Scope (picker): every repo; a major release asks him too. Shared rule: standards global/AGENTS.md ("publishing but patch releases"), docs/decisions/2026-11-22-releases.md (STD-311).
+
+      ## Done when
+      - [ ] `.github/skills/release/SKILL.md` step 4: a patch release (only Z of vX.Y.Z changes) is tagged, pushed and released without asking; a minor or major one asks him first (HelpNeeded on the release ticket when he can't be asked directly), quoting his words.
+      - [ ] Step 2 and `docs/release-guide.md` (Pre-Release Checklist, step 1): the bump is a patch by default; a minor or major only when he asks for or approves it. When both could apply (he asked for a minor, the ticket title says patch), his request wins.
+      - [ ] A failed step (QA red, tag push refused, Release job fails twice) stops the release and is reported on the release ticket, as before; no tag is pushed before QA is green.
+      - [ ] No other text in AGENTS.md, docs/ or .github/ says every release needs his OK (`grep -rniE "release|tag" ... | grep -iE "owner|OK"`).
+- at: 2026-11-23T04:31:40.179722+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:31:51.958059+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:21:29.952625+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-804","DEV-817"]}'
+    new: '{"related":["DEV-804","DEV-817","DEV-831"]}'
+- at: 2026-11-23T08:21:55.354569+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:22:09.454097+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T09:59:49.306740+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:00:00.346136+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T10:00:00.429159+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T11:16:14.679648+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T12:37:13.729772+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T14:10:16.436928+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T15:27:21.380880+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T16:46:32.585871+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:00:59.002971+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-804","DEV-817","DEV-831"]}'
+    new: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831"]}'
+- at: 2026-11-24T16:18:28.567185+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: job-paused
+    new: job-paused, merge-retried
+- at: 2026-11-24T16:18:37.786326+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:55.821136+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-24T16:44:14.606786+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:44:15.079852+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7caf16d93d900e94ee980dba78bb581cdef0f79576babed2575fefcfb41922e
+- at: 2026-11-24T17:04:47.211293+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831"]}'
+    new: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840"]}'
+- at: 2026-11-24T17:04:48.898080+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:49.360591+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840"]}'
+    new: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840","DEV-791"]}'
+- at: 2026-11-24T17:05:00.261366+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T17:23:53.369367+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:23:59.270030+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T17:38:44.992011+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840","DEV-791"]}'
+    new: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840","DEV-791","DEV-767"]}'
+- at: 2026-11-24T18:13:29.817175+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-24T18:13:30.159108+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-24T18:13:31.424713+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T18:13:34.723981+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:31:48.882390+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:31:49.548772+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T19:31:51.408767+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:41:18.881836+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:41:20.142340+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused, merge-retried
+    new: ''
+- at: 2026-11-24T23:16:01.373220+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840","DEV-791","DEV-767"]}'
+    new: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840","DEV-791","DEV-767","DEV-778"]}'

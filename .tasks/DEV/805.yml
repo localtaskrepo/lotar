@@ -1,21 +1,142 @@
 title: 'list-running --all: wrapper rows show tasks_dir ''-'' and the docs still say only this tasks directory''s wrappers are listed'
-status: Todo
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-22T20:12:34.614201+00:00
-modified: 2026-11-22T20:12:57.925886+00:00
+modified: 2026-11-24T21:59:39.688545+00:00
 relationships:
+  depends_on:
+  - DEV-763
   related:
   - DEV-763
+  - DEV-786
+  - DEV-767
+  - DEV-771
+  - DEV-774
+comments:
+- date: 2026-11-23T00:54:01.640535+00:00
+  author: claude
+  text: |-
+    Waits for DEV-763 to land on main: the code to fix isn't on main yet.
+
+    - `list_running_jobs_everywhere`, `with_wrapper_processes` and the `--all` docs exist only in `4f1cd6ac8` on `agent/DEV-763` (ticket in Merging); `main` (`2b825e211`) has none of them.
+    - Added `depends-on DEV-763` and tag `waits`. Continue here once DEV-763 is merged: parse `--tasks-dir` from the wrapper command line into `tasks_dir`, and fix the `docs/help/agent.md` paragraph.
+- date: 2026-11-23T06:41:33.199719+00:00
+  author: claude
+  text: |-
+    Done: wrapper rows under `list-running --all` show the `--tasks-dir` they were started for.
+
+    - New `wrapper_tasks_dir` in `crates/lotar-lib/src/cli/handlers/agent.rs` reads `--tasks-dir` before `--` (canonicalized when it resolves); `list_wrapper_processes` puts it in `tasks_dir`, `wrapper_runs_in` uses it for the existing filter. Older wrappers without the flag stay `-` (JSON `null`).
+    - Without `--all` the filter is unchanged; JSON `tasks_dir` is now filled for wrappers too, like job records.
+    - `docs/help/agent.md`: the wrapper paragraph now says `--all` lists every tasks directory's wrappers with their `tasks_dir`.
+    - Unit test `wrapper_rows_show_their_tasks_dir` (incl. older wrapper, agent args after `--` ignored).
+    - Branch fast-forwarded to main `108a6996c` (has DEV-763). sccache's server pointed at a deleted temp dir, so checks ran unsandboxed with `RUSTC_WRAPPER=`.
+    - Told the DEV-786 thread it touches the same two files.
+  report:
+    commits:
+    - hash: f11013573
+      what: wrapper rows get tasks_dir from --tasks-dir; docs say what --all lists
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2479 Rust, 1567 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 407 tests
+    next: Merge agent/DEV-805 (on main 108a6996c)
+- date: 2026-11-23T08:42:24.149469+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T084201.248Z-105 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T084201.248Z-105 why.'
+- date: 2026-11-24T18:48:52.812769+00:00
+  author: claude
+  text: |-
+    Review: passed. `f11013573` does what "Done when" asks; merges cleanly onto main `855ff6f46`.
+
+    - Read: the diff (`crates/lotar-lib/src/cli/handlers/agent.rs`, `docs/help/agent.md`), the ticket, DEV-763, and main's commits to both files since (DEV-767, DEV-771, DEV-774: they don't touch the wrapper code). `git merge-tree main HEAD` gives no conflicts.
+    - `wrapper_tasks_dir` reads `--tasks-dir` only before `--` and canonicalizes like job records. The wrapper is spawned with a canonical path (`agent_job_service.rs:996`). `wrapper_runs_in` now reuses it, so the filter without `--all` is unchanged. Dedup in `with_wrapper_processes` is unchanged, so the record row still wins.
+    - Live check with fake `lotar-agent-wrapper` processes: `list-running --all` (text and JSON) shows `/private/tmp/.../a/.tasks` for the new wrapper and `-` / `null` for one without `--tasks-dir`, which is still listed. A path that can't be resolved shows as written. Without `--all`, `--tasks-dir a` lists only that dir's wrapper, with `tasks_dir` filled.
+    - Docs paragraph matches the behaviour.
+    - Reran: `npm ci` ok; `npm run lint` passed; `cargo nextest run -p lotar-lib -E 'test(list_running) | test(/wrapper/) | binary(/agent/)'` 7/7 passed, incl. the new `wrapper_rows_show_their_tasks_dir`. Full `npm test` and `npm run smoke` were not rerun (the fix agent reports them passed on `108a6996c`).
+    - No stray files, no second branch. No tickets filed.
+- date: 2026-11-24T19:49:14.525122+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/PageHeader-DiDJHFaU.js                 32.20 kB │ gzip:  12.47 kB
+    target/web/assets/SyncHub-Bxltj9Sn.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-C_pgaq3k.js                      47.86 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-CAV7iRsD.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-BII0DxUG.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DquDsQ8j.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-ymW2sFje.js                153.98 kB │ gzip:  38.52 kB
+    target/web/assets/SprintsList-BzJn0XWH.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-DUGgBBgf.js                     420.00 kB │ gzip: 127.67 kB
+
+    ✓ built in 2.09s
+    compressed 1939KiB -> 582KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806 (pid 92840), since 19:14 UTC
+    rust-test-runner: Took the check lock after 13 min
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805/crates/lotar-core)
+       Compiling harnessmux v0.3.0
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805/crates/lotar-lib)
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805/crates/lotar-tasks)
+       Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805/crates/lotar-agent)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805)
+        Finished `dev` profile [unoptimized] target(s) in 29.28s
+    ────────────
+     Nextest run ID 41ecd86f-afaf-4743-8124-fbfa85cd0e4c with nextest profile: default
+        Starting 2489 tests across 14 binaries
+    ────────────
+         Summary [ 200.556s] 2489 tests run: 2489 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpTghOkU
+    ```.
+
+    - Rebased `agent/DEV-805` onto `main` (`855ff6f4628f`): `7bb6115d4646`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T21:59:39.688545+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:\n```\ntarget/web/assets/ProjectInsights-CAV7iRsD.js            59.29 kB │ gzip:  19.04 kB\ntarget/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB\ntarget/web/assets/AutomationRulesEditor-BII0DxUG.js      72.27 kB │ gzip:  20.10 kB\ntarget/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB\ntarget/web/assets/MarkdownContent-DquDsQ8j.js           111.18 kB │ gzip:  35.20 kB\ntarget/web/assets/ConfigView-ymW2sFje.js                153.98 kB │ gzip:  38.52 kB\ntarget/web/assets/SprintsList-BzJn0XWH.js               254.93 kB │ gzip:  85.09 kB\ntarget/web/assets/index-DUGgBBgf.js                     420.00 kB │ gzip: 127.67 kB\n\n✓ built in 9.24s\n\e[33m[PLUGIN_TIMINGS] \e[0mJavaScript callbacks ran for 7.3s of this 9.2s build (79%).\nThe slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):\n  - plugin vite:vue transform (62%, 5.7s, 310 calls)\nAdditional callback time came from the callbacks below and from callbacks under 1s.\n1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:\n  - plugin vite:asset load (3 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.\n\ncompressed 1939KiB -> 582KiB (70% saved), embedding 89 gz + 1 raw assets\nrust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806 (pid 32418), since 21:14 UTC\nrust-test-runner: Took the check lock after 32 min\n   Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805/crates/lotar-web-assets)\n   Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-805)\n    Finished `dev` profile [unoptimized] target(s) in 7.10s\n────────────\n Nextest run ID 8abc99c1-b366-4bad-b0cb-7ddfca6f3ce1 with nextest profile: default\n    Starting 2489 tests across 14 binaries\n────────────\n     Summary [ 392.999s] 2489 tests run: 2489 passed, 0 skipped\nrust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmp4FLWZ1\n```.\n\n- Rebase onto `main` changed nothing (`7bb6115d4646`)\n- The check `npm run -s lint:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeced1b04e5228831466e9cd5e5b40847be299d3a868889d3e80daab96d8a6ba1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A42c6f21cbc4db470efa47a8538c852ec26c98bba092340aef9f8aae5c2a138d3
 description: |-
   Found in the DEV-763 review (2026-11-22).
 
   - `list_running_jobs_everywhere` in `crates/lotar-lib/src/cli/handlers/agent.rs` calls `with_wrapper_processes(jobs, None)`, so `--all` lists every `lotar-agent-wrapper` on the machine, each with `tasks_dir` `-` (`list_wrapper_processes` sets `tasks_dir: None`) although the wrapper's command line has `--tasks-dir`.
   - `docs/help/agent.md` ("`list-running` also lists the `lotar-agent-wrapper` processes ... of this tasks directory") doesn't say that `--all` lists them all.
 
-  Done when: wrapper rows under `--all` show the `--tasks-dir` from their command line (`-` for older wrappers), and the docs paragraph says what `--all` lists.
+  ## Done when
+
+  - [ ] `lotar agent list-running --all` (text and `--format json`): a wrapper row's `tasks_dir` is the `--tasks-dir` value from the wrapper's command line before `--` (canonicalized like job records; the value as written when it can't be resolved).
+  - [ ] A wrapper without `--tasks-dir` (an older lotar) still shows `-` (JSON `null`) and is still listed under `--all`.
+  - [ ] Without `--all`: same filtering as before (only this tasks directory's wrappers); their JSON `tasks_dir` is filled the same way.
+  - [ ] A wrapper whose job record is also listed is still shown once (the record row wins).
+  - [ ] `docs/help/agent.md` says that `--all` lists the wrappers of every tasks directory, with their `tasks_dir`.
+  - [ ] Unit test for reading `--tasks-dir` from a wrapper command line, including the older-wrapper case.
+tags:
+- job-paused
 history:
 - at: 2026-11-22T20:12:40.963936+00:00
   actor: claude
@@ -28,3 +149,134 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-23T00:53:04.146964+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T00:53:36.808297+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeced1b04e5228831466e9cd5e5b40847be299d3a868889d3e80daab96d8a6ba1
+- at: 2026-11-23T00:54:01.092874+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-763"]}'
+    new: '{"depends_on":["DEV-763"],"related":["DEV-763"]}'
+- at: 2026-11-23T00:54:01.588246+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-23T00:54:01.640535+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T00:55:07.389467+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-23T02:29:33.409053+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-23T06:18:07.485966+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-23T06:18:11.255405+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A42c6f21cbc4db470efa47a8538c852ec26c98bba092340aef9f8aae5c2a138d3
+- at: 2026-11-23T06:18:58.868692+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-763 review (2026-11-22).
+
+      - `list_running_jobs_everywhere` in `crates/lotar-lib/src/cli/handlers/agent.rs` calls `with_wrapper_processes(jobs, None)`, so `--all` lists every `lotar-agent-wrapper` on the machine, each with `tasks_dir` `-` (`list_wrapper_processes` sets `tasks_dir: None`) although the wrapper's command line has `--tasks-dir`.
+      - `docs/help/agent.md` ("`list-running` also lists the `lotar-agent-wrapper` processes ... of this tasks directory") doesn't say that `--all` lists them all.
+
+      Done when: wrapper rows under `--all` show the `--tasks-dir` from their command line (`-` for older wrappers), and the docs paragraph says what `--all` lists.
+    new: |-
+      Found in the DEV-763 review (2026-11-22).
+
+      - `list_running_jobs_everywhere` in `crates/lotar-lib/src/cli/handlers/agent.rs` calls `with_wrapper_processes(jobs, None)`, so `--all` lists every `lotar-agent-wrapper` on the machine, each with `tasks_dir` `-` (`list_wrapper_processes` sets `tasks_dir: None`) although the wrapper's command line has `--tasks-dir`.
+      - `docs/help/agent.md` ("`list-running` also lists the `lotar-agent-wrapper` processes ... of this tasks directory") doesn't say that `--all` lists them all.
+
+      ## Done when
+
+      - [ ] `lotar agent list-running --all` (text and `--format json`): a wrapper row's `tasks_dir` is the `--tasks-dir` value from the wrapper's command line before `--` (canonicalized like job records; the value as written when it can't be resolved).
+      - [ ] A wrapper without `--tasks-dir` (an older lotar) still shows `-` (JSON `null`) and is still listed under `--all`.
+      - [ ] Without `--all`: same filtering as before (only this tasks directory's wrappers); their JSON `tasks_dir` is filled the same way.
+      - [ ] A wrapper whose job record is also listed is still shown once (the record row wins).
+      - [ ] `docs/help/agent.md` says that `--all` lists the wrappers of every tasks directory, with their `tasks_dir`.
+      - [ ] Unit test for reading `--tasks-dir` from a wrapper command line, including the older-wrapper case.
+- at: 2026-11-23T06:36:22.148024+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-763"],"related":["DEV-763"]}'
+    new: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786"]}'
+- at: 2026-11-23T06:41:33.199719+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:41:45.192561+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:42:24.057244+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T08:42:24.149469+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T18:29:46.377503+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T18:48:52.812769+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T18:48:53.193973+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786"]}'
+    new: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774"]}'
+- at: 2026-11-24T19:49:14.525122+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:59:39.688545+00:00
+  actor: automation
+  changes:
+  - field: comment_added

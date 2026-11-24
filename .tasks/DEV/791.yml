@@ -1,16 +1,26 @@
 title: lotar comment -m <text> - reads stdin and silently drops the -m text
-status: Reviewing
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
 created: 2026-11-22T08:26:27.727612+00:00
-modified: 2026-11-22T19:38:35.052031+00:00
+modified: 2026-11-24T21:24:57.416319+00:00
 relationships:
   depends_on:
   - DEV-776
+  - local:LOCA-601
   related:
   - DEV-776
+  - DEV-801
+  - DEV-782
+  - DEV-785
+  - DEV-787
+  - DEV-790
+  - DEV-809
+  - DEV-816
+  - DEV-827
+  - DEV-767
+  - DEV-850
 comments:
 - date: 2026-11-22T15:42:44.277575+00:00
   author: claude
@@ -45,9 +55,309 @@ comments:
       result: passed
       reason: exit 1 with the hint, nothing saved
     next: Merge agent/DEV-791 onto main
+- date: 2026-11-23T05:27:25.896284+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Calendar-C0xARt3f.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CX443Y8V.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-TBtDqkQf.js                  25.87 kB │ gzip:   8.77 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-CinwyI-m.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-CzYU1Ow2.js                      47.85 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-LVHYGkHY.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-ugyk1aPA.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-DfWYORyb.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-CGcF2nGk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-AdOIdUyW.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 7.25s
+    compressed 1930KiB -> 580KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-agent)
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-lib)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791)
+        Finished `dev` profile [unoptimized] target(s) in 1m 52s
+    ────────────
+     Nextest run ID b910074c-62b7-41ef-b96a-cd181fca3828 with nextest profile: default
+        Starting 2471 tests across 14 binaries
+    ────────────
+         Summary [ 505.761s] 2471 tests run: 2471 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpDOpQWY
+    ```.
+
+    - Rebased `agent/DEV-791` onto `main` (`f95414e5ab9b`): `b70a6d9c6ab6`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T05:29:13.880960+00:00
+  author: automation
+  text: The merge agent's job job-20261123T050444.113Z-62 failed (lotar agent logs job-20261123T050444.113Z-62); the fix agent retries it on branch agent/DEV-791.
+- date: 2026-11-23T08:52:04.152958+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:\n```\ntarget/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB\ntarget/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB\n\n✓ built in 7.69s\n\e[33m[PLUGIN_TIMINGS] \e[0mJavaScript callbacks ran for 5.8s of this 7.6s build (76%).\nThe slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):\n  - plugin vite:vue transform (60%, 4.6s, 307 calls)\n  - plugin vite:build-html transform (20%, 1.6s, 1 call)\nThese rows add up to more than the total. Callbacks can overlap, so the same time counts for more than one row.\n2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:\n  - plugin vite:css transform (89 calls)\n  - plugin vite:asset load (3 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.\n\ncompressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets\nrust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-802 (pid 69627), since 08:27 UTC\nrust-test-runner: Took the check lock after 11 min\n   Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-core)\n   Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-web-assets)\n   Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-lib)\n   Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-tasks)\n   Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791/crates/lotar-agent)\n   Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-791)\n    Finished `dev` profile [unoptimized] target(s) in 2m 44s\n────────────\n Nextest run ID 6929c5c2-e0e1-4b61-b067-759678acc5d5 with nextest profile: default\n    Starting 2481 tests across 14 binaries\n────────────\n     Summary [ 497.758s] 2481 tests run: 2481 passed, 0 skipped\nrust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpgb3q6p\n```.\n\n- Rebased `agent/DEV-791` onto `main` (`d4bdbbbf62f8`): `cf7c97b07641`\n- The check `npm run -s lint:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T08:52:08.729166+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082651.976Z-99 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082651.976Z-99 why.'
+- date: 2026-11-23T19:17:51.669891+00:00
+  author: automation
+  text: The fix agent's job job-20261123T191732.016Z-419 failed (lotar agent logs job-20261123T191732.016Z-419); @fix-retry retries it on branch agent/DEV-791.
+- date: 2026-11-23T19:18:07.890600+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T191752.965Z-420 failed again (lotar agent logs job-20261123T191752.965Z-420). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:19:08.689384+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude login action LOCA-601; no retry choice is needed here.
+
+    - Jobs `job-20261123T191732.016Z-419` and `job-20261123T191752.965Z-420` both failed before work: the login expired and cannot be renewed.
+    - Earlier `job-20261123T082651.976Z-99` hit the weekly limit, resetting November 24 at 08:00 Pacific; renewing the login may still leave that limit in effect. Do not retry while authentication or quota is unavailable.
+    - LOCA-601 already defines authentication completion checks; its owner inbox is INBOX-668. Per `standards/docs/decisions/2026-11-15-inbox-triage.md`, this ticket waits Blocked with no assignee and resumes through Prerequisites done.
+    - Earlier merge checks also found a temp-folder leak, already recorded in DEV-801; no checks are waived by this triage.
+- date: 2026-11-23T19:19:09.595282+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:19:13.316327+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-791 yet. DEV-791 waits for local:LOCA-601.'
+- date: 2026-11-24T16:08:01.272032+00:00
+  author: claude
+  text: |-
+    Fix still good, nothing new to change: the merge failed only on the known temp-folder flake (DEV-801).
+
+    - Branch `agent/DEV-791` = `main` (`d4bdbbbf6`) + `cf7c97b07`, nothing uncommitted
+    - Both merge runs: all Rust tests passed, then the runner's guard found one `.tmp…` dir; same leak seen in DEV-782, DEV-785, DEV-787, DEV-790, DEV-809 merges/reviews
+    - `npm run -s test:rust -- dev282` (this ticket's test file): 7 passed, guard found no leftovers
+    - Check rerun on the built binary: `lotar comment TST-1 -m msg - <<<'other'` exits 1 with the hint, no comment saved
+  report:
+    commits:
+    - hash: cf7c97b07
+      what: refuse more than one of -m, -F and TEXT with a hint
+    checks:
+    - command: npm run -s test:rust -- dev282
+      result: passed
+      reason: 7 tests, no temp leftovers
+    - command: lotar comment TST-1 -m msg - <<<'other'
+      result: passed
+      reason: exit 1 with hint, no comment saved
+    - command: npm run lint
+      result: not_run
+      reason: passed in the merge run on cf7c97b07 (lint:agent), no change since
+    - command: npm test
+      result: not_run
+      reason: full Rust suite passed 2481/2481 in the merge run; only the temp guard tripped (DEV-801)
+    - command: npm run smoke
+      result: not_run
+      reason: no change since the reviewed commit
+    next: 'Merge agent: rerun test:agent; a lone temp-folder leftover is DEV-801''s flake, not this change'
+- date: 2026-11-24T16:08:06.839507+00:00
+  author: claude
+  text: |-
+    Fix unchanged and still correct; the failed merge was the known temp-folder flake (DEV-801), not this change.
+
+    - Branch holds one commit beyond `main` (`d4bdbbbf6`): `cf7c97b07`, no new edits needed
+    - Ticket check `lotar comment <ID> -m msg - <<<'other'`: exit 1, `Give the comment once…` with hint, nothing saved
+    - `cargo nextest run -p lotar-lib --test integration dev282`: 7 passed, temp folder count unchanged (261 before and after)
+    - Merge failure on 2026-11-23: all 2481 tests passed, only the guard found `.tmpgb3q6p`; same leak seen in DEV-782, DEV-785, DEV-787, DEV-790, DEV-809 merges
+  report:
+    commits:
+    - hash: cf7c97b07
+      what: refuse more than one of -m, -F and TEXT
+    checks:
+    - command: lotar comment PRB-1 -m msg - <<<'other' (ticket check)
+      result: passed
+      reason: exit 1 with hint, nothing saved
+    - command: cargo nextest run -p lotar-lib --test integration dev282
+      result: passed
+      reason: 7 tests, no temp entries left
+    - command: npm run -s lint:agent
+      result: passed
+      reason: merge run 2026-11-23 on the same commit
+    - command: npm run -s test:agent
+      result: failed
+      reason: 2481/2481 passed, temp-folder guard tripped on .tmpgb3q6p, known flake DEV-801
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or server change
+    next: Merge agent reruns test:agent; a leftover .tmp entry is DEV-801, not this change
+- date: 2026-11-24T16:15:34.163150+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b207549efaa03f8bb9222313e972acab1875fc1de68fe3959451a42977c91ce of the job job-20261123T161645.039Z-352 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:16:05.297417+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A457cfd636b7eb891802f4a3e755fde64a4e7447c2cd4033f5eaeb570754b9303 of the job job-20261123T125250.073Z-241 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:16:34.291376+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f5ef2f0c52ab6dd97c903f431bc44c6a131414ef7aa3bcc49c58974325b4616 of the job job-20261123T115237.248Z-206 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:17:18.811245+00:00
+  author: claude
+  text: |-
+    Fix done, nothing new to change: `cf7c97b07` on `agent/DEV-791`, on top of `main` (`d4bdbbbf6`).
+
+    - Ran the ticket's check again with the built binary: exit 1, `Give the comment once…` plus a hint, nothing saved
+    - LOCA-601 (the login) is Done, so no prerequisite is open now
+    - The merge is only held up by the known temp-folder leak (DEV-801)
+    - Several T3 threads ran this job at the same time (see the automation comments); this one makes no edits
+  report:
+    commits:
+    - hash: cf7c97b07
+      what: refuse more than one of -m, -F and TEXT with a hint
+    checks:
+    - command: lotar comment TST-1 -m msg - <<<'other'
+      result: passed
+      reason: exit 1 with hint, no comment saved
+    - command: npm run -s test:agent
+      result: failed
+      reason: all 2481 Rust tests passed; only the temp-folder guard tripped (DEV-801, not this change)
+    - command: npm run lint
+      result: not_run
+      reason: unchanged since earlier runs on cf7c97b07
+    next: Merge once DEV-801's temp-folder leak is fixed or the merge check is rerun
+- date: 2026-11-24T16:26:48.547711+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abc9a595b2abf13ca2b274f677ae19886f138bb6e6b23f3490d59ee39bfa83b45 of the job job-20261123T181713.723Z-395 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:26:49.868287+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A69006606dc4c52552b979e42f850081797b37bab95fbc5b00fe31c7c0b104257 of the job job-20261123T151626.746Z-319 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:50.603173+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6fa2e4b52af95ea00979977069469bddac8f9432611f55be50cf7d4bbbeb02ad of the job job-20261123T095209.367Z-139 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:51.347902+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3502cb18c89e908530bc4f3076dfd59b943e8f7bb22c6075cebe1a23ebacf52 of the job job-20261123T082651.976Z-99 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:48:51.405726+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3502cb18c89e908530bc4f3076dfd59b943e8f7bb22c6075cebe1a23ebacf52 of the job job-20261123T082651.976Z-99 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:49:31.032842+00:00
+  author: claude
+  text: |-
+    Merged: DEV-791 is on `main` as `3473319ba` and pushed to origin.
+
+    - The first `npm run -s test:agent` failed only on the known temp-folder leak (`.tmpgb3q6p`, all 2481 tests passed); I added a comment to the flaky list DEV-801
+    - The rerun passed: 2481/2481, nothing left in the temp folder
+    - Rebased onto `8e6369b3d` (STD-335 only changes `.tasks/DEV/automation.yml`), then fast-forwarded the main checkout
+  report:
+    commits:
+    - hash: 3473319ba
+      what: refuse more than one of -m, -F and TEXT
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge run
+    - command: npm run -s test:agent
+      result: passed
+      reason: rerun, 2481/2481, no temp leftovers
+    - command: npm run smoke
+      result: not_run
+      reason: not part of lotar's merge checks
+    next: 'None: landed on main and pushed'
+- date: 2026-11-24T21:00:12.395787+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A02351dc3801dac2b84a22baef920ba697719ffddbb5a1ffe823738e14ecae7e2 of the job job-20261124T194313.633Z-52 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T210012.370Z-89: DEV-791 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:03:01.086694+00:00
+  author: claude
+  text: |-
+    Nothing left to do: the fix is on `main` as `3473319ba`, and a local build refuses the mixed input.
+
+    - Built `3473319ba`: `lotar comment TST-1 -m msg - <<<'other'` and `-m msg -F -` both exit 1 with the hint; `-m ok` alone still saves
+    - The installed `lotar 0.15.6` still saves `other`: no release tag contains `3473319ba` yet, so the fix ships in the next release
+    - I changed no files and made no new commit
+  report:
+    commits:
+    - hash: 3473319ba
+      what: refuse -m with -F or TEXT (already on main)
+    checks:
+    - command: lotar comment TST-1 -m msg - <<<other (build of 3473319ba)
+      result: passed
+      reason: refused with hint, exit 1
+    - command: same check with installed lotar 0.15.6
+      result: failed
+      reason: release predates the fix, saves 'other'
+    - command: npm run lint/test/smoke
+      result: not_run
+      reason: no new changes; the merge job ran test:agent 2481/2481
+    next: 'None: the fix ships with the next release after 0.15.6'
+- date: 2026-11-24T21:03:30.723775+00:00
+  author: claude
+  text: |-
+    Done: the fix is on `main` (`3473319ba`) and the ticket's check passes.
+
+    - Ran in a scratch workspace with `target/debug/lotar` built from `3473319ba`: `lotar comment TST-1 -m msg - <<<'other'` refuses with "Give the comment once, not with -m and TEXT…" and exit 1; plain `-m msg2` still saves
+    - The installed `lotar 0.15.6` predates the fix (no release tag contains `3473319ba`), so it still saves `other` silently until the next release
+    - Full suites ran in the merge job (2481/2481)
+  report:
+    commits:
+    - hash: 3473319ba
+      what: refuse -m together with TEXT/-F instead of dropping one
+    checks:
+    - command: lotar comment TST-1 -m msg - <<<'other' (branch build)
+      result: passed
+      reason: refused with hint, exit 1
+    - command: lotar comment TST-1 -m msg - <<<'other' (installed 0.15.6)
+      result: not_run
+      reason: 0.15.6 predates the fix, still saves stdin
+    next: Ships with the next lotar release
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab0f4d5f17a66f33db4ed35ffaf7aa830bbe9872437d49c9bc5a4ef36fcbd364
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad64dba53a7c591ed66fa7ce0bf338b913bb9a0aa1ba4e893b7e2dd768705c648
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3502cb18c89e908530bc4f3076dfd59b943e8f7bb22c6075cebe1a23ebacf52
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6fa2e4b52af95ea00979977069469bddac8f9432611f55be50cf7d4bbbeb02ad
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad8cbaeae779be6d5e432ed595705280838df91ce067c29f77d38e1413c43c71b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f5ef2f0c52ab6dd97c903f431bc44c6a131414ef7aa3bcc49c58974325b4616
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A457cfd636b7eb891802f4a3e755fde64a4e7447c2cd4033f5eaeb570754b9303
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb5129a675dac635afc8834bed8251c04038b54df92fa65d5a06fdbfbc43c2f0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A69006606dc4c52552b979e42f850081797b37bab95fbc5b00fe31c7c0b104257
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b207549efaa03f8bb9222313e972acab1875fc1de68fe3959451a42977c91ce
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6242955273777f695aa956d39d325e6db6d0158ab53c36210f35e6ec7b5a3f3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abc9a595b2abf13ca2b274f677ae19886f138bb6e6b23f3490d59ee39bfa83b45
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7faec2d992d505f7a755d5322bd421da8d0a84c6fddad47aeab76abd970b03ba
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8319b775c900c1809c96fdc0580cf8a7522f33abf6c50f7cddd082212468b735
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A02351dc3801dac2b84a22baef920ba697719ffddbb5a1ffe823738e14ecae7e2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa477b18edc5489bb3a0e45441358f71cd525cc0c8b5617fc04cdb5d992ed3c51
 description: 'Found (DEV-776 review): since DEV-776 a lone `-` as TEXT means `-F -`, which comes before `-m` in `resolve_comment_text` (crates/lotar-lib/src/cli/handlers/comment.rs:362). So `lotar comment <ID> -m msg - <<EOF` saves the stdin text and drops msg without a word; before DEV-776 the `-` was dropped instead. Check: `lotar comment <ID> -m msg - <<<''other''`. Done: giving more than one of -m, -F and TEXT is refused with a hint (or -m and a lone - is), never one silently dropped.'
 tags:
 - health
@@ -122,3 +432,301 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-23T00:19:12.734855+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T05:27:25.896284+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:28:45.874358+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-776"],"related":["DEV-776"]}'
+    new: '{"depends_on":["DEV-776"],"related":["DEV-776","DEV-801"]}'
+- at: 2026-11-23T05:29:09.415450+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-23T05:29:13.880960+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:26:57.755067+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-23T08:52:04.152958+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:52:04.662565+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3502cb18c89e908530bc4f3076dfd59b943e8f7bb22c6075cebe1a23ebacf52
+- at: 2026-11-23T08:52:08.628749+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried
+    new: health, merge-retried, job-paused
+- at: 2026-11-23T08:52:08.729166+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:52:21.551452+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6fa2e4b52af95ea00979977069469bddac8f9432611f55be50cf7d4bbbeb02ad
+- at: 2026-11-23T10:52:33.009805+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad8cbaeae779be6d5e432ed595705280838df91ce067c29f77d38e1413c43c71b
+- at: 2026-11-23T11:52:46.258474+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f5ef2f0c52ab6dd97c903f431bc44c6a131414ef7aa3bcc49c58974325b4616
+- at: 2026-11-23T12:52:59.961031+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A457cfd636b7eb891802f4a3e755fde64a4e7447c2cd4033f5eaeb570754b9303
+- at: 2026-11-23T14:16:24.103532+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb5129a675dac635afc8834bed8251c04038b54df92fa65d5a06fdbfbc43c2f0
+- at: 2026-11-23T15:16:41.525719+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A69006606dc4c52552b979e42f850081797b37bab95fbc5b00fe31c7c0b104257
+- at: 2026-11-23T16:16:53.789798+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b207549efaa03f8bb9222313e972acab1875fc1de68fe3959451a42977c91ce
+- at: 2026-11-23T17:17:09.617753+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6242955273777f695aa956d39d325e6db6d0158ab53c36210f35e6ec7b5a3f3
+- at: 2026-11-23T18:17:27.492679+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abc9a595b2abf13ca2b274f677ae19886f138bb6e6b23f3490d59ee39bfa83b45
+- at: 2026-11-23T19:17:49.210337+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7faec2d992d505f7a755d5322bd421da8d0a84c6fddad47aeab76abd970b03ba
+- at: 2026-11-23T19:17:50.287610+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, merge-retried, job-paused
+    new: health, merge-retried, job-paused, fix-retried
+- at: 2026-11-23T19:17:51.669891+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:04.130456+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8319b775c900c1809c96fdc0580cf8a7522f33abf6c50f7cddd082212468b735
+- at: 2026-11-23T19:18:07.198693+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:18:07.890600+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:19:03.395417+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-776"],"related":["DEV-776","DEV-801"]}'
+    new: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801"]}'
+- at: 2026-11-23T19:19:03.912064+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:19:08.689384+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:19:09.331701+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T19:19:09.595282+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:19:13.316327+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:19:25.200167+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:08:01.272032+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:08:02.733692+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801"]}'
+    new: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809"]}'
+- at: 2026-11-24T16:08:06.839507+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:15:34.163150+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:16:05.297417+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:16:34.291376+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:17:18.811245+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:48.547711+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:49.868287+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:50.603173+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:51.347902+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:48:51.405726+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:49:31.032842+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:49.358427+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809"]}'
+    new: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809","DEV-816"]}'
+- at: 2026-11-24T17:24:50.323592+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809","DEV-816"]}'
+    new: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809","DEV-816","DEV-827"]}'
+- at: 2026-11-24T17:38:44.990830+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809","DEV-816","DEV-827"]}'
+    new: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809","DEV-816","DEV-827","DEV-767"]}'
+- at: 2026-11-24T19:03:14.022669+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:43:19.401767+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T19:43:19.982161+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A02351dc3801dac2b84a22baef920ba697719ffddbb5a1ffe823738e14ecae7e2
+- at: 2026-11-24T20:43:27.609343+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa477b18edc5489bb3a0e45441358f71cd525cc0c8b5617fc04cdb5d992ed3c51
+- at: 2026-11-24T21:00:12.395787+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:03:01.086694+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:03:30.723775+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:05:32.576568+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T21:06:07.573695+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, merge-retried, job-paused, fix-retried
+    new: health
+- at: 2026-11-24T21:24:57.416319+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809","DEV-816","DEV-827","DEV-767"]}'
+    new: '{"depends_on":["DEV-776","local:LOCA-601"],"related":["DEV-776","DEV-801","DEV-782","DEV-785","DEV-787","DEV-790","DEV-809","DEV-816","DEV-827","DEV-767","DEV-850"]}'

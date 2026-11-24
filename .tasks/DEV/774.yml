@@ -1,17 +1,24 @@
 title: 'Bump harnessmux to 0.3: Claude tool commands from tool.updated, and plans in the job log'
-status: Blocked
+status: Done
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-21T22:42:33.887526+00:00
-modified: 2026-11-22T19:43:50.137620+00:00
+modified: 2026-11-24T22:51:20.551634+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-13
   - harnessmux:HARN-16
   related:
   - DEV-766
+  - DEV-777
+  - DEV-778
+  - DEV-782
+  - DEV-767
+  - DEV-805
+  - DEV-833
+  - DEV-769
 comments:
 - date: 2026-11-22T02:38:02.077636+00:00
   author: claude
@@ -25,8 +32,101 @@ comments:
 - date: 2026-11-22T19:43:50.137620+00:00
   author: claude
   text: 'Stalled since 2026-11-22T02:38Z with no lotar job: the live check restarted @fix, its prerequisites are done (lotar rule "Prerequisites done: continue the waiting ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-23T00:23:28.071900+00:00
+  author: claude
+  text: |-
+    Done: lotar is on harnessmux 0.3.0, Claude tool rows name their command or path, and plans appear in the job log.
+
+    - `Cargo.toml`: harnessmux `0.3.0`. I fast-forwarded the branch to main first so it has DEV-766
+    - `agent_runner.rs`: resume maps the new `Error::NotResumable`, the same line as DEV-777. Without it, 0.3 would break the fallback to a new session
+    - `agent_job_service/tools.rs`: input, paths and output now come from `tool.started`, `tool.updated` and `tool.finished`, not `raw`. The newest input wins. For Codex, the output is harnessmux's joined terminal output. A cut longer than 16 KB keeps its full size in `output_bytes`
+    - A `tool.updated` that changes the title, input or paths writes another `running` entry. The log shows only each call's newest entry (`visibleLogEntries`), so a running Claude Bash call shows its command live
+    - `plan` events become `agent_job_plan` entries: `plan` holds the steps, and `message` is a Markdown task list, or "Plan cleared". `api_types.rs`, `types.ts`, `openapi.json`, `agent.md` and `sse.md` all agree
+    - Tests: the event shapes come from harnessmux's live Claude recording, plus Codex shapes. The driver test runs 40 Claude calls and 2 plans; its log stays under 200 KB
+  report:
+    commits:
+    - hash: c6eef96f4
+      what: harnessmux 0.3.0, tool.updated, event fields, agent_job_plan
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2470 Rust + 1569 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 407 tests
+    - command: live Claude job
+      result: not_run
+      reason: tests use Claude and Codex events from harnessmux's own live recording
+    next: Merge; DEV-777 makes the same harnessmux bump and NotResumable line, so rebasing either one onto the other is clean
+- date: 2026-11-23T08:27:01.962303+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T08:27:09.685742+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082646.828Z-98 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082646.828Z-98 why.'
+- date: 2026-11-23T09:29:22.605871+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T10:30:57.577058+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T11:31:43.112372+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T12:32:03.194045+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T13:34:23.280707+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T14:34:37.329909+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T15:34:55.636480+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T16:35:18.334266+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T17:05:15.225321+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-774` onto `main` conflicts in `docs/help/sse.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-774` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6331f86331214fb16e5f95218a7af2feca6938bae968e0bb650aafa789a84b43
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f823ae5fe624249af05cfbf43a32985189d25e5c5b1c24fa3b10538e5f10fc7
 description: |-
   DEV-766 builds tool entries from harnessmux 0.2.0's `Event.raw`. claude-agent-acp sends a Bash command or Read path only in an in-progress `tool_call_update`, which 0.2.0 drops, so Claude tool rows show only "Terminal" and the output. harnessmux 0.3.0 (HARN-14) emits it as `tool.updated` and adds `input`, `locations`, `output` and `plan`, but is not on crates.io (HARN-13 waits for the owner).
 
@@ -100,3 +200,137 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-23T00:09:02.489684+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-23T00:09:08.699+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f823ae5fe624249af05cfbf43a32985189d25e5c5b1c24fa3b10538e5f10fc7
+- at: 2026-11-23T00:23:28.071900+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T00:23:28.430366+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777"]}'
+- at: 2026-11-23T00:24:38.444522+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T05:28:55.398704+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T08:27:01.962303+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:27:09.464907+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent
+    new: agent, job-paused
+- at: 2026-11-23T08:27:09.685742+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:29:22.605871+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:30:57.577058+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T11:31:43.112372+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T12:32:03.194045+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T13:34:23.280707+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T14:34:37.329909+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T15:34:55.636480+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T16:35:18.334266+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:05:15.225321+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:17:56.718213+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: agent, job-paused
+    new: agent
+- at: 2026-11-24T17:21:34.284154+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778"]}'
+- at: 2026-11-24T17:37:55.617725+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782"]}'
+- at: 2026-11-24T17:38:44.990351+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767"]}'
+- at: 2026-11-24T18:48:53.193223+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805"]}'
+- at: 2026-11-24T22:25:53.934706+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833"]}'
+- at: 2026-11-24T22:51:20.551634+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833"]}'
+    new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833","DEV-769"]}'

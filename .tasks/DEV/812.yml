@@ -1,16 +1,365 @@
 title: 'File viewer hangs forever when a git call hangs: git children have no timeout'
-status: Todo
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-22T21:53:12.043089+00:00
-modified: 2026-11-22T22:00:01.998584+00:00
+modified: 2026-11-24T19:00:45.366589+00:00
 relationships:
+  blocks:
+  - DEV-808
   related:
   - DEV-813
   - DEV-814
   - DEV-768
+  - DEV-808
+  - DEV-784
+  - DEV-837
+comments:
+- date: 2026-11-23T02:41:05.797687+00:00
+  author: claude
+  text: |-
+    From DEV-808 (the inbox relay timeouts are this hang):
+    - `clear_repository_env` (`crates/lotar-core/src/utils/git.rs`) strips every `GIT_CONFIG*` key from lotar's git children, so the check's `GIT_CONFIG_GLOBAL` FIFO doesn't reach them. Point `HOME` at a folder whose `.gitconfig` is a FIFO instead.
+    - The CLI hangs too, not only the server: `repos.ts --inbox` runs about 5 lotar calls. With `GIT_TIMEOUT` at 20 s each, a hung git can still cost well over a minute per relay. DEV-808 waits on this ticket for its "nested comment returns within seconds" check.
+- date: 2026-11-23T03:39:02.537589+00:00
+  author: claude
+  text: |-
+    Fixed: a hung git config gives no file links within ~5 s instead of blocking the file viewer.
+
+    - **Two causes.** Git children had no timeout. Also, the file viewer's walk (`ignore` crate) opened `~/.gitconfig` inside lotar's own process to find `core.excludesFile`, so a child timeout alone would not have unblocked `/api/files/*`.
+    - `git_command` now returns `GitCommand` (`crates/lotar-core/src/utils/git.rs`). It has no `output`/`status` without a limit: 20 s (`GIT_TIMEOUT`), or 10 min (`GIT_LONG_TIMEOUT`) for `commit`, `push`, `rebase`, `merge`, `add`, `worktree` and other slow subcommands. All ~60 call sites are covered, and the compiler enforces it.
+    - The merge job's `git push` goes through its own cancellable runner, which now also stops after 10 min.
+    - `apply_global_excludes` asks `git config --path --get core.excludesFile` with a 5 s limit. The file viewer, reference suggestions and scanner use it.
+    - If git doesn't answer in time, the viewer lists no files (no links, 404) rather than show globally ignored files. Suggestions and the scanner carry on without global excludes.
+    - Tests: a git child hung on a FIFO `.gitconfig` is stopped at its timeout. `/api/files/resolve` and `/api/files/content` answer in ~5 s with `HOME/.gitconfig` as a FIFO. Globally ignored files stay hidden.
+    - Limit: if the excludes file itself sat in Dropbox, lotar still reads it in-process. That is not today's setup.
+    - For DEV-808: CLI git calls now stop at 20 s. A relay of ~5 lotar calls can still take ~100 s when git hangs.
+  report:
+    commits:
+    - hash: b3ca55304
+      what: git children time out; file walks get global excludes from a timed git call
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2474 Rust, 1567 UI
+    - command: npm run smoke
+      result: passed
+      reason: '407'
+    - command: red test before fix
+      result: passed
+      reason: hung_git_config test hung until killed at 120 s without the fix
+    - command: live lotar serve with a hung ~/.gitconfig
+      result: not_run
+      reason: covered by the API test
+    next: Review, then merge
+- date: 2026-11-23T07:19:55.779498+00:00
+  author: claude
+  text: |-
+    Review: passed. `b3ca55304` does what "Done when" asks; no blocking or minor findings.
+
+    - **Read:** the diff (8 files), the ticket and both comments, DEV-808, DEV-813/814 (duplicates, WontDo) and main's commits since the merge base. Main's DEV-784 adds a `git_command(...).status()` call that compiles against the new `GitCommand` (it times it too). `git merge-tree main HEAD` merges cleanly.
+    - **Every git child has a limit:** `git_command` returns `GitCommand` (`crates/lotar-core/src/utils/git.rs:48`). Its only `output`/`status` go through `output_within`, which kills the process group and returns `TimedOut`. Only two places get the raw command back: `BlobBatch` (`audit_service.rs:27`, every read limited by `GIT_TIMEOUT`) and the merge job's push (`merge.rs:359`, `run_process` with `GIT_LONG_TIMEOUT`). The only other `Command::new("git")` calls are in tests (`t3_claude_settings.rs`).
+    - **No in-process global config read:** `git_global(true)` is gone from all three walks (`scanner.rs`, `repo_file_service.rs`, `reference_service.rs`). `ignore` 0.4.34 opened `$HOME/.gitconfig` itself (`gitignore.rs:636`), which blocks on a FIFO, so `hung_git_config_gives_no_file_links_within_seconds` would hang on main.
+    - **Excludes still apply the same way:** `add_ignore` gets the same cwd root and precedence slot as the old global matcher. A timeout empties only the file viewer (`repo_file_service.rs:69`); missing git, a git error or nothing set falls back to `$XDG_CONFIG_HOME/git/ignore` or `~/.config/git/ignore`.
+    - **Out of scope, not a finding:** lotar still parses the repo's own `.git/config` (`read_remotes`, `GitConfigDetector`). That file is not the one that hung.
+    - **Reran:** `npm ci` (ok). `cargo nextest run -p lotar-core -p lotar-lib -p lotar-tasks -p lotar-agent -E 'test(/timeout_tests/) | test(/dev549/) | test(/repo_file/) | test(/reference/) | test(/scanner/) | test(/merge/)'`: 209 passed in 280 s. `npm run lint:agent` passed. Worktree left clean.
+    - **Not rerun:** full `npm test` and `npm run smoke`, too long for this review. The fix agent reports both passed.
+    - **No UI changes**, so no ui-review was needed. No tickets filed.
+- date: 2026-11-23T09:47:30.817127+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:\n```\ntarget/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB\ntarget/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB\ntarget/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB\ntarget/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB\n\n✓ built in 3.49s\n\e[33m[PLUGIN_TIMINGS] \e[0mJavaScript callbacks ran for 2.9s of this 3.5s build (83%).\nThe slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):\n  - plugin vite:vue transform (71%, 2.5s, 307 calls)\nAdditional callback time came from the callbacks below and from callbacks under 1s.\n1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:\n  - plugin vite:asset load (3 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.\n\ncompressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets\nrust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-777 (pid 8680), since 08:33 UTC\nrust-test-runner: Took the check lock after 25 min\n   Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-core)\n   Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-web-assets)\n   Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-lib)\n   Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-tasks)\n   Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-agent)\n   Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812)\n    Finished `dev` profile [unoptimized] target(s) in 2m 30s\n────────────\n Nextest run ID 828fe4cd-806e-4e86-a2c2-ff5cf0b3de84 with nextest profile: default\n    Starting 2484 tests across 14 binaries\n────────────\n     Summary [1092.247s] 2484 tests run: 2484 passed (1 slow), 0 skipped\nrust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpHjpu9p\n```.\n\n- Rebased `agent/DEV-812` onto `main` (`d4bdbbbf62f8`): `7796348632d1`\n- The check `npm run -s lint:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T09:47:38.883535+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085858.399Z-116 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085858.399Z-116 why.'
+- date: 2026-11-23T11:07:49.672952+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Dependencies-DZjT2q4g.js               16.10 kB │ gzip:   6.21 kB
+    target/web/assets/ScanView-BXAFtyMw.js                   16.54 kB │ gzip:   5.50 kB
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.92s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812)
+        Finished `dev` profile [unoptimized] target(s) in 6.32s
+    ────────────
+     Nextest run ID 2c1402b3-5c83-4b2d-8d14-3467d59172cf with nextest profile: default
+        Starting 2484 tests across 14 binaries
+    ────────────
+         Summary [1083.279s] 2484 tests run: 2484 passed (1 slow), 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpNv6hJu
+    ```.
+
+    - Rebase onto `main` changed nothing (`7796348632d1`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T12:28:02.435149+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Dependencies-DZjT2q4g.js               16.10 kB │ gzip:   6.21 kB
+    target/web/assets/ScanView-BXAFtyMw.js                   16.54 kB │ gzip:   5.50 kB
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.54s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812)
+        Finished `dev` profile [unoptimized] target(s) in 4.79s
+    ────────────
+     Nextest run ID f19b6930-0a4f-4fea-b6cf-04d368b5cb93 with nextest profile: default
+        Starting 2484 tests across 14 binaries
+    ────────────
+         Summary [1076.218s] 2484 tests run: 2484 passed (1 slow), 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpXRlOis
+    ```.
+
+    - Rebase onto `main` changed nothing (`7796348632d1`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T13:48:49.167775+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Dependencies-DZjT2q4g.js               16.10 kB │ gzip:   6.21 kB
+    target/web/assets/ScanView-BXAFtyMw.js                   16.54 kB │ gzip:   5.50 kB
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.93s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812)
+        Finished `dev` profile [unoptimized] target(s) in 5.60s
+    ────────────
+     Nextest run ID 44843f1d-bb5a-4388-9629-a7cd366a3561 with nextest profile: default
+        Starting 2484 tests across 14 binaries
+    ────────────
+         Summary [1092.926s] 2484 tests run: 2484 passed (1 slow), 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmp3lY3Xl
+    ```.
+
+    - Rebase onto `main` changed nothing (`7796348632d1`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T15:09:33.775717+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Dependencies-DZjT2q4g.js               16.10 kB │ gzip:   6.21 kB
+    target/web/assets/ScanView-BXAFtyMw.js                   16.54 kB │ gzip:   5.50 kB
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.87s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812)
+        Finished `dev` profile [unoptimized] target(s) in 5.38s
+    ────────────
+     Nextest run ID 7dfe46bf-9e3d-4b1c-a3f4-b99ceb29f193 with nextest profile: default
+        Starting 2484 tests across 14 binaries
+    ────────────
+         Summary [1093.197s] 2484 tests run: 2484 passed (1 slow), 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpFP3mav
+    ```.
+
+    - Rebase onto `main` changed nothing (`7796348632d1`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T16:30:44.676159+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/Dependencies-DZjT2q4g.js               16.10 kB │ gzip:   6.21 kB
+    target/web/assets/ScanView-BXAFtyMw.js                   16.54 kB │ gzip:   5.50 kB
+    target/web/assets/Calendar-h9y83UQJ.js                   18.35 kB │ gzip:   6.86 kB
+    target/web/assets/core-DYVNBsTp.js                       20.39 kB │ gzip:   8.05 kB
+    target/web/assets/ReleasesList-CXAgv4Dg.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-BNcSDuFp.js                  28.25 kB │ gzip:   9.36 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-BNuSIsam.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-4b3VNnFc.js                      47.85 kB │ gzip:  15.24 kB
+    target/web/assets/ProjectInsights-Cu6ZWYUK.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-_cwCqdPV.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-Oqyc2_Wo.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-BrepuXhk.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-Cb0OTuq2.js                     416.09 kB │ gzip: 126.30 kB
+
+    ✓ built in 2.83s
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812)
+        Finished `dev` profile [unoptimized] target(s) in 6.27s
+    ────────────
+     Nextest run ID 5ebe2e28-23e6-40e1-913f-e8c4ac51777d with nextest profile: default
+        Starting 2484 tests across 14 binaries
+    ────────────
+         Summary [1112.159s] 2484 tests run: 2484 passed (1 slow), 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpumlTSX
+    ```.
+
+    - Rebase onto `main` changed nothing (`7796348632d1`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T19:00:45.366589+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/PageHeader-DzBNyHD7.js                 32.14 kB │ gzip:  12.46 kB
+    target/web/assets/SyncHub-DZR-rABL.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-BM8j2Jey.js                      47.85 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-CZWQf7HG.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-BEDS3N53.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DJu-CGEK.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-mtu--ZHQ.js                153.98 kB │ gzip:  38.53 kB
+    target/web/assets/SprintsList-TBbCJ6fb.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-BhhNqebU.js                     416.18 kB │ gzip: 126.33 kB
+
+    ✓ built in 989ms
+    compressed 1933KiB -> 581KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-767 (pid 73252), since 17:06 UTC
+    rust-test-runner: Took the check lock after 46 min
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-core)
+       Compiling harnessmux v0.3.0
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-lib)
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-tasks)
+       Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812/crates/lotar-agent)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-812)
+        Finished `dev` profile [unoptimized] target(s) in 35.08s
+    ────────────
+     Nextest run ID 856b78a7-9616-48ed-affa-a8c9873e690e with nextest profile: default
+        Starting 2486 tests across 14 binaries
+    ────────────
+         Summary [ 422.450s] 2486 tests run: 2486 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpfBSyHg
+    ```.
+
+    - Rebased `agent/DEV-812` onto `main` (`504d8b5383cb`): `20a7ddcac23d`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abd8a3d74b5d576a0f613d6baed1c7bc8a33dcde7a18ac90585f463926f291532
 description: |-
   Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
 
@@ -21,6 +370,20 @@ description: |-
   Expected: git calls from the server have a timeout and fail, so one hung git call gives an error (or no file links) instead of blocking the endpoint until a restart. The machine's git config is fixed separately (standards side).
 
   Check: with GIT_CONFIG_GLOBAL pointing at a FIFO nobody writes, /api/files/resolve answers within a few seconds.
+
+  Second cause found while fixing (2026-11-23): the file viewer's listing (`RepoFileService`, `ignore` crate) reads `~/.gitconfig` inside lotar's own process to find `core.excludesFile`. That open blocks the request thread the same way, and no child timeout can stop it. `lotar`'s git children also drop `GIT_CONFIG*`, so the check points `HOME` at a folder whose `.gitconfig` is a FIFO.
+
+  ## Done when
+
+  - [ ] Every git child lotar starts through `utils::git::git_command` (server, CLI, agent jobs) is stopped with its children after a timeout and returns a `TimedOut` error; no call site waits on a git child without one.
+  - [ ] Read-only git calls stop after 20 s (`GIT_TIMEOUT`); calls that can run long by design (commit with hooks, push, rebase, merge, add, worktree add) stop after a longer limit, not never.
+  - [ ] No lotar process reads git's config files itself: the file viewer listing, reference file suggestions and the source scanner get the global excludes file from a timed `git config` call, not from the `ignore` crate.
+  - [ ] Global excludes lookup times out (git hangs, 5 s): the file viewer lists no files (no file links, `/api/files/content` answers 404) rather than showing files git would ignore; suggestions and the scanner go on without the global excludes.
+  - [ ] Global excludes lookup finds nothing set, git is missing or git errors: git's default (`$XDG_CONFIG_HOME/git/ignore`, else `~/.config/git/ignore`) applies, as before.
+  - [ ] With `HOME` pointing at a folder whose `.gitconfig` is a FIFO nobody writes, `/api/files/resolve` and `/api/files/content` answer within a few seconds (automated test).
+  - [ ] With a normal git config, file links and the file viewer work as before, globally ignored files stay hidden (tests).
+tags:
+- job-paused
 history:
 - at: 2026-11-22T21:53:12.327786+00:00
   actor: claude
@@ -45,3 +408,190 @@ history:
   - field: relationships
     old: '{"related":["DEV-813","DEV-814"]}'
     new: '{"related":["DEV-813","DEV-814","DEV-768"]}'
+- at: 2026-11-23T02:40:39.490574+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-813","DEV-814","DEV-768"]}'
+    new: '{"related":["DEV-813","DEV-814","DEV-768","DEV-808"]}'
+- at: 2026-11-23T02:41:05.797687+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:46:38.058077+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-813","DEV-814","DEV-768","DEV-808"]}'
+    new: '{"blocks":["DEV-808"],"related":["DEV-813","DEV-814","DEV-768","DEV-808"]}'
+- at: 2026-11-23T03:22:41.259212+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T03:23:02.738599+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abd8a3d74b5d576a0f613d6baed1c7bc8a33dcde7a18ac90585f463926f291532
+- at: 2026-11-23T03:26:28.066365+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
+
+      Cause: each server has a child `git -C <repo>/.tasks rev-parse --path-format=absolute --git-common-dir` running since 11:28, blocked in open() inside read_very_early_config. ~/.gitconfig is a symlink into Dropbox's File Provider folder (~/Library/CloudStorage/Dropbox), and macOS holds the open while it checks Files and Folders access for the process lotar started (sandboxd logs TCCAccessRequestIndirect for a FileProvider domain with lotar as the subject). Each brew upgrade changes lotar's path (Cellar/lotar/<version>), so the check comes back after every upgrade.
+
+      The same hang stops automation runs: 'Inbox: the owner's answer goes to the source' times out after 300 s (INBOX-647, 648, 651, 652), and its repos.ts --inbox children stay blocked on the same git call.
+
+      Expected: git calls from the server have a timeout and fail, so one hung git call gives an error (or no file links) instead of blocking the endpoint until a restart. The machine's git config is fixed separately (standards side).
+
+      Check: with GIT_CONFIG_GLOBAL pointing at a FIFO nobody writes, /api/files/resolve answers within a few seconds.
+    new: |-
+      Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
+
+      Cause: each server has a child `git -C <repo>/.tasks rev-parse --path-format=absolute --git-common-dir` running since 11:28, blocked in open() inside read_very_early_config. ~/.gitconfig is a symlink into Dropbox's File Provider folder (~/Library/CloudStorage/Dropbox), and macOS holds the open while it checks Files and Folders access for the process lotar started (sandboxd logs TCCAccessRequestIndirect for a FileProvider domain with lotar as the subject). Each brew upgrade changes lotar's path (Cellar/lotar/<version>), so the check comes back after every upgrade.
+
+      The same hang stops automation runs: 'Inbox: the owner's answer goes to the source' times out after 300 s (INBOX-647, 648, 651, 652), and its repos.ts --inbox children stay blocked on the same git call.
+
+      Expected: git calls from the server have a timeout and fail, so one hung git call gives an error (or no file links) instead of blocking the endpoint until a restart. The machine's git config is fixed separately (standards side).
+
+      Check: with GIT_CONFIG_GLOBAL pointing at a FIFO nobody writes, /api/files/resolve answers within a few seconds.
+
+      Second cause found while fixing (2026-11-23): the file viewer's listing (`RepoFileService`, `ignore` crate) reads `~/.gitconfig` inside lotar's own process to find `core.excludesFile`. That open blocks the request thread the same way, and no child timeout can stop it. `lotar`'s git children also drop `GIT_CONFIG*`, so the check points `HOME` at a folder whose `.gitconfig` is a FIFO.
+
+      ## Done when
+
+      - [ ] Every git child lotar starts through `utils::git::git_command` (server, CLI, agent jobs) is stopped with its children after a timeout and returns a `TimedOut` error; no call site waits on a git child without one.
+      - [ ] Read-only git calls stop after 20 s (`GIT_TIMEOUT`); calls that can run long by design (commit with hooks, push, rebase, merge, add, worktree add) stop after a longer limit, not never.
+      - [ ] No lotar process reads git's config files itself: the file viewer listing, reference file suggestions and the source scanner get the global excludes file from a timed `git config` call, not from the `ignore` crate.
+      - [ ] Global excludes lookup fails (git hangs or errors): the file viewer lists no files (no file links, `/api/files/content` answers 404) rather than showing files git would ignore; suggestions and the scanner go on without the global excludes.
+      - [ ] Global excludes lookup finds nothing set: git's default (`$XDG_CONFIG_HOME/git/ignore`, else `~/.config/git/ignore`) applies, as before.
+      - [ ] With `HOME` pointing at a folder whose `.gitconfig` is a FIFO nobody writes, `/api/files/resolve` and `/api/files/content` answer within a few seconds (automated test).
+      - [ ] With a normal git config, file links and the file viewer work as before, globally ignored files stay hidden (tests).
+- at: 2026-11-23T03:34:58.606283+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
+
+      Cause: each server has a child `git -C <repo>/.tasks rev-parse --path-format=absolute --git-common-dir` running since 11:28, blocked in open() inside read_very_early_config. ~/.gitconfig is a symlink into Dropbox's File Provider folder (~/Library/CloudStorage/Dropbox), and macOS holds the open while it checks Files and Folders access for the process lotar started (sandboxd logs TCCAccessRequestIndirect for a FileProvider domain with lotar as the subject). Each brew upgrade changes lotar's path (Cellar/lotar/<version>), so the check comes back after every upgrade.
+
+      The same hang stops automation runs: 'Inbox: the owner's answer goes to the source' times out after 300 s (INBOX-647, 648, 651, 652), and its repos.ts --inbox children stay blocked on the same git call.
+
+      Expected: git calls from the server have a timeout and fail, so one hung git call gives an error (or no file links) instead of blocking the endpoint until a restart. The machine's git config is fixed separately (standards side).
+
+      Check: with GIT_CONFIG_GLOBAL pointing at a FIFO nobody writes, /api/files/resolve answers within a few seconds.
+
+      Second cause found while fixing (2026-11-23): the file viewer's listing (`RepoFileService`, `ignore` crate) reads `~/.gitconfig` inside lotar's own process to find `core.excludesFile`. That open blocks the request thread the same way, and no child timeout can stop it. `lotar`'s git children also drop `GIT_CONFIG*`, so the check points `HOME` at a folder whose `.gitconfig` is a FIFO.
+
+      ## Done when
+
+      - [ ] Every git child lotar starts through `utils::git::git_command` (server, CLI, agent jobs) is stopped with its children after a timeout and returns a `TimedOut` error; no call site waits on a git child without one.
+      - [ ] Read-only git calls stop after 20 s (`GIT_TIMEOUT`); calls that can run long by design (commit with hooks, push, rebase, merge, add, worktree add) stop after a longer limit, not never.
+      - [ ] No lotar process reads git's config files itself: the file viewer listing, reference file suggestions and the source scanner get the global excludes file from a timed `git config` call, not from the `ignore` crate.
+      - [ ] Global excludes lookup fails (git hangs or errors): the file viewer lists no files (no file links, `/api/files/content` answers 404) rather than showing files git would ignore; suggestions and the scanner go on without the global excludes.
+      - [ ] Global excludes lookup finds nothing set: git's default (`$XDG_CONFIG_HOME/git/ignore`, else `~/.config/git/ignore`) applies, as before.
+      - [ ] With `HOME` pointing at a folder whose `.gitconfig` is a FIFO nobody writes, `/api/files/resolve` and `/api/files/content` answer within a few seconds (automated test).
+      - [ ] With a normal git config, file links and the file viewer work as before, globally ignored files stay hidden (tests).
+    new: |-
+      Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
+
+      Cause: each server has a child `git -C <repo>/.tasks rev-parse --path-format=absolute --git-common-dir` running since 11:28, blocked in open() inside read_very_early_config. ~/.gitconfig is a symlink into Dropbox's File Provider folder (~/Library/CloudStorage/Dropbox), and macOS holds the open while it checks Files and Folders access for the process lotar started (sandboxd logs TCCAccessRequestIndirect for a FileProvider domain with lotar as the subject). Each brew upgrade changes lotar's path (Cellar/lotar/<version>), so the check comes back after every upgrade.
+
+      The same hang stops automation runs: 'Inbox: the owner's answer goes to the source' times out after 300 s (INBOX-647, 648, 651, 652), and its repos.ts --inbox children stay blocked on the same git call.
+
+      Expected: git calls from the server have a timeout and fail, so one hung git call gives an error (or no file links) instead of blocking the endpoint until a restart. The machine's git config is fixed separately (standards side).
+
+      Check: with GIT_CONFIG_GLOBAL pointing at a FIFO nobody writes, /api/files/resolve answers within a few seconds.
+
+      Second cause found while fixing (2026-11-23): the file viewer's listing (`RepoFileService`, `ignore` crate) reads `~/.gitconfig` inside lotar's own process to find `core.excludesFile`. That open blocks the request thread the same way, and no child timeout can stop it. `lotar`'s git children also drop `GIT_CONFIG*`, so the check points `HOME` at a folder whose `.gitconfig` is a FIFO.
+
+      ## Done when
+
+      - [ ] Every git child lotar starts through `utils::git::git_command` (server, CLI, agent jobs) is stopped with its children after a timeout and returns a `TimedOut` error; no call site waits on a git child without one.
+      - [ ] Read-only git calls stop after 20 s (`GIT_TIMEOUT`); calls that can run long by design (commit with hooks, push, rebase, merge, add, worktree add) stop after a longer limit, not never.
+      - [ ] No lotar process reads git's config files itself: the file viewer listing, reference file suggestions and the source scanner get the global excludes file from a timed `git config` call, not from the `ignore` crate.
+      - [ ] Global excludes lookup times out (git hangs, 5 s): the file viewer lists no files (no file links, `/api/files/content` answers 404) rather than showing files git would ignore; suggestions and the scanner go on without the global excludes.
+      - [ ] Global excludes lookup finds nothing set, git is missing or git errors: git's default (`$XDG_CONFIG_HOME/git/ignore`, else `~/.config/git/ignore`) applies, as before.
+      - [ ] With `HOME` pointing at a folder whose `.gitconfig` is a FIFO nobody writes, `/api/files/resolve` and `/api/files/content` answer within a few seconds (automated test).
+      - [ ] With a normal git config, file links and the file viewer work as before, globally ignored files stay hidden (tests).
+- at: 2026-11-23T03:39:02.537589+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T03:39:13.726833+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T07:19:55.779498+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:19:57.259396+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-808"],"related":["DEV-813","DEV-814","DEV-768","DEV-808"]}'
+    new: '{"blocks":["DEV-808"],"related":["DEV-813","DEV-814","DEV-768","DEV-808","DEV-784"]}'
+- at: 2026-11-23T07:20:06.353405+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T09:47:30.817127+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:47:38.283186+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T09:47:38.883535+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T11:07:49.672952+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T12:28:02.435149+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T13:48:49.167775+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T15:09:33.775717+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T16:30:44.676159+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:34:29.641923+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-808"],"related":["DEV-813","DEV-814","DEV-768","DEV-808","DEV-784"]}'
+    new: '{"blocks":["DEV-808"],"related":["DEV-813","DEV-814","DEV-768","DEV-808","DEV-784","DEV-837"]}'
+- at: 2026-11-24T19:00:45.366589+00:00
+  actor: automation
+  changes:
+  - field: comment_added

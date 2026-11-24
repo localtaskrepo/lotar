@@ -1,0 +1,221 @@
+title: Memory gate holds every queue for hours on macOS swap that stays used after memory pressure has passed
+status: Reviewing
+priority: High
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-23T00:07:07.617585+00:00
+modified: 2026-11-24T21:48:37.612986+00:00
+relationships:
+  related:
+  - DEV-623
+  - DEV-827
+comments:
+- date: 2026-11-23T01:32:58.854497+00:00
+  author: claude
+  text: 'Also, for the standards reliability role (STD-296): a hold leaves no trace once it clears. Log its start and end (reason, since, until) in the server log, ~/Library/Logs/lotar-services/<repo>.log; the role reads those logs for outages.'
+- date: 2026-11-23T05:03:23.802714+00:00
+  author: claude
+  text: |-
+    Fixed: full swap holds jobs only while less than 20% of memory is free.
+
+    - `memory_gate.rs`: the reading adds free memory (`kern.memorystatus_level` on macOS, `MemAvailable` on Linux). The swap rule holds only below 20% free. Where free memory can't be read, swap alone still holds.
+    - The hold reason names free memory: `swap 3.6 of 4.0 GB used (90%, limit 85%, 19% of memory free)`.
+    - `LOTAR_MEMORY_READING` takes `free=<percent>`. New integration test `full_swap_with_free_memory_starts_the_job` (`pressure=normal,swap=3.6/4,free=63`: the job runs), plus unit tests.
+    - This Mac right now: swap 93% used, `kern.memorystatus_level` 71, pressure normal. That holds on the old code and not on the new.
+    - Docs: `docs/help/agent.md` (Memory gate) and `config-reference.md`. Also removed a duplicate `agent.job_history` pair from `config-reference.md`.
+    - Logging a hold's start and end (the comment above) is now its own ticket, DEV-827. The detached worker's stderr goes to `/dev/null`, so where the log line is written still has to be decided.
+  report:
+    commits:
+    - hash: 498f00ef3
+      what: full swap holds only while under 20% of memory is free
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2472 Rust, 1567 UI
+    - command: npm run smoke
+      result: passed
+      reason: '407'
+    - command: new test fails on the old code
+      result: not_run
+      reason: not reverted to check; on the old code swap 90% > 85% holds
+    next: 'Review, then merge; after the merge revert the max_swap_percent: 95 workaround in each repo''s .tasks/config.yml (owner)'
+- date: 2026-11-23T08:26:32.454312+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082554.692Z-97 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082554.692Z-97 why.'
+- date: 2026-11-24T17:25:39.314012+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix is right, but the "Done when" test also passes on the old code.
+
+    - Read: `git log main..HEAD` (one commit `498f00ef3`), its diff, the ticket and comments, DEV-623, DEV-827, AGENTS.md, and the last 5 commits on main to the touched files. `git merge-tree` onto main: no conflicts.
+    - Reran (after `npm ci`): `npm run -s lint:agent` passed. The memory gate unit and integration tests passed (`cargo nextest run -p lotar-agent -p lotar-lib -E 'test(memory_gate) | test(full_swap) | …'`, 13 passed).
+    - The logic is right: full swap holds only below 20% free (`memory_gate.rs:165`). If free memory can't be read, full swap still holds. The docs say what holds. This Mac right now: swap 80%, `kern.memorystatus_level` 76.
+    - **Blocking**: `crates/lotar-lib/tests/dev623_memory_gate_test.rs:93` `full_swap_with_free_memory_starts_the_job` proves nothing. I copied it onto the old code (the merge base, in a detached scratch worktree) and it **passed**. Why: the old `parse_fake` rejects `free=63` as an unknown reading. A failed reading holds nothing, so the job starts and `memory_hold` is null anyway. The handoff said "on the old code swap 90% > 85% holds"; that is wrong for this test.
+    - Fix: also assert `memory_error` is null in the `agent queue` JSON (`crates/lotar-lib/src/cli/handlers/agent.rs:493`). Better, add a case in the same test with `swap=3.6/4,free=10` that holds. Then confirm the test fails on the old code.
+    - Not blocking: `SWAP_HOLD_FREE_PERCENT = 20` is a fixed constant, not a config key. The ticket left the threshold open. The docs state it.
+    - Not rerun: the full `npm test` and `npm run smoke` (the fix agent reported both passed).
+- date: 2026-11-24T21:19:34.955798+00:00
+  author: claude
+  text: |-
+    Two fix jobs ran at once on this worktree; this one stepped back and changed nothing.
+
+    - The rework thread `mcp:launch:317eced5…` (started 19:18Z, hit the usage limit) came back at the 21:00Z reset and is fixing the review finding in `crates/lotar-lib/tests/dev623_memory_gate_test.rs`.
+    - This job (`mcp:launch:eb848eef…`, 20:18Z) found its uncommitted edits, saw the file change underneath it, and stopped so the two don't collide.
+    - Seen at 21:20Z: `full_swap_with_free_memory_starts_the_job` and `full_swap_with_little_free_memory_holds_the_job`, plus the DEV-623 hold test: 3 passed (`cargo nextest run -p lotar-lib -E 'test(full_swap) | test(a_queued_job_waits_while_memory_is_short)'`).
+    - That thread's comment carries the outcome: the old-code check, the amend of `498f00ef3`, and the checks it ran.
+- date: 2026-11-24T21:20:58.596894+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A317eced5048001ad3214ea1d73ba8616b72f7057d458d896a0f91bfedca751f3 of the job job-20261124T191832.642Z-41 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212058.434Z-93: DEV-819 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:48:27.519041+00:00
+  author: claude
+  text: |-
+    Fixed the review finding: the DEV-819 tests now fail on the old code.
+
+    - The review read HEAD `498f00ef3`. I amended it to `d53b74759` (signed).
+    - `crates/lotar-lib/tests/dev623_memory_gate_test.rs`: `full_swap_with_free_memory_starts_the_job` now also asserts `memory_error` is null.
+    - New test `full_swap_with_little_free_memory_holds_the_job` (`swap=3.6/4,free=10`): the job is held with reason `swap 3.6 of 4.0 GB used (90%, limit 85%, 10% of memory free)`.
+    - Each case has its own workspace, through a `gated_workspace` helper. When both ran in one workspace, the held worker's reading leaked into the second case.
+    - On the old code (merge base `f95414e5a`, scratch worktree, since removed) both tests fail. The first fails on the `memory_error` check, the second because nothing holds.
+    - `SWAP_HOLD_FREE_PERCENT = 20` stays a fixed constant, as the review accepted. The docs state it.
+  report:
+    commits:
+    - hash: d53b74759
+      what: memory gate tests now fail on the old code
+    checks:
+    - command: cargo nextest run -p lotar-lib -E 'test(full_swap) | test(a_queued_job_waits)'
+      result: passed
+    - command: new tests on the old code (merge base f95414e5a)
+      result: passed
+      reason: both fail there as they should
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review again
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a0ceaa47a6640fdc6dc5091e8e1e101051bb83529f4ab09999e77f38275e1c3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A317eced5048001ad3214ea1d73ba8616b72f7057d458d896a0f91bfedca751f3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb848eef88cc6e7815227cd279561f9d9b69411c4d5fdf42b02edb80ec621cc4
+description: |-
+  Found 2026-11-22: from 22:25Z every queue on the Mac was held with 'waiting for memory: swap 3.4 of 4.0 GB used (85%, limit 85%)' (lotar 36 queued, 0 running; standards 14 queued). At the same time kern.memorystatus_vm_pressure_level was normal and memory_pressure reported 63% free. macOS keeps pages in swap after a shortage is over and gives swap back only slowly or at a reboot, so the swap rule (DEV-623) can hold all jobs indefinitely while RAM is free. Nothing in lotar agent queue says the hold may never clear.
+
+  Done when: swap use alone no longer holds jobs while the pressure level is normal and free memory is high; for example hold on swap only while swap use is still growing, or only together with low free memory (kern.memorystatus_level). A test with LOTAR_MEMORY_READING covers high, flat swap with normal pressure: jobs start. docs/help/agent.md (Memory gate) says what holds.
+
+  Workaround in place: agent.memory_gate.max_swap_percent: 95 in every repo's .tasks/config.yml (owner 2026-11-22). Revert it once this ships.
+tags:
+- job-paused
+- review-returned
+history:
+- at: 2026-11-23T00:07:07.856181+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-623"]}'
+- at: 2026-11-23T01:32:58.854497+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:44:49.990587+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T04:44:51.717804+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a0ceaa47a6640fdc6dc5091e8e1e101051bb83529f4ab09999e77f38275e1c3
+- at: 2026-11-23T05:02:58.750389+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623"]}'
+    new: '{"related":["DEV-623","DEV-827"]}'
+- at: 2026-11-23T05:03:23.802714+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:03:39.534491+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:26:32.205480+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T08:26:32.454312+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:25:39.314012+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:25:41.706336+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused
+    new: job-paused, review-blocked
+- at: 2026-11-24T17:25:55.921530+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: job-paused, review-blocked
+    new: job-paused, review-returned
+- at: 2026-11-24T19:18:35.005600+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T19:18:36.098372+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A317eced5048001ad3214ea1d73ba8616b72f7057d458d896a0f91bfedca751f3
+- at: 2026-11-24T20:18:40.878317+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb848eef88cc6e7815227cd279561f9d9b69411c4d5fdf42b02edb80ec621cc4
+- at: 2026-11-24T21:19:34.955798+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:20:58.596894+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:48:27.519041+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:48:37.612986+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

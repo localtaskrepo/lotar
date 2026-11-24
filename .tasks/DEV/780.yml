@@ -1,11 +1,10 @@
 title: Leftover worktree folder DEV-754 (only target/) makes every job on DEV-754 fail at worktree setup
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: triage
-assignee: '@fix'
 created: 2026-11-22T00:32:24.998213+00:00
-modified: 2026-11-22T22:40:37.415627+00:00
+modified: 2026-11-23T03:32:08.556149+00:00
 relationships:
   related:
   - DEV-754
@@ -16,6 +15,9 @@ relationships:
   - DEV-779
   - DEV-788
   - DEV-787
+  - DEV-763
+  - DEV-792
+  - DEV-797
 comments:
 - date: 2026-11-22T05:51:11.110659+00:00
   author: claude
@@ -115,8 +117,16 @@ comments:
     - `repos.json` has `"push": true` for lotar: "On private repos you can decide to push in general" (`docs/decisions/2026-11-11-formatting.md`); finished work is pushed (`docs/decisions/2026-11-12-push-finished-work.md`, owner 2026-11-12).
     - The main checkout holds no unfinished work of other tickets in `origin/main..main` (DEV-779, DEV-780 only, both Done).
     - Checks on the rebased commit `4227dd7f5a70`: `lint:agent` and `test:agent` passed; the smoke failures are in `ui.board-other` (flaky under load, DEV-788), which this Rust-only change doesn't touch.
+- date: 2026-11-23T02:30:57.335066+00:00
+  author: claude
+  text: |-
+    Already pushed: `321debdf9` is on `origin/main`, so the ticket is done.
+
+    - `git merge-base --is-ancestor 321debdf9 origin/main`: true. `origin/main..main` now lists only DEV-792 and DEV-763, not this ticket.
+    - `.lotar-worktrees/lotar/DEV-754` doesn't exist.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4daf3b5b2d12896a61a7f9fca80a3131f0ea4b09b3f1277a7366a2ee06bf4c7c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A974d60a3d140702c1e709d552928bdcf5b95add9333671ad6a9385812a48072e
 description: 'Found: .lotar-worktrees/lotar/DEV-754 holds only target/ and git worktree list doesn''t show it; jobs job-20261121T211326.368Z-110 and job-20261122T003045.021Z-125 failed with ''already exists''. Check: git worktree add succeeds for a ticket whose folder has no worktree. Done: leftover folder removed, or worktree setup clears an empty leftover folder.'
 tags:
 - health
@@ -269,3 +279,38 @@ history:
   - field: relationships
     old: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788"]}'
     new: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788","DEV-787"]}'
+- at: 2026-11-23T02:30:35.625022+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T02:30:39.502979+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A974d60a3d140702c1e709d552928bdcf5b95add9333671ad6a9385812a48072e
+- at: 2026-11-23T02:30:57.335066+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:30:57.603373+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788","DEV-787"]}'
+    new: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788","DEV-787","DEV-763","DEV-792"]}'
+- at: 2026-11-23T02:31:09.392545+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-23T03:32:08.556149+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788","DEV-787","DEV-763","DEV-792"]}'
+    new: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788","DEV-787","DEV-763","DEV-792","DEV-797"]}'

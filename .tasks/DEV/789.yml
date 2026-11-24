@@ -5,12 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T08:06:40.134808+00:00
-modified: 2026-11-22T19:27:44.974370+00:00
+modified: 2026-11-23T08:24:26.303431+00:00
 relationships:
   depends_on:
   - DEV-766
   related:
   - DEV-766
+  - DEV-818
+  - DEV-779
 comments:
 - date: 2026-11-22T13:46:52.546394+00:00
   author: claude
@@ -43,9 +45,86 @@ comments:
       result: passed
       reason: '407'
     next: Merge agent/DEV-789
+- date: 2026-11-22T22:48:59.718822+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix is correct and tested, but the before/after screenshots the UI review rule asks for are missing (owner rule 2026-11-13, STD-97).
+
+    **What I reviewed:** `017d20071`, 4 files under `view/`. Main (`321debdf9`) changed none of them since the base `c8ea61a59`.
+
+    - **Matches the server:** `tool_entry` (`crates/lotar-agent/src/services/agent_job_service.rs:4560`) sets `last_message` only when `tool.status != "completed"`. The UI now does the same in both places:
+      - `view/pages/AgentJobs.vue:524`: a completed tool gives `null`, and `mergeJobFields` keeps the old line.
+      - `view/composables/useAgentActivity.ts:101`: same rule.
+    - **Done when:** both points are met, and nothing outside the ticket changed.
+    - **Failing tests first:** with main's two source files put back, both new vitests fail, receiving `"Terminal"`. With the fix they pass: `npx vitest run … AgentJobs.spec.ts AgentActivityIndicator.spec.ts` gives 35 passed.
+    - **Full UI run:** 1569 of 1569 passed at load ~27. A first run at load ~50 had 8 failures, with workers taking ~21 s to start. That is the 30 s timeout this branch still has; main raised it to 120 s in DEV-779 (`83043eacf`), so the rebase at merge picks that up.
+    - **Lint:** `vue-tsc`, `oxlint`, `eslint` and `prettier --check` are clean on the changed files.
+    - **Not rerun:** the Rust suite and `npm run smoke`. The change is UI-only.
+    - **My after screenshots:** this branch's web build served by a scratch `lotar serve`, Agents page, a mocked running job with a tool start then a completion over SSE, light and dark at 1920, 1440 and 390 px. The card keeps `Bash: npm test` in all six, with no visible problem. They are in `/tmp/dev789-review/shots/`, not attached.
+
+    **Blocking**
+    - DEV-789 has no before/after screenshots attached. The fix comment links none, and `lotar show DEV-789` lists only the two T3 links. The UI review rule says that blocks. To fix: attach the Agents page job card before and after, in light and dark at 1920, 1440 and 390 px, with a running job where a tool starts and then completes (before: `Terminal`; after: the tool's own line). Use `lotar task reference add upload DEV-789 <file>` and link them in the comment. No code change is needed.
+
+    **Filed**
+    - DEV-818 (minor, not from this diff): in an agent job, the exported `LOTAR_TASKS_DIR` wins over a scratch folder's `.tasks`. My scratch `lotar add` created a real `@fix` ticket, which I hard-deleted before a job started. `npm run seed:test-tasks` would do the same.
+- date: 2026-11-23T04:42:39.914255+00:00
+  author: claude
+  text: |-
+    Screenshots attached, the review's only blocking finding. No code change, so the commit stays `017d20071`.
+
+    - Review read `017d20071`, which is HEAD.
+    - Built the web UI twice into a scratch folder: main's `AgentJobs.vue` and `useAgentActivity.ts` (before) and this branch (after). Served each with a scratch `lotar serve --tasks-dir <scratch> --web-ui-path <build>` with `LOTAR_TASKS_DIR` unset (see DEV-818). Worktree is clean.
+    - Playwright: mocked running job, then `agent_job_tool` running `Bash: npm test`, then completed `Terminal`. Light and dark at 1920, 1440 and 390 px (390 full page).
+    - Before: the card shows `Terminal`. After: it keeps `Bash: npm test`.
+    - Nothing to amend: the commit has no file changes this round.
+    - "Removed now" in the card's time line shows up in both, from the mocked job's data, not from this change.
+
+    1920 light: ![before](attachment:agents-before-light-1920.9e6f3e05021324d733e971ab80d80bd7.png) ![after](attachment:agents-after-light-1920.03801454d0be28f1f6ad7356fcce6714.png)
+    1920 dark: ![before](attachment:agents-before-dark-1920.1b43dc4935dc4c815873fe1644e47ef1.png) ![after](attachment:agents-after-dark-1920.2c60715c5fb5c50b1c7cc2d9729fda7c.png)
+    1440 light: ![before](attachment:agents-before-light-1440.b637c3725312bb2b1935afa5fa83f203.png) ![after](attachment:agents-after-light-1440.efb998a3c0349fdf61075e563c33b889.png)
+    1440 dark: ![before](attachment:agents-before-dark-1440.abf0b2ef5961c4192ea780024f7fb9cf.png) ![after](attachment:agents-after-dark-1440.771f522d3a7f36aad9a2669aebe3c944.png)
+    390 light: ![before](attachment:agents-before-light-390.530105b9b8df8b499d90e07112b8fcae.png) ![after](attachment:agents-after-light-390.48381a20b40b22320f3276c02de14d48.png)
+    390 dark: ![before](attachment:agents-before-dark-390.0f9b32b44683d7b7d29623f12e0ea036.png) ![after](attachment:agents-after-dark-390.019219696e1564fe2c994dd137922dd0.png)
+  report:
+    commits:
+    - hash: 017d20071
+      what: the fix, unchanged
+    checks:
+    - command: npm run test:ui:agent -- __tests__/AgentJobs.spec.ts __tests__/AgentActivityIndicator.spec.ts
+      result: passed
+      reason: 35 passed
+    - command: before/after screenshots (Playwright, mocked job + SSE tool start then completion)
+      result: passed
+      reason: 'before Terminal, after Bash: npm test at all 12'
+    - command: npm run lint
+      result: not_run
+      reason: no code change this round; review found it clean on 017d20071
+    - command: npm test
+      result: not_run
+      reason: no code change; review ran the full UI suite, 1569 passed
+    - command: npm run smoke
+      result: not_run
+      reason: no code change; UI-only fix
+    next: 'Review again: screenshots are attached'
+- date: 2026-11-23T08:24:26.303431+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082341.781Z-94 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082341.781Z-94 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbec1b9366a3e727602217837d75843415ce7d4c239dc0ded79a4911ff97aad0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8cf00dfcf8a49abc2ffc9d2aac60765537ab121463ce2db3a7b3264007c1ba3a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A984adea1ba2d41589ea75b3e936427139eead0d6eecb087641deaddbaa417fe9
+- attachment: agents-before-light-1920.9e6f3e05021324d733e971ab80d80bd7.png
+- attachment: agents-after-light-1920.03801454d0be28f1f6ad7356fcce6714.png
+- attachment: agents-before-dark-1920.1b43dc4935dc4c815873fe1644e47ef1.png
+- attachment: agents-after-dark-1920.2c60715c5fb5c50b1c7cc2d9729fda7c.png
+- attachment: agents-before-light-1440.b637c3725312bb2b1935afa5fa83f203.png
+- attachment: agents-after-light-1440.efb998a3c0349fdf61075e563c33b889.png
+- attachment: agents-before-dark-1440.abf0b2ef5961c4192ea780024f7fb9cf.png
+- attachment: agents-after-dark-1440.771f522d3a7f36aad9a2669aebe3c944.png
+- attachment: agents-before-light-390.530105b9b8df8b499d90e07112b8fcae.png
+- attachment: agents-after-light-390.48381a20b40b22320f3276c02de14d48.png
+- attachment: agents-before-dark-390.0f9b32b44683d7b7d29623f12e0ea036.png
+- attachment: agents-after-dark-390.019219696e1564fe2c994dd137922dd0.png
 description: |-
   Found in the review of DEV-766.
 
@@ -65,6 +144,8 @@ description: |-
 tags:
 - agent
 - ui
+- review-returned
+- job-paused
 history:
 - at: 2026-11-22T08:06:42.114577+00:00
   actor: claude
@@ -176,3 +257,128 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T22:45:36.700561+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766"],"related":["DEV-766"]}'
+    new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818"]}'
+- at: 2026-11-22T22:48:59.718822+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:49:01.600380+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818"]}'
+    new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779"]}'
+- at: 2026-11-22T22:49:03.460887+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, review-blocked
+- at: 2026-11-22T22:49:14.816167+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, ui, review-blocked
+    new: agent, ui, review-returned
+- at: 2026-11-23T04:40:26.112431+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T04:40:30.832548+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A984adea1ba2d41589ea75b3e936427139eead0d6eecb087641deaddbaa417fe9
+- at: 2026-11-23T04:42:10.461712+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-before-light-1920.9e6f3e05021324d733e971ab80d80bd7.png
+- at: 2026-11-23T04:42:10.578764+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-after-light-1920.03801454d0be28f1f6ad7356fcce6714.png
+- at: 2026-11-23T04:42:10.758346+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-before-dark-1920.1b43dc4935dc4c815873fe1644e47ef1.png
+- at: 2026-11-23T04:42:10.882354+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-after-dark-1920.2c60715c5fb5c50b1c7cc2d9729fda7c.png
+- at: 2026-11-23T04:42:10.980656+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-before-light-1440.b637c3725312bb2b1935afa5fa83f203.png
+- at: 2026-11-23T04:42:11.067784+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-after-light-1440.efb998a3c0349fdf61075e563c33b889.png
+- at: 2026-11-23T04:42:11.161782+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-before-dark-1440.abf0b2ef5961c4192ea780024f7fb9cf.png
+- at: 2026-11-23T04:42:11.250746+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-after-dark-1440.771f522d3a7f36aad9a2669aebe3c944.png
+- at: 2026-11-23T04:42:11.357483+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-before-light-390.530105b9b8df8b499d90e07112b8fcae.png
+- at: 2026-11-23T04:42:11.471220+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-after-light-390.48381a20b40b22320f3276c02de14d48.png
+- at: 2026-11-23T04:42:11.569366+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-before-dark-390.0f9b32b44683d7b7d29623f12e0ea036.png
+- at: 2026-11-23T04:42:11.693330+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agents-after-dark-390.019219696e1564fe2c994dd137922dd0.png
+- at: 2026-11-23T04:42:39.914255+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:43:06.902490+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:24:26.202104+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui, review-returned
+    new: agent, ui, review-returned, job-paused
+- at: 2026-11-23T08:24:26.303431+00:00
+  actor: automation
+  changes:
+  - field: comment_added

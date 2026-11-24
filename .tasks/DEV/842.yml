@@ -1,0 +1,227 @@
+title: lotar task edit -D - saves a lone - as the description instead of reading stdin
+status: Reviewing
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T17:22:19.506908+00:00
+modified: 2026-11-24T21:39:12.789168+00:00
+relationships:
+  related:
+  - DEV-776
+  - DEV-818
+  - DEV-832
+comments:
+- date: 2026-11-24T19:18:09.426255+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191800.714Z-38 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191800.714Z-38 why.'
+- date: 2026-11-24T21:21:59.920382+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0 of the job job-20261124T201810.090Z-66 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212159.908Z-95: DEV-842 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:22:03.668666+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac862ff1db012f6c60ec944f429edcf793a121169e64009b3e22ffd95e959d446 of the job job-20261124T191800.714Z-38 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0 that the job job-20261124T212159.908Z-95 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:22:18.304804+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0 of the job job-20261124T201810.090Z-66 again, beside the running job job-20261124T212159.908Z-95. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:38:38.843513+00:00
+  author: claude
+  text: |-
+    `-D -` / `--description -` now reads the description from stdin in `lotar add`, `lotar task add` and `lotar task edit`, the same way `comment -F -` does.
+
+    - `description_from_stdin` in `crates/lotar-lib/src/cli/handlers/mod.rs` trims trailing newlines. It runs before anything is written, so a failed read changes nothing. Any other value, including `- a list item`, is saved as given
+    - `task/edit.rs` reads stdin once, so with `--select` every matching task gets the same text
+    - New tests in `crates/lotar-lib/tests/dev842_description_from_stdin_test.rs`: add, task add, edit, `--select` and a `-`-prefixed value. Invalid UTF-8 on stdin fails for both add and edit and writes nothing
+    - `lotar task edit TST-1 -D -` with the installed build saves `'-'`; with the branch build it saves the piped text
+    - The `--help` text and `docs/help/add.md` / `docs/help/task.md` say so
+    - `scan` passes no description, so it is not affected. No caller relied on a literal `-`
+    - Two sessions resumed this job in the same worktree, a case of the DEV-832/836 bug. The other thread made the first edits and stopped before committing; this one finished and committed
+    - No guidance correction needed
+  report:
+    commits:
+    - hash: a5ad5b7e4
+      what: -D - reads the description from stdin in add, task add and task edit
+    checks:
+    - command: cargo nextest run --test integration -E 'test(/dev842|dev282|lone_dash/)'
+      result: passed
+      reason: 9 tests
+    - command: 'ticket Check: installed lotar vs branch build'
+      result: passed
+      reason: old saves '-', branch saves 'new'
+    - command: cargo clippy --all-targets
+      result: passed
+    - command: rustfmt --check and prettier --check on changed files
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    next: Review, then merge
+- date: 2026-11-24T21:38:48.695445+00:00
+  author: claude
+  text: |-
+    `-D -` now reads the description from stdin in `lotar add`, `task add` and `task edit`, as DEV-776 did for `comment`.
+
+    - New `description_from_stdin` in `crates/lotar-lib/src/cli/handlers/mod.rs`: only a lone `-` reads stdin, trailing newlines trimmed; any other value (also `- a list item`) is saved as given
+    - Called before any write in `AddHandler::execute_with_finding` and once in `EditHandler::execute` (`task/edit.rs`), so `--select` gives every match the same text and a failed read changes nothing
+    - Test `crates/lotar-lib/tests/dev842_description_from_stdin_test.rs`: add, task add, edit, `--select`, a `-`-prefixed value, and unreadable stdin (non-UTF-8: error, nothing written)
+    - Repro from the ticket: installed build saved `'-'`, branch build saved `new`
+    - `docs/help/add.md`, `docs/help/task.md` and the `-D` help text say so
+    - Callers: no repo under `~/Development` passes a literal `-D -`
+    - No guidance correction needed
+  report:
+    commits:
+    - hash: a5ad5b7e4
+      what: -D - reads the description from stdin in add, task add and task edit
+    checks:
+    - command: cargo nextest run --test integration -E 'test(/dev842|lone_dash|dev282/)'
+      result: passed
+      reason: 9 tests
+    - command: cargo clippy --all-targets
+      result: passed
+    - command: rustfmt + prettier --check on changed files
+      result: passed
+    - command: manual repro (installed build vs branch build)
+      result: passed
+      reason: old saved '-', branch saved stdin
+    - command: npm run lint
+      result: not_run
+      reason: merge runs it (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: merge runs it (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it (DEV-797)
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac862ff1db012f6c60ec944f429edcf793a121169e64009b3e22ffd95e959d446
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0
+description: |-
+  Found in the DEV-818 review: the DEV-818 fix job's description edit at 2026-11-23 04:34Z replaced the ticket's whole Found / Done when text with '-'. DEV-776 fixed the same for lotar comment; task edit and add were left out. The job prompt itself tells agents to run lotar task edit <ID> -D ..., so the heredoc form is what they reach for.
+
+  ## Check
+  In a scratch folder: lotar --tasks-dir <dir>/.tasks add x --project TST -D orig, then printf 'new' | lotar --tasks-dir <dir>/.tasks task edit TST-1 -D -. The description becomes '-' (reproduced 2026-11-24).
+
+  ## Done when
+  DEV-776 chose to read stdin for comment, so -D - reads stdin here too.
+  - [ ] `lotar add`, `lotar task add` and `lotar task edit` (also `lotar edit`, `--select`) with `-D -` / `--description -` save stdin as the description, trailing newlines trimmed like `comment -F -`.
+  - [ ] `--select` edits every matching task with the same stdin text (stdin is read once).
+  - [ ] stdin can't be read: the command fails with an error and writes nothing.
+  - [ ] Any other value, including text that starts with `-`, is saved as given.
+  - [ ] `docs/help/add.md` and `docs/help/task.md` say so.
+  - [ ] A test covers add and edit.
+tags:
+- agent
+- job-paused
+history:
+- at: 2026-11-24T17:22:19.773370+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-776","DEV-818","TST-1"]}'
+- at: 2026-11-24T17:22:20.065691+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T17:22:48.165323+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-776","DEV-818","TST-1"]}'
+    new: '{"related":["DEV-776","DEV-818"]}'
+- at: 2026-11-24T19:18:04.959348+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:18:06.031773+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac862ff1db012f6c60ec944f429edcf793a121169e64009b3e22ffd95e959d446
+- at: 2026-11-24T19:18:09.382097+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent
+    new: agent, job-paused
+- at: 2026-11-24T19:18:09.426255+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:18:11.511717+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0
+- at: 2026-11-24T21:05:13.739750+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-818 review: the DEV-818 fix job's description edit at 2026-11-23 04:34Z replaced the ticket's whole Found / Done when text with '-'. DEV-776 fixed the same for lotar comment; task edit and add were left out. The job prompt itself tells agents to run lotar task edit <ID> -D ..., so the heredoc form is what they reach for.
+
+      ## Check
+      In a scratch folder: lotar --tasks-dir <dir>/.tasks add x --project TST -D orig, then printf 'new' | lotar --tasks-dir <dir>/.tasks task edit TST-1 -D -. The description becomes '-' (reproduced 2026-11-24).
+
+      ## Done when
+      - [ ] -D - (task add and task edit) reads the description from stdin, like comment -F -, or is refused with a hint, matching what DEV-776 chose for comment.
+      - [ ] A test covers both commands.
+    new: |-
+      Found in the DEV-818 review: the DEV-818 fix job's description edit at 2026-11-23 04:34Z replaced the ticket's whole Found / Done when text with '-'. DEV-776 fixed the same for lotar comment; task edit and add were left out. The job prompt itself tells agents to run lotar task edit <ID> -D ..., so the heredoc form is what they reach for.
+
+      ## Check
+      In a scratch folder: lotar --tasks-dir <dir>/.tasks add x --project TST -D orig, then printf 'new' | lotar --tasks-dir <dir>/.tasks task edit TST-1 -D -. The description becomes '-' (reproduced 2026-11-24).
+
+      ## Done when
+      DEV-776 chose to read stdin for comment, so -D - reads stdin here too.
+      - [ ] `lotar add`, `lotar task add` and `lotar task edit` (also `lotar edit`, `--select`) with `-D -` / `--description -` save stdin as the description, trailing newlines trimmed like `comment -F -`.
+      - [ ] `--select` edits every matching task with the same stdin text (stdin is read once).
+      - [ ] stdin can't be read: the command fails with an error and writes nothing.
+      - [ ] Any other value, including text that starts with `-`, is saved as given.
+      - [ ] `docs/help/add.md` and `docs/help/task.md` say so.
+      - [ ] A test covers add and edit.
+- at: 2026-11-24T21:21:59.920382+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:03.668666+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:18.304804+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:38:38.843513+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:38:39.362441+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-776","DEV-818"]}'
+    new: '{"related":["DEV-776","DEV-818","DEV-832"]}'
+- at: 2026-11-24T21:38:48.695445+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:39:12.789168+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

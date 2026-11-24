@@ -1,0 +1,137 @@
+title: 'betterleaks: tests/fixtures/agent-streams/copilot-edit.jsonl apiCallId values match generic-api-key'
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T16:42:38.212660+00:00
+modified: 2026-11-24T22:26:25.598652+00:00
+relationships:
+  related:
+  - DEV-503
+comments:
+- date: 2026-11-24T19:12:36.503135+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191231.109Z-30 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191231.109Z-30 why.'
+- date: 2026-11-24T21:02:03.660050+00:00
+  author: claude
+  text: |-
+    History sweep clean: `.gitleaks.toml` allowlists Copilot `apiCallId` request IDs in the stream fixtures.
+
+    - Fixture was removed in DEV-503, so the 8 findings are history only (`830761fe5`, `27308a291`); the values are base64 request IDs
+    - New allowlist in `.gitleaks.toml`, commented as lotar-only: `generic-api-key`, path `^tests/fixtures/agent-streams/` AND match `apiCallId":"<base64>"`
+    - `betterleaks git --config .gitleaks.toml --redact .`: no leaks found
+    - Narrowness checked in a scratch repo: the same value in `other/` and an `apiKey` key inside the fixture dir still fire
+    - `betterleaks dir` reports one more finding, in the untracked build output `target/debug/...libureq...rmeta`. It was there before this change and is out of scope
+  report:
+    commits:
+    - hash: 53fd47716
+      what: allowlist Copilot apiCallId in tests/fixtures/agent-streams
+    checks:
+    - command: betterleaks git --config .gitleaks.toml --redact .
+      result: passed
+      reason: no leaks found (was 8)
+    - command: allowlist narrowness scratch repo
+      result: passed
+      reason: same apiCallId outside the dir and another key inside it still fire
+    next: Review, then merge; the merge agent reruns the betterleaks sweep on main
+- date: 2026-11-24T22:26:18.303672+00:00
+  author: claude
+  text: |-
+    Ready for review: the history sweep reports no leaks with commit `53fd47716`.
+
+    - `.gitleaks.toml` has a new allowlist for `generic-api-key`. It applies only when the path is under `^tests/fixtures/agent-streams/` AND the match is `apiCallId":"<base64>"`
+    - I reran `betterleaks git --config .gitleaks.toml --redact .` in this job: no leaks found
+    - Earlier test in a scratch repo, to check it's narrow: the same value in another directory still fires, and so does an `apiKey` key in the fixture directory
+  report:
+    commits:
+    - hash: 53fd47716
+      what: .gitleaks.toml allowlist for Copilot apiCallId in tests/fixtures/agent-streams
+    checks:
+    - command: betterleaks git --config .gitleaks.toml --redact .
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: config-only change, the merge runs the suites
+    - command: npm test
+      result: not_run
+      reason: config-only change, the merge runs the suites
+    - command: npm run smoke
+      result: not_run
+      reason: config-only change, the merge runs the suites
+    next: Review, then the merge agent lands 53fd47716 and reruns the betterleaks sweep on main
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb05412bdd614deae4fbbce7434e92817be71817849e10680d39089e3c7ef9cd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A246b69a28e09213bdf866f311ded790e80b05882e8b28b3e2357cb1e2843d10e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1d0acdac54acd192103db3fcee4410601c480cac86e5ae3f70663ff7f205794b
+description: |-
+  Found by the security pass 2026-W47 (standards STD-328): betterleaks git --config .gitleaks.toml --redact . reports 8 generic-api-key findings, all apiCallId request IDs in the Copilot stream fixture (commits 830761fe5, 27308a291). Not secrets, but the history sweep is red.
+
+  Check: betterleaks git --config .gitleaks.toml --redact . in the lotar checkout.
+
+  Done when: an allowlist in .gitleaks.toml for apiCallId in tests/fixtures/agent-streams (narrow, with a comment why) makes the sweep report no leaks.
+tags:
+- health
+- job-paused
+custom_fields:
+  finding: leaks:copilot-edit.jsonl
+history:
+- at: 2026-11-24T16:42:38.542652+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:12:33.686728+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:12:34.146783+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb05412bdd614deae4fbbce7434e92817be71817849e10680d39089e3c7ef9cd
+- at: 2026-11-24T19:12:36.473100+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:12:36.503135+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:12:38.134125+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A246b69a28e09213bdf866f311ded790e80b05882e8b28b3e2357cb1e2843d10e
+- at: 2026-11-24T21:02:03.660050+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:02:06.050964+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-503"]}'
+- at: 2026-11-24T22:26:03.266105+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1d0acdac54acd192103db3fcee4410601c480cac86e5ae3f70663ff7f205794b
+- at: 2026-11-24T22:26:18.303672+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:26:25.598652+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

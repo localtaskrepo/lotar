@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-16T02:29:53.068923+00:00
-modified: 2026-11-18T20:46:29.050913+00:00
+modified: 2026-11-24T20:03:54.904511+00:00
 relationships:
   related:
   - DEV-594
@@ -26,6 +26,8 @@ relationships:
   - DEV-530
   - DEV-639
   - DEV-713
+  - DEV-786
+  - DEV-849
 comments:
 - date: 2026-11-16T02:33:15.242181+00:00
   author: claude
@@ -369,3 +371,15 @@ history:
   - field: relationships
     old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605","DEV-611","DEV-626","DEV-530","DEV-639"]}'
     new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605","DEV-611","DEV-626","DEV-530","DEV-639","DEV-713"]}'
+- at: 2026-11-23T02:17:16.319194+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605","DEV-611","DEV-626","DEV-530","DEV-639","DEV-713"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605","DEV-611","DEV-626","DEV-530","DEV-639","DEV-713","DEV-786"]}'
+- at: 2026-11-24T20:03:54.904511+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605","DEV-611","DEV-626","DEV-530","DEV-639","DEV-713","DEV-786"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503","DEV-613","DEV-616","DEV-614","DEV-583","DEV-608","DEV-563","DEV-604","DEV-606","DEV-605","DEV-611","DEV-626","DEV-530","DEV-639","DEV-713","DEV-786","DEV-849"]}'

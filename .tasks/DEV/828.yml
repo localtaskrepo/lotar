@@ -1,0 +1,339 @@
+title: 'JSON comment lists leave deleted comments out without their #N, so counting positions picks the wrong comment for --edit/--delete'
+status: Blocked
+priority: Medium
+type: Bug
+reporter: claude
+created: 2026-11-23T07:19:10.376712+00:00
+modified: 2026-11-24T16:30:39.233374+00:00
+relationships:
+  depends_on:
+  - local:LOCA-601
+  - DEV-809
+  related:
+  - DEV-809
+  - DEV-832
+comments:
+- date: 2026-11-23T08:58:27.711836+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085811.410Z-114 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085811.410Z-114 why.'
+- date: 2026-11-23T19:02:50.529422+00:00
+  author: automation
+  text: The fix agent's job job-20261123T190234.207Z-407 failed (lotar agent logs job-20261123T190234.207Z-407); @fix-retry retries it on branch agent/DEV-828.
+- date: 2026-11-23T19:03:07.638721+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T190251.787Z-408 failed again (lotar agent logs job-20261123T190251.787Z-408). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:04:09.438416+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude login action LOCA-601; no retry choice is needed.
+
+    - Jobs `job-20261123T190234.207Z-407` and `job-20261123T190251.787Z-408` both stopped before work: the login expired and cannot be renewed.
+    - LOCA-601 already defines authentication checks and covers this Mac. DEV-828 now depends on `local:LOCA-601`, is Blocked and unassigned; Prerequisites done resumes it.
+    - Earlier job `job-20261123T085811.410Z-114` reported the weekly limit resetting November 24 at 08:00 America/Los_Angeles. Restoring login may leave that separate limit in effect; no immediate retry was requested.
+    - Applied the infrastructure/action deduplication rule in `docs/decisions/2026-11-15-inbox-triage.md` and the no-rate-limit-retry decision in `docs/decisions/2026-11-16-fix-retry.md` (standards).
+- date: 2026-11-23T19:04:10.295033+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:04:13.179748+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-828 yet. DEV-828 waits for local:LOCA-601.'
+- date: 2026-11-24T16:00:59.858209+00:00
+  author: claude
+  text: |-
+    Waits for DEV-809: the code this ticket fixes isn't on `main` yet.
+
+    - `--edit/--delete/--restore <N>`, the `#N` text output and the deleted-comment filter (`listed_comments` in `crates/lotar-lib/src/cli/handlers/comment.rs`) exist only on `agent/DEV-809` (`e86f6b995`).
+    - DEV-809 is Merging; its rebase onto `main` conflicts in `crates/lotar-lib/tests/integration.rs` (merge agent pending).
+    - Added depends-on DEV-809 and tag `waits`. No commits on `agent/DEV-828`; work resumes once DEV-809 is on `main`.
+- date: 2026-11-24T16:01:08.958800+00:00
+  author: claude
+  text: |-
+    Waits for DEV-809: the comment numbers and `--edit/--delete/--restore` this fixes are only on `agent/DEV-809`, not on `main`.
+
+    - `main` (`d4bdbbbf6`) has no comment delete; `render_comment_list` in `crates/lotar-lib/src/cli/handlers/comment.rs` lists every comment.
+    - DEV-809 is in Merging; its rebase conflicts in `crates/lotar-lib/tests/integration.rs`.
+    - Added depends-on DEV-809 and tag `waits`; I continue once DEV-809 is on `main`.
+- date: 2026-11-24T16:19:29.636659+00:00
+  author: claude
+  text: |-
+    Still waits for DEV-809: it is Merging, not on `main` yet (`main` at `d4bdbbbf6`).
+
+    - No commits on `agent/DEV-828`; status Blocked with depends-on DEV-809 and tag `waits` stay as set.
+- date: 2026-11-24T16:30:29.386404+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4a53f022d1b5fdee4b650cae11a36fe6651ce60d131e946ef06c9a1bca2da633 of the job job-20261123T170149.960Z-374 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:30:31.341303+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab0903b659f76e61c392b3f3fefa2e8e0c1cec5ea5c0f1118184f91c0b4d3916c of the job job-20261123T150120.191Z-306 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:32.340949+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A673cd5663ba0f1b2dca7f80a4e2ac955488890828217c35d9b8f29f6921ed580 of the job job-20261123T135927.066Z-273 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:34.538161+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a8a60abc035782103bd9fad8e72a8c693476298d0ab31207a6bfe70fcfd667a of the job job-20261123T115847.153Z-214 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:35.634335+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c42a9b6c0867d415898ccc215d2fedffeacaef78888a943de658e8552b4b798 of the job job-20261123T105837.442Z-180 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:38.228399+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60 of the job job-20261123T095828.319Z-147 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:30:39.233374+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c of the job job-20261123T085811.410Z-114 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c42a9b6c0867d415898ccc215d2fedffeacaef78888a943de658e8552b4b798
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a8a60abc035782103bd9fad8e72a8c693476298d0ab31207a6bfe70fcfd667a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab40b2b4371238ab035c05948dbdd0c7f1411970f424a5998613e3fbfe537829a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A673cd5663ba0f1b2dca7f80a4e2ac955488890828217c35d9b8f29f6921ed580
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab0903b659f76e61c392b3f3fefa2e8e0c1cec5ea5c0f1118184f91c0b4d3916c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3d56a7d5f0d093b12b64ba43646d7e16a08ef2c083d0bd39f7c28b916661398
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4a53f022d1b5fdee4b650cae11a36fe6651ce60d131e946ef06c9a1bca2da633
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2424047f55c22b3e7d55d2fd811e0c0dae99072428b934d18b548ef7acd05f8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0858c1b7cd77d94aa690da353b582acbd4d782034a9a9ae54c3d2b3df9cc4847
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A612fe8a46e05ce59bfef51e0cca7d5ccfe612b752039a4d4fd43857373f45aad
+description: |-
+  Found in the DEV-809 review (2026-11-22).
+
+  `lotar --format json comment <ID>` and `lotar --format json show <ID>` drop deleted comments (`crates/lotar-lib/src/cli/handlers/comment.rs` `render_comment_list`, `crates/lotar-lib/src/cli/handlers/task/show.rs` `handle_show`), but the items carry no number. Text output prints `#N` (stored position), and `lotar comment <ID> --edit|--delete|--restore <N>` takes that N. An agent reading JSON and counting positions after a delete is off by one per deleted comment above: `--delete 3` hits the wrong comment (restorable, but `--edit` overwrites the wrong text).
+
+  ## Done when
+  - [ ] Each JSON comment item from `lotar comment <ID>` and `lotar show <ID>` carries its 1-based stored number (e.g. `number`), the one `--edit/--delete/--restore` take; deleted ones stay out as now.
+  - [ ] Test: delete #2 of three, JSON lists numbers 1 and 3.
+  - [ ] `docs/help/comment.md` says so.
+tags:
+- job-paused
+- fix-retried
+- waits
+history:
+- at: 2026-11-23T07:19:13.361734+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T08:58:22.707069+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T08:58:24.328149+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c
+- at: 2026-11-23T08:58:27.624300+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T08:58:27.711836+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:58:33.119858+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60
+- at: 2026-11-23T10:58:43.146084+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c42a9b6c0867d415898ccc215d2fedffeacaef78888a943de658e8552b4b798
+- at: 2026-11-23T11:58:53.783678+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a8a60abc035782103bd9fad8e72a8c693476298d0ab31207a6bfe70fcfd667a
+- at: 2026-11-23T12:59:05.558748+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab40b2b4371238ab035c05948dbdd0c7f1411970f424a5998613e3fbfe537829a
+- at: 2026-11-23T14:01:04.369947+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A673cd5663ba0f1b2dca7f80a4e2ac955488890828217c35d9b8f29f6921ed580
+- at: 2026-11-23T15:01:30.711899+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab0903b659f76e61c392b3f3fefa2e8e0c1cec5ea5c0f1118184f91c0b4d3916c
+- at: 2026-11-23T16:01:45.557730+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3d56a7d5f0d093b12b64ba43646d7e16a08ef2c083d0bd39f7c28b916661398
+- at: 2026-11-23T17:02:08.853274+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4a53f022d1b5fdee4b650cae11a36fe6651ce60d131e946ef06c9a1bca2da633
+- at: 2026-11-23T18:02:30.279907+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2424047f55c22b3e7d55d2fd811e0c0dae99072428b934d18b548ef7acd05f8
+- at: 2026-11-23T19:02:47.810520+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0858c1b7cd77d94aa690da353b582acbd4d782034a9a9ae54c3d2b3df9cc4847
+- at: 2026-11-23T19:02:48.888719+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: job-paused
+    new: job-paused, fix-retried
+- at: 2026-11-23T19:02:50.529422+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:03:05.568192+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A612fe8a46e05ce59bfef51e0cca7d5ccfe612b752039a4d4fd43857373f45aad
+- at: 2026-11-23T19:03:06.707306+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:03:07.638721+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:04:04.279659+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-809"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-809"]}'
+- at: 2026-11-23T19:04:04.874409+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:04:08.875652+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:04:09.438416+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:04:10.046513+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:04:10.295033+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:04:13.179748+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:04:33.175524+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:00:57.157321+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-809"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-809"],"related":["DEV-809"]}'
+- at: 2026-11-24T16:00:59.689460+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused, fix-retried
+    new: job-paused, fix-retried, waits
+- at: 2026-11-24T16:00:59.858209+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:01:08.958800+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:02:55.033148+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-809"],"related":["DEV-809"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-809"],"related":["DEV-809","DEV-832"]}'
+- at: 2026-11-24T16:19:29.636659+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:29.386404+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:31.341303+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:32.340949+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:34.538161+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:35.634335+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:38.228399+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:30:39.233374+00:00
+  actor: automation
+  changes:
+  - field: comment_added

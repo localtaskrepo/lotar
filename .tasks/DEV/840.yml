@@ -1,0 +1,206 @@
+title: 'Flaky: a Rust test sometimes leaves a .tmpXXXXXX entry in the test runner''s temp folder, failing a passing run'
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T17:04:45.761529+00:00
+modified: 2026-11-24T23:16:01.374099+00:00
+relationships:
+  blocks:
+  - DEV-782
+  related:
+  - DEV-816
+  - DEV-768
+  - DEV-832
+  - DEV-782
+  - DEV-778
+comments:
+- date: 2026-11-24T19:13:00.928345+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191255.514Z-34 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191255.514Z-34 why.'
+- date: 2026-11-24T21:12:03.709929+00:00
+  author: claude
+  text: |-
+    Likely cause: the sccache server, not a test. Found while merging DEV-768, which hit the same leak twice (`.tmpnSQE1j`, `.tmp2aKk0x`).
+
+    - Both failing runs compiled first ("Compiling lotar-core … harnessmux"). A full rerun with nothing to compile left the temp folder empty (2488/2488 passed).
+    - `runTestsInFreshTemp` (`scripts/rust-test-runner.mjs`) sets `TMPDIR` before `cargo nextest run` compiles. When no sccache server is up, the `sccache` wrapper starts one, and the server inherits that `TMPDIR` (`SCCACHE_START_SERVER=1` shows in `ps eww` of the server).
+    - That server outlives the run and handles every session's compiles, so their temp dirs land in the run's folder while tests run. After the runner deletes the folder, the server fails with "Failed to create temp dir", which is what the DEV-768 reviewer hit with sccache.
+    - Fix to try: build before setting the fresh `TMPDIR` (`cargo nextest run --no-run` with the caller's env), then run the tests in the fresh temp. Or start the server first with `sccache --start-server` under the normal `TMPDIR`.
+- date: 2026-11-24T21:15:56.845072+00:00
+  author: claude
+  text: |-
+    Duplicate session stood down: two resumed sessions shared this worktree (DEV-832/833/836); session [0a20a4] carries on.
+
+    - I edited nothing and made no commits; my findings went to [0a20a4].
+    - Suspect: `crates/lotar-lib/tests/dev732_worker_leaves_its_launchers_folder_test.rs` returns while its real queue worker still writes into the `TestFixtures` `TempDir` (`.tmpXXXXXX` in TMPDIR). The other worker tests wait for the worker to go idle first.
+    - Not confirmed under load yet: my full run lost its output when the session was cut.
+- date: 2026-11-24T21:22:05.482800+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659 of the job job-20261124T201301.112Z-63 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212203.587Z-30: DEV-840 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:22:51.014481+00:00
+  author: automation
+  text: The fix agent's job job-20261124T212203.587Z-30 failed (lotar agent logs job-20261124T212203.587Z-30); @fix-retry retries it on branch agent/DEV-840.
+- date: 2026-11-24T21:37:55.876201+00:00
+  author: claude
+  text: |-
+    Fixed both likely sources of the leftover `.tmpXXXXXX` in commit `53c39bfc2`.
+
+    - `scripts/rust-test-runner.mjs`: `runTestsInFreshTemp` first runs `cargo nextest run --no-run` with the caller's `TMPDIR`, and only then runs the tests with the fresh one. A compile can no longer start the shared sccache server inside the run's temp folder. The test step now compiles nothing (`Finished in 0.12s`).
+    - `crates/lotar-lib/tests/dev732_worker_leaves_its_launchers_folder_test.rs`: before its `TempDir` drops, the test waits for `agent queue` to report the worker idle, as `dev733` already does. A peer session found this one: it was the only real-worker test that returned while its worker was still writing.
+    - New runner tests: the build runs first with the caller's `TMPDIR`, and a failed build skips the tests.
+  report:
+    commits:
+    - hash: 53c39bfc2
+      what: runner builds before the fresh TMPDIR; dev732 waits for its worker
+    checks:
+    - command: node --test scripts/tests/rust-test-runner.test.mjs
+      result: passed
+    - command: node scripts/rust-test-runner.mjs --agent -E 'test(/dev7|dev6|dev5|worker|queue/)'
+      result: passed
+      reason: 346 tests, 3 runs (2 concurrent), temp folder empty
+    - command: cargo clippy -p lotar-lib --test '*' -- -D warnings
+      result: passed
+    - command: prettier/oxlint/rustfmt on changed files
+      result: passed
+    - command: full npm run -s test:agent under load
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge; the merge check is the full run under load
+- date: 2026-11-24T22:57:06.388364+00:00
+  author: claude
+  text: |-
+    The leak isn't only sccache: DEV-782's merge hit it with the server already running under the normal `TMPDIR`.
+
+    - `npm run -s test:agent` on `3a9eef64a` (2026-11-24): 2489/2489 passed, then `.tmpyhMW8x` left
+    - Before the run: `sccache --start-server` said "Address in use"; `ps eww` of the server showed `TMPDIR=/var/folders/.../T/`, not the run's folder
+    - The run compiled 4 crates (`Finished in 9.81s`), so the sccache path can't be ruled out entirely, but it points to a test, e.g. the `dev732` worker test from your fix
+    - Same leak twice before on DEV-782's merge (`.tmpo61Zez` and one earlier)
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
+description: |-
+  Found: the DEV-816 merge check `npm run -s test:agent` (2026-11-23, at 2480/2480 passed, after waiting 5 min for the check lock) failed with `rust-test-runner: error: tests left 1 entries in the temp folder: .tmpGLFMn2`. A rerun on 2026-11-24 passed with nothing left. The `.tmp` + 6 chars name is the tempfile crate's default prefix, so a `tempfile::tempdir()`/`NamedTempFile` was probably dropped while a child process or thread still wrote into it, or was never dropped.
+  Check: find the test that creates it, for example by running nextest under load with `--no-fail-fast` and listing the runner's temp folder per test.
+  Done: the test removes what it creates; a full run under load leaves nothing in the temp folder.
+tags:
+- health
+- job-paused
+- fix-retried
+custom_fields:
+  finding: test:rust-temp-leftover
+history:
+- at: 2026-11-24T17:04:47.213033+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-816"]}'
+- at: 2026-11-24T17:04:48.287055+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:12:58.114394+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:12:58.587598+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
+- at: 2026-11-24T19:13:00.898568+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:13:00.928345+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:13:02.438756+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
+- at: 2026-11-24T21:12:03.709929+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:12:05.388371+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-816"]}'
+    new: '{"related":["DEV-816","DEV-768"]}'
+- at: 2026-11-24T21:15:56.845072+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:15:57.632077+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-816","DEV-768"]}'
+    new: '{"related":["DEV-816","DEV-768","DEV-832"]}'
+- at: 2026-11-24T21:22:05.482800+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:35.111818+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, job-paused
+    new: health, job-paused, fix-retried
+- at: 2026-11-24T21:22:51.014481+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:37:55.876201+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:12:29.881790+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix-retry'
+- at: 2026-11-24T22:12:30.015669+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T22:57:06.388364+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:57:07.724708+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-816","DEV-768","DEV-832"]}'
+    new: '{"related":["DEV-816","DEV-768","DEV-832","DEV-782"]}'
+- at: 2026-11-24T22:58:26.055269+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-816","DEV-768","DEV-832","DEV-782"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782"]}'
+- at: 2026-11-24T23:16:01.374099+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782"]}'
+    new: '{"blocks":["DEV-782"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778"]}'

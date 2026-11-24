@@ -1,16 +1,22 @@
 title: 'Agents page tab counts disagree with the queue it lists: All 0 beside 3 waiting tickets, Queued counts prerequisite waits'
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T19:10:25.728494+00:00
-modified: 2026-11-22T21:10:18.495362+00:00
+modified: 2026-11-24T17:13:56.423193+00:00
 relationships:
   depends_on:
   - DEV-771
+  - local:LOCA-601
   related:
   - DEV-771
+  - DEV-818
+  - DEV-786
+  - DEV-834
+  - DEV-833
+  - DEV-800
 comments:
 - date: 2026-11-22T21:10:09.829931+00:00
   author: claude
@@ -20,8 +26,194 @@ comments:
     - The **Waiting in the queue** card and the on-disk queue counts come from `3333807b1` on `agent/DEV-771`; `git log main..agent/DEV-771` shows it unmerged, DEV-771 is in Reviewing with a blocking finding
     - On main, `view/pages/AgentJobs.vue:323` tabs count jobs only and there is no waiting-ticket list to agree with, so a fix now would conflict with DEV-771's rework
     - Next: once DEV-771 is on main, count waiting tickets in the All and Queued tabs per the rule in `docs/help/agent.md`, plus a Vitest
+- date: 2026-11-23T08:54:28.153664+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085405.619Z-110 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085405.619Z-110 why.'
+- date: 2026-11-23T19:16:59.550680+00:00
+  author: automation
+  text: The fix agent's job job-20261123T191641.652Z-417 failed (lotar agent logs job-20261123T191641.652Z-417); @fix-retry retries it on branch agent/DEV-798.
+- date: 2026-11-23T19:17:22.057643+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T191700.991Z-418 failed again (lotar agent logs job-20261123T191700.991Z-418). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:18:17.896690+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude login ticket LOCA-601; no retry choice is needed.
+
+    - Jobs `job-20261123T191641.652Z-417` and `job-20261123T191700.991Z-418` both stopped before work: “this login reached its time limit and cannot be renewed”.
+    - LOCA-601 already tracks renewing the Mac login and checking authentication; INBOX-668 is the one owner-action entry.
+    - Applied the infrastructure/prerequisite rule in `docs/decisions/2026-11-15-inbox-triage.md` (standards). DEV-798 is `Blocked`, unassigned, and depends on `local:LOCA-601`; it resumes through Prerequisites done after that ticket closes.
+- date: 2026-11-23T19:18:18.774658+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:18:22.646279+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-798 yet. DEV-798 waits for local:LOCA-601.'
+- date: 2026-11-24T16:11:20.521118+00:00
+  author: claude
+  text: |-
+    Fix in the worktree, checks running: All counts what it lists, Queued counts what the top Queued counts.
+
+    - `view/pages/AgentJobs.vue`: All = jobs + waiting tickets + prerequisite waits; Queued = queued jobs + waiting tickets, prerequisite waits left out
+    - `docs/help/agent.md` states the rule; new Vitest in `view/__tests__/AgentJobs.spec.ts` (3 waiting, 1 prerequisite wait, no jobs: All 4, Queued 3) fails without the fix (All 0)
+    - Homebrew `node` 26.13.1_3 won't start: `libsimdutf.38.dylib` is gone after simdutf went to 9.5.0. Checks run through a scratchpad shim that sets `DYLD_FALLBACK_LIBRARY_PATH` to the still-installed `Cellar/simdutf/9.4.0/lib`. The system is unchanged; `brew reinstall node` or `brew upgrade node` is the owner's call
+    - `npm run lint:agent` passed; `npm test` running
+- date: 2026-11-24T16:20:29.237824+00:00
+  author: claude
+  text: |-
+    Four Claude sessions run on DEV-798 at once in one worktree; this one stopped so they don't break each other's builds.
+
+    - Claude pids `51290`, `54430`, `58516` (this one) and `67949` started 08:18:26–08:18:45 on 2026-11-24, all with cwd `.lotar-worktrees/lotar/DEV-798`; `lotar agent list-jobs` shows no running DEV-798 job, so lotar's job list doesn't know about them
+    - My `npm run test:agent` failed in the web build: `scripts/compress-web.mjs` hit `ENOENT target/web/assets/useSse-rvqBSHc3.js` while pid `67949` ran `npm run test:smoke:agent` into the same `target/`. The build broke, not the fix
+    - The fix is already committed on `agent/DEV-798`: `42046bfde` (All = jobs + waiting tickets + prerequisite waits, Queued = queued jobs + waiting tickets, rule in `docs/help/agent.md`, Vitest in `view/__tests__/AgentJobs.spec.ts`); `npm run lint:agent` passed earlier
+    - Homebrew `node` starts again (`v26.13.1`), so the simdutf shim from the earlier comment isn't needed
+    - Next: let one session finish `npm test` and `npm run smoke` on `42046bfde`. Why four sessions started is worth a look
+- date: 2026-11-24T16:20:31.395609+00:00
+  author: claude
+  text: |-
+    Fix is committed (`42046bfde`). I stopped my own checks because two other sessions run them in this worktree right now.
+
+    - Two resumed Claude sessions (`66c8307c…`, `6401a5bc…`) on DEV-798 run `vue-tsc` and cargo in this worktree at the same time as this job
+    - My `npm run test:agent` failed in `build:web` with `ENOTEMPTY ... target/web/assets`: parallel builds into the same `target/`, not the change
+    - Node works again (`v26.13.1`), so the shim from the earlier comment isn't needed
+    - Status left as is: their `npm test` and `npm run smoke` results decide this ticket
+  report:
+    commits:
+    - hash: 42046bfde
+      what: All counts jobs, waiting tickets and prerequisite waits; Queued counts queued jobs and waiting tickets; docs/help/agent.md rule; Vitest
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: earlier session today
+    - command: npm test
+      result: not_run
+      reason: web build hit ENOTEMPTY on target/web/assets while two other sessions built in the same worktree
+    - command: npm run smoke
+      result: not_run
+      reason: stopped to avoid colliding with the other sessions
+    next: Let the other sessions on this worktree finish npm test and npm run smoke and post the result
+- date: 2026-11-24T16:27:26.026081+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 of the job job-20261123T181624.335Z-394 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T162725.892Z-1: DEV-798 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:27:27.255299+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0b3aa95c6e83c9215af475411c2431d2ce83d2d82a97c698ad60a240f10038eb of the job job-20261123T171602.199Z-379 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 that the job job-20261124T162725.892Z-1 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:27.648755+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A503d48f1f5a1e32eb21d4df7ee835eb1f07edb0c77abcaf344adc35edc3e096d of the job job-20261123T161545.563Z-350 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 that the job job-20261124T162725.892Z-1 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:28.119161+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A676f0af222a5538766895d71e2b14505319ad0262d66f89caa11ada8ae2b0c33 of the job job-20261123T151529.564Z-317 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 that the job job-20261124T162725.892Z-1 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:28.767125+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c274f9c1813b6b40682438782f44f2d1a63973683afa0ec3006e63224557e6f of the job job-20261123T115508.091Z-208 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 that the job job-20261124T162725.892Z-1 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:29.380780+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4caf2b1f0408146f95a97eaf86e0672d4b37da22ebaa54a4bc5d98abc87d67fa of the job job-20261123T105456.505Z-174 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 that the job job-20261124T162725.892Z-1 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:30.126334+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82c4251e935bcdfebffcc75c6cf250ff45d7e061333fee57955d340d89fff1d4 of the job job-20261123T095438.215Z-141 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 that the job job-20261124T162725.892Z-1 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:30.629607+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77140068723ec150f5d9f0e01ad962d4aec2578c1a4725d7c5a0232c48bd8cb2 of the job job-20261123T085405.619Z-110 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078 that the job job-20261124T162725.892Z-1 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:50:51.896174+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82c4251e935bcdfebffcc75c6cf250ff45d7e061333fee57955d340d89fff1d4 of the job job-20261123T095438.215Z-141 again, beside the running job job-20261124T162725.892Z-1. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:01:49.161211+00:00
+  author: claude
+  text: |-
+    Done: the tab counts now follow one rule, and it is written in the help.
+
+    - `view/pages/AgentJobs.vue`: **All** counts everything the tab lists (jobs, waiting tickets, prerequisite waits). **Queued** counts queued jobs and waiting tickets, the same as the Queued count at the top
+    - `docs/help/agent.md` states the rule
+    - `view/__tests__/AgentJobs.spec.ts`: 3 waiting tickets, 1 prerequisite wait, no jobs gives All 4 and Queued 3. Without the fix it showed All 0
+    - Node starts again (`v26.13.1`), so all checks ran directly, with no shim
+  report:
+    commits:
+    - hash: 42046bfde
+      what: All tab counts jobs + waiting tickets + prerequisite waits; Queued counts queued jobs + waiting tickets; rule in docs/help/agent.md; Vitest
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2480 Rust, 1569 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 408 tests
+    - command: browser check of the Agents page
+      result: not_run
+      reason: 'the new Vitest covers the counts (3 waiting, 1 prerequisite wait, no jobs: All 4, Queued 3)'
+    next: Merge agent/DEV-798
+- date: 2026-11-24T17:13:56.423193+00:00
+  author: claude
+  text: |-
+    Fixed and checked: All counts everything it lists, Queued counts what the top Queued counts.
+
+    - `view/pages/AgentJobs.vue`: All = jobs + waiting tickets + prerequisite waits; Queued = queued jobs + waiting tickets, prerequisite waits left out
+    - `docs/help/agent.md` states the rule; Vitest in `view/__tests__/AgentJobs.spec.ts` (3 waiting, 1 prerequisite wait, no jobs: All 4, Queued 3)
+    - Commit `42046bfde` on `agent/DEV-798`, on top of main `d4bdbbbf6`
+    - Homebrew `node` starts again (v26.13.1), so this run needed no shim
+  report:
+    commits:
+    - hash: 42046bfde
+      what: All and Queued tab counts follow the top counts, rule in docs/help/agent.md, Vitest
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2480 Rust, 1569 Vitest
+    - command: npm run smoke
+      result: passed
+      reason: 408 tests
+    - command: new Vitest red without the fix
+      result: passed
+      reason: All 0 and Queued 4 against main's AgentJobs.vue
+    - command: browser check of the Agents page
+      result: not_run
+      reason: covered by the Vitest on the tab counts
+    next: Merge agent/DEV-798
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f2cf92fa6872f2c564eefe71cdf3f838044e29cd640d405d056eb3a11d82d3b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77140068723ec150f5d9f0e01ad962d4aec2578c1a4725d7c5a0232c48bd8cb2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82c4251e935bcdfebffcc75c6cf250ff45d7e061333fee57955d340d89fff1d4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4caf2b1f0408146f95a97eaf86e0672d4b37da22ebaa54a4bc5d98abc87d67fa
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c274f9c1813b6b40682438782f44f2d1a63973683afa0ec3006e63224557e6f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afda277faa0e1562f90a1fe46a0bc7677bdd4847724ed7fe7bf5692177123e183
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af9b943b14f878bec19f55ed37d8c5434e86768e09b298399a6e0f820da79f5c8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A676f0af222a5538766895d71e2b14505319ad0262d66f89caa11ada8ae2b0c33
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A503d48f1f5a1e32eb21d4df7ee835eb1f07edb0c77abcaf344adc35edc3e096d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0b3aa95c6e83c9215af475411c2431d2ce83d2d82a97c698ad60a240f10038eb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A079172024a173c373d791497ba374852d2b9b0b779b3335146bc36a1a1ec12e4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac47d5ee5c8bb1759be217289abeea4d2be3375a1e2c6cf86b7c3acf44f504a95
 description: |-
   Found in the review of DEV-771 (branch agent/DEV-771, 3333807b1): with 3 tickets in the on-disk queue the All tab shows 'All 0' above the **Waiting in the queue** card listing them (view/pages/AgentJobs.vue:401 counts jobs only). The Queued tab counts jobs waiting for prerequisites too (AgentJobs.vue:406), while the Queued count at the top and docs/help/agent.md say they don't count as queued.
 
@@ -30,7 +222,8 @@ description: |-
   Done when: All and Queued tab counts include the waiting tickets consistently with the top counts; a Vitest covers it.
 tags:
 - ui
-- waits
+- job-paused
+- fix-retried
 history:
 - at: 2026-11-22T19:10:26.105371+00:00
   actor: claude
@@ -76,3 +269,252 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-22T22:45:47.505269+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771"],"related":["DEV-771"]}'
+    new: '{"depends_on":["DEV-771"],"related":["DEV-771","DEV-818"]}'
+- at: 2026-11-23T02:17:16.360081+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771"],"related":["DEV-771","DEV-818"]}'
+    new: '{"depends_on":["DEV-771"],"related":["DEV-771","DEV-818","DEV-786"]}'
+- at: 2026-11-23T06:56:03.938673+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, waits
+    new: ui
+- at: 2026-11-23T08:54:20.155957+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-23T08:54:24.692531+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77140068723ec150f5d9f0e01ad962d4aec2578c1a4725d7c5a0232c48bd8cb2
+- at: 2026-11-23T08:54:28.054550+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui
+    new: ui, job-paused
+- at: 2026-11-23T08:54:28.153664+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:54:52.461564+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82c4251e935bcdfebffcc75c6cf250ff45d7e061333fee57955d340d89fff1d4
+- at: 2026-11-23T10:55:03.451154+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4caf2b1f0408146f95a97eaf86e0672d4b37da22ebaa54a4bc5d98abc87d67fa
+- at: 2026-11-23T11:55:17.059022+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c274f9c1813b6b40682438782f44f2d1a63973683afa0ec3006e63224557e6f
+- at: 2026-11-23T12:55:30.279514+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afda277faa0e1562f90a1fe46a0bc7677bdd4847724ed7fe7bf5692177123e183
+- at: 2026-11-23T14:15:24.790156+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af9b943b14f878bec19f55ed37d8c5434e86768e09b298399a6e0f820da79f5c8
+- at: 2026-11-23T15:15:41.185135+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A676f0af222a5538766895d71e2b14505319ad0262d66f89caa11ada8ae2b0c33
+- at: 2026-11-23T16:15:58.046384+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A503d48f1f5a1e32eb21d4df7ee835eb1f07edb0c77abcaf344adc35edc3e096d
+- at: 2026-11-23T17:16:20.117103+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0b3aa95c6e83c9215af475411c2431d2ce83d2d82a97c698ad60a240f10038eb
+- at: 2026-11-23T18:16:36.655964+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8f925d314abe32129cf1762ad8314b0d5171b4094e79f0625a15d62fad01078
+- at: 2026-11-23T19:16:56.814982+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A079172024a173c373d791497ba374852d2b9b0b779b3335146bc36a1a1ec12e4
+- at: 2026-11-23T19:16:57.986125+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: ui, job-paused
+    new: ui, job-paused, fix-retried
+- at: 2026-11-23T19:16:59.550680+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:17:20.038584+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac47d5ee5c8bb1759be217289abeea4d2be3375a1e2c6cf86b7c3acf44f504a95
+- at: 2026-11-23T19:17:21.132924+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:17:22.057643+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:12.535898+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771"],"related":["DEV-771","DEV-818","DEV-786"]}'
+    new: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786"]}'
+- at: 2026-11-23T19:18:13.057444+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:18:17.896690+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:18.518195+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T19:18:18.774658+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:22.646279+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:32.357046+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:05:33.079974+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786"]}'
+    new: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834"]}'
+- at: 2026-11-24T16:05:46.361621+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834"]}'
+    new: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834","DEV-833"]}'
+- at: 2026-11-24T16:11:20.521118+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:20:29.237824+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:20:31.395609+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:25.610604+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:27:26.026081+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:27.255299+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:27.648755+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:28.119161+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:28.767125+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:29.380780+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:30.126334+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:30.629607+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:30.795047+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T16:50:51.896174+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:01:49.161211+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:01:59.557143+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T17:05:04.081939+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834","DEV-833"]}'
+    new: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834","DEV-833","DEV-800"]}'
+- at: 2026-11-24T17:13:56.423193+00:00
+  actor: claude
+  changes:
+  - field: comment_added

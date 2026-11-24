@@ -30,6 +30,9 @@ fn serve_sends_the_embedded_index_page() {
             .env_remove("LOTAR_WEB_UI_PATH")
             .env("LOTAR_IGNORE_HOME_CONFIG", "1")
             .env("LOTAR_TEST_SILENT", "1")
+            // No queue worker: it runs in its own process group, outlives the
+            // killed server and recreates `.tasks` in the removed temp dir.
+            .env("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1")
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()

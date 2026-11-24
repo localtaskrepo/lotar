@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T21:07:30.522875+00:00
-modified: 2026-11-22T05:33:05.350920+00:00
+modified: 2026-11-24T22:25:53.932304+00:00
 relationships:
   depends_on:
   - DEV-711
@@ -16,6 +16,8 @@ relationships:
   - DEV-734
   - DEV-725
   - DEV-770
+  - DEV-835
+  - DEV-833
 comments:
 - date: 2026-11-20T21:28:29.221996+00:00
   author: claude
@@ -425,3 +427,15 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734","DEV-725"]}'
     new: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734","DEV-725","DEV-770"]}'
+- at: 2026-11-24T16:08:23.345705+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734","DEV-725","DEV-770"]}'
+    new: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734","DEV-725","DEV-770","DEV-835"]}'
+- at: 2026-11-24T22:25:53.932304+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734","DEV-725","DEV-770","DEV-835"]}'
+    new: '{"depends_on":["DEV-711"],"related":["DEV-711","DEV-730","DEV-741","DEV-734","DEV-725","DEV-770","DEV-835","DEV-833"]}'

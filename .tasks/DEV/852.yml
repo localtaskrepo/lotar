@@ -1,0 +1,60 @@
+title: 'Automation: a rule''s comment can ask a question with options'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T21:03:41.684865+00:00
+modified: 2026-11-24T21:05:00.745186+00:00
+relationships:
+  blocks:
+  - DEV-796
+  related:
+  - DEV-796
+  - DEV-488
+  - DEV-851
+description: |-
+  A rule's `comment` action writes plain text only, so a rule that asks a person a choice has to shell out: `run: lotar comment --question ... --option ...`, which needs `lotar trust`. Found while drafting DEV-796 (built-in `agent-team` template): a shipped template can't rely on `run`, so its questions come out as prose without options. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
+
+  ## Evidence
+
+  - `crates/lotar-agent/src/automation/types.rs` `AutomationAction.comment: Option<String>`
+  - standards `configs/lotar/automation.yml:671`: `env LOTAR_DEFAULT_REPORTER=automation sh -c 'lotar comment "$1" --question "$2" --option "fix: ..."'`
+  - `CommentQuestion`/`QuestionOption` (with `set`) already exist in `crates/lotar-core/src/types.rs` (DEV-488)
+
+  ## Proposal
+
+  - `comment:` keeps the string form and also takes a map: `{ text, question: { options: [{ key, label, set }], recommended, multiple, other } }`, the same fields `lotar comment --question` writes. `text` and labels take `${{...}}` templates.
+  - The question comment's author is `automation`, as other rule comments.
+  - `lotar config validate` and the automation validation refuse bad keys, duplicate keys, a `recommended` that is no option, and `set` fields an answer can't set (as `--set` does).
+  - `lotar automation simulate` shows the question and its options.
+
+  ## Done when
+
+  - [ ] A rule with a `comment.question` writes a question comment that `lotar list --has question` finds and `lotar comment --answer <key>` answers, applying the option's `set`
+  - [ ] Invalid questions fail validation with a message naming the rule
+  - [ ] docs/help (automation actions) describe the map form with an example; REST/OpenAPI agree if the automation config shape is exposed there
+history:
+- at: 2026-11-24T21:03:47.328905+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-796"]}'
+    new: '{"related":["DEV-796","DEV-488"]}'
+- at: 2026-11-24T21:03:49.733987+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T21:04:34.642620+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-796","DEV-488"]}'
+    new: '{"related":["DEV-796","DEV-488","DEV-851"]}'
+- at: 2026-11-24T21:05:00.745186+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-796","DEV-488","DEV-851"]}'
+    new: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-488","DEV-851"]}'

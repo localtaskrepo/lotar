@@ -1,0 +1,60 @@
+title: 'Automation rules can ask a question with options: comment action takes a question, not only text'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T21:03:27.498462+00:00
+modified: 2026-11-24T21:04:34.642304+00:00
+deleted_at: 2026-11-24T21:04:37.100165+00:00
+relationships:
+  related:
+  - DEV-488
+  - DEV-796
+  - DEV-852
+comments:
+- date: 2026-11-24T21:04:33.204144+00:00
+  author: claude
+  text: Duplicate of DEV-852, filed at the same minute by a parallel DEV-796 session; removed.
+description: |-
+  An automation rule's `comment:` posts plain text only (`AutomationAction.comment: Option<String>`, `crates/lotar-agent/src/automation/types.rs`). A rule that asks the reporter a question with options has to use `run: lotar comment --question`, and `run` needs `lotar trust`. A built-in template can't rely on trust, so DEV-796's `agent-team` draft writes the choices in words and the answer can't set fields. Owner decision 2026-11-24 on DEV-796 (INBOX-698): "First fix the lotar gaps (question comments in rules, job reporter), then build".
+
+  ## Proposal
+
+  - `comment:` also takes a map: `{ text, question: { options: [{ key, label, set }], recommended, multiple, other } }`, the same shape as a comment's `question` (`CommentQuestion`, `crates/lotar-core/src/types.rs`, DEV-488). A string stays valid.
+  - `text` and option labels accept `${{...}}` templates; the posted comment is a question comment as `lotar comment --question` writes it.
+  - `lotar automation simulate` shows the question and its options.
+
+  ## Done when
+
+  - [ ] A rule with a question comment posts a comment whose `question` an answer can choose, without `lotar trust`; option `set` applies on the answer.
+  - [ ] Existing string comments load and behave as before.
+  - [ ] `lotar config validate` refuses a question with no options or an unknown `set` field.
+  - [ ] docs/help (automation actions) describes it; tests cover the rule and the simulate output.
+history:
+- at: 2026-11-24T21:03:30.344244+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-488","DEV-796"]}'
+- at: 2026-11-24T21:03:32.664647+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T21:04:33.204144+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:04:34.642304+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-488","DEV-796"]}'
+    new: '{"related":["DEV-488","DEV-796","DEV-852"]}'
+- at: 2026-11-24T21:04:37.100165+00:00
+  actor: claude
+  changes:
+  - field: deleted
+    new: 2026-11-24T21:04:37.100165+00:00

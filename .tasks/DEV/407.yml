@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T02:47:52.153512+00:00
-modified: 2026-11-14T00:20:36.859035+00:00
+modified: 2026-11-23T03:03:10.469852+00:00
 relationships:
   blocks:
   - DEV-398
   related:
   - DEV-398
   - DEV-412
+  - DEV-811
 comments:
 - date: 2026-11-13T03:01:08.871423+00:00
   author: claude
@@ -88,3 +89,9 @@ history:
   changes:
   - field: releases
     new: '#3'
+- at: 2026-11-23T03:03:10.469852+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-398"],"related":["DEV-398","DEV-412"]}'
+    new: '{"blocks":["DEV-398"],"related":["DEV-398","DEV-412","DEV-811"]}'

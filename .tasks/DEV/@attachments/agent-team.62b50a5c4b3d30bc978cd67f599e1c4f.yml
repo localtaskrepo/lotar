@@ -1,0 +1,437 @@
+# Agent Team Project Template (DRAFT, DEV-796)
+# Agents implement, review on a second provider and merge; a person is asked
+# only when the agents can't go on:
+#   Todo → InProgress (@implement) → Reviewing (@review) → Merging (@merge) → Done
+# - The review runs in a new session on another provider (Codex after Claude),
+#   changes nothing and posts its verdict (`lotar comment --review pass|block`).
+# - A blocking review goes back to the implementing agent's own session, twice;
+#   the third blocking review goes to the reporter with one question.
+# - A failed implementation job retries once on @implement-retry, a failed merge
+#   goes back to @implement once; a second failure goes to the reporter.
+# - A job that stops on a usage limit pauses and runs again by itself.
+# - An agent that waits for another ticket adds a depends-on relationship and
+#   tag `waits`: the ticket goes Blocked and its agent continues once the
+#   prerequisites are done.
+# - A person's comment reaches the ticket's agent: queued to its running job,
+#   else as the next turn of its session.
+# - A job that finds nothing to change closes the ticket itself.
+#
+# `lotar init --template agent-team` writes the `config:` block below into the
+# project config and the `automation:` block into the project's automation.yml.
+# Assign a ticket to @implement to start. Both providers' CLIs must be signed in
+# (claude and codex); change the runners below to use others.
+
+name: "Agent Team"
+description: "Agents implement, review on a second provider and merge; retries, prerequisites and comments reach the agent"
+config:
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo              # Backlog
+      - InProgress        # Agent implementing
+      - Reviewing         # Agent reviewing on the second provider
+      - Merging           # Agent merging into main
+      - Blocked           # Waiting for prerequisites
+      - HelpNeeded        # Waiting for a person (the reporter)
+      - Done              # Complete
+      - WontDo            # Closed without a change
+    done_states:
+      - Done
+      - WontDo
+    types:
+      - Feature
+      - Bug
+      - Chore
+      - Refactor
+    priorities:
+      - Low
+      - Medium
+      - High
+      - Critical
+    tags:
+      - "*"
+
+  # LoTaR adds its own instructions to every job (the lotar CLI, the worktree
+  # branch, how the job ends); the rules' prompts below describe each step.
+  # runner: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo,
+  # antigravity or t3. The reviewer runs on another provider than the author, so
+  # it doesn't share the author's blind spots.
+  agents:
+    implement:
+      runner: claude
+      # model: opus
+      effort: medium
+    # The one retry of a failed implementation job, in a new session.
+    implement-retry:
+      runner: claude
+      effort: medium
+    review:
+      runner: codex
+      effort: medium
+      # A review comments, tags and reruns checks through lotar and the shell.
+      permissions: full
+    merge:
+      runner: claude
+      effort: medium
+      permissions: full
+
+  agent:
+    worktree:
+      enabled: true
+      branch_prefix: "agent/"
+      cleanup_on_done: true
+      cleanup_delete_branches: true
+      # max_parallel_jobs: 4
+    # lotar merges by itself and starts @merge only when a step needs judgment
+    # (a conflict, a check that fails twice). Needs `lotar trust`.
+    # merge:
+    #   checks: [npm run lint, npm test]
+    #   install: npm ci
+    #   push: false
+
+automation:
+  rules:
+    # First, so assigning @implement by hand starts its job with this prompt (the first rule that
+    # assigns a profile gives its job's settings). Also: lotar automation run "Start: implement" --select id:<ID>
+    - name: "Start: implement"
+      when:
+        not: { assignee: "@agent" }
+      on:
+        manual:
+          set:
+            assignee: "@implement"
+          agent:
+            prompt: &implement-prompt |
+              Work ticket ${{ticket.id}} ("${{ticket.title}}"): read it, its comments and relationships, then do
+              it the way this repository's guidance (AGENTS.md, CONTRIBUTING.md) says. Run lotar with
+              LOTAR_DEFAULT_REPORTER=implement, so your comments carry an agent name. After a failed merge or
+              a review your branch may hold earlier commits (git log <main>..HEAD): build on them.
+              1. Before you code: a ticket without "## Done when" gets one in its description (lotar task edit
+                 ${{ticket.id}} -D ...), checkboxes a reviewer can check.
+              2. Never delete work that isn't saved elsewhere, and never decide what only the reporter decides:
+                 comment one question (lotar comment ${{ticket.id}} --question ... --option ...), set the status
+                 to HelpNeeded, assign the ticket to its reporter and stop.
+                 It waits for another ticket: lotar task relationships add --kind depends-on ${{ticket.id}} <ID>,
+                 lotar task edit ${{ticket.id}} --tag waits, comment what it waits for and stop. It goes Blocked
+                 and you continue here when <ID> is done.
+              3. Commit on your worktree's branch with the message "${{ticket.id}} ${{ticket.title}}", never with
+                 --no-verify. Don't merge or push: the merge does that after the review.
+              4. Don't end your turn while tests still run: the job ends with your turn.
+              5. Nothing to commit (done already, or no file change needed) and no commits beyond main: comment
+                 the reason in one line, then lotar status ${{ticket.id}} Done (or WontDo) and lotar assignee
+                 ${{ticket.id}} --clear, and stop. No review or merge follows.
+              6. Otherwise comment the outcome (lotar comment ${{ticket.id}} --commit "<sha>: <what>" --check
+                 "<command>=passed|failed|not_run" -F -). When your job ends, an agent on another provider reviews it.
+
+    - name: "Implement: lifecycle"
+      when:
+        any:
+          - assignee: "@implement"
+          - assignee: "@implement-retry"
+      on:
+        job_started:
+          set:
+            status: InProgress
+
+    - name: "Implement done: review on the second provider"
+      when:
+        all:
+          - any:
+              - assignee: "@implement"
+              - assignee: "@implement-retry"
+          - not: { tags: { any: [waits] } }
+      on:
+        job_completed:
+          set:
+            assignee: "@review"
+            status: Reviewing
+          agent:
+            session: fresh
+            prompt: |
+              Review the work for ticket ${{ticket.id}} ("${{ticket.title}}") before it is merged. Another agent
+              committed it on your worktree's branch. Run lotar with LOTAR_DEFAULT_REPORTER=review.
+              Change no files, commit nothing and leave status and assignee as they are. Nobody reads this
+              session: what you find goes into the ticket's comments.
+              1. The work: git log <main>..HEAD and its diff, main being the main checkout's branch. No commits:
+                 lotar comment ${{ticket.id}} --review pass "Nothing to review" and stop.
+              2. Read what it must agree with: the ticket and its comments ("Done when", what the author claims),
+                 related tickets and the repository's guidance.
+              3. Check that it does all "Done when" asks and nothing the ticket didn't ask, that a bug fix has a
+                 test that failed before it, and that nothing decides what only the reporter decides. Rerun the
+                 checks the author names that finish in a few minutes.
+              4. Blocking (a bug, an unmade decision or unfinished work would reach main): lotar comment
+                 ${{ticket.id}} --review block --commit <HEAD> --blocker "<file>:<line>: <what and the fix>" for
+                 each. Otherwise --review pass, with --finding for what is real but minor. Don't end your turn
+                 while checks still run.
+
+    - name: "Implement waits: Blocked until its prerequisites are done"
+      when:
+        all:
+          - any:
+              - assignee: "@implement"
+              - assignee: "@implement-retry"
+          - tags: { any: [waits] }
+      on:
+        job_completed:
+          set:
+            status: Blocked
+
+    # The reviewer's verdict comment tags the ticket, so the job's end can route it.
+    - name: "Review: a blocking verdict tags the ticket"
+      when:
+        comment: { review: block }
+      on:
+        commented:
+          add:
+            tags: [review-blocked]
+
+    - name: "Review: lifecycle"
+      when:
+        assignee: "@review"
+      on:
+        job_started:
+          set:
+            status: Reviewing
+
+    - name: "Review passed: merge"
+      when:
+        all:
+          - assignee: "@review"
+          - not: { tags: { any: [review-blocked] } }
+      on:
+        job_completed:
+          set:
+            assignee: "@merge"
+            status: Merging
+          agent:
+            prompt: |
+              Merge the work for ticket ${{ticket.id}} ("${{ticket.title}}") into the main checkout (the first
+              entry of git worktree list). Run lotar with LOTAR_DEFAULT_REPORTER=merge. Nobody reads
+              this session. When lotar's own merge handed off (its comment comes before this prompt), start at the
+              step that needed judgment.
+              1. Rebase onto the main checkout's branch. Resolve a conflict only when both sides' intent is kept;
+                 otherwise git rebase --abort and hand back.
+              2. Run the checks the repository's guidance names. One fails: hand back.
+              3. git -C <main checkout> merge --ff-only <your branch>. Main moved on: back to step 1. Never
+                 stash, reset or commit other files in the main checkout. Push only if the guidance says so.
+              4. Comment the outcome: the commits merged and the checks that ran.
+              To hand back: comment one question, set the status to HelpNeeded, assign the ticket to the
+              reporter and stop.
+
+    # A crashed review doesn't merge: no merge without a review.
+    - name: "Review failed: ask the reporter"
+      when:
+        all:
+          - assignee: "@review"
+          - not: { tags: { any: [review-blocked] } }
+      on:
+        job_failed:
+          set:
+            status: HelpNeeded
+            assignee: "@reporter"
+          comment: >-
+            The review job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}), so branch
+            ${{agent.worktree_branch}} isn't merged unreviewed. Assign @review to review again, or set WontDo.
+
+    # Blocking findings go back to the author's own session, twice. The tags count the rounds.
+    - name: "Review blocked: back to @implement"
+      when:
+        all:
+          - assignee: "@review"
+          - tags: { any: [review-blocked] }
+          - not: { tags: { any: [review-returned] } }
+      on:
+        job_completed: &rework
+          set:
+            assignee: "@implement"
+          add:
+            tags: [review-returned]
+          remove: &unblocked
+            tags: [review-blocked]
+          agent: &rework-agent
+            session: continue
+            prompt: |
+              The review of ticket ${{ticket.id}} ("${{ticket.title}}") blocked: its last review comment names the
+              findings. Run lotar with LOTAR_DEFAULT_REPORTER=implement. Your branch holds the earlier
+              commits: build on them.
+              1. Check that the review read your HEAD (git log -1 --format=%h). Otherwise fix each finding, or
+                 answer in a comment why it isn't one. A finding only the reporter can decide: comment one
+                 question, set the status to HelpNeeded, assign the ticket to the reporter and stop.
+              2. Commit, never with --no-verify. Don't merge or push.
+              3. Don't end your turn while tests still run. Comment what you did about each finding, the commit
+                 and the checks that ran. When your job ends the work is reviewed again.
+        job_failed: *rework
+
+    - name: "Review blocked again: rework once more"
+      when:
+        all:
+          - assignee: "@review"
+          - tags: { any: [review-blocked] }
+          - tags: { any: [review-returned] }
+          - not: { tags: { any: [review-returned-twice] } }
+      on:
+        job_completed: &rework-twice
+          set:
+            assignee: "@implement"
+          add:
+            tags: [review-returned-twice]
+          remove: *unblocked
+          agent: *rework-agent
+        job_failed: *rework-twice
+
+    - name: "Review blocked a third time: ask the reporter"
+      when:
+        all:
+          - assignee: "@review"
+          - tags: { any: [review-blocked] }
+          - tags: { any: [review-returned-twice] }
+      on:
+        job_completed: &to-reporter
+          set:
+            status: HelpNeeded
+            assignee: "@reporter"
+          remove: *unblocked
+          comment: >-
+            The review blocked a third time, after two reworks (the comments above). Assign @implement for another
+            rework, decide the findings in a comment, or set WontDo.
+        job_failed: *to-reporter
+
+    # A failed implementation job retries once in a new session; a usage limit pauses instead (below).
+    - name: "Implement failed: retry once"
+      when:
+        all:
+          - assignee: "@implement"
+          - not: { tags: { any: [implement-retried] } }
+      on:
+        job_failed:
+          set:
+            assignee: "@implement-retry"
+          add:
+            tags: [implement-retried]
+          comment: >-
+            The job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); @implement-retry retries it on
+            branch ${{agent.worktree_branch}}.
+          agent:
+            prompt: *implement-prompt
+
+    - name: "Implement failed again: ask the reporter"
+      when:
+        any:
+          - assignee: "@implement-retry"
+          - all:
+              - assignee: "@implement"
+              - tags: { any: [implement-retried] }
+      on:
+        job_failed:
+          set:
+            status: HelpNeeded
+            assignee: "@reporter"
+          comment: >-
+            The job ${{agent.job_id}} failed again (lotar agent logs ${{agent.job_id}}). Assign @implement to
+            retry, or set WontDo.
+
+    - name: "Merge: lifecycle"
+      when:
+        assignee: "@merge"
+      on:
+        job_started:
+          set:
+            status: Merging
+        job_completed:
+          set:
+            status: Done
+          remove: &done-tags
+            tags: [implement-retried, merge-retried, review-blocked, review-returned, review-returned-twice, job-paused]
+
+    # A failed merge goes back to the author once; with nothing left to do it closes the ticket itself.
+    - name: "Merge failed: back to @implement once"
+      when:
+        all:
+          - assignee: "@merge"
+          - not: { tags: { any: [merge-retried] } }
+      on:
+        job_failed:
+          set:
+            assignee: "@implement"
+          add:
+            tags: [merge-retried]
+          comment: >-
+            The merge job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); @implement retries it on
+            branch ${{agent.worktree_branch}}.
+          agent:
+            prompt: *implement-prompt
+
+    - name: "Merge failed again: ask the reporter"
+      when:
+        all:
+          - assignee: "@merge"
+          - tags: { any: [merge-retried] }
+      on:
+        job_failed:
+          set:
+            status: HelpNeeded
+            assignee: "@reporter"
+          comment: >-
+            The merge job ${{agent.job_id}} failed again (lotar agent logs ${{agent.job_id}}). The work is on
+            branch ${{agent.worktree_branch}}. Assign @implement to retry, or merge it yourself.
+
+    - name: "Job paused: comment once"
+      when:
+        not: { tags: { any: [job-paused] } }
+      on:
+        job_paused:
+          add:
+            tags: [job-paused]
+          comment: >-
+            Paused, not failed: the job ${{agent.job_id}} (${{agent.profile}}) stopped on a usage limit or a paused
+            queue and runs again by itself. lotar agent list-jobs shows when.
+
+    - name: "Done: clear the round tags"
+      when:
+        status: Done
+      on:
+        updated:
+          remove: *done-tags
+
+    # A prerequisite in another repository can't notify this one: run `lotar automation run` from cron.
+    - name: "Prerequisites done: continue the waiting ticket"
+      when:
+        status: Blocked
+      on:
+        unblocked:
+          remove:
+            tags: [waits]
+          tell_agent:
+            agent: implement
+            message: |
+              Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{unblocked.by}}, which is done now. Read the
+              ticket and its comments, then continue where it stopped, as the first prompt of this session says.
+
+    # A person's comment reaches the ticket's agent. Agents' own comments carry their profile name
+    # (LOTAR_DEFAULT_REPORTER in the prompts above), so they don't come back to them.
+    - name: "Comments: a person's comment reaches the agent"
+      when:
+        all:
+          - not: { comment: { author: [implement, implement-retry, review, merge, automation] } }
+          # An answer that closed the ticket needs no agent.
+          - not:
+              all:
+                - not: { comment: { answer: { exists: false } } }
+                - current: { status: [Done, WontDo] }
+      on:
+        commented:
+          tell_agent:
+            agent: implement
+            message: |
+              ${{comment.author}} commented on ticket ${{ticket.id}} ("${{ticket.title}}"), which was
+              ${{ticket.status}} and assigned to "${{ticket.assignee}}":
+              ${{comment.text}}
+              Run lotar with LOTAR_DEFAULT_REPORTER=implement. Act on the comment:
+              - A job runs on the ticket: this is its next turn. Answer, change the work as asked, carry on.
+              - It answers what the ticket waited for, or asks for a change: do the work and commit it as the
+                first prompt of this session says; the review and merge follow when your job ends.
+              - It shows the work is done: comment the evidence, then lotar status ${{ticket.id}} Done and
+                lotar assignee ${{ticket.id}} --clear.
+              - Otherwise answer in one comment, then set status and assignee back to ${{ticket.status}} and
+                "${{ticket.assignee}}", so no review or merge follows.

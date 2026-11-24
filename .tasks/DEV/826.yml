@@ -1,0 +1,91 @@
+title: 'Agents page: a question of a job in another process shows in a box after a reload, but not live'
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-23T04:27:39.844205+00:00
+modified: 2026-11-23T07:50:11.792669+00:00
+relationships:
+  depends_on:
+  - DEV-782
+  related:
+  - DEV-782
+  - DEV-765
+comments:
+- date: 2026-11-23T07:49:44.529276+00:00
+  author: claude
+  text: |-
+    Waits for DEV-782: the reload half of this ticket is its fix, not yet on main.
+
+    - DEV-782's `799bb8b8a` (branch `agent/DEV-782`, status Reviewing) adds `logged_question` to `saved_job_dto`; on main `saved_job_dto` still sets `question: None`, so today neither reload nor live shows the box
+    - Live fix once it lands: `LogFollower::api_event` in `crates/lotar-agent/src/services/agent_job_service/follow.rs` passes the current event (as a `JobLogEntry`) in the `SavedJob` events instead of `Vec::new()`, so `logged_question` gives the same title-only question; the next event clears it, as after a reload
+    - Test: a `follow.rs` test that an `agent_job_question` line yields `question.title` = its message, no options, and the next line `question: null`
+    - No code changed in this job; nothing committed
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407a18347417b166c014fede135d875b0cb8589e4b34f67cb90e149629e91c1d
+description: |-
+  Found while reviewing DEV-782.
+
+  - After a reload, `GET /api/jobs` gives such a job a `question` (title only, no options), so its card on the Agents page shows the box 'The agent asks: …' without buttons (`view/pages/AgentJobs.vue` ~:183).
+  - Live, the log follower sends the `agent_job_question` event with `question: null` (`crates/lotar-agent/src/services/agent_job_service/follow.rs` ~:141 builds the DTO with no events), and `updateFromEvent` takes `payload.question`: the card shows the question only as its last message, no box.
+  - docs/help/agent.md says 'A question of such a job shows … its card has no buttons'.
+
+  ## Done when
+  - [ ] Live and after a reload the card of a job in another process that waits on a question looks the same (box with the title, no buttons), and the next event clears it in both.
+  - [ ] A test covers the live case.
+tags:
+- ui
+- agent
+- waits
+history:
+- at: 2026-11-23T04:27:51.331691+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T04:28:11.412997+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-782","DEV-765"]}'
+    new: '{"related":["DEV-782","DEV-765","DEV-818"]}'
+- at: 2026-11-23T04:30:39.513939+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-782","DEV-765","DEV-818"]}'
+    new: '{"related":["DEV-782","DEV-765"]}'
+- at: 2026-11-23T07:48:51.229564+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T07:48:52.730665+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407a18347417b166c014fede135d875b0cb8589e4b34f67cb90e149629e91c1d
+- at: 2026-11-23T07:49:43.965930+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-782","DEV-765"]}'
+    new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765"]}'
+- at: 2026-11-23T07:49:44.477222+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, agent
+    new: ui, agent, waits
+- at: 2026-11-23T07:49:44.529276+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:50:11.792669+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

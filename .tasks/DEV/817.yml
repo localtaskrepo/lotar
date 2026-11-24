@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-22T22:24:57.734074+00:00
-modified: 2026-11-22T22:35:23.554049+00:00
+modified: 2026-11-23T04:32:10.623096+00:00
 relationships:
   related:
   - DEV-804
@@ -16,6 +16,15 @@ comments:
     Duplicate: closed, the chief of staff filed DEV-816 for this first.
 
     - Filed by the STD-311 job, which ran after the chief of staff had already finished STD-311.
+- date: 2026-11-23T04:32:10.623096+00:00
+  author: claude
+  text: |-
+    No change here: duplicate of [DEV-816](https://lotar.pyxzl.net/task/DEV-816), which makes this fix and is in Reviewing.
+
+    - `git log main..HEAD` on `agent/DEV-817`: no commits; nothing to commit.
+    - On main `.github/skills/release/SKILL.md` step 4 and `docs/release-guide.md` step 1 still ask him for every release; DEV-816's branch changes them.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75f9aec2a9ae5ba1cfc329cb9a41efdf8018037b005d859e312c3bcfd911832d
 description: |-
   Found: the owner changed the release rule for every repo (2026-11-22, chief of staff thread): "Only minor changes need my okay. Patch level updates can always be done". Major releases still ask him. Recorded in standards STD-311, docs/decisions/2026-11-22-releases.md. Here .github/skills/release/SKILL.md step 4 still says every tag needs his OK, and docs/release-guide.md (Pre-Release Checklist, step 1) says he picks the bump.
 
@@ -61,3 +70,12 @@ history:
   - field: relationships
     old: '{"related":["DEV-804"]}'
     new: '{"related":["DEV-804","DEV-816"]}'
+- at: 2026-11-23T04:31:56.444542+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75f9aec2a9ae5ba1cfc329cb9a41efdf8018037b005d859e312c3bcfd911832d
+- at: 2026-11-23T04:32:10.623096+00:00
+  actor: claude
+  changes:
+  - field: comment_added

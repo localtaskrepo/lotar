@@ -5,10 +5,11 @@ type: Bug
 reporter: mallox
 assignee: claude
 created: 2026-10-31T22:06:35.245507+00:00
-modified: 2026-11-03T22:25:36.485985+00:00
+modified: 2026-11-23T03:03:10.469612+00:00
 relationships:
   related:
   - DEV-253
+  - DEV-811
 comments:
 - date: 2026-11-03T22:25:36.460093+00:00
   text: |-
@@ -51,3 +52,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-23T03:03:10.469612+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-253"]}'
+    new: '{"related":["DEV-253","DEV-811"]}'

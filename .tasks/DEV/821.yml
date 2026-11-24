@@ -1,0 +1,261 @@
+title: 'lotar trust didn''t replay one skipped run: the owner''s inbox answer on INBOX-646 was never relayed'
+status: Merging
+priority: High
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-23T01:32:44.631216+00:00
+modified: 2026-11-24T23:12:09.700487+00:00
+relationships:
+  blocks:
+  - DEV-844
+  related:
+  - DEV-800
+  - DEV-833
+  - DEV-844
+comments:
+- date: 2026-11-23T05:48:29.430406+00:00
+  author: claude
+  text: |-
+    Fixed: concurrent writes to the trust file no longer lose skipped runs.
+
+    - Cause: `update_trust_file` in `crates/lotar-core/src/config/trust.rs` read, changed and wrote the trust file without a lock. A serve and a CLI recording skips at the same time overwrote each other's `skipped_runs`, which is how INBOX-646's run was lost.
+    - Fix: it now holds an exclusive lock file next to the trust file (`acquire_storage_lock_within`, 10 s wait) for the whole read-modify-write.
+    - Second gap: a skip recorded just after `lotar trust` took the runs stayed in the file until the next trust. After recording a skip, automation now replays it if the workspace is trusted by then (`crates/lotar-agent/src/services/automation_service.rs`). The take runs under the lock, so each run is replayed only once.
+    - Test `concurrent_skips_and_a_trust_lose_no_skipped_run`: 8 threads record 80 skips while trust and take run 5 times. Every run is taken exactly once. With the lock removed, it loses runs and takes some twice.
+    - No test covers the second gap: there is no way to time the trust deterministically between the check and the record.
+    - Docs: `docs/help/trust.md`, Skipped runs section.
+  report:
+    commits:
+    - hash: d853d6afa
+      what: lock the trust file's read-modify-write; replay a skip recorded after lotar trust took the runs
+    checks:
+    - command: cargo nextest run -p lotar-core concurrent_skips
+      result: passed
+      reason: fails without the lock (runs lost and taken twice)
+    - command: npm run lint
+      result: passed
+      reason: as lint:agent
+    - command: npm test
+      result: passed
+      reason: rerun with RUSTC_WRAPPER= after sccache failed to make its temp dir
+    - command: npm run smoke
+      result: passed
+      reason: with RUSTC_WRAPPER=
+    next: Review on another model, then merge
+- date: 2026-11-23T08:27:29.476008+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082720.168Z-100 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082720.168Z-100 why.'
+- date: 2026-11-24T17:30:21.154441+00:00
+  author: claude
+  text: |-
+    Review: passed. The trust-file lock fixes the lost skipped run, and the test fails without it.
+
+    - Read: `d853d6afa` (diff from `main...HEAD`; main has no newer commits to `trust.rs`, `automation_service.rs` or `safety.rs`), the ticket, DEV-800, DEV-833, `AGENTS.md`
+    - `crates/lotar-core/src/config/trust.rs:357`: `update_trust_file` now holds an flock on a lock file beside the trust file for the whole read, change and write. It is the only writer of the trust file, and the file is shared by all repos and processes, so a write from another repo at the same moment could lose INBOX-646's entry. That fits the minutes between the five skips.
+    - `take_skipped_runs` runs under the same lock, so a run is taken only once. A record that waits more than 10 s on the lock fails. The skip comment then leaves out "`lotar trust` runs it then", so the run is reported, not dropped silently.
+    - `automation_service.rs:2668`: when the workspace is trusted after the record, the skip replays at once. I went through the orderings of trust, take and record: each run is replayed by exactly one process. No test covers this path, which the fix agent says; the lock test covers the case that lost INBOX-646.
+    - Ran `npm ci` first. Removed the lock in a detached scratch copy (since deleted): the new test failed 3 of 3 runs
+    - No stray files; worktree clean after the checks
+    - Minor, filed: DEV-844 (`docs/help/trust.md:45`: the new sentence is missing its verb)
+  report:
+    checks:
+    - command: cargo nextest run -p lotar-core concurrent_skips
+      result: passed
+      reason: and fails 3 of 3 runs with the lock removed
+    - command: cargo nextest run -p lotar-core -p lotar-agent
+      result: passed
+      reason: 413 tests
+    - command: cargo nextest run -p lotar-lib -E 'test(/trust|skipped/)'
+      result: passed
+      reason: 13 tests
+    - command: npm run lint
+      result: passed
+      reason: as lint:agent
+    - command: npm test
+      result: not_run
+      reason: the full suite; the touched crates ran in full
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or REST change
+- date: 2026-11-24T19:27:19.563746+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+       Compiling clap_complete v4.6.11
+       Compiling predicates-core v1.0.10
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-821/crates/lotar-web-assets)
+       Compiling pulldown-cmark v0.13.6
+       Compiling notify v8.2.2
+       Compiling rustls-webpki v0.103.16
+       Compiling include_dir v0.7.4
+       Compiling difflib v0.4.0
+       Compiling termtree v0.5.1
+       Compiling wait-timeout v0.2.1
+       Compiling predicates v3.1.4
+       Compiling predicates-tree v1.0.13
+       Compiling rustls v0.23.46
+       Compiling serde_with v3.24.0
+       Compiling assert_cmd v2.2.2
+       Compiling serde_yaml_ng v0.10.0
+       Compiling ureq v3.5.1
+       Compiling agent-client-protocol-schema v1.17.0
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-821/crates/lotar-core)
+       Compiling agent-client-protocol v5.2.0
+       Compiling harnessmux v0.3.0
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-821/crates/lotar-tasks)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-821)
+        Finished `dev` profile [unoptimized] target(s) in 53.00s
+    ────────────
+     Nextest run ID f6625adf-8105-4d21-be74-9a14cd5ec845 with nextest profile: default
+        Starting 2489 tests across 14 binaries
+    ────────────
+         Summary [ 240.146s] 2489 tests run: 2489 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmp8jugng
+    ```.
+
+    - Rebased `agent/DEV-821` onto `main` (`855ff6f4628f`): `0ee647135cfc`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T23:12:09.700487+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+       Compiling unicase v2.10.0
+       Compiling ring v0.17.14
+       Compiling ctor v1.0.14
+       Compiling utf8-zero v0.8.1
+       Compiling percent-encoding v2.3.2
+       Compiling harnessmux v0.3.0
+       Compiling clap_complete v4.6.12
+       Compiling predicates-core v1.0.10
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-821/crates/lotar-web-assets)
+       Compiling include_dir v0.7.4
+       Compiling difflib v0.4.0
+       Compiling webpki-roots v1.0.12
+       Compiling notify v8.2.2
+       Compiling pulldown-cmark v0.13.6
+       Compiling termtree v0.5.1
+       Compiling wait-timeout v0.2.1
+       Compiling rustls-webpki v0.103.17
+       Compiling predicates v3.1.4
+       Compiling predicates-tree v1.0.13
+       Compiling rustls v0.23.46
+       Compiling assert_cmd v2.2.2
+       Compiling ureq v3.5.2
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-821)
+        Finished `dev` profile [unoptimized] target(s) in 3m 13s
+    ────────────
+     Nextest run ID 5e4cad2b-7fb4-4a76-8213-f491fdac8d7c with nextest profile: default
+        Starting 2489 tests across 14 binaries
+    ────────────
+         Summary [ 208.307s] 2489 tests run: 2489 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpSXMH1s
+    ```.
+
+    - Rebased `agent/DEV-821` onto `main` (`7467c63f5bb5`): `b314c1662410`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa1a190e7422c8e7d2071a5abd86df9bbd32d86b9e9a51ec33ed03931587b295d
+description: |-
+  Found 2026-11-22: in standards, the rule 'Inbox: the owner's answer goes to the source' was skipped (repo untrusted after a rules change) on INBOX-637 (22:00:46Z), INBOX-650 (22:02:02), INBOX-646 (22:03:58), INBOX-641 (22:04:56) and INBOX-639 (22:05:20). After lotar trust, four got the comment 'ran ... after lotar trust' and were relayed. INBOX-646 got none: no 'ran', 'failed' or 'didn't run' comment, and lotar trust --status lists no skipped runs left, so the run was dropped silently and the owner's answer never reached DEV-800 for about 3.5 hours. Guess: two processes (lotar serve and the CLI, or two serves) wrote skipped_runs in the trust file at about the same time and one write lost the other's entry, or trust ran between the skip and its write. I replayed it by hand at 01:40Z (the rule's command with the ticket's values).
+
+  Done when: a skipped run recorded while another process writes the trust file (another skip, or lotar trust) is never lost; a test with concurrent skips and a trust in between shows each skipped run replayed or reported exactly once.
+tags:
+- job-paused
+history:
+- at: 2026-11-23T01:32:44.907908+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-800"]}'
+- at: 2026-11-23T05:40:52.855433+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T05:40:57.130531+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa1a190e7422c8e7d2071a5abd86df9bbd32d86b9e9a51ec33ed03931587b295d
+- at: 2026-11-23T05:48:29.430406+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:48:45.563563+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:27:29.299306+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T08:27:29.476008+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:09:50.290218+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800"]}'
+    new: '{"related":["DEV-800","DEV-833"]}'
+- at: 2026-11-24T17:30:03.851062+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-833"]}'
+    new: '{"related":["DEV-800","DEV-833","DEV-844"]}'
+- at: 2026-11-24T17:30:21.154441+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:30:42.441108+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T19:27:19.563746+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:00:40.841754+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-833","DEV-844"]}'
+    new: '{"blocks":["DEV-844"],"related":["DEV-800","DEV-833","DEV-844"]}'
+- at: 2026-11-24T23:12:09.700487+00:00
+  actor: automation
+  changes:
+  - field: comment_added

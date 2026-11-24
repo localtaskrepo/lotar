@@ -1,11 +1,11 @@
 title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
-status: Reviewing
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-22T19:46:53.716476+00:00
+modified: 2026-11-24T22:31:54.944667+00:00
 relationships:
   related:
   - DEV-725
@@ -13,6 +13,12 @@ relationships:
   - DEV-755
   - DEV-783
   - DEV-794
+  - DEV-600
+  - DEV-798
+  - DEV-805
+  - DEV-843
+  - DEV-771
+  - DEV-856
 comments:
 - date: 2026-11-22T05:07:00.362925+00:00
   author: claude
@@ -138,6 +144,236 @@ comments:
       result: passed
       reason: 17:48Z run, no edits since
     next: Review on another model, then the merge agent rebases onto main
+- date: 2026-11-23T02:17:10.558810+00:00
+  author: claude
+  text: |-
+    Review: blocking. An entry whose ticket is busy now holds a queue slot on every pass, which slows the queue down.
+
+    Reviewed `bc0c7d822` (only commit past `main`, tree clean).
+
+    **Blocking**
+    - `crates/lotar-agent/src/services/agent_queue_service.rs:977` with `:1034` and `:765-770`: before this change, an entry whose ticket is busy ("already has an active job", or a T3 thread hold, DEV-600) went to the end of the queue. Now `place` puts it back at its rank.
+      - `dequeue_startable` gives it a slot (`slots.take`) on every 300 ms pass, before the lower entries behind it, and the start then fails as busy.
+      - So each busy High/merge/review entry blocks one of DEV's 3 slots for as long as its ticket's job or thread runs. That works against the ticket's goal of speeding the queue up.
+      - Fix: in `dequeue_startable`, keep an entry whose ticket has an active job or thread hold without taking a slot. Add a test: a High entry on a busy ticket and a Low entry with one free slot, and the Low starts.
+    - `agent_queue_service.rs:931` (`place`, `pinned` branch): an entry someone moved (pinned) that goes back after a busy or failed start is put at index 0. That puts it ahead of paused retries and everything else, not back where it was moved to. "Done when" asks that it go back to its place.
+      - Fix: put a pinned entry back at its old index. Or, with the first fix, a busy entry is never taken, so only the failed-start path needs this.
+
+    **Also (small, fix while there)**
+    - `crates/lotar-lib/src/cli/handlers/agent.rs:520`: the text output checks `pending.is_empty()` but lists `ordered`, which includes the entries being started. With only starting entries it prints "No pending entries".
+
+    **Checked, fine**
+    - Order, kinds, move, REST and contract: `api_types.rs`, `types.ts`, `openapi.json` and `docs/help` agree.
+    - In a scratch workspace, the CLI move worked (text and JSON), `--up --down` was refused, and REST gave a 400 for a ticket that isn't queued.
+    - Agents page: my screenshots (light/dark, 1920/1440/390) look right. The fix agent's screenshots are on the ticket.
+    - The "0 Queued" count beside a full queue is the existing DEV-798.
+
+    **Reran:** `npm ci` (ok); nextest `the_queue_starts…` and `a_moved_entry…` (pass); `dev786_queue_order_test` (pass); vitest `AgentQueuePanel.spec.ts` and `AgentJobs.spec.ts` (36 pass).
+    **Not rerun:** full lint, test and smoke. Load average was 60-111, and the builds alone took more than 30 minutes.
+
+    **My mistake, fixed:** this job's `LOTAR_TASKS_DIR` pointed my scratch `lotar add` calls at the real backlog. That created DEV-822..826. They were never queued and nothing referenced them, and I hard-deleted them. DEV-826 was the highest ID, so the next new DEV ticket reuses that number.
+- date: 2026-11-23T06:36:21.508359+00:00
+  author: claude
+  text: |-
+    Review findings fixed: a busy ticket's entry no longer holds a slot, and a moved entry goes back to its place after a failed start.
+
+    - The review read `bc0c7d822`, which was HEAD. I amended it to `99c714ed9`, signed
+    - **Busy ticket:** `dequeue_startable` now skips, without taking a slot, any entry whose ticket has a job (in this process, in another process, or taken this pass) or a recent T3 Code thread hold (DEV-600). The entries after it start in the meantime
+    - **Moved entry after a failed start:** it now goes back to the index the worker took it from (`taken_from`, never saved to disk), not to index 0
+    - New test `a_busy_tickets_entry_leaves_its_slot_to_the_next_one`: a High entry whose ticket is busy and a Low entry, with one free slot, and the Low starts. Then a moved entry fails to start and goes back to its place. I checked that the test fails when either fix is taken out
+    - **CLI:** the "No pending entries" check now uses the same list it prints (`ordered`). `list_pending` already included the entries being started, so the case the review described only happened if the queue changed between two reads
+    - Heads-up from DEV-805: it also changes `crates/lotar-lib/src/cli/handlers/agent.rs` and `docs/help/agent.md`. Whichever lands second may need to resolve a small rebase conflict
+  report:
+    commits:
+    - hash: 99c714ed9
+      what: DEV-786 queue order, move, kinds; busy tickets wait without a slot, moved entries go back to their place
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: rerun with RUSTC_WRAPPER= after sccache failed to create its temp dir
+    - command: npm run test:agent
+      result: passed
+      reason: 2457 Rust, 1569 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: '408'
+    next: Review again; on landing, expect a small rebase conflict with DEV-805 in agent.rs and docs/help/agent.md
+- date: 2026-11-23T08:41:42.008384+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T084120.308Z-104 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T084120.308Z-104 why.'
+- date: 2026-11-24T18:58:38.249739+00:00
+  author: claude
+  text: |-
+    Review: blocking. Main now has its own queue list on the Agents page (DEV-771, `928cc5a19`), and this branch adds a second one. The branch doesn't rebase cleanly.
+
+    Reviewed `99c714ed9` (the only commit past `main`, tree clean). Its base `f7733872c` is 10 commits behind `main`.
+
+    **Blocking**
+    - **Two queue lists and two APIs for the same queue.** On `main`, DEV-771 added `AgentQueueService::overview`, the `queue` field of `GET /api/jobs` (`AgentQueueOverview`, `AgentQueuedTicket` with `waits_for`), and a "Waiting in the queue" card in `view/pages/AgentJobs.vue:76`. It uses the same `data-testid="agent-queue"`. This branch adds `GET /api/agent-queue` (`AgentQueueEntryInfo`) and a second card, `view/components/AgentQueuePanel.vue`. Merged, the page lists the queue twice, and two REST shapes and the CLI JSON `pending` describe the same entries in different ways.
+      - Fix: rebase onto `main` and keep one list. For example, add `kind`, `priority`, `pinned`, `starting` to `AgentQueuedTicket`, list `overview`'s `pending` in start order, and put the move buttons on DEV-771's card. That card already shows `waits_for` and refreshes. Then drop `GET /api/agent-queue`, or keep it only if the page needs it. Update `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help` to match.
+    - **Rebase conflicts:** `git merge-tree --write-tree main HEAD` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs` (imports and `overview`), `crates/lotar-lib/src/cli/handlers/agent.rs` (DEV-771 rewrote the `agent queue` listing) and `crates/lotar-lib/src/cli/args/mod.rs`. Resolving them means deciding how the two lists become one, so a merge job shouldn't do it.
+
+    **Also (small, fix while there)**
+    - Retry entries carry no priority. `requeue_first` and `pause` (`agent_queue_service.rs:629`, `:647`) get their entries from `AgentQueueEntry::retry_of` (callers `agent_job_service.rs:5517`, `:5721`), and neither sets `priority`. Usage-limit, paused and unresumable retries therefore show "no priority" or `-`. Order isn't affected, because they are pinned. Fix: set `priority` from `ticket_priority` there.
+    - In the fix agent's screenshots the stats say "0 Queued" next to 5 queued entries. On the old base that is DEV-771's bug, which `main` fixes; after the rebase it should be gone. Check it in the new screenshots.
+
+    **The rest holds**
+    - Order (priority, then kind, then arrival), `kind()` from the profile name, the priority stored at queue time, pinned entries, moves keeping prompt/model/effort/thread, and busy tickets waiting without a slot all match "Done when" and the first review.
+    - The default `issue_priorities` is Low, Medium, High (`crates/lotar-core/src/config/types.rs:1421`), so `Reverse(position)` puts the highest first, as intended.
+
+    **Reran**
+    - `npm ci`: ok.
+    - `cargo nextest run -p lotar-agent -E 'test(/queue/)'`: 20 passed.
+    - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev786/)'`: 1 passed.
+    - `vitest` `AgentQueuePanel.spec.ts` and `AgentJobs.spec.ts`: 36 passed.
+    - Not run: full `npm run lint`, `npm test`, `npm run smoke`. The rebase changes the code they would check.
+    - Screenshots: I read the fix agent's after set (1440 light, 1920 and 390 dark). The layout looks fine. I didn't take my own: the page changes with the rebase, so the rework needs new screenshots anyway.
+- date: 2026-11-24T21:20:10.925386+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbe3f6f2b9f5f0774d2b5d191bea29deadd9edce6ee483056a0d4775929f8910 of the job job-20261124T204142.948Z-74 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212010.711Z-25: DEV-786 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:20:13.922075+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75eeea848c8200c12dd6b35b0367c94ec55cf6b15f6e51184f231924b1873292 of the job job-20261124T194133.690Z-48 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbe3f6f2b9f5f0774d2b5d191bea29deadd9edce6ee483056a0d4775929f8910 that the job job-20261124T212010.711Z-25 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:46:48.004680+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75eeea848c8200c12dd6b35b0367c94ec55cf6b15f6e51184f231924b1873292 of the job job-20261124T194133.690Z-48 again, beside the running job job-20261124T212010.711Z-25. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:50:16.625603+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75eeea848c8200c12dd6b35b0367c94ec55cf6b15f6e51184f231924b1873292 of the job job-20261124T194133.690Z-48 again, beside the running job job-20261124T212010.711Z-25. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:51:52.495993+00:00
+  author: claude
+  text: |-
+    Review fixes done: one queue list, rebased, retry priority set.
+
+    - **Two lists, two APIs:** fixed. DEV-771's "Waiting in the queue" card is now the only list. `AgentQueuedTicket` gained `kind`, `priority`, `pinned` and `starting`. The overview's `pending` comes in start order, and the move buttons sit on that card. `AgentQueuePanel` is gone, and so are `GET /api/agent-queue` and its types. `POST /api/agent-queue/move` now returns `{entry, position, total, queue}`, with `queue` the full overview. `lotar agent queue` prints the same list (place column: starting/kept). openapi, api-quick-reference and agent.md are updated.
+    - **Rebase conflicts:** rebased onto main, one commit.
+    - **Retry priority:** `pause` and `requeue_first` now set the priority from `ticket_priority` when the retry has none.
+    - **"0 Queued":** gone. The header says 4 Queued and the card lists the same 4 (screenshots attached: light, dark, 390px). Scratch data, with DEMO-1 moved to the top to show "Kept in place".
+    - Heads-up: DEV-843 adds `ticket_created` to queue entries. Moves keep whole entries, so the field survives, but the two branches will conflict in agent_queue_service.rs.
+    - Seen in passing, not changed: the header shows "∞ Max parallel" when `max_parallel_jobs` is 0 (`|| '∞'` in AgentJobs.vue), though 0 pauses new jobs.
+  report:
+    commits:
+    - hash: a4a876895
+      what: rebased onto main, one queue list on DEV-771's card, retry priority
+    checks:
+    - command: cargo clippy --workspace --all-targets
+      result: passed
+    - command: cargo nextest run -p lotar-agent -E 'test(/queue/)'
+      result: passed
+      reason: 21 tests
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev786|dev771|queue/)'
+      result: passed
+      reason: 26 tests
+    - command: npm run -s test:ui:agent -- view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: 35 tests
+    - command: npm run lint:frontend
+      result: passed
+    - command: smoke ui.agent-jobs.smoke.spec.ts (fresh target/web)
+      result: passed
+      reason: 14 tests
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs it
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review a4a876895 again, then merge
+- date: 2026-11-24T21:52:29.632909+00:00
+  author: claude
+  text: |-
+    Review findings fixed: rebased onto `main`, one queue list and one queue shape; retries show their priority.
+
+    - The review read `99c714ed9`, which was HEAD. Now amended to `ba43e9632` (signed), on `main` `855ff6f46`
+    - **One list:** `view/components/AgentQueuePanel.vue` and `GET /api/agent-queue` are gone. DEV-771's "Waiting in the queue" card in `view/pages/AgentJobs.vue` now lists `overview.pending` in start order. Each row shows its place, kind, priority and "Kept in place", plus the four move buttons. A failed move shows its error
+    - **One shape:** `AgentQueuedTicket` gained `kind`, `priority`, `pinned`, `starting`, used by `GET /api/jobs` `queue`, the CLI's `--format json` and the answer to `POST /api/agent-queue/move` (`entry`, `position`, `total`, `queue`). `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/agent.md` and `api-quick-reference.md` agree
+    - **Conflicts** in `agent_queue_service.rs`, `cli/handlers/agent.rs`, `cli/args/mod.rs` are resolved on DEV-771's `overview`. The CLI list adds `#`, `kind`, `priority` and `place`
+    - **Retry priority:** `pause` and `requeue_first` read the ticket's priority. New test `a_retry_shows_its_tickets_priority` fails without the fix
+    - **"0 Queued":** gone. The smoke test now asserts that the stats say 3 next to the 3 rows. Screenshots before and after a move show one card, kinds, priorities and the moved entry kept in place
+    - Docs: the stale "**Queue**" bullet from the old card is folded into DEV-771's Agents page bullet
+    - Note: something else ran `git rebase --continue` in this worktree at 13:49 while I ran the smoke tests. Its commit held the same tree as mine; I amended on top of it
+  report:
+    commits:
+    - hash: ba43e9632
+      what: DEV-786 rebased onto main 855ff6f46; one queue list (DEV-771's card) with kind, priority and move buttons
+    checks:
+    - command: cargo clippy --all-targets --all-features -D warnings
+      result: passed
+    - command: rustfmt / prettier --check on the changed files
+      result: passed
+    - command: npm run lint:frontend (vue-tsc + smoke tsc)
+      result: passed
+    - command: oxlint + eslint
+      result: passed
+    - command: cargo nextest -p lotar-agent -E test(/queue/)
+      result: passed
+      reason: 22 tests
+    - command: cargo nextest -E test(/dev786|queue|dev771|agent_jobs|jobs_route/)
+      result: passed
+      reason: 48 tests
+    - command: vitest view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: 35 tests
+    - command: smoke ui.agent-jobs.smoke.spec.ts (after build:smoke)
+      result: passed
+      reason: 14 tests
+    - command: npm run lint, npm test, npm run smoke (full)
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review ba43e9632 again
+- date: 2026-11-24T22:25:46.910720+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T21:52Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T22:31:43.408410+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code does what "Done when" asks and my own screenshots show no problem, but the screenshot set for this version is incomplete.
+
+    Reviewed `ba43e9632`, the only commit past `main` `c72189e40`. It merges cleanly (`git merge-tree --write-tree main HEAD`), with no stray files and no second branch.
+
+    **Blocking**
+    - **Screenshots of the current card missing.** The 12 full-page PNGs (1920/1440/390, light/dark, before/after) are from 2026-11-22 and show the removed `AgentQueuePanel`. For the reworked card in `view/pages/AgentJobs.vue:76-131` the ticket has only 3 crops: `dev786-queue-card.webp`, `-dark.webp` and `-phone.webp` (light). Missing: before and after of the Agents page at 1920 and 1440 in light and dark, 390 in dark, and before shots of DEV-771's card. Fix: attach that set. The code needs no change.
+
+    **Checked, fine**
+    - Order: `place()` in `agent_queue_service.rs` sorts by priority (the config's `issue_priorities`, last value highest; DEV lists Low, Medium, High), then kind, then `queued_at`. Pinned entries keep their place. Paused, usage-limit and unresumable retries go first via `pause`/`requeue_first` and read the ticket's priority
+    - Kind comes from the profile name (`kind()`), with bare runner = `run`. The busy-ticket skip in `dequeue_startable` keeps a High entry with a running job from holding a slot. It is needed now that put-back entries return to their place instead of the end
+    - `move`: one of `--first/--up/--down/--last` is required (clap group). A missing ticket, a starting job and several profiles without `--agent` all fail with an error naming the ticket. `api_types.rs`, `types.ts`, `openapi.json`, `agent.md` and `api-quick-reference.md` agree
+    - Scratch workspace (5 tickets, `max_parallel_jobs: 0`): the CLI list, `GET /api/jobs` `queue` and `queue move` print the expected order, kind, priority and `kept`
+    - My screenshots at 1920/1440/390 in light and dark, plus a failed move at 1440, show no visible problem. They are in `/tmp/dev786-review/mine`, outside the repo
+
+    **Reran**
+    - `npm ci` passed
+    - `cargo nextest run -p lotar-agent -E 'test(/queue/)'`: 22 passed
+    - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev786|dev771|queue/)'`: 26 passed
+    - `vitest --config view/vitest.config.ts view/__tests__/AgentJobs.spec.ts`: 35 passed
+    - Not run: full lint/test/smoke and the smoke spec (the merge runs them)
+
+    **Tickets:** none filed. The "∞ Max parallel" the fix agent saw is already [DEV-856](https://lotar.pyxzl.net/task/DEV-856).
+- date: 2026-11-24T22:31:54.944667+00:00
+  author: automation
+  text: |-
+    The review found blocking problems a third time, after two reworks (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -154,6 +390,12 @@ references:
 - attachment: dev786-before-light-390.3bfc4a73ef913a0431f941cd72692dc2.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A67fc5720ba826219716ea277a59b751ba1d4296682edd17a9af20cdf991f4882
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7b0c29c6eb398eded8136199727a23f429bb79edb665a2f629e7ce5f2f08b42a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A46fe5cd969ce76e565315fd272951fb603d2d1c1d0ad7281fd9270adf9441693
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75eeea848c8200c12dd6b35b0367c94ec55cf6b15f6e51184f231924b1873292
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbe3f6f2b9f5f0774d2b5d191bea29deadd9edce6ee483056a0d4775929f8910
+- attachment: dev786-queue-card.a0a9ed8f560e9ec83145cab7fc718d39.webp
+- attachment: dev786-queue-card-dark.3c1db1b5e8bfba61bb8155811e81a0fa.webp
+- attachment: dev786-queue-card-phone.3d1c8a0eda6d9df5c26af99e235865c2.webp
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). The queue runs in arrival order (only a paused job's retry goes first): the v0.15.6 release review DEV-725 was 13th of 20 behind Medium fixes, and STD-258, STD-259, STD-273 wait on that release. Do: order queued entries by the ticket's priority (Critical, High, Medium, Low), then queued_at; show the order in lotar agent queue and the Agents page; paused retries still first. Done when: a test queues a Low then a High ticket and the High starts first.
 
@@ -186,6 +428,9 @@ tags:
 - ui
 - fix-retried
 - retry-fix
+- review-returned
+- job-paused
+- review-returned-twice
 history:
 - at: 2026-11-22T03:06:54.686868+00:00
   actor: claude
@@ -428,3 +673,218 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-23T02:17:10.558810+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:17:16.328244+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798"]}'
+- at: 2026-11-23T02:17:21.883614+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, fix-retried, retry-fix
+    new: ui, fix-retried, retry-fix, review-blocked
+- at: 2026-11-23T02:17:38.535728+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-blocked
+    new: ui, fix-retried, retry-fix, review-returned
+- at: 2026-11-23T06:13:40.624304+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T06:13:47.027887+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A46fe5cd969ce76e565315fd272951fb603d2d1c1d0ad7281fd9270adf9441693
+- at: 2026-11-23T06:36:21.508359+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:36:22.147081+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805"]}'
+- at: 2026-11-23T06:36:35.932545+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:41:41.896566+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-returned
+    new: ui, fix-retried, retry-fix, review-returned, job-paused
+- at: 2026-11-23T08:41:42.008384+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:22:39.293311+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843"]}'
+- at: 2026-11-24T18:58:38.249739+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T18:58:38.695915+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771"]}'
+- at: 2026-11-24T18:58:39.004389+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-returned, job-paused
+    new: ui, fix-retried, retry-fix, review-returned, job-paused, review-blocked
+- at: 2026-11-24T18:58:49.871442+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-returned, job-paused, review-blocked
+    new: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice
+- at: 2026-11-24T19:41:39.223284+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T19:41:40.094563+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75eeea848c8200c12dd6b35b0367c94ec55cf6b15f6e51184f231924b1873292
+- at: 2026-11-24T20:41:45.895283+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acbe3f6f2b9f5f0774d2b5d191bea29deadd9edce6ee483056a0d4775929f8910
+- at: 2026-11-24T21:20:10.925386+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:20:13.922075+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:46:48.004680+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:50:16.625603+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:51:26.559307+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-queue-card.a0a9ed8f560e9ec83145cab7fc718d39.webp
+- at: 2026-11-24T21:51:27.635886+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-queue-card-dark.3c1db1b5e8bfba61bb8155811e81a0fa.webp
+- at: 2026-11-24T21:51:28.689601+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev786-queue-card-phone.3d1c8a0eda6d9df5c26af99e235865c2.webp
+- at: 2026-11-24T21:51:52.495993+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:51:57.927005+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856"]}'
+- at: 2026-11-24T21:52:29.632909+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:52:38.824997+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T22:25:42.941063+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T22:25:43.209745+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-24T22:25:43.811668+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T22:25:46.910720+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:31:43.408410+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:31:43.877794+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice
+    new: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice, review-blocked
+- at: 2026-11-24T22:31:54.823809+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice, review-blocked
+    new: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice
+- at: 2026-11-24T22:31:54.944667+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,0 +1,30 @@
+title: 'A t3 job paused on Claude''s weekly limit retries hourly: the reset time is only in the thread''s message'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T21:39:09.103486+00:00
+modified: 2026-11-24T21:39:09.839441+00:00
+relationships:
+  related:
+  - DEV-711
+  - DEV-811
+  - DEV-832
+description: 'Found 2026-11-24 (DEV-832): DEV-811''s t3 jobs on 2026-11-23 paused with `after the default wait (the provider named no reset time)` and retried every hour until the reset. The runner error was `Usage limit reached: Claude API rate limit reached. Try again later.`; the reset was only in the job''s agent message `You''ve hit your weekly limit · resets Nov 24 at 8am (America/Los_Angeles)`, which usage_limit.rs ignores on purpose (DEV-711: the agent''s words don''t count). Check: `lotar agent logs job-20261123T085509.723Z-112`. Done: a t3 job paused on such a limit waits until the reset that line names (for example, read T3''s own limit notice, not the agent''s replies), with a test.'
+tags:
+- health
+custom_fields:
+  finding: agent-jobs:limit-reset-in-message
+history:
+- at: 2026-11-24T21:39:09.460604+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-711","DEV-811","DEV-832"]}'
+- at: 2026-11-24T21:39:09.839441+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

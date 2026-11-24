@@ -1,0 +1,546 @@
+title: agent.worktree.build_root does nothing in repos that ignore target/ (staff, harnessmux, autospec)
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-23T01:03:01.554607+00:00
+modified: 2026-11-24T16:21:13.295854+00:00
+relationships:
+  depends_on:
+  - local:LOCA-601
+  related:
+  - DEV-762
+  - DEV-830
+comments:
+- date: 2026-11-23T05:35:12.179349+00:00
+  author: claude
+  text: |-
+    Needs your choice: which fix should make the build root work in staff, harnessmux and autospec?
+
+    - `.gitignore` has `target/` in `~/Development/staff`, `@localtaskrepo/harnessmux` and `@localtaskrepo/autospec`; lotar has `/target`. A `target/` line doesn't ignore a symlink, so the job falls back to building in the worktree
+    - LOCA-571 step 4 also turns each main checkout's `target` into a link. With `target/` that link shows as untracked in the main checkouts too, and `info/exclude` set by lotar jobs would cover it only by accident
+    - No thread or ticket has an answer yet (searched T3 threads, DEV-762, LOCA-571)
+    - DEV-762 (the build root itself) isn't on main yet: it's in Merging
+
+    **Question:** fix it in the repos or in lotar?
+    1. **Repos (recommended):** change `target/` to `target` (no slash: still ignores nested ones, like harnessmux's `xtask/`, and also the link) in the 3 repos' `.gitignore`, as part of LOCA-571 step 4. Visible in each repo, covers main checkouts too, no lotar code
+    2. **lotar:** when `build_root` is set, lotar writes `/target` into the repo's `.git/info/exclude` (hidden, local to this Mac)
+- date: 2026-11-23T07:49:08.526606+00:00
+  author: mallox
+  text: 'Answer: repos (Change `target/` to `target` in the 3 repos'' .gitignore (LOCA-571 step 4)) (answered in INBOX-662)'
+- date: 2026-11-23T09:16:19.287689+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T091604.954Z-121 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T091604.954Z-121 why.'
+- date: 2026-11-23T19:19:40.656900+00:00
+  author: automation
+  text: The fix agent's job job-20261123T191923.773Z-423 failed (lotar agent logs job-20261123T191923.773Z-423); @fix-retry retries it on branch agent/DEV-820.
+- date: 2026-11-23T19:20:02.255660+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T191945.832Z-424 failed again (lotar agent logs job-20261123T191945.832Z-424). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:21:16.209120+00:00
+  author: triage
+  text: |-
+    Blocked on local:LOCA-601; no new implementation decision or retry is needed.
+
+    - Jobs `job-20261123T191923.773Z-423` and `job-20261123T191945.832Z-424` both failed before work: Claude login expired and cannot be renewed.
+    - Earlier `job-20261123T091604.954Z-121` reported the weekly limit resetting November 24 at 08:00 Pacific; restoring authentication may leave that separate limit in effect.
+    - Owner already chose the repo fix on 2026-11-23 in INBOX-662: change `target/` to `target` in the three repos. That choice stands.
+    - Following `docs/decisions/2026-11-15-inbox-triage.md` in standards: dependency added, status Blocked, assignee cleared. LOCA-601 checks authentication; Prerequisites done resumes this work when it closes. The single owner action remains INBOX-668.
+- date: 2026-11-23T19:21:17.037224+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:21:20.416807+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-820 yet. DEV-820 waits for local:LOCA-601.'
+- date: 2026-11-24T16:03:53.624603+00:00
+  author: claude
+  text: |-
+    Done as you chose: the 3 repos' `.gitignore` now say `target`, not `target/`.
+
+    - Signed commits fast-forwarded onto each local `main`: staff `ceeca00`, harnessmux `bb196b5`, autospec `66c6bb0`. Not pushed
+    - A `target` symlink in a fresh worktree of each: `git check-ignore -v target` matches the new line, `git status` is empty. Same line covers the main checkouts' link from LOCA-571 step 4
+    - No lotar change: `docs/help/agent.md` on main already says the symlink needs a pattern without the trailing slash
+    - Not run: a real job with `build_root`, since it isn't configured yet (LOCA-571)
+    - A second session ran this same job at the same time and made the staff commit; I made harnessmux and autospec. No duplicates
+  report:
+    commits:
+    - hash: ceeca00
+      what: staff .gitignore target/ → target
+    - hash: bb196b5
+      what: harnessmux .gitignore target/ → target
+    - hash: 66c6bb0
+      what: autospec .gitignore target/ → target
+    checks:
+    - command: git check-ignore -v target (symlink, fresh worktree of each main)
+      result: passed
+    - command: git status in those worktrees
+      result: passed
+      reason: empty
+    - command: job worktree with build_root set
+      result: not_run
+      reason: build_root isn't configured yet (LOCA-571)
+    next: 'When LOCA-571 sets build_root: start a job in each repo and check its log has no ''not ignored'' line; push the 3 mains (not pushed: this job doesn''t push)'
+- date: 2026-11-24T16:04:20.844672+00:00
+  author: claude
+  text: |-
+    One more lotar commit on `agent/DEV-820`: the doc now names the line you chose.
+
+    - `docs/help/agent.md` (build_root): "`target` or `/target` in `.gitignore`, not `target/`", and that this also keeps the link out of `git status`. Before, it named only `/target`
+    - The 3 repo commits (`ceeca00`, `bb196b5`, `66c6bb0`) are as the other session wrote. I checked them: signed, on each local `main`, not pushed, `git check-ignore -v target` matches
+    - The job's fallback log line in `agent_job_service.rs` still says `/target`. That's still correct, so I didn't change it
+    - Status stays Blocked as the other session set it. The one open box needs a real job with `build_root` (LOCA-571 step 4)
+  report:
+    commits:
+    - hash: dde9de015
+      what: docs/help/agent.md names target or /target
+    checks:
+    - command: git check-ignore -v target in each repo
+      result: passed
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint/test/smoke
+      result: not_run
+      reason: one sentence in a doc, no code
+    - command: real job with build_root
+      result: not_run
+      reason: build_root not configured yet (LOCA-571 step 4)
+    next: 'LOCA-571 step 4: set build_root, start a job in staff/harnessmux/autospec, check target is a link and the log has no fallback line'
+- date: 2026-11-24T16:04:52.967336+00:00
+  author: claude
+  text: |-
+    This run found the work already done by the two sessions before it, so it changed nothing.
+
+    - Checked: staff `ceeca00`, harnessmux `bb196b5`, autospec `66c6bb0` on each local `main` (not pushed); lotar `dde9de015` on `agent/DEV-820` (`docs/help/agent.md`)
+    - Status stays Blocked: the last box needs a real job with `build_root` (LOCA-571 step 4)
+- date: 2026-11-24T16:14:38.974662+00:00
+  author: claude
+  text: |-
+    Another resumed run of this job found the work already done, so it changed nothing.
+
+    - Checked again: a `target` symlink in a fresh clone of staff, harnessmux and autospec leaves `git status` empty; lotar `dde9de015` is on `agent/DEV-820`
+    - The status stays Blocked until LOCA-571 sets `build_root` and a real job can run
+- date: 2026-11-24T16:19:19.631794+00:00
+  author: claude
+  text: 'Resumed run: nothing left to change; `dde9de015` is on `agent/DEV-820`, status stays Blocked until LOCA-571 sets `build_root`.'
+- date: 2026-11-24T16:19:22.701715+00:00
+  author: claude
+  text: |-
+    Another resumed run found nothing left to change.
+
+    - Still in place: staff `ceeca00`, harnessmux `bb196b5`, autospec `66c6bb0` (each `.gitignore` says `target`, `git check-ignore -v target` matches); lotar `dde9de015` on `agent/DEV-820`
+    - Stays Blocked: the last box needs a real job with `build_root` (LOCA-571 step 4)
+- date: 2026-11-24T16:19:31.640006+00:00
+  author: claude
+  text: |-
+    Resumed run: work still done, nothing changed.
+
+    - All 3 `.gitignore` files on `main` say `target` (staff, harnessmux `bb196b5`, autospec `66c6bb0`); lotar `dde9de015` on `agent/DEV-820`
+    - Stays Blocked until LOCA-571 sets `build_root` for the real-job check
+- date: 2026-11-24T16:21:09.223767+00:00
+  author: claude
+  text: |-
+    Done: the owner's choice (repos, 2026-11-23, answered in INBOX-662) is on each repo's main; lotar needs no change.
+
+    - `.gitignore` `target/` → `target`: staff `ceeca00`, harnessmux `bb196b5`, autospec `66c6bb0`, all on `main`
+    - Fresh clones of each with a `target` symlink: `git check-ignore -v target` matches `.gitignore:<n>:target`, `git status --short` is empty, so a link stays out of the worktree's and the main checkout's status
+    - `clone_build_output` (`crates/lotar-agent/src/services/agent_job_service.rs:1683`) runs that same `git check-ignore --quiet target` before it links, so the "not ignored" fallback no longer applies
+    - `docs/help/agent.md:403` already names the line needed (`target` or `/target`, not `target/`)
+    - Not run: a live job with `build_root` set, because it isn't on yet (LOCA-571)
+  report:
+    checks:
+    - command: git check-ignore + git status with a target symlink in fresh clones of staff, harnessmux, autospec
+      result: passed
+    - command: live job with agent.worktree.build_root set
+      result: not_run
+      reason: build_root isn't on yet (LOCA-571)
+    next: None in lotar; LOCA-571 step 4 turns build_root and the main-checkout links on
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4074206412d0a940bbf774cafc520b7b09482d159f7b58798430c0843151d68d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae3ac78fa0e08d7edf939e73e763a07d8ec0476fe873d3f6af0376bc82c55a6c7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7fd6642a87d56794dcb51fc38a6b72c08f1c813cc25e9411e8a2aa79fd6a9189
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A36b69b3480ce9b201ea383d57dd085981f197c6f90841fb2a8699a7fd6eeffa0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A80a411e869a8e6ff171e6b9a4eddcc45a9ffec404e3978471b94a8b09051c8d9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5f54a05086624419404993acca6f34357e57bfbc387adbbff0521268aa48e014
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A791a03a4f5dd8612bf8e69a76a609363f6841a8fb96c91ad94e3be0acd87eaf5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa209fad6978756c4633db04c76de88976971e0839cd32b5357613a88479b77a8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a5559781d31a2689cf75bb18cd35a1af36fcba5a7c18cbbac0dbbd0ee61604a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A464a729eeadd925da730e51e91d6bbef240e25602aa0b8c0194f7843c0d72327
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c4acdec51850d0a70c9c2311b5dca1b91546f394e091be671d58a1e56aa3974
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad94944e53035649ab8c5936a164927a785fb4104853470bfab194776beb8fd3f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0801140f05ccd5fb69b798d3e4968509eb8aff6c7a40b20bb23ba2e18a067034
+description: |-
+  Found in the DEV-762 review, 2026-11-22.
+
+  - The build root works only when git ignores `target` as a link: `/target`, not `target/` (`git check-ignore` in `clone_build_output`, `crates/lotar-agent/src/services/agent_job_service.rs`; DEV-762, not on main yet).
+  - lotar's `.gitignore` has `/target`; staff, harnessmux and autospec have `target/`. With LOCA-571 on, their jobs keep building in the worktree; each job log says why.
+  - Fix: either those repos change `target/` to `/target` as part of LOCA-571 step 4, or lotar adds `/target` to the repository's `info/exclude` when `build_root` is set. Choosing between the two is the owner's call.
+  - Owner 2026-11-23 (INBOX-662): "repos (Change `target/` to `target` in the 3 repos' .gitignore (LOCA-571 step 4))"
+  - LOCA-571 step 4 also makes each main checkout's `target` a symlink. With `target/` in `.gitignore` that link shows up untracked in the main checkout too, so it needs the same ignore either way.
+
+  ## Done when
+
+  - [x] Owner's choice recorded here, dated, in his words
+  - [ ] staff, harnessmux and autospec: a new job worktree with `build_root` set gets `target` as a link into `<build_root>/<repo>/<ticket>`, and the job log has no "not ignored" fallback line
+  - [x] The link is not in `git status` of the worktree or the main checkout
+  - [ ] If lotar changes (info/exclude): it adds the line only when `build_root` is set and the line is missing, never twice; a failed write leaves the build in the worktree and logs why (the current fallback); a test covers both; docs/help/agent.md says so
+  - [x] If the repos change: each repo's `.gitignore` commit is on its main; lotar's docs/help/agent.md still says which line is needed
+history:
+- at: 2026-11-23T01:03:32.918445+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T05:33:30.606896+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T05:33:34.235707+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4074206412d0a940bbf774cafc520b7b09482d159f7b58798430c0843151d68d
+- at: 2026-11-23T05:34:38.579414+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-762 review, 2026-11-22.
+
+      - The build root works only when git ignores `target` as a link: `/target`, not `target/` (`git check-ignore` in `clone_build_output`, `crates/lotar-agent/src/services/agent_job_service.rs`).
+      - In `~/Development/standards/repos.json`, lotar has `/target`, but staff, harnessmux and autospec have `target/`. With LOCA-571 on, their jobs keep building in the worktree; each job log says why.
+      - Fix: either those repos change `target/` to `/target` as part of LOCA-571 step 4, or lotar adds `/target` to the repository's `info/exclude` when `build_root` is set. Choosing between the two is the owner's call.
+
+      Done when the build root takes effect in every Rust repo that turns it on.
+    new: |-
+      Found in the DEV-762 review, 2026-11-22.
+
+      - The build root works only when git ignores `target` as a link: `/target`, not `target/` (`git check-ignore` in `link_build_root`, `crates/lotar-agent/src/services/agent_job_service.rs` ~3318).
+      - lotar's `.gitignore` has `/target`; staff, harnessmux and autospec have `target/`. With LOCA-571 on, their jobs keep building in the worktree; each job log says why.
+      - Fix: either those repos change `target/` to `/target` as part of LOCA-571 step 4, or lotar adds `/target` to the repository's `info/exclude` when `build_root` is set. Choosing between the two is the owner's call.
+      - LOCA-571 step 4 also makes each main checkout's `target` a symlink. With `target/` in `.gitignore` that link shows up untracked in the main checkout too, so it needs the same ignore either way.
+
+      ## Done when
+
+      - [ ] Owner's choice recorded here, dated, in his words
+      - [ ] staff, harnessmux and autospec: a new job worktree with `build_root` set gets `target` as a link into `<build_root>/<repo>/<ticket>`, and the job log has no "not ignored" fallback line
+      - [ ] The link is not in `git status` of the worktree or the main checkout
+      - [ ] If lotar changes (info/exclude): it adds the line only when `build_root` is set and the line is missing, never twice; a failed write leaves the build in the worktree and logs why (the current fallback); a test covers both; docs/help/agent.md says so
+      - [ ] If the repos change: each repo's `.gitignore` commit is on its main; lotar's docs/help/agent.md still says which line is needed
+- at: 2026-11-23T05:35:04.042772+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-762 review, 2026-11-22.
+
+      - The build root works only when git ignores `target` as a link: `/target`, not `target/` (`git check-ignore` in `link_build_root`, `crates/lotar-agent/src/services/agent_job_service.rs` ~3318).
+      - lotar's `.gitignore` has `/target`; staff, harnessmux and autospec have `target/`. With LOCA-571 on, their jobs keep building in the worktree; each job log says why.
+      - Fix: either those repos change `target/` to `/target` as part of LOCA-571 step 4, or lotar adds `/target` to the repository's `info/exclude` when `build_root` is set. Choosing between the two is the owner's call.
+      - LOCA-571 step 4 also makes each main checkout's `target` a symlink. With `target/` in `.gitignore` that link shows up untracked in the main checkout too, so it needs the same ignore either way.
+
+      ## Done when
+
+      - [ ] Owner's choice recorded here, dated, in his words
+      - [ ] staff, harnessmux and autospec: a new job worktree with `build_root` set gets `target` as a link into `<build_root>/<repo>/<ticket>`, and the job log has no "not ignored" fallback line
+      - [ ] The link is not in `git status` of the worktree or the main checkout
+      - [ ] If lotar changes (info/exclude): it adds the line only when `build_root` is set and the line is missing, never twice; a failed write leaves the build in the worktree and logs why (the current fallback); a test covers both; docs/help/agent.md says so
+      - [ ] If the repos change: each repo's `.gitignore` commit is on its main; lotar's docs/help/agent.md still says which line is needed
+    new: |-
+      Found in the DEV-762 review, 2026-11-22.
+
+      - The build root works only when git ignores `target` as a link: `/target`, not `target/` (`git check-ignore` in `clone_build_output`, `crates/lotar-agent/src/services/agent_job_service.rs`; DEV-762, not on main yet).
+      - lotar's `.gitignore` has `/target`; staff, harnessmux and autospec have `target/`. With LOCA-571 on, their jobs keep building in the worktree; each job log says why.
+      - Fix: either those repos change `target/` to `/target` as part of LOCA-571 step 4, or lotar adds `/target` to the repository's `info/exclude` when `build_root` is set. Choosing between the two is the owner's call.
+      - LOCA-571 step 4 also makes each main checkout's `target` a symlink. With `target/` in `.gitignore` that link shows up untracked in the main checkout too, so it needs the same ignore either way.
+
+      ## Done when
+
+      - [ ] Owner's choice recorded here, dated, in his words
+      - [ ] staff, harnessmux and autospec: a new job worktree with `build_root` set gets `target` as a link into `<build_root>/<repo>/<ticket>`, and the job log has no "not ignored" fallback line
+      - [ ] The link is not in `git status` of the worktree or the main checkout
+      - [ ] If lotar changes (info/exclude): it adds the line only when `build_root` is set and the line is missing, never twice; a failed write leaves the build in the worktree and logs why (the current fallback); a test covers both; docs/help/agent.md says so
+      - [ ] If the repos change: each repo's `.gitignore` commit is on its main; lotar's docs/help/agent.md still says which line is needed
+- at: 2026-11-23T05:35:12.179349+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:35:26.679502+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-23T07:49:08.526606+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:49:09.150826+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T07:51:29.017400+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-762"]}'
+    new: '{"related":["DEV-762","DEV-830"]}'
+- at: 2026-11-23T09:16:13.533096+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-23T09:16:17.129682+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae3ac78fa0e08d7edf939e73e763a07d8ec0476fe873d3f6af0376bc82c55a6c7
+- at: 2026-11-23T09:16:19.180991+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T09:16:19.287689+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:16:28.740078+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7fd6642a87d56794dcb51fc38a6b72c08f1c813cc25e9411e8a2aa79fd6a9189
+- at: 2026-11-23T11:17:07.454892+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A36b69b3480ce9b201ea383d57dd085981f197c6f90841fb2a8699a7fd6eeffa0
+- at: 2026-11-23T12:17:25.668211+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A80a411e869a8e6ff171e6b9a4eddcc45a9ffec404e3978471b94a8b09051c8d9
+- at: 2026-11-23T13:17:37.350718+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5f54a05086624419404993acca6f34357e57bfbc387adbbff0521268aa48e014
+- at: 2026-11-23T14:18:11.769983+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A791a03a4f5dd8612bf8e69a76a609363f6841a8fb96c91ad94e3be0acd87eaf5
+- at: 2026-11-23T15:18:26.418117+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa209fad6978756c4633db04c76de88976971e0839cd32b5357613a88479b77a8
+- at: 2026-11-23T16:18:41.864393+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9a5559781d31a2689cf75bb18cd35a1af36fcba5a7c18cbbac0dbbd0ee61604a
+- at: 2026-11-23T17:18:58.950361+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A464a729eeadd925da730e51e91d6bbef240e25602aa0b8c0194f7843c0d72327
+- at: 2026-11-23T18:19:16.288724+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c4acdec51850d0a70c9c2311b5dca1b91546f394e091be671d58a1e56aa3974
+- at: 2026-11-23T19:19:37.939151+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad94944e53035649ab8c5936a164927a785fb4104853470bfab194776beb8fd3f
+- at: 2026-11-23T19:19:39.013070+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: job-paused
+    new: job-paused, fix-retried
+- at: 2026-11-23T19:19:40.656900+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:20:00.135991+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0801140f05ccd5fb69b798d3e4968509eb8aff6c7a40b20bb23ba2e18a067034
+- at: 2026-11-23T19:20:01.487119+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:20:02.255660+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:21:10.346655+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-762","DEV-830"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-762","DEV-830"]}'
+- at: 2026-11-23T19:21:10.998545+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:21:15.627696+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:21:16.209120+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:21:16.754143+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:21:17.037224+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:21:20.416807+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:21:44.554455+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:03:30.686634+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-762 review, 2026-11-22.
+
+      - The build root works only when git ignores `target` as a link: `/target`, not `target/` (`git check-ignore` in `clone_build_output`, `crates/lotar-agent/src/services/agent_job_service.rs`; DEV-762, not on main yet).
+      - lotar's `.gitignore` has `/target`; staff, harnessmux and autospec have `target/`. With LOCA-571 on, their jobs keep building in the worktree; each job log says why.
+      - Fix: either those repos change `target/` to `/target` as part of LOCA-571 step 4, or lotar adds `/target` to the repository's `info/exclude` when `build_root` is set. Choosing between the two is the owner's call.
+      - LOCA-571 step 4 also makes each main checkout's `target` a symlink. With `target/` in `.gitignore` that link shows up untracked in the main checkout too, so it needs the same ignore either way.
+
+      ## Done when
+
+      - [ ] Owner's choice recorded here, dated, in his words
+      - [ ] staff, harnessmux and autospec: a new job worktree with `build_root` set gets `target` as a link into `<build_root>/<repo>/<ticket>`, and the job log has no "not ignored" fallback line
+      - [ ] The link is not in `git status` of the worktree or the main checkout
+      - [ ] If lotar changes (info/exclude): it adds the line only when `build_root` is set and the line is missing, never twice; a failed write leaves the build in the worktree and logs why (the current fallback); a test covers both; docs/help/agent.md says so
+      - [ ] If the repos change: each repo's `.gitignore` commit is on its main; lotar's docs/help/agent.md still says which line is needed
+    new: |-
+      Found in the DEV-762 review, 2026-11-22.
+
+      - The build root works only when git ignores `target` as a link: `/target`, not `target/` (`git check-ignore` in `clone_build_output`, `crates/lotar-agent/src/services/agent_job_service.rs`; DEV-762, not on main yet).
+      - lotar's `.gitignore` has `/target`; staff, harnessmux and autospec have `target/`. With LOCA-571 on, their jobs keep building in the worktree; each job log says why.
+      - Fix: either those repos change `target/` to `/target` as part of LOCA-571 step 4, or lotar adds `/target` to the repository's `info/exclude` when `build_root` is set. Choosing between the two is the owner's call.
+      - Owner 2026-11-23 (INBOX-662): "repos (Change `target/` to `target` in the 3 repos' .gitignore (LOCA-571 step 4))"
+      - LOCA-571 step 4 also makes each main checkout's `target` a symlink. With `target/` in `.gitignore` that link shows up untracked in the main checkout too, so it needs the same ignore either way.
+
+      ## Done when
+
+      - [x] Owner's choice recorded here, dated, in his words
+      - [ ] staff, harnessmux and autospec: a new job worktree with `build_root` set gets `target` as a link into `<build_root>/<repo>/<ticket>`, and the job log has no "not ignored" fallback line
+      - [x] The link is not in `git status` of the worktree or the main checkout
+      - [ ] If lotar changes (info/exclude): it adds the line only when `build_root` is set and the line is missing, never twice; a failed write leaves the build in the worktree and logs why (the current fallback); a test covers both; docs/help/agent.md says so
+      - [x] If the repos change: each repo's `.gitignore` commit is on its main; lotar's docs/help/agent.md still says which line is needed
+- at: 2026-11-24T16:03:53.624603+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:04:20.844672+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:04:52.967336+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:14:38.974662+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:19.631794+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:22.701715+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:31.640006+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:21:09.223767+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:21:11.393364+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Done
+  - field: assignee
+    new: claude
+- at: 2026-11-24T16:21:11.672396+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused, fix-retried
+    new: ''
+- at: 2026-11-24T16:21:13.295854+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude

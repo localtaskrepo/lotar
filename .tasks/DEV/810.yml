@@ -1,20 +1,406 @@
 title: 'Kept T3 Code threads of done tickets stay unsettled: 56 completed job threads in the sidebar on 0.15.6'
-status: Todo
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-22T21:22:50.394391+00:00
+modified: 2026-11-24T21:35:12.467973+00:00
 relationships:
+  depends_on:
+  - local:LOCA-601
   related:
   - DEV-747
   - DEV-752
+  - DEV-808
+  - DEV-809
+  - DEV-611
+  - DEV-833
+  - DEV-778
+  - DEV-849
 comments:
 - date: 2026-11-22T21:22:50.394391+00:00
   author: claude
   text: 'Backlog settled by hand 2026-11-22 13:45 PST (chief of staff, full access): 42 job threads of Done tickets. The 28 still unsettled belong to open tickets or running roles. The fix still needs its test: the next done ticket with pruned job logs shows whether lotar settles it.'
-description: 'Found 2026-11-22 13:30 PST (chief of staff, owner: ''t3 still has a lot of open threads. We''re on the new version of lotar so I hope this can be cleaned up now?''). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads (''<ID> fix: ...'', ''<ID> review: ...''), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing ''Threads to settle'' lists 42). DEV-747''s look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says ''Settled'' or ''was not settled''. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else ''no harnessmux session holds it''. The chief of staff can''t settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job''s log or session record is gone (find them from T3''s thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner''s OK.'
+- date: 2026-11-23T02:45:17.990444+00:00
+  author: claude
+  text: |-
+    Fixed: lotar now settles kept T3 Code threads of done tickets also without their session record, worktree or job log.
+
+    - Cause 1 (23 notes in job logs): a ticket's next job reuses its session name (`standards-04f015-STD-298-fix`), so the harnessmux record holds only the newest thread: `no harnessmux session holds it`. Now `record_for` makes a record for the thread.
+    - Cause 2 (26 notes): `t3 thread show` ran in the removed ticket worktree: `could not read the T3 Code thread`. Now it runs in the repo checkout.
+    - Cause 3: with job logs pruned, the look never asked T3 Code. Now it asks whenever a project has a `t3` profile, and settles completed, unsettled, `full-access` threads whose title starts with a done ticket's ID. `auto` threads (the owner's) and open tickets' threads are left alone.
+    - The ticket said no log had these notes: they were in the job logs (`@agent-logs`). Each settle/refusal now also goes to stderr of `lotar serve` / the worker as `[lotar] <ID>: ...`.
+    - Tests first, failing, then green: 3 new in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`. Docs: `docs/help/agent.md`.
+    - Other running threads (DEV-808, DEV-809, STD-307, STD-320) don't touch `kept.rs`/`resumed.rs`: no heads-up sent.
+  report:
+    commits:
+    - hash: b5810e539
+      what: settle kept threads without their session record or worktree, find unlogged job threads of done tickets by title, log each to stderr
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2473 Rust, 1567 UI
+    - command: npm run smoke
+      result: passed
+      reason: '407'
+    - command: backlog count after release
+      result: not_run
+      reason: needs the release, which needs the owner's OK
+    next: 'Review, merge; after the release count unsettled completed job threads of done tickets (before: lotar 8, standards 2 completed full-access, mostly open tickets)'
+- date: 2026-11-23T06:54:27.812857+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix works, but the test for cause 1 (session name reused) also passes without the fix.
+
+    - Reviewed `b5810e539` (`git diff main...HEAD`: `kept.rs`, `resumed.rs`, the dev503 test, `docs/help/agent.md`). It merges cleanly onto main `108a6996c`. `npm ci` passed.
+    - `cargo nextest run --cargo-profile dev -p lotar-lib --test integration dev503_harness_jobs_test`: 53 passed.
+    - Do the tests fail without the fix? I put main's `kept.rs` and `resumed.rs` back for one run, then restored them:
+      - `a_kept_thread_whose_worktree_is_gone_is_settled` fails: good.
+      - `a_done_tickets_job_thread_without_a_job_log_is_settled_by_its_title` fails: good.
+      - `a_kept_thread_whose_session_holds_a_newer_thread_is_settled` **passes** (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs:1287`).
+    - Why: its second `fix` job continues the failed thread-0, which can't be resumed. That takes the hand-off path, and `keep_session` (`agent_job_service.rs:3642`, DEV-611) saves thread-0's record as `<name>.<stamp>`, so the old code finds it. In real use a fresh job overwrites the record without keeping a copy. `~/.local/state/harnessmux/sessions` has only `standards-04f015-STD-298-fix.json` and no kept rounds.
+    - So "Done when" item 2 (thread in a job log, its record now holds a newer thread) has no test that failed first. The fix comment's "Tests first, failing" doesn't hold for this test.
+    - Fix: run the second job with `run_t3_with(&fixtures, "fix", &["--session", "fresh"])` (or a `session: fresh` profile). Check it fails on main with `no harnessmux session holds it` and passes with `record_for`.
+    - No other problems found:
+      - `record_for` builds the stand-in record in memory only. harnessmux 0.2.0 `t3::settle` doesn't save it, so no real session record changes.
+      - A thread that runs, waits or that a session follows is left alone (status filter, `resumed::followed`).
+      - Refusals go out once per process, and lines go to stderr as `[lotar] <ID>: ...`. The docs match the code.
+    - Not rerun by me: full `npm run lint`, `npm test`, `npm run smoke` (the fix agent reports them passed). The backlog count after the release still waits for the owner's OK.
+    - No minor tickets filed.
+- date: 2026-11-23T08:53:46.863158+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085335.542Z-109 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085335.542Z-109 why.'
+- date: 2026-11-23T19:05:29.674502+00:00
+  author: automation
+  text: The fix agent's job job-20261123T190506.473Z-411 failed (lotar agent logs job-20261123T190506.473Z-411); @fix-retry retries it on branch agent/DEV-810.
+- date: 2026-11-23T19:05:47.727997+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T190529.518Z-412 failed again (lotar agent logs job-20261123T190529.518Z-412). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:06:57.783199+00:00
+  author: triage
+  text: |-
+    Blocked on local:LOCA-601; retrying another Claude profile cannot repair the expired Mac login.
+
+    - Jobs `job-20261123T190506.473Z-411` and `job-20261123T190529.518Z-412` both stopped before work: `this login reached its time limit and cannot be renewed`.
+    - Earlier job `job-20261123T085335.542Z-109` hit the weekly limit, resetting November 24 at 08:00 America/Los_Angeles. Restored authentication may still leave that separate limit in effect.
+    - LOCA-601 already has the owner action and verification checks; INBOX-668 is its single sign-in question. Per `docs/decisions/2026-11-15-inbox-triage.md` in standards, this ticket depends on it, is Blocked and unassigned; Prerequisites done resumes it once the checks pass. No confirmation reply needed.
+    - Remaining work: correct the reused-session regression test as the review requested, prove it fails without the fix, then continue review and release verification.
+- date: 2026-11-23T19:06:58.535464+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:07:01.555383+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-810 yet. DEV-810 waits for local:LOCA-601.'
+- date: 2026-11-24T16:16:48.264851+00:00
+  author: claude
+  text: |-
+    Review finding fixed: the reused-session test now fails without the fix.
+
+    - Review read `b5810e539` = HEAD then: finding is valid.
+    - `a_kept_thread_whose_session_holds_a_newer_thread_is_settled` runs its second job with `--session new`, so the record is overwritten and no `<name>.<stamp>` copy is kept (DEV-611 hand-off path avoided).
+    - On main's `kept.rs`/`resumed.rs`: fails with `The T3 Code thread https://t3.test/thread-0 was not settled: no harnessmux session holds it`. With the fix: passes.
+    - Amended, signed: `c7741b49e`. Only the test changed from `b5810e539` (`git diff b5810e539 HEAD --stat`: 1 file).
+    - Problem: 4 Claude sessions ran in this worktree at once (pids 42028, 43315, 83237, 83806, all `cwd` DEV-810). They swap `kept.rs`/`resumed.rs` with main's for the same check, so the files keep changing. I committed only the test file (`--only`). Right now main's two files are staged in the worktree by another session; HEAD is intact.
+    - So the full lint/test/smoke didn't run here: they wouldn't test the commit.
+  report:
+    commits:
+    - hash: c7741b49e
+      what: reused-session test starts a new session, so it fails without the fix
+    checks:
+    - command: cargo nextest run --cargo-profile dev -p lotar-lib --test integration -E 'test(/dev503_harness_jobs_test::/)'
+      result: passed
+      reason: 53 passed
+    - command: same test on main's kept.rs and resumed.rs
+      result: failed
+      reason: as wanted, 'no harnessmux session holds it'
+    - command: npm run lint
+      result: not_run
+      reason: 3 other sessions edit this worktree at once (see below); a full run would not test the commit
+    - command: npm test
+      result: not_run
+      reason: same reason
+    - command: npm run smoke
+      result: not_run
+      reason: same reason
+    next: Review c7741b49e; run lint, test and smoke once only one session uses the DEV-810 worktree
+- date: 2026-11-24T16:19:33.672511+00:00
+  author: claude
+  text: |-
+    Duplicate session: the review finding is already fixed in `c7741b49e`. I changed nothing.
+
+    - HEAD is `c7741b49e`. It holds the reused-session test fix described in the 16:16 comment.
+    - Two other Claude sessions (pids `56761`, `59321`) are working in this worktree right now. They have uncommitted edits: main's `kept.rs`/`resumed.rs` staged, and a debug `panic!` in `dev503_harness_jobs_test.rs:1304`. I left them alone. This is DEV-833 (a paused ticket resumes as several sessions in one worktree).
+    - I ran no checks: with the files changing underneath, they wouldn't test the commit.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: other sessions edit this worktree at the same time (DEV-833)
+    - command: npm test
+      result: not_run
+      reason: same reason
+    - command: npm run smoke
+      result: not_run
+      reason: same reason
+    next: 'Once one session holds the DEV-810 worktree: review c7741b49e and run lint, test and smoke'
+- date: 2026-11-24T16:19:39.441806+00:00
+  author: claude
+  text: |-
+    One fix session stood down: four Claude sessions resumed in the DEV-810 worktree at 08:18 and one is mid-work.
+
+    - HEAD `c7741b49e` (amended 08:13) already has the review's fix: the second job runs `run_t3_with(&fixtures, "fix", &["--session", "new"])`.
+    - Another session is checking that the test fails without the fix: main's `kept.rs` and `resumed.rs` are staged, and a debug `panic!` is in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`. I changed nothing.
+    - Four sessions resumed in this worktree (claude pids 51824, 56761, 59321, 70832), probably the fix rounds the usage limit paused. Only one should carry on; the rest should stop.
+- date: 2026-11-24T16:20:02.543239+00:00
+  author: claude
+  text: |-
+    No change from this session: the review finding is already fixed in HEAD `c7741b49e`, and 3 other sessions are working in this worktree right now.
+
+    - HEAD `c7741b49e` (amended earlier today) runs the second job of `a_kept_thread_whose_session_holds_a_newer_thread_is_settled` with `--session new`. The comment of 16:16 reports that it fails on main and passes with the fix.
+    - T3 Code started 4 Claude sessions in the DEV-810 worktree within one minute (08:18): this one plus pids `51824`, `56761`, `59321`. They have main's `kept.rs`/`resumed.rs` staged and a debug `panic!` in the dev503 test, which is their check in progress. I left their changes alone.
+    - This is the bug in DEV-833 (several sessions resume at once in one worktree). I didn't file a new ticket.
+    - So lint, test and smoke still haven't run on `c7741b49e`.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: 3 other sessions edit this worktree right now
+    - command: npm test
+      result: not_run
+      reason: same reason
+    - command: npm run smoke
+      result: not_run
+      reason: same reason
+    next: 'Once one session holds the DEV-810 worktree: run lint, test, smoke on c7741b49e, then review'
+- date: 2026-11-24T16:22:46.884143+00:00
+  author: claude
+  text: |-
+    A fifth session stood down: the finding is fixed in HEAD `c7741b49e`, and session pid `59321` is running the checks on a copy of it.
+
+    - I changed nothing in the worktree. Its uncommitted edits (main's `kept.rs`/`resumed.rs` staged, a debug `panic!` in the dev503 test) belong to another session's check.
+    - Pid `59321` copied `c7741b49e` to its scratchpad (`git archive`) to run lint, test and smoke there, away from the edits.
+    - Same cause as the comments above: DEV-833.
+- date: 2026-11-24T16:29:19.964319+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082 of the job job-20261123T180448.622Z-391 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T162919.454Z-2: DEV-810 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:29:23.276468+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4b8652db575c964276992b09be40c6a049da9d5f0aea86159d2c049bd58f4ecd of the job job-20261123T150356.974Z-311 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082 that the job job-20261124T162919.454Z-2 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:24.220850+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5689431b2be8f2a28bc6f6cee2b89d3a49e79bc9a607985371d7b6068d4e2029 of the job job-20261123T140335.797Z-278 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082 that the job job-20261124T162919.454Z-2 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:25.819024+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A57a29524665d0d429900f305773566558b4a015ebabb8cf04ef7de17e531de32 of the job job-20261123T125558.421Z-245 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082 that the job job-20261124T162919.454Z-2 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:29.824964+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9f5e1374ab8fb3435967317c5aacb3539ce917d44a133090b91a520b2e91ec59 of the job job-20261123T105534.508Z-176 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082 that the job job-20261124T162919.454Z-2 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:30.731526+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9f7c15583bdfb543384aeaf2a523ef8b544a0a53446ba29e17e259ad65c1ef57 of the job job-20261123T095523.959Z-143 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082 that the job job-20261124T162919.454Z-2 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:29:34.766264+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261124T162919.454Z-2 failed again (lotar agent logs job-20261124T162919.454Z-2). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-24T16:32:35.715742+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261124T162919.454Z-2 failed with 'Claude Code process exited with code 143' (SIGTERM) in a taken-over thread, while several resumed sessions shared the worktree (DEV-833); no work error. Remaining: confirm the amended test fails without the fix, then lint, test, smoke.
+  answer:
+    to: 2026-11-24T16:29:34.766264+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): job-20261124T162919.454Z-2 failed with ''Claude Code process exited with code 143'' (SIGTERM) in a taken-over thread, while several resumed sessions shared the worktree (DEV-833); no work error. Remaining: confirm the amended test fails without the fix, then lint, test, smoke.'
+- date: 2026-11-24T17:05:26.905175+00:00
+  author: claude
+  text: |-
+    Checks pass on HEAD `c7741b49e`. The review finding was already fixed there, so this round changed no code.
+
+    - Review finding (the reused-session test also passed without the fix): fixed in `c7741b49e` by the earlier round. The second job runs with `--session new`, so it fails on main's code with `no harnessmux session holds it`.
+    - The worktree isn't clean: other sessions in this worktree have staged main's `kept.rs`/`resumed.rs` and changed the test file. I left that alone and ran the checks on `git archive c7741b49e` in a scratch folder, so they cover exactly the commit.
+    - `lint:agent`, `test:agent` and `test:smoke:agent` all passed (the first smoke run waited out its 30 min for port 47586, held by DEV-778's smoke, then ran again and passed).
+    - Before merging, reset the worktree to `c7741b49e`: its uncommitted changes aren't part of the work.
+  report:
+    commits:
+    - hash: c7741b49e
+      what: DEV-810 fix, reused-session test now runs a fresh session (signed)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: on a clean copy of c7741b49e
+    - command: npm run test:agent
+      result: passed
+      reason: 2473 Rust, 1567 UI tests
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 407 tests; first try didn't start, the DEV-778 smoke run held port 47586
+    next: Review c7741b49e again
+- date: 2026-11-24T21:01:49.296090+00:00
+  author: claude
+  text: |-
+    Nothing new to do: the fix is `c7741b49e`, checked at 17:05Z. Ready for review.
+
+    - This round came after two usage-limit pauses. It changed no code.
+    - The worktree still has uncommitted leftovers from earlier debug runs: main's `kept.rs`/`resumed.rs` staged, and a `panic!("DEBUG …")` in `dev503_harness_jobs_test.rs`. Committing them would undo the fix. AGENTS.md says to leave staged changes alone, so I didn't touch them.
+    - A second Claude session (`591b012d…`) runs the same fix prompt in this worktree right now. That's DEV-833 (several resumed sessions share one worktree).
+  report:
+    commits:
+    - hash: c7741b49e
+      what: settle kept T3 Code threads of done tickets without job log or session record; logs to stderr and job log
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: on git archive c7741b49e, 2026-11-24 17:05Z round
+    - command: npm run test:agent
+      result: passed
+      reason: same round
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: same round
+    next: Review, then merge c7741b49e; reset the worktree to c7741b49e first (its uncommitted changes are leftovers, not the fix)
+- date: 2026-11-24T21:20:49.228038+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A93efbf3043cc8f88842f92b54d1bdb9f9224d1cfd00ffd4b602328de85b44f80 of the job job-20261124T201219.422Z-60 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8e7f03fca9fb2e315c36ef63f93bf2d4a3fc44c5de856ef55ed21df8e84d88f3 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:34:44.926481+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A93efbf3043cc8f88842f92b54d1bdb9f9224d1cfd00ffd4b602328de85b44f80 of the job job-20261124T201219.422Z-60 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T213444.860Z-35: DEV-810 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:34:52.757296+00:00
+  author: claude
+  text: |-
+    Confirmed again: without the fix, the reused-session test fails.
+
+    - Ran `git archive c7741b49e` in a scratch folder, with the merge-base `kept.rs`/`resumed.rs`. The test fails at `dev503_harness_jobs_test.rs:1304` with `left: ["thread-1"]`, `right: ["thread-1", "thread-0"]`: thread-0 isn't settled.
+    - So the review finding is fixed in `c7741b49e`. A note saying the test still passes was out of date.
+  report:
+    checks:
+    - command: cargo nextest run --test integration -E 'test(a_kept_thread_whose_session_holds_a_newer_thread_is_settled)' without the fix
+      result: failed
+      reason: as it should
+- date: 2026-11-24T21:35:12.467973+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261124T213444.860Z-35 failed again (lotar agent logs job-20261124T213444.860Z-35). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9f7c15583bdfb543384aeaf2a523ef8b544a0a53446ba29e17e259ad65c1ef57
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9f5e1374ab8fb3435967317c5aacb3539ce917d44a133090b91a520b2e91ec59
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abe339d08904ec666265de031abcc1f05d33fb14db5a57b01df43b5ee18c08aa7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A57a29524665d0d429900f305773566558b4a015ebabb8cf04ef7de17e531de32
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5689431b2be8f2a28bc6f6cee2b89d3a49e79bc9a607985371d7b6068d4e2029
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4b8652db575c964276992b09be40c6a049da9d5f0aea86159d2c049bd58f4ecd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8bb83f91aeeebc3a8a1b54b65a52a42f15c43292fa41f76ead5b97515b0fe5c0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac226d398b3b9a31baa80b793b8bf1afe13b7ac7f2c38eeaef84f3c75336d3cb2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8ac447f68df00a5dbf6790ea3c130cde5f588bb7e83d93e419806ad43b306bd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75016bc3a7e986d168c7c233798bace1bc1cddaca3762b8dee0115cc6ea077c2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8e7f03fca9fb2e315c36ef63f93bf2d4a3fc44c5de856ef55ed21df8e84d88f3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A93efbf3043cc8f88842f92b54d1bdb9f9224d1cfd00ffd4b602328de85b44f80
+description: |-
+  Found 2026-11-22 13:30 PST (chief of staff, owner: 't3 still has a lot of open threads. We're on the new version of lotar so I hope this can be cleaned up now?'). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads ('<ID> fix: ...', '<ID> review: ...'), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing 'Threads to settle' lists 42). DEV-747's look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says 'Settled' or 'was not settled'. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else 'no harnessmux session holds it'. The chief of staff can't settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job's log or session record is gone (find them from T3's thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner's OK.
+
+  ## Causes found (job logs, 2026-11-22)
+  - The look ran and noted refusals in job logs: 23x `was not settled: no harnessmux session holds it`, 26x `was not settled: could not read the T3 Code thread` (lotar and standards `@agent-logs`).
+  - A ticket's session name (`standards-04f015-STD-298-fix`) is reused by its next job, so the harnessmux record holds only the newest thread: older threads have none.
+  - `t3 thread show` runs in the session's cwd, the ticket worktree, which cleanup removed after the merge.
+  - With every job log pruned, the look found no thread and didn't ask T3 Code at all.
+
+  ## Done when
+  - [ ] Failing tests first (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`), then green.
+  - [ ] A kept thread of a job log whose harnessmux record now holds a newer thread (or no record) is settled.
+  - [ ] A kept thread whose session cwd (worktree) is gone is settled: `t3` runs in the repository's checkout instead.
+  - [ ] A thread no job log names (logs pruned, record gone) is settled when `t3 thread list` shows it completed, unsettled, `full-access`, and its title starts with the ID of a done ticket of this tasks directory ("find them from T3's thread list, e.g. thread title"). A thread that runs, waits, or that a running harnessmux session follows is left alone; open tickets' threads keep the DEV-747 rule (needs a job log).
+  - [ ] T3 Code is asked even with no job log, but only when a project of the tasks directory has a `t3` agent profile.
+  - [ ] Each settle and each refusal (refusal once per process) goes to the process log (stderr of `lotar serve` / the queue worker, the server log repos.ts points at) as `[lotar] <ID>: Settled the T3 Code thread <link>` / `... was not settled: <why>`, and to the job log when there is one. A failed settle changes nothing else; the next look tries again.
+  - [ ] `docs/help/agent.md` says so.
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+  - [ ] After the release (owner's OK): count unsettled completed job threads of done tickets before and after (2026-11-22 before: lotar 8, standards 2 completed full-access unsettled threads, many on open tickets).
+tags:
+- review-returned
+- job-paused
+- fix-retried
+- retry-fix
 history:
 - at: 2026-11-22T21:19:09.309565+00:00
   actor: claude
@@ -29,5 +415,376 @@ history:
     new: '@fix'
 - at: 2026-11-22T21:22:50.394391+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:33:05.787160+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T02:33:10.075026+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
+- at: 2026-11-23T02:36:33.437172+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found 2026-11-22 13:30 PST (chief of staff, owner: ''t3 still has a lot of open threads. We''re on the new version of lotar so I hope this can be cleaned up now?''). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads (''<ID> fix: ...'', ''<ID> review: ...''), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing ''Threads to settle'' lists 42). DEV-747''s look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says ''Settled'' or ''was not settled''. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else ''no harnessmux session holds it''. The chief of staff can''t settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job''s log or session record is gone (find them from T3''s thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner''s OK.'
+    new: |-
+      Found 2026-11-22 13:30 PST (chief of staff, owner: 't3 still has a lot of open threads. We're on the new version of lotar so I hope this can be cleaned up now?'). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads ('<ID> fix: ...', '<ID> review: ...'), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing 'Threads to settle' lists 42). DEV-747's look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says 'Settled' or 'was not settled'. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else 'no harnessmux session holds it'. The chief of staff can't settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job's log or session record is gone (find them from T3's thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner's OK.
+
+      ## Causes found (job logs, 2026-11-22)
+      - The look ran and noted refusals in job logs: 23x `was not settled: no harnessmux session holds it`, 26x `was not settled: could not read the T3 Code thread` (lotar and standards `@agent-logs`).
+      - A ticket's session name (`standards-04f015-STD-298-fix`) is reused by its next job, so the harnessmux record holds only the newest thread: older threads have none.
+      - `t3 thread show` runs in the session's cwd, the ticket worktree, which cleanup removed after the merge.
+      - With every job log pruned, the look found no thread and didn't ask T3 Code at all.
+
+      ## Done when
+      - [ ] Failing tests first (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`), then green.
+      - [ ] A kept thread of a job log whose harnessmux record now holds a newer thread (or no record) is settled.
+      - [ ] A kept thread whose session cwd (worktree) is gone is settled: `t3` runs in the repository's checkout instead.
+      - [ ] A thread no job log names (logs pruned, record gone) is settled when `t3 thread list` shows it completed, unsettled, `full-access`, and its title starts with the ID of a done ticket of this tasks directory ("find them from T3's thread list, e.g. thread title"). A thread that runs, waits, or that a running harnessmux session follows is left alone; open tickets' threads keep the DEV-747 rule (needs a job log).
+      - [ ] T3 Code is asked even with no job log, but only when a project of the tasks directory has a `t3` agent profile.
+      - [ ] Each settle and each refusal (refusal once per process) goes to the process log (stderr of `lotar serve` / the queue worker, the server log repos.ts points at) as `[lotar] <ID>: Settled the T3 Code thread <link>` / `... was not settled: <why>`, and to the job log when there is one. A failed settle changes nothing else; the next look tries again.
+      - [ ] `docs/help/agent.md` says so.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+      - [ ] After the release (owner's OK): count unsettled completed job threads of done tickets before and after (2026-11-22 before: lotar 8, standards 2 completed full-access unsettled threads, many on open tickets).
+- at: 2026-11-23T02:45:17.990444+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:45:18.445522+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-747","DEV-752"]}'
+    new: '{"related":["DEV-747","DEV-752","DEV-808","DEV-809"]}'
+- at: 2026-11-23T02:46:20.387592+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T06:54:27.812857+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:54:28.769565+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-747","DEV-752","DEV-808","DEV-809"]}'
+    new: '{"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611"]}'
+- at: 2026-11-23T06:54:29.686722+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-23T06:54:38.414219+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-23T08:53:41.407142+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T08:53:43.336949+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
+- at: 2026-11-23T08:53:46.774590+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, job-paused
+- at: 2026-11-23T08:53:46.863158+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:55:30.206751+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9f7c15583bdfb543384aeaf2a523ef8b544a0a53446ba29e17e259ad65c1ef57
+- at: 2026-11-23T10:55:41.805092+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9f5e1374ab8fb3435967317c5aacb3539ce917d44a133090b91a520b2e91ec59
+- at: 2026-11-23T11:55:53.986379+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abe339d08904ec666265de031abcc1f05d33fb14db5a57b01df43b5ee18c08aa7
+- at: 2026-11-23T12:56:08.686943+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A57a29524665d0d429900f305773566558b4a015ebabb8cf04ef7de17e531de32
+- at: 2026-11-23T14:03:52.125902+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5689431b2be8f2a28bc6f6cee2b89d3a49e79bc9a607985371d7b6068d4e2029
+- at: 2026-11-23T15:04:09.041276+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4b8652db575c964276992b09be40c6a049da9d5f0aea86159d2c049bd58f4ecd
+- at: 2026-11-23T16:04:25.168230+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8bb83f91aeeebc3a8a1b54b65a52a42f15c43292fa41f76ead5b97515b0fe5c0
+- at: 2026-11-23T17:04:41.880944+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac226d398b3b9a31baa80b793b8bf1afe13b7ac7f2c38eeaef84f3c75336d3cb2
+- at: 2026-11-23T18:05:02.772993+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A848ed5d31798f56c4a69f0191b58df30114705d375d968ce60b992019d624082
+- at: 2026-11-23T19:05:25.935103+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8ac447f68df00a5dbf6790ea3c130cde5f588bb7e83d93e419806ad43b306bd
+- at: 2026-11-23T19:05:27.341018+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: review-returned, job-paused
+    new: review-returned, job-paused, fix-retried
+- at: 2026-11-23T19:05:29.674502+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:05:45.669452+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75016bc3a7e986d168c7c233798bace1bc1cddaca3762b8dee0115cc6ea077c2
+- at: 2026-11-23T19:05:46.778894+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:05:47.727997+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:06:38.291617+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611"]}'
+- at: 2026-11-23T19:06:38.733840+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:06:42.828617+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:06:57.783199+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:06:58.293294+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:06:58.535464+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:07:01.555383+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:07:14.107257+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:16:48.264851+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:33.672511+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:34.622679+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833"]}'
+- at: 2026-11-24T16:19:39.441806+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:20:02.543239+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:22:46.884143+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:19.287982+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:29:19.964319+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:23.276468+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:24.220850+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:24.299356+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T16:29:25.819024+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:29.824964+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:30.731526+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:33.160955+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-24T16:29:34.766264+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:32:35.715742+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:32:35.715850+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T16:32:51.278689+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: review-returned, job-paused, fix-retried
+    new: review-returned, job-paused, fix-retried, retry-fix
+- at: 2026-11-24T17:05:26.905175+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:05:27.193815+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778"]}'
+- at: 2026-11-24T19:12:15.707521+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T19:12:16.283888+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8e7f03fca9fb2e315c36ef63f93bf2d4a3fc44c5de856ef55ed21df8e84d88f3
+- at: 2026-11-24T20:03:54.905280+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849"]}'
+- at: 2026-11-24T20:12:24.197036+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A93efbf3043cc8f88842f92b54d1bdb9f9224d1cfd00ffd4b602328de85b44f80
+- at: 2026-11-24T21:01:49.296090+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:20:49.228038+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:34:44.926481+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:34:52.757296+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:35:09.771445+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-24T21:35:12.467973+00:00
+  actor: automation
   changes:
   - field: comment_added

@@ -1,20 +1,390 @@
 title: Delete a comment or withdraw a question (soft, kept in history)
-status: Todo
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-22T21:14:20.898265+00:00
-modified: 2026-11-22T21:14:21.231389+00:00
+modified: 2026-11-24T19:09:32.026294+00:00
+relationships:
+  blocks:
+  - DEV-828
+  related:
+  - DEV-810
+  - DEV-828
+  - DEV-801
+  - DEV-791
+comments:
+- date: 2026-11-23T02:55:13.202702+00:00
+  author: claude
+  text: |-
+    Comments can be deleted (soft: kept in the file and in history), restored and edited; deleting an open question withdraws it.
+
+    - CLI: `lotar comment <ID> --delete|--restore <N|date>`, `--edit <N|date> <text>`, `--deleted`. Listings now number comments `#N`; `lotar show` and `lotar comment` leave deleted ones out, so the inbox mirror and staff see a withdrawn question as gone.
+    - REST `POST /api/tasks/comment/delete` and `/restore` `{id, index}`; MCP `task_comment_delete` and `task_comment_restore`. The DTO keeps deleted comments with `deleted_at`.
+    - History records `comment#N.deleted_at`. A withdrawn question can't be answered; a deleted answer reopens its question (fields its option set stay).
+    - Counts, search, stats, timeline, automation templates and agent prompts skip deleted comments.
+    - Web UI: Delete (Withdraw on an open question) on each comment and answer; "Show N deleted" lists them with Restore.
+    - MCP tool count asserts went from 58 to 60 in three tests.
+    - Docs: `docs/help/comment.md`, `mcp-tools.md`, `mcp.md`, `api-quick-reference.md`, `docs/openapi.json`.
+
+    Screenshots, Comments tab (after: one comment deleted, list expanded). The "before" set was taken with the installed lotar 0.15.6:
+    - Before: [light 1440](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-before-light-1440.ba28e5042307c199162b0cd553995b5a.png), [dark 1440](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-before-dark-1440.ee7477d5665984d6ae4058cbf0813893.png), [light 390](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-before-light-390.0aab3838f25d723f9a136b84361a71c2.png), [dark 390](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-before-dark-390.b66959aac1d403a9ace51fa07a0f4a05.png), [light 1920](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-before-light-1920.bb28c64e95bcf4145f89839f5c44d2ec.png), [dark 1920](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-before-dark-1920.6a685abfa837159ded5001e2082f6368.png)
+    - After: [light 1440](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-after-light-1440.4af75e77d784d1369e6e679b5289dfb2.png), [dark 1440](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-after-dark-1440.d971fa707767d0fbf6be7ccbca942da5.png), [light 390](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-after-light-390.1ecfb3aad79bd8302be95ca88190ff21.png), [dark 390](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-after-dark-390.6e23a9796ce4df6e09246452c6dbd3d0.png), [light 1920](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-after-light-1920.d07048c3e7bb0e1b26b290488d8fedb8.png), [dark 1920](https://lotar.pyxzl.net/api/attachments/get?project=DEV&path=dev809-after-dark-1920.57f16c155676c290f5a93c821217d00d.png)
+  report:
+    commits:
+    - hash: e86f6b995
+      what: soft delete, restore and edit of comments on CLI, REST, MCP and web UI
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2474 Rust, 1571 UI, release and hooks tests
+    - command: npm run smoke
+      result: passed
+      reason: 408 tests
+    next: Review and merge agent/DEV-809
+- date: 2026-11-23T07:19:33.468028+00:00
+  author: claude
+  text: |-
+    Review: passed. `e86f6b995` does what "Done when" asks; one minor follow-up filed as [DEV-828](https://lotar.pyxzl.net/task/DEV-828).
+
+    - **Read:** the full diff against `main` (41 files), the ticket and the fix comment, DEV-810, AGENTS.md. Also the callers in other repos: `standards/scripts/repos.ts` (`shown`/`openAsked`) and `staff/src/lotar.rs` both read `lotar --format json show`, which now leaves deleted comments out, so a withdrawn question drops out of the inbox mirror and staff. No other repo parses the text listing, so the new `#N` prefix breaks nothing.
+    - **Storage and questions:** `deleted_at` is optional (old files load as before). History records `comment#N.deleted_at` in both directions, and a repeated delete or restore changes nothing. Edit refuses a deleted comment, and a trashed task is refused (`ensure_not_deleted`). `open_questions`, `find_question` and `has:question` skip deleted questions and deleted answers; an answer's fields aren't reverted.
+    - **Other views:** comment counts, search, stats, timeline, the template's `ticket.comments`, agent prompts, merge checks and the UI helpers (`openQuestions`, `answerTo`, `latestReview`) all filter deleted comments.
+    - **Contracts:** `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `mcp-tools.md` and `comment.md` agree. The openapi entries have no request body, the same as the existing `comment/update`.
+    - **Reran:** `npm ci`, `npm run -s lint:agent` passed. `npm run -s test:agent`: 2474/2474 Rust tests passed, but the run exited 1 on a leftover temp entry `.tmpZyw5k2`. That is the known flake on DEV-801: the branch's own tests (`npm run -s test:rust -- dev809`) leave nothing behind. `npm run -s test:ui:agent`: 1571 passed. `npm run smoke`: 408 passed.
+    - **Manual CLI:** in a scratch workspace, delete, `--deleted`, the restore-first refusal, and the no-match errors for `#0` and an unknown date all behave as the ticket says.
+    - **UI:** read the fix agent's before and after screenshots. Took my own at 1920, 1440 and 390 px in light and dark mode, with an open question, an answered question and one deleted comment. Delete, Withdraw, the answer's Delete, the "Hide 1 deleted" toggle and the dashed, greyed deleted comment with Restore read fine, with no layout problem.
+    - **Minor, filed [DEV-828](https://lotar.pyxzl.net/task/DEV-828):** the JSON lists from `lotar comment` and `lotar show` drop deleted comments without giving each item its `#N`. An agent counting positions would `--edit` or `--delete` the wrong comment. The fix is a `number` field on each JSON item.
+    - **My mistake:** my first scratch `lotar add` wrote to the main checkout because the job sets `LOTAR_TASKS_DIR`. It made an untracked `.tasks/DEMO/` (a single task), which I removed. Nothing tracked changed.
+- date: 2026-11-23T08:58:42.382400+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T08:58:49.083534+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085836.514Z-115 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085836.514Z-115 why.'
+- date: 2026-11-23T09:58:55.775349+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T10:59:07.864691+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T11:59:20.138372+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T12:59:33.054854+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T14:01:52.302071+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T15:02:08.295356+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T16:02:20.632597+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T19:09:32.026294+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-809` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-809` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac27b9c0e3d3dfd1c1825964a70b37a1adddc458708633986e1c840147b967840
+- attachment: dev809-after-dark-1440.d971fa707767d0fbf6be7ccbca942da5.png
+- attachment: dev809-after-dark-1920.57f16c155676c290f5a93c821217d00d.png
+- attachment: dev809-after-dark-390.6e23a9796ce4df6e09246452c6dbd3d0.png
+- attachment: dev809-after-light-1440.4af75e77d784d1369e6e679b5289dfb2.png
+- attachment: dev809-after-light-1920.d07048c3e7bb0e1b26b290488d8fedb8.png
+- attachment: dev809-after-light-390.1ecfb3aad79bd8302be95ca88190ff21.png
+- attachment: dev809-before-dark-1440.ee7477d5665984d6ae4058cbf0813893.png
+- attachment: dev809-before-dark-1920.6a685abfa837159ded5001e2082f6368.png
+- attachment: dev809-before-dark-390.b66959aac1d403a9ace51fa07a0f4a05.png
+- attachment: dev809-before-light-1440.ba28e5042307c199162b0cd553995b5a.png
+- attachment: dev809-before-light-1920.bb28c64e95bcf4145f89839f5c44d2ec.png
+- attachment: dev809-before-light-390.0aab3838f25d723f9a136b84361a71c2.png
 description: |-
   Owner 2026-11-22: "You can't edit an existing question? I thought we support (soft) deletes. If not ... file as a feature request on lotar."
 
-  Found: tasks have soft delete (deleted_at, restore); comments can only be updated (POST /api/tasks/comment/update, MCP task_comment_update), with no CLI command and no delete. An automation asked a wrong question on STD-302 (retry options on a finished research job), and its inbox entry took over those options; the only way out was editing both YAML files by hand.
+  ## Found
 
-  Done when: a comment can be soft-deleted and restored from the CLI (lotar comment <ID> --delete <index|date>), the API, MCP and the web UI; a deleted comment drops out of normal views and open-question lists but stays in the file with deleted_at and a history entry; an open question can be withdrawn the same way, so whatever mirrors it (an inbox entry) sees it as gone; lotar comment also gets --edit for the existing update.
+  Tasks have soft delete (`deleted_at`, restore); comments can only be updated (`POST /api/tasks/comment/update`, MCP `task_comment_update`), with no CLI command and no delete. An automation asked a wrong question on STD-302 (retry options on a finished research job), and its inbox entry took over those options; the only way out was editing both YAML files by hand.
+
+  The inbox mirror (`standards/scripts/repos.ts` `openAsked`) and staff (`staff/src/lotar.rs`) read `lotar --format json show` and work out open questions from its comments themselves.
+
+  ## Done when
+
+  Storage
+  - [ ] A comment gets an optional `deleted_at` (RFC 3339). Deleting sets it, restoring clears it; the comment stays in the YAML, in place. Old files without it load unchanged.
+  - [ ] Delete and restore each add a history entry `comment#N.deleted_at` (N 1-based, as edits record `comment#N`): delete old none, new the time; restore old the time, new none.
+  - [ ] Deleting a deleted comment, or restoring one that isn't deleted, changes nothing and adds no history.
+  - [ ] Editing a deleted comment is refused ("restore it first"). Comments on a deleted (trashed) task are refused as for other comment changes.
+
+  Questions
+  - [ ] A deleted question is withdrawn: it is no open question (`open_questions`, `has:question`, the open question in list rows), and answering it is refused.
+  - [ ] A deleted answer no longer answers: its question is open again. The fields its option set stay as they are.
+
+  Surfaces
+  - [ ] CLI: `lotar comment <ID> --delete <N|date>`, `--restore <N|date>`, `--edit <N|date> <text>` (text as for a new comment: positional, `-m`, `-F`). N is 1-based as listed; date is a comment's exact `date`. No match: an error naming what was given.
+  - [ ] CLI views leave deleted comments out: `lotar comment <ID>` (text and JSON) and `lotar show` (text and JSON), so whatever reads them (the inbox mirror, staff) sees a withdrawn question as gone. The list numbers comments `#N` by their stored position, so numbers don't shift; `lotar comment <ID> --deleted` lists the deleted ones.
+  - [ ] REST: `POST /api/tasks/comment/delete` and `/restore` `{id, index}` (0-based, as `comment/update`); the task DTO keeps deleted comments with `deleted_at` so indexes stay stable. `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+  - [ ] MCP: `task_comment_delete` and `task_comment_restore` `{id, index}`, documented in `docs/help/mcp-tools.md`.
+  - [ ] Web UI: each comment has Delete; deleted comments are hidden behind a "N deleted" toggle that shows them greyed with Restore.
+  - [ ] Other views skip deleted comments: comment counts, search, stats, timeline, automation templates (`ticket.comments[-1]`), agent prompts.
+  - [ ] Docs (`docs/help`) describe delete, restore, edit and withdrawing a question.
+  - [ ] Tests for the service, CLI, REST, MCP and UI; `npm run lint`, `npm test`, `npm run smoke` pass.
+tags:
+- ui
+- job-paused
 history:
 - at: 2026-11-22T21:14:21.231389+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-23T02:32:47.862650+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T02:32:53.990824+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac27b9c0e3d3dfd1c1825964a70b37a1adddc458708633986e1c840147b967840
+- at: 2026-11-23T02:35:20.721989+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner 2026-11-22: "You can't edit an existing question? I thought we support (soft) deletes. If not ... file as a feature request on lotar."
+
+      Found: tasks have soft delete (deleted_at, restore); comments can only be updated (POST /api/tasks/comment/update, MCP task_comment_update), with no CLI command and no delete. An automation asked a wrong question on STD-302 (retry options on a finished research job), and its inbox entry took over those options; the only way out was editing both YAML files by hand.
+
+      Done when: a comment can be soft-deleted and restored from the CLI (lotar comment <ID> --delete <index|date>), the API, MCP and the web UI; a deleted comment drops out of normal views and open-question lists but stays in the file with deleted_at and a history entry; an open question can be withdrawn the same way, so whatever mirrors it (an inbox entry) sees it as gone; lotar comment also gets --edit for the existing update.
+    new: |-
+      Owner 2026-11-22: "You can't edit an existing question? I thought we support (soft) deletes. If not ... file as a feature request on lotar."
+
+      ## Found
+
+      Tasks have soft delete (`deleted_at`, restore); comments can only be updated (`POST /api/tasks/comment/update`, MCP `task_comment_update`), with no CLI command and no delete. An automation asked a wrong question on STD-302 (retry options on a finished research job), and its inbox entry took over those options; the only way out was editing both YAML files by hand.
+
+      The inbox mirror (`standards/scripts/repos.ts` `openAsked`) and staff (`staff/src/lotar.rs`) read `lotar --format json show` and work out open questions from its comments themselves.
+
+      ## Done when
+
+      Storage
+      - [ ] A comment gets an optional `deleted_at` (RFC 3339). Deleting sets it, restoring clears it; the comment stays in the YAML, in place. Old files without it load unchanged.
+      - [ ] Delete and restore each add a history entry `comment#N.deleted_at` (N 1-based, as edits record `comment#N`): delete old none, new the time; restore old the time, new none.
+      - [ ] Deleting a deleted comment, or restoring one that isn't deleted, changes nothing and adds no history.
+      - [ ] Editing a deleted comment is refused ("restore it first"). Comments on a deleted (trashed) task are refused as for other comment changes.
+
+      Questions
+      - [ ] A deleted question is withdrawn: it is no open question (`open_questions`, `has:question`, the open question in list rows), and answering it is refused.
+      - [ ] A deleted answer no longer answers: its question is open again. The fields its option set stay as they are.
+
+      Surfaces
+      - [ ] CLI: `lotar comment <ID> --delete <N|date>`, `--restore <N|date>`, `--edit <N|date> <text>` (text as for a new comment: positional, `-m`, `-F`). N is 1-based as listed; date is a comment's exact `date`. No match: an error naming what was given.
+      - [ ] CLI views leave deleted comments out: `lotar comment <ID>` (text and JSON) and `lotar show` (text and JSON), so whatever reads them (the inbox mirror, staff) sees a withdrawn question as gone. The list numbers comments `#N` by their stored position, so numbers don't shift; `lotar comment <ID> --deleted` lists the deleted ones.
+      - [ ] REST: `POST /api/tasks/comment/delete` and `/restore` `{id, index}` (0-based, as `comment/update`); the task DTO keeps deleted comments with `deleted_at` so indexes stay stable. `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+      - [ ] MCP: `task_comment_delete` and `task_comment_restore` `{id, index}`, documented in `docs/help/mcp-tools.md`.
+      - [ ] Web UI: each comment has Delete; deleted comments are hidden behind a "N deleted" toggle that shows them greyed with Restore.
+      - [ ] Other views skip deleted comments: comment counts, search, stats, timeline, automation templates (`ticket.comments[-1]`), agent prompts.
+      - [ ] Docs (`docs/help`) describe delete, restore, edit and withdrawing a question.
+      - [ ] Tests for the service, CLI, REST, MCP and UI; `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-23T02:45:18.445240+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-810"]}'
+- at: 2026-11-23T02:47:24.176630+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: ui
+- at: 2026-11-23T02:47:24.241800+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-after-dark-1440.d971fa707767d0fbf6be7ccbca942da5.png
+- at: 2026-11-23T02:47:24.280583+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-after-dark-1920.57f16c155676c290f5a93c821217d00d.png
+- at: 2026-11-23T02:47:24.319396+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-after-dark-390.6e23a9796ce4df6e09246452c6dbd3d0.png
+- at: 2026-11-23T02:47:24.359404+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-after-light-1440.4af75e77d784d1369e6e679b5289dfb2.png
+- at: 2026-11-23T02:47:24.399493+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-after-light-1920.d07048c3e7bb0e1b26b290488d8fedb8.png
+- at: 2026-11-23T02:47:24.439635+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-after-light-390.1ecfb3aad79bd8302be95ca88190ff21.png
+- at: 2026-11-23T02:47:24.479176+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-before-dark-1440.ee7477d5665984d6ae4058cbf0813893.png
+- at: 2026-11-23T02:47:24.519439+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-before-dark-1920.6a685abfa837159ded5001e2082f6368.png
+- at: 2026-11-23T02:47:24.562419+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-before-dark-390.b66959aac1d403a9ace51fa07a0f4a05.png
+- at: 2026-11-23T02:47:24.602299+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-before-light-1440.ba28e5042307c199162b0cd553995b5a.png
+- at: 2026-11-23T02:47:24.645266+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-before-light-1920.bb28c64e95bcf4145f89839f5c44d2ec.png
+- at: 2026-11-23T02:47:24.687858+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev809-before-light-390.0aab3838f25d723f9a136b84361a71c2.png
+- at: 2026-11-23T02:55:13.202702+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:55:32.467111+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T07:19:11.565343+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-810"]}'
+    new: '{"related":["DEV-810","DEV-828"]}'
+- at: 2026-11-23T07:19:32.314004+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-810","DEV-828"]}'
+    new: '{"related":["DEV-810","DEV-828","DEV-801"]}'
+- at: 2026-11-23T07:19:33.468028+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:19:42.145425+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T08:58:42.382400+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:58:49.018374+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui
+    new: ui, job-paused
+- at: 2026-11-23T08:58:49.083534+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:58:55.775349+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:59:07.864691+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T11:59:20.138372+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T12:59:33.054854+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T14:01:52.302071+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T15:02:08.295356+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T16:02:20.632597+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:00:57.155347+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-810","DEV-828","DEV-801"]}'
+    new: '{"blocks":["DEV-828"],"related":["DEV-810","DEV-828","DEV-801"]}'
+- at: 2026-11-24T16:08:02.734987+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-828"],"related":["DEV-810","DEV-828","DEV-801"]}'
+    new: '{"blocks":["DEV-828"],"related":["DEV-810","DEV-828","DEV-801","DEV-791"]}'
+- at: 2026-11-24T19:09:32.026294+00:00
+  actor: automation
+  changes:
+  - field: comment_added

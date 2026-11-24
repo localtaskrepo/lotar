@@ -3,9 +3,8 @@ status: WontDo
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-22T21:53:15.614370+00:00
-modified: 2026-11-22T21:53:52.306212+00:00
+modified: 2026-11-23T03:34:42.902673+00:00
 relationships:
   related:
   - DEV-812
@@ -13,6 +12,11 @@ comments:
 - date: 2026-11-22T21:53:51.820732+00:00
   author: claude
   text: 'Duplicate of DEV-812: filed three times by a retry loop of mine. Work on DEV-812.'
+- date: 2026-11-23T03:34:33.349376+00:00
+  author: claude
+  text: 'Nothing to do here: duplicate of [DEV-812](https://lotar.pyxzl.net/task/DEV-812), which is in progress; no commits on `agent/DEV-813`.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7548177155bef5f6e8c0fd31b010093bfb374d55c9535468dc7d22c1e8acfffe
 description: |-
   Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
 
@@ -45,3 +49,26 @@ history:
   - field: status
     old: Todo
     new: WontDo
+- at: 2026-11-23T03:34:12.468730+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: WontDo
+    new: InProgress
+- at: 2026-11-23T03:34:18.809057+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7548177155bef5f6e8c0fd31b010093bfb374d55c9535468dc7d22c1e8acfffe
+- at: 2026-11-23T03:34:33.349376+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T03:34:42.902673+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+  - field: assignee
+    old: '@fix'

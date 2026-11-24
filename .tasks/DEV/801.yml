@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-22T22:40:05.875209+00:00
+modified: 2026-11-24T22:04:04.379049+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -16,6 +16,14 @@ relationships:
   - DEV-788
   - DEV-792
   - DEV-799
+  - DEV-782
+  - DEV-790
+  - DEV-791
+  - DEV-809
+  - DEV-777
+  - DEV-802
+  - DEV-767
+  - DEV-825
 comments:
 - date: 2026-11-22T22:40:05.875209+00:00
   author: claude
@@ -23,6 +31,58 @@ comments:
     Reported again by claude on 2026-11-22.
 
     Rust suite temp guard: a test left `.tmpo9xMic` (a tempfile-crate temp dir) in nextest's temp folder, so `npm run -s test:agent` failed although all 2469 tests passed. Seen once at load average 35-41 in lotar's merge of DEV-787 (`6ab3e9002`, a 2-line test-wait change); the same change passed the suite on the previous base. Which test leaks is unknown.
+- date: 2026-11-23T04:27:55.971834+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-22.
+
+    Rust suite temp guard: a test left `.tmpiU1LnI` (a tempfile-crate temp dir) in nextest's temp folder, so `npm run -s test:agent` failed although all 2471 tests passed. Seen in the review of DEV-782 (rebased onto main `f95414e5a`) at load average 77; DEV-782's change adds no temp files.
+- date: 2026-11-23T05:28:36.798619+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-22.
+
+    Rust suite temp guard: a test left `.tmpkSboEm` (a tempfile-crate temp dir) in nextest's temp folder, so `npm run -s test:agent` failed although all 2470 tests passed. Seen in lotar's merge of DEV-790 (docs-only, rebased onto `f95414e5a`); the change adds no temp files.
+- date: 2026-11-23T05:28:43.407758+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-22.
+
+    Rust suite temp guard: a test left `.tmpDOpQWY` (tempfile-crate dir) in nextest's temp folder; `npm run -s test:agent` failed though all 2471 tests passed. lotar's merge of DEV-791 on main `f95414e5a`; DEV-791's new test uses TestFixtures like its neighbours.
+- date: 2026-11-23T06:05:16.991267+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-22.
+
+    Rust suite temp guard: a test left `.tmpexqDCx` (tempfile-crate dir) in nextest's temp folder; `npm run -s test:agent` failed though all 2470 tests passed. lotar's merge of DEV-785 (test config only, rebased onto `e16388223`).
+- date: 2026-11-23T07:19:31.365870+00:00
+  author: claude
+  text: |-
+    Temp-folder leak again in the DEV-809 review run: all 2474 Rust tests passed, `npm run -s test:agent` exited 1 on a leftover `.tmpZyw5k2`.
+
+    - `npm run -s test:rust -- dev809` (the branch's new tests) leaves nothing; same pattern as DEV-785, DEV-787, DEV-791.
+- date: 2026-11-24T16:01:34.248846+00:00
+  author: claude
+  text: |-
+    Temp-folder leak again in lotar's merge of DEV-777: all 2481 Rust tests passed, `npm run -s test:agent` exited 1 on a leftover `.tmpJOwM3X`.
+
+    - Branch rebased onto `d4bdbbbf6`; DEV-777's only new test (`dev503_harness_jobs_test`) uses the same fake-ACP fixture as its neighbours
+    - Same pattern as DEV-785, DEV-787, DEV-791, DEV-802, DEV-809
+- date: 2026-11-24T16:19:36.520864+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-24.
+
+    Rust suite temp guard: a test left `.tmpgb3q6p` (tempfile-crate dir) in nextest temp folder; `npm run -s test:agent` failed though all 2481 tests passed. lotar merge of DEV-791 rebased onto `d4bdbbbf6`; same pattern as DEV-777, DEV-785, DEV-809.
+- date: 2026-11-24T17:38:45.324134+00:00
+  author: claude
+  text: 'Again in the DEV-767 merge 2026-11-24: `.tmpAv90sn` left after 2487/2487 passed; the rerun was clean.'
+- date: 2026-11-24T22:04:04.102097+00:00
+  author: claude
+  text: |-
+    Reported again by claude on 2026-11-24.
+
+    Rust suite temp guard (DEV-825 merge, 2026-11-24): all 2490 tests passed, a test left .tmplwXV3X. Reproduced in a plain cargo nextest run --workspace with its own TMPDIR: the leftover .tmpgOsEub held only an empty .tasks folder, both created at 21:53:59 UTC, 1.5 s into the run, when mostly lotar-agent unit tests (agent_job_service::tests, dev520_session_events_tests) were running. Running lotar-agent --lib alone 4 times left nothing. Likely a thread that recreates <tempdir>/.tasks after its test's TempDir was dropped.
 description: |-
   The repo's flaky list (owner 2026-11-22, "No ticket per flaky test", standards STD-299): a test that fails under machine load and passes when run alone is reported here as a comment (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D "<test>: <how it failed>, passes alone; <ticket or job>"`), not as a ticket of its own. A test that also fails alone is a bug with its own ticket.
 
@@ -48,3 +108,81 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-23T04:27:55.971834+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:28:01.363330+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782"]}'
+- at: 2026-11-23T05:28:36.798619+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:28:39.507755+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790"]}'
+- at: 2026-11-23T05:28:43.407758+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:28:45.878430+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791"]}'
+- at: 2026-11-23T06:05:16.991267+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:19:31.365870+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:19:32.312861+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809"]}'
+- at: 2026-11-24T16:01:34.248846+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:01:35.161414+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802"]}'
+- at: 2026-11-24T16:19:36.520864+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:38:44.991707+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767"]}'
+- at: 2026-11-24T17:38:45.324134+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:04:04.102097+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:04:04.379049+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825"]}'

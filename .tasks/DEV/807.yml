@@ -1,23 +1,186 @@
 title: Instructions button keeps 'Not recorded for this job' when opened before the job's first turn
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T20:45:46.748448+00:00
-modified: 2026-11-22T20:45:59.734042+00:00
+modified: 2026-11-24T23:00:13.623315+00:00
 relationships:
+  depends_on:
+  - DEV-767
   related:
   - DEV-767
+comments:
+- date: 2026-11-23T02:11:22.927857+00:00
+  author: claude
+  text: |-
+    Waits for DEV-767: the file to fix isn't on main yet.
+
+    - `view/components/AgentRunInputs.vue` exists only on `agent/DEV-767` (`f384ce022`); DEV-767 is in Reviewing.
+    - Added "## Done when", `depends-on DEV-767`, tag `waits`.
+    - Fix once DEV-767 lands: set `loaded` only when `inputs` isn't `null`, plus the Vitest.
+- date: 2026-11-24T19:37:17.332546+00:00
+  author: automation
+  text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-807 yet. Agent job job-20261124T193716.125Z-22 is queued: it is waiting for a free slot (3 of DEV''s agent.worktree.max_parallel_jobs 3 running).'
+- date: 2026-11-24T19:42:48.564286+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T193716.125Z-22 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T193716.125Z-22 why.'
+- date: 2026-11-24T21:18:35.870839+00:00
+  author: claude
+  text: |-
+    Fixed: Instructions loads again after "Not recorded for this job"; a record stays cached.
+
+    - `view/components/AgentRunInputs.vue`: dropped `loaded`; `toggle()` loads while `inputs` is `null` and no load runs. A failed load still retries on the next open.
+    - `view/__tests__/AgentRunInputs.spec.ts`: open with `null` → not recorded; reopen → record shows; reopen → no third fetch. Plus: clicks during a running load start no second one.
+    - Branch fast-forwarded to main (`855ff6f46`, DEV-767) first: it had no commits of its own.
+    - Not checked in a browser: Vitest covers the change.
+    - No guidance correction.
+  report:
+    commits:
+    - hash: fe8a8ddeb
+      what: reload while no record, cache a record
+    checks:
+    - command: npm run test:ui:agent -- view/__tests__/AgentRunInputs.spec.ts
+      result: passed
+      reason: 6 tests; the new one failed on the old component first
+    - command: prettier, oxlint, eslint, vue-tsc on the changed files
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: targeted checks only, the merge runs it
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'Merge agent: full suites, then land agent/DEV-807'
+- date: 2026-11-24T21:18:42.086518+00:00
+  author: claude
+  text: |-
+    Fixed: Instructions loads again after an empty result, and keeps a record once one came back.
+
+    - `view/components/AgentRunInputs.vue`: dropped `loaded`; `toggle()` loads when there is no record and no load is running. A failed load still shows its error and the next open retries.
+    - `view/__tests__/AgentRunInputs.spec.ts`: open with `null` → "Not recorded for this job", reopen → record shows, reopen → no third fetch; a second open during a load starts no second fetch.
+    - Commit `f241a4b84`.
+  report:
+    commits:
+    - hash: f241a4b84
+      what: reload while no record, cache a record
+    checks:
+    - command: npx vitest run view/__tests__/AgentRunInputs.spec.ts
+      result: passed
+      reason: new test fails on the old component, passes with the fix
+    - command: npx vue-tsc --project view/tsconfig.json --noEmit
+      result: passed
+    - command: prettier, oxlint, eslint on the two files
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    - command: browser check
+      result: not_run
+      reason: covered by the Vitest
+    next: Merge runs lint, test, smoke
+- date: 2026-11-24T21:18:45.814251+00:00
+  author: claude
+  text: 'Correction: the commit is `f241a4b84`, not `fe8a8ddeb` as the comment above says.'
+  report:
+    commits:
+    - hash: f241a4b84
+      what: reload while no record, cache a record
+- date: 2026-11-24T21:20:27.810229+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb2a4fbb9313d916e73cdfd8edc690423c01f31b484b04aba6ba5dd7dfd467ce of the job job-20261124T193716.125Z-22 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad2539ee495d3758c2c4a5daf352bfd68a640cbedf86653ba173c8084f6ffe746 that the job job-20261124T212024.423Z-26 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:57:49.523533+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T21:20Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T22:07:35.034111+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix is right, but the ticket has no UI screenshots (the review rules block without them).
+
+    - Reviewed `f241a4b84` on `agent/DEV-807` (based on `855ff6f46`; main has moved on, but neither touched file changed there since DEV-767).
+    - Fix: `view/components/AgentRunInputs.vue:81`: `toggle()` loads when there's no record and no load is running; `loaded` is gone. This meets every behaviour item in "Done when": a `null` result loads again, a record stays cached, a running load blocks a second one, an error still retries.
+    - Test: `view/__tests__/AgentRunInputs.spec.ts:116`: `npx vitest run --config view/vitest.config.ts AgentRunInputs.spec.ts`: 6 passed. With the old component put back, the new test fails (`expected 2 calls, got 1`), so it covers the bug.
+    - `npm ci` ok. Prettier, oxlint and eslint on both files: clean.
+    - In the browser: the worktree UI (Vite) ran against a scratch `lotar serve` (0.15.6, no inputs route yet), with Playwright returning `null`, then a record. Every theme and width: "Not recorded for this job.", then the record after reopening, 2 fetches in total. Light and dark at 1920, 1440 and 390 px look fine; markup and styles are unchanged.
+    - **Blocking:** no before/after screenshots are attached or linked. The fix comment says "Not checked in a browser". Fix: attach before and after screenshots of the Agents job card with Instructions open (light and dark, 1920/1440/390) with `lotar task reference add upload DEV-807 <file>`, and link them in the hand-off comment. No code change needed.
+    - No minor tickets filed. No owner decision touched.
+- date: 2026-11-24T23:00:06.911431+00:00
+  author: claude
+  text: |-
+    Review finding fixed: before/after screenshots are attached. No code change, so `f241a4b84` stays as it was (amending it unchanged would only give it a new hash).
+
+    - The review read HEAD `f241a4b84`.
+    - Setup: the worktree UI (Vite) against a scratch `lotar serve` 0.15.6. Playwright served one running job; `/api/jobs/inputs` returned `null` first, then a record. Steps: Show logs → Instructions ("Not recorded for this job.") → close → open again.
+    - **Before** (component from `855ff6f46`): the reopen makes no fetch and still says "Not recorded for this job." Attachments `DEV-807-before-{light,dark}-{1920,1440,390}.png`.
+    - **After** (`f241a4b84`): the reopen fetches a second time and shows the record (settings table, Copy prompt). Attachments `DEV-807-after-{light,dark}-{1920,1440,390}.png`.
+    - I looked at the images. Both themes and all three widths look fine, and nothing overflows the job card at 390 px.
+  report:
+    commits:
+    - hash: f241a4b84
+      what: Instructions loads again after a null record; a record stays cached
+    checks:
+    - command: npx vitest run --config view/vitest.config.ts AgentRunInputs.spec.ts
+      result: passed
+      reason: 6 tests
+    - command: Playwright before/after, light+dark at 1920/1440/390
+      result: passed
+      reason: before 1 fetch, still 'Not recorded'; after 2 fetches, record shown
+    - command: npm run lint
+      result: not_run
+      reason: no code changed this round; the merge runs it
+    - command: npm test
+      result: not_run
+      reason: no code changed this round; the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: no code changed this round; the merge runs it
+    next: 'Review again: the screenshots are attached'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7634167f076e693f0f795dd8049d362219ce29257a5b94c01e6c6f883cf9fb6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb2a4fbb9313d916e73cdfd8edc690423c01f31b484b04aba6ba5dd7dfd467ce
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad2539ee495d3758c2c4a5daf352bfd68a640cbedf86653ba173c8084f6ffe746
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac490e4e243ab2bee7ada3df19856db8063821c1dc3a466ccd4442d0609c001f0
+- attachment: DEV-807-before-dark-1440.74390b9dbe0256bd7fd4f0568353bfd1.png
+- attachment: DEV-807-before-dark-1920.57018b838c41ef7a5ff03061a3bbb1fd.png
+- attachment: DEV-807-before-dark-390.017133824bb81cce5cba2ae91acf7839.png
+- attachment: DEV-807-before-light-1440.493730cce207a6ccf43d5c02558a23a0.png
+- attachment: DEV-807-before-light-1920.53a1503772498c4d0275092cc7156bae.png
+- attachment: DEV-807-before-light-390.5daa54c07b361ed9ea6d87b945d40213.png
+- attachment: DEV-807-after-dark-1440.08d453620864deb213e9f04b4ede7762.png
+- attachment: DEV-807-after-dark-1920.4ae11d4243a5b4d8131234423069e753.png
+- attachment: DEV-807-after-dark-390.88ecf09c73d04b7ddad98c852d2b5468.png
+- attachment: DEV-807-after-light-1440.76b711064ba9a10443270941493cfeb6.png
+- attachment: DEV-807-after-light-1920.add2592378e17be06d5d674b704ff31e.png
+- attachment: DEV-807-after-light-390.1cfb0a58d0c6ce5279598c459e4ed39c.png
 description: |-
   Found in the DEV-767 review (f384ce022).
 
   `view/components/AgentRunInputs.vue` sets `loaded = true` after a load that returns `inputs: null`, so `toggle()` never loads again. Open the button on a queued job, or a running job still in its worktree setup: it says "Not recorded for this job" until the page reloads, also after the first turn has written its `run_inputs` line.
 
   Fix: count a `null` result as not loaded while the job hasn't ended (or reload on every open while it runs). Add a Vitest that opens it with `null`, then with a record.
+
+  ## Done when
+
+  - [ ] Opening Instructions after a load that returned `inputs: null` fetches again; a returned record is cached and not fetched again on the next open.
+  - [ ] While a fetch runs, a second open doesn't start another one.
+  - [ ] A failed fetch shows its error and the next open retries (unchanged).
+  - [ ] `view/__tests__/AgentRunInputs.spec.ts`: open with `null` → "Not recorded for this job"; close, reopen with a record → the record shows; reopen → no third fetch.
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
 tags:
 - agent
 - ui
+- job-paused
+- review-returned
 history:
 - at: 2026-11-22T20:45:51.763263+00:00
   actor: claude
@@ -30,3 +193,247 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-23T02:10:41.551339+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T02:10:51.537467+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7634167f076e693f0f795dd8049d362219ce29257a5b94c01e6c6f883cf9fb6
+- at: 2026-11-23T02:11:22.175487+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-767 review (f384ce022).
+
+      `view/components/AgentRunInputs.vue` sets `loaded = true` after a load that returns `inputs: null`, so `toggle()` never loads again. Open the button on a queued job, or a running job still in its worktree setup: it says "Not recorded for this job" until the page reloads, also after the first turn has written its `run_inputs` line.
+
+      Fix: count a `null` result as not loaded while the job hasn't ended (or reload on every open while it runs). Add a Vitest that opens it with `null`, then with a record.
+    new: |-
+      Found in the DEV-767 review (f384ce022).
+
+      `view/components/AgentRunInputs.vue` sets `loaded = true` after a load that returns `inputs: null`, so `toggle()` never loads again. Open the button on a queued job, or a running job still in its worktree setup: it says "Not recorded for this job" until the page reloads, also after the first turn has written its `run_inputs` line.
+
+      Fix: count a `null` result as not loaded while the job hasn't ended (or reload on every open while it runs). Add a Vitest that opens it with `null`, then with a record.
+
+      ## Done when
+
+      - [ ] Opening Instructions after a load that returned `inputs: null` fetches again; a returned record is cached and not fetched again on the next open.
+      - [ ] While a fetch runs, a second open doesn't start another one.
+      - [ ] A failed fetch shows its error and the next open retries (unchanged).
+      - [ ] `view/__tests__/AgentRunInputs.spec.ts`: open with `null` → "Not recorded for this job"; close, reopen with a record → the record shows; reopen → no third fetch.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-23T02:11:22.427897+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-767"]}'
+    new: '{"depends_on":["DEV-767"],"related":["DEV-767"]}'
+- at: 2026-11-23T02:11:22.881306+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, waits
+- at: 2026-11-23T02:11:22.927857+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:11:32.849364+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-24T19:37:15.478574+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent, ui, waits
+    new: agent, ui
+- at: 2026-11-24T19:37:17.332546+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:42:44.945894+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T19:42:45.828294+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb2a4fbb9313d916e73cdfd8edc690423c01f31b484b04aba6ba5dd7dfd467ce
+- at: 2026-11-24T19:42:48.435684+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, job-paused
+- at: 2026-11-24T19:42:48.564286+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:42:50.843331+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad2539ee495d3758c2c4a5daf352bfd68a640cbedf86653ba173c8084f6ffe746
+- at: 2026-11-24T21:18:35.870839+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:18:42.086518+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:18:45.814251+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:20:27.810229+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:20:52.657314+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T21:56:53.794602+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T21:56:54.793058+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-24T21:56:56.830878+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T21:57:49.523533+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:07:35.034111+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:07:35.551104+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui, job-paused
+    new: agent, ui, job-paused, review-blocked
+- at: 2026-11-24T22:07:43.828246+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, ui, job-paused, review-blocked
+    new: agent, ui, job-paused, review-returned
+- at: 2026-11-24T22:57:20.355954+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T22:57:20.970528+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac490e4e243ab2bee7ada3df19856db8063821c1dc3a466ccd4442d0609c001f0
+- at: 2026-11-24T22:59:51.998084+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-before-dark-1440.74390b9dbe0256bd7fd4f0568353bfd1.png
+- at: 2026-11-24T22:59:52.087315+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-before-dark-1920.57018b838c41ef7a5ff03061a3bbb1fd.png
+- at: 2026-11-24T22:59:52.183651+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-before-dark-390.017133824bb81cce5cba2ae91acf7839.png
+- at: 2026-11-24T22:59:52.297855+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-before-light-1440.493730cce207a6ccf43d5c02558a23a0.png
+- at: 2026-11-24T22:59:52.418288+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-before-light-1920.53a1503772498c4d0275092cc7156bae.png
+- at: 2026-11-24T22:59:52.536841+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-before-light-390.5daa54c07b361ed9ea6d87b945d40213.png
+- at: 2026-11-24T22:59:52.648459+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-after-dark-1440.08d453620864deb213e9f04b4ede7762.png
+- at: 2026-11-24T22:59:52.739490+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-after-dark-1920.4ae11d4243a5b4d8131234423069e753.png
+- at: 2026-11-24T22:59:52.839565+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-after-dark-390.88ecf09c73d04b7ddad98c852d2b5468.png
+- at: 2026-11-24T22:59:52.976604+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-after-light-1440.76b711064ba9a10443270941493cfeb6.png
+- at: 2026-11-24T22:59:53.094981+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-after-light-1920.add2592378e17be06d5d674b704ff31e.png
+- at: 2026-11-24T22:59:53.194192+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-807-after-light-390.1cfb0a58d0c6ce5279598c459e4ed39c.png
+- at: 2026-11-24T23:00:06.911431+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T23:00:13.623315+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

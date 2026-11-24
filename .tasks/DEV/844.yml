@@ -1,0 +1,100 @@
+title: 'docs/help/trust.md: the sentence on a run skipped while lotar trust replays is missing its verb'
+status: Blocked
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T17:30:03.578015+00:00
+modified: 2026-11-24T22:14:05.869138+00:00
+relationships:
+  depends_on:
+  - DEV-821
+  related:
+  - DEV-821
+comments:
+- date: 2026-11-24T19:19:12.397970+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191843.004Z-42 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191843.004Z-42 why.'
+- date: 2026-11-24T21:00:42.830251+00:00
+  author: claude
+  text: |-
+    Waits for DEV-821: the sentence isn't on main yet.
+
+    - `docs/help/trust.md:45` with "A run skipped while `lotar trust` was already replaying runs right after its skip is recorded." exists only on `agent/DEV-821` (`0ee647135`); DEV-821 is in Merging.
+    - On main (`855ff6f46`) the Skipped runs section has no such sentence, so editing it here would conflict with that merge.
+    - When DEV-821 lands: rebase on main and change it to "A run skipped while `lotar trust` was already replaying runs is replayed right after its skip is recorded."
+- date: 2026-11-24T21:09:43.883465+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b6334253d092bdb815a9d1ea20b967ac4eb05f37759228370c057cc8771dd06 of the job job-20261124T191843.004Z-42 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T22:14:05.869138+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-821. It starts once they are done.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b6334253d092bdb815a9d1ea20b967ac4eb05f37759228370c057cc8771dd06
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac453b498fe330d5e1884e94989ba616bf8ec22980d0162e238ebb1c3c9c827df
+description: 'Found in the DEV-821 review: docs/help/trust.md:45 reads ''A run skipped while `lotar trust` was already replaying runs right after its skip is recorded.'' It means: such a run is replayed right after its skip is recorded (crates/lotar-agent/src/services/automation_service.rs:2668). Done when the sentence says that.'
+tags:
+- job-paused
+- waits
+history:
+- at: 2026-11-24T17:30:04.341226+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:19:09.032511+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:19:09.716603+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b6334253d092bdb815a9d1ea20b967ac4eb05f37759228370c057cc8771dd06
+- at: 2026-11-24T19:19:12.249925+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-24T19:19:12.397970+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:19:14.447825+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac453b498fe330d5e1884e94989ba616bf8ec22980d0162e238ebb1c3c9c827df
+- at: 2026-11-24T21:00:40.843446+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-821"]}'
+    new: '{"depends_on":["DEV-821"],"related":["DEV-821"]}'
+- at: 2026-11-24T21:00:42.747666+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused
+    new: job-paused, waits
+- at: 2026-11-24T21:00:42.830251+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:09:43.883465+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:14:05.804207+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-24T22:14:05.869138+00:00
+  actor: automation
+  changes:
+  - field: comment_added

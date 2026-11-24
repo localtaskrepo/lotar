@@ -5,13 +5,15 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T06:13:38.957747+00:00
-modified: 2026-11-22T22:40:37.423912+00:00
+modified: 2026-11-24T16:08:02.731252+00:00
 relationships:
   related:
   - DEV-772
   - DEV-801
   - DEV-779
   - DEV-780
+  - DEV-797
+  - DEV-791
 comments:
 - date: 2026-11-22T11:29:27.723430+00:00
   author: claude
@@ -174,3 +176,15 @@ history:
   - field: relationships
     old: '{"related":["DEV-772","DEV-801"]}'
     new: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780"]}'
+- at: 2026-11-23T03:32:08.560375+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780"]}'
+    new: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780","DEV-797"]}'
+- at: 2026-11-24T16:08:02.731252+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780","DEV-797"]}'
+    new: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780","DEV-797","DEV-791"]}'

@@ -1,0 +1,103 @@
+title: Automation run fails with ENOENT when --tasks-dir is a bare relative path (.tasks)
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-23T02:40:57.765513+00:00
+modified: 2026-11-24T21:15:13.849171+00:00
+relationships:
+  related:
+  - DEV-808
+  - DEV-846
+comments:
+- date: 2026-11-23T06:52:40.712608+00:00
+  author: claude
+  text: |-
+    Fixed: a run now starts in the workspace root with `--tasks-dir .tasks`.
+
+    - Cause: `Path::new(".tasks").parent()` is the empty path, and `resolve_run_cwd` (and other `tasks_dir.parent()` callers) used it as the workspace root.
+    - Fix in `crates/lotar-core/src/workspace.rs`: a relative `--tasks-dir` or `LOTAR_TASKS_DIR` is joined to the working folder when it is resolved.
+    - New test `cli_bare_relative_tasks_dir_runs_in_workspace_root`: failed before the fix, passes now.
+    - `config show` now prints that path as absolute; two identical tests that matched `../other/tasks` now match the path's tail (`project_integration_test.rs`, `relative_path_parent_search_test.rs`).
+    - Checks ran with `RUSTC_WRAPPER=`: sccache couldn't create its temp folder in the sandbox.
+  report:
+    commits:
+    - hash: f52bafbb5
+      what: relative --tasks-dir and LOTAR_TASKS_DIR made absolute at resolution
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2479 Rust, 1567 UI
+    - command: npm run smoke
+      result: passed
+      reason: 407 tests
+    - command: manual repro with --tasks-dir .tasks
+      result: passed
+      reason: 0.15.6 ENOENT, new build writes out.txt in the workspace root
+    next: Review, then merge
+- date: 2026-11-23T08:52:31.881095+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085221.682Z-107 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085221.682Z-107 why.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccd370f7deef9474d7a8ac5052c860af8776fc0857317e7dd90f1555006eb54
+description: 'Found 2026-11-22 (DEV-808): with lotar 0.15.6, `lotar --tasks-dir .tasks priority AR-1 High` in a workspace whose rule has `run: ''pwd > out.txt''` fails with "Automation rule ''r'' failed on AR-1: IO error: No such file or directory (os error 2)" and the command never runs. `--tasks-dir ./.tasks`, an absolute path and no flag all work. Likely the run''s working folder is the tasks dir''s parent, which is the empty path for `.tasks`. Check: a test with `--tasks-dir .tasks` and a run that writes a file. Done: the run runs in the workspace root.'
+tags:
+- health
+- job-paused
+custom_fields:
+  finding: automation:relative-tasks-dir-run-cwd
+history:
+- at: 2026-11-23T02:40:58.191127+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-808"]}'
+- at: 2026-11-23T02:40:58.601789+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T06:37:30.108132+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T06:37:31.349269+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccd370f7deef9474d7a8ac5052c860af8776fc0857317e7dd90f1555006eb54
+- at: 2026-11-23T06:52:40.712608+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:52:49.323776+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:52:31.813799+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-23T08:52:31.881095+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:15:13.849171+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-808"]}'
+    new: '{"related":["DEV-808","DEV-846"]}'

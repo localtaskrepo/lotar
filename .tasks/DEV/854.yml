@@ -1,0 +1,56 @@
+title: 'Agent jobs comment as their agent: lotar sets LOTAR_DEFAULT_REPORTER in the job''s environment'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T21:03:56.346204+00:00
+modified: 2026-11-24T21:04:39.188396+00:00
+deleted_at: 2026-11-24T21:04:41.552797+00:00
+relationships:
+  related:
+  - DEV-796
+  - DEV-853
+comments:
+- date: 2026-11-24T21:04:37.144920+00:00
+  author: claude
+  text: Duplicate of DEV-853, filed at the same minute by a parallel DEV-796 session; removed.
+description: |-
+  An agent's comments, history entries and filed tickets carry the person's name (git user, `default.reporter`) unless its prompt tells it to set `LOTAR_DEFAULT_REPORTER`. Our standards prompts do ("Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex)"); a built-in template shouldn't depend on that, and its comment rules (`comment: { author: "@user" }`) would treat an agent's comment as the person's. The job environment (`job_env`, `crates/lotar-agent/src/services/agent_job_service.rs`, and `build_lotar_env` in `automation_service.rs`) sets `LOTAR_AGENT_*` and `LOTAR_TICKET_*` but not the reporter. Owner decision 2026-11-24 on DEV-796 (INBOX-698): "First fix the lotar gaps (question comments in rules, job reporter), then build".
+
+  ## Proposal
+
+  - The job's environment sets `LOTAR_DEFAULT_REPORTER` to the agent's name: the job's provider for the t3 runner (claude, codex), else the runner. Same names agents use today, so the hand-back rule for agent reporters (`without_agent_reporter_hand_back`, `AGENT_RUNNERS`) and existing prompts keep working; a prompt that sets it still wins per command.
+  - To decide in the fix, not assumed: whether the profile name (`@implement`) would serve better. It would make `@agent` author conditions match, but a ticket an agent files would get a profile as reporter, and a hand-back to `@reporter` would start a job.
+
+  ## Done when
+
+  - [ ] A job's agent that runs `lotar comment` without setting the variable writes the comment as its agent name; a test covers claude and t3 jobs.
+  - [ ] docs/help/agent.md lists the variable with the other job variables.
+history:
+- at: 2026-11-24T21:03:58.249711+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-796"]}'
+- at: 2026-11-24T21:04:01.382693+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T21:04:37.144920+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:04:39.188396+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-796"]}'
+    new: '{"related":["DEV-796","DEV-853"]}'
+- at: 2026-11-24T21:04:41.552797+00:00
+  actor: claude
+  changes:
+  - field: deleted
+    new: 2026-11-24T21:04:41.552797+00:00

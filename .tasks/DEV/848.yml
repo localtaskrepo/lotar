@@ -1,0 +1,182 @@
+title: Jira sync check returns 401 for inline scoped token
+status: Reviewing
+priority: High
+type: Bug
+reporter: codex
+assignee: '@review'
+created: 2026-11-24T20:03:06.454346+00:00
+modified: 2026-11-24T21:49:02.134057+00:00
+relationships:
+  related:
+  - DEV-300
+comments:
+- date: 2026-11-24T20:04:10.740443+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T200406.901Z-2 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T200406.901Z-2 why.'
+- date: 2026-11-24T20:35:12.391579+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T20:04Z with no lotar job: the live check restarted @fix as the next turn of its thread, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T21:22:39.343648+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d4edb4cd314d39fbe0fcb99cb68949c3d001274e5c8a91e9f7560539b8217 of the job job-20261124T203513.808Z-71 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212239.251Z-97: DEV-848 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:48:47.412343+00:00
+  author: claude
+  text: |-
+    Likely cause found: the inline token in the file differs from the real one (line wrap, curly quotes or an invisible character). LoTaR now says so instead of sending it and getting a 401.
+
+    - Installed 0.15.6 with an isolated `HOME`, a dummy token and a local fixture: inline and env tokens send the same correct Basic header. Plain, single or double quotes, a trailing comment, CRLF line ends, a BOM and a trailing NBSP all pass, so config loading and the request are fine
+    - These give a 401 with the email right and the token changed: curly quotes `“…”` (+2 chars), a zero-width space (+1), and a long token wrapped onto a second line inside `"…"`, where YAML turns the break into a space (+1)
+    - Pasting the value from an editor can hide all three, which explains the byte-for-byte match the owner saw
+    - Fix in `crates/lotar-lib/src/services/sync_service/client.rs`: `resolve_auth_value` refuses any character outside printable ASCII, for inline and env values alike, and nothing is sent. Example error: `token in the profile holds a space at character 46`. The DEV-300 order is unchanged
+    - Regression test in `provider_tests.rs`; `docs/help/sync.md` says to keep the token on one line
+    - Not verified against the live config: the job didn't read the owner's `~/.lotar`
+  report:
+    commits:
+    - hash: 17db87998
+      what: refuse tokens/emails with spaces, line breaks or non-ASCII before any request; error names the character and position, not the value
+    checks:
+    - command: cargo nextest run -p lotar-lib --lib -E 'test(/sync_service::provider_tests::auth::/)'
+      result: passed
+      reason: 6/6; new test failed first without the fix
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev300|sync/)'
+      result: passed
+      reason: 19/19
+    - command: cargo clippy -p lotar-lib --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --check and prettier --check on changed files
+      result: passed
+    - command: target/debug/lotar sync check against a local fixture with a dummy token
+      result: passed
+      reason: bad values refused with exit 1 and 0 requests; inline, CRLF and env tokens OK
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    - command: live Jira check with the owner's ~/.lotar
+      result: not_run
+      reason: real credentials stay out of the job
+    next: 'Owner: run lotar sync check once this lands; if it names a character, put the token on one line in ~/.lotar'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d4edb4cd314d39fbe0fcb99cb68949c3d001274e5c8a91e9f7560539b8217
+description: |-
+  The owner asked on Nov 24 to investigate why installed LoTaR 0.15.6 on macOS returns HTTP 401 for a Jira Cloud scoped token stored inline. The same installed CLI connects when the token comes from the environment. This affects the test site for STD-317.
+
+  ## Reproduction and controls
+
+  - Read-only `lotar sync check` with remote project `KAN` and explicit `--auth-profile jira.default` returned 401 with `LOTAR_JIRA_TOKEN` unset and a quoted inline token in the home profile.
+  - With `token_env: LOTAR_JIRA_TOKEN` and the verified scoped token in that environment variable, the installed CLI passed the check for the same project.
+  - The owner confirmed one `jira.default` profile. Its redacted settings have `method: basic`, the token owner's email in `email_env`, the Jira site as `base_url`, and the verified Cloud ID in `api_url: https://api.atlassian.com/ex/jira/<cloudId>`. LoTaR's redacted inspection confirmed Basic auth and the expected endpoint.
+  - The owner copied the current inline value into a secure prompt. It matched the previously verified token byte for byte, required no YAML quote escaping, and authenticated to Jira project `KAN` directly (HTTP 200).
+  - An isolated diagnostic using LoTaR's YAML parser and v0.15.6 request construction preserved the inline value and authenticated to the same Jira project with `LOTAR_JIRA_TOKEN` unset. The installed CLI still returned 401 afterward. The cause remains open.
+
+  ## Done when
+
+  - [ ] Compare the installed CLI's full config loading and sync request path for inline and environment-backed auth. Start with an isolated config, a dummy token, and a local fixture to verify the endpoint and Authorization header without logging its value.
+  - [ ] Identify where the live and isolated paths diverge, or document which hypotheses were ruled out and the next safe diagnostic. Start with `crates/lotar-core/src/config/persistence.rs` and `crates/lotar-lib/src/services/sync_service/client.rs`.
+  - [ ] If a LoTaR defect is confirmed, add a regression test and verify the fix through the CLI. Record the commands, outcomes, and any verification limits.
+  - [ ] Before any request, `lotar sync check`, push and pull refuse a token or email (inline in the profile or from its environment variable) that holds a space, tab, line break, control character or non-ASCII character (curly quotes, zero-width space, non-breaking space inside the value). The error names the profile, the field (token or email), where it came from (the profile or `$VAR`), the kind of character and its position, never the value; the command exits non-zero and sends nothing.
+  - [ ] Leading and trailing whitespace stays trimmed as before; valid tokens with `=`, `-`, `_`, `+`, `/` pass unchanged. An environment variable named by the value still wins over the literal (DEV-300 order unchanged).
+  - [ ] `docs/help/sync.md` says a token must sit on one line and how to fix the error.
+
+  Keep real credentials out of prompts, tests, logs, fixtures, and ticket comments. Honor the credential-file guard and leave the user's live config alone during isolated diagnostics.
+tags:
+- backend
+- job-paused
+custom_fields:
+  finding: jira-sync:inline-scoped-token-401
+history:
+- at: 2026-11-24T20:03:06.790285+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T20:04:08.168882+00:00
+  actor: codex
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T20:04:08.383421+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d4edb4cd314d39fbe0fcb99cb68949c3d001274e5c8a91e9f7560539b8217
+- at: 2026-11-24T20:04:10.691530+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend
+    new: backend, job-paused
+- at: 2026-11-24T20:04:10.740443+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:35:12.391579+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:19:31.949678+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The owner asked on Nov 24 to investigate why installed LoTaR 0.15.6 on macOS returns HTTP 401 for a Jira Cloud scoped token stored inline. The same installed CLI connects when the token comes from the environment. This affects the test site for STD-317.
+
+      ## Reproduction and controls
+
+      - Read-only `lotar sync check` with remote project `KAN` and explicit `--auth-profile jira.default` returned 401 with `LOTAR_JIRA_TOKEN` unset and a quoted inline token in the home profile.
+      - With `token_env: LOTAR_JIRA_TOKEN` and the verified scoped token in that environment variable, the installed CLI passed the check for the same project.
+      - The owner confirmed one `jira.default` profile. Its redacted settings have `method: basic`, the token owner's email in `email_env`, the Jira site as `base_url`, and the verified Cloud ID in `api_url: https://api.atlassian.com/ex/jira/<cloudId>`. LoTaR's redacted inspection confirmed Basic auth and the expected endpoint.
+      - The owner copied the current inline value into a secure prompt. It matched the previously verified token byte for byte, required no YAML quote escaping, and authenticated to Jira project `KAN` directly (HTTP 200).
+      - An isolated diagnostic using LoTaR's YAML parser and v0.15.6 request construction preserved the inline value and authenticated to the same Jira project with `LOTAR_JIRA_TOKEN` unset. The installed CLI still returned 401 afterward. The cause remains open.
+
+      ## Done when
+
+      - [ ] Compare the installed CLI's full config loading and sync request path for inline and environment-backed auth. Start with an isolated config, a dummy token, and a local fixture to verify the endpoint and Authorization header without logging its value.
+      - [ ] Identify where the live and isolated paths diverge, or document which hypotheses were ruled out and the next safe diagnostic. Start with `crates/lotar-core/src/config/persistence.rs` and `crates/lotar-lib/src/services/sync_service/client.rs`.
+      - [ ] If a LoTaR defect is confirmed, add a regression test and verify the fix through the CLI. Record the commands, outcomes, and any verification limits.
+
+      Keep real credentials out of prompts, tests, logs, fixtures, and ticket comments. Honor the credential-file guard and leave the user's live config alone during isolated diagnostics.
+    new: |-
+      The owner asked on Nov 24 to investigate why installed LoTaR 0.15.6 on macOS returns HTTP 401 for a Jira Cloud scoped token stored inline. The same installed CLI connects when the token comes from the environment. This affects the test site for STD-317.
+
+      ## Reproduction and controls
+
+      - Read-only `lotar sync check` with remote project `KAN` and explicit `--auth-profile jira.default` returned 401 with `LOTAR_JIRA_TOKEN` unset and a quoted inline token in the home profile.
+      - With `token_env: LOTAR_JIRA_TOKEN` and the verified scoped token in that environment variable, the installed CLI passed the check for the same project.
+      - The owner confirmed one `jira.default` profile. Its redacted settings have `method: basic`, the token owner's email in `email_env`, the Jira site as `base_url`, and the verified Cloud ID in `api_url: https://api.atlassian.com/ex/jira/<cloudId>`. LoTaR's redacted inspection confirmed Basic auth and the expected endpoint.
+      - The owner copied the current inline value into a secure prompt. It matched the previously verified token byte for byte, required no YAML quote escaping, and authenticated to Jira project `KAN` directly (HTTP 200).
+      - An isolated diagnostic using LoTaR's YAML parser and v0.15.6 request construction preserved the inline value and authenticated to the same Jira project with `LOTAR_JIRA_TOKEN` unset. The installed CLI still returned 401 afterward. The cause remains open.
+
+      ## Done when
+
+      - [ ] Compare the installed CLI's full config loading and sync request path for inline and environment-backed auth. Start with an isolated config, a dummy token, and a local fixture to verify the endpoint and Authorization header without logging its value.
+      - [ ] Identify where the live and isolated paths diverge, or document which hypotheses were ruled out and the next safe diagnostic. Start with `crates/lotar-core/src/config/persistence.rs` and `crates/lotar-lib/src/services/sync_service/client.rs`.
+      - [ ] If a LoTaR defect is confirmed, add a regression test and verify the fix through the CLI. Record the commands, outcomes, and any verification limits.
+      - [ ] Before any request, `lotar sync check`, push and pull refuse a token or email (inline in the profile or from its environment variable) that holds a space, tab, line break, control character or non-ASCII character (curly quotes, zero-width space, non-breaking space inside the value). The error names the profile, the field (token or email), where it came from (the profile or `$VAR`), the kind of character and its position, never the value; the command exits non-zero and sends nothing.
+      - [ ] Leading and trailing whitespace stays trimmed as before; valid tokens with `=`, `-`, `_`, `+`, `/` pass unchanged. An environment variable named by the value still wins over the literal (DEV-300 order unchanged).
+      - [ ] `docs/help/sync.md` says a token must sit on one line and how to fix the error.
+
+      Keep real credentials out of prompts, tests, logs, fixtures, and ticket comments. Honor the credential-file guard and leave the user's live config alone during isolated diagnostics.
+- at: 2026-11-24T21:19:32.626671+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-300"]}'
+- at: 2026-11-24T21:22:39.343648+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:48:47.412343+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:49:02.134057+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

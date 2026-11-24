@@ -1,17 +1,58 @@
 title: 'Server: an automation run command that runs lotar comment on another ticket hangs until the 300 s limit, and the owner''s inbox answers aren''t relayed'
-status: Todo
+status: Blocked
 priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T21:11:09.195177+00:00
-modified: 2026-11-22T22:13:05.495250+00:00
+modified: 2026-11-23T02:47:21.536517+00:00
 relationships:
+  depends_on:
+  - DEV-812
   related:
   - DEV-732
   - DEV-757
   - DEV-815
-description: 'Found (2026-11-22, chief of staff): standards'' rule ''Inbox: the owner''s answer goes to the source'' (standards .tasks/INBOX/automation.yml) runs `lotar --tasks-dir <source_repo>/.tasks comment <source> --answer ...` and then `lotar status <INBOX> Done`. On INBOX-651 (source STD-299, 21:04 UTC, lotar 0.15.6) the comment was written on STD-299 at once, but the command didn''t return: the server log (~/Library/Logs/lotar-services/standards.log) says ''Automation run command did not finish within 300s and was stopped''. So INBOX-651 stayed Todo, STD-299 stayed HelpNeeded/mallox, and the STD rule ''Comments: the owner''s comment reaches the agent'' (its set, run and tell_agent) didn''t take effect: no job started. The same failure earlier today on INBOX-567 (STD-257), INBOX-580 (STD-262), INBOX-592 (DEV-732), while INBOX-554 (STD-210), 613 (DEV-757), 621 (LOCA-571) went through: intermittent, not tied to one repo. The owner felt his inbox inputs didn''t respond. The step the STD rule runs, `repos.ts --inbox STD-299`, takes 0.2 s alone. Suspects: the nested lotar call''s own automation (tell_agent, or the storage lock the outer server run holds, crates/lotar-agent/src/services/automation_service.rs), and whether the server blocks the comment request for those 300 s. Done when: a nested lotar comment from a run command returns within seconds and its own rules fire, with a test that reproduces the hang first; and a run that times out leaves a visible comment on the ticket, not only a server log line.'
+  - DEV-812
+  - DEV-822
+  - DEV-823
+  - DEV-810
+comments:
+- date: 2026-11-23T02:46:38.539871+00:00
+  author: claude
+  text: |-
+    Timeout comment done; the hang itself is DEV-812, so this waits on it.
+    - Cause: lotar's git calls have no timeout. After the brew upgrade, macOS held git's open of `~/.gitconfig` (Dropbox) behind an access check, and the `lotar` calls of `repos.ts --inbox` sat there until 300 s. A replica of the INBOX/STD rules relays in 0.4 s, also with 5 answers at once.
+    - Change: a waited-for run that times out now comments on its ticket: `Automation rule '…' stopped its run on X: it did not finish within Ns. The rule's actions after it didn't run.`
+    - Test: `run_commands_time_out` (dev278) failed before, passes now.
+    - Filed on the way: DEV-822 (runs fail with ENOENT for `--tasks-dir .tasks`), DEV-823 (a live transaction in another project refuses writes as a crashed one).
+  report:
+    commits:
+    - hash: f5a3211f2
+      what: run timeout comments on the ticket
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: 'Once DEV-812 lands: check an inbox answer relays within seconds while git hangs, then set Done'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A802f16b984a97e31b9f3796a54cdc37a2bf74d7da732e9e59834d045069ff063
+description: |-
+  Found (2026-11-22, chief of staff): standards' rule 'Inbox: the owner's answer goes to the source' (standards .tasks/INBOX/automation.yml) runs `lotar --tasks-dir <source_repo>/.tasks comment <source> --answer ...` and then `lotar status <INBOX> Done`. On INBOX-651 (source STD-299, 21:04 UTC, lotar 0.15.6) the comment was written on STD-299 at once, but the command didn't return: the server log (~/Library/Logs/lotar-services/standards.log) says 'Automation run command did not finish within 300s and was stopped'. So INBOX-651 stayed Todo, STD-299 stayed HelpNeeded/mallox, and the STD rule 'Comments: the owner's comment reaches the agent' (its set, run and tell_agent) didn't take effect: no job started. The same failure earlier today on INBOX-567 (STD-257), INBOX-580 (STD-262), INBOX-592 (DEV-732), while INBOX-554 (STD-210), 613 (DEV-757), 621 (LOCA-571) went through: intermittent, not tied to one repo. The owner felt his inbox inputs didn't respond. The step the STD rule runs, `repos.ts --inbox STD-299`, takes 0.2 s alone. Suspects: the nested lotar call's own automation (tell_agent, or the storage lock the outer server run holds, crates/lotar-agent/src/services/automation_service.rs), and whether the server blocks the comment request for those 300 s. Done when: a nested lotar comment from a run command returns within seconds and its own rules fire, with a test that reproduces the hang first; and a run that times out leaves a visible comment on the ticket, not only a server log line.
+
+  Cause (found 2026-11-22 while working this ticket): DEV-812. The 'Inbox: the owner's answer goes to the source' runs hung on lotar's git calls with no timeout: macOS held git's open of ~/.gitconfig (a symlink into Dropbox) behind an access check for the newly upgraded lotar path. The nested comment itself was fast: a replica of standards' INBOX/STD rules relayed in 0.4 s through `lotar serve`, also with 5 answers at once.
+
+  ## Done when
+
+  - [x] A waited-for run that times out leaves a comment on its ticket naming the rule and the timeout, besides the stderr line and the automation_failed event. The rule's later actions still don't run. If writing that comment fails, the run's error is still what's reported, and the comment's failure goes to stderr.
+  - [x] Test: dev278 `run_commands_time_out` fails before the change (no comment) and passes after.
+  - [ ] The nested comment returns within seconds while git hangs: that is DEV-812's git timeout. This ticket depends on DEV-812 for it; check it once DEV-812 lands.
+  - [x] npm run lint, npm test, npm run smoke pass.
+tags:
+- waits
 history:
 - at: 2026-11-22T21:11:09.477794+00:00
   actor: claude
@@ -30,3 +71,99 @@ history:
   - field: relationships
     old: '{"related":["DEV-732","DEV-757"]}'
     new: '{"related":["DEV-732","DEV-757","DEV-815"]}'
+- at: 2026-11-23T02:20:11.635031+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T02:20:14.654118+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A802f16b984a97e31b9f3796a54cdc37a2bf74d7da732e9e59834d045069ff063
+- at: 2026-11-23T02:40:38.892226+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found (2026-11-22, chief of staff): standards'' rule ''Inbox: the owner''s answer goes to the source'' (standards .tasks/INBOX/automation.yml) runs `lotar --tasks-dir <source_repo>/.tasks comment <source> --answer ...` and then `lotar status <INBOX> Done`. On INBOX-651 (source STD-299, 21:04 UTC, lotar 0.15.6) the comment was written on STD-299 at once, but the command didn''t return: the server log (~/Library/Logs/lotar-services/standards.log) says ''Automation run command did not finish within 300s and was stopped''. So INBOX-651 stayed Todo, STD-299 stayed HelpNeeded/mallox, and the STD rule ''Comments: the owner''s comment reaches the agent'' (its set, run and tell_agent) didn''t take effect: no job started. The same failure earlier today on INBOX-567 (STD-257), INBOX-580 (STD-262), INBOX-592 (DEV-732), while INBOX-554 (STD-210), 613 (DEV-757), 621 (LOCA-571) went through: intermittent, not tied to one repo. The owner felt his inbox inputs didn''t respond. The step the STD rule runs, `repos.ts --inbox STD-299`, takes 0.2 s alone. Suspects: the nested lotar call''s own automation (tell_agent, or the storage lock the outer server run holds, crates/lotar-agent/src/services/automation_service.rs), and whether the server blocks the comment request for those 300 s. Done when: a nested lotar comment from a run command returns within seconds and its own rules fire, with a test that reproduces the hang first; and a run that times out leaves a visible comment on the ticket, not only a server log line.'
+    new: |-
+      Found (2026-11-22, chief of staff): standards' rule 'Inbox: the owner's answer goes to the source' (standards .tasks/INBOX/automation.yml) runs `lotar --tasks-dir <source_repo>/.tasks comment <source> --answer ...` and then `lotar status <INBOX> Done`. On INBOX-651 (source STD-299, 21:04 UTC, lotar 0.15.6) the comment was written on STD-299 at once, but the command didn't return: the server log (~/Library/Logs/lotar-services/standards.log) says 'Automation run command did not finish within 300s and was stopped'. So INBOX-651 stayed Todo, STD-299 stayed HelpNeeded/mallox, and the STD rule 'Comments: the owner's comment reaches the agent' (its set, run and tell_agent) didn't take effect: no job started. The same failure earlier today on INBOX-567 (STD-257), INBOX-580 (STD-262), INBOX-592 (DEV-732), while INBOX-554 (STD-210), 613 (DEV-757), 621 (LOCA-571) went through: intermittent, not tied to one repo. The owner felt his inbox inputs didn't respond. The step the STD rule runs, `repos.ts --inbox STD-299`, takes 0.2 s alone. Suspects: the nested lotar call's own automation (tell_agent, or the storage lock the outer server run holds, crates/lotar-agent/src/services/automation_service.rs), and whether the server blocks the comment request for those 300 s. Done when: a nested lotar comment from a run command returns within seconds and its own rules fire, with a test that reproduces the hang first; and a run that times out leaves a visible comment on the ticket, not only a server log line.
+
+      Cause (found 2026-11-22 while working this ticket): DEV-812. The 'Inbox: the owner's answer goes to the source' runs hung on lotar's git calls with no timeout: macOS held git's open of ~/.gitconfig (a symlink into Dropbox) behind an access check for the newly upgraded lotar path. The nested comment itself was fast: a replica of standards' INBOX/STD rules relayed in 0.4 s through `lotar serve`, also with 5 answers at once.
+
+      ## Done when
+
+      - [ ] A waited-for run that times out leaves a comment on its ticket naming the rule and the timeout, besides the stderr line and the automation_failed event. The rule's later actions still don't run. If writing that comment fails, the run's error is still what's reported, and the comment's failure goes to stderr.
+      - [ ] Test: dev278 `run_commands_time_out` fails before the change (no comment) and passes after.
+      - [ ] The nested comment returns within seconds while git hangs: that is DEV-812's git timeout. This ticket depends on DEV-812 for it; check it once DEV-812 lands.
+      - [ ] npm run lint, npm test, npm run smoke pass.
+- at: 2026-11-23T02:40:39.490152+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-757","DEV-815"]}'
+    new: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812"]}'
+- at: 2026-11-23T02:40:58.190613+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812"]}'
+    new: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822"]}'
+- at: 2026-11-23T02:40:59.464815+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822"]}'
+    new: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823"]}'
+- at: 2026-11-23T02:45:18.444861+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823"]}'
+    new: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823","DEV-810"]}'
+- at: 2026-11-23T02:46:37.794730+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found (2026-11-22, chief of staff): standards' rule 'Inbox: the owner's answer goes to the source' (standards .tasks/INBOX/automation.yml) runs `lotar --tasks-dir <source_repo>/.tasks comment <source> --answer ...` and then `lotar status <INBOX> Done`. On INBOX-651 (source STD-299, 21:04 UTC, lotar 0.15.6) the comment was written on STD-299 at once, but the command didn't return: the server log (~/Library/Logs/lotar-services/standards.log) says 'Automation run command did not finish within 300s and was stopped'. So INBOX-651 stayed Todo, STD-299 stayed HelpNeeded/mallox, and the STD rule 'Comments: the owner's comment reaches the agent' (its set, run and tell_agent) didn't take effect: no job started. The same failure earlier today on INBOX-567 (STD-257), INBOX-580 (STD-262), INBOX-592 (DEV-732), while INBOX-554 (STD-210), 613 (DEV-757), 621 (LOCA-571) went through: intermittent, not tied to one repo. The owner felt his inbox inputs didn't respond. The step the STD rule runs, `repos.ts --inbox STD-299`, takes 0.2 s alone. Suspects: the nested lotar call's own automation (tell_agent, or the storage lock the outer server run holds, crates/lotar-agent/src/services/automation_service.rs), and whether the server blocks the comment request for those 300 s. Done when: a nested lotar comment from a run command returns within seconds and its own rules fire, with a test that reproduces the hang first; and a run that times out leaves a visible comment on the ticket, not only a server log line.
+
+      Cause (found 2026-11-22 while working this ticket): DEV-812. The 'Inbox: the owner's answer goes to the source' runs hung on lotar's git calls with no timeout: macOS held git's open of ~/.gitconfig (a symlink into Dropbox) behind an access check for the newly upgraded lotar path. The nested comment itself was fast: a replica of standards' INBOX/STD rules relayed in 0.4 s through `lotar serve`, also with 5 answers at once.
+
+      ## Done when
+
+      - [ ] A waited-for run that times out leaves a comment on its ticket naming the rule and the timeout, besides the stderr line and the automation_failed event. The rule's later actions still don't run. If writing that comment fails, the run's error is still what's reported, and the comment's failure goes to stderr.
+      - [ ] Test: dev278 `run_commands_time_out` fails before the change (no comment) and passes after.
+      - [ ] The nested comment returns within seconds while git hangs: that is DEV-812's git timeout. This ticket depends on DEV-812 for it; check it once DEV-812 lands.
+      - [ ] npm run lint, npm test, npm run smoke pass.
+    new: |-
+      Found (2026-11-22, chief of staff): standards' rule 'Inbox: the owner's answer goes to the source' (standards .tasks/INBOX/automation.yml) runs `lotar --tasks-dir <source_repo>/.tasks comment <source> --answer ...` and then `lotar status <INBOX> Done`. On INBOX-651 (source STD-299, 21:04 UTC, lotar 0.15.6) the comment was written on STD-299 at once, but the command didn't return: the server log (~/Library/Logs/lotar-services/standards.log) says 'Automation run command did not finish within 300s and was stopped'. So INBOX-651 stayed Todo, STD-299 stayed HelpNeeded/mallox, and the STD rule 'Comments: the owner's comment reaches the agent' (its set, run and tell_agent) didn't take effect: no job started. The same failure earlier today on INBOX-567 (STD-257), INBOX-580 (STD-262), INBOX-592 (DEV-732), while INBOX-554 (STD-210), 613 (DEV-757), 621 (LOCA-571) went through: intermittent, not tied to one repo. The owner felt his inbox inputs didn't respond. The step the STD rule runs, `repos.ts --inbox STD-299`, takes 0.2 s alone. Suspects: the nested lotar call's own automation (tell_agent, or the storage lock the outer server run holds, crates/lotar-agent/src/services/automation_service.rs), and whether the server blocks the comment request for those 300 s. Done when: a nested lotar comment from a run command returns within seconds and its own rules fire, with a test that reproduces the hang first; and a run that times out leaves a visible comment on the ticket, not only a server log line.
+
+      Cause (found 2026-11-22 while working this ticket): DEV-812. The 'Inbox: the owner's answer goes to the source' runs hung on lotar's git calls with no timeout: macOS held git's open of ~/.gitconfig (a symlink into Dropbox) behind an access check for the newly upgraded lotar path. The nested comment itself was fast: a replica of standards' INBOX/STD rules relayed in 0.4 s through `lotar serve`, also with 5 answers at once.
+
+      ## Done when
+
+      - [x] A waited-for run that times out leaves a comment on its ticket naming the rule and the timeout, besides the stderr line and the automation_failed event. The rule's later actions still don't run. If writing that comment fails, the run's error is still what's reported, and the comment's failure goes to stderr.
+      - [x] Test: dev278 `run_commands_time_out` fails before the change (no comment) and passes after.
+      - [ ] The nested comment returns within seconds while git hangs: that is DEV-812's git timeout. This ticket depends on DEV-812 for it; check it once DEV-812 lands.
+      - [x] npm run lint, npm test, npm run smoke pass.
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-23T02:46:38.057513+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823","DEV-810"]}'
+    new: '{"depends_on":["DEV-812"],"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823","DEV-810"]}'
+- at: 2026-11-23T02:46:38.539871+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:47:21.536517+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

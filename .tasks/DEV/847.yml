@@ -1,0 +1,148 @@
+title: lotar trust --status lists rules without a run command as 'runs null'
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-24T19:02:19.747340+00:00
+modified: 2026-11-24T21:26:43.335709+00:00
+comments:
+- date: 2026-11-24T19:42:49.025356+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T194159.166Z-50 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T194159.166Z-50 why.'
+- date: 2026-11-24T21:03:07.397228+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f26d9e60c1a3e9028a825c798e3c8b40a39d439df14ec7de0633850b721c04b of the job job-20261124T194159.166Z-50 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:22:31.733140+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f26d9e60c1a3e9028a825c798e3c8b40a39d439df14ec7de0633850b721c04b of the job job-20261124T194159.166Z-50 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A52027990c744b9c68f5c0b55ade2e20531d05d0c3315fce63e0fa3c2212eaad8 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:26:21.336956+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A52027990c744b9c68f5c0b55ade2e20531d05d0c3315fce63e0fa3c2212eaad8 of the job job-20261124T204250.332Z-78 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212621.283Z-98: DEV-847 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:26:29.611761+00:00
+  author: claude
+  text: |-
+    Fixed: `lotar trust --status` lists only rules that have a run command.
+
+    - Cause: a serialized rule action without `run` holds `run: null`, and `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` printed it as `runs null`
+    - Fix: skip null `run` values. A file with no commands still shows `no run commands`
+    - New unit test `skips_rules_without_a_run_command`: it fails without the fix and passes with it
+    - Manual check: a scratch repo with one `run` rule and one `set` rule now prints only `rule 'hi' on created runs echo hi`
+    - Commit `a30c1b1a4`
+  report:
+    commits:
+    - hash: a30c1b1a4
+      what: 'skip run: null actions in lotar trust --status'
+    checks:
+    - command: cargo nextest run -p lotar-lib --lib trust
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration dev259
+      result: passed
+    - command: rustfmt --edition 2024 --check trust.rs
+      result: passed
+    - command: cargo clippy -p lotar-lib --all-targets -D warnings
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review, then merge
+- date: 2026-11-24T21:26:43.335709+00:00
+  author: claude
+  text: |-
+    Fixed: `lotar trust --status` and `lotar trust` now list only rules that have a run command.
+
+    - Cause: `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` turns each rule into YAML first. An action without `run` comes out as `run: null`, so every rule matched and was listed as `runs null`.
+    - Fix: skip a `run` that is null. A file with no run commands now shows `no run commands`.
+    - New test `skips_rules_without_a_run_command`. A build from before the fix failed it with `rule 'tag' on updated runs null`. It passes now.
+    - Commit `a30c1b1a4` (signed) on `agent/DEV-847`.
+  report:
+    commits:
+    - hash: a30c1b1a4
+      what: skip rules without a run command in lotar trust listings
+    checks:
+    - command: cargo nextest run -p lotar-lib -E 'test(trust)'
+      result: passed
+    - command: cargo clippy -p lotar-lib --all-targets
+      result: passed
+    - command: rustfmt --edition 2024 --check trust.rs
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: merge runs full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs full suites (DEV-797)
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f26d9e60c1a3e9028a825c798e3c8b40a39d439df14ec7de0633850b721c04b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A52027990c744b9c68f5c0b55ade2e20531d05d0c3315fce63e0fa3c2212eaad8
+description: 'Found: in mallocator/foundera, `lotar trust --status` (0.15.6) lists every automation rule, also those with no run action, as "rule ''<name>'' on <event> runs null" (about 40 of 60 lines). That hides the real commands an owner should review. Check: `lotar trust --status` in a repo whose automation.yml has rules without run. Done: only rules with a run command are listed.'
+tags:
+- health
+- job-paused
+custom_fields:
+  finding: trust-status:runs-null
+history:
+- at: 2026-11-24T19:02:19.891271+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:42:45.583917+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:42:46.431856+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f26d9e60c1a3e9028a825c798e3c8b40a39d439df14ec7de0633850b721c04b
+- at: 2026-11-24T19:42:48.923549+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:42:49.025356+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:42:51.805209+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A52027990c744b9c68f5c0b55ade2e20531d05d0c3315fce63e0fa3c2212eaad8
+- at: 2026-11-24T21:03:07.397228+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:31.733140+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:26:21.336956+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:26:29.611761+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:26:39.182724+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T21:26:43.335709+00:00
+  actor: claude
+  changes:
+  - field: comment_added

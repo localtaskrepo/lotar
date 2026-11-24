@@ -1,0 +1,375 @@
+title: 'lotar add misses worktrees created with git worktree add --relative-paths: their ID can repeat (DEV-802)'
+status: HelpNeeded
+priority: Low
+type: Bug
+reporter: claude
+assignee: mallox
+created: 2026-11-23T04:27:34.695967+00:00
+modified: 2026-11-24T22:39:13.778293+00:00
+relationships:
+  related:
+  - DEV-802
+  - DEV-833
+  - DEV-845
+  - DEV-5
+  - DEV-654
+  - DEV-801
+  - DEV-767
+  - DEV-768
+comments:
+- date: 2026-11-23T07:49:27.544311+00:00
+  author: claude
+  text: |-
+    Fixed: a worktree added with `git worktree add --relative-paths` now counts when `lotar add` picks the next ID.
+
+    - Cause: `checkout_tops` (`crates/lotar-core/src/utils/git.rs`) read the relative `gitdir` line (`../../../../wt/.git`) against the process's cwd, so that worktree was left out.
+    - Fix: the line now resolves against its admin folder (`.git/worktrees/<name>/`). An absolute line works as before. An empty line is skipped, so it no longer resolves to the admin folder itself.
+    - Failing test first: `checkouts_of_one_repository_get_distinct_ids` (`crates/lotar-lib/tests/dev270_task_numbers_test.rs`) now adds a `--relative-paths` worktree. Before the fix, two checkouts both got `DEV-5`; with the fix they get `DEV-5` and `DEV-6`.
+    - New unit test `checkout_tops_resolve_relative_gitdir_lines_against_the_admin_folder` (`crates/lotar-core/tests/common/dev73_git_metadata_cases.rs`) writes relative, absolute, empty and dangling lines by hand, so no git process is needed.
+    - Branch: DEV-802's commit `b7256c744` isn't on main yet (its ticket is in Merging), so I cherry-picked it as `65d57abd3`. Merge after DEV-802 lands; rebasing onto main then skips that commit.
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: 3fad61477
+      what: checkout_tops resolves a relative gitdir line against its admin folder; tests
+    - hash: 65d57abd3
+      what: cherry-pick of DEV-802's b7256c744 (still in Merging), which this fix builds on
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: RUSTC_WRAPPER= (sccache could not create its temp dir in the sandbox)
+    - command: npm run test:agent
+      result: passed
+      reason: 2482 Rust, 1568 UI, release and hook tests; RUSTC_WRAPPER=
+    - command: npm run smoke
+      result: passed
+      reason: 118 files, 407 tests; RUSTC_WRAPPER=
+    next: Review 3fad61477; merge after DEV-802 lands (the rebase onto main then drops 65d57abd3)
+- date: 2026-11-23T09:17:44.355413+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T091734.993Z-123 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T091734.993Z-123 why.'
+- date: 2026-11-24T18:57:03.402700+00:00
+  author: claude
+  text: |-
+    Review: passed. `3fad61477` fixes `checkout_tops` as the ticket asks; it can merge after DEV-802 lands.
+
+    - Read: the diff `main...HEAD` (`3fad61477` plus `65d57abd3`, the cherry-pick of DEV-802), the ticket and its Done when, the fix comment, DEV-802, DEV-833, AGENTS.md, and `git log -5 main` for the touched files (nothing new since DEV-654).
+    - `crates/lotar-core/src/utils/git.rs:291`: a relative `gitdir` line now resolves against its admin folder with `admin.join(line)`, and an absolute line replaces it, so behavior is the same as before. An empty line is skipped. A missing file or a dangling path still gives `None`. The result no longer depends on the cwd.
+    - Failing test first, confirmed: with the pre-fix `git.rs` and a rebuilt `target/debug/lotar`, `checkouts_of_one_repository_get_distinct_ids` fails (DEV-5 handed out twice). With the fix it passes. The file was restored afterwards and the worktree is clean.
+    - Reran: `npm ci` ok; `cargo nextest run -p lotar-core checkout_tops` passed; `cargo nextest run -p lotar-lib checkouts_of_one_repository` passed; `rustfmt --check` on the 3 files passed. Git here is 2.56.1, and CI runs on ubuntu-latest, which has `--relative-paths`.
+    - Not rerun: the full `npm run lint`, `npm test` and `npm run smoke`. The fix agent reported all three passed with `RUSTC_WRAPPER=`.
+    - Merge order: `65d57abd3` has the same patch-id as `agent/DEV-802` (`59419f496`), so a rebase drops it. `3fad61477` applies cleanly on `agent/DEV-802` and on main (`git merge-tree`).
+    - Minor, filed as [DEV-845](https://lotar.pyxzl.net/task/DEV-845): the commit is titled "DEV-825 first". The job prompt itself asked for that subject, because `${{ticket.title}}` rendered as "first". Give the commit its real title when merging (it isn't pushed).
+    - A small mismatch, not blocking: the Done when asks for a --relative-paths worktree on git 2.48+, but the 4th checkbox says the test writes the line itself on older git. The test doesn't do that; it relies on git 2.48+, as the ticket asked.
+- date: 2026-11-24T19:45:20.885822+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/PageHeader-DiDJHFaU.js                 32.20 kB │ gzip:  12.47 kB
+    target/web/assets/SyncHub-Bxltj9Sn.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-C_pgaq3k.js                      47.86 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-CAV7iRsD.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-BII0DxUG.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DquDsQ8j.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-ymW2sFje.js                153.98 kB │ gzip:  38.52 kB
+    target/web/assets/SprintsList-BzJn0XWH.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-DUGgBBgf.js                     420.00 kB │ gzip: 127.67 kB
+
+    ✓ built in 2.71s
+    compressed 1939KiB -> 582KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-782 (pid 30386), since 19:26 UTC
+    rust-test-runner: Took the check lock after 3 min
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825/crates/lotar-core)
+       Compiling harnessmux v0.3.0
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825/crates/lotar-lib)
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825/crates/lotar-tasks)
+       Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825/crates/lotar-agent)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825)
+        Finished `dev` profile [unoptimized] target(s) in 33.80s
+    ────────────
+     Nextest run ID 5eeb4323-cc1f-4672-adda-b0c9b6a2813d with nextest profile: default
+        Starting 2490 tests across 14 binaries
+    ────────────
+         Summary [ 210.389s] 2490 tests run: 2490 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmp5DmwQJ
+    ```.
+
+    - Rebased `agent/DEV-825` onto `main` (`855ff6f4628f`): `879f137c7d35`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T21:52:40.453801+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/ReleasesList-cy3WQ8OM.js               22.74 kB │ gzip:   7.49 kB
+    target/web/assets/AgentJobs-D2FGsWGQ.js                  28.39 kB │ gzip:   9.39 kB
+    target/web/assets/useFilterBuilder-D4z-8i-8.js           30.77 kB │ gzip:  10.89 kB
+    target/web/assets/PageHeader-DiDJHFaU.js                 32.20 kB │ gzip:  12.47 kB
+    target/web/assets/SyncHub-Bxltj9Sn.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-C_pgaq3k.js                      47.86 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-CAV7iRsD.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-BII0DxUG.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DquDsQ8j.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-ymW2sFje.js                153.98 kB │ gzip:  38.52 kB
+    target/web/assets/SprintsList-BzJn0XWH.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-DUGgBBgf.js                     420.00 kB │ gzip: 127.67 kB
+
+    ✓ built in 10.28s
+    compressed 1939KiB -> 582KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806 (pid 32418), since 21:14 UTC
+    rust-test-runner: Took the check lock after 6 min
+        Blocking waiting for file lock on package cache
+        Blocking waiting for file lock on package cache
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825/crates/lotar-web-assets)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-825)
+        Finished `dev` profile [unoptimized] target(s) in 2m 28s
+    ────────────
+     Nextest run ID 2cff9dab-cc74-4561-a169-af00a919c254 with nextest profile: default
+        Starting 2490 tests across 14 binaries
+    ────────────
+         Summary [ 962.760s] 2490 tests run: 2490 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmplwXV3X
+    ```.
+
+    - Rebase onto `main` changed nothing (`879f137c7d35`)
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T22:39:03.992790+00:00
+  author: claude
+  text: |-
+    Not merged: every Rust test passes, but the temp-folder guard (DEV-801) trips on every run of this branch. Should I land it anyway or wait for DEV-801?
+
+    - Rebased onto `main` `c72189e40` (DEV-768) with no conflicts. The branch is `54e806f30` (DEV-802's commit, still not on main) + `e6442860b`.
+    - `npm run -s test:agent` ran twice after the rebase. Both times all 2490 passed and one `.tmpXXXXXX` was left, so it exited 1. lotar's own run before that failed the same way. DEV-802's branch has also failed 3 of 3 merges this way.
+    - Reproduced with a plain `cargo nextest run --workspace` and its own TMPDIR. The leftover was `.tmpgOsEub/` holding only an empty `.tasks`, created 1.5 s into the run. That is the folder shape `TestFixtures::new()` (`crates/lotar-lib/tests/common/mod.rs:267`) creates.
+    - Probably not this change: `checkout_tops` and DEV-802's `related_task_roots` only read files. The branch's two tests leave nothing on their own, and 24 parallel copies of `checkouts_of_one_repository_get_distinct_ids` left nothing. The `lotar-agent` lib tests run alone 4 times, and 3 at once, left nothing either.
+    - A run with a separate TMPDIR per test, using a nextest wrapper script, didn't hit the leak, so the test that leaks is still unknown. Other branches leak too (DEV-767 passed on a rerun), but these two branches leak every time, so DEV-802's code may make it more likely.
+    - Added the evidence to DEV-801.
+    - Options: (a) land both commits now as a known DEV-801 flake, which also lands DEV-802; (b) wait until DEV-801 is fixed.
+  report:
+    commits:
+    - hash: e6442860b
+      what: DEV-825 fix, rebased onto c72189e40
+    - hash: 54e806f30
+      what: DEV-802's commit, rebased (not on main yet)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+      reason: after the rebase
+    - command: npm run -s test:agent
+      result: failed
+      reason: 2490/2490 passed, temp guard found .tmprNzyBZ, again .tmplgz33I on rerun
+    - command: npm run -s smoke
+      result: not_run
+      reason: test:agent failed first
+    next: 'Owner: land despite the DEV-801 temp leak, or hold until DEV-801 is fixed'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
+description: |-
+  Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
+
+  ## Done when
+
+  - [ ] `checkout_tops` resolves a relative `gitdir` line against its admin folder (`.git/worktrees/<name>/`), the way `metadata_directory` does; an absolute line works as before.
+  - [ ] The result does not depend on the process's cwd.
+  - [ ] A `gitdir` line that is empty, unreadable or points at a folder that no longer exists still leaves that worktree out (no error, no panic); the other checkouts still count.
+  - [ ] `checkouts_of_one_repository_get_distinct_ids` (`crates/lotar-lib/tests/dev270_task_numbers_test.rs`) adds a worktree made with `git worktree add --relative-paths` (git 2.48+, as on the CI runners); `lotar add` there and then in the absolute-path worktree get distinct IDs. A unit test in `dev73_git_metadata_cases.rs` writes relative, absolute, empty and dangling `gitdir` lines by hand, so the parsing is covered without git.
+  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+tags:
+- health
+custom_fields:
+  finding: review:DEV-802-relative-worktree-paths
+history:
+- at: 2026-11-23T04:27:41.520989+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-3","DEV-802"]}'
+- at: 2026-11-23T04:27:45.661894+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T04:28:11.412465+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-802"]}'
+    new: '{"related":["DEV-3","DEV-802","DEV-818"]}'
+- at: 2026-11-23T04:29:00.730900+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-3","DEV-802","DEV-818"]}'
+    new: '{"related":["DEV-802","DEV-818"]}'
+- at: 2026-11-23T04:30:47.812311+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-818"]}'
+    new: '{"related":["DEV-802"]}'
+- at: 2026-11-23T07:21:08.252866+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T07:21:10.587067+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
+- at: 2026-11-23T07:21:51.144426+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process''s cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar''s own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.'
+    new: |-
+      Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
+
+      ## Done when
+
+      - [ ] `checkout_tops` resolves a relative `gitdir` line against its admin folder (`.git/worktrees/<name>/`), the way `metadata_directory` does; an absolute line works as before.
+      - [ ] The result does not depend on the process's cwd.
+      - [ ] A `gitdir` line that is empty, unreadable or points at a folder that no longer exists still leaves that worktree out (no error, no panic); the other checkouts still count.
+      - [ ] `checkouts_of_one_repository_get_distinct_ids` (`crates/lotar-lib/tests/dev270_task_numbers_test.rs`) adds a worktree made with `git worktree add --relative-paths`, and `lotar add` there and in an absolute-path worktree gets distinct IDs. Git older than 2.48 (no `--relative-paths`): the test writes the relative `gitdir` line itself, so it runs everywhere.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-23T07:24:35.758433+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
+
+      ## Done when
+
+      - [ ] `checkout_tops` resolves a relative `gitdir` line against its admin folder (`.git/worktrees/<name>/`), the way `metadata_directory` does; an absolute line works as before.
+      - [ ] The result does not depend on the process's cwd.
+      - [ ] A `gitdir` line that is empty, unreadable or points at a folder that no longer exists still leaves that worktree out (no error, no panic); the other checkouts still count.
+      - [ ] `checkouts_of_one_repository_get_distinct_ids` (`crates/lotar-lib/tests/dev270_task_numbers_test.rs`) adds a worktree made with `git worktree add --relative-paths`, and `lotar add` there and in an absolute-path worktree gets distinct IDs. Git older than 2.48 (no `--relative-paths`): the test writes the relative `gitdir` line itself, so it runs everywhere.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+    new: |-
+      Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
+
+      ## Done when
+
+      - [ ] `checkout_tops` resolves a relative `gitdir` line against its admin folder (`.git/worktrees/<name>/`), the way `metadata_directory` does; an absolute line works as before.
+      - [ ] The result does not depend on the process's cwd.
+      - [ ] A `gitdir` line that is empty, unreadable or points at a folder that no longer exists still leaves that worktree out (no error, no panic); the other checkouts still count.
+      - [ ] `checkouts_of_one_repository_get_distinct_ids` (`crates/lotar-lib/tests/dev270_task_numbers_test.rs`) adds a worktree made with `git worktree add --relative-paths` (git 2.48+, as on the CI runners); `lotar add` there and then in the absolute-path worktree get distinct IDs. A unit test in `dev73_git_metadata_cases.rs` writes relative, absolute, empty and dangling `gitdir` lines by hand, so the parsing is covered without git.
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
+- at: 2026-11-23T07:49:27.544311+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:50:14.034309+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T09:17:44.291491+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-23T09:17:44.355413+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:09:50.290556+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802"]}'
+    new: '{"related":["DEV-802","DEV-833"]}'
+- at: 2026-11-24T18:56:52.373766+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-833"]}'
+    new: '{"related":["DEV-802","DEV-833","DEV-845"]}'
+- at: 2026-11-24T18:57:03.402700+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T18:57:03.642248+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-833","DEV-845"]}'
+    new: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654"]}'
+- at: 2026-11-24T18:57:13.904078+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T19:45:20.885822+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:52:40.453801+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:04:04.379675+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654"]}'
+    new: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801"]}'
+- at: 2026-11-24T22:39:03.992790+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:39:04.273200+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801"]}'
+    new: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768"]}'
+- at: 2026-11-24T22:39:13.559084+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, job-paused
+    new: health
+- at: 2026-11-24T22:39:13.778293+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

@@ -1,16 +1,28 @@
 title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-22T19:00:45.272142+00:00
+modified: 2026-11-24T22:01:32.863028+00:00
 relationships:
+  depends_on:
+  - local:LOCA-601
+  - DEV-852
+  - DEV-853
   related:
   - DEV-201
   - standards:STD-219
   - standards:STD-297
+  - DEV-830
+  - DEV-832
+  - DEV-834
+  - DEV-833
+  - DEV-851
+  - DEV-852
+  - DEV-853
+  - DEV-854
 comments:
 - date: 2026-11-22T18:51:51.656944+00:00
   author: claude
@@ -33,6 +45,400 @@ comments:
 - date: 2026-11-22T19:00:45.272142+00:00
   author: claude
   text: 'Since filing: the sharing thread wrote its plan down as STD-297 (standards docs/aiswarm.md, a proposal under review). It names "copier for the lotar template" as an open question for you; this ticket is the template''s content inside lotar, which copier or standards would then install. If the plan changes the delivery, this can wait for its split into tickets.'
+- date: 2026-11-23T07:49:53.399482+00:00
+  author: mallox
+  text: |-
+    Answer: explore (Draft the template file and list which of our rules are generic first)
+
+    (answered in INBOX-642)
+  answer:
+    to: 2026-11-22T18:51:51.656944+00:00
+    choice:
+    - explore
+    note: (answered in INBOX-642)
+- date: 2026-11-23T09:17:07.621120+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T091643.010Z-122 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T091643.010Z-122 why.'
+- date: 2026-11-23T19:21:23.482804+00:00
+  author: automation
+  text: The fix agent's job job-20261123T192106.323Z-425 failed (lotar agent logs job-20261123T192106.323Z-425); @fix-retry retries it on branch agent/DEV-796.
+- date: 2026-11-23T19:21:43.469232+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T192125.247Z-426 failed again (lotar agent logs job-20261123T192125.247Z-426). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:22:38.741415+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude sign-in ticket LOCA-601; no new template decision is needed.
+
+    - Jobs `job-20261123T192106.323Z-425` and `job-20261123T192125.247Z-426` both stopped before work: "this login reached its time limit and cannot be renewed".
+    - Your `explore` answer on 2026-11-23 still applies: draft the template and identify the generic rules first.
+    - Infrastructure rule: `standards/docs/decisions/2026-11-15-inbox-triage.md`. LOCA-601 already defines authentication completion checks; INBOX-668 holds the one owner action.
+    - DEV-796 is Blocked with its assignee cleared. It resumes through "Prerequisites done" when LOCA-601 is Done; no confirmation reply is needed.
+- date: 2026-11-23T19:22:39.629979+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:22:42.801171+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-796 yet. DEV-796 waits for local:LOCA-601.'
+- date: 2026-11-24T16:04:56.070840+00:00
+  author: claude
+  text: |-
+    Drafted `agent-team` (attached: `DEV-796-agent-team-draft.yml`, 385 lines) and sorted our rules into generic and ours. Nothing is wired into lotar yet, so there's no commit.
+
+    **Generic, in the draft** (from standards `configs/lotar/automation.yml`)
+    - Review in a fresh session on a second runner (`@review`, codex; claude implements)
+    - Blocking review goes back to `@implement` twice (tags `review-returned`, `-twice`), the third time to `@reporter`
+    - A crashed review doesn't merge; it goes to `@reporter`
+    - A failed implement job retries once on `@implement-retry`, then goes to `@reporter`
+    - A failed merge goes back to `@implement` once, then to `@reporter`
+    - Tag `waits` sends the ticket to Blocked; the `unblocked` event continues it with `tell_agent`
+    - A person's comment reaches the agent (`tell_agent`) on InProgress, Reviewing, Merging and HelpNeeded tickets
+    - A job with nothing to commit closes the ticket itself; a "Done when" is written before the code
+    - A paused job comments once; Done clears the workflow tags
+
+    **Ours alone, left out**
+    - Health findings, `@fix-light`/`@fix-fable`, Research type, the inbox and triage, `repos.ts --inbox/--asked/--live` (stall restarts), `worktree.ts`
+    - T3 thread names, `t3_thread_list`/cross-project-help, `repos.json` push/install, `mallox`, ticket model fields
+
+    **Needs your decision before it ships**
+    - Agent-filed tickets start `@fix` on their own (reporter claude/codex): left out, assigning `@implement` starts the work
+    - The UI step with screenshots (skill ui-review): left out, since it depends on a skill
+    - Question comments with options (`lotar comment --question`) need a `run`, and `run` needs `lotar trust`: the draft uses plain comments instead
+
+    **lotar gaps the draft ran into**
+    - `lotar config validate` doesn't check automation.yml: a rule with `status: Nope` passed. The ticket's done check needs `automation simulate` or a new validate step
+    - A comment's author can't be told apart: `@agent` matches only `@profile` names, and agents comment as `claude`/`codex`. The draft therefore lists runner names
+    - A profile assigned by hand gets the prompt of the first rule that assigns it, here the rework prompt, so the work instructions are in the profile's `instructions`
+
+    **Checked**
+    - `lotar config validate --project TEAM` passes for the draft in a scratch repo
+    - `lotar automation simulate` runs these steps: implement done → review, implement failed → retry, review blocked second time → rework, third time → reporter, comment → tell_agent
+    - The simulate runs queued 2 real jobs from the scratch repo (`TEAM-1`, `TEAM-2`). I removed both with `lotar agent queue remove` before they started; the memory hold kept them from running
+- date: 2026-11-24T16:05:04.277959+00:00
+  author: claude
+  text: |-
+    Build agent-team from the attached draft (the generic list above), wired into lotar init with docs and an end-to-end test?
+
+    Options:
+    - yes: Build it as drafted, leaving out the three open items (recommended)
+    - more: Build it and also add agent-filed tickets starting on their own and the UI screenshot step
+    - no: Not now
+  question:
+    options:
+    - key: yes
+      label: Build it as drafted, leaving out the three open items (recommended)
+    - key: more
+      label: Build it and also add agent-filed tickets starting on their own and the UI screenshot step
+    - key: no
+      label: Not now
+- date: 2026-11-24T16:05:20.731499+00:00
+  author: claude
+  text: |-
+    Drafted `agent-team` (attached: `agent-team.62b50a5c4b3d30bc978cd67f599e1c4f.yml`, 440 lines, 21 rules); nothing wired into lotar yet.
+
+    **Generic, in the draft**
+    - implement → review in a fresh session on a second provider (Claude → Codex) → merge → Done
+    - Review verdict via `lotar comment --review block`; a rule tags it, two reworks in the author's own session, third block → `@reporter`
+    - No merge after a crashed review
+    - Failed implement job: one retry on `@implement-retry`; failed merge: back to `@implement` once; second failure → `@reporter`
+    - Usage-limit pause comments once; agent waits on a ticket (depends-on + tag `waits`) → Blocked → continues when done
+    - A person's comment reaches the agent (`tell_agent`); a no-change job closes itself; optional `agent.merge`
+
+    **Ours alone, left out**
+    - health/light tickets, `repos.ts` (inbox, `--asked`, worktree setup), INBOX triage, Research type
+    - T3-specific: "Answered in the thread" rules, thread tools, `t3_thread_list` step
+    - `mallox`, `repos.json` push list, the auto-start of tickets agents file, Stalled restarts, `@fix-fable`/`@fix-light`
+    - UI screenshot rule (needs skill `ui-review`)
+
+    **Checked**
+    - `lotar config validate` passed on the draft's config in a scratch repo
+    - `lotar automation simulate`: manual start, a person's comment, review verdict tag, blocked review → rework all route as meant
+
+    **lotar gaps it shows**
+    - A rule's `comment` can't ask a question with options: ours uses `run: lotar comment --question` (needs trust), the draft writes plain text
+    - Agent comments carry the person's name unless the prompt sets `LOTAR_DEFAULT_REPORTER`; the comment rule relies on that. lotar could set it to the profile name in jobs.
+    - `${{agent.profile}}` in a next job's prompt is the ended job's, so prompts hardcode their names
+- date: 2026-11-24T16:05:21.029961+00:00
+  author: claude
+  text: |-
+    Build agent-team from the attached draft?
+
+    Options:
+    - build: Wire it in, add docs and the end-to-end test (recommended)
+    - gaps: First fix the lotar gaps (question comments in rules, job reporter), then build
+    - wait: Wait for STD-297's packaging decision
+  question:
+    options:
+    - key: build
+      label: Wire it in, add docs and the end-to-end test
+    - key: gaps
+      label: First fix the lotar gaps (question comments in rules, job reporter), then build
+    - key: wait
+      label: Wait for STD-297's packaging decision
+    recommended: build
+- date: 2026-11-24T16:05:36.026771+00:00
+  author: claude
+  text: |-
+    Explore done: draft template `agent-team.yml` committed, and our rules sorted into generic and ours-only.
+
+    **Draft** `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml` (`d9394237f`), 23 rules, not yet listed by `lotar init`:
+    - Profiles `@implement`, `@implement-retry`, `@review` (codex, fresh session), `@merge`
+    - Statuses Todo, InProgress, Reviewing, Merging, Blocked, HelpNeeded, Done, WontDo
+    - Questions and failures go to `@reporter`; no names, repos or hosts of ours
+
+    **Generic, in the draft** (from standards `automation.yml`):
+    - Implement → review on another runner → merge ("Fix done: review on Codex", "Review passed: merge")
+    - A failed review asks the reporter instead of merging
+    - Blocked review: two reworks in the implementer's session, the third asks the reporter
+    - A failed job retries once on `@implement-retry`, then asks the reporter
+    - A failed merge goes back to the implementer once, then to the reporter
+    - Tag `waits` → Blocked, and "Prerequisites done" continues it (tell_agent)
+    - A person's comment reaches the agent (tell_agent)
+    - A no-change job closes the ticket itself (prompt step)
+    - "Job paused: comment once", clear the tags on Done
+
+    **Left out, ours alone:**
+    - Health, light, fable and research profiles and rules; Research type
+    - Inbox and triage, `repos.ts` (`--inbox`, `--asked`, `--live`), worktree install from `repos.json`
+    - T3 thread names and tools, thread-list and cross-project steps, "Answered in the thread", "Stalled" rules
+    - `repos.json` push rule, `lotar trust` by agents, the ui-review screenshot steps, the phone format
+    - Question comments with options: a rule can only post plain text, so ours use `run: lotar comment --question` (needs trust). The draft's comments name the choices in words.
+
+    **Found in lotar while drafting:**
+    - `comment: { author: "@user" }` matches agents' comments too: `@user` means "not a profile name", and agents comment as `claude`/`codex`. The draft lists the runner names to exclude them. A `@person` placeholder would be cleaner. Proposed as part of the build, not filed yet.
+    - A real comment in my scratch test queued a real `@implement` job. I removed it before it started (`lotar agent queue remove`).
+  report:
+    commits:
+    - hash: d9394237f
+      what: draft agent-team.yml, not wired into lotar init
+    checks:
+    - command: lotar config validate (draft config in a scratch project)
+      result: passed
+    - command: lotar automation simulate --event commented
+      result: passed
+      reason: a person's comment tells @implement, an agent's (claude) matches nothing
+    - command: job-path simulation and end-to-end test
+      result: not_run
+      reason: part of the build step
+    - command: npx prettier --check
+      result: not_run
+      reason: node fails to start on this Mac (libsimdutf.38.dylib missing)
+    next: 'Owner: build it as drafted, or change the choices below'
+- date: 2026-11-24T16:05:36.318829+00:00
+  author: claude
+  text: |-
+    Build agent-team as drafted (wire it into lotar init, docs/help/templates.md, the end-to-end test)?
+
+    Options:
+    - build: Build it as drafted, review on codex
+    - claude-review: Build it, but review on claude by default (works with one provider) (recommended)
+    - person: Build it, and add a @person comment-author placeholder in lotar first
+    - no: Not now
+  question:
+    options:
+    - key: build
+      label: Build it as drafted, review on codex
+    - key: claude-review
+      label: Build it, but review on claude by default (works with one provider)
+    - key: person
+      label: Build it, and add a @person comment-author placeholder in lotar first
+    - key: no
+      label: Not now
+    recommended: claude-review
+- date: 2026-11-24T16:05:46.834423+00:00
+  author: claude
+  text: |-
+    Heads-up: at least 4 Claude sessions resumed on DEV-796 at 08:00 in the same worktree, so there are two drafts now.
+
+    - Mine: the ticket attachment `agent-team.62b50a5c4b3d30bc978cd67f599e1c4f.yml` (21 rules), summarized in the comments above
+    - Another session's, uncommitted in the worktree: `docs/developers/agent-team-template.draft.yml` (19 rules) and `docs/developers/agent-team-template.md` (the generic-vs-ours table). I left both files as they are.
+    - Both make the same generic/ours split. Keep one; the question above holds for either.
+- date: 2026-11-24T16:06:09.676208+00:00
+  author: claude
+  text: |-
+    Draft done: `agent-team` template (19 rules, 4 profiles) plus the list of our rules that are generic.
+
+    - Draft: `docs/developers/agent-team-template.draft.yml`; list and gaps: `docs/developers/agent-team-template.md`. Not registered, `lotar init` doesn't offer it yet.
+    - Flow: `@implement` → `@review` on a second provider (Codex), fresh session → `@merge` → Done. Two rework rounds, then the reporter is asked. One retry on `@implement-retry`. Merge retries once. `waits` → Blocked → continue when prerequisites are done. A person's comment reaches the agent. A no-change job closes itself. Paused jobs comment once.
+    - Taken over from ours: 13 of our rule groups, with `@reporter` instead of `mallox`.
+    - Ours alone, left out: health, `repos.ts` (inbox, worktree setup, stall restarts, push/install), T3 thread specifics, Research flow, UI screenshots, decisions files.
+    - Generic but left out for now: starting agents' own unassigned tickets, questions with options (needs `run`, so `lotar trust`), manual stall restarts.
+    - lotar gaps found: no "comment by a person" condition (`@user` matches `claude`, so the draft excludes runner names by hand); a failed job whose agent already asked still gets the retry comment; `${{workspace.root}}` is empty in rule prompts.
+    - Checked in a scratch workspace: `lotar config validate` passes, `lotar automation simulate` routes every step.
+    - Machine: Homebrew `node` fails to start (`libsimdutf.38.dylib` missing, simdutf is 9.5 now); `brew reinstall node` would likely fix it. Other agents' npm checks will fail until then.
+  report:
+    commits:
+    - hash: 9c801e028
+      what: draft agent-team template and the generic/ours-only list
+    checks:
+    - command: lotar config validate (draft in a scratch workspace)
+      result: passed
+    - command: lotar automation simulate (each step)
+      result: passed
+    - command: prettier
+      result: not_run
+      reason: docs/ is in .prettierignore; Homebrew node is broken anyway (libsimdutf.38 missing after simdutf 9.5)
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: docs-only draft, nothing registered
+    next: 'Owner decides: build it out, or change the draft first'
+- date: 2026-11-24T16:06:09.957953+00:00
+  author: claude
+  text: |-
+    Build the agent-team template from this draft (register it, docs/help/templates.md, end-to-end test)?
+
+    Options:
+    - build: Build it as drafted (recommended)
+    - change: Change the draft first (say what)
+    - no: Keep it a draft, not now
+  question:
+    options:
+    - key: build
+      label: Build it as drafted
+    - key: change
+      label: Change the draft first (say what)
+    - key: no
+      label: Keep it a draft, not now
+    recommended: build
+- date: 2026-11-24T16:14:32.230429+00:00
+  author: claude
+  text: |-
+    One more resumed session (16:14Z): the draft is already done, so I added no third copy and left status and assignee as they are.
+
+    - Branch `agent/DEV-796` has both drafts committed: `d9394237f` (`crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml`, 21 rules) and `9c801e028` (`docs/developers/agent-team-template.draft.yml` plus the generic-or-ours list `docs/developers/agent-team-template.md`, 19 rules)
+    - Three questions are open above and they overlap. Whichever answer you pick, the build keeps one draft and drops the other from the branch.
+- date: 2026-11-24T16:26:52.847187+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 of the job job-20261123T182048.534Z-398 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T162652.754Z-5: DEV-796 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:26:53.400452+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c919f579588c6c26bceb594630e4a39e77275064e53daaa4ba646fa55b5025c of the job job-20261123T162006.551Z-358 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 that the job job-20261124T162652.754Z-5 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:53.825705+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94edfb2fd4962a6dbb35fb37a02b9ab53de0b428dbfa737fd273e7c5a069ef52 of the job job-20261123T151907.106Z-324 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 that the job job-20261124T162652.754Z-5 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:55.009251+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab2f5f790e1da466d80157a352269e4c8a01792f4d00a736006ce8624b3e0cc5e of the job job-20261123T141845.734Z-291 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 that the job job-20261124T162652.754Z-5 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:55.622884+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acd13c6462b818ef89009471cb7add62916b0b4bce6b16ddc013091a97211b950 of the job job-20261123T131830.474Z-256 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 that the job job-20261124T162652.754Z-5 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:56.217247+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0e385badb2b24fc89995f2e31789cea5b54b5d8876b4747f28fe096ab1bce465 of the job job-20261123T121819.274Z-223 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 that the job job-20261124T162652.754Z-5 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:57.028019+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A15e2ee6193a7696ba57e82fcbbb18610feb4781714f29c77a51f479fc3a5cda8 of the job job-20261123T111721.429Z-189 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 that the job job-20261124T162652.754Z-5 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:57.437204+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a of the job job-20261123T091643.010Z-122 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9 that the job job-20261124T162652.754Z-5 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:01:26.773268+00:00
+  author: claude
+  text: |-
+    Waiting for your decision, not a review: the 16:27Z move to Reviewing/@review had no answer behind it, so I put the ticket back to HelpNeeded.
+
+    - Nobody answered the three open build questions; all 13 DEV-796 threads are completed and no job runs for it
+    - Reviewing found nothing to review: the drafts on `agent/DEV-796` (`d9394237f`, `9c801e028`) are proposals, and the live check skips tickets tagged `proposal`, so it never restarted a review
+    - The three earlier questions overlap; this one replaces them
+- date: 2026-11-24T17:01:27.265705+00:00
+  author: claude
+  text: |-
+    Build the agent-team template from the drafts on agent/DEV-796 (one draft is kept, the other dropped)?
+
+    Options:
+    - build-claude: Build it, review on Claude by default (works with one provider) (recommended)
+    - build-codex: Build it as drafted, review on Codex
+    - gaps: First fix the lotar gaps (question comments in rules, job reporter), then build
+    - wait: Wait for STD-297's packaging decision
+  question:
+    options:
+    - key: build-claude
+      label: Build it, review on Claude by default (works with one provider)
+      set:
+        status: Todo
+        assignee: '@fix'
+    - key: build-codex
+      label: Build it as drafted, review on Codex
+      set:
+        status: Todo
+        assignee: '@fix'
+    - key: gaps
+      label: First fix the lotar gaps (question comments in rules, job reporter), then build
+    - key: wait
+      label: Wait for STD-297's packaging decision
+    recommended: build-claude
+- date: 2026-11-24T19:14:52.433604+00:00
+  author: mallox
+  text: |-
+    Answer: gaps (First fix the lotar gaps (question comments in rules, job reporter), then build)
+
+    (answered in INBOX-698)
+  answer:
+    to: 2026-11-24T17:01:27.265705+00:00
+    choice:
+    - gaps
+    note: (answered in INBOX-698)
+- date: 2026-11-24T21:05:27.474654+00:00
+  author: claude
+  text: |-
+    Waits for the two gaps you chose to fix first: DEV-852 and DEV-853, then the build continues here.
+
+    - [DEV-852](https://lotar.pyxzl.net/task/DEV-852): a rule's `comment:` can ask a question with options, without `run` or `lotar trust`
+    - [DEV-853](https://lotar.pyxzl.net/task/DEV-853): agent jobs set `LOTAR_DEFAULT_REPORTER` to the agent's name, so comments don't carry your name
+    - Both are separate features (one commit each), so each got its own ticket; DEV-796 depends on them and is tagged `waits`
+    - A parallel session filed the same two at the same minute; I deleted my copies (`DEV-851`, `DEV-854`)
+    - No code changed in this job; the drafts stay on `agent/DEV-796` (`d9394237f`, `9c801e028`)
+  report:
+    checks:
+    - command: code checks
+      result: not_run
+      reason: no code changed, only tickets
+    next: 'When DEV-852 and DEV-853 are Done: build agent-team from one draft on agent/DEV-796, drop the other, use both features, docs/help/templates.md and the end-to-end test'
+- date: 2026-11-24T22:01:32.863028+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-852, DEV-853. It starts once they are done.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A15e2ee6193a7696ba57e82fcbbb18610feb4781714f29c77a51f479fc3a5cda8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0e385badb2b24fc89995f2e31789cea5b54b5d8876b4747f28fe096ab1bce465
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acd13c6462b818ef89009471cb7add62916b0b4bce6b16ddc013091a97211b950
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab2f5f790e1da466d80157a352269e4c8a01792f4d00a736006ce8624b3e0cc5e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94edfb2fd4962a6dbb35fb37a02b9ab53de0b428dbfa737fd273e7c5a069ef52
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c919f579588c6c26bceb594630e4a39e77275064e53daaa4ba646fa55b5025c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2107d66441d2b9ae84da79337087c84043adcaa3b4f6cdccc9497feed5a101b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acca7046843572dff728311e2a4dfd27e72077efdeee8ea753ade5cd31c4bd061
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27c5fc664374f1ad69dd5328c90d0bf89ca3cd874c1b0f846fcae317f2e0868
+- attachment: DEV-796-agent-team-draft.1c75fae370345ecda74fbc29438b5e6e.yml
+- attachment: agent-team.62b50a5c4b3d30bc978cd67f599e1c4f.yml
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5d3914fa9eaeb3f6affd93b25776353eb09b86e34156f831cdbb5e621666f0dd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab1e53b916e854b9cdfeaf1b059cfdce628ef757fc79de47898a9ef761240dd1b
 description: |-
   The agent templates lotar ships are far behind the setup our own repos run on, so someone who starts with `lotar init --template agent-pipeline` misses most of what we learned. The shipped templates run implement, test and merge, and send any failure back to the reporter. Ours adds a review on a second provider, one retry before a person is asked, the person's comment reaching the running agent, and tickets that wait Blocked until their prerequisites are done. Found by product development (2026-11-22). It came from the standards thread "Sharing Agent Setup With Teammates" (2026-11-21), where the owner wrote: "I was already mulling over a lotar template that includes our learnings for an easy project set up", and "I'm also thinking about other people that may want to use it, and keep using it the same as we are and improving it". It takes the standards Direction "a platform for other people" further. The thread holds the packaging question (plugins, copier, a shared repo); this ticket covers only what lotar itself ships.
 
@@ -68,6 +474,9 @@ description: |-
   - [ ] docs/help/templates.md describes it, with what it adds over agent-reviewed.
 tags:
 - proposal
+- job-paused
+- fix-retried
+- waits
 history:
 - at: 2026-11-22T18:50:35.515064+00:00
   actor: claude
@@ -93,5 +502,399 @@ history:
     new: '{"related":["DEV-201","standards:STD-219","standards:STD-297"]}'
 - at: 2026-11-22T19:00:45.272142+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:49:53.399482+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:49:54.032651+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T07:51:29.016558+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-201","standards:STD-219","standards:STD-297"]}'
+    new: '{"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830"]}'
+- at: 2026-11-23T09:17:02.016868+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-23T09:17:03.530582+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
+- at: 2026-11-23T09:17:07.567323+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal
+    new: proposal, job-paused
+- at: 2026-11-23T09:17:07.621120+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:17:13.770382+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
+- at: 2026-11-23T11:18:11.420311+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A15e2ee6193a7696ba57e82fcbbb18610feb4781714f29c77a51f479fc3a5cda8
+- at: 2026-11-23T12:18:26.061647+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0e385badb2b24fc89995f2e31789cea5b54b5d8876b4747f28fe096ab1bce465
+- at: 2026-11-23T13:18:38.545438+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acd13c6462b818ef89009471cb7add62916b0b4bce6b16ddc013091a97211b950
+- at: 2026-11-23T14:18:57.915546+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab2f5f790e1da466d80157a352269e4c8a01792f4d00a736006ce8624b3e0cc5e
+- at: 2026-11-23T15:19:54.264162+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94edfb2fd4962a6dbb35fb37a02b9ab53de0b428dbfa737fd273e7c5a069ef52
+- at: 2026-11-23T16:20:25.594232+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c919f579588c6c26bceb594630e4a39e77275064e53daaa4ba646fa55b5025c
+- at: 2026-11-23T17:20:42.578071+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af2107d66441d2b9ae84da79337087c84043adcaa3b4f6cdccc9497feed5a101b
+- at: 2026-11-23T18:21:02.471250+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c9de1d42c25779fafdc2f47fb607d4dc3a1e259feb19e7d9e1d1a2ef4deadf9
+- at: 2026-11-23T19:21:19.000640+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acca7046843572dff728311e2a4dfd27e72077efdeee8ea753ade5cd31c4bd061
+- at: 2026-11-23T19:21:22.019174+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: proposal, job-paused
+    new: proposal, job-paused, fix-retried
+- at: 2026-11-23T19:21:23.482804+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:21:41.187813+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27c5fc664374f1ad69dd5328c90d0bf89ca3cd874c1b0f846fcae317f2e0868
+- at: 2026-11-23T19:21:42.491788+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:21:43.469232+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:22:33.386779+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830"]}'
+- at: 2026-11-23T19:22:33.858675+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:22:38.161410+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:22:38.741415+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:22:39.348786+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:22:39.629979+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:22:42.801171+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:22:56.988999+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:02:55.029779+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832"]}'
+- at: 2026-11-24T16:04:39.978972+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-796-agent-team-draft.1c75fae370345ecda74fbc29438b5e6e.yml
+- at: 2026-11-24T16:04:56.070840+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:04.277959+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:04.437486+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: HelpNeeded
+  - field: assignee
+    new: claude
+- at: 2026-11-24T16:05:08.532210+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:agent-team.62b50a5c4b3d30bc978cd67f599e1c4f.yml
+- at: 2026-11-24T16:05:20.731499+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:21.029961+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:24.332613+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: mallox
+- at: 2026-11-24T16:05:33.079236+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834"]}'
+- at: 2026-11-24T16:05:36.026771+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:36.318829+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:46.355644+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833"]}'
+- at: 2026-11-24T16:05:46.834423+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:06:09.676208+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:06:09.957953+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:14:32.230429+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:52.186211+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T16:26:52.847187+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:53.400452+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:53.825705+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:54.436129+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T16:26:55.009251+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:55.622884+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:56.217247+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:57.028019+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:57.437204+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:04.269687+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T17:01:26.773268+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:01:27.265705+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:01:27.544749+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+- at: 2026-11-24T17:01:31.342222+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-24T19:14:52.433604+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:14:53.356029+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T19:43:38.444576+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T19:43:38.948549+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5d3914fa9eaeb3f6affd93b25776353eb09b86e34156f831cdbb5e621666f0dd
+- at: 2026-11-24T20:43:46.595006+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab1e53b916e854b9cdfeaf1b059cfdce628ef757fc79de47898a9ef761240dd1b
+- at: 2026-11-24T21:03:30.342579+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851"]}'
+- at: 2026-11-24T21:03:43.361532+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852"]}'
+- at: 2026-11-24T21:03:55.116793+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853"]}'
+- at: 2026-11-24T21:03:58.248+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854"]}'
+- at: 2026-11-24T21:05:00.742668+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-852"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854"]}'
+- at: 2026-11-24T21:05:07.848006+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-852"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854"]}'
+- at: 2026-11-24T21:05:14.284150+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal, job-paused, fix-retried
+    new: proposal, job-paused, fix-retried, waits
+- at: 2026-11-24T21:05:27.474654+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:01:32.528642+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-24T22:01:32.863028+00:00
+  actor: automation
   changes:
   - field: comment_added

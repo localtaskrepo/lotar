@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:39:20.858113+00:00
-modified: 2026-11-22T19:04:41.333659+00:00
+modified: 2026-11-24T17:22:19.772530+00:00
 relationships:
   blocks:
   - DEV-791
@@ -17,6 +17,7 @@ relationships:
   - DEV-788
   - DEV-738
   - DEV-725
+  - DEV-842
 comments:
 - date: 2026-11-22T02:53:13.779728+00:00
   author: claude
@@ -211,3 +212,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791","DEV-770","DEV-775","DEV-788","DEV-738"]}'
     new: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791","DEV-770","DEV-775","DEV-788","DEV-738","DEV-725"]}'
+- at: 2026-11-24T17:22:19.772530+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791","DEV-770","DEV-775","DEV-788","DEV-738","DEV-725"]}'
+    new: '{"blocks":["DEV-791"],"related":["DEV-768","DEV-791","DEV-770","DEV-775","DEV-788","DEV-738","DEV-725","DEV-842"]}'

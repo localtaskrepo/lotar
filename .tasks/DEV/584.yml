@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T20:32:09.848672+00:00
-modified: 2026-11-20T00:06:51.840158+00:00
+modified: 2026-11-24T16:09:50.289256+00:00
 relationships:
   depends_on:
   - standards:STD-133
@@ -25,6 +25,7 @@ relationships:
   - DEV-530
   - DEV-704
   - DEV-713
+  - DEV-833
 comments:
 - date: 2026-11-16T00:14:23.282323+00:00
   author: claude
@@ -571,3 +572,9 @@ history:
   changes:
   - field: releases
     new: '#10'
+- at: 2026-11-24T16:09:50.289256+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626","standards:STD-246","DEV-530","DEV-704","DEV-713"]}'
+    new: '{"depends_on":["standards:STD-133"],"related":["DEV-585","DEV-594","DEV-604","DEV-617","DEV-663","DEV-683","DEV-708","DEV-686","DEV-653","DEV-711","DEV-626","standards:STD-246","DEV-530","DEV-704","DEV-713","DEV-833"]}'

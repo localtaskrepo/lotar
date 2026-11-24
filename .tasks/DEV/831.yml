@@ -1,0 +1,486 @@
+title: 'Release skill step 4: a minor or major release the owner asked for still makes the agent ask him again'
+status: Reviewing
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-23T08:21:23.478863+00:00
+modified: 2026-11-24T21:18:51.524693+00:00
+relationships:
+  depends_on:
+  - local:LOCA-601
+  - DEV-816
+  related:
+  - DEV-816
+  - DEV-832
+  - DEV-834
+  - DEV-833
+comments:
+- date: 2026-11-23T09:21:13.458713+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T092054.865Z-126 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T092054.865Z-126 why.'
+- date: 2026-11-23T19:25:09.544985+00:00
+  author: automation
+  text: The fix agent's job job-20261123T192448.934Z-429 failed (lotar agent logs job-20261123T192448.934Z-429); @fix-retry retries it on branch agent/DEV-831.
+- date: 2026-11-23T19:25:28.888721+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T192509.433Z-430 failed again (lotar agent logs job-20261123T192509.433Z-430). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:26:26.889087+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Mac login ticket LOCA-601; no release decision or retry choice is needed.
+
+    - Jobs `job-20261123T192448.934Z-429` and `job-20261123T192509.433Z-430` both stopped before work: Claude login expired and could not be renewed.
+    - Added prerequisite `local:LOCA-601`, set `Blocked`, and cleared the assignee under the owner’s `docs/decisions/2026-11-15-inbox-triage.md` infrastructure rule.
+    - LOCA-601 already defines authentication completion checks; its closure resumes this work through `Prerequisites done`. The owner action is asked once in INBOX-668.
+- date: 2026-11-23T19:26:27.789882+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:26:30.977503+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-831 yet. DEV-831 waits for local:LOCA-601.'
+- date: 2026-11-24T16:01:00.819443+00:00
+  author: claude
+  text: |-
+    Waits for DEV-816: the step 4 wording this ticket fixes exists only on its unmerged branch.
+
+    - The quoted lines ("waits for his OK: ask him first", "only when he asks for or approves it") come from `dd48a57e0` on `agent/DEV-816`; `main` (`d4bdbbbf6`) has neither.
+    - DEV-816 is in Merging. Editing that text here would conflict with its merge, so DEV-831 now depends on DEV-816 and carries tag `waits`.
+    - Once DEV-816 is on main: edit step 4 of `.github/skills/release/SKILL.md` and the Pre-Release Checklist step 1 of `docs/release-guide.md` so that his request for a minor or major release is his OK, and the agent asks only when it picked the bump itself.
+    - The earlier prerequisite `local:LOCA-601` (Claude login) still holds the ticket, though this job signed in fine.
+- date: 2026-11-24T16:01:13.588011+00:00
+  author: claude
+  text: |-
+    Waits for DEV-816: the step 4 text this ticket fixes exists only in its commit, which isn't on main yet.
+
+    - `dd48a57e0` (agent/DEV-816, status Merging) wrote step 4's "A minor or major release waits for his OK: ask him first". On main, step 4 still asks before every tag.
+    - DEV-816's merge stopped on an unrelated check: `npm run -s test:agent` passed 2480/2480 but left a temp folder `.tmpF3JDHb`.
+    - Plan once it lands: step 4 says his own request for a minor or major release ("create a release now with a minor bump", v0.14.0) is his OK. The agent asks only when it picked a minor or major bump itself. A patch still ships without asking. The checklist in `docs/release-guide.md` gets the same wording.
+    - Added `depends-on DEV-816` and tag `waits`. No commits on `agent/DEV-831`.
+    - The LOCA-601 prerequisite looks stale: this Claude job did sign in. I left it for triage.
+- date: 2026-11-24T16:13:54.482673+00:00
+  author: claude
+  text: |-
+    Still waits for DEV-816: it is in Merging, `dd48a57e0` is not on main (`d4bdbbbf6`) yet.
+
+    - No change since the last comment; the plan there stands. No commits on `agent/DEV-831`.
+- date: 2026-11-24T16:19:26.712025+00:00
+  author: claude
+  text: |-
+    Still waits for DEV-816 (Merging): `dd48a57e0` is not on main (`d4bdbbbf6`).
+
+    - Status Blocked, `depends-on DEV-816`, tag `waits` stay as set. No commits on `agent/DEV-831`; the plan in the earlier comment stands.
+- date: 2026-11-24T16:31:31.175701+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f569fb59196ce82b0ed4aad62e6221b8a35734565522be5a53ec6dc1e19be08 of the job job-20261123T182431.136Z-400 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:31:36.427162+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1537ed072806aff97de1a0b736037fb6a8338aeb4ad014b6e06ac5b2bd7a3bee of the job job-20261123T162352.709Z-362 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:39.095065+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1eb30efce67366a42367ec3b617b4a4ca2c1a4c8a6dee05dfb72579c797f1027 of the job job-20261123T152332.222Z-329 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:41.935363+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8be071afce5dfa5240f3741d002231081eebccf613f87c3e05a2065dd8f73fbe of the job job-20261123T142208.768Z-295 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:44.276+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1dfd3e8c26fb61fe2489c481b72b912ef90a8c65b532e4a2e32ab39bed93d8d9 of the job job-20261123T122132.070Z-227 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:47.028634+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A605f2d144f8be7d59339808d857ae18d6788c8d898fc5a60f01f6703853b40ee of the job job-20261123T112122.573Z-193 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:49.438998+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aca5491a9b58dc04788a415f7e6cd6f356656f0c1b00627ed7a16bf13eda6fe5e of the job job-20261123T102114.236Z-159 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:52.815011+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A41457a4efbab78f4ddd82650de13a05fad1dddda8d5e2647a277ee8017e4f075 of the job job-20261123T092054.865Z-126 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T19:41:28.964670+00:00
+  author: automation
+  text: 'Automation rule ''Prerequisites done: continue the waiting ticket'' told no agent on DEV-831 yet. Agent job job-20261124T194123.535Z-23 is queued: it is waiting for a free slot (3 of DEV''s agent.worktree.max_parallel_jobs 3 running).'
+- date: 2026-11-24T21:11:03.472425+00:00
+  author: claude
+  text: |-
+    Done: step 4 now treats his request for a minor or major release as his OK.
+
+    - DEV-816 landed as `28e3633ec`; fast-forwarded `agent/DEV-831` to main `855ff6f46` (no own commits before).
+    - `.github/skills/release/SKILL.md` step 4: a minor or major release needs his OK, his request is that OK (v0.14.0 quote); ask only when the agent picked the bump itself. Patch still ships without asking.
+    - `docs/release-guide.md` Pre-Release Checklist step 1: same rule added after the v0.14.0 quote.
+    - Commit `b6454cc79`, signed.
+  report:
+    commits:
+    - hash: b6454cc79
+      what: 'step 4 and checklist: his request for a minor or major release is his OK'
+    checks:
+    - command: npx prettier --check .github/skills/release/SKILL.md docs/release-guide.md
+      result: passed
+    - command: link and consistency check (grep 'minor or major' in docs and skills)
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change, the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: Merge agent lands agent/DEV-831 on main
+- date: 2026-11-24T21:13:17.536005+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3077bdf4629a8babb7356f251f34b8e19d6ad6b2895a79f2d6632831f30aed8 of the job job-20261124T194123.535Z-23 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T211317.360Z-91: DEV-831 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:13:35.291870+00:00
+  author: claude
+  text: |-
+    Resumed thread: nothing left to do, `b6454cc79` (signed) already holds the fix.
+
+    - Worktree clean; branch is main `855ff6f46` plus `b6454cc79`.
+    - Step 4 now: his request for a minor or major release is his OK; ask only when the agent picked the bump itself. Prettier check re-run: passed.
+  report:
+    commits:
+    - hash: b6454cc79
+      what: 'step 4 and checklist: his request for a minor or major release is his OK'
+    checks:
+    - command: npx prettier --check .github/skills/release/SKILL.md docs/release-guide.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: docs-only change, the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: docs-only change
+    - command: npm run smoke
+      result: not_run
+      reason: docs-only change
+    next: Merge agent lands agent/DEV-831 on main
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A41457a4efbab78f4ddd82650de13a05fad1dddda8d5e2647a277ee8017e4f075
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aca5491a9b58dc04788a415f7e6cd6f356656f0c1b00627ed7a16bf13eda6fe5e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A605f2d144f8be7d59339808d857ae18d6788c8d898fc5a60f01f6703853b40ee
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1dfd3e8c26fb61fe2489c481b72b912ef90a8c65b532e4a2e32ab39bed93d8d9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada2dd88a27e878a946364d38349cf8060b03ac34c70e9da0651ac8f5be66e353
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8be071afce5dfa5240f3741d002231081eebccf613f87c3e05a2065dd8f73fbe
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1eb30efce67366a42367ec3b617b4a4ca2c1a4c8a6dee05dfb72579c797f1027
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1537ed072806aff97de1a0b736037fb6a8338aeb4ad014b6e06ac5b2bd7a3bee
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A78e853faa4466fd731f14f5a26b0f8d55761c363b56613bee98c051a30e00b0c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f569fb59196ce82b0ed4aad62e6221b8a35734565522be5a53ec6dc1e19be08
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4776a01bbeb3a0c897f22d30fc4f7996777ee430ae50e7c599ff8112b42a985
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A79bd84d501d1c5828dc2e5db03a4cb7b7dc5cfb7a51dbfcfb4a18fdf9d7acde9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3077bdf4629a8babb7356f251f34b8e19d6ad6b2895a79f2d6632831f30aed8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab67d4046d6f1333034bb8f0358654b8f3c1b37da7532aa1b4379940af9d1a3c9
+description: |-
+  Found in the DEV-816 review: `.github/skills/release/SKILL.md` step 4 says a minor or major release 'waits for his OK: ask him first'. `docs/release-guide.md` Pre-Release Checklist step 1 says a minor or major bump happens 'only when he asks for or approves it'. So when he asked for the minor himself (v0.14.0: 'create a release now with a minor bump'), the skill would still make the agent ask again. His words: 'Only minor changes need my okay.'
+
+  ## Done when
+  - [ ] Step 4 says that his request for a minor or major release is his OK, and the agent asks only when it picked the bump itself.
+tags:
+- job-paused
+- fix-retried
+history:
+- at: 2026-11-23T08:21:29.964753+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-816"]}'
+- at: 2026-11-23T08:21:36.829409+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T09:21:08.810674+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T09:21:10.140907+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A41457a4efbab78f4ddd82650de13a05fad1dddda8d5e2647a277ee8017e4f075
+- at: 2026-11-23T09:21:13.389748+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T09:21:13.458713+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:21:18.739798+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aca5491a9b58dc04788a415f7e6cd6f356656f0c1b00627ed7a16bf13eda6fe5e
+- at: 2026-11-23T11:21:28.151232+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A605f2d144f8be7d59339808d857ae18d6788c8d898fc5a60f01f6703853b40ee
+- at: 2026-11-23T12:21:37.987973+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1dfd3e8c26fb61fe2489c481b72b912ef90a8c65b532e4a2e32ab39bed93d8d9
+- at: 2026-11-23T13:21:49.230625+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ada2dd88a27e878a946364d38349cf8060b03ac34c70e9da0651ac8f5be66e353
+- at: 2026-11-23T14:23:25.180375+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8be071afce5dfa5240f3741d002231081eebccf613f87c3e05a2065dd8f73fbe
+- at: 2026-11-23T15:23:48.090559+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1eb30efce67366a42367ec3b617b4a4ca2c1a4c8a6dee05dfb72579c797f1027
+- at: 2026-11-23T16:24:09.482689+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1537ed072806aff97de1a0b736037fb6a8338aeb4ad014b6e06ac5b2bd7a3bee
+- at: 2026-11-23T17:24:25.503204+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A78e853faa4466fd731f14f5a26b0f8d55761c363b56613bee98c051a30e00b0c
+- at: 2026-11-23T18:24:44.335280+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f569fb59196ce82b0ed4aad62e6221b8a35734565522be5a53ec6dc1e19be08
+- at: 2026-11-23T19:25:02.472636+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab4776a01bbeb3a0c897f22d30fc4f7996777ee430ae50e7c599ff8112b42a985
+- at: 2026-11-23T19:25:05.797567+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: job-paused
+    new: job-paused, fix-retried
+- at: 2026-11-23T19:25:09.544985+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:25:25.059006+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A79bd84d501d1c5828dc2e5db03a4cb7b7dc5cfb7a51dbfcfb4a18fdf9d7acde9
+- at: 2026-11-23T19:25:28.118629+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:25:28.888721+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:26:20.803147+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-816"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-816"]}'
+- at: 2026-11-23T19:26:21.478490+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:26:26.376636+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:26:26.889087+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:26:27.525438+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:26:27.789882+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:26:30.977503+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:26:52.996316+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:00:59.012594+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-816"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816"]}'
+- at: 2026-11-24T16:01:00.734327+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused, fix-retried
+    new: job-paused, fix-retried, waits
+- at: 2026-11-24T16:01:00.819443+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:01:13.588011+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:02:55.035156+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832"]}'
+- at: 2026-11-24T16:05:33.084517+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832","DEV-834"]}'
+- at: 2026-11-24T16:05:46.363378+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832","DEV-834"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832","DEV-834","DEV-833"]}'
+- at: 2026-11-24T16:13:54.482673+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:26.712025+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:31.175701+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:36.427162+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:39.095065+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:41.935363+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:44.276+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:47.028634+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:49.438998+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:52.815011+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:41:23.191699+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: job-paused, fix-retried, waits
+    new: job-paused, fix-retried
+- at: 2026-11-24T19:41:23.240986+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:41:28.964670+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:43:07.702093+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T19:43:08.162123+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3077bdf4629a8babb7356f251f34b8e19d6ad6b2895a79f2d6632831f30aed8
+- at: 2026-11-24T20:43:15.606129+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab67d4046d6f1333034bb8f0358654b8f3c1b37da7532aa1b4379940af9d1a3c9
+- at: 2026-11-24T21:11:03.472425+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:13:17.536005+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:13:35.291870+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:18:51.524693+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

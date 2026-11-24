@@ -1,14 +1,22 @@
 title: 'Proposal: findings: agents add a health finding to the repo''s open bundle of the day instead of a ticket of their own'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-22T19:21:29.504789+00:00
-modified: 2026-11-22T19:21:45.678256+00:00
+modified: 2026-11-24T17:05:15.676859+00:00
 relationships:
+  depends_on:
+  - local:LOCA-601
   related:
   - standards:STD-299
+  - DEV-821
+  - DEV-830
+  - DEV-832
+  - DEV-833
+  - DEV-834
+  - DEV-798
 comments:
 - date: 2026-11-22T19:21:44.907191+00:00
   author: claude
@@ -17,6 +25,222 @@ comments:
 
     - Why: STD-299 bundles the daily run's findings in standards; agent-filed findings need lotar to do the same.
     - Yes: an agent builds it as the Done when says. No: WontDo; agents keep one ticket per finding.
+- date: 2026-11-23T01:32:23.697338+00:00
+  author: mallox
+  text: Can't we add a custom field for this? Does this need to be a feature? (answered in INBOX-646)
+- date: 2026-11-23T05:39:50.543336+00:00
+  author: claude
+  text: |-
+    Partly: the `finding` custom field already holds a list, but a custom field alone won't put a new report into today's bundle. That still needs a small change in `lotar add`.
+
+    - Already works: `FindingService::prior` (`crates/lotar-lib/src/services/finding_service.rs`) matches any value of a list `finding` field. A ticket with `finding: [a:x, b:y]` already turns a repeat report into a comment, a won't-do already suppresses both keys, and `lotar list finding=a:x` already finds it. So done criterion 2 needs no new code.
+    - Missing: `lotar add --finding b:y` finds no ticket for `b:y` and creates a new one. To join the bundle, an agent would have to run 4 steps itself: look up the key, list today's open `bundle=health:<date>` ticket, add the key to its field, then comment. The finding lock (`.finding.lock`) doesn't cover those steps, so two agents at the same moment would create 2 bundles or drop a key. A job already running on the bundle would also miss the new report (criterion 3).
+    - Smallest build: in `FindingService::report`, when no ticket has the key and `--bundle` is given, add the key and a section to the project's open bundle ticket created today, under the same lock. Otherwise create the bundle ticket. If the bundle is InProgress, Reviewing or Merging, start a new bundle. That's about one function plus tests and the `add.md` docs.
+    - My recommendation: build `--bundle` like this, with no new field type and no other changes.
+- date: 2026-11-23T07:48:53.770709+00:00
+  author: mallox
+  text: 'Answer: yes (Yes, build `--bundle` as described, no new field type (recommended)) (answered in INBOX-663)'
+- date: 2026-11-23T09:15:45.637566+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T091531.727Z-120 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T091531.727Z-120 why.'
+- date: 2026-11-23T19:18:23.219902+00:00
+  author: automation
+  text: The fix agent's job job-20261123T191805.699Z-421 failed (lotar agent logs job-20261123T191805.699Z-421); @fix-retry retries it on branch agent/DEV-800.
+- date: 2026-11-23T19:18:43.277132+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T191825.352Z-422 failed again (lotar agent logs job-20261123T191825.352Z-422). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:19:49.254036+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude login ticket local:LOCA-601; no new feature approval or retry decision is needed.
+
+    - Owner already approved building `--bundle` on 2026-11-23 at 07:48 UTC, answered in INBOX-663.
+    - Jobs `job-20261123T191805.699Z-421` and `job-20261123T191825.352Z-422` both stopped before implementation: the Claude login expired and cannot be renewed.
+    - Earlier job `job-20261123T091531.727Z-120` reported a weekly limit resetting November 24 at 08:00 America/Los_Angeles; renewed authentication may leave that separate limit.
+    - Following standards `docs/decisions/2026-11-15-inbox-triage.md`: depends on `local:LOCA-601`, Blocked, assignee cleared. Prerequisites done resumes the approved work when login recovery is verified.
+- date: 2026-11-23T19:19:50.149222+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:19:53.467541+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-800 yet. DEV-800 waits for local:LOCA-601.'
+- date: 2026-11-24T16:04:49.183318+00:00
+  author: claude
+  text: |-
+    Stopped this session: 3 other sessions build DEV-800 in the same worktree at once.
+
+    - At the 08:00 reset 4 Claude sessions started in `.lotar-worktrees/lotar/DEV-800`, all on this ticket; two of them already added the same `FINDING_BUNDLE_FIELD` twice in `crates/lotar-core/src/utils/custom_fields.rs`.
+    - I took my own edits back out and made no commit; the other sessions' changes stay as they are.
+    - Filed the double resume as a finding (`agent-jobs:paused-resume-duplicates`).
+- date: 2026-11-24T16:05:56.832701+00:00
+  author: claude
+  text: |-
+    Session 862ae2 stopped without changes: a parallel session is already building `--bundle` in this worktree
+
+    - 4 Claude sessions started in `.lotar-worktrees/lotar/DEV-800` within 4 minutes (the old failed T3 threads resumed next to the new job), filed as DEV-833
+    - pid 89463 writes the code (`validate_bundle`, `open_bundle`, `join_bundle` in `finding_service.rs`); 862ae2 and pids 93866 and 89961 stopped and took their own edits out
+    - Design note for the builder: `repos.ts` already keys its bundles `health:<date>` and treats `InProgress`, `Reviewing`, `Merging` as in-job (`IN_JOB`), so `--bundle health` can share that key; the standards fix rule starts a job on `created`, which sets `InProgress` on `job_started`
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: I wrote no code
+    - command: npm test
+      result: not_run
+      reason: I wrote no code
+    - command: npm run smoke
+      result: not_run
+      reason: I wrote no code
+    next: Session pid 89463 finishes the --bundle build in this worktree and commits it
+- date: 2026-11-24T16:17:04.050195+00:00
+  author: claude
+  text: |-
+    One more duplicate session (started 16:15 UTC) stopped without changes: pid 89463 is still building `--bundle` here
+
+    - Worktree has the builder's uncommitted edits (14 files, `finding_service.rs`, `dev800_finding_bundle_test.rs`), compiling at 16:16 UTC; I touched none of them
+    - Same cause as DEV-833 (paused jobs resume several sessions at once); no new finding filed
+- date: 2026-11-24T16:19:48.236172+00:00
+  author: claude
+  text: 'Another duplicate session (720dde4c, 16:18 UTC) stopped without changes: a parallel session is still building and testing `--bundle` in this worktree.'
+- date: 2026-11-24T16:20:12.615743+00:00
+  author: claude
+  text: |-
+    Another duplicate session (pid 59226, 16:18 UTC) stopped without changes: sessions 51568 and 54975 are running the `dev800` tests on the uncommitted `--bundle` work
+
+    - Builder pid 89463 has exited without a commit; the 14 changed files and `crates/lotar-lib/tests/dev800_finding_bundle_test.rs` are still uncommitted in the worktree
+    - I edited no files and left status and assignee as they are; same cause as DEV-833
+- date: 2026-11-24T16:27:31.693658+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 of the job job-20261123T181743.713Z-396 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T162731.653Z-7: DEV-800 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:27:32.323050+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571 of the job job-20261123T161709.380Z-353 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 that the job job-20261124T162731.653Z-7 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:33.030492+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A289a0b54bdc559375d1b8f41bc16d0210d1b4bb7a07cf8fd3194d9e9a7047e99 of the job job-20261123T141639.791Z-287 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 that the job job-20261124T162731.653Z-7 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:34.208316+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b767e0bd9b6c5ce10b7a37de12c1027a432f90cf2c3c111716903020ed27213 of the job job-20261123T131621.016Z-254 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 that the job job-20261124T162731.653Z-7 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:34.642608+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A17a6a212532c8ec8e177bab812d6e959c24e27d69beac4129d4a1191e37e0740 of the job job-20261123T121608.080Z-220 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 that the job job-20261124T162731.653Z-7 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:35.332998+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A96480834d1b417fdc15aa9e1c0635fe1d0e65d367741317ce27c4c7c8d66a500 of the job job-20261123T111557.082Z-187 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 that the job job-20261124T162731.653Z-7 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:35.878631+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6749c3b93d41a66318c1ef16c3ca95ca01f329cf29f8e44e20878b253f5594a4 of the job job-20261123T101546.222Z-153 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 that the job job-20261124T162731.653Z-7 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:27:36.670714+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3a03ec4dedd1c78405b0b9c07c48b204cac1cc5303fded5ca8cebf2acf89a9bd of the job job-20261123T091531.727Z-120 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20 that the job job-20261124T162731.653Z-7 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:44:36.700812+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571 of the job job-20261123T161709.380Z-353 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A96480834d1b417fdc15aa9e1c0635fe1d0e65d367741317ce27c4c7c8d66a500 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:54:53.468422+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571 of the job job-20261123T161709.380Z-353 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A96480834d1b417fdc15aa9e1c0635fe1d0e65d367741317ce27c4c7c8d66a500 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:56:40.210458+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A96480834d1b417fdc15aa9e1c0635fe1d0e65d367741317ce27c4c7c8d66a500 of the job job-20261123T111557.082Z-187 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:04:04.358081+00:00
+  author: claude
+  text: |-
+    Built `lotar add --finding <key> --bundle <name>`: a day's findings share one bundle ticket.
+
+    - First report of the day creates `Health <date>: <title>` with field `finding_bundle: health:<date>`. Later reports with new keys add the key to `finding` and a section to the description, and bump the title (`... and 1 more`). Output: `state: bundled`.
+    - Same day, new ticket: a bundle in `InProgress`, `Reviewing`, `Merging`, done or won't do takes no new keys. The report starts a new bundle, so a running fix job never closes a finding it didn't see. Next day: new bundle.
+    - Keys keep their meaning per key: a repeat report becomes a comment on the bundle, a won't-do bundle suppresses all its keys, and `lotar list finding=a:x` finds the bundle.
+    - Joining holds the finding lock (`FindingService::join_bundle` in `crates/lotar-lib/src/services/finding_service.rs`).
+    - The merge job's `finding_check` now runs once per key (`merge.rs`).
+    - Docs: `docs/help/add.md#bundles`, `agent.md`, `mcp-tools.md`. `bundled` added to `api_types.rs`, `types.ts`, `openapi.json`. `--bundle` is CLI only.
+    - Tests: `crates/lotar-lib/tests/dev800_finding_bundle_test.rs` covers all 3 code criteria. Criterion 4's standards switch is left for standards.
+  report:
+    commits:
+    - hash: 65b240a99
+      what: lotar add --bundle, merge finding_check per key, docs
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2482 Rust tests plus UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: 407 tests
+    next: Merge, then standards switches the global rule and repos.ts to --bundle health (STD-299)
+- date: 2026-11-24T17:04:23.451709+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A96480834d1b417fdc15aa9e1c0635fe1d0e65d367741317ce27c4c7c8d66a500 of the job job-20261123T111557.082Z-187 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571 that waits for an answer. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:04:58.868882+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571 of the job job-20261123T161709.380Z-353 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T170458.846Z-5: DEV-800 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T17:05:03.662524+00:00
+  author: claude
+  text: |-
+    Built `lotar add --finding <key> --bundle <name>`: findings of one day share one bundle ticket.
+
+    - A key with no ticket joins the project's open bundle of today (`finding_bundle: health:<date>`). Its key goes into the `finding` list, a `## <title>` section goes into the description, and the title counts the findings (`Health 2026-11-24: Stale worktree and 1 more`). JSON state `bundled`.
+    - No open bundle today: a new bundle ticket. The next day starts a new one.
+    - A bundle in `InProgress`, `Reviewing` or `Merging`, done or won't-do takes no new keys. The report starts a new bundle that day, so a fix job never closes a finding it didn't see (criterion 3).
+    - Each key keeps its meaning: a repeat report goes to the bundle as a comment, a won't-do bundle suppresses all its keys, and `lotar list finding=a:x` finds the bundle.
+    - Joining holds the finding lock. The merge job's `finding_check` now runs once per key (`merge.rs`).
+    - Docs: `docs/help/add.md#bundles`, `agent.md`, `mcp-tools.md`. `bundled` was added to `api_types.rs`, `view/api/types.ts` and `openapi.json`. `--bundle` works in the CLI only.
+    - Tests: `crates/lotar-lib/tests/dev800_finding_bundle_test.rs` (criteria 1–3) plus unit tests in `finding_service.rs`.
+    - The first smoke run hit its 10-minute limit while waiting for DEV-798's check lock. The rerun passed.
+  report:
+    commits:
+    - hash: 65b240a99
+      what: lotar add --finding <key> --bundle <name>
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: Rust 2482/2482, UI, release, hooks
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 407/407
+    next: 'standards (STD-299): switch the global rule and repos.ts to --bundle health'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3ebf16ff34582047edf563b966469b7a92d4ed540d3faa3d9306e482871e5d3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3a03ec4dedd1c78405b0b9c07c48b204cac1cc5303fded5ca8cebf2acf89a9bd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6749c3b93d41a66318c1ef16c3ca95ca01f329cf29f8e44e20878b253f5594a4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A96480834d1b417fdc15aa9e1c0635fe1d0e65d367741317ce27c4c7c8d66a500
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A17a6a212532c8ec8e177bab812d6e959c24e27d69beac4129d4a1191e37e0740
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b767e0bd9b6c5ce10b7a37de12c1027a432f90cf2c3c111716903020ed27213
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A289a0b54bdc559375d1b8f41bc16d0210d1b4bb7a07cf8fd3194d9e9a7047e99
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae00064a44405e9ee359ff09678a1ea157f8a8f20ce077d526d824b7db0290e3b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad9031f88646b42adbd7900e33e16cdce659f0cc7b3aa223f296ce19b6baf2a0c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6983b0a0fc203bb7c2193948fc5a233166ecf9c20d2eefe1aa49474924401baa
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae960071d43c32cb994af71b582843e1c2aa780d8dbad9c27fd108ed926c8a5ec
 description: |-
   Standards STD-299 (owner 2026-11-22, his pick verbatim: "Bundle health findings"): one health ticket per repo per day collects that day's findings. The daily `repos.ts --report` run now does that itself (finding `health:<date>`, one section per finding). Agents that file a problem during the day (`lotar add --finding <check>:<subject> --tag health`, about 55 tickets in 72 h besides flaky tests) still get one ticket each: lotar has no way to add a new key to an open ticket.
 
@@ -29,6 +253,8 @@ description: |-
   - [ ] Docs (findings help) describe it; standards then switches the global rule and repos.ts to `--bundle health`.
 tags:
 - proposal
+- job-paused
+- fix-retried
 history:
 - at: 2026-11-22T19:21:42.179621+00:00
   actor: claude
@@ -52,3 +278,345 @@ history:
   - field: status
     old: Todo
     new: HelpNeeded
+- at: 2026-11-23T01:32:23.697338+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-23T01:32:24.361929+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T01:32:44.907509+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-299"]}'
+    new: '{"related":["standards:STD-299","DEV-821"]}'
+- at: 2026-11-23T05:39:12.539836+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-23T05:39:18.409922+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3ebf16ff34582047edf563b966469b7a92d4ed540d3faa3d9306e482871e5d3
+- at: 2026-11-23T05:39:50.543336+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:40:00.755697+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-23T07:48:53.770709+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:48:54.473220+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-23T07:51:29.017080+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-299","DEV-821"]}'
+    new: '{"related":["standards:STD-299","DEV-821","DEV-830"]}'
+- at: 2026-11-23T09:15:37.399105+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-23T09:15:39.239803+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3a03ec4dedd1c78405b0b9c07c48b204cac1cc5303fded5ca8cebf2acf89a9bd
+- at: 2026-11-23T09:15:45.485950+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal
+    new: proposal, job-paused
+- at: 2026-11-23T09:15:45.637566+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:15:52.423379+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6749c3b93d41a66318c1ef16c3ca95ca01f329cf29f8e44e20878b253f5594a4
+- at: 2026-11-23T11:16:03.997008+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A96480834d1b417fdc15aa9e1c0635fe1d0e65d367741317ce27c4c7c8d66a500
+- at: 2026-11-23T12:16:15.986591+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A17a6a212532c8ec8e177bab812d6e959c24e27d69beac4129d4a1191e37e0740
+- at: 2026-11-23T13:16:30.560347+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b767e0bd9b6c5ce10b7a37de12c1027a432f90cf2c3c111716903020ed27213
+- at: 2026-11-23T14:16:50.110301+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A289a0b54bdc559375d1b8f41bc16d0210d1b4bb7a07cf8fd3194d9e9a7047e99
+- at: 2026-11-23T15:17:04.758995+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae00064a44405e9ee359ff09678a1ea157f8a8f20ce077d526d824b7db0290e3b
+- at: 2026-11-23T16:17:20.676698+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab627279ea789971ff044cabd601497d0b39d279b978fe3783797d54d1a9c6571
+- at: 2026-11-23T17:17:37.675985+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad9031f88646b42adbd7900e33e16cdce659f0cc7b3aa223f296ce19b6baf2a0c
+- at: 2026-11-23T18:17:58.312991+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20
+- at: 2026-11-23T19:18:19.114495+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6983b0a0fc203bb7c2193948fc5a233166ecf9c20d2eefe1aa49474924401baa
+- at: 2026-11-23T19:18:22.006408+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: proposal, job-paused
+    new: proposal, job-paused, fix-retried
+- at: 2026-11-23T19:18:23.219902+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:18:41.284036+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae960071d43c32cb994af71b582843e1c2aa780d8dbad9c27fd108ed926c8a5ec
+- at: 2026-11-23T19:18:42.353049+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:18:43.277132+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:19:43.535577+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-299","DEV-821","DEV-830"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830"]}'
+- at: 2026-11-23T19:19:44.098031+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:19:48.824346+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:19:49.254036+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:19:49.889775+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:19:50.149222+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:19:53.467541+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:20:05.702799+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:02:55.030388+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832"]}'
+- at: 2026-11-24T16:04:42.170170+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833"]}'
+- at: 2026-11-24T16:04:49.183318+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:33.080495+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834"]}'
+- at: 2026-11-24T16:05:56.832701+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:17:04.050195+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:48.236172+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:20:12.615743+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:31.441127+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:27:31.693658+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:32.323050+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:33.030492+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:33.182322+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T16:27:34.208316+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:34.642608+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:35.332998+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:35.878631+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:27:36.670714+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:29:27.808485+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T16:44:36.700812+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:54:53.468422+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:56:40.210458+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:04.358081+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:23.451709+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:58.786411+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+- at: 2026-11-24T17:04:58.868882+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:05:02.339195+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T17:05:03.662524+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:05:04.083356+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834","DEV-798"]}'
+- at: 2026-11-24T17:05:15.676859+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

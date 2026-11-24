@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.692252+00:00
-modified: 2026-11-12T21:40:35.924975+00:00
+modified: 2026-11-23T04:30:21.155041+00:00
 relationships:
   related:
   - DEV-385
@@ -57,4 +57,16 @@ history:
   changes:
   - field: relationships
     old: '{"related":["DEV-385"]}'
+    new: '{"related":["DEV-385","DEV-396"]}'
+- at: 2026-11-23T04:28:18.090117+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-385","DEV-396"]}'
+    new: '{"related":["DEV-385","DEV-396","DEV-802"]}'
+- at: 2026-11-23T04:30:21.155041+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-385","DEV-396","DEV-802"]}'
     new: '{"related":["DEV-385","DEV-396"]}'

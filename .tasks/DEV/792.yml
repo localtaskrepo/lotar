@@ -1,15 +1,17 @@
 title: 'harness.agent-launcher smoke: a failed 45 s start wait loses its wrapper stderr to the 120 s test timeout'
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T11:07:54.938084+00:00
-modified: 2026-11-22T20:39:30.950834+00:00
+modified: 2026-11-23T03:32:08.561937+00:00
 relationships:
   related:
   - DEV-781
   - DEV-801
+  - DEV-780
+  - DEV-797
 comments:
 - date: 2026-11-22T18:58:43.115280+00:00
   author: claude
@@ -55,6 +57,12 @@ comments:
     - Reran: `npm ci` ok; `npm run lint:frontend` (smoke tsc) passed; `npx prettier --check` on the file passed; `npm run test:smoke:quick:agent -- smoke/tests/harness.agent-launcher.smoke.spec.ts` passed: 7/7 in 10 s.
     - Not rerun: the full lint, test and smoke gates, and the forced hung-wrapper check (the fix agent reported it; the code path reads correct).
     - No UI change, no stray files, no second branch. No tickets filed.
+- date: 2026-11-23T01:38:56.838907+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-792` onto `main` conflicts in `smoke/tests/harness.agent-launcher.smoke.spec.ts`; lotar aborted the rebase, `agent/DEV-792` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3a5b702f4f0841a6f3112eafa0efcf6e0ff29db5b01c7ccf1a8355cbacaadde
 description: |-
@@ -122,3 +130,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-23T01:38:56.838907+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T01:56:45.185342+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-23T02:30:57.603948+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-781","DEV-801"]}'
+    new: '{"related":["DEV-781","DEV-801","DEV-780"]}'
+- at: 2026-11-23T03:32:08.561937+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-781","DEV-801","DEV-780"]}'
+    new: '{"related":["DEV-781","DEV-801","DEV-780","DEV-797"]}'

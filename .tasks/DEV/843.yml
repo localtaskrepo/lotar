@@ -1,0 +1,223 @@
+title: A job queued for a hard-deleted ticket runs on the new ticket that reuses its ID, with the deleted ticket's title in its prompt
+status: Reviewing
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@review-claude'
+created: 2026-11-24T17:22:39.025840+00:00
+modified: 2026-11-24T22:21:34.760865+00:00
+relationships:
+  related:
+  - DEV-786
+  - DEV-818
+  - DEV-833
+comments:
+- date: 2026-11-24T19:18:18.982167+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191813.228Z-39 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191813.228Z-39 why.'
+- date: 2026-11-24T21:18:26.092251+00:00
+  author: claude
+  text: |-
+    Duplicate session: job `job-20261124T201819.427Z-67` stopped without edits; job `job-20261124T191813.228Z-39` keeps the work.
+
+    - Both jobs resumed after the usage limit in the same worktree `.lotar-worktrees/lotar/DEV-843`. That is DEV-833's bug.
+    - I sent the other thread (`4ccadac…`) my design notes: `ticket_created` on the queue entry, the worker check, and filling in `${{ticket.*}}` when the job starts.
+    - The tree was clean, nothing to commit. The end of job `-67` may move the ticket on while `-39` still works.
+- date: 2026-11-24T21:22:11.194180+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502 of the job job-20261124T191813.228Z-39 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:22:29.055632+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c of the job job-20261124T201819.427Z-67 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212229.012Z-32: DEV-843 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:23:02.773051+00:00
+  author: automation
+  text: The fix agent's job job-20261124T212229.012Z-32 failed (lotar agent logs job-20261124T212229.012Z-32); @fix-retry retries it on branch agent/DEV-843.
+- date: 2026-11-24T21:35:32.137108+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502 of the job job-20261124T191813.228Z-39 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:42:01.171567+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502 of the job job-20261124T191813.228Z-39 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:50:01.597365+00:00
+  author: claude
+  text: |-
+    Fixed: a queued job no longer outlives its ticket, and its prompt shows the ticket's title at start.
+
+    - Queue entries keep `ticket_created` (`agent_queue_service.rs`). A new ticket reusing the ID replaces the stale entry; the worker drops an entry whose ticket is gone or re-created, with a comment, no retries. Only "ticket not found" drops; other read errors retry as before. Old entries without the field aren't checked.
+    - Parked entries, paused retries and `requeue_first` fill the field too; `unpark` carries it.
+    - Rule `agent.prompt`: event values fill in when the rule fires, `${{ticket.*}}` when the job starts (`template.rs` `expand_keeping_ticket` / `expand_ticket_only`, `start_job_inner`). Other placeholders in a manual prompt stay as written.
+    - Tests: `a_ticket_that_reuses_a_deleted_tickets_id_replaces_its_queued_job`, `an_entry_whose_ticket_was_deleted_leaves_the_queue_without_starting`, `a_jobs_prompt_shows_the_tickets_title_when_the_job_starts`, plus 2 unit tests.
+    - Docs: `docs/help/automation.md` (agent run settings).
+    - Two jobs (-39, -67) resumed in this worktree at once (DEV-833); -67 stopped without edits. Told the DEV-786 thread about the new entry field.
+    - No guidance correction.
+  report:
+    commits:
+    - hash: 0dde35870
+      what: queue entries remember their ticket; rule prompts fill ticket values at job start
+    checks:
+    - command: cargo nextest run -p lotar-agent + lotar-lib queue/prompt/park/automation tests
+      result: passed
+      reason: 321 passed
+    - command: cargo clippy -p lotar-agent -p lotar-lib --all-targets
+      result: passed
+    - command: rustfmt + prettier on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
+    next: Review on another model, then merge
+- date: 2026-11-24T21:50:19.669740+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502 of the job job-20261124T191813.228Z-39 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
+description: |-
+  Found in the DEV-818 review. On 2026-11-22 a review job's scratch lotar add created DEV-818 'Example ticket for the Agents page' (assignee @fix, 22:42Z) in the real backlog and hard-deleted it. At 22:45Z the finding ticket got the same ID DEV-818 and was also assigned @fix. The fix job that started 2026-11-23 04:32Z (job-20261123T043208.499Z-57) got the prompt 'Work ticket DEV-818 ("Example ticket for the Agents page")' and the order to commit as 'DEV-818 Example ticket for the Agents page'. So commit 4cf6a8cd7 carries the deleted ticket's title.
+
+  ## Check
+  - .tasks/DEV/DEV-818.context, first user message: the old title.
+  - .tasks/@agent-logs/job-20261122T220133.344Z-22.jsonl: the deleted ticket with that title.
+  - Likely cause: the queue entry from 22:42Z kept its rendered prompt (DEV-786: entries keep their prompt) when the ticket was deleted and the ID reused. Not confirmed in code.
+
+  ## Done when
+  - [ ] A queue entry remembers when its ticket was created (`ticket_created`). Entries queued before this change have none and are not checked.
+  - [ ] Queueing a job for a ticket whose entry (same ID, same profile) belongs to an earlier, deleted ticket replaces that entry: the new ticket's job is queued, with the new rule's prompt and settings. Test.
+  - [ ] When the worker takes an entry whose ticket no longer exists, or exists with another created time, it drops the entry without starting a job and without spending retries; it says so on stderr and, when a ticket with that ID exists, in an automation comment on it. Test.
+  - [ ] A parked entry (waiting for prerequisites) keeps its `ticket_created` when it moves back to the queue.
+  - [ ] A rule's `agent.prompt` fills in event values (`comment.*`, `previous.*`, `unblocked.*`, `agent.*`) when the rule fires, but `${{ticket.*}}` values when the job starts, from the ticket as it is then. So a queued job's prompt shows the ticket's current title. Test: queue, rename the ticket, start: the prompt has the new title.
+  - [ ] A prompt with no `${{ticket.*}}` placeholders starts unchanged; a value filled in at the rule (e.g. a comment's text) is not expanded a second time except for `${{ticket.*}}` it contains.
+  - [ ] Docs on the rule's `prompt` say when ticket values are filled in.
+tags:
+- agent
+- job-paused
+- fix-retried
+history:
+- at: 2026-11-24T17:22:39.294489+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-786","DEV-818"]}'
+- at: 2026-11-24T17:22:39.562892+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T19:18:15.834719+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:18:16.422809+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
+- at: 2026-11-24T19:18:18.939365+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent
+    new: agent, job-paused
+- at: 2026-11-24T19:18:18.982167+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:18:20.902227+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
+- at: 2026-11-24T21:05:05.313397+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-818 review. On 2026-11-22 a review job's scratch lotar add created DEV-818 'Example ticket for the Agents page' (assignee @fix, 22:42Z) in the real backlog and hard-deleted it. At 22:45Z the finding ticket got the same ID DEV-818 and was also assigned @fix. The fix job that started 2026-11-23 04:32Z (job-20261123T043208.499Z-57) got the prompt 'Work ticket DEV-818 ("Example ticket for the Agents page")' and the order to commit as 'DEV-818 Example ticket for the Agents page'. So commit 4cf6a8cd7 carries the deleted ticket's title.
+
+      ## Check
+      - .tasks/DEV/DEV-818.context, first user message: the old title.
+      - .tasks/@agent-logs/job-20261122T220133.344Z-22.jsonl: the deleted ticket with that title.
+      - Likely cause: the queue entry from 22:42Z kept its rendered prompt (DEV-786: entries keep their prompt) when the ticket was deleted and the ID reused. Not confirmed in code.
+
+      ## Done when
+      - [ ] Hard-deleting a ticket drops its queued jobs (or a job checks that its ticket is the one it was queued for), with a test.
+      - [ ] A job's prompt shows the ticket's current title, not the one it had at enqueue, with a test.
+    new: |-
+      Found in the DEV-818 review. On 2026-11-22 a review job's scratch lotar add created DEV-818 'Example ticket for the Agents page' (assignee @fix, 22:42Z) in the real backlog and hard-deleted it. At 22:45Z the finding ticket got the same ID DEV-818 and was also assigned @fix. The fix job that started 2026-11-23 04:32Z (job-20261123T043208.499Z-57) got the prompt 'Work ticket DEV-818 ("Example ticket for the Agents page")' and the order to commit as 'DEV-818 Example ticket for the Agents page'. So commit 4cf6a8cd7 carries the deleted ticket's title.
+
+      ## Check
+      - .tasks/DEV/DEV-818.context, first user message: the old title.
+      - .tasks/@agent-logs/job-20261122T220133.344Z-22.jsonl: the deleted ticket with that title.
+      - Likely cause: the queue entry from 22:42Z kept its rendered prompt (DEV-786: entries keep their prompt) when the ticket was deleted and the ID reused. Not confirmed in code.
+
+      ## Done when
+      - [ ] A queue entry remembers when its ticket was created (`ticket_created`). Entries queued before this change have none and are not checked.
+      - [ ] Queueing a job for a ticket whose entry (same ID, same profile) belongs to an earlier, deleted ticket replaces that entry: the new ticket's job is queued, with the new rule's prompt and settings. Test.
+      - [ ] When the worker takes an entry whose ticket no longer exists, or exists with another created time, it drops the entry without starting a job and without spending retries; it says so on stderr and, when a ticket with that ID exists, in an automation comment on it. Test.
+      - [ ] A parked entry (waiting for prerequisites) keeps its `ticket_created` when it moves back to the queue.
+      - [ ] A rule's `agent.prompt` fills in event values (`comment.*`, `previous.*`, `unblocked.*`, `agent.*`) when the rule fires, but `${{ticket.*}}` values when the job starts, from the ticket as it is then. So a queued job's prompt shows the ticket's current title. Test: queue, rename the ticket, start: the prompt has the new title.
+      - [ ] A prompt with no `${{ticket.*}}` placeholders starts unchanged; a value filled in at the rule (e.g. a comment's text) is not expanded a second time except for `${{ticket.*}}` it contains.
+      - [ ] Docs on the rule's `prompt` say when ticket values are filled in.
+- at: 2026-11-24T21:18:26.092251+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:18:26.877339+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-786","DEV-818"]}'
+    new: '{"related":["DEV-786","DEV-818","DEV-833"]}'
+- at: 2026-11-24T21:22:11.194180+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:29.055632+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:22:47.884682+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: agent, job-paused
+    new: agent, job-paused, fix-retried
+- at: 2026-11-24T21:23:02.773051+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:35:32.137108+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:42:01.171567+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:50:01.597365+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:50:19.669740+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:21:34.484759+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix-retry'
+- at: 2026-11-24T22:21:34.760865+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review-claude'

@@ -1,11 +1,11 @@
 title: 'Agent jobs: one full test run at a time across jobs, agents keep working in parallel'
-status: Reviewing
+status: Done
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T03:06:53.057587+00:00
-modified: 2026-11-22T19:45:11.462864+00:00
+modified: 2026-11-23T07:19:57.258008+00:00
 relationships:
   related:
   - DEV-748
@@ -15,6 +15,8 @@ relationships:
   - DEV-785
   - DEV-795
   - DEV-783
+  - DEV-806
+  - DEV-812
 comments:
 - date: 2026-11-22T08:49:27.438495+00:00
   author: claude
@@ -151,6 +153,19 @@ comments:
       result: not_run
       reason: needs the installed build
     next: Review, then merge agent rebases onto main and resolves the merge.rs conflict with DEV-783
+- date: 2026-11-23T05:32:17.150924+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-784` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service/merge.rs`; lotar aborted the rebase, `agent/DEV-784` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T05:34:58.645866+00:00
+  author: claude
+  text: |-
+    Merge: rebased onto `main` (`e16388223`), conflict resolved; checks running.
+
+    - `merge.rs`: kept DEV-783's `install()` and `check()` with its rerun; `check()` takes the lock's `env`, both `run_shell` calls pass it, so the rerun also runs with `LOTAR_CHECK_LOCK_HELD=1`
+    - New HEAD `425fe5664`; `npm ci` passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74696b7a2d960572c6a68d1078f63f25eba1e0fcbc23d815d4b9c4cc6b8c50bf
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A127f32860f776708e00d865e74409e5ba45f8df03a998ccfaee2a641b9d5ce92
@@ -171,9 +186,6 @@ description: |-
   - [ ] **Test**: two holders' runs never overlap (Rust unit test and Node test), and merge checks run with `LOTAR_CHECK_LOCK_HELD=1` (DEV-605 test).
   - [ ] **Docs**: `docs/help/agent.md` (lotar's own merge), `docs/help/config-reference.md`, `smoke/README.md`, testing-strategy skill.
   - [ ] Load during a full queue stays near the core count: checked on the queue after the new build is installed (not testable in CI).
-tags:
-- fix-retried
-- retry-fix
 history:
 - at: 2026-11-22T03:06:53.285183+00:00
   actor: claude
@@ -361,3 +373,41 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-23T00:49:26.507958+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T05:32:17.150924+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:34:58.645866+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:35:15.081792+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried, retry-fix
+    new: ''
+- at: 2026-11-23T06:12:32.316513+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795","DEV-783"]}'
+    new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795","DEV-783","DEV-806"]}'
+- at: 2026-11-23T07:19:57.258008+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795","DEV-783","DEV-806"]}'
+    new: '{"related":["DEV-748","DEV-755","DEV-586","DEV-605","DEV-785","DEV-795","DEV-783","DEV-806","DEV-812"]}'

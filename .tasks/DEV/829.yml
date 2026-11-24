@@ -1,0 +1,404 @@
+title: 'docs: assignee picker search and profiles API omit the agent profile description (DEV-768)'
+status: Blocked
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-23T07:46:13.287811+00:00
+modified: 2026-11-24T22:23:58.104774+00:00
+relationships:
+  depends_on:
+  - DEV-768
+  related:
+  - DEV-768
+comments:
+- date: 2026-11-23T09:05:13.863013+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T090442.030Z-118 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T090442.030Z-118 why.'
+- date: 2026-11-23T19:14:51.974662+00:00
+  author: automation
+  text: The fix agent's job job-20261123T191434.456Z-413 failed (lotar agent logs job-20261123T191434.456Z-413); @fix-retry retries it on branch agent/DEV-829.
+- date: 2026-11-23T19:15:11.973166+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T191453.349Z-414 failed again (lotar agent logs job-20261123T191453.349Z-414). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T19:16:29.609232+00:00
+  author: triage
+  text: |-
+    Blocked on LOCA-601: Claude login expired before either fix job could do work.
+
+    - Jobs `job-20261123T191434.456Z-413` and `job-20261123T191453.349Z-414` both report: "this login reached its time limit and cannot be renewed".
+    - Added prerequisite `local:LOCA-601`, set Blocked and cleared the assignee; no retry while authentication is broken.
+    - Infrastructure triage follows the owner's `docs/decisions/2026-11-15-inbox-triage.md` in standards. LOCA-601 already carries the sign-in action and completion checks; Prerequisites done resumes this work.
+- date: 2026-11-23T19:16:30.441130+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T19:16:33.418871+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-829 yet. DEV-829 waits for local:LOCA-601.'
+- date: 2026-11-24T16:03:15.079401+00:00
+  author: claude
+  text: |-
+    Waits for DEV-768: the two lines to fix exist only on its branch.
+
+    - `git log main..agent/DEV-768` holds `a7d97ede2`, which writes both lines; main still has the older text (`api-quick-reference.md:48` without `provider?`, no Assignee picker bullet in `serve.md`).
+    - Editing them now would conflict with DEV-768's merge (it is in Merging).
+    - Added depends-on DEV-768, tag `waits`, and a "Done when" with checkboxes.
+    - Removed the depends-on LOCA-601: this Claude job signed in and ran, so the login works again.
+- date: 2026-11-24T16:04:42.612952+00:00
+  author: claude
+  text: |-
+    Still waits for DEV-768: it is in Merging, not on main yet.
+
+    - `git log main..agent/DEV-768` still shows `a7d97ede2`; main is at `d4bdbbbf6`.
+    - No edits on `agent/DEV-829`; depends-on DEV-768 and tag `waits` stay.
+- date: 2026-11-24T16:19:24.566521+00:00
+  author: claude
+  text: 'Still waits for DEV-768 (Merging, not on main): main at `d4bdbbbf6`, `a7d97ede2` only on `agent/DEV-768`. No edits; depends-on, tag `waits` and Blocked stay.'
+- date: 2026-11-24T16:19:29.620600+00:00
+  author: claude
+  text: |-
+    Still waits for DEV-768 (Merging, not on main yet); no edits made.
+
+    - main is at `d4bdbbbf6`; `git log main --grep DEV-768` is empty.
+    - Status Blocked, depends-on DEV-768 and tag `waits` stay; resume when DEV-768 lands.
+- date: 2026-11-24T16:19:40.695564+00:00
+  author: claude
+  text: |-
+    Still waits for DEV-768 (Merging, not on main): no edits.
+
+    - `git log main..agent/DEV-768` still shows `a7d97ede2`; main at `d4bdbbbf6`.
+    - Depends-on DEV-768, status Blocked and tag `waits` stay; the work starts once DEV-768 is Done.
+- date: 2026-11-24T16:22:47.323916+00:00
+  author: claude
+  text: |-
+    Still waits for DEV-768: no change made.
+
+    - DEV-768 is `Merging`; its commit `a7d97ede2` is only on `agent/DEV-768`, not on `main` (`git log main..agent/DEV-768`).
+    - The Assignee picker bullet in `docs/help/serve.md` exists only on that branch; editing the `api-quick-reference.md` line now would conflict with DEV-768's edit of the same line.
+    - Depends-on DEV-768 and tag `waits` stay; this resumes when DEV-768 is done.
+- date: 2026-11-24T16:31:04.774843+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A921b7d792872ac9edaf26947ab0fcb5db3777f2639b596627776caee6dec4a10 of the job job-20261123T181417.196Z-392 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T16:31:07.460374+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A46d188452fd28e76b5a392d6c71fd2f20ec516d0dc9a3c64e58f6af007365f92 of the job job-20261123T171401.623Z-377 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:08.665377+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A786352bd2c4c2eb0c371f36e929d509da8db5c982548a4787130ed39993cc426 of the job job-20261123T141103.437Z-280 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:09.839945+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A66bc471d6c80c256782bb3133829a9ebe82d7d27cac09b70d8bf9637a6420e47 of the job job-20261123T120533.044Z-218 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:10.671827+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ce7e314ae2602863ad20bb0c0e1e1e98ac34095a148b2f266c3fb9d3ede37e5 of the job job-20261123T110523.425Z-185 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:31:11.358781+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8b7878b8e0e67d93adf4738ce59a4e0f45e9c49654f8148827e59a3e2344e76f of the job job-20261123T100514.416Z-151 again, beside the ticket''s running job. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad20053c42d089766490447cbb98e7d8b13ab2cf0dc91e8199c3406ffae1b97b4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8b7878b8e0e67d93adf4738ce59a4e0f45e9c49654f8148827e59a3e2344e76f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ce7e314ae2602863ad20bb0c0e1e1e98ac34095a148b2f266c3fb9d3ede37e5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A66bc471d6c80c256782bb3133829a9ebe82d7d27cac09b70d8bf9637a6420e47
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab2daa18e4e2e660657bc2da4b3f0aa4c23156dd56dc084bbbd22483d0fb889b4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A786352bd2c4c2eb0c371f36e929d509da8db5c982548a4787130ed39993cc426
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc71b52b7863f3084261edf8c66fc5080ff332b85f8db33c368c5df99c448f20
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa19c46b8bfc556e43b42b4baad38c19a40a5ad61462b960494047f6a080f313f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A46d188452fd28e76b5a392d6c71fd2f20ec516d0dc9a3c64e58f6af007365f92
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A921b7d792872ac9edaf26947ab0fcb5db3777f2639b596627776caee6dec4a10
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9dbdf67ec25cdf70803ba1ac5468fb767e2d10d33c420300a4dc2c25585140ca
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aaf70e148e6a38633840acb6c2942e6b2a97b2579f2c0601ab4065189f094b29d
+description: |-
+  Found in the DEV-768 review: `f6a3671d2` (now `a7d97ede2` on `agent/DEV-768`) adds `agents.<name>.description`, shown under the name and matched by the picker's search, but two docs still describe the state before it.
+
+  - `docs/help/serve.md` (Assignee picker bullet): 'Each agent shows its runner, model, effort and provider. Every word you type must match a name, runner, model, effort or provider' – should name the description line and that search matches it.
+  - `docs/help/api-quick-reference.md` (GET /api/agents/profiles): the field list '(name, runner, model?, effort?, provider?, permissions)' leaves out description?.
+
+  Both lines come from DEV-768 and exist only on its branch: this ticket starts after DEV-768 is on main.
+
+  ## Done when
+  - [ ] `docs/help/serve.md` Assignee picker bullet says each agent shows its description (when set) under the name, and that every typed word may also match the description.
+  - [ ] `docs/help/api-quick-reference.md` GET /api/agents/profiles field list reads `(name, runner, description?, model?, effort?, provider?, permissions)`, matching `AgentProfileInfo` in `api_types.rs` and `view/api/types.ts`.
+  - [ ] No other help page describes the picker or profile fields without the description (`grep -rn` over `docs/help`).
+tags:
+- docs
+- job-paused
+- fix-retried
+history:
+- at: 2026-11-23T07:46:21.352073+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-768"]}'
+- at: 2026-11-23T07:46:27.052473+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T09:05:05.357461+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T09:05:10.165922+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad20053c42d089766490447cbb98e7d8b13ab2cf0dc91e8199c3406ffae1b97b4
+- at: 2026-11-23T09:05:13.750031+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: docs
+    new: docs, job-paused
+- at: 2026-11-23T09:05:13.863013+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:05:19.262318+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8b7878b8e0e67d93adf4738ce59a4e0f45e9c49654f8148827e59a3e2344e76f
+- at: 2026-11-23T11:05:29.237767+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ce7e314ae2602863ad20bb0c0e1e1e98ac34095a148b2f266c3fb9d3ede37e5
+- at: 2026-11-23T12:05:39.934277+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A66bc471d6c80c256782bb3133829a9ebe82d7d27cac09b70d8bf9637a6420e47
+- at: 2026-11-23T13:05:53.375701+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab2daa18e4e2e660657bc2da4b3f0aa4c23156dd56dc084bbbd22483d0fb889b4
+- at: 2026-11-23T14:12:33.593618+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A786352bd2c4c2eb0c371f36e929d509da8db5c982548a4787130ed39993cc426
+- at: 2026-11-23T15:13:18.775787+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc71b52b7863f3084261edf8c66fc5080ff332b85f8db33c368c5df99c448f20
+- at: 2026-11-23T16:13:56.698608+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa19c46b8bfc556e43b42b4baad38c19a40a5ad61462b960494047f6a080f313f
+- at: 2026-11-23T17:14:12.758128+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A46d188452fd28e76b5a392d6c71fd2f20ec516d0dc9a3c64e58f6af007365f92
+- at: 2026-11-23T18:14:29.427054+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A921b7d792872ac9edaf26947ab0fcb5db3777f2639b596627776caee6dec4a10
+- at: 2026-11-23T19:14:47.624097+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9dbdf67ec25cdf70803ba1ac5468fb767e2d10d33c420300a4dc2c25585140ca
+- at: 2026-11-23T19:14:50.802554+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: docs, job-paused
+    new: docs, job-paused, fix-retried
+- at: 2026-11-23T19:14:51.974662+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:15:09.587631+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aaf70e148e6a38633840acb6c2942e6b2a97b2579f2c0601ab4065189f094b29d
+- at: 2026-11-23T19:15:10.966871+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T19:15:11.973166+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:16:23.668314+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-768"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-768"]}'
+- at: 2026-11-23T19:16:24.472595+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T19:16:29.082059+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T19:16:29.609232+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:16:30.185319+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T19:16:30.441130+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:16:33.418871+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T19:16:58.819722+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:03:10.110468+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-768 review: `f6a3671d2` adds `agents.<name>.description`, shown under the name and matched by the picker's search, but two docs still describe the state before it.
+
+      - `docs/help/serve.md` (Assignee picker bullet): 'Each agent shows its runner, model, effort and provider. Every word you type must match a name, runner, model, effort or provider' – should name the description line and that search matches it.
+      - `docs/help/api-quick-reference.md` (GET /api/agents/profiles): the field list '(name, runner, model?, effort?, provider?, permissions)' leaves out description?.
+
+      Done when both lines name the description.
+    new: |-
+      Found in the DEV-768 review: `f6a3671d2` (now `a7d97ede2` on `agent/DEV-768`) adds `agents.<name>.description`, shown under the name and matched by the picker's search, but two docs still describe the state before it.
+
+      - `docs/help/serve.md` (Assignee picker bullet): 'Each agent shows its runner, model, effort and provider. Every word you type must match a name, runner, model, effort or provider' – should name the description line and that search matches it.
+      - `docs/help/api-quick-reference.md` (GET /api/agents/profiles): the field list '(name, runner, model?, effort?, provider?, permissions)' leaves out description?.
+
+      Both lines come from DEV-768 and exist only on its branch: this ticket starts after DEV-768 is on main.
+
+      ## Done when
+      - [ ] `docs/help/serve.md` Assignee picker bullet says each agent shows its description (when set) under the name, and that every typed word may also match the description.
+      - [ ] `docs/help/api-quick-reference.md` GET /api/agents/profiles field list reads `(name, runner, description?, model?, effort?, provider?, permissions)`, matching `AgentProfileInfo` in `api_types.rs` and `view/api/types.ts`.
+      - [ ] No other help page describes the picker or profile fields without the description (`grep -rn` over `docs/help`).
+- at: 2026-11-24T16:03:10.673496+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-768"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-768"],"related":["DEV-768"]}'
+- at: 2026-11-24T16:03:13.135314+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-768"],"related":["DEV-768"]}'
+    new: '{"depends_on":["DEV-768"],"related":["DEV-768"]}'
+- at: 2026-11-24T16:03:14.988381+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: docs, job-paused, fix-retried
+    new: docs, job-paused, fix-retried, waits
+- at: 2026-11-24T16:03:15.079401+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:04:42.612952+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:24.566521+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:29.620600+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:19:40.695564+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:22:47.323916+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:04.774843+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:07.460374+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:08.665377+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:09.839945+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:10.671827+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:31:11.358781+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:23:57.797810+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: docs, job-paused, fix-retried, waits
+    new: docs, job-paused, fix-retried
+- at: 2026-11-24T22:23:58.104774+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'

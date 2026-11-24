@@ -1,0 +1,30 @@
+title: T3 thread row says Finished while the thread waits on background work
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T22:44:15.700672+00:00
+modified: 2026-11-24T22:44:16.963130+00:00
+relationships:
+  related:
+  - DEV-849
+description: |-
+  Found in the DEV-849 review: `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` maps T3 status `completed` with no `activeRunId` to `finished`. A thread that ended its turn on `t3_background_wait` (non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` in `t3 thread show --json`) is still working: its lotar job ends only after the wake run. The row then says Finished while the job runs.
+
+  Done when: such a thread shows Running (or a 'waits on background work' state), with a unit test on `from_shown`.
+tags:
+- agent
+- ui
+history:
+- at: 2026-11-24T22:44:16.379275+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-849"]}'
+- at: 2026-11-24T22:44:16.963130+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -5,11 +5,12 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-22T19:29:28.702865+00:00
+modified: 2026-11-23T08:24:45.782269+00:00
 relationships:
   related:
   - DEV-725
   - DEV-780
+  - DEV-783
 comments:
 - date: 2026-11-22T18:46:53.150110+00:00
   author: claude
@@ -38,8 +39,49 @@ comments:
       result: passed
       reason: 407 of 407 at load ~50
     next: Review, then merge
+- date: 2026-11-22T22:48:49.377331+00:00
+  author: claude
+  text: |-
+    Review: blocking. The gate stops only a check that lotar saw fail. A merge agent whose turn ends while its own first check run is still going still gets its branch landed.
+
+    - **Gap (Done-when bullet 1):** the gate in `ensure_branch_merged` (`crates/lotar-agent/src/services/agent_job_service.rs:5201-5208`) only fires when a report since the job started names a check `failed`. Take lotar's most common hand-off, a rebase conflict (`agent_job_service/merge.rs:234`): no check has run yet, so no report has one. The agent resolves the conflict, starts smoke, and ends its turn with "waiting for the result". `git merge --ff-only` at `:5209` then lands an untested conflict resolution on main. That is the same failure as DEV-725, and the ticket asks for "a merge (or any) agent turn that ends with its own check still running".
+    - **Fix:** before lotar runs its own fast-forward, require every `agent.merge.checks` command to be reported `passed` since the job started, after its latest failure. Otherwise fail the job, or rerun the checks itself with merge.rs's check runner. Add a test: a conflict hand-off with no passed report stays unmerged.
+    - **Same spot:** the gate matches commands by exact text. `hand_off_prompt` (`merge.rs:95`) doesn't tell the agent that lotar lands the branch only after a `--check "<exact command>=passed"` report. An agent that reports `npm run test:smoke:agent` instead of `npm run -s smoke` fails a good merge. Name the commands in the hand-off prompt.
+    - **Holds:** the DEV-725 case and the DEV-780 case are both covered. DEV-780 had smoke `failed` at 18:32Z, and a taken-over job keeps its first `started_at` (`:2076`, from the active-job record), so the gate applies. The new `takeover_branch` fallback gives it a branch. An agent that fast-forwards main itself still lands (the `landed` branch returns before the gate). The test `a_merge_job_whose_check_failed_and_never_passed_stays_unmerged` would fail without the gate (lotar would fast-forward). The docs in `docs/help/agent.md` match the code.
+    - **Done-when bullet 2 is met outside the code:** DEV-725 was reopened, then released at 19:38Z (tag `v0.15.6` on `78c006d4b`, lotar 0.15.6 installed). The owner told the agent to release it at 19:02Z.
+    - **Branch:** one commit, `6112404d5`, 3 files, no stray files. It applies cleanly on main `321debdf9` (`git merge-tree`), including DEV-783's change that reruns a failed check.
+    - **Reran:** `npm ci` passed. `cargo nextest run --workspace -E 'test(/merge/)'`: 61 of 61 passed. The 4 new tests passed. `npm run -s lint:agent` passed. I didn't rerun the full `npm run -s test:agent` or `npm run -s smoke`: they take too long for a review, and the fix agent reports both passed.
+    - No UI changes, so no screenshots are needed.
+- date: 2026-11-23T04:39:54.136845+00:00
+  author: claude
+  text: |-
+    Review findings fixed: lotar now fast-forwards a merge only when each configured check is reported passed in the job.
+
+    - **Gap (no check ran, e.g. rebase conflict):** `ensure_branch_merged` now takes the repo's `agent.merge.checks` (when lotar's merge ran: config set and trusted). `merge::unpassed_checks` lists each check whose latest result since the job started is `failed`, and each configured check that no report since then names `passed`, unless the latest report on the branch's commit does (the case where lotar skipped the check). If any are listed, the job fails and the branch stays unmerged.
+    - **Exact command text:** `hand_off_prompt` now names the exact flags (`--check "<cmd>=passed"` for each check) and says not to end the turn while a check runs.
+    - Review comment read `6112404d5`, the HEAD at the time. Amended into `6a37dafe0` (signed).
+    - Tests: 4 new in `agent_job_service.rs`: conflict hand-off with no passed report stays unmerged, all checks passed lands, a pass on the branch commit counts, the hand-off names the checks. The 4 tests from the first round still pass.
+    - Docs: `docs/help/agent.md` (merge-job paragraph and lotar's own merge section).
+  report:
+    commits:
+    - hash: 6a37dafe0
+      what: gate on agent.merge.checks reported passed; hand-off names the --check flags
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2474 Rust, 1567 UI
+    - command: npm run -s test:smoke:agent
+      result: passed
+      reason: 407 of 407
+    next: Review again
+- date: 2026-11-23T08:24:45.782269+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082249.243Z-93 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082249.243Z-93 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
 description: |-
   Found by the standards communication review (STD-17), 2026-11-22.
 
@@ -59,6 +101,8 @@ description: |-
   - A release ticket isn't set Done before its tag is pushed; DEV-725 is reopened or finished (smoke green, pushed, tagged, installed), and the owner or chief of staff is told its real state.
 tags:
 - health
+- review-returned
+- job-paused
 custom_fields:
   finding: comms:merge-lands-while-agent-waits
 history:
@@ -107,3 +151,62 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-22T22:48:49.377331+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-22T22:48:51.394407+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-780"]}'
+    new: '{"related":["DEV-725","DEV-780","DEV-783"]}'
+- at: 2026-11-22T22:48:53.486365+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-22T22:49:12.486392+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-23T04:32:42.244472+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T04:32:44.687577+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
+- at: 2026-11-23T04:39:54.136845+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T04:40:06.240276+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:24:45.272555+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, job-paused
+- at: 2026-11-23T08:24:45.782269+00:00
+  actor: automation
+  changes:
+  - field: comment_added

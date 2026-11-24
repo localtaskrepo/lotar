@@ -1,0 +1,271 @@
+title: 'Agent jobs: a ticket paused on a usage limit resumes as several sessions at once in one worktree'
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-24T16:04:39.624520+00:00
+modified: 2026-11-24T22:26:00.091595+00:00
+relationships:
+  related:
+  - DEV-800
+  - DEV-778
+  - DEV-796
+  - DEV-798
+  - DEV-811
+  - DEV-830
+  - DEV-831
+  - DEV-834
+  - DEV-584
+  - DEV-821
+  - DEV-825
+  - DEV-777
+  - DEV-810
+  - DEV-843
+  - DEV-740
+  - DEV-767
+  - DEV-770
+  - DEV-774
+comments:
+- date: 2026-11-24T16:05:45.622823+00:00
+  author: claude
+  text: |-
+    More evidence from DEV-800 session 862ae2 (my duplicate DEV-834 deleted)
+
+    - `ListAgents` at ~16:05Z: 4 sessions for DEV-800 (862ae2, 3ef9cd, ac3835, 511274), all with cwd `.lotar-worktrees/lotar/DEV-800`
+    - Also 3 to 5 sessions each for DEV-778, DEV-796, DEV-798, DEV-811, DEV-830, DEV-831, STD-328
+    - The old ones look like the T3 threads of jobs that failed on 2026-11-23 after the login expired (`lotar-95e687-DEV-800-fix`, `-fix-retry`)
+- date: 2026-11-24T16:09:48.082083+00:00
+  author: claude
+  text: 'Evidence from the communication review (2026-11-24): headless Claude jobs paused until the named reset ("resets 8am", e.g. 3 jobs per ticket on DEV-821 to DEV-825), but t3 jobs repeat every hour, because T3''s error says only "Usage limit reached ... Try again later": STD-334 paused 11 times from 08:23Z to 18:25Z on 2026-11-23, DEV-811 five times. In the 26 hours: 72 paused t3 jobs in lotar, 12 in standards, 2 in local, each a T3 thread of its own. Those threads are what T3 resumed at the reset. Worth checking whether a t3 job can take the reset time from T3''s paused-turn notice ("paused until the 5-hour limit resets in 11m", seen in DEV-584''s comments), or wait on one probe job per provider instead of one per ticket.'
+- date: 2026-11-24T19:10:45.009452+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261124T191028.432Z-24 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261124T191028.432Z-24 why.'
+- date: 2026-11-24T21:18:35.359789+00:00
+  author: claude
+  text: |-
+    Reproduced live on this ticket: T3 resumed both paused job threads at the reset, so two sessions worked in the DEV-833 worktree at once. I stopped and left the fix to the other session.
+
+    - Threads `mcp:launch:d283ffe…` (19:10Z job) and `mcp:launch:6ec0824…` (20:10Z retry) both `running` since about 21:14Z, each sent "Continue where you left off." by T3
+    - Neither thread was taken over: `agent list-jobs` shows no DEV-833 job, and the 21:10Z retry is still queued, so it would start a third session
+    - Hourly retries: the reset time is only in the assistant message ("resets 1pm (America/Los_Angeles)"), and `usage_limit_pause` reads only `runner_errors`, so it waits the default hour
+    - The uncommitted diff in the worktree (`after_limit`, the retry continues the same T3 thread) belongs to the 6ec0824 session; I sent it these findings and made no edits
+- date: 2026-11-24T21:21:16.447293+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6ec0824c6fa32269749b2e873e5be78b09bbec46fad2a03e83785b28054990f0 of the job job-20261124T201045.425Z-57 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T212116.427Z-28: DEV-833 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T21:21:19.488877+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad283ffe4e392d92106338ccab22b08a4b58c2c5b994c8bd7ae8f3843fcb2a4ab of the job job-20261124T191028.432Z-24 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6ec0824c6fa32269749b2e873e5be78b09bbec46fad2a03e83785b28054990f0 that the job job-20261124T212116.427Z-28 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T21:26:14.274264+00:00
+  author: claude
+  text: |-
+    Cause found, fix in progress on `agent/DEV-833`: each hourly retry of a paused t3 job opened a new T3 thread, and T3 resumes every paused thread at the reset
+
+    - T3 marks each paused turn ("This turn is paused until the 7-day limit resets in 21h 43m") and sends "Continue where you left off." at the reset (DEV-800 thread `mcp:launch:947bb4…`)
+    - lotar sees only "Try again later", waits an hour, and the retry (`session` new, or idle past `continue_within_minutes` 55) starts thread N+1
+    - Fix: a t3 limit retry continues the paused job's thread (`session: continue`, no idle handoff), and the reset time comes from the agent's reply ("resets 1pm (America/Los_Angeles)") when the runner's error names none
+- date: 2026-11-24T21:48:50.912806+00:00
+  author: claude
+  text: |-
+    Fixed: a t3 job's retry after a usage limit now continues the paused job's T3 Code thread instead of starting a new one.
+
+    - Cause: T3 Code pauses the turn and resumes it at the reset by itself. lotar saw only "Try again later", retried every hour in a new thread, and T3 Code resumed every one of those threads at the reset. DEV-800 had about 10.
+    - The retry now has `session: continue`, also past `continue_within_minutes`. The job note says "in the same T3 Code thread".
+    - When the error names no reset, the reset is read from a limit line in the agent's reply ("resets 1pm (America/Los_Angeles)"), so there are no hourly retries.
+    - New test in `dev503_harness_jobs_test.rs`: one `t3_thread_launch`, then one `t3_thread_send` to the same thread. The docs (`docs/help/agent.md`, Usage limits) are updated.
+    - Retries already in the queue from the old binary (DEV-833's 21:10Z one) still start a new thread.
+    - Possible follow-up for harnessmux, not filed: report T3's `system_notice` limit item and its reset epoch.
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: 43b013d00
+      what: a t3 job's usage-limit retry continues the paused job's thread; the reset comes from the agent's reply
+    checks:
+    - command: cargo nextest run --cargo-profile dev -E 'test(dev584) | test(usage_limit) | test(dev626) | test(resumed) | test(dev510) | test(continue) | test(dev503) | test(reset_named)'
+      result: passed
+      reason: 96 tests
+    - command: new test a_t3_jobs_retry_after_a_usage_limit_continues_its_thread fails without the fix
+      result: passed
+    - command: cargo clippy --all-targets
+      result: passed
+    - command: rustfmt and prettier on changed files
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: ps/lsof one session per worktree
+      result: not_run
+      reason: needs the released binary; today DEV-833 shows 1 claude process
+    next: 'Merge; after release, watch the next usage-limit pause: one T3 thread per ticket'
+- date: 2026-11-24T22:20:34.857236+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T21:49Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T22:25:53.678721+00:00
+  author: claude
+  text: |-
+    Review: passed. A paused t3 job's retry continues the same T3 Code thread, so a ticket resumes as one session.
+
+    - Read: `43b013d00` (6 files against merge-base `855ff6f46`), the ticket and its comments, `docs/help/agent.md` (Usage limits), and the recent main commits to the touched files (DEV-767, DEV-774, DEV-770, DEV-740): nothing the fix relies on has changed.
+    - Done when: the retry sets `session: continue` and skips the `continue_within_minutes` handoff only for t3 limit retries (`agent_job_service.rs:3688`). `after_limit` comes from `not_before`, and only `usage_limit_pause` sets that, so other queued jobs are unaffected.
+    - The reset is read from the agent's reply only when the runner already reported a limit (`usage_limit.rs:83`), so the agent's words alone still pause no job, as the docs say.
+    - Reran `cargo nextest run -E 'test(dev584) | test(usage_limit) | test(dev503) | test(reset_named) | test(resumed)'`: 84 passed.
+    - The new test `a_t3_jobs_retry_after_a_usage_limit_continues_its_thread` fails with main's `crates/lotar-agent/src` (`dev503_harness_jobs_test.rs:1502`) and passes with the fix. I restored the files afterwards; the worktree is clean.
+    - No stray files, no second branch, no owner decision touched, no UI change.
+    - Not rerun: clippy, lint, the full suites and smoke (the merge runs them), and the live ps/lsof check (needs the released binary).
+    - Tickets filed: none.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad283ffe4e392d92106338ccab22b08a4b58c2c5b994c8bd7ae8f3843fcb2a4ab
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6ec0824c6fa32269749b2e873e5be78b09bbec46fad2a03e83785b28054990f0
+description: 'Found: at the 2026-11-24 08:00 limit reset, 4 Claude sessions of T3 Code (pids 89463, 89961, 1066, 93866, each --add-dir the DEV-800 worktree, 3 of them --resume of earlier threads) worked on DEV-800 at the same time and edited the same files (two added the same FINDING_BUNDLE_FIELD constant twice in crates/lotar-core/src/utils/custom_fields.rs). The hourly retries while paused (sessions lotar-95e687-DEV-800-fix.20261123T091544Z .. T181801Z) seem to each come back. Check: ps aux | grep claude, lsof -a -p <pid> -d cwd: more than one session per job worktree. Done: one ticket resumes as one session.'
+tags:
+- health
+- job-paused
+custom_fields:
+  finding: agent-jobs:paused-resume-duplicates
+history:
+- at: 2026-11-24T16:04:42.173807+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-800"]}'
+- at: 2026-11-24T16:04:45.853882+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:05:45.622823+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:46.363863+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834"]}'
+- at: 2026-11-24T16:09:48.082083+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:09:50.290998+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825"]}'
+- at: 2026-11-24T16:11:38.383339+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777"]}'
+- at: 2026-11-24T16:19:34.623822+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810"]}'
+- at: 2026-11-24T19:10:42.186767+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-24T19:10:42.674387+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad283ffe4e392d92106338ccab22b08a4b58c2c5b994c8bd7ae8f3843fcb2a4ab
+- at: 2026-11-24T19:10:44.981324+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-24T19:10:45.009452+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T20:10:46.791845+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6ec0824c6fa32269749b2e873e5be78b09bbec46fad2a03e83785b28054990f0
+- at: 2026-11-24T21:18:26.876820+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843"]}'
+- at: 2026-11-24T21:18:35.359789+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:21:16.447293+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:21:19.488877+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:26:14.274264+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:48:50.912806+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:49:05.473820+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T22:20:27.820253+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-24T22:20:28.459450+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-24T22:20:29.289539+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-24T22:20:34.857236+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:25:53.678721+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:25:53.935197+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843"]}'
+    new: '{"related":["DEV-800","DEV-778","DEV-796","DEV-798","DEV-811","DEV-830","DEV-831","DEV-834","DEV-584","DEV-821","DEV-825","DEV-777","DEV-810","DEV-843","DEV-740","DEV-767","DEV-770","DEV-774"]}'
+- at: 2026-11-24T22:26:00.091595+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

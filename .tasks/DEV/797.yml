@@ -5,10 +5,15 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-22T21:30:16.313374+00:00
+modified: 2026-11-23T08:54:50.250175+00:00
 relationships:
   blocks:
   - DEV-801
+  related:
+  - DEV-763
+  - DEV-780
+  - DEV-787
+  - DEV-792
 comments:
 - date: 2026-11-22T21:30:02.840094+00:00
   author: claude
@@ -50,8 +55,58 @@ comments:
       result: failed
       reason: STD-130/133 and STD-194 usage-limit tests in scripts/automation.test.ts fail on main's file too; the commit gate refuses the standards commit
     next: Merge afdb9d5c0; commit the uncommitted standards change in ~/.t3/worktrees/standards/dev-797-targeted-checks once standards' check passes, and land it; after the release, measure merge check rounds against the 84% failure baseline
+- date: 2026-11-23T03:32:06.765553+00:00
+  author: claude
+  text: |-
+    Review: blocking. The lock works, but cancelling a waiting merge from another process doesn't end the wait, and a waiting merge agent never comments its wait time.
+
+    Read: `afdb9d5c0` (diff `main...HEAD`), the ticket, its Done when and the fix comment, DEV-801, AGENTS.md, main's newer commits to the same files (DEV-763, DEV-792, DEV-787, DEV-780).
+    Reran: `npm ci`, `npm run lint` (passed, no warnings), `cargo nextest run -p lotar-agent checks_lock` (2 passed), `cargo nextest run -p lotar-lib --test integration -E 'test(dev797) or test(dev605) or test(dev783)'` (22 passed).
+
+    **Blocking**
+    1. **Cancel from another process doesn't end the wait.** In `crates/lotar-agent/src/services/agent_job_service/checks_lock.rs:72`, the wait loop only calls `should_stop_job`, which reads this process's job registry. `lotar agent cancel <id>` from another process (a CLI, or a job running in the queue worker) writes a `<job>.cancel` file (`agent_active_jobs::request_cancel`). Only the runner loops read that file (`agent_job_service.rs` ~4035 and ~4641, `cancel_requested`). So the merge keeps waiting, the CLI reports "has not stopped yet" after 15 s, and the merge runs its full checks once the lock frees. That misses Done when: "cancelling the job while it waits ends the wait". **Fix:** in the wait loop, also check `agent_active_jobs::cancel_requested(tasks_dir, job_id)`, then call `AgentJobService::cancel_job(job_id)` and return `Cancelled`. Add a test that writes the cancel request while the job waits.
+    2. **A waiting merge agent doesn't comment its wait.** At `agent_job_service.rs` ~3604-3626 (the merge-agent path, used by every repo without `agent.merge`), `Waited … the merge agent starts now` and `starts without the checks lock` go only to the job's progress log. Only lotar's own merge puts them in its comment (`merge.rs` `wait_for_checks_lock`). Done when says the waiting job "comments the wait time". **Fix:** comment the wait on the ticket there too, and update `docs/help/agent.md` ("lotar's merge comments how long it waited"). The test `a_merge_agent_waits_for_another_merges_checks` should then assert the comment.
+
+    **Not blocking**
+    - The standards half of Done when (`configs/lotar/automation.yml`) is still uncommitted in `~/.t3/worktrees/standards/dev-797-targeted-checks`, on the old base `01f8784e`. Filed [STD-324](https://standards.pyxzl.net/task/STD-324) so it isn't lost. It doesn't block this lotar merge.
+    - Checked and fine: the lock is taken only by merge jobs, after "nothing to merge" and the hand-offs that come before it; it's held through a hand-off until `run_job` returns; no stall watch runs during the wait; tests use their own queue folder (the `common` ctor and `smoke/helpers/workspace.ts`), so a merge's own checks never wait on the lock that merge holds; the git hooks are unchanged; the prompts, AGENTS.md and testing-strategy edits match the owner's words.
+    - Rebasing onto main has a trivial conflict in `crates/lotar-lib/tests/integration.rs` (adjacent `mod` lines, next to DEV-763).
+    - My own slip: I first filed the standards ticket in lotar as DEV-824, because the job's `LOTAR_TASKS_DIR` overrides the folder. I hard-deleted it and removed its link from DEV-797.
+- date: 2026-11-23T07:00:49.043125+00:00
+  author: claude
+  text: |-
+    Rework: both blocking findings fixed, amended as `3c444f069`.
+
+    - Review read `afdb9d5c0`, which was HEAD.
+    - **Cancel from another process:** the wait loop in `checks_lock.rs` now reads `agent_active_jobs::cancel_requested`, calls `AgentJobService::cancel_job` and stops the wait. The job's record exists while it waits (`start_job` registers it), so `lotar agent cancel` finds it. New test `a_cancel_from_another_process_ends_the_wait`: the job ends `cancelled` and runs no checks once the lock frees. Without the fix it fails (still `running` after 60 s).
+    - **Merge agent's wait comment:** `comment_checks_lock` in `agent_job_service.rs` puts "Waited … the merge agent starts now" (or "starts without the checks lock: …") in the job log and on the ticket. `a_merge_agent_waits_for_another_merges_checks` now checks for the comment. Without the fix it fails.
+    - `docs/help/agent.md` "The checks lock": both kinds of merge comment the wait, `lotar agent cancel` ends it, and the "no lock" fallback is in the comment.
+    - Not changed: STD-324 (the standards prompt copy) is still open, as the review noted.
+  report:
+    commits:
+    - hash: 3c444f069
+      what: cancel from another process ends the lock wait; a waiting merge agent comments its wait
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(dev797) or test(dev605) or test(dev783)'
+      result: passed
+      reason: 23 passed
+    - command: cargo nextest run -p lotar-agent checks_lock
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: rework job, the merge runs the full suites (AGENTS.md)
+    - command: npm run smoke
+      result: not_run
+      reason: rework job, the merge runs it
+    next: Review again, then merge
+- date: 2026-11-23T08:54:50.250175+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T085437.865Z-111 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T085437.865Z-111 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
 description: |-
   Owner decision 2026-11-22 (chief of staff's options picker, after a 72 h pipeline measurement): picked "Full suites once, one at a time": fix and review jobs run only the tests for what changed; only the merge runs the full suites; one full suite runs on the machine at a time (a shared lock in lotar). Not picked: the lock alone, or 2 parallel jobs instead of 3.
 
@@ -75,6 +130,8 @@ description: |-
   - [ ] Measured after release: merge check rounds that fail on load timeouts, against the 84% baseline (a follow-up after the release, not this job).
 tags:
 - agent
+- review-returned
+- job-paused
 history:
 - at: 2026-11-22T19:02:57.524782+00:00
   actor: claude
@@ -151,3 +208,74 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-23T03:29:48.472575+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801"]}'
+    new: '{"blocks":["DEV-801"],"related":["DEV-824"]}'
+- at: 2026-11-23T03:31:24.730543+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801"],"related":["DEV-824"]}'
+    new: '{"blocks":["DEV-801"]}'
+- at: 2026-11-23T03:32:06.765553+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T03:32:08.563090+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801"]}'
+    new: '{"blocks":["DEV-801"],"related":["DEV-763","DEV-780","DEV-787","DEV-792"]}'
+- at: 2026-11-23T03:32:10.459871+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent
+    new: agent, review-blocked
+- at: 2026-11-23T03:32:30.069780+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, review-blocked
+    new: agent, review-returned
+- at: 2026-11-23T06:57:29.941892+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-23T06:57:34.928335+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
+- at: 2026-11-23T07:00:49.043125+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T07:01:14.879755+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T08:54:50.098660+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, review-returned
+    new: agent, review-returned, job-paused
+- at: 2026-11-23T08:54:50.250175+00:00
+  actor: automation
+  changes:
+  - field: comment_added

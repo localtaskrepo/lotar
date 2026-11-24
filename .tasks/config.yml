@@ -5,6 +5,8 @@ default:
 server:
   public_url: https://lotar.pyxzl.net
 agent:
+  memory_gate:
+    max_swap_percent: 95
   merge:
     checks:
     - npm run -s lint:agent

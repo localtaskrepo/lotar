@@ -1,0 +1,47 @@
+title: 'Agent jobs: after the Claude login came back, 2 to 4 Claude sessions per ticket run in the same job worktree'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-24T16:05:31.382055+00:00
+modified: 2026-11-24T16:05:46.364842+00:00
+deleted_at: 2026-11-24T16:05:56.750070+00:00
+relationships:
+  related:
+  - DEV-778
+  - DEV-796
+  - DEV-798
+  - DEV-800
+  - DEV-811
+  - DEV-830
+  - DEV-831
+  - DEV-833
+description: 'Found 2026-11-24 ~16:05Z from the DEV-800 fix job: ListAgents shows 4 sessions for DEV-800 (862ae2, 3ef9cd, ac3835, 511274), all with cwd .lotar-worktrees/lotar/DEV-800, started within 4 minutes; one of them edits the code while the others start the same work. DEV-778, DEV-796, DEV-798, DEV-811, DEV-830, DEV-831, STD-328 also show 3 to 5 sessions each. They look like the T3 threads of jobs that failed on 2026-11-23 with an expired Claude login (harnessmux sessions lotar-95e687-DEV-800-fix, -fix-retry), resumed together with the new job. Check: ListAgents or ps for claude --resume processes, grouped by cwd. Done when: one ticket has at most one agent session working in its worktree, and resuming after a login failure doesn''t start the old job threads again next to the new job.'
+tags:
+- health
+custom_fields:
+  finding: agent-jobs:duplicate-sessions
+history:
+- at: 2026-11-24T16:05:33.085165+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-778","DEV-796","DEV-798","DEV-800","DEV-811","DEV-830","DEV-831"]}'
+- at: 2026-11-24T16:05:34.461104+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:05:46.364842+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-778","DEV-796","DEV-798","DEV-800","DEV-811","DEV-830","DEV-831"]}'
+    new: '{"related":["DEV-778","DEV-796","DEV-798","DEV-800","DEV-811","DEV-830","DEV-831","DEV-833"]}'
+- at: 2026-11-24T16:05:56.750070+00:00
+  actor: claude
+  changes:
+  - field: deleted
+    new: 2026-11-24T16:05:56.750070+00:00

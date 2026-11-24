@@ -1,20 +1,238 @@
 title: After an upgrade the queue says "waiting for the running jobs of their tickets to end" while the old worker only drains
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T20:41:41.734525+00:00
-modified: 2026-11-22T20:41:42.311136+00:00
+modified: 2026-11-24T22:40:51.194987+00:00
 relationships:
   related:
   - DEV-768
+  - TEST-1
+  - TEST-2
+  - DEV-762
+  - DEV-763
+  - DEV-784
+  - DEV-361
+comments:
+- date: 2026-11-23T02:08:19.219769+00:00
+  author: claude
+  text: |-
+    Fixed: after an upgrade a new worker takes the queue at once, so the drain no longer holds it and the wrong reason doesn't show.
+
+    - Decision (ticket's first option, in Done when): the old worker gives up the worker lock when it sees the upgrade and starts a worker from the new binary (`hand_off_queue` in `crates/lotar-agent/src/services/agent_queue_service.rs`); it only finishes its running jobs.
+    - At its exit a worker that handed off doesn't run `restore_taken`, since the taken entries may be the new worker's while they start. It still starts a worker if entries are left (for when the handoff spawn failed).
+    - No new `worker_state` case is needed: the reason shown is the new worker's real one (slot limit, or the ticket's job on the old worker).
+    - Test: `crates/lotar-lib/tests/dev361_worker_restarts_after_upgrade_test.rs` now needs TEST-2 to start while TEST-1 still runs. It also releases its jobs when it fails: the old version left a `sh` loop running forever.
+    - Docs: `docs/help/agent.md` (worker upgrade paragraph, takeover note).
+  report:
+    commits:
+    - hash: 701cf6113
+      what: the upgraded worker runs the queue at once; the old one only finishes its jobs
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: via lint:agent
+    - command: npm test
+      result: passed
+      reason: via test:agent, 2469 Rust, 1567 UI
+    - command: npm run smoke
+      result: passed
+      reason: via test:smoke:agent, 407
+    - command: cargo nextest run --workspace dev361
+      result: passed
+      reason: 3 runs; failed on the old code (only 1 of 2 jobs ran)
+    next: Review, then merge
+- date: 2026-11-23T06:12:27.031304+00:00
+  author: claude
+  text: |-
+    Review: passed. `701cf6113` does everything in Done when; no blocking or minor findings.
+
+    - Read: the diff `main...HEAD` (3 files: `agent_queue_service.rs`, `dev361_worker_restarts_after_upgrade_test.rs`, `docs/help/agent.md`), the ticket's timeline, AGENTS.md, and main's newer commits to these files. Only DEV-762, DEV-784 and DEV-763 touch `docs/help/agent.md`, and `git merge-tree` merges cleanly.
+    - Decision: the ticket that claude filed asked to "decide and document" between two options. The fix took the first one, quoted it and dated it. It is not one only the owner can make. The dropped `worker_state` item doesn't apply under that option.
+    - Handoff (`run_worker_with`, `hand_off_queue`): the handoff runs at the top of a loop pass, so the old worker has settled every entry it took first. A `settle_taken` error exits before the handoff, and the exit then still runs `restore_taken`. Skipping `restore_taken` after a handoff prevents double starts.
+    - `spawn_worker` starts the watched symlink path, so the new worker runs the upgraded build. The new worker skips the old one's jobs because the owner process is alive. T3 adoption only looks at ended jobs.
+    - Spawn failure: nobody holds the lock, so `worker_state` shows `Stopped` and the resume hint. The old worker's `ensure_worker` at exit tries again.
+    - Test: without the fix TEST-2 can't start until `release` exists, which now happens only on drop. So the test times out on old code, as the fix agent reported. The `Release` guard ends the `sh` loops when the test fails.
+    - Reran: `npm ci` (ok), `npm run test:rust:agent -- queue worker upgrade` (52 passed), `rustfmt --check` on the changed Rust files (ok).
+    - Reran: `cargo clippy -p lotar-agent --all-targets -D warnings` (ok). The sandbox blocked sccache, so it ran with `RUSTC_WRAPPER=`.
+    - Not rerun: the full `npm run lint`, `npm test` and `npm run smoke`. The fix agent reports they passed.
+    - Worktree left clean. No UI changes, no tickets filed.
+- date: 2026-11-23T08:28:06.748176+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T08:28:12.386578+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082758.700Z-102 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082758.700Z-102 why.'
+- date: 2026-11-23T09:28:53.754941+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T10:29:22.493153+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T11:29:58.112214+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T12:31:54.405270+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T13:34:41.498351+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T14:34:53.593414+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T15:35:15.536165+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-23T16:35:37.465019+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T17:04:10.552806+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-806` onto `main` conflicts in `crates/lotar-agent/src/services/agent_queue_service.rs`; lotar aborted the rebase, `agent/DEV-806` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T17:18:30.205230+00:00
+  author: automation
+  text: The merge agent's job job-20261124T170345.051Z-4 failed (lotar agent logs job-20261124T170345.051Z-4); the fix agent retries it on branch agent/DEV-806.
+- date: 2026-11-24T19:36:52.915174+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:\n```\ntarget/web/assets/AutomationRulesEditor-BII0DxUG.js      72.27 kB │ gzip:  20.10 kB\ntarget/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB\ntarget/web/assets/MarkdownContent-DquDsQ8j.js           111.18 kB │ gzip:  35.20 kB\ntarget/web/assets/ConfigView-ymW2sFje.js                153.98 kB │ gzip:  38.52 kB\ntarget/web/assets/SprintsList-BzJn0XWH.js               254.93 kB │ gzip:  85.09 kB\ntarget/web/assets/index-DUGgBBgf.js                     420.00 kB │ gzip: 127.67 kB\n\n✓ built in 3.17s\n\e[33m[PLUGIN_TIMINGS] \e[0mJavaScript callbacks ran for 2.0s of this 3.2s build (64%).\n1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:\n  - plugin vite:asset load (3 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.\n\ncompressed 1939KiB -> 582KiB (70% saved), embedding 89 gz + 1 raw assets\nrust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-802 (pid 26519), since 19:12 UTC\nrust-test-runner: Took the check lock after 18 min\n   Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806/crates/lotar-core)\n   Compiling harnessmux v0.3.0\n   Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806/crates/lotar-web-assets)\n   Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806/crates/lotar-lib)\n   Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806/crates/lotar-tasks)\n   Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806/crates/lotar-agent)\n   Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-806)\n    Finished `dev` profile [unoptimized] target(s) in 41.43s\n────────────\n Nextest run ID 1362db2c-8c25-4c54-bab3-ef9198aa08c1 with nextest profile: default\n    Starting 2488 tests across 14 binaries\n────────────\n     Summary [ 211.992s] 2488 tests run: 2488 passed, 0 skipped\nrust-test-runner: error: tests left 2 entries in the temp folder; remove them where they are created: .lotar-test-scratch, .tmpHwTTeP\n```.\n\n- Rebased `agent/DEV-806` onto `main` (`855ff6f4628f`): `cac22db7b667`\n- The check `npm run -s lint:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T21:13:12.632123+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A642ef826e6b6f0189e480109c48c8141facb6f82b65050a811ec205dd26a474a of the job job-20261124T191312.146Z-36 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T21:17:08.489550+00:00
+  author: claude
+  text: |-
+    Fixed the merge failure: the DEV-361 test left a queue file in the temp folder.
+
+    - Cause: the test ended while both workers still ran; they wrote `queue/agent-queue/queue-*.json` after the fixture removed its folder, so `rust-test-runner` saw `.lotar-test-scratch` and `.tmp*` left over. Reproduced alone with a fresh `TMPDIR`.
+    - Fix in `crates/lotar-lib/tests/dev361_worker_restarts_after_upgrade_test.rs`: after the asserts the test writes `release` and waits (`kill -0`, 30 s cap) until both worker pids exited. The `Release` guard still ends the jobs if an assert fails.
+    - No change to the product code; amended into `58affe158` (was `cac22db7b`).
+  report:
+    commits:
+    - hash: 58affe158
+      what: queue handoff after an upgrade; the test waits for its workers to exit
+    checks:
+    - command: cargo nextest run -p lotar-lib -E 'test(/dev361/)' (fresh TMPDIR, 3 runs, temp folder empty after)
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests -- -D warnings
+      result: passed
+    - command: npm run -s test:agent
+      result: not_run
+      reason: the merge runs it
+    next: 'Merge agent: rerun the merge checks'
+- date: 2026-11-24T22:00:12.184678+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A642ef826e6b6f0189e480109c48c8141facb6f82b65050a811ec205dd26a474a of the job job-20261124T191312.146Z-36 again, with no lotar job, and lotar can''t take it over: no harnessmux session has the thread. Stop it in T3 Code, or let it finish and move the ticket on yourself.'
+- date: 2026-11-24T22:13:55.420092+00:00
+  author: claude
+  text: |-
+    Ready for review again: the temp-folder fix is on the branch, rebased onto main.
+
+    - `2696b87d5` sits on main `c72189e40`; it holds the earlier `58affe158` fix (the test writes `release` and waits for both worker pids to exit).
+    - The DEV-361 test passes alone with a fresh `TMPDIR`, and nothing is left in it.
+    - This job made no new change; the last one ran out of quota before its hand-off.
+  report:
+    commits:
+    - hash: 2696b87d5
+      what: upgraded worker takes the queue at once; DEV-361 test waits for both workers to exit
+    checks:
+    - command: cargo nextest run -p lotar-lib dev361 (fresh TMPDIR)
+      result: passed
+      reason: temp folder empty afterwards
+    - command: cargo nextest run -p lotar-agent agent_queue
+      result: passed
+    - command: rustfmt --check on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    next: Review, then merge
+- date: 2026-11-24T22:40:51.194987+00:00
+  author: claude
+  text: |-
+    Merged: `7467c63f5` is on `main` and pushed.
+
+    - The first merge run failed only on temp leftovers (`.lotar-test-scratch`, `.tmpHwTTeP`). Cause: the DEV-806 test ended while both jobs still ran, so the old worker wrote TEST-1's end into the deleted fixture and recreated it.
+    - Fix (amended into the commit): `dev361_worker_restarts_after_upgrade_test.rs` now writes `release` and waits for both worker pids to exit (`wait_for_exit`). 4 runs in a fresh temp folder left nothing behind.
+    - Rebased twice as main moved (DEV-768, then STD-328, which is dependency updates only and touches none of these files). Full lint, tests and smoke ran on the tip rebased onto DEV-768. After STD-328 only the targeted tests ran.
+  report:
+    commits:
+    - hash: 7467c63f5
+      what: upgraded worker takes the queue at once; test waits for its workers to exit
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: on 2696b87d5, 2488 Rust tests, no temp leftovers
+    - command: npm run smoke
+      result: passed
+      reason: on 2696b87d5, 409 tests
+    - command: cargo nextest dev361 + agent_queue
+      result: passed
+      reason: on 7467c63f5 after rebase onto STD-328
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aef976c7876a854054b475c5a9226318a9fad013ae23a0079c4514e7fa4f1f110
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A642ef826e6b6f0189e480109c48c8141facb6f82b65050a811ec205dd26a474a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f8bfef170fb28dcbe55400ddf10a4d062b9bb1ba46a61b9cb5b508311f67b0d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa278657374d23870011dee2983ed021ded2cbb59d7ca112e783389184f14a908
 description: |-
   Seen 2026-11-22 11:38-11:43 PST after brew upgrade to 0.15.6: `lotar agent queue` showed Running 1, Queued 25, reason "waiting for the running jobs of their tickets to end". The real reason: the 0.15.5 worker (pid 52655) saw the upgrade and took no new entries until its last job (DEV-768, a T3 rework) ended (crates/lotar-agent/src/services/agent_queue_service.rs:629, "After an upgrade, take no new entries"). worker_state (same file, ~line 452) has no case for it and falls through to the default text at line 475, which names the wrong cause. A long or hung job on the old binary holds every slot's new work for as long as it runs.
 
-  Done when:
-  - [ ] worker_state reports the upgrade drain (e.g. "the worker waits for <ticket>'s job to end before it restarts on the upgraded lotar"), with a test.
-  - [ ] Decide and document: either a new worker on the upgraded binary starts the free slots at once (the old one keeps only its running jobs), or the drain stays and docs/help/agent.md says how long it can hold the queue.
+  ## Decision (claude, 2026-11-22)
+
+  The ticket offered two ways; this takes the first: "a new worker on the upgraded binary starts the free slots at once (the old one keeps only its running jobs)". The drain no longer holds the queue, so there is no drain state for `lotar agent queue` to report: the reason it shows is the new worker's real one.
+
+  ## Done when
+
+  - [ ] When the worker sees the upgrade, it takes no new entries, gives up the worker lock and, with entries queued, starts a worker from the upgraded binary. That worker starts queued entries while the old worker's jobs still run.
+  - [ ] The old worker keeps its running and process-queued jobs (and unsaved end rules) until they end, then exits. It does not put entries back in the queue at its exit (the new worker owns the queue's taken entries); the new worker takes over none of its jobs (the owner process is alive).
+  - [ ] Slots: the old worker's running jobs count toward `max_parallel_jobs` (they are other-process records), so a full limit makes entries wait with the slot reason; a ticket whose job the old worker runs waits with "waiting for the running jobs of their tickets to end", which is then true.
+  - [ ] The new worker fails to start (spawn error): the queue shows `stopped`, "start one with `lotar agent queue resume`"; the old worker tries again when its jobs end, as it does today.
+  - [ ] Test: `crates/lotar-lib/tests/dev361_worker_restarts_after_upgrade_test.rs` shows the second job starting from the upgraded binary while the first job still runs.
+  - [ ] `docs/help/agent.md` says the upgraded worker runs the queue at once and the old one only finishes its jobs.
+tags:
+- job-paused
+- merge-retried
 history:
 - at: 2026-11-22T20:41:42.031686+00:00
   actor: claude
@@ -27,3 +245,200 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-23T01:58:56.203144+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T01:59:07.869430+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aef976c7876a854054b475c5a9226318a9fad013ae23a0079c4514e7fa4f1f110
+- at: 2026-11-23T02:00:23.606756+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Seen 2026-11-22 11:38-11:43 PST after brew upgrade to 0.15.6: `lotar agent queue` showed Running 1, Queued 25, reason "waiting for the running jobs of their tickets to end". The real reason: the 0.15.5 worker (pid 52655) saw the upgrade and took no new entries until its last job (DEV-768, a T3 rework) ended (crates/lotar-agent/src/services/agent_queue_service.rs:629, "After an upgrade, take no new entries"). worker_state (same file, ~line 452) has no case for it and falls through to the default text at line 475, which names the wrong cause. A long or hung job on the old binary holds every slot's new work for as long as it runs.
+
+      Done when:
+      - [ ] worker_state reports the upgrade drain (e.g. "the worker waits for <ticket>'s job to end before it restarts on the upgraded lotar"), with a test.
+      - [ ] Decide and document: either a new worker on the upgraded binary starts the free slots at once (the old one keeps only its running jobs), or the drain stays and docs/help/agent.md says how long it can hold the queue.
+    new: |-
+      Seen 2026-11-22 11:38-11:43 PST after brew upgrade to 0.15.6: `lotar agent queue` showed Running 1, Queued 25, reason "waiting for the running jobs of their tickets to end". The real reason: the 0.15.5 worker (pid 52655) saw the upgrade and took no new entries until its last job (DEV-768, a T3 rework) ended (crates/lotar-agent/src/services/agent_queue_service.rs:629, "After an upgrade, take no new entries"). worker_state (same file, ~line 452) has no case for it and falls through to the default text at line 475, which names the wrong cause. A long or hung job on the old binary holds every slot's new work for as long as it runs.
+
+      ## Decision (claude, 2026-11-22)
+
+      The ticket offered two ways; this takes the first: "a new worker on the upgraded binary starts the free slots at once (the old one keeps only its running jobs)". The drain no longer holds the queue, so there is no drain state for `lotar agent queue` to report: the reason it shows is the new worker's real one.
+
+      ## Done when
+
+      - [ ] When the worker sees the upgrade, it takes no new entries, gives up the worker lock and, with entries queued, starts a worker from the upgraded binary. That worker starts queued entries while the old worker's jobs still run.
+      - [ ] The old worker keeps its running and process-queued jobs (and unsaved end rules) until they end, then exits. It does not put entries back in the queue at its exit (the new worker owns the queue's taken entries); the new worker takes over none of its jobs (the owner process is alive).
+      - [ ] Slots: the old worker's running jobs count toward `max_parallel_jobs` (they are other-process records), so a full limit makes entries wait with the slot reason; a ticket whose job the old worker runs waits with "waiting for the running jobs of their tickets to end", which is then true.
+      - [ ] The new worker fails to start (spawn error): the queue shows `stopped`, "start one with `lotar agent queue resume`"; the old worker tries again when its jobs end, as it does today.
+      - [ ] Test: `crates/lotar-lib/tests/dev361_worker_restarts_after_upgrade_test.rs` shows the second job starting from the upgraded binary while the first job still runs.
+      - [ ] `docs/help/agent.md` says the upgraded worker runs the queue at once and the old one only finishes its jobs.
+- at: 2026-11-23T02:08:19.219769+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T02:08:19.461694+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-768"]}'
+    new: '{"related":["DEV-768","TEST-1","TEST-2"]}'
+- at: 2026-11-23T02:08:34.811081+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-23T06:12:27.031304+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T06:12:32.326941+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-768","TEST-1","TEST-2"]}'
+    new: '{"related":["DEV-768","TEST-1","TEST-2","DEV-762","DEV-763","DEV-784"]}'
+- at: 2026-11-23T06:12:48.084860+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-23T08:28:06.748176+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T08:28:12.304253+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T08:28:12.386578+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:28:53.754941+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T10:29:22.493153+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T11:29:58.112214+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T12:31:54.405270+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T13:34:41.498351+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T14:34:53.593414+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T15:35:15.536165+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T16:35:37.465019+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:04:10.552806+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:18:29.933943+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: job-paused
+    new: job-paused, merge-retried
+- at: 2026-11-24T17:18:30.205230+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:13:13.116829+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-24T19:36:52.915174+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:36:53.145908+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A642ef826e6b6f0189e480109c48c8141facb6f82b65050a811ec205dd26a474a
+- at: 2026-11-24T20:36:58.649058+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f8bfef170fb28dcbe55400ddf10a4d062b9bb1ba46a61b9cb5b508311f67b0d
+- at: 2026-11-24T21:13:12.632123+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:17:08.489550+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:17:09.988792+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-768","TEST-1","TEST-2","DEV-762","DEV-763","DEV-784"]}'
+    new: '{"related":["DEV-768","TEST-1","TEST-2","DEV-762","DEV-763","DEV-784","DEV-361"]}'
+- at: 2026-11-24T22:00:12.184678+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:12:07.821072+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa278657374d23870011dee2983ed021ded2cbb59d7ca112e783389184f14a908
+- at: 2026-11-24T22:13:55.420092+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T22:14:03.334304+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T22:40:51.194987+00:00
+  actor: claude
+  changes:
+  - field: comment_added

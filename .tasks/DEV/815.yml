@@ -1,16 +1,50 @@
 title: 'Web UI and CLI writes fail with ''sprints lock still busy'': the standards agent worker holds @sprints/.sprints.lock for up to 13.5 s at a time'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-22T22:13:05.166729+00:00
-modified: 2026-11-22T22:24:53.664276+00:00
+modified: 2026-11-24T16:34:29.643432+00:00
 relationships:
   related:
   - DEV-643
   - DEV-808
   - DEV-804
+  - DEV-837
+comments:
+- date: 2026-11-23T05:18:17.237664+00:00
+  author: claude
+  text: |-
+    Cause found and fixed (not yet committed):
+    - Relationship reads (worker dependency check, `relationships check`, graph) held the sprints/task locks while resolving cross-repo refs and parsing every task: 1.6 s per call on standards, live.
+    - Fix: parse lock-free first, under the locks only read+hash and reuse matching parses; read-only calls release the locks right after the load.
+    - Hold on live standards: 1578 ms → 27 ms. Comment mention-linking: 180 → 39 ms.
+    - Next: lint, test, smoke, commit.
+- date: 2026-11-23T05:24:49.664683+00:00
+  author: claude
+  text: |-
+    Fixed: relationship reads no longer keep writers waiting; live sprints-lock hold 1578 ms → 27 ms.
+    - Cause: the worker's dependency check (and `relationships check`, graph) held the sprints/task locks while resolving cross-repo tickets and parsing every task file (~1.6 s on standards; seconds under load).
+    - Read-only calls now release the locks right after loading; task files are parsed before the locks and only read+hashed under them (also for mention linking and relationship edits).
+    - Debug/test builds panic when git, t3, the agent command, run, waiting_run, merge checks or the job-registry wait happen under a task/sprint lock. The full suite found no such path.
+    - Open: the post-install flock probe on standards under load (merge/release check).
+  report:
+    commits:
+    - hash: 2aaa1b4e6
+      what: release relationship-snapshot locks before slow work; lock-hold detector
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    - command: flock probe on standards after install
+      result: not_run
+      reason: needs the installed release
+    next: After install, run the flock probe on standards/.tasks/@sprints/.sprints.lock under load and confirm no hold over 1 s
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ac511ed2234431868156fac482dcb0d600259367e18be7e2edbe853f3ad1d1a
 description: |-
   The owner keeps getting sprint lock errors in the web UI (2026-11-22). Writes wait 2 s for `@sprints/.sprints.lock` (`acquire_storage_lock`, `DEFAULT_STORAGE_LOCK_WAIT`) and then fail with "Storage lock .../@sprints/.sprints.lock is still busy after 2 seconds".
 
@@ -22,7 +56,17 @@ description: |-
 
   Possibly the same cause as DEV-808: the inbox relay ran `lotar --tasks-dir local/.tasks comment LOCA-578 ...` for 45 s and more. Its automation ran `node standards/scripts/repos.ts --inbox LOCA-578`, which calls lotar on standards' INBOX while the worker holds standards' locks.
 
-  Done when: no worker path holds the sprints lock (or a task lock) while it runs a child process (git, t3, harnessmux, automation run commands) or waits on a mutex that such a path holds. A test holds each slow step and checks that both locks stay free (as in `a_task_update_waits_for_the_registry_without_holding_the_storage_locks`). After the install, the flock probe on standards shows no hold over 1 s under load.
+  ## Done when
+
+  Owner wording (from the ticket): "no worker path holds the sprints lock (or a task lock) while it runs a child process (git, t3, harnessmux, automation run commands) or waits on a mutex that such a path holds".
+
+  - [x] No path holds the sprints lock or a task lock (the exclusive write locks, and the relationship snapshot's shared locks) while it starts git, t3, the agent command (harnessmux), an automation run command, a waiting_run command or a merge check.
+  - [x] Debug builds and tests enforce it: those starts panic, naming the held locks, when the thread holds one (`check_no_storage_lock`). Release builds skip the check and behave as before.
+  - [x] Each path the check finds is fixed: the slow step runs after the locks are released. If the step fails, its error is returned as before; the write under the lock is not undone by it.
+  - [x] The slow step that held the locks is fixed (found in the Rust suite: no child process under them; found by sampling: relationship reads): the worker's dependency check, `relationships check`, graph and repair preview read the task files under the locks and release them before resolving other repos' tickets; task files are parsed before the locks are taken, so mention linking and relationship edits only read and hash them under the locks.
+  - [x] A test holds each fixed slow step and checks that both locks stay free (as in `a_task_update_waits_for_the_registry_without_holding_the_storage_locks`); it fails before the fix.
+  - [x] npm run lint, npm test and npm run smoke pass.
+  - [ ] After the install (merge/release check, not this job): the flock probe on standards shows no hold over 1 s under load.
 history:
 - at: 2026-11-22T22:13:05.495443+00:00
   actor: claude
@@ -41,3 +85,120 @@ history:
   - field: relationships
     old: '{"related":["DEV-643","DEV-808"]}'
     new: '{"related":["DEV-643","DEV-808","DEV-804"]}'
+- at: 2026-11-23T04:16:03.034673+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-23T04:16:13.231751+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ac511ed2234431868156fac482dcb0d600259367e18be7e2edbe853f3ad1d1a
+- at: 2026-11-23T04:24:37.032920+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The owner keeps getting sprint lock errors in the web UI (2026-11-22). Writes wait 2 s for `@sprints/.sprints.lock` (`acquire_storage_lock`, `DEFAULT_STORAGE_LOCK_WAIT`) and then fail with "Storage lock .../@sprints/.sprints.lock is still busy after 2 seconds".
+
+      Measured live on 0.15.6, standards (`~/Development/standards/.tasks`), 2026-11-22 14:10-14:20 PST:
+      - A flock probe (`LOCK_EX|LOCK_NB` every 50 ms) found the lock held 19% of 45 s (longest hold 4.4 s), then 43% of 40 s. In a 50 s run the holds were 4.5 s, 13.5 s, 0.45 s and 9.2 s.
+      - Every time the lock was busy, `lsof` showed only `lotar --tasks-dir /Users/mallox/Development/standards/.tasks agent worker` (pid 50691, started 11:56) with the lock file open.
+      - `sample 50691`: the main thread sat in `poll` 86% of the time, the rest in `open`/`readdir`/`stat`. That looks like a thread holding the lock while it waits on a child process or I/O. The binary is stripped, so there are no Rust frames.
+      - Worker children that started as holds began: `git merge-base --is-ancestor ... HEAD`, `git merge-tree --write-tree --no-messages HEAD refs/heads/agent/STD-243`, `t3 thread show mcp:launch:...`, `t3 thread list --project /Users/mallox/Development/standards --json`, plus the INBOX rule's relay `sh -c ... lotar comment ...`. This is a correlation only; a holder that runs git or t3 under the storage locks is the likely cause, like the job-registry wait in DEV-643.
+
+      Possibly the same cause as DEV-808: the inbox relay ran `lotar --tasks-dir local/.tasks comment LOCA-578 ...` for 45 s and more. Its automation ran `node standards/scripts/repos.ts --inbox LOCA-578`, which calls lotar on standards' INBOX while the worker holds standards' locks.
+
+      Done when: no worker path holds the sprints lock (or a task lock) while it runs a child process (git, t3, harnessmux, automation run commands) or waits on a mutex that such a path holds. A test holds each slow step and checks that both locks stay free (as in `a_task_update_waits_for_the_registry_without_holding_the_storage_locks`). After the install, the flock probe on standards shows no hold over 1 s under load.
+    new: |-
+      The owner keeps getting sprint lock errors in the web UI (2026-11-22). Writes wait 2 s for `@sprints/.sprints.lock` (`acquire_storage_lock`, `DEFAULT_STORAGE_LOCK_WAIT`) and then fail with "Storage lock .../@sprints/.sprints.lock is still busy after 2 seconds".
+
+      Measured live on 0.15.6, standards (`~/Development/standards/.tasks`), 2026-11-22 14:10-14:20 PST:
+      - A flock probe (`LOCK_EX|LOCK_NB` every 50 ms) found the lock held 19% of 45 s (longest hold 4.4 s), then 43% of 40 s. In a 50 s run the holds were 4.5 s, 13.5 s, 0.45 s and 9.2 s.
+      - Every time the lock was busy, `lsof` showed only `lotar --tasks-dir /Users/mallox/Development/standards/.tasks agent worker` (pid 50691, started 11:56) with the lock file open.
+      - `sample 50691`: the main thread sat in `poll` 86% of the time, the rest in `open`/`readdir`/`stat`. That looks like a thread holding the lock while it waits on a child process or I/O. The binary is stripped, so there are no Rust frames.
+      - Worker children that started as holds began: `git merge-base --is-ancestor ... HEAD`, `git merge-tree --write-tree --no-messages HEAD refs/heads/agent/STD-243`, `t3 thread show mcp:launch:...`, `t3 thread list --project /Users/mallox/Development/standards --json`, plus the INBOX rule's relay `sh -c ... lotar comment ...`. This is a correlation only; a holder that runs git or t3 under the storage locks is the likely cause, like the job-registry wait in DEV-643.
+
+      Possibly the same cause as DEV-808: the inbox relay ran `lotar --tasks-dir local/.tasks comment LOCA-578 ...` for 45 s and more. Its automation ran `node standards/scripts/repos.ts --inbox LOCA-578`, which calls lotar on standards' INBOX while the worker holds standards' locks.
+
+      ## Done when
+
+      Owner wording (from the ticket): "no worker path holds the sprints lock (or a task lock) while it runs a child process (git, t3, harnessmux, automation run commands) or waits on a mutex that such a path holds".
+
+      - [ ] No path holds the sprints lock or a task lock (the exclusive write locks, and the relationship snapshot's shared locks) while it starts git, t3, the agent command (harnessmux), an automation run command, a waiting_run command or a merge check.
+      - [ ] Debug builds and tests enforce it: those starts panic, naming the held locks, when the thread holds one (`check_no_storage_lock`). Release builds skip the check and behave as before.
+      - [ ] Each path the check finds is fixed: the slow step runs after the locks are released. If the step fails, its error is returned as before; the write under the lock is not undone by it.
+      - [ ] A test holds each fixed slow step and checks that both locks stay free (as in `a_task_update_waits_for_the_registry_without_holding_the_storage_locks`); it fails before the fix.
+      - [ ] npm run lint, npm test and npm run smoke pass.
+      - [ ] After the install (merge/release check, not this job): the flock probe on standards shows no hold over 1 s under load.
+- at: 2026-11-23T05:18:17.237664+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:24:49.615496+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The owner keeps getting sprint lock errors in the web UI (2026-11-22). Writes wait 2 s for `@sprints/.sprints.lock` (`acquire_storage_lock`, `DEFAULT_STORAGE_LOCK_WAIT`) and then fail with "Storage lock .../@sprints/.sprints.lock is still busy after 2 seconds".
+
+      Measured live on 0.15.6, standards (`~/Development/standards/.tasks`), 2026-11-22 14:10-14:20 PST:
+      - A flock probe (`LOCK_EX|LOCK_NB` every 50 ms) found the lock held 19% of 45 s (longest hold 4.4 s), then 43% of 40 s. In a 50 s run the holds were 4.5 s, 13.5 s, 0.45 s and 9.2 s.
+      - Every time the lock was busy, `lsof` showed only `lotar --tasks-dir /Users/mallox/Development/standards/.tasks agent worker` (pid 50691, started 11:56) with the lock file open.
+      - `sample 50691`: the main thread sat in `poll` 86% of the time, the rest in `open`/`readdir`/`stat`. That looks like a thread holding the lock while it waits on a child process or I/O. The binary is stripped, so there are no Rust frames.
+      - Worker children that started as holds began: `git merge-base --is-ancestor ... HEAD`, `git merge-tree --write-tree --no-messages HEAD refs/heads/agent/STD-243`, `t3 thread show mcp:launch:...`, `t3 thread list --project /Users/mallox/Development/standards --json`, plus the INBOX rule's relay `sh -c ... lotar comment ...`. This is a correlation only; a holder that runs git or t3 under the storage locks is the likely cause, like the job-registry wait in DEV-643.
+
+      Possibly the same cause as DEV-808: the inbox relay ran `lotar --tasks-dir local/.tasks comment LOCA-578 ...` for 45 s and more. Its automation ran `node standards/scripts/repos.ts --inbox LOCA-578`, which calls lotar on standards' INBOX while the worker holds standards' locks.
+
+      ## Done when
+
+      Owner wording (from the ticket): "no worker path holds the sprints lock (or a task lock) while it runs a child process (git, t3, harnessmux, automation run commands) or waits on a mutex that such a path holds".
+
+      - [ ] No path holds the sprints lock or a task lock (the exclusive write locks, and the relationship snapshot's shared locks) while it starts git, t3, the agent command (harnessmux), an automation run command, a waiting_run command or a merge check.
+      - [ ] Debug builds and tests enforce it: those starts panic, naming the held locks, when the thread holds one (`check_no_storage_lock`). Release builds skip the check and behave as before.
+      - [ ] Each path the check finds is fixed: the slow step runs after the locks are released. If the step fails, its error is returned as before; the write under the lock is not undone by it.
+      - [ ] A test holds each fixed slow step and checks that both locks stay free (as in `a_task_update_waits_for_the_registry_without_holding_the_storage_locks`); it fails before the fix.
+      - [ ] npm run lint, npm test and npm run smoke pass.
+      - [ ] After the install (merge/release check, not this job): the flock probe on standards shows no hold over 1 s under load.
+    new: |-
+      The owner keeps getting sprint lock errors in the web UI (2026-11-22). Writes wait 2 s for `@sprints/.sprints.lock` (`acquire_storage_lock`, `DEFAULT_STORAGE_LOCK_WAIT`) and then fail with "Storage lock .../@sprints/.sprints.lock is still busy after 2 seconds".
+
+      Measured live on 0.15.6, standards (`~/Development/standards/.tasks`), 2026-11-22 14:10-14:20 PST:
+      - A flock probe (`LOCK_EX|LOCK_NB` every 50 ms) found the lock held 19% of 45 s (longest hold 4.4 s), then 43% of 40 s. In a 50 s run the holds were 4.5 s, 13.5 s, 0.45 s and 9.2 s.
+      - Every time the lock was busy, `lsof` showed only `lotar --tasks-dir /Users/mallox/Development/standards/.tasks agent worker` (pid 50691, started 11:56) with the lock file open.
+      - `sample 50691`: the main thread sat in `poll` 86% of the time, the rest in `open`/`readdir`/`stat`. That looks like a thread holding the lock while it waits on a child process or I/O. The binary is stripped, so there are no Rust frames.
+      - Worker children that started as holds began: `git merge-base --is-ancestor ... HEAD`, `git merge-tree --write-tree --no-messages HEAD refs/heads/agent/STD-243`, `t3 thread show mcp:launch:...`, `t3 thread list --project /Users/mallox/Development/standards --json`, plus the INBOX rule's relay `sh -c ... lotar comment ...`. This is a correlation only; a holder that runs git or t3 under the storage locks is the likely cause, like the job-registry wait in DEV-643.
+
+      Possibly the same cause as DEV-808: the inbox relay ran `lotar --tasks-dir local/.tasks comment LOCA-578 ...` for 45 s and more. Its automation ran `node standards/scripts/repos.ts --inbox LOCA-578`, which calls lotar on standards' INBOX while the worker holds standards' locks.
+
+      ## Done when
+
+      Owner wording (from the ticket): "no worker path holds the sprints lock (or a task lock) while it runs a child process (git, t3, harnessmux, automation run commands) or waits on a mutex that such a path holds".
+
+      - [x] No path holds the sprints lock or a task lock (the exclusive write locks, and the relationship snapshot's shared locks) while it starts git, t3, the agent command (harnessmux), an automation run command, a waiting_run command or a merge check.
+      - [x] Debug builds and tests enforce it: those starts panic, naming the held locks, when the thread holds one (`check_no_storage_lock`). Release builds skip the check and behave as before.
+      - [x] Each path the check finds is fixed: the slow step runs after the locks are released. If the step fails, its error is returned as before; the write under the lock is not undone by it.
+      - [x] The slow step that held the locks is fixed (found in the Rust suite: no child process under them; found by sampling: relationship reads): the worker's dependency check, `relationships check`, graph and repair preview read the task files under the locks and release them before resolving other repos' tickets; task files are parsed before the locks are taken, so mention linking and relationship edits only read and hash them under the locks.
+      - [x] A test holds each fixed slow step and checks that both locks stay free (as in `a_task_update_waits_for_the_registry_without_holding_the_storage_locks`); it fails before the fix.
+      - [x] npm run lint, npm test and npm run smoke pass.
+      - [ ] After the install (merge/release check, not this job): the flock probe on standards shows no hold over 1 s under load.
+- at: 2026-11-23T05:24:49.664683+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-23T05:25:08.307219+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:34:29.643432+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-643","DEV-808","DEV-804"]}'
+    new: '{"related":["DEV-643","DEV-808","DEV-804","DEV-837"]}'

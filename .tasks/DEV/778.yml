@@ -1,16 +1,30 @@
 title: A job's build root folder outlives its worktree when the removal or cleanup is cut off
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-22T00:05:08.801449+00:00
-modified: 2026-11-22T03:36:01.074217+00:00
+modified: 2026-11-24T23:16:08.501762+00:00
 relationships:
   depends_on:
   - DEV-762
+  - local:LOCA-601
+  blocks:
+  - DEV-841
   related:
   - DEV-762
+  - DEV-832
+  - DEV-834
+  - DEV-833
+  - DEV-810
+  - DEV-841
+  - DEV-774
+  - DEV-782
+  - DEV-785
+  - DEV-802
+  - DEV-816
+  - DEV-840
 comments:
 - date: 2026-11-22T03:35:49.249990+00:00
   author: claude
@@ -20,8 +34,360 @@ comments:
     - `build_root_dir`, the build delete in `remove_worktree_dir` and the parked `.<ticket>.lotar-cleanup-<job>` folders exist only in `4e32e4ff3` on `agent/DEV-762`, which is in Merging
     - Added "Done when" to the description; the sweep's callers are only in lotar (`crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-lib/src/cli/handlers/agent.rs`, `crates/lotar-lib/tests/agent_safety_test.rs`)
     - No code changed; next: once DEV-762 is on main, rebase `agent/DEV-778` and do the work
+- date: 2026-11-23T08:27:48.729549+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261123T082739.867Z-101 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261123T082739.867Z-101 why.'
+- date: 2026-11-23T18:34:13.452156+00:00
+  author: automation
+  text: The fix agent's job job-20261123T183355.273Z-401 failed (lotar agent logs job-20261123T183355.273Z-401); @fix-retry retries it on branch agent/DEV-778.
+- date: 2026-11-23T18:34:31.984304+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261123T183414.769Z-402 failed again (lotar agent logs job-20261123T183414.769Z-402). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-23T18:36:11.386857+00:00
+  author: triage
+  text: |-
+    Blocked on the shared Claude sign-in ticket, local:LOCA-601; no retry decision is needed.
+
+    - Jobs `job-20261123T183355.273Z-401` and `job-20261123T183414.769Z-402` both failed before work: the Claude login expired and cannot renew.
+    - Earlier `job-20261123T082739.867Z-101` hit the weekly limit, resetting November 24 at 08:00 America/Los_Angeles; restoring login may leave that separate limit in effect.
+    - Infrastructure handling: owner decision `docs/decisions/2026-11-15-inbox-triage.md` in standards and this triage job’s outside-action rule. Resume through `Prerequisites done` when `LOCA-601` is verified Done; do not retry an expired login.
+- date: 2026-11-23T18:36:11.970303+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: local:LOCA-601. It starts once they are done.'
+- date: 2026-11-23T18:36:15.248325+00:00
+  author: automation
+  text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-778 yet. DEV-778 waits for local:LOCA-601.'
+- date: 2026-11-24T16:00:08.826853+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0abad9a46a7a34e5ab5f31476ba3f41638e6883fe0c5d8d097bd505cae9d31f7 of the job job-20261123T123004.511Z-231 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T160008.817Z-1: DEV-778 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:02:11.236660+00:00
+  author: claude
+  text: |-
+    Started: DEV-762 is on main, branch rebased; implementing the sweep.
+
+    - Plan: `sweep_build_root` in `agent_job_service.rs` deletes orphan `<name>` and parked `.<name>.lotar-cleanup-<job>` folders in `<build_root>/<repo>`; called by `remove_worktree_dir` (link's folder), Done cleanup and `lotar agent worktree cleanup` (configured folder); `remove_build_output` sweeps parked folders first
+    - Live = named after or linked by a `git worktree list` entry, or named like a folder beside a listed worktree (one being added)
+- date: 2026-11-24T16:03:07.875907+00:00
+  author: claude
+  text: |-
+    Stopped: 5 agent sessions are working in the DEV-778 worktree at once, writing conflicting fixes
+
+    - `agent/DEV-778` rebased onto `main` (`d4bdbbbf6`, DEV-762 included); no commit from me
+    - `lsof` shows 5 `claude` processes with cwd `.lotar-worktrees/lotar/DEV-778` (PIDs `84775` (me), `86667`, `85715`, `95202`, `67442`), all started 08:00–08:02, when the usage limit reset; `lotar agent list-jobs` lists one job, `job-20261124T160008.817Z-1`
+    - The uncommitted diff in `crates/lotar-agent/src/services/agent_job_service.rs` already has two different `sweep_build_root` and two `PARKED_BUILD_MARKER` versions from other sessions, so it doesn't compile; `crates/lotar-lib/src/cli/handlers/agent.rs` is changed too
+    - I left their changes alone and wrote nothing: a sixth writer would only add to the conflict
+    - Probably a lotar bug: resuming after the limit started several sessions for one job. Worth its own ticket
+
+    Question: which session should keep DEV-778 (or should I finish it once the others are stopped)?
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: stopped before any change of mine
+    - command: npm test
+      result: not_run
+      reason: stopped before any change of mine
+    - command: npm run smoke
+      result: not_run
+      reason: stopped before any change of mine
+    next: 'Owner: keep one session on DEV-778 and stop the others; that session finishes the sweep'
+- date: 2026-11-24T16:03:18.877343+00:00
+  author: claude
+  text: |-
+    Stopped: 5 Claude sessions work in the DEV-778 worktree at once and overwrite each other's edits.
+
+    - Running in `.lotar-worktrees/lotar/DEV-778`, each a `t3-claude ... --resume=<id>`: pids `67442`, `84775`, `85715`, `95202` and this job's `86667` (resume `002165da`). They probably all resumed at the usage-limit reset (job `job-20261124T160008.817Z-1`)
+    - `crates/lotar-agent/src/services/agent_job_service.rs` now holds **two** different `pub fn sweep_build_root` (plus `sweep_parked_builds`, `configured_build_root_dir`) from two other sessions, and `crates/lotar-lib/src/cli/handlers/agent.rs` is changed too: it won't compile as is
+    - This job changed no files (its edit script stopped at its first check) and committed nothing
+    - Likely a LoTaR bug: a resumed paused job shouldn't start a session while another one for the ticket still runs
+
+    Question: which session should finish DEV-778? The others need stopping, and their duplicate code needs removing.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: stopped, other sessions edit the same files
+    - command: npm test
+      result: not_run
+      reason: stopped
+    - command: npm run smoke
+      result: not_run
+      reason: stopped
+    next: 'Owner: keep one session on DEV-778 and stop the others; that one finishes the sweep'
+- date: 2026-11-24T16:03:51.392172+00:00
+  author: claude
+  text: |-
+    Stopped too: session `95202` (resume `ac66dd5a`) is one of the parallel writers; my 16:02 "Started" plan is void.
+
+    - My `sweep_build_root` block in `agent_job_service.rs` was already overwritten by another session when I checked; I removed nothing of theirs and committed nothing
+    - `agent.rs` `worktree_cleanup` now calls a 3-argument `sweep_build_root` while the file has two versions: it doesn't compile
+    - Same question as the two comments above: which session keeps DEV-778?
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: worktree holds other sessions' conflicting edits
+    - command: npm test
+      result: not_run
+      reason: same
+    - command: npm run smoke
+      result: not_run
+      reason: same
+    next: 'Owner: stop all but one session in the DEV-778 worktree, then that one finishes the sweep'
+- date: 2026-11-24T16:04:56.425399+00:00
+  author: claude
+  text: |-
+    Stopped: a sixth Claude session (pid `93635`, started 08:03 PST) got this job; I changed and committed nothing.
+
+    - Still running in `.lotar-worktrees/lotar/DEV-778`: `67442`, `84775`, `85715`, `86667`, `95202`; `85715` is running `cargo build` right now
+    - The worktree's diff now holds one `sweep_build_root` plus tests in `crates/lotar-lib/tests/agent_safety_test.rs`, so one session seems to have merged the versions; not verified by me
+    - A resumed job starting several sessions at once looks like a lotar bug (see the 16:03Z comments)
+
+    Question: which session should finish DEV-778? The others need stopping.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: other sessions edit the worktree
+    - command: npm test
+      result: not_run
+      reason: same
+    - command: npm run smoke
+      result: not_run
+      reason: same
+    next: 'Owner: stop all but one session in the DEV-778 worktree; that one finishes and commits'
+- date: 2026-11-24T16:08:34.258412+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A11147ef6cd0867b7365382aa28dbb64a5ac8be363fd1dcc383f581e3a078787a of the job job-20261123T153228.812Z-333 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T160834.223Z-3: DEV-778 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:08:40.756236+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0e0c0c772b396cd1bb763245d54b7cf3654357194448914a7834b4dbc74fca16 of the job job-20261123T143213.530Z-298 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A11147ef6cd0867b7365382aa28dbb64a5ac8be363fd1dcc383f581e3a078787a that the job job-20261124T160834.223Z-3 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:08:53.173245+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A309d56b343d2103730f2bc854017b3b2c92322c33842429abe4d78f4e5aa9056 of the job job-20261123T133128.848Z-265 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A11147ef6cd0867b7365382aa28dbb64a5ac8be363fd1dcc383f581e3a078787a that the job job-20261124T160834.223Z-3 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:20:15.360854+00:00
+  author: claude
+  text: |-
+    Stopped: I'm the T3 thread `80a98602`, one of about 10 DEV-778 threads T3 Code restarted after the usage-limit reset. I changed and committed nothing.
+
+    - T3 Code lists 10 DEV-778 threads as running, and 2+ `claude` processes are in `.lotar-worktrees/lotar/DEV-778` (pids `50331` = me, `54128`)
+    - The uncommitted diff in the worktree holds a complete-looking fix: `sweep_build_root` in `agent_job_service.rs`, its callers in `agent.rs`, 2 tests in `agent_safety_test.rs`, and `docs/help/agent.md`. Last edited 08:10 PST. Keep it; it isn't saved anywhere else
+    - Question: which one session should finish DEV-778 (from that diff), after the other DEV-778 threads are stopped in T3 Code?
+- date: 2026-11-24T16:25:59.041446+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d of the job job-20261123T173337.676Z-386 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261124T162558.882Z-4: DEV-778 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-24T16:26:00.932690+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6883823c47658fdfbb0d6d8962220f42239d2383e0344b7a492f93887df7e2bb of the job job-20261123T163317.805Z-366 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d that the job job-20261124T162558.882Z-4 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:02.425163+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A80a986029bd8c061e51a76933d6deaafa10400fa54b67f4e1feaee2e5f472a3c of the job job-20261123T112905.926Z-197 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d that the job job-20261124T162558.882Z-4 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:08.121781+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A60f038bf78d3b5d90282e0bc1dfdd09db995f09f528aa2e516596f2c417f39ee of the job job-20261123T102823.187Z-163 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d that the job job-20261124T162558.882Z-4 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:10.084015+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4b9f74b899e6eea8b5cb1895ab75015f13eb24480a9d465cf5bfa09631d46d87 of the job job-20261123T092808.388Z-130 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d that the job job-20261124T162558.882Z-4 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T16:26:10.761283+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53f6b26caf08444d74b3031a53e4eaeb9201accb87a0965c458d756de69ad3f8 of the job job-20261123T082739.867Z-101 again, beside the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d that the job job-20261124T162558.882Z-4 took over. lotar can''t stop a T3 Code thread (T3''s CLI has no interrupt) and takes over only one per ticket: stop it in T3 Code.'
+- date: 2026-11-24T17:03:19.579263+00:00
+  author: claude
+  text: |-
+    Done: removals and cleanups now also delete the build folders that a cut-off removal or cleanup left in the build root.
+
+    - `sweep_build_root` in `crates/lotar-agent/src/services/agent_job_service.rs` deletes from `<build_root>/<repo>` (the configured root plus the one the removed worktree's `target` linked to) any `.<name>.lotar-cleanup-<job>` folder, and any `<name>` folder that no listed worktree is named after or links `target` to
+    - A folder stays while its worktree is listed or still being added (its folder exists in the worktree dir). If git can't list the worktrees, nothing is deleted. A failed delete is only a warning
+    - Called by `remove_worktree_dir`, by `prune_missing_worktree` and once at the start of `lotar agent worktree cleanup` (not with `--dry-run`). `remove_build_output` first deletes the ticket's own older parked folders
+    - Tests: `leftover_builds_in_the_build_root_go_with_the_next_removal_or_cleanup` and `ending_a_job_deletes_the_tickets_parked_builds_in_the_build_root` in `crates/lotar-lib/tests/agent_safety_test.rs`. Docs updated: `docs/help/agent.md`
+    - Watch out: two clones with the same folder name that share one `build_root` share `<build_root>/<repo>`, so the sweep can delete the other clone's builds. That is build output only and comes from how DEV-762 names the folders
+    - No guidance change; no wall-clock tests found
+  report:
+    commits:
+    - hash: a66b4c529
+      what: sweep leftover and parked builds in the build root on removal and cleanup
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: Rust 2482, UI 1568, release and hooks
+    - command: npm run smoke
+      result: passed
+      reason: '408'
+    next: Merge agent/DEV-778
+- date: 2026-11-24T17:21:34.055398+00:00
+  author: claude
+  text: |-
+    Review: passed. `a66b4c529` does what "Done when" asks; one minor gap filed as [DEV-841](https://lotar.pyxzl.net/task/DEV-841).
+
+    - Reviewed `git diff main...HEAD` (merge-base `d4bdbbbf6`; HEAD = `agent/DEV-778`, no newer rework commits). It touches 4 files: `agent_job_service.rs`, `cli/handlers/agent.rs`, `agent_safety_test.rs`, `docs/help/agent.md`. No stray files. `git merge-tree` against main (`504d8b538`, DEV-774 touches the same file) shows no conflicts
+    - `sweep_build_root` (`agent_job_service.rs:1808`) covers the configured root and the linked root, deduplicated. It keeps a folder that a listed worktree is named after or links `target` to, or whose folder exists in the worktree dir. It does nothing when `git worktree list` fails, and a failed delete is only a warning. `remove_worktree_dir` sweeps whatever happened and returns the removal's own result unchanged. With no build root set, nothing is swept
+    - Every removal path is covered: `remove_worktree` (Done cleanup, cleanup rules), both CLI calls, and `prune_missing_worktree`. There's also a sweep at the start of CLI cleanup (skipped with `--dry-run`). `remove_build_output` (`:3352`) also deletes the same ticket's older parked folders. The prefix ends in `.`, so `DEV-1` doesn't match `DEV-10`
+    - Live builds are safe: the job's build folder is created only after `git worktree add` lists the worktree (`:1626`-`:1633`), so the sweep can't race a worktree being added
+    - Tests: `leftover_builds_in_the_build_root_go_with_the_next_removal_or_cleanup` covers an undeletable build, a cut-off removal, a parked folder, a live build and one being added. `ending_a_job_deletes_the_tickets_parked_builds_in_the_build_root` covers parked folders. Without the sweep, both would fail on the `!orphan.exists()` / `!parked.exists()` asserts. I didn't run them against the old code, because the signature change stops them compiling there
+    - Reran `cargo nextest run -p lotar-lib --test integration` with the build_root, leftover and parked filters (11 passed). Also reran the cleanup and prune tests in `agent_safety_test` (10 passed). `npm ci` ran first and passed. I didn't rerun lint, the full suite or smoke: the merge runs them
+    - Minor, filed as [DEV-841](https://lotar.pyxzl.net/task/DEV-841): the sweep at the start of CLI cleanup (`cli/handlers/agent.rs:665`) uses only the global `build_root`. When a project sets its own, that root's last leftover stays
+    - The fix agent's own warning holds: two clones with the same folder name that share a `build_root` share `<build_root>/<repo>`, so a sweep can delete the other clone's live builds. That comes from how DEV-762 names the folders; I filed nothing for it
+- date: 2026-11-24T17:56:20.029387+00:00
+  author: claude
+  text: 'Stalled since 2026-11-24T17:21Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-24T19:31:16.467929+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+    target/web/assets/PageHeader-DiDJHFaU.js                 32.20 kB │ gzip:  12.47 kB
+    target/web/assets/SyncHub-Bxltj9Sn.js                    41.03 kB │ gzip:  12.68 kB
+    target/web/assets/Board-C_pgaq3k.js                      47.86 kB │ gzip:  15.25 kB
+    target/web/assets/ProjectInsights-CAV7iRsD.js            59.29 kB │ gzip:  19.04 kB
+    target/web/assets/runtime-core.esm-bundler-99Omx5-4.js   67.69 kB │ gzip:  26.47 kB
+    target/web/assets/AutomationRulesEditor-BII0DxUG.js      72.27 kB │ gzip:  20.10 kB
+    target/web/assets/browser-BOA6hCEr.js                    96.56 kB │ gzip:  30.11 kB
+    target/web/assets/MarkdownContent-DquDsQ8j.js           111.18 kB │ gzip:  35.20 kB
+    target/web/assets/ConfigView-ymW2sFje.js                153.98 kB │ gzip:  38.52 kB
+    target/web/assets/SprintsList-BzJn0XWH.js               254.93 kB │ gzip:  85.09 kB
+    target/web/assets/index-DUGgBBgf.js                     420.00 kB │ gzip: 127.67 kB
+
+    ✓ built in 1.15s
+    compressed 1939KiB -> 582KiB (70% saved), embedding 89 gz + 1 raw assets
+    rust-test-runner: Waiting for the machine's check lock (port 47586), held by the Rust suite (scripts/rust-test-runner.mjs) in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-821 (pid 94166), since 19:20 UTC
+    rust-test-runner: Took the check lock after 2 min
+       Compiling lotar-core v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778/crates/lotar-core)
+       Compiling harnessmux v0.3.0
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778/crates/lotar-web-assets)
+       Compiling lotar-lib v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778/crates/lotar-lib)
+       Compiling lotar-tasks v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778/crates/lotar-tasks)
+       Compiling lotar-agent v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778/crates/lotar-agent)
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778)
+        Finished `dev` profile [unoptimized] target(s) in 28.05s
+    ────────────
+     Nextest run ID 7aa41e00-7c6d-4d0a-a2e2-9a56e7b1906e with nextest profile: default
+        Starting 2490 tests across 14 binaries
+    ────────────
+         Summary [ 206.220s] 2490 tests run: 2490 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpl3UrzL
+    ```.
+
+    - Rebased `agent/DEV-778` onto `main` (`855ff6f4628f`): `23d43baefa83`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T23:03:10.605843+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+       Compiling ring v0.17.14
+       Compiling unicase v2.10.0
+       Compiling utf8-zero v0.8.1
+       Compiling percent-encoding v2.3.2
+       Compiling ctor v1.0.14
+       Compiling clap_complete v4.6.12
+       Compiling predicates-core v1.0.10
+       Compiling harnessmux v0.3.0
+       Compiling lotar-web-assets v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778/crates/lotar-web-assets)
+       Compiling include_dir v0.7.4
+       Compiling difflib v0.4.0
+       Compiling webpki-roots v1.0.12
+       Compiling notify v8.2.2
+       Compiling rustls-webpki v0.103.17
+       Compiling termtree v0.5.1
+       Compiling wait-timeout v0.2.1
+       Compiling pulldown-cmark v0.13.6
+       Compiling predicates v3.1.4
+       Compiling rustls v0.23.46
+       Compiling predicates-tree v1.0.13
+       Compiling ureq v3.5.2
+       Compiling assert_cmd v2.2.2
+       Compiling lotar v0.15.6 (/Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-778)
+        Finished `dev` profile [unoptimized] target(s) in 2m 24s
+    ────────────
+     Nextest run ID bb7e7345-283f-4d92-aeb4-727ccab99130 with nextest profile: default
+        Starting 2490 tests across 14 binaries
+    ────────────
+         Summary [ 210.109s] 2490 tests run: 2490 passed, 0 skipped
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .tmpkYFAOk
+    ```.
+
+    - Rebased `agent/DEV-778` onto `main` (`7467c63f5bb5`): `ffda525cdc66`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-24T23:16:00.971155+00:00
+  author: claude
+  text: |-
+    Not merged: `test:agent` fails on the known temp-folder leak (DEV-840), not on DEV-778. Land anyway, or wait for DEV-840?
+
+    - Rebased `ffda525cd` onto main `7467c63f5` (by lotar's merge); `npm ci` and `lint:agent` passed
+    - `npm run -s test:agent`: 2490/2490 Rust tests passed both times, then the runner found `.tmpkYFAOk` (lotar's run) and `.tmpUOfOkf` (my rerun) left in its temp folder
+    - Not this change: the 44 `agent_safety_test` tests (DEV-778's 2 new ones included) run with a fresh `TMPDIR` left nothing behind (`cargo nextest run -p lotar-lib --test integration agent_safety_test`)
+    - Same leak blocked the DEV-816, DEV-802, DEV-785 and DEV-782 merges. DEV-840 tracks it (Reviewing, fix `53c39bfc2` not on main, and a later comment says sccache isn't the only cause)
+    - UI, release and hooks suites didn't run: `test:agent` stops after the Rust step fails
+    - Question: land DEV-778 without a clean `test:agent`, or wait for DEV-840 to merge and rerun?
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: by lotar's merge on ffda525cd
+    - command: npm run -s test:agent
+      result: failed
+      reason: 2490/2490 Rust tests passed twice, both runs left one .tmpXXXXXX entry (DEV-840)
+    - command: test:ui:agent, test:release, test:hooks
+      result: not_run
+      reason: test:agent stops after the Rust step fails
+    next: 'Owner: land DEV-778 despite the DEV-840 leak, or wait for DEV-840 to merge and rerun'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A282711a46030edc51d136dceb5c1716c2f6ab065a6408c803b5f8995e2d5510c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53f6b26caf08444d74b3031a53e4eaeb9201accb87a0965c458d756de69ad3f8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4b9f74b899e6eea8b5cb1895ab75015f13eb24480a9d465cf5bfa09631d46d87
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A60f038bf78d3b5d90282e0bc1dfdd09db995f09f528aa2e516596f2c417f39ee
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A80a986029bd8c061e51a76933d6deaafa10400fa54b67f4e1feaee2e5f472a3c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0abad9a46a7a34e5ab5f31476ba3f41638e6883fe0c5d8d097bd505cae9d31f7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A309d56b343d2103730f2bc854017b3b2c92322c33842429abe4d78f4e5aa9056
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0e0c0c772b396cd1bb763245d54b7cf3654357194448914a7834b4dbc74fca16
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A11147ef6cd0867b7365382aa28dbb64a5ac8be363fd1dcc383f581e3a078787a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6883823c47658fdfbb0d6d8962220f42239d2383e0344b7a492f93887df7e2bb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c79f134fafe147bd09d2a534462f6e52d9632123a4cf1002bf8006cd6d22b85
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77b22e5750b413bdfd4e513d16df8cfde9cd0e03a337bf58d318be42634c22a3
 description: |-
   Found in the DEV-762 review. `remove_worktree_dir` (crates/lotar-agent/src/services/agent_job_service.rs ~2816) finds the build root folder before the rename, but deletes it only after the trash folder is gone. A removal cut off in between, or a failed delete of that folder, leaves `<build_root>/<repo>/<ticket>` with no link pointing at it. The next removal sweeps leftover `.<name>.lotar-removed` folders but not the build root. `remove_build_output` (~3243) has the same gap for its parked `.<ticket>.lotar-cleanup-<job>` folders in the build root. Those builds then take quota on /Volumes/Builds until someone deletes them by hand.
 
@@ -41,8 +407,6 @@ description: |-
   - [ ] Unset build root: nothing changes
   - [ ] Test: a removal cut off after the rename (or a build folder that can't be deleted) leaves the folder; the next removal or cleanup deletes it, and a live worktree's build stays
   - [ ] Docs (`docs/help/agent.md`) say leftovers are swept
-tags:
-- waits
 history:
 - at: 2026-11-22T00:05:10.705262+00:00
   actor: claude
@@ -117,3 +481,382 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-23T06:01:55.776072+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-23T08:27:43.142524+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-23T08:27:45.096951+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53f6b26caf08444d74b3031a53e4eaeb9201accb87a0965c458d756de69ad3f8
+- at: 2026-11-23T08:27:48.509108+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-23T08:27:48.729549+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T09:28:19.511920+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4b9f74b899e6eea8b5cb1895ab75015f13eb24480a9d465cf5bfa09631d46d87
+- at: 2026-11-23T10:28:30.653617+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A60f038bf78d3b5d90282e0bc1dfdd09db995f09f528aa2e516596f2c417f39ee
+- at: 2026-11-23T11:29:34.833722+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A80a986029bd8c061e51a76933d6deaafa10400fa54b67f4e1feaee2e5f472a3c
+- at: 2026-11-23T12:31:16.526573+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0abad9a46a7a34e5ab5f31476ba3f41638e6883fe0c5d8d097bd505cae9d31f7
+- at: 2026-11-23T13:32:08.731603+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A309d56b343d2103730f2bc854017b3b2c92322c33842429abe4d78f4e5aa9056
+- at: 2026-11-23T14:32:24.495714+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0e0c0c772b396cd1bb763245d54b7cf3654357194448914a7834b4dbc74fca16
+- at: 2026-11-23T15:32:39.947386+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A11147ef6cd0867b7365382aa28dbb64a5ac8be363fd1dcc383f581e3a078787a
+- at: 2026-11-23T16:33:30.592981+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6883823c47658fdfbb0d6d8962220f42239d2383e0344b7a492f93887df7e2bb
+- at: 2026-11-23T17:33:50.900542+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa3bf1de4d6d164ef02fc118c1a2d5b558f6979b3faa309ba97d9a75045d1ee4d
+- at: 2026-11-23T18:34:09.227260+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c79f134fafe147bd09d2a534462f6e52d9632123a4cf1002bf8006cd6d22b85
+- at: 2026-11-23T18:34:12.295455+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: job-paused
+    new: job-paused, fix-retried
+- at: 2026-11-23T18:34:13.452156+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:34:29.923493+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77b22e5750b413bdfd4e513d16df8cfde9cd0e03a337bf58d318be42634c22a3
+- at: 2026-11-23T18:34:30.999890+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-23T18:34:31.984304+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:05.634330+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762"],"related":["DEV-762"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762"]}'
+- at: 2026-11-23T18:36:06.275189+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-23T18:36:10.841316+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-23T18:36:11.386857+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:11.713884+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-23T18:36:11.970303+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:15.248325+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-23T18:36:47.530384+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-24T16:00:08.787987+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-24T16:00:08.826853+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:00:09.291321+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-24T16:02:11.236660+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:02:55.028565+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832"]}'
+- at: 2026-11-24T16:03:07.875907+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:03:18.877343+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:03:51.392172+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:04:56.425399+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:05:15.586960+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-24T16:05:33.078125+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834"]}'
+- at: 2026-11-24T16:05:46.351133+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833"]}'
+- at: 2026-11-24T16:08:33.970748+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T16:08:34.258412+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:08:40.756236+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:08:53.173245+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:09:04.939247+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T16:20:15.360854+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:22:46.527549+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-24T16:25:58.515480+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-24T16:25:59.041446+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:00.932690+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:02.425163+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:08.121781+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:10.084015+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T16:26:10.568351+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-24T16:26:10.761283+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:03:19.579263+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:03:34.611415+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-24T17:05:27.192855+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810"]}'
+- at: 2026-11-24T17:20:58.704366+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841"]}'
+- at: 2026-11-24T17:21:34.055398+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T17:21:34.284629+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774"]}'
+- at: 2026-11-24T17:21:51.038959+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-24T17:56:17.715254+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-24T17:56:18.131469+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-24T17:56:20.029387+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T19:31:16.467929+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T21:01:39.387705+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"blocks":["DEV-841"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774"]}'
+- at: 2026-11-24T23:03:10.605843+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-24T23:16:00.971155+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-24T23:16:01.369732+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601"],"blocks":["DEV-841"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601"],"blocks":["DEV-841"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774","DEV-782","DEV-785","DEV-802","DEV-816","DEV-840"]}'
+- at: 2026-11-24T23:16:08.449246+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: job-paused, fix-retried
+    new: ''
+- at: 2026-11-24T23:16:08.501762+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
