@@ -52,7 +52,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 
 ### Organization
 - `--tag <TAG>`, `-i <TAG>` - Tags (can be used multiple times)
-- `--description <TEXT>`, `-D <TEXT>` - Detailed description
+- `--description <TEXT>`, `-D <TEXT>` - Detailed description. `-D -` reads it from stdin, trailing newlines trimmed, like `lotar comment -F -`: `lotar add "Title" -D - <<'EOF'`. Any other value, also one starting with `-`, is saved as given.
 
 Types and priorities are whatever your configuration defines, so there are no shortcuts such as `--bug` or `--high`: use `--type bug` or `--priority high` (matched case-insensitively against the configured values).
 

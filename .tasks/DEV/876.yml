@@ -1,11 +1,11 @@
 title: 'T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
 status: Todo
-priority: Medium
+priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T19:54:54.013521+00:00
-modified: 2026-11-25T19:54:54.693755+00:00
+modified: 2026-11-25T22:12:12.816826+00:00
 relationships:
   related:
   - DEV-777
@@ -25,3 +25,9 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T22:12:12.816826+00:00
+  actor: claude
+  changes:
+  - field: priority
+    old: Medium
+    new: High

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T00:07:07.617585+00:00
-modified: 2026-11-25T12:17:31.964492+00:00
+modified: 2026-11-25T22:10:25.827093+00:00
 relationships:
   related:
   - DEV-623
@@ -99,6 +99,12 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review again
+- date: 2026-11-25T22:10:25.827093+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-819` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-819` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a0ceaa47a6640fdc6dc5091e8e1e101051bb83529f4ab09999e77f38275e1c3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A317eced5048001ad3214ea1d73ba8616b72f7057d458d896a0f91bfedca751f3
@@ -228,3 +234,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T22:10:25.827093+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,0 +1,30 @@
+title: Record memory-gate holds and each job's queued time in the job records
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T22:11:53.112006+00:00
+modified: 2026-11-25T22:12:11.998042+00:00
+relationships:
+  related:
+  - DEV-827
+description: 'From standards STD-359 proposal F (owner 2026-11-25: all of A-F). The throughput measurement couldn''t count memory-gate hours (holds only go to the server log, DEV-827) and gives queue waits only as a lower bound: the queue keeps no time an entry was queued. Store queued_at per queue entry and job, and each gate hold (start, end, reason) where lotar agent jobs or a stats command can read them.'
+history:
+- at: 2026-11-25T22:11:53.449819+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-827"]}'
+- at: 2026-11-25T22:12:11.921583+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal
+    new: ''
+- at: 2026-11-25T22:12:11.998042+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

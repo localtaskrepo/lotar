@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T05:02:58.468147+00:00
-modified: 2026-11-25T19:54:54.340158+00:00
+modified: 2026-11-25T22:11:53.448580+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -15,6 +15,7 @@ relationships:
   - DEV-837
   - DEV-833
   - DEV-876
+  - DEV-882
 comments:
 - date: 2026-11-23T08:26:18.817426+00:00
   author: automation
@@ -676,3 +677,9 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833"]}'
     new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876"]}'
+- at: 2026-11-25T22:11:53.448580+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882"]}'

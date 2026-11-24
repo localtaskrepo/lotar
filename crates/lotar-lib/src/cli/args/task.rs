@@ -180,7 +180,7 @@ pub struct AddArgs {
     #[serde(alias = "due_date")]
     pub due: Option<String>,
 
-    /// Task description
+    /// Task description; `-` reads it from stdin
     #[arg(long, short = 'D', alias = "desc", allow_hyphen_values = true)]
     pub description: Option<String>,
 
@@ -659,7 +659,7 @@ pub struct TaskAddArgs {
     #[serde(alias = "due_date")]
     pub due: Option<String>,
 
-    /// Task description
+    /// Task description; `-` reads it from stdin
     #[arg(long, short = 'D', alias = "desc", allow_hyphen_values = true)]
     pub description: Option<String>,
 
@@ -737,7 +737,7 @@ pub struct TaskEditArgs {
     #[serde(alias = "due_date")]
     pub due: Option<String>,
 
-    /// New description
+    /// New description; `-` reads it from stdin
     #[arg(long, short = 'D', allow_hyphen_values = true)]
     pub description: Option<String>,
 

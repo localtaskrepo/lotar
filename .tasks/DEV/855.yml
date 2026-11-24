@@ -1,11 +1,11 @@
 title: 'A t3 job paused on Claude''s weekly limit retries hourly: the reset time is only in the thread''s message'
 status: Blocked
-priority: Medium
+priority: High
 type: Bug
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-24T21:39:09.103486+00:00
-modified: 2026-11-25T21:15:36.385073+00:00
+modified: 2026-11-25T22:12:12.513679+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-31
@@ -99,3 +99,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-25T22:12:12.513679+00:00
+  actor: claude
+  changes:
+  - field: priority
+    old: Medium
+    new: High

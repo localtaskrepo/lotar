@@ -1,0 +1,25 @@
+title: 'Job prompts tell agents to run lotar --format json show, which prints every comment and the history: the largest Bash output in job sessions'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T22:18:53.793616+00:00
+modified: 2026-11-25T22:18:54.141688+00:00
+description: |-
+  Found by STD-362 (owner 2026-11-25: all of STD-359's proposals A-F, among them "keep long check output out of the conversation").
+
+  Measured over the 7 days to 2026-11-25 in ~/.claude/projects/*lotar-worktrees*/*.jsonl (Bash tool results by command):
+  - lotar show: 2,157 results, 7.8 M characters, 152 over 10 k. The largest group, ahead of git diff (5.8 M).
+  - Check commands (cargo nextest, vitest, node --test, test:agent, npm run check): under 2.5 M in all, medians 300-600 characters; the quiet reporters already work.
+  - `lotar --format json show STD-359` prints 44 k characters (one long comment plus history); the job prompt already carries the description and relationships, so most of it repeats.
+
+  Each character stays in the session for every later request (cache reads, 95% of job tokens per STD-359).
+
+  Done when: the job instructions' LoTaR CLI block names a compact form (for example `lotar show <ID>` without history, comments cut to their first lines with a way to read one in full), and the show command offers it; a test covers the block's command.
+history:
+- at: 2026-11-25T22:18:54.141688+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

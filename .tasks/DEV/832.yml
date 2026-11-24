@@ -1,11 +1,11 @@
 title: After the usage-limit reset, T3 Code resumed 2-4 sessions per job in the same worktree
 status: Merging
-priority: Medium
+priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-25T12:41:52.142532+00:00
+modified: 2026-11-25T22:12:12.755608+00:00
 relationships:
   related:
   - DEV-777
@@ -283,3 +283,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T22:12:12.755608+00:00
+  actor: claude
+  changes:
+  - field: priority
+    old: Medium
+    new: High

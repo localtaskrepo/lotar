@@ -103,7 +103,7 @@ pub struct AddedTask {
 
 impl AddHandler {
     pub fn execute_with_finding(
-        args: AddArgs,
+        mut args: AddArgs,
         project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -115,6 +115,7 @@ impl AddHandler {
         if args.title.trim().is_empty() {
             return Err("Title cannot be empty.".to_string());
         }
+        args.description = description_from_stdin(args.description)?;
         let finding_key = args.finding.as_deref().map(FindingService::validate_key).transpose().map_err(|e| e.to_string())?;
         let bundle = args.bundle.as_deref().map(FindingService::validate_bundle).transpose().map_err(|e| e.to_string())?;
         // Create project resolver and validator
@@ -546,6 +547,19 @@ impl AddHandler {
         });
         Ok(AddedTask { task_id, finding })
     }
+}
+
+/// `-D -` reads the description from stdin, like `comment -F -` (DEV-842):
+/// trailing newlines are trimmed, any other value is kept as given. Read
+/// before anything is written, so a failed read changes nothing.
+pub(crate) fn description_from_stdin(description: Option<String>) -> Result<Option<String>, String> {
+    use std::io::Read;
+    if description.as_deref() != Some("-") {
+        return Ok(description);
+    }
+    let mut buffer = String::new();
+    std::io::stdin().read_to_string(&mut buffer).map_err(|e| format!("Failed to read the description from stdin (-D -): {e}"))?;
+    Ok(Some(buffer.trim_end_matches(['\n', '\r']).to_string()))
 }
 
 /// `created`, `state` and `id` of a finding report on the JSON of a created task.

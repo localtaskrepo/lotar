@@ -1,0 +1,19 @@
+title: A bad value in the home config's agents block drops every agent profile, and config validate still passes
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T22:17:22.622204+00:00
+modified: 2026-11-25T22:17:22.988210+00:00
+description: 'Found (STD-360): in a home .lotar whose agents block sets stall_timeout_seconds: notanumber on one profile, lotar --format json config show lists no agent_profiles at all, and lotar config validate prints ''Global configuration is valid''. A one-character typo in one profile silently removes all of them, so no job starts. Check: HOME=<tmp> with that .lotar, run lotar config validate and lotar --format json config show. Done: validate names the profile and key and fails, and the other profiles still load (or the load fails loudly).'
+tags:
+- health
+custom_fields:
+  finding: config:agents-block-invalid-value
+history:
+- at: 2026-11-25T22:17:22.988210+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

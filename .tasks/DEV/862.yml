@@ -1,11 +1,11 @@
 title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
 status: InProgress
-priority: Medium
+priority: High
 type: Feature
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-25T14:24:13.727451+00:00
+modified: 2026-11-25T22:12:12.566849+00:00
 comments:
 - date: 2026-11-25T13:24:09.600579+00:00
   author: automation
@@ -57,3 +57,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T22:12:12.566849+00:00
+  actor: claude
+  changes:
+  - field: priority
+    old: Medium
+    new: High

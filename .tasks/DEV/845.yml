@@ -1,11 +1,11 @@
 title: 'DEV-825''s fix job prompt rendered ${{ticket.title}} as "first": its commit is "DEV-825 first"'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T18:56:52.105522+00:00
-modified: 2026-11-25T11:28:16.906287+00:00
+modified: 2026-11-25T22:07:59.172134+00:00
 relationships:
   related:
   - DEV-825
@@ -95,13 +95,39 @@ comments:
     - No UI change, no stray files, no second branch.
     - **Minor, filed [DEV-870](https://lotar.pyxzl.net/task/DEV-870):** a job held in the in-process pending queue still starts with the whole prompt built at `create` (`agent_job_service.rs:499`, `:6176`). That covers its title and ticket context. Older behaviour, not this rule-queue path.
     - **At merge:** DEV-825's commit still needs its real title (an amend). This branch doesn't do that.
+- date: 2026-11-25T22:07:58.294387+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-845` is in `main`.
+
+    - Rebased `agent/DEV-845` onto `main` (`22f3333bcf23`): `c851631b2212`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `c851631b2212`
+    - Amended the pending `.tasks` changes into the merged commit: `99c26108395a`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[agent-jobs:commit-title-placeholder]`
+  report:
+    commits:
+    - hash: 99c261083
+      what: 'DEV-845 DEV-825''s fix job prompt rendered ${{ticket.title}} as "first": its commit is "DEV-825 first"'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acb1cbebeb545bfdc2bcca307b19f8b9296c9f7ff5d0fe03ce112d0035a699ed3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A866aae813f35da8073eae1d715e02ba1fa7262952a554714981ab78ee1942388
 description: 'Found: reviewing DEV-825, commit `3fad61477` on `agent/DEV-825` is titled "DEV-825 first". The fix job was told so: its prompt (session `lotar-95e687-DEV-825-fix`) says `message "DEV-825 first"`, where `.tasks/DEV/automation.yml:134` has `"${{ticket.id}} ${{ticket.title}}"`. Other jobs got their full title (DEV-747, DEV-563). DEV-825 was filed from a review worktree on 2026-11-23 and briefly had a scratch-looking relation to DEV-3, so the title the job read may have come from a scratch ticket. Check: `grep -o "DEV-825 first" ~/.local/state/harnessmux/sessions/lotar-95e687-DEV-825-fix.events.jsonl`. Done: the cause is found and fixed, and a job prompt always carries the ticket''s current title. The DEV-825 commit gets its real title when it is merged (unpushed, so an amend).'
 tags:
 - health
-- job-paused
 custom_fields:
   finding: agent-jobs:commit-title-placeholder
 history:
@@ -192,3 +218,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T22:07:58.294387+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T22:07:59.172134+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health

@@ -1,11 +1,11 @@
 title: 'An expired provider login fails every job into retries, owner questions and inbox triage: pause that provider''s queue like a signing failure (DEV-604)'
 status: Reviewing
-priority: Medium
+priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T16:08:21.742893+00:00
-modified: 2026-11-25T12:42:25.429244+00:00
+modified: 2026-11-25T22:12:12.682325+00:00
 relationships:
   related:
   - DEV-604
@@ -217,3 +217,9 @@ history:
   - field: tags
     old: health, job-paused, review-blocked
     new: health, job-paused, review-returned
+- at: 2026-11-25T22:12:12.682325+00:00
+  actor: claude
+  changes:
+  - field: priority
+    old: Medium
+    new: High

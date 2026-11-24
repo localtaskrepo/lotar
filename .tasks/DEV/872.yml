@@ -1,11 +1,11 @@
 title: 't3 thread show fails: ServerOwnsDatabaseError, t3 job runner exits 1 right after start'
 status: InProgress
-priority: Medium
+priority: High
 type: Feature
 reporter: triage
 assignee: '@fix'
 created: 2026-11-25T17:09:40.877284+00:00
-modified: 2026-11-25T18:15:15.542511+00:00
+modified: 2026-11-25T22:12:12.619909+00:00
 relationships:
   blocks:
   - DEV-858
@@ -55,3 +55,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T22:12:12.619909+00:00
+  actor: claude
+  changes:
+  - field: priority
+    old: Medium
+    new: High

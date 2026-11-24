@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:22:19.506908+00:00
-modified: 2026-11-25T10:46:16.982737+00:00
+modified: 2026-11-25T22:40:09.944664+00:00
 relationships:
   related:
   - DEV-776
@@ -115,6 +115,61 @@ comments:
     - `docs/help/add.md`, `docs/help/task.md` and the `-D` help text match the behaviour
     - Not rerun: clippy, full `npm run lint`/`npm test`/`npm run smoke` (the merge runs them)
     - Minor findings: none; no tickets filed
+- date: 2026-11-25T22:40:09.944664+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+     ✓ |wall-clock| tests/cli.automation.smoke.spec.ts (16 tests) 949ms
+       ✓ CLI automation smoke scenarios (16)
+         ✓ supports condition matching with changes block 312ms
+     ✓ |wall-clock| tests/harness.agent-launcher.smoke.spec.ts (7 tests) 611ms
+
+    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+     FAIL  |wall-clock| tests/ui.sync-scope.smoke.spec.ts > UI sync scope isolation (DEV-67) > editor saves global edits without leaking into the project config
+    TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+    Call log:
+      - waiting for locator('[data-testid="remote-dialog-choice"]') to be visible
+
+     ❯ tests/ui.sync-scope.smoke.spec.ts:577:32
+        575|
+        576|                     await remoteRow(page, 'inherited-jira').getByRole(…
+        577|                     await page.waitForSelector('[data-testid="remote-d…
+           |                                ^
+        578|                     await page.getByRole('button', { name: 'Edit in Gl…
+        579|                     await expect
+     ❯ helpers/ui.ts:112:20
+     ❯ withBrowser helpers/ui.ts:92:20
+     ❯ tests/ui.sync-scope.smoke.spec.ts:573:17
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+     Test Files  1 failed | 117 passed (118)
+          Tests  1 failed | 410 passed (411)
+       Start at  14:28:13
+       Duration  716.36s (tests 90%, import 9%, setup 1%, transform 1%)
+    ```.
+
+    - Rebased `agent/DEV-842` onto `main` (`b372deae77c8`): `2297a8b610ed`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-842` onto `main` (`22f3333bcf23`): `29a0c85a092b`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac862ff1db012f6c60ec944f429edcf793a121169e64009b3e22ffd95e959d446
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0
@@ -260,3 +315,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-25T22:40:09.944664+00:00
+  actor: automation
+  changes:
+  - field: comment_added

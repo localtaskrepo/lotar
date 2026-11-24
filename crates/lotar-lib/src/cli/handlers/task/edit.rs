@@ -14,8 +14,10 @@ impl CommandHandler for EditHandler {
     type Args = TaskEditArgs;
     type Result = Result<(), String>;
 
-    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &crate::output::OutputRenderer) -> Self::Result {
+    fn execute(mut args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &crate::output::OutputRenderer) -> Self::Result {
         renderer.log_info("edit: begin");
+        // Once, so `--select` gives every task the same text.
+        args.description = crate::cli::handlers::description_from_stdin(args.description)?;
         let Some(select) = args.select.as_deref() else {
             let id = args.id.clone().ok_or("Name the task to edit: a task ID, or --select '<query>'")?;
             let Some((full_id, updated)) = edit_one(&args, &id, project, resolver, renderer)? else {
