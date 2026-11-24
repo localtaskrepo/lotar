@@ -1321,7 +1321,7 @@ describe('AgentJobs queue of every process (DEV-771)', () => {
         try {
             expect(wrapper.find('.queue-stats-card').text()).toContain('3 Queued')
             const queuedTab = wrapper.findAll('.filter-tab').find((tab) => tab.text().startsWith('Queued'))!
-            expect(queuedTab.find('.tab-count').text()).toBe('4')
+            expect(queuedTab.find('.tab-count').text()).toBe('3')
             const entries = wrapper.findAll('[data-testid="agent-queue-entry"]')
             expect(entries.map((entry) => entry.find('.chip').text())).toEqual(['DEV-7', 'DEV-3', 'DEV-4'])
             expect(entries[0]!.text()).toContain('@fix')
@@ -1337,10 +1337,48 @@ describe('AgentJobs queue of every process (DEV-771)', () => {
 
             await queuedTab.trigger('click')
             expect(wrapper.find('[data-testid="agent-queue"]').exists()).toBe(true)
+            expect(wrapper.findAll('[data-testid="agent-queue-parked"]')).toHaveLength(1)
             expect(wrapper.text()).not.toContain('No queued jobs')
             const completedTab = wrapper.findAll('.filter-tab').find((tab) => tab.text().startsWith('Completed'))!
             await completedTab.trigger('click')
             expect(wrapper.find('[data-testid="agent-queue"]').exists()).toBe(false)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it('counts the waiting tickets in the All and Queued tabs as the top counts do (DEV-798)', async () => {
+        const entry = (ticket_id: string) => ({
+            ticket_id,
+            agent: 'fix',
+            queued_at: '2026-10-08T09:00:00.000Z',
+            attempts: 0,
+            waits_for: 'waiting for a free slot',
+        })
+        ;(api.listAgentJobs as any).mockResolvedValue({
+            jobs: [],
+            queue_stats: { running: 0, queued: 3, max_parallel: 2 },
+            queue: {
+                worker_state: 'active',
+                reason: null,
+                pending: [entry('DEV-7'), entry('DEV-3'), entry('DEV-4')],
+                waiting_for_prerequisites: [
+                    { ticket_id: 'DEV-8', agent: 'implement', parked_at: '2026-10-08T08:00:00.000Z', status: 'Todo' },
+                ],
+            },
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            const count = (label: string) =>
+                wrapper
+                    .findAll('.filter-tab')
+                    .find((tab) => tab.text().startsWith(label))!
+                    .find('.tab-count')
+                    .text()
+            expect(wrapper.find('.queue-stats-card').text()).toContain('3 Queued')
+            expect(count('All')).toBe('4')
+            expect(count('Queued')).toBe('3')
+            expect(count('Running')).toBe('0')
         } finally {
             wrapper.unmount()
         }

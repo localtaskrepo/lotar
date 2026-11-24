@@ -1,16 +1,18 @@
 title: 'docs: assignee picker search and profiles API omit the agent profile description (DEV-768)'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T07:46:13.287811+00:00
-modified: 2026-11-26T03:14:11.132675+00:00
+modified: 2026-11-26T03:47:07.605834+00:00
 relationships:
   depends_on:
   - DEV-768
   related:
   - DEV-768
+  - DEV-777
+  - DEV-811
 comments:
 - date: 2026-11-23T09:05:13.863013+00:00
   author: automation
@@ -202,6 +204,30 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T03:46:59.798097+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `cc453dc5c` is on `main` and `origin/main`.
+
+    - Lotar's smoke failure, `ui.task-view.smoke.spec.ts` (the large view off-center by 19px), was load-dependent: a full `npm run -s smoke` on the rebased branch passed 411/411
+    - As AGENTS.md says, that spec joins `WALL_CLOCK_SPECS` in `smoke/vitest.config.ts`, amended into the DEV-829 commit, as the DEV-811 and DEV-777 merges did. Full smoke passed again after that
+    - Rebased twice because main moved (`4c1360b17`, then `5d3223431`). After the second rebase, `npm ci`, `lint:agent` and `test:agent` passed again; smoke was not rerun, because main's new commits only add `crates/lotar-lib/tests/dev584_usage_limit_pause_test.rs` and `docs/help/trust.md`
+    - The main checkout's pending `.tasks` changes were amended into the merged commit; the checkout is clean
+    - No rule or config files changed, so no `lotar trust` was needed
+  report:
+    commits:
+    - hash: cc453dc5c
+      what: docs name the agent profile description; ui.task-view smoke spec joins the wall-clock group
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411 on base 4c1360b17, again after the config change (test:smoke:quick:agent); not rerun after the last rebase onto 5d3223431, which only added a Rust test and docs/help/trust.md
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad20053c42d089766490447cbb98e7d8b13ab2cf0dc91e8199c3406ffae1b97b4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8b7878b8e0e67d93adf4738ce59a4e0f45e9c49654f8148827e59a3e2344e76f
@@ -230,8 +256,6 @@ description: |-
   - [ ] No other help page describes the picker or profile fields without the description (`grep -rn` over `docs/help`).
 tags:
 - docs
-- job-paused
-- fix-retried
 history:
 - at: 2026-11-23T07:46:21.352073+00:00
   actor: claude
@@ -526,3 +550,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T03:46:59.798097+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T03:47:00.060734+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-768"],"related":["DEV-768"]}'
+    new: '{"depends_on":["DEV-768"],"related":["DEV-768","DEV-777","DEV-811"]}'
+- at: 2026-11-26T03:47:07.605834+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: docs, job-paused, fix-retried
+    new: docs

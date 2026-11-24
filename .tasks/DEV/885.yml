@@ -4,11 +4,13 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-25T23:52:10.484956+00:00
-modified: 2026-11-26T02:16:26.980853+00:00
+modified: 2026-11-26T04:52:31.416918+00:00
 relationships:
   related:
   - DEV-748
   - DEV-837
+  - DEV-890
+  - DEV-863
 comments:
 - date: 2026-11-26T02:16:19.583200+00:00
   author: claude
@@ -63,3 +65,15 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-26T04:52:06.018569+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-837"]}'
+    new: '{"related":["DEV-748","DEV-837","DEV-890"]}'
+- at: 2026-11-26T04:52:31.416918+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-748","DEV-837","DEV-890"]}'
+    new: '{"related":["DEV-748","DEV-837","DEV-890","DEV-863"]}'

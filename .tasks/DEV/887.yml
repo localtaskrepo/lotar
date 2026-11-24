@@ -1,11 +1,11 @@
 title: 'A relative --tasks-dir (.tasks) gives every repo the same agent queue file: DEV and STD tickets wait in it with no worker'
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T01:01:39.223004+00:00
-modified: 2026-11-26T01:01:41.244943+00:00
+modified: 2026-11-26T04:43:07.453286+00:00
 relationships:
   related:
   - DEV-865
@@ -15,19 +15,23 @@ relationships:
   - DEV-849
   - DEV-850
   - DEV-872
+  - DEV-889
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8013082b72e0bfd4b9e6194ee238a6d9d376eecd3f849f16d034532dfc5bd182
 description: |-
   Found in the review of DEV-865.
 
   - `crates/lotar-agent/src/services/agent_queue_service.rs:1391` `queue_file_path` and `:1405` `queue_hash` hash the tasks dir **as given**, not its absolute path. Every process that queues with `--tasks-dir .tasks` (or `LOTAR_TASKS_DIR=.tasks`), in any repo, shares one file.
   - On this Mac: `~/Library/Caches/lotar/agent-queue/queue-b06823c0….json` has `"tasks_dir": ".tasks"` and 7 pending entries from two repos: DEV-850, DEV-849, DEV-848, DEV-827, DEV-872 (lotar) and STD-336, STD-359 (standards), queued 2026-11-24/25. `lotar agent queue` in the repos (absolute path) doesn't show them, so they wait with no worker.
   - Repro: `lotar --tasks-dir .tasks agent queue` in any folder (for example a new scratch repo) lists those DEV/STD entries.
-  - Unknown: which caller queues with the relative path (an automation rule, a hook, a T3 thread). DEV-822 fixed the same relative path for `automation run`.
+  - Caller: lotar 0.15.6 and older passed `--tasks-dir .tasks` / `LOTAR_TASKS_DIR=.tasks` through unchanged (for example `.github/skills/lotar-dev-tracking/SKILL.md` tells agents to run `lotar --tasks-dir .tasks …`). DEV-822 (`87f6d2cf1`) made the CLI resolver absolute; this ticket makes the queue's own paths independent of how a caller spells the folder.
 
   ## Done when
 
-  - [ ] The queue, worker lock and active-job paths come from the canonical absolute tasks dir, so `.tasks` and its absolute path give the same file
-  - [ ] Entries already in a relative-path queue file are not lost: moved to the right queue or reported (owner decides which)
-  - [ ] A test: queueing with `.tasks` from the repo root and listing with the absolute path show the same entries
+  - [ ] The queue file, worker lock and memory-gate state paths are keyed by the canonical absolute tasks dir (as active-job and end-action paths already are), so `.tasks`, `./.tasks`, its absolute path and a symlinked spelling (`/tmp` vs `/private/tmp`) give the same file. A folder that doesn't exist yet is keyed by its absolute path (joined to the working folder).
+  - [ ] The queue file records that canonical path in `tasks_dir`.
+  - [ ] Entries already in a relative-path queue file are not lost: the old file stays untouched; what happens to its 7 entries is the owner's call in DEV-889 (tag owner). This ticket reports their current state there.
+  - [ ] A test: queueing with `.tasks` from the repo root and listing with the absolute path show the same entries.
 history:
 - at: 2026-11-26T01:01:40.650929+00:00
   actor: claude
@@ -40,3 +44,51 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T04:41:16.525769+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T04:41:17.039468+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8013082b72e0bfd4b9e6194ee238a6d9d376eecd3f849f16d034532dfc5bd182
+- at: 2026-11-26T04:43:07.016905+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-865.
+
+      - `crates/lotar-agent/src/services/agent_queue_service.rs:1391` `queue_file_path` and `:1405` `queue_hash` hash the tasks dir **as given**, not its absolute path. Every process that queues with `--tasks-dir .tasks` (or `LOTAR_TASKS_DIR=.tasks`), in any repo, shares one file.
+      - On this Mac: `~/Library/Caches/lotar/agent-queue/queue-b06823c0….json` has `"tasks_dir": ".tasks"` and 7 pending entries from two repos: DEV-850, DEV-849, DEV-848, DEV-827, DEV-872 (lotar) and STD-336, STD-359 (standards), queued 2026-11-24/25. `lotar agent queue` in the repos (absolute path) doesn't show them, so they wait with no worker.
+      - Repro: `lotar --tasks-dir .tasks agent queue` in any folder (for example a new scratch repo) lists those DEV/STD entries.
+      - Unknown: which caller queues with the relative path (an automation rule, a hook, a T3 thread). DEV-822 fixed the same relative path for `automation run`.
+
+      ## Done when
+
+      - [ ] The queue, worker lock and active-job paths come from the canonical absolute tasks dir, so `.tasks` and its absolute path give the same file
+      - [ ] Entries already in a relative-path queue file are not lost: moved to the right queue or reported (owner decides which)
+      - [ ] A test: queueing with `.tasks` from the repo root and listing with the absolute path show the same entries
+    new: |-
+      Found in the review of DEV-865.
+
+      - `crates/lotar-agent/src/services/agent_queue_service.rs:1391` `queue_file_path` and `:1405` `queue_hash` hash the tasks dir **as given**, not its absolute path. Every process that queues with `--tasks-dir .tasks` (or `LOTAR_TASKS_DIR=.tasks`), in any repo, shares one file.
+      - On this Mac: `~/Library/Caches/lotar/agent-queue/queue-b06823c0….json` has `"tasks_dir": ".tasks"` and 7 pending entries from two repos: DEV-850, DEV-849, DEV-848, DEV-827, DEV-872 (lotar) and STD-336, STD-359 (standards), queued 2026-11-24/25. `lotar agent queue` in the repos (absolute path) doesn't show them, so they wait with no worker.
+      - Repro: `lotar --tasks-dir .tasks agent queue` in any folder (for example a new scratch repo) lists those DEV/STD entries.
+      - Caller: lotar 0.15.6 and older passed `--tasks-dir .tasks` / `LOTAR_TASKS_DIR=.tasks` through unchanged (for example `.github/skills/lotar-dev-tracking/SKILL.md` tells agents to run `lotar --tasks-dir .tasks …`). DEV-822 (`87f6d2cf1`) made the CLI resolver absolute; this ticket makes the queue's own paths independent of how a caller spells the folder.
+
+      ## Done when
+
+      - [ ] The queue file, worker lock and memory-gate state paths are keyed by the canonical absolute tasks dir (as active-job and end-action paths already are), so `.tasks`, `./.tasks`, its absolute path and a symlinked spelling (`/tmp` vs `/private/tmp`) give the same file. A folder that doesn't exist yet is keyed by its absolute path (joined to the working folder).
+      - [ ] The queue file records that canonical path in `tasks_dir`.
+      - [ ] Entries already in a relative-path queue file are not lost: the old file stays untouched; what happens to its 7 entries is the owner's call in DEV-889 (tag owner). This ticket reports their current state there.
+      - [ ] A test: queueing with `.tasks` from the repo root and listing with the absolute path show the same entries.
+- at: 2026-11-26T04:43:07.453286+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889"]}'

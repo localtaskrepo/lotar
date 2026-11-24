@@ -1,0 +1,32 @@
+title: Test a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge still fails on main, also alone
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T04:52:05.701091+00:00
+modified: 2026-11-26T04:52:06.324425+00:00
+relationships:
+  related:
+  - DEV-863
+  - DEV-885
+description: |-
+  Found: in the review of DEV-863 on 2026-11-25, `cargo nextest run -p lotar-lib --test integration dev605` on main `cc453dc5c` plus DEV-863's test-only commit failed it 3 of 3 tries (60 s, the merge job still running); load average 7-10. Run alone on `cc453dc5c` (`cargo nextest run -p lotar-lib --test integration a_check_that_leaves_a_process_running`) it failed once and passed on retry (nextest: 1 flaky). DEV-885 closed it as passing alone on `2e49a88db` 4 of 4; main's merge code hasn't changed since, so it is intermittent, not fixed.
+  Check: run the alone command with `--retries 0` 5 times under normal load.
+  Done: the test passes 5 of 5 alone with `--retries 0` and in the full suite.
+tags:
+- health
+custom_fields:
+  finding: tests:dev605-background-check-flaky
+history:
+- at: 2026-11-26T04:52:06.018752+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-863","DEV-885"]}'
+- at: 2026-11-26T04:52:06.324425+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

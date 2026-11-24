@@ -1,14 +1,50 @@
 title: 'A fix job retried after a failed merge fails in 2s with the merge job''s verdict: STD-336 job-20261124T231242.639Z-51'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T00:48:58.355185+00:00
-modified: 2026-11-26T03:23:47.720831+00:00
+modified: 2026-11-26T03:48:26.214095+00:00
 relationships:
   related:
   - DEV-860
+  - DEV-566
+comments:
+- date: 2026-11-26T03:48:15.461422+00:00
+  author: claude
+  text: |-
+    Fixed: a `@fix` retry on a `Merging` ticket now runs the fix agent instead of lotar's merge.
+
+    - Cause: the merge's `job_failed` rule assigns `@fix` but leaves the status `Merging`. `is_merge_job_candidate` counted every job on a `Merging` ticket as a merge job, so job `-51` ran lotar's merge ("Nothing to merge"), then failed with "nothing was built". No agent turn ran.
+    - Change: if a job names a profile, it is a merge job only when that profile is `merge`. `Merging` decides only for a job with no profile. Every repo's rules start merges as `@merge`, so merges work as before. `crates/lotar-agent/src/services/agent_job_service.rs`
+    - Tests: a new unit test covers the rule. The new `dev605` test `a_fix_job_on_a_merging_ticket_runs_its_agent` checks that the fix agent runs and nothing gets merged. I removed the "other profile on Merging is a merge job" case from the DEV-566 test, since that case is the bug.
+    - Docs: `docs/help/agent.md` now gives the new rule in four places.
+    - Flaky, not caused by this change: in `dev605_merge_without_agent_test`, merge tests time out at the 60s deadline under load. Different tests fail each run, e.g. `a_clean_branch_lands_and_pushes_without_an_agent`, `the_checks_tell_their_scripts_that_the_check_lock_is_held`, `unpushed_commits_of_others_hand_off_after_landing`. 4 failed on the old source too, and each passes alone. The module is already in the `wall-clock` group, so no config change.
+  report:
+    commits:
+    - hash: 58f8f1fa0
+      what: a named profile's job on a Merging ticket is no merge job
+    checks:
+    - command: cargo nextest run -E 'test(a_job_on_a_merging_ticket) | test(a_taken_over_job_keeps) | test(dev566) | test(merge_job_does_not_start_while_review_blocked) | test(review_blocks)'
+      result: passed
+    - command: cargo nextest run -E 'test(dev605)'
+      result: failed
+      reason: 2-4 of 22 merge tests hit the 60s job deadline under load (different ones each run, 4 also on the old source); each passes alone
+    - command: cargo clippy -p lotar-agent -p lotar --all-targets
+      result: passed
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge; rerun the dev605 tests alone if they time out
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6
 description: |-
@@ -44,3 +80,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6
+- at: 2026-11-26T03:48:15.461422+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T03:48:15.866469+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860"]}'
+    new: '{"related":["DEV-860","DEV-566"]}'
+- at: 2026-11-26T03:48:26.214095+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

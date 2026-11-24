@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:10:25.728494+00:00
-modified: 2026-11-26T00:58:41.578251+00:00
+modified: 2026-11-26T03:47:14.094301+00:00
 relationships:
   depends_on:
   - DEV-771
@@ -256,6 +256,12 @@ comments:
     - **Screenshots:** the fix agent attached all 12 (before and after, light and dark, at 1920, 1440 and 390 px). I read 4 of them; they show before `All 0 · Queued 4` and after `All 4 · Queued 3`. I took my own 6 after screenshots in the same state (Vite with a mocked `/api/jobs`, scratch `lotar serve`). All show tabs `All 4 · Running 0 · Queued 3` and top `3 Queued`. No layout problems in the 2 I looked at (light 390, dark 1440)
     - **Merge conflict:** `view/pages/AgentJobs.vue` and `docs/help/agent.md` conflict with main. `56de78e33` (DEV-769) counts the tabs from `searchedJobs` and changed the next docs line. Fix: keep main's lines, then change the All count to `searchedJobs.value.length + queueWaiting.value`, change the Queued count to `+ queuePending.value`, and keep the branch's docs sentence. I tried this in a scratch copy on main: `AgentJobs.spec.ts` 37 passed and `vue-tsc` was clean. The scratch copy is removed
     - Nothing outside the ticket was changed. No stray files and no second branch. No new tickets filed (the minor finding is already [DEV-865](https://lotar.pyxzl.net/task/DEV-865))
+- date: 2026-11-26T03:47:14.094301+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-798` onto `main` conflicts in `docs/help/agent.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-798` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f2cf92fa6872f2c564eefe71cdf3f838044e29cd640d405d056eb3a11d82d3b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77140068723ec150f5d9f0e01ad962d4aec2578c1a4725d7c5a0232c48bd8cb2
@@ -716,3 +722,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T03:47:14.094301+00:00
+  actor: automation
+  changes:
+  - field: comment_added

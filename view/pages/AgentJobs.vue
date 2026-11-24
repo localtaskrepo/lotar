@@ -414,9 +414,11 @@ let clock: ReturnType<typeof setInterval> | null = null
 let queuePoll: ReturnType<typeof setInterval> | null = null
 const QUEUE_POLL_MS = 15000
 
-const queueWaiting = computed(
-  () => (queue.value?.pending.length ?? 0) + (queue.value?.waiting_for_prerequisites.length ?? 0),
-)
+// Tickets waiting in the queue count as queued, like the Queued count at the
+// top; jobs waiting for prerequisites don't, but All counts them (DEV-798).
+const queuePending = computed(() => queue.value?.pending.length ?? 0)
+const queueParked = computed(() => queue.value?.waiting_for_prerequisites.length ?? 0)
+const queueWaiting = computed(() => queuePending.value + queueParked.value)
 const showQueue = computed(() => queueWaiting.value > 0 && (activeTab.value === 'all' || activeTab.value === 'queued'))
 
 function applyQueue(response: AgentJobListResponse) {
@@ -472,7 +474,7 @@ const searchedJobs = computed(() => {
 })
 
 const tabs = computed(() => [
-  { value: 'all' as const, label: 'All', count: searchedJobs.value.length },
+  { value: 'all' as const, label: 'All', count: searchedJobs.value.length + queueWaiting.value },
   {
     value: 'running' as const,
     label: 'Running',
@@ -481,7 +483,7 @@ const tabs = computed(() => [
   {
     value: 'queued' as const,
     label: 'Queued',
-    count: searchedJobs.value.filter((j) => j.status === 'queued').length + queueWaiting.value,
+    count: searchedJobs.value.filter((j) => j.status === 'queued').length + queuePending.value,
   },
   {
     value: 'completed' as const,

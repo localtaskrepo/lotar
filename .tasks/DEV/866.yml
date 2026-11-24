@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T05:29:21.102795+00:00
-modified: 2026-11-26T01:01:21.324309+00:00
+modified: 2026-11-26T04:41:12.374965+00:00
 relationships:
   related:
   - DEV-789
@@ -44,8 +44,41 @@ comments:
     - **Finding:** `crates/lotar-lib/src/cli/preprocess.rs:181` `SERVE_VALUE_OPTIONS` says it covers "globals given after it" but misses the global `--config`. `lotar serve --tasks-dir <dir> --config server.port=1` (also with `--port 1` after it) fails with `error: a value is required for '--config <KEY=VALUE>'`. `docs/help/serve.md:47` documents `--config server.port=...` for serve, and `find_serve_index` (`preprocess.rs:12`, `:314`) already treats `--config` as taking a value. "Done when" asks for every option that takes a value. The fix agent's claim that the other serve options are flags is wrong for this one.
     - **Fix:** add `"--config"` to `SERVE_VALUE_OPTIONS` and a `--config server.port=1` case to `keeps_web_ui_path_and_allow_host_values_when_port_missing` (or a test of its own).
     - Otherwise fine: the refactor keeps the old options' behaviour, the new test fails on main, there are no stray files, and the lines fit the 160-column rustfmt width.
+- date: 2026-11-26T04:41:03.715334+00:00
+  author: claude
+  text: |-
+    Review finding fixed: `serve` now keeps the value of `--config <KEY=VALUE>` too, without an earlier port.
+
+    - Review read `7e45eea7d`, which was HEAD.
+    - Added `"--config"` to `SERVE_VALUE_OPTIONS` (`crates/lotar-lib/src/cli/preprocess.rs`), plus a new test `keeps_config_value_when_port_missing`.
+    - Manual: `lotar serve --tasks-dir <dir> --config server.port=18797` starts on port 18797.
+    - The other `ServeArgs` options (`--open`, `--web-ui-embedded`, `--exit-on-upgrade`) are flags. The globals `-v` and `--force-archived` are flags too.
+    - Amended into `31866fa9e`, signed.
+  report:
+    commits:
+    - hash: 31866fa9e
+      what: serve keeps the values of --web-ui-path, --allow-host and --config without an earlier port
+    checks:
+    - command: cargo nextest run -p lotar-lib preprocess
+      result: passed
+      reason: 23 tests
+    - command: cargo clippy -p lotar-lib --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check crates/lotar-lib/src/cli/preprocess.rs
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af7c853bc72540dd8dd160e793ee215ee636fb7378dea9f82c7f46d1dfbc0eb6d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab01ace2febfeb2b4d0c8224b3a2de98d83376549136189cb8171d1b7baf76f44
 description: |-
   ## Found
 
@@ -120,3 +153,27 @@ history:
   - field: tags
     old: health, review-blocked
     new: health, review-returned
+- at: 2026-11-26T04:38:43.232076+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T04:38:44.089930+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab01ace2febfeb2b4d0c8224b3a2de98d83376549136189cb8171d1b7baf76f44
+- at: 2026-11-26T04:41:03.715334+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T04:41:12.374965+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
