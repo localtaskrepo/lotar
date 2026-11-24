@@ -3,9 +3,9 @@ status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-26T11:05:28.365161+00:00
-modified: 2026-11-26T19:59:48.802760+00:00
+modified: 2026-11-26T21:27:13.911067+00:00
 relationships:
   related:
   - DEV-835
@@ -58,6 +58,13 @@ comments:
     Review: nothing to review
 
     - `git log main..HEAD` on `agent/DEV-897` is empty and the worktree is clean: the fix agent made no commit (it says the fix was already on main in `17cd3a49f`, DEV-884).
+- date: 2026-11-26T21:27:12.587380+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-897` is in `main` already.
+- date: 2026-11-26T21:27:13.911067+00:00
+  author: automation
+  text: The merge agent's job job-20261126T212711.331Z-67 failed (lotar agent logs job-20261126T212711.331Z-67); the fix agent retries it on branch agent/DEV-897.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad504f2a05e61530d0cfa6130b6be02a1b4202fcc595ab383581b96fbb2b7623f
 description: |-
@@ -75,6 +82,7 @@ description: |-
   - [ ] Then `lotar trust` in this repo (its run commands changed) and the stalled DEV tickets restart: `node ~/Development/standards/scripts/repos.ts --live` lists no stalled DEV ticket.
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: automation-file:DEV-835
 history:
@@ -148,3 +156,20 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T21:27:12.587380+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:27:13.583118+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-26T21:27:13.911067+00:00
+  actor: automation
+  changes:
+  - field: comment_added

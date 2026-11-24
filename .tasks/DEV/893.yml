@@ -1,11 +1,11 @@
 title: config validate prints 'Global configuration is valid' right after the invalid home config error
-status: Blocked
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T07:06:01.774631+00:00
-modified: 2026-11-26T20:27:38.010965+00:00
+modified: 2026-11-26T21:28:00.559024+00:00
 relationships:
   depends_on:
   - DEV-883
@@ -26,11 +26,16 @@ comments:
     - `validate.rs` on main has no home config check: `lotar config validate` with the ticket's `~/.lotar` exits 0 and prints no error (checked with this branch's build and `/opt/homebrew/bin/lotar`)
     - The error line comes from DEV-883's commit (`agent/DEV-883`, `78701985a`), status Merging
     - Once DEV-883 is on main: rebase onto it and drop the `Global configuration is valid` line when the home config fails to parse
+- date: 2026-11-26T21:28:00.559024+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T212755.519Z-72 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212755.519Z-72 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ac7687ed3b49ddb0c5fbe6482ac41b79bcec3ccb030425967d34b829990ff1b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3425182e8f3db8400d2baffa866734d4802b9b8d2c0b7747a749ef64b9ecb341
 description: 'Found (DEV-883 review): with a ~/.lotar whose agents.bad.stall_timeout_seconds is notanumber, `lotar config validate` prints `❌ Invalid home config (~/.lotar): …` and then `✅ Global configuration is valid` before failing with exit 1. The success line contradicts the error above it. Check: HOME=<tmp> with that .lotar, run lotar config validate. Done: no ''Global configuration is valid'' line when the home config fails to parse (crates/lotar-lib/src/cli/handlers/config/validate.rs:43-61).'
 tags:
 - health
+- job-paused
 history:
 - at: 2026-11-26T07:06:02.628617+00:00
   actor: claude
@@ -80,3 +85,24 @@ history:
   - field: tags
     old: health, waits
     new: health
+- at: 2026-11-26T21:27:56.645659+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T21:27:58.029242+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3425182e8f3db8400d2baffa866734d4802b9b8d2c0b7747a749ef64b9ecb341
+- at: 2026-11-26T21:28:00.523366+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-26T21:28:00.559024+00:00
+  actor: automation
+  changes:
+  - field: comment_added

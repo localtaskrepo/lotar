@@ -31,10 +31,12 @@ fn a_worker_started_from_another_folder_works_in_the_tasks_folders_parent() {
     let launcher = root.join("launcher");
     std::fs::create_dir_all(&launcher).unwrap();
     let record = root.join("worker-cwd");
-    // The job writes down the folder of the worker it runs under (its parent
-    // is the runner wrapper, the worker is further up).
+    let worker_pid = root.join("worker-pid");
+    // The job writes down the pid and folder of the worker it runs under.
     let script = format!(
-        "w=$PPID; while [ \"$w\" -gt 1 ] && ! ps -o command= -p $w | grep -q ' agent worker$'; do w=$(ps -o ppid= -p $w | tr -d ' '); done; if [ -e /proc/$w/cwd ]; then d=$(readlink /proc/$w/cwd); else d=$(lsof -a -p $w -d cwd -Fn | sed -n 's/^n//p'); fi; printf '%s\\n' \"$d\" > \"{}\"",
+        "{}; printf '%s\\n' \"$w\" > \"{}\"; if [ -e /proc/$w/cwd ]; then d=$(readlink /proc/$w/cwd); else d=$(lsof -a -p $w -d cwd -Fn | sed -n 's/^n//p'); fi; printf '%s\\n' \"$d\" > \"{}\"",
+        common::FIND_AGENT_WORKER_SH,
+        worker_pid.display(),
         record.display()
     );
     std::fs::write(
@@ -70,4 +72,8 @@ fn a_worker_started_from_another_folder_works_in_the_tasks_folders_parent() {
     let worker_cwd = wait_for(&record, Duration::from_secs(30));
     let expected = fixtures.tasks_root.parent().unwrap().canonicalize().unwrap();
     assert_eq!(Path::new(&worker_cwd).canonicalize().unwrap(), expected, "the worker kept the folder of the command that started it");
+
+    // The worker still finishes the job after the record lands; let it exit
+    // before the fixture removes its folder (DEV-840).
+    common::wait_for_worker_exit(&wait_for(&worker_pid, Duration::from_secs(1)), Duration::from_secs(30));
 }

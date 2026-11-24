@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-26T07:08:32.438639+00:00
-modified: 2026-11-26T20:09:45.033823+00:00
+modified: 2026-11-26T21:27:17.221869+00:00
 relationships:
   related:
   - DEV-882
@@ -31,9 +31,14 @@ comments:
       result: not_run
       reason: doc-only change; behaviour confirmed by reading the code
     next: Merge agent lands agent/DEV-894
+- date: 2026-11-26T21:27:17.221869+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T212714.529Z-68 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212714.529Z-68 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A470c11b34c29bb4c843c90ed862b3d00652bc82aabe62bbd4762e4028a98de0f
 description: 'Found in review of DEV-882 (4a46916a2). docs/help/agent.md list-jobs line says `created_at` is when a job left the queue. For a job that `lotar serve` holds as queued, the in-memory record (`GET /api/jobs` while it is queued or running) keeps `created_at` = the time it was queued, which equals `queued_at` (agent_job_service.rs start_job_inner: `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`). Only the saved log header takes `created_at` from `started_at` (start_job -> init_job_log). Check: hold a job in serve, read GET /api/jobs. Done: the doc describes created_at for both, or the record''s created_at matches the log header''s.'
+tags:
+- job-paused
 history:
 - at: 2026-11-26T07:08:35.462071+00:00
   actor: claude
@@ -70,3 +75,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T21:27:17.189929+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-26T21:27:17.221869+00:00
+  actor: automation
+  changes:
+  - field: comment_added

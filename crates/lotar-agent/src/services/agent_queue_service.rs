@@ -415,28 +415,13 @@ impl AgentQueueService {
 
     /// The jobs waiting for their tickets' prerequisites.
     pub fn list_parked(tasks_dir: &Path) -> LoTaRResult<Vec<ParkedEntry>> {
-        if !queue_file_path(tasks_dir).exists() {
-            return Ok(Vec::new());
-        }
-        let mut entries = Vec::new();
-        with_locked_queue(tasks_dir, |state| {
-            entries = state.parked.clone();
-        })?;
-        Ok(entries)
+        Ok(read_queue(tasks_dir)?.map(|state| state.parked).unwrap_or_default())
     }
 
     /// List all pending entries, also those a worker took and has not
     /// started yet, without modifying the queue.
     pub fn list_pending(tasks_dir: &Path) -> LoTaRResult<Vec<AgentQueueEntry>> {
-        let queue_path = queue_file_path(tasks_dir);
-        if !queue_path.exists() {
-            return Ok(Vec::new());
-        }
-        let mut entries = Vec::new();
-        with_locked_queue(tasks_dir, |state| {
-            entries = state.taken.iter().chain(&state.pending).cloned().collect();
-        })?;
-        Ok(entries)
+        Ok(read_queue(tasks_dir)?.map(|state| state.taken.into_iter().chain(state.pending).collect()).unwrap_or_default())
     }
 
     /// Remove all pending entries from the queue. Returns the number removed.
@@ -1266,11 +1251,7 @@ fn next_try_at() -> String {
 }
 
 fn pending_count(tasks_dir: &Path) -> LoTaRResult<usize> {
-    let mut count = 0;
-    with_locked_queue(tasks_dir, |state| {
-        count = state.pending.len();
-    })?;
-    Ok(count)
+    Ok(read_queue(tasks_dir)?.map_or(0, |state| state.pending.len()))
 }
 
 fn with_locked_queue<F>(tasks_dir: &Path, mut apply: F) -> LoTaRResult<()>
@@ -1293,12 +1274,22 @@ where
 }
 
 /// The queue's state, read without writing it back; `None` without a queue.
-fn read_state(tasks_dir: &Path) -> Option<AgentQueueState> {
-    let mut file = File::open(queue_file_path(tasks_dir)).ok()?;
-    file.lock_shared().ok()?;
-    let state = load_state(&mut file, tasks_dir).ok();
+/// A reader never creates the queue's folder: a worker that exits after its
+/// owner removed that folder must not bring it back (DEV-840).
+fn read_queue(tasks_dir: &Path) -> LoTaRResult<Option<AgentQueueState>> {
+    let mut file = match File::open(queue_file_path(tasks_dir)) {
+        Ok(file) => file,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(LoTaRError::IoError(err)),
+    };
+    file.lock_shared().map_err(LoTaRError::IoError)?;
+    let state = load_state(&mut file, tasks_dir);
     let _ = file.unlock();
-    state
+    state.map(Some)
+}
+
+fn read_state(tasks_dir: &Path) -> Option<AgentQueueState> {
+    read_queue(tasks_dir).ok().flatten()
 }
 
 fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState> {
@@ -1824,6 +1815,21 @@ mod tests {
         assert!(AgentQueueService::enqueue(&tasks_dir, req.clone()).unwrap());
         assert!(!AgentQueueService::enqueue(&tasks_dir, req).unwrap());
         assert_eq!(pending_count(&tasks_dir).unwrap(), 1);
+    }
+
+    /// DEV-840: a worker reads the queue also after its lock is free, when
+    /// the queue's folder may already be removed; reading must not recreate it.
+    #[test]
+    fn reading_the_queue_leaves_a_removed_queue_folder_removed() {
+        let dir = tempdir().unwrap();
+        let queue_base = dir.path().join("queue");
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", queue_base.to_str().unwrap());
+        let tasks_dir = dir.path().join("tasks");
+
+        assert_eq!(pending_count(&tasks_dir).unwrap(), 0);
+        assert!(AgentQueueService::list_pending(&tasks_dir).unwrap().is_empty());
+        assert!(AgentQueueService::list_parked(&tasks_dir).unwrap().is_empty());
+        assert!(!queue_base.exists());
     }
 
     /// DEV-530: unpark moves the parked job to the queue in one step, as a

@@ -56,6 +56,25 @@ pub fn lotar_cmd() -> Result<Command, CargoError> {
     Ok(cmd)
 }
 
+/// `sh` that sets `w` to the pid of the `lotar agent worker` a job runs
+/// under: the job's parent is the runner wrapper, the worker is further up.
+#[cfg(unix)]
+pub const FIND_AGENT_WORKER_SH: &str =
+    "w=$PPID; while [ \"$w\" -gt 1 ] && ! ps -o command= -p $w | grep -q ' agent worker$'; do w=$(ps -o ppid= -p $w | tr -d ' '); done";
+
+/// Wait for the queue worker `pid` to exit. Once its lock is free it still
+/// runs for a moment, and anything it writes then would recreate a fixture
+/// folder the test already removed (DEV-840).
+#[cfg(unix)]
+pub fn wait_for_worker_exit(pid: &str, limit: std::time::Duration) {
+    assert!(pid.parse::<u32>().is_ok_and(|pid| pid > 1), "the job found no worker: {pid:?}");
+    let deadline = std::time::Instant::now() + limit;
+    while std::process::Command::new("kill").args(["-0", pid]).stderr(std::process::Stdio::null()).status().is_ok_and(|status| status.success()) {
+        assert!(std::time::Instant::now() < deadline, "the queue worker {pid} did not exit");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
 #[ctor(unsafe)]
 unsafe fn init_lotar_test_environment() {
     scrub_repository_routing_env();

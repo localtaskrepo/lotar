@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T20:46:09.265801+00:00
+modified: 2026-11-26T21:28:10.229060+00:00
 relationships:
   related:
   - DEV-860
@@ -68,9 +68,13 @@ comments:
     - Installed lotar is `0.15.7`; `0cf94860d` (DEV-887) is in no tag yet.
     - Next: after the release is installed, requeue the entries under each repo's absolute tasks dir, delete `queue-b06823c0….json`, then Done.
     - Status Blocked, tag `waits`, so no health question is open.
+- date: 2026-11-26T21:28:10.229060+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T212804.665Z-73 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212804.665Z-73 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A348c8be0d6af88553ec0fc486e860caa6d139c788491aa5c658ec157106d8578
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A248ebff83276229a3f6cc5725bb91047266afbdba32b66f9a38417f9292d4edf
 description: |-
   Found (DEV-860 review): `~/Library/Caches/lotar/agent-queue/queue-b06823c05bdb7cda4004b1281c7001744d021ba39e3f81993eb5805f188f6f3e.json` (tasks_dir `.tasks`, last written 2026-11-25 22:14Z) holds DEV-850, DEV-849, DEV-848, DEV-827, STD-336, DEV-872 and STD-359. Since DEV-822 the resolver makes the path absolute, so nothing reads that file again.
 
@@ -81,6 +85,7 @@ tags:
 - health
 - owner
 - waits
+- job-paused
 custom_fields:
   finding: bug:stranded-relative-queue
 history:
@@ -204,5 +209,20 @@ history:
     old: '@fix'
 - at: 2026-11-26T20:46:09.265801+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:28:07.570275+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A248ebff83276229a3f6cc5725bb91047266afbdba32b66f9a38417f9292d4edf
+- at: 2026-11-26T21:28:10.196358+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, owner, waits
+    new: health, owner, waits, job-paused
+- at: 2026-11-26T21:28:10.229060+00:00
+  actor: automation
   changes:
   - field: comment_added

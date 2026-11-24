@@ -1,11 +1,11 @@
 title: Test a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge still fails on main, also alone
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T04:52:05.701091+00:00
-modified: 2026-11-26T19:47:08.941866+00:00
+modified: 2026-11-26T21:27:01.302430+00:00
 relationships:
   related:
   - DEV-863
@@ -54,6 +54,32 @@ comments:
     - Reran, with another run holding port `47586` the whole time (load 9-12): `cargo nextest run -p lotar-lib --test integration a_check_that_leaves_a_process_running --retries 0` (variable unset) passed 5 of 5 at about 6.7 s each. All 21 `dev605` tests passed. `rustfmt --check` passed.
     - Not rerun: the before-fix failure (the fix agent reproduced it at 60.3 s) and the full suite (the merge runs it).
     - No minor findings and no tickets filed. `npm ci` ran without errors.
+- date: 2026-11-26T21:27:00.894952+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-890` is in `main`.
+
+    - Rebased `agent/DEV-890` onto `main` (`bd6c94d37593`): `3c765e2e59ec`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `3c765e2e59ec`
+    - Amended the pending `.tasks` changes into the merged commit: `d1061401edfe`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[tests:dev605-background-check-flaky]`
+  report:
+    commits:
+    - hash: d1061401e
+      what: DEV-890 Test a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge still fails on main, also alone
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1c77d12b46b9314a8da1ae6f7a5fbd0e70c94581544bece67b83c750b703b7a
 description: |-
@@ -133,3 +159,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T21:27:00.894952+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:27:01.302430+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

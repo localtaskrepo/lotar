@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T22:44:17.550162+00:00
-modified: 2026-11-26T21:02:50.040123+00:00
+modified: 2026-11-26T21:26:51.644005+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -177,6 +177,9 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-858` onto `main` conflicts in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`; lotar aborted the rebase, `agent/DEV-858` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T21:26:51.644005+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T210247.119Z-51 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210247.119Z-51 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b1c83e2cf0d2436f0b72ea63e6750f769de0de33c35f3204adaa0b9888d2d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad158317efeb4c09caef52d93f060c84098ee0ec393e83112798470246e9fa9e3
@@ -197,6 +200,7 @@ description: |-
 tags:
 - agent
 - fix-retried
+- job-paused
 history:
 - at: 2026-11-24T22:44:18.166402+00:00
   actor: claude
@@ -452,6 +456,16 @@ history:
     old: '@review'
     new: '@merge'
 - at: 2026-11-26T21:02:50.040123+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:26:51.610256+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, fix-retried
+    new: agent, fix-retried, job-paused
+- at: 2026-11-26T21:26:51.644005+00:00
   actor: automation
   changes:
   - field: comment_added

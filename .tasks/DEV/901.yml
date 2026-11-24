@@ -1,11 +1,11 @@
 title: Run agent jobs on a second machine over ssh (dyson)
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-26T20:50:45.607758+00:00
+modified: 2026-11-26T21:27:51.744586+00:00
 comments:
 - date: 2026-11-26T20:04:29.483394+00:00
   author: claude
@@ -25,8 +25,12 @@ comments:
 - date: 2026-11-26T20:50:45.607758+00:00
   author: claude
   text: 'For route B (owner 2026-11-26: "Also fix and research jobs, through a T3 Code server on dyson"): T3 Code 0.1.13 (Mac, since 2026-11-26 12:44 PST) fixed tasks delegated to a linked machine on an older version not reporting back (pingdotgg/t3code PR 42717). Add to Done when: before a job goes to dyson''s T3, lotar compares the linked environment''s T3 version with the Mac''s (`t3 environment list`) and holds the job with a clear message when they differ or dyson doesn''t answer; it never falls back to the Mac. dyson''s setup keeps T3 current with `t3 update` (local LOCA-631 comment #24). Also 0.1.13: finished delegated child threads settle on their own (PR 43558), so remote job threads need no manual settle.'
+- date: 2026-11-26T21:27:51.744586+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T212746.696Z-71 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212746.696Z-71 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
 description: |-
   The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Debian 13, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today. Also from LOCA-631: "Worker now, swarm later" (no tickets, decisions or swarm state on dyson); "No NAS jobs and no NAS credentials on dyson until he says it runs stable"; dyson is optional capacity and may be off.
 
@@ -52,6 +56,8 @@ description: |-
   - [ ] Cap: running jobs per host never exceed its `max_jobs`, on top of the global and project limits; a full host makes the job wait with "waiting for a free slot (N of dyson's max_jobs M running)".
   - [ ] Disconnect or stop: the remote agent's process group gets SIGTERM, then SIGKILL after 10 s; nothing of the job keeps running on the host.
   - [ ] Tests with a fake ssh program cover the launch line, the cap wait, the worktree push/fetch and the disconnect cleanup; docs/help describes `agent.hosts` and `host`.
+tags:
+- job-paused
 history:
 - at: 2026-11-26T17:08:01.171137+00:00
   actor: claude
@@ -168,5 +174,26 @@ history:
     new: '@fix'
 - at: 2026-11-26T20:50:45.607758+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:27:47.961972+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T21:27:49.367717+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
+- at: 2026-11-26T21:27:51.708617+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-26T21:27:51.744586+00:00
+  actor: automation
   changes:
   - field: comment_added

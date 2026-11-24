@@ -493,7 +493,10 @@ test('probe env: owned overrides beat parent values on every platform', () => {
 
 // A fake nextest run that creates the given entries in the temp folder it was handed.
 function leavesInTemp(names, exitCode = 0) {
-    return async (_runArgs, env) => {
+    return async (runArgs, env) => {
+        if (runArgs[0] === '--no-run') {
+            return { exitCode: 0 };
+        }
         for (const name of names) {
             await fs.writeFile(path.join(env.TMPDIR, name), '');
         }
@@ -528,4 +531,33 @@ test('fresh temp: test leftovers fail a passing run, beside xcrun_db too', async
 
 test('fresh temp: a failing run keeps its own exit code', async () => {
     assert.equal((await freshTempRun(['lotar-leftover'], 101)).exitCode, 101);
+});
+
+// DEV-840: a compile can start the shared sccache server, which keeps the TMPDIR it started with. The build runs with
+// the caller's temp folder, so only the tests get the fresh one.
+test('fresh temp: the build runs first with the caller temp folder', async () => {
+    const calls = [];
+    const outcome = await runTestsInFreshTemp(
+        ['-p', 'lotar'],
+        { TMPDIR: '/caller-tmp' },
+        { write() {} },
+        async (args, env) => {
+            calls.push({ args, tmp: env.TMPDIR });
+            return { exitCode: 0 };
+        },
+    );
+    assert.equal(outcome.exitCode, 0);
+    assert.deepEqual(calls[0], { args: ['--no-run', '-p', 'lotar'], tmp: '/caller-tmp' });
+    assert.deepEqual(calls[1].args, ['-p', 'lotar']);
+    assert.notEqual(calls[1].tmp, '/caller-tmp');
+});
+
+test('fresh temp: a failing build skips the tests', async () => {
+    const calls = [];
+    const outcome = await runTestsInFreshTemp([], {}, { write() {} }, async (args) => {
+        calls.push(args);
+        return { exitCode: 101 };
+    });
+    assert.equal(outcome.exitCode, 101);
+    assert.equal(calls.length, 1);
 });

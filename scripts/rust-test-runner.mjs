@@ -552,8 +552,16 @@ async function runTests(runArgs, childEnv) {
 const TOOLCHAIN_TEMP_ENTRIES = new Set(['xcrun_db']);
 
 // Tests clean up after themselves (DEV-315): nextest runs with a fresh temp folder, and a passing run fails when
-// anything is left in it.
+// anything is left in it. The build runs first with the caller's temp folder: a compile can start the shared sccache
+// server, which keeps its TMPDIR for every later compile on the machine and would write into this folder (DEV-840).
 export async function runTestsInFreshTemp(runArgs, childEnv, stderr, run = runTests) {
+    if (runArgs.includes('--no-run')) {
+        return run(runArgs, childEnv);
+    }
+    const build = await run(['--no-run', ...runArgs], childEnv);
+    if (build.exitCode !== 0) {
+        return build;
+    }
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'lotar-rust-temp-'));
     const outcome = await run(runArgs, { ...childEnv, TMPDIR: root, TEMP: root, TMP: root });
     const leftovers = (await fs.readdir(root)).filter((name) => !TOOLCHAIN_TEMP_ENTRIES.has(name));
