@@ -1,11 +1,11 @@
 title: 'Automation: a rule''s comment can ask a question with options'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T21:03:41.684865+00:00
-modified: 2026-11-25T07:48:50.212746+00:00
+modified: 2026-11-25T08:03:00.201445+00:00
 relationships:
   blocks:
   - DEV-796
@@ -13,6 +13,45 @@ relationships:
   - DEV-796
   - DEV-488
   - DEV-851
+comments:
+- date: 2026-11-25T08:02:46.204900+00:00
+  author: claude
+  text: |-
+    A rule's `comment:` can now ask a question with options; answering applies the option's `set`.
+
+    - `comment:` keeps the string form and also takes `{ text, question: { options: [{ key, label, set }], recommended, multiple, other } }` (`AutomationComment` in `crates/lotar-agent/src/automation/types.rs`)
+    - Written by `automation` through the new `TaskService::ask_question_with_context`, so it fires no `on.commented` rules; `text` and labels take templates
+    - Saving rules and `lotar config validate` refuse bad questions with `Rule '<name>' (<event>): comment question: ...`. `config validate` now also checks the scope's `automation.yml`; the standards rules file gives warnings only, no errors
+    - `lotar automation simulate` shows `Ask: ...` with the options
+    - Web rule builder: a rule with a question is YAML-only, so the builder can't drop it; summaries say `ask`. Only `view/utils` changed (no page, component or style), so no ui tag or screenshots
+    - REST/OpenAPI unchanged: rules travel as YAML text
+    - Docs: `docs/help/automation.md#asking-a-question`, `docs/help/config.md`. The example was run end to end in a scratch workspace
+    - Guidance: no durable finding
+  report:
+    commits:
+    - hash: 01daa6380
+      what: comment action takes { text, question }; validation, config validate, simulate, UI guard, docs
+    checks:
+    - command: cargo nextest run --workspace -E 'test(dev852) | test(validate) | test(automation) | test(question)'
+      result: passed
+      reason: 244 tests
+    - command: vitest view/__tests__/automationRules*.spec.ts AutomationRulesEditor.spec.ts
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo fmt --all --check
+      result: passed
+    - command: vue-tsc --project view/tsconfig.json --noEmit
+      result: passed
+    - command: npx prettier --check <changed files>
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae300be0eb1776a74acd7f47cd42c1d251db1f4df2ca39cae4f189033f9da6082
 description: |-
@@ -131,3 +170,16 @@ history:
       - [ ] `lotar automation simulate` lists the question with its options and the recommended one
       - [ ] The web rule builder shows a rule with a question comment as YAML-only (not editable there) so saving from the builder can't drop the question; rule summaries name the question
       - [ ] docs/help/automation.md describes the map form with an example; REST/OpenAPI need no change (automation rules travel as YAML text)
+- at: 2026-11-25T08:02:46.204900+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T08:03:00.201445+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

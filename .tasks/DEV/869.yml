@@ -1,0 +1,24 @@
+title: lotar trust --status shows a structured run command as a JSON blob with its default fields
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T08:19:53.997487+00:00
+modified: 2026-11-25T08:19:54.577482+00:00
+relationships:
+  related:
+  - DEV-847
+description: 'Found while reviewing DEV-847: a rule with `run: {command: echo, args: [x]}` is listed as `runs {"command":"echo","args":["x"],"env":{},"cwd":null,"ignore_failure":false,"wait":true}`. `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` prints the serialized AutomationRunCommand with every default. Check: `lotar trust --status` in a repo with a structured run rule. Done: it reads like the command line (`echo x`), plus only the settings that differ from the default (env, cwd).'
+history:
+- at: 2026-11-25T08:19:54.296572+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-847"]}'
+- at: 2026-11-25T08:19:54.577482+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

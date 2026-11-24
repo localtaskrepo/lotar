@@ -1,16 +1,17 @@
 title: Instructions button keeps 'Not recorded for this job' when opened before the job's first turn
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:45:46.748448+00:00
-modified: 2026-11-25T06:50:11.501966+00:00
+modified: 2026-11-25T07:57:40.412527+00:00
 relationships:
   depends_on:
   - DEV-767
   related:
   - DEV-767
+  - DEV-809
 comments:
 - date: 2026-11-23T02:11:22.927857+00:00
   author: claude
@@ -205,6 +206,31 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-25T07:57:31.573221+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `d3c11b78c` is on `main` and `origin/main`.
+
+    - Main had moved to `8180a5e1e` (DEV-809) by the time lotar handed off, so I rebased again (no conflicts) and reran `npm ci`.
+    - The earlier `test:agent` failure was 5 vitest files whose workers didn't start ("Timeout waiting for worker to respond") while the load average was about 32. That was machine load, not this change. The rerun passed in full.
+    - Checks on `440fe6381`: `lint:agent`, `test:agent` (nextest 2499 passed, vitest 1598 passed) and `smoke` (410 passed) all passed.
+    - Ran `git merge --ff-only`, then amended the pending `.tasks` changes into the commit (so it became `d3c11b78c`) and ran `git push`. The pre-push hook passed. The push also took DEV-809 (Done).
+    - No rule or config files changed, so I didn't run `lotar trust`.
+  report:
+    commits:
+    - hash: d3c11b78c
+      what: Instructions reload while no record (rebased from f241a4b84/b56e04a05/440fe6381; .tasks amended in)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: nextest 2499/2499, vitest 1598/1598
+    - command: npm run -s smoke
+      result: passed
+      reason: 118 files, 410 tests
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7634167f076e693f0f795dd8049d362219ce29257a5b94c01e6c6f883cf9fb6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb2a4fbb9313d916e73cdfd8edc690423c01f31b484b04aba6ba5dd7dfd467ce
@@ -239,8 +265,6 @@ description: |-
 tags:
 - agent
 - ui
-- job-paused
-- review-returned
 history:
 - at: 2026-11-22T20:45:51.763263+00:00
   actor: claude
@@ -514,3 +538,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T07:57:31.573221+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T07:57:31.824211+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-767"],"related":["DEV-767"]}'
+    new: '{"depends_on":["DEV-767"],"related":["DEV-767","DEV-809"]}'
+- at: 2026-11-25T07:57:40.412527+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: agent, ui, job-paused, review-returned
+    new: agent, ui

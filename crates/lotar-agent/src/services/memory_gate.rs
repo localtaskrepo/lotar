@@ -48,6 +48,36 @@ struct GateState {
     /// Why the last reading failed; a failed reading holds nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    /// The last short-of-memory reason of a hold, kept while it settles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    held_reason: Option<String>,
+    /// The last hold that ended, kept until the next one ends, so `lotar
+    /// serve` logs it also when another process ended it (DEV-827).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_hold: Option<EndedHold>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct EndedHold {
+    reason: String,
+    #[serde(with = "rfc3339_required")]
+    since: Timestamp,
+    #[serde(with = "rfc3339_required")]
+    until: Timestamp,
+}
+
+mod rfc3339_required {
+    use crate::utils::time::{self, Rfc3339};
+    use jiff::Timestamp;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(at: &Timestamp, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&at.to_rfc3339_z())
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Timestamp, D::Error> {
+        time::parse_rfc3339(&String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
 }
 
 /// The state file's times as RFC 3339 text.
@@ -129,22 +159,93 @@ pub fn status(tasks_dir: &Path) -> GateStatus {
 }
 
 fn decide(previous: &GateState, reading: Result<MemoryReading, String>, now: Timestamp, config: &AgentMemoryGateConfig) -> GateState {
+    // A hold ends when its memory settled or a reading failed.
+    let ended = |previous: &GateState| {
+        previous.held_since.map(|since| EndedHold { reason: previous.short_reason(), since, until: now }).or_else(|| previous.last_hold.clone())
+    };
     let reading = match reading {
         Ok(reading) => reading,
-        Err(error) => return GateState { checked_at: Some(now), error: Some(error), ..GateState::default() },
+        Err(error) => return GateState { checked_at: Some(now), error: Some(error), last_hold: ended(previous), ..GateState::default() },
     };
     if let Some(reason) = short_of_memory(&reading, config) {
-        return GateState { checked_at: Some(now), held_since: previous.held_since.or(Some(now)), normal_since: None, reason: Some(reason), error: None };
+        return GateState {
+            checked_at: Some(now),
+            held_since: previous.held_since.or(Some(now)),
+            reason: Some(reason.clone()),
+            held_reason: Some(reason),
+            last_hold: previous.last_hold.clone(),
+            ..GateState::default()
+        };
     }
     let Some(held_since) = previous.held_since else {
-        return GateState { checked_at: Some(now), ..GateState::default() };
+        return GateState { checked_at: Some(now), last_hold: previous.last_hold.clone(), ..GateState::default() };
     };
     let normal_since = previous.normal_since.unwrap_or(now);
     if now - normal_since >= seconds(config.settle_seconds) {
-        return GateState { checked_at: Some(now), ..GateState::default() };
+        return GateState { checked_at: Some(now), last_hold: ended(previous), ..GateState::default() };
     }
     let reason = format!("memory is normal again since {}; held jobs start after {} s of normal memory", stamp(normal_since), config.settle_seconds);
-    GateState { checked_at: Some(now), held_since: Some(held_since), normal_since: Some(normal_since), reason: Some(reason), error: None }
+    GateState {
+        checked_at: Some(now),
+        held_since: Some(held_since),
+        normal_since: Some(normal_since),
+        reason: Some(reason),
+        error: None,
+        held_reason: previous.held_reason.clone(),
+        last_hold: previous.last_hold.clone(),
+    }
+}
+
+impl GateState {
+    /// Why memory was short; a state file from before DEV-827 has only `reason`.
+    fn short_reason(&self) -> String {
+        self.held_reason.clone().or_else(|| self.reason.clone()).unwrap_or_default()
+    }
+}
+
+/// Writes each hold's start and end once, for `lotar serve`'s log: it reads
+/// the state file that `check` keeps in whichever process, and no memory.
+#[derive(Debug, Default)]
+pub struct HoldLog {
+    started: Option<Timestamp>,
+    ended: Option<Timestamp>,
+}
+
+impl HoldLog {
+    /// A hold that ended before now is not logged again; one in effect is.
+    pub fn new(tasks_dir: &Path) -> Self {
+        Self { started: None, ended: load(&state_path(tasks_dir)).last_hold.map(|hold| hold.since) }
+    }
+
+    /// The lines for what changed since the last call.
+    pub fn poll(&mut self, tasks_dir: &Path) -> Vec<String> {
+        if !gate_config(tasks_dir).is_enabled() {
+            return Vec::new();
+        }
+        self.lines(&load(&state_path(tasks_dir)))
+    }
+
+    fn lines(&mut self, state: &GateState) -> Vec<String> {
+        let mut lines = Vec::new();
+        if let Some(hold) = state.last_hold.as_ref().filter(|hold| self.ended != Some(hold.since)) {
+            // Started and ended between two reads: both lines.
+            if self.started != Some(hold.since) {
+                lines.push(started_line(&hold.reason, hold.since));
+            }
+            lines.push(format!("[lotar] memory hold ended: {}, since {}, until {}", hold.reason, stamp(hold.since), stamp(hold.until)));
+            self.started = Some(hold.since);
+            self.ended = Some(hold.since);
+        }
+        if let Some(since) = state.held_since.filter(|since| self.started != Some(*since)) {
+            lines.push(started_line(&state.short_reason(), since));
+            self.started = Some(since);
+        }
+        lines
+    }
+}
+
+fn started_line(reason: &str, since: Timestamp) -> String {
+    format!("[lotar] memory hold started: {reason}, since {}", stamp(since))
 }
 
 fn short_of_memory(reading: &MemoryReading, config: &AgentMemoryGateConfig) -> Option<String> {
@@ -367,7 +468,8 @@ mod tests {
         assert_eq!(hold_of(&again).unwrap().since, at(0));
         let settled = decide(&decide(&again, reading("normal"), at(180), &config()), reading("normal"), at(300), &config());
         assert!(hold_of(&settled).is_none());
-        assert_eq!(settled, GateState { checked_at: Some(at(300)), ..GateState::default() });
+        let ended = EndedHold { reason: "swap 9.0 of 10.0 GB used (90%, limit 85%)".to_string(), since: at(0), until: at(300) };
+        assert_eq!(settled, GateState { checked_at: Some(at(300)), last_hold: Some(ended), ..GateState::default() });
     }
 
     #[test]
@@ -376,6 +478,69 @@ mod tests {
         let failed = decide(&held, reading("bogus"), at(30), &config());
         assert!(hold_of(&failed).is_none());
         assert_eq!(failed.error.as_deref(), Some("LOTAR_MEMORY_READING: unknown reading 'bogus'"));
+        // The failed reading ends the hold at its own time.
+        assert_eq!(failed.last_hold, Some(EndedHold { reason: "macOS reports memory pressure warn".to_string(), since: at(0), until: at(30) }));
+    }
+
+    #[test]
+    fn hold_log_writes_start_and_end_once_each() {
+        let mut log = HoldLog::default();
+        let open = decide(&GateState::default(), reading("normal"), at(0), &config());
+        assert!(log.lines(&open).is_empty());
+        let held = decide(&open, reading("swap=9.5/10"), at(5), &config());
+        assert_eq!(log.lines(&held), ["[lotar] memory hold started: swap 9.5 of 10.0 GB used (95%, limit 85%), since 2027-01-15T08:00:05Z"]);
+        let still = decide(&held, reading("pressure=warn,swap=9.5/10"), at(35), &config());
+        assert!(log.lines(&still).is_empty(), "the same hold with another reason starts once");
+        let settling = decide(&still, reading("normal"), at(65), &config());
+        assert!(log.lines(&settling).is_empty());
+        let settled = decide(&settling, reading("normal"), at(185), &config());
+        assert_eq!(
+            log.lines(&settled),
+            [
+                "[lotar] memory hold ended: macOS reports memory pressure warn; swap 9.5 of 10.0 GB used (95%, limit 85%), since 2027-01-15T08:00:05Z, until 2027-01-15T08:03:05Z"
+            ]
+        );
+        let later = decide(&settled, reading("normal"), at(215), &config());
+        assert!(log.lines(&later).is_empty(), "an ended hold is logged once");
+        // The next hold starts and ends again, here between two reads of the log.
+        let next = decide(&later, reading("pressure=critical"), at(300), &config());
+        let failed = decide(&next, reading("bogus"), at(310), &config());
+        assert_eq!(
+            log.lines(&failed),
+            [
+                "[lotar] memory hold started: macOS reports memory pressure critical, since 2027-01-15T08:05:00Z",
+                "[lotar] memory hold ended: macOS reports memory pressure critical, since 2027-01-15T08:05:00Z, until 2027-01-15T08:05:10Z",
+            ]
+        );
+    }
+
+    #[test]
+    fn hold_log_skips_a_hold_that_ended_before_serve_started() {
+        let dir = tempfile::tempdir().unwrap();
+        let tasks_dir = dir.path().join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  memory_gate:\n    enabled: true\n").unwrap();
+        let path = state_path(&tasks_dir);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // No state file yet: nothing to log.
+        assert!(HoldLog::new(&tasks_dir).poll(&tasks_dir).is_empty());
+        let ended = GateState {
+            checked_at: Some(at(100)),
+            last_hold: Some(EndedHold { reason: "swap full".to_string(), since: at(0), until: at(90) }),
+            ..GateState::default()
+        };
+        std::fs::write(&path, serde_json::to_string(&ended).unwrap()).unwrap();
+        let mut log = HoldLog::new(&tasks_dir);
+        assert!(log.poll(&tasks_dir).is_empty());
+        // A hold in effect when serve starts is logged.
+        let held =
+            GateState { held_since: Some(at(200)), reason: Some("swap full again".to_string()), held_reason: Some("swap full again".to_string()), ..ended };
+        std::fs::write(&path, serde_json::to_string(&held).unwrap()).unwrap();
+        assert_eq!(HoldLog::new(&tasks_dir).poll(&tasks_dir), ["[lotar] memory hold started: swap full again, since 2027-01-15T08:03:20Z"]);
+        // Gate off: no lines.
+        std::fs::write(tasks_dir.join("config.yml"), "agent:\n  memory_gate:\n    enabled: false\n").unwrap();
+        assert!(HoldLog::new(&tasks_dir).poll(&tasks_dir).is_empty());
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

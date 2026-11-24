@@ -1,11 +1,11 @@
 title: 'In an agent job, lotar commands in a scratch folder write to the real backlog: the job''s LOTAR_TASKS_DIR wins over the folder''s .tasks'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-22T22:45:30.423583+00:00
-modified: 2026-11-24T21:12:29.763419+00:00
+modified: 2026-11-25T07:58:12.372819+00:00
 relationships:
   related:
   - DEV-789
@@ -139,10 +139,37 @@ comments:
 - date: 2026-11-24T21:12:29.763419+00:00
   author: automation
   text: The fix agent's job job-20261124T210014.411Z-90 failed (lotar agent logs job-20261124T210014.411Z-90); @fix-retry retries it on branch agent/DEV-818.
+- date: 2026-11-25T07:58:04.816950+00:00
+  author: claude
+  text: |-
+    Retry: nothing left to fix. The failed job had already done both review fixes. Ready for review.
+
+    - HEAD `059bf9016` (signed) has the ticket title as its subject. The earlier comment's `ac57aa8c1` is stale; `059bf9016` is the commit
+    - Description: Found / Done when restored, both boxes ticked
+    - Diff `main...HEAD`: the same 7 files the review checked
+    - `npm run test:seed`: 4/4 passed
+  report:
+    commits:
+    - hash: 059bf9016
+      what: seeder ignores inherited LOTAR_TASKS_DIR, test, guidance
+    checks:
+    - command: npm run test:seed
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review HEAD 059bf9016
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74c5c58c601ef694fbd19e11ae4f6f12cd58806b6677fd57ec8aa945025e70c5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21c093248c4aae62a7aad5cd3e16a2804c2430af1d91e5ceeadf55daad4f3035
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7feb52b860f4446b6e8cc9eec1771469a9c51b9975e416f5b5e91b9942206808
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb844846ff0b392d0aaef50525b40e15c09db52466754f46f50fc27141003393
 description: |-
   Found in the review of DEV-789.
 
@@ -351,3 +378,21 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T07:57:43.008125+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb844846ff0b392d0aaef50525b40e15c09db52466754f46f50fc27141003393
+- at: 2026-11-25T07:58:04.816950+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T07:58:12.372819+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

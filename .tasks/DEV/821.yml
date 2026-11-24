@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T01:32:44.631216+00:00
-modified: 2026-11-25T05:25:32.360558+00:00
+modified: 2026-11-25T11:28:04.778476+00:00
 relationships:
   blocks:
   - DEV-844
@@ -15,6 +15,7 @@ relationships:
   - DEV-844
   - DEV-805
   - DEV-811
+  - DEV-845
 comments:
 - date: 2026-11-23T05:48:29.430406+00:00
   author: claude
@@ -309,3 +310,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-844"],"related":["DEV-800","DEV-833","DEV-844","DEV-805"]}'
     new: '{"blocks":["DEV-844"],"related":["DEV-800","DEV-833","DEV-844","DEV-805","DEV-811"]}'
+- at: 2026-11-25T11:28:04.778476+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-844"],"related":["DEV-800","DEV-833","DEV-844","DEV-805","DEV-811"]}'
+    new: '{"blocks":["DEV-844"],"related":["DEV-800","DEV-833","DEV-844","DEV-805","DEV-811","DEV-845"]}'

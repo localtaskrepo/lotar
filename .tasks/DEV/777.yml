@@ -1,11 +1,11 @@
 title: A continue job treats any ACP error on resume as a session that can't be resumed, not only a refused session/resume or session/load
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-24T21:31:31.616631+00:00
+modified: 2026-11-25T09:31:48.586063+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -745,3 +745,12 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T09:31:48.586063+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

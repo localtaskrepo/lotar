@@ -1,0 +1,27 @@
+title: 'A job held in the in-process pending queue starts with the prompt built at create: an old title and ticket context'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T11:03:31.428115+00:00
+modified: 2026-11-25T11:03:33.249354+00:00
+relationships:
+  related:
+  - DEV-845
+description: |-
+  Found: reviewing DEV-845. `AgentJobService::create` (`crates/lotar-agent/src/services/agent_job_service.rs:499`) builds the whole prompt (ticket context, filled `${{ticket.title}}`) and stores it in `PendingJob`; `process_pending_queue` (`:6176`) starts it with that text, so a job held there (memory hold, slot wait, paused queue) gets the title and context from when it was queued. DEV-845 covers the persistent queue only.
+  Check: rename a ticket while its job waits in the in-process pending queue; the started prompt shows the old title.
+  Done: a job from the pending queue builds its prompt from the ticket when it starts.
+history:
+- at: 2026-11-25T11:03:32.324643+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-845"]}'
+- at: 2026-11-25T11:03:33.249354+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

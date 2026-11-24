@@ -1,16 +1,18 @@
 title: lotar task edit -D - saves a lone - as the description instead of reading stdin
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T17:22:19.506908+00:00
-modified: 2026-11-24T21:39:12.789168+00:00
+modified: 2026-11-25T10:46:16.982737+00:00
 relationships:
   related:
   - DEV-776
   - DEV-818
   - DEV-832
+  - DEV-791
+  - DEV-809
 comments:
 - date: 2026-11-24T19:18:09.426255+00:00
   author: automation
@@ -99,6 +101,20 @@ comments:
       result: not_run
       reason: merge runs it (DEV-797)
     next: Review, then merge
+- date: 2026-11-25T10:46:07.019987+00:00
+  author: claude
+  text: |-
+    Review: passed. `a5ad5b7e4` does all that "Done when" asks and nothing else. It rebases onto main without conflict.
+
+    - Read: the diff `main...agent/DEV-842` (7 files, no stray files), DEV-776 (the same fix for `comment`), the DEV-809 and DEV-791 commits on main to the touched files (no conflict, checked with `git merge-tree`), and AGENTS.md
+    - `description_from_stdin` (`crates/lotar-lib/src/cli/handlers/mod.rs:534`) acts only on a lone `-`, like `comment -F -`: it trims trailing `\n`/`\r` and returns an error when stdin can't be read
+    - Called before any write in `AddHandler::execute_with_finding` (covers `add` and `task add`) and once at the top of `EditHandler::execute` (`task/edit.rs:20`), so `--select` reads stdin once. The only other caller, `scan_handler.rs:209`, passes `description: None`, so it is unaffected
+    - Reran `npm ci` (ok), `cargo build --bin lotar`, and `cargo nextest run -p lotar-lib --test integration -E 'test(/dev842|dev776|dev791|cli_arg_deser/)'`: 9 of 9 passed
+    - Ticket repro with the branch build in a scratch dir: `printf 'new' | lotar task edit TST-1 -D -` saved `new`. `-D --` saved `--`. `--description=- --dry-run` wrote nothing
+    - The test would fail before the fix: the installed build saves `-`, so `assert_eq!(…, "from add…")` fails
+    - `docs/help/add.md`, `docs/help/task.md` and the `-D` help text match the behaviour
+    - Not rerun: clippy, full `npm run lint`/`npm test`/`npm run smoke` (the merge runs them)
+    - Minor findings: none; no tickets filed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac862ff1db012f6c60ec944f429edcf793a121169e64009b3e22ffd95e959d446
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0
@@ -225,3 +241,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T10:46:07.019987+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T10:46:07.372310+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-776","DEV-818","DEV-832"]}'
+    new: '{"related":["DEV-776","DEV-818","DEV-832","DEV-791","DEV-809"]}'
+- at: 2026-11-25T10:46:16.982737+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

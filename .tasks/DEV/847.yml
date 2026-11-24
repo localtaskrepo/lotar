@@ -1,11 +1,14 @@
 title: lotar trust --status lists rules without a run command as 'runs null'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T19:02:19.747340+00:00
-modified: 2026-11-24T21:26:43.335709+00:00
+modified: 2026-11-25T08:44:26.818576+00:00
+relationships:
+  related:
+  - DEV-869
 comments:
 - date: 2026-11-24T19:42:49.025356+00:00
   author: automation
@@ -76,6 +79,18 @@ comments:
       result: not_run
       reason: merge runs full suites (DEV-797)
     next: Review, then merge
+- date: 2026-11-25T08:29:02.793265+00:00
+  author: claude
+  text: |-
+    Review: passed. Only rules with a run command are listed now; the merge can go ahead.
+
+    - Read: commit `a30c1b1a4` (only `crates/lotar-lib/src/cli/handlers/trust.rs` changed, +22/−1), the ticket, both fix comments, `AutomationAction` in `crates/lotar-agent/src/automation/types.rs` (`run: Option<…>` with no `skip_serializing_if`, which is why it serialized as `run: null`), and the last 5 main commits to `trust.rs` (none conflict with the fix)
+    - `trust.rs:141` adds a null filter on `run`, the smallest fix. Both `lotar trust` and `--status` go through `describe`, so both are fixed
+    - New test `skips_rules_without_a_run_command`: before the fix it would get an extra `runs null` line and fail its `assert_eq`. It covers the "no run commands" case too
+    - Reran: `npm ci` ok; `cargo nextest run -p lotar-lib trust` 9/9 passed (the 5 integration tests need `cargo build --bin lotar` first, as the fix agent said); `cargo clippy -p lotar-lib --all-targets -D warnings` clean; `rustfmt --check` clean
+    - Manual check: a scratch repo with a `run` rule, a `set` rule and a structured `run` rule. `lotar trust --status` lists only the two run rules
+    - No UI change, no stray files, no second branch
+    - Minor, filed: [DEV-869](https://lotar.pyxzl.net/task/DEV-869). A structured `run` prints as a JSON blob with its default fields (`"env":{},"cwd":null,…`). This happened before the fix too
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f26d9e60c1a3e9028a825c798e3c8b40a39d439df14ec7de0633850b721c04b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A52027990c744b9c68f5c0b55ade2e20531d05d0c3315fce63e0fa3c2212eaad8
@@ -146,3 +161,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T08:19:54.296096+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-869"]}'
+- at: 2026-11-25T08:29:02.793265+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T08:44:26.818576+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

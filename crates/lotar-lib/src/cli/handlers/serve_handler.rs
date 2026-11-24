@@ -301,6 +301,19 @@ impl CommandHandler for ServeHandler {
                 std::thread::sleep(std::time::Duration::from_secs(30));
             }
         });
+        // Memory holds the queue worker or this server decided, in this
+        // server's log (DEV-827): the worker's stderr goes nowhere.
+        let tasks_dir = resolver.path.clone();
+        std::thread::spawn(move || {
+            use crate::services::memory_gate::{HELD_RECHECK_SECS, HoldLog};
+            let mut log = HoldLog::new(&tasks_dir);
+            loop {
+                for line in log.poll(&tasks_dir) {
+                    eprintln!("{line}");
+                }
+                std::thread::sleep(std::time::Duration::from_secs(HELD_RECHECK_SECS));
+            }
+        });
         // Entries a killed worker left behind start now, not at the next
         // enqueue (DEV-592).
         match crate::services::agent_queue_service::AgentQueueService::resume(&resolver.path) {

@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Research
 reporter: codex
-assignee: '@review-light'
+assignee: '@research'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-24T21:25:15.256454+00:00
+modified: 2026-11-25T08:07:54.672407+00:00
 relationships:
   related:
   - DEV-849
@@ -58,6 +58,17 @@ comments:
     - key: prefetch
       label: Also preload the latest run
     recommended: expand
+- date: 2026-11-25T08:07:50.438443+00:00
+  author: claude
+  text: |-
+    Review: blocking. One claim contradicts the source it rests on.
+
+    - Read: `main..HEAD` is one commit, `ed765c1a0`. It changes only `docs/research/inline-transcript-review.md`. I read all 193 lines and opened the harnessmux README and the Claude settings reference.
+    - Passed: the commit touches no other file. Facts carry links. It ends with one recommendation, its cost and one open choice. Claude's 30-day default (`cleanupPeriodDays`), the `v:1` events table, the 16 KB output cap, `session/resume` and `session/load`, and `Session::send` returning the turn all match the sources.
+    - **Blocking, lines 70–71 and 126–127:** the write-up says a T3 session's harnessmux log has "no tool calls" and "the full detail stays in T3", so T3 jobs show only replies. The [harnessmux README](https://github.com/localtaskrepo/harnessmux#sessions) (section on t3, "While a t3 turn runs…") says the opposite. harnessmux reads the thread's activity every 2 seconds and sends each command, file change and tool as `tool.started` and `tool.finished` (with `output`), plus `thought.delta` and `plan`. The README names T3 Code 0.1.11 for this (line 132 of the README). The log checked, `lotar-95e687-DEV-849-fix.events.jsonl`, may predate that or come from the installed 0.1.10 CLI (line 52 of the write-up). The write-up needs to check that a log written by lotar's 0.3.0 library holds T3 tool events. Then it needs to fix the T3 bullets, the mobile sketch's T3 phase and slice item 3 to match.
+    - Not blocking: the Codex row (line 48) rests on a discussion and an issue, not official docs. The write-up says so itself.
+
+    Next step: the research agent re-checks a T3 log from lotar 0.3.0 and corrects those lines.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
 description: |-
@@ -81,6 +92,7 @@ tags:
 - agent
 - ui
 - job-paused
+- review-returned
 history:
 - at: 2026-11-24T20:22:36.316999+00:00
   actor: codex
@@ -135,3 +147,22 @@ history:
   - field: assignee
     old: '@research'
     new: '@review-light'
+- at: 2026-11-25T08:07:50.438443+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T08:07:50.709758+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui, job-paused
+    new: agent, ui, job-paused, review-blocked
+- at: 2026-11-25T08:07:54.672407+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review-light'
+    new: '@research'
+  - field: tags
+    old: agent, ui, job-paused, review-blocked
+    new: agent, ui, job-paused, review-returned

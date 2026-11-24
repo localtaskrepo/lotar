@@ -1,17 +1,20 @@
 title: 'DEV-825''s fix job prompt rendered ${{ticket.title}} as "first": its commit is "DEV-825 first"'
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T18:56:52.105522+00:00
-modified: 2026-11-24T21:46:08.180246+00:00
+modified: 2026-11-25T11:28:16.906287+00:00
 relationships:
   related:
   - DEV-825
   - DEV-3
   - DEV-563
   - DEV-747
+  - DEV-870
+  - DEV-809
+  - DEV-821
 comments:
 - date: 2026-11-24T19:37:11.536212+00:00
   author: automation
@@ -78,6 +81,20 @@ comments:
       result: not_run
       reason: left for the merge (DEV-797)
     next: Review, then merge. Separately, DEV-825's merge gives 879f137c7 its real title (amend, unpushed)
+- date: 2026-11-25T11:28:04.505695+00:00
+  author: claude
+  text: |-
+    Review: passed. `34c737675` makes a rule's job fill `${{ticket.title}}` when the job starts, and it merges cleanly onto main `d3c11b78c`.
+
+    - **Read:** the diff of `34c737675` (4 files), the ticket and the fix comment, DEV-825's timeline, `AgentJobService::create` and the queue/retry paths, and `docs/help/automation.md`. Main touched these files since (DEV-809, DEV-821), but `git merge-tree` shows no conflict.
+    - **Fix holds:** `from_action` (`automation_service.rs:3085`) now leaves the title placeholder in. `create` (`agent_job_service.rs:379`) fills it from the ticket it loads, the same one the "Ticket context" comes from. Retries keep the placeholder in `req.prompt`, so they also get the title at their start. The other placeholders are still filled in when the rule runs, as documented.
+    - **Evidence:** the DEV-825 session log contains `DEV-825 first` twice. Rule ran 04:27Z, job started 07:20Z. That matches the fix agent's cause.
+    - **Test failed before the fix:** `a_rule_job_prompt_leaves_the_title_for_the_job_start` gets the title already filled in with the old `tmpl.expand`.
+    - **Reran:** `RUSTC_WRAPPER= cargo nextest run -p lotar-agent --lib -E 'test(/template|a_rule_job_prompt_leaves_the_title|agent_run_settings|thread_name/)'`: 14 passed, both new tests included. Lint, the full suites and smoke were not rerun: the merge runs them.
+    - **Side effect, harmless:** a CLI, MCP or REST prompt that contains a literal `${{ticket.title}}` now gets the title filled in too.
+    - No UI change, no stray files, no second branch.
+    - **Minor, filed [DEV-870](https://lotar.pyxzl.net/task/DEV-870):** a job held in the in-process pending queue still starts with the whole prompt built at `create` (`agent_job_service.rs:499`, `:6176`). That covers its title and ticket context. Older behaviour, not this rule-queue path.
+    - **At merge:** DEV-825's commit still needs its real title (an amend). This branch doesn't do that.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acb1cbebeb545bfdc2bcca307b19f8b9296c9f7ff5d0fe03ce112d0035a699ed3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A866aae813f35da8073eae1d715e02ba1fa7262952a554714981ab78ee1942388
@@ -150,3 +167,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T11:03:32.323480+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-825","DEV-3","DEV-563","DEV-747"]}'
+    new: '{"related":["DEV-825","DEV-3","DEV-563","DEV-747","DEV-870"]}'
+- at: 2026-11-25T11:28:04.505695+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T11:28:04.778920+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-825","DEV-3","DEV-563","DEV-747","DEV-870"]}'
+    new: '{"related":["DEV-825","DEV-3","DEV-563","DEV-747","DEV-870","DEV-809","DEV-821"]}'
+- at: 2026-11-25T11:28:16.906287+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

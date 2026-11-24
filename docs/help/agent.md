@@ -509,6 +509,7 @@ LoTaR starts no new job while the machine is short of memory: macOS reports memo
 - While held, the queue reads memory again every 30 s. Held jobs start once memory has been normal for `agent.memory_gate.settle_seconds` (default 120); short of memory again during that time, the wait starts over. A job is never failed or retried for this.
 - `lotar agent queue` and `lotar agent list-jobs` say why jobs wait and since when, for example `waiting for memory: swap 9.4 of 10.0 GB used (94%, limit 85%) (held since 2026-11-16T21:30:00Z)`. With `--format json` both print `memory_hold`.
 - A memory reading that fails holds nothing; `lotar agent queue` warns about it.
+- `lotar serve` writes each hold's start and end once to its stderr (its log under launchd), whichever process decided it: `[lotar] memory hold started: <reason>, since <time>` and `[lotar] memory hold ended: <reason>, since <time>, until <time>`, with the last short-of-memory reason. It reads the shared state file every 30 s, so a hold that started and ended in between still gets both lines. A failed reading ends a hold at its time. A server started during a hold logs its start; one that ended before the server started is not logged again.
 - On by default on macOS, off elsewhere. `agent.memory_gate.enabled: true` turns it on elsewhere too; on Linux it then reads swap from `/proc/meminfo` (there is no pressure level there).
 
 ```yaml

@@ -1,19 +1,26 @@
 title: 'A t3 job paused on Claude''s weekly limit retries hourly: the reset time is only in the thread''s message'
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-24T21:39:09.103486+00:00
-modified: 2026-11-24T21:39:09.839441+00:00
+modified: 2026-11-25T09:49:06.648949+00:00
 relationships:
   related:
   - DEV-711
   - DEV-811
   - DEV-832
+comments:
+- date: 2026-11-25T09:49:06.648949+00:00
+  author: automation
+  text: The fix agent's job job-20261125T093155.384Z-131 failed (lotar agent logs job-20261125T093155.384Z-131); @fix-retry retries it on branch agent/DEV-855.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae62a87351aceefc08e381281dfb92af0b04239bbe4ef6d135c49d6cf3e112f84
 description: 'Found 2026-11-24 (DEV-832): DEV-811''s t3 jobs on 2026-11-23 paused with `after the default wait (the provider named no reset time)` and retried every hour until the reset. The runner error was `Usage limit reached: Claude API rate limit reached. Try again later.`; the reset was only in the job''s agent message `You''ve hit your weekly limit · resets Nov 24 at 8am (America/Los_Angeles)`, which usage_limit.rs ignores on purpose (DEV-711: the agent''s words don''t count). Check: `lotar agent logs job-20261123T085509.723Z-112`. Done: a t3 job paused on such a limit waits until the reset that line names (for example, read T3''s own limit notice, not the agent''s replies), with a test.'
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: agent-jobs:limit-reset-in-message
 history:
@@ -28,3 +35,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-25T09:31:59.270570+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-25T09:32:00.025651+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae62a87351aceefc08e381281dfb92af0b04239bbe4ef6d135c49d6cf3e112f84
+- at: 2026-11-25T09:49:05.452707+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-25T09:49:06.648949+00:00
+  actor: automation
+  changes:
+  - field: comment_added
