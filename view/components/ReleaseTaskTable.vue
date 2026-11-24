@@ -48,8 +48,7 @@
             />
           </td>
           <td class="release-table__id">
-            <span class="muted">{{ projectOf(task.id) }}</span
-            ><strong>-{{ numericOf(task.id) }}</strong>
+            <span class="muted">{{ projectOf(task.id) }}</span><strong>-{{ numericOf(task.id) }}</strong>
           </td>
           <td class="release-table__title">
             <button type="button" class="release-table__open" @click.stop="emit('open', task)">

@@ -24,8 +24,11 @@ const sprint = { label: (id: number) => `#${id}`, stateClass: () => '', tooltip:
   <div class="dependency-card-details">
     <header v-if="hasHeader" class="task-header">
       <div class="task-header__left">
-        <span v-if="visible('id')" class="muted id">{{ node.id }}</span
-        ><strong v-if="visible('title') && title" class="title">{{ title }}</strong>
+        <span v-if="visible('id')" class="muted id">{{ node.id }}</span><strong
+          v-if="visible('title') && title"
+          class="title"
+          >{{ title }}</strong
+        >
       </div>
       <span
         v-if="visible('priority') && task?.priority"

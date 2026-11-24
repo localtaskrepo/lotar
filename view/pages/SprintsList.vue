@@ -38,8 +38,8 @@
 
     <div v-if="hasMissingSprints" class="alert warn">
       <p>
-        Missing sprint files detected for <strong>{{ missingSprintMessage }}</strong
-        >. Review assignments or run cleanup before creating new sprints.
+        Missing sprint files detected for <strong>{{ missingSprintMessage }}</strong>. Review assignments or run cleanup
+        before creating new sprints.
       </p>
     </div>
 

@@ -45,8 +45,8 @@
     <details class="agent-setup__more">
       <summary>Add it to the configuration yourself</summary>
       <p>
-        Put this in <code>{{ configPath }}</code
-        >, or run <code>lotar config set agents '{"{{ name || 'implement' }}": "{{ runner }}"}'{{ scopeFlag }}</code
+        Put this in <code>{{ configPath }}</code>, or run
+        <code>lotar config set agents '{"{{ name || 'implement' }}": "{{ runner }}"}'{{ scopeFlag }}</code
         >:
       </p>
       <pre class="agent-setup__yaml">{{ yaml }}</pre>

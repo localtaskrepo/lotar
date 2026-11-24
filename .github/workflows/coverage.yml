@@ -90,7 +90,7 @@ jobs:
           shared-key: coverage-${{ runner.os }}
 
       - name: Install cargo-llvm-cov and cargo-nextest
-        uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
           tool: cargo-llvm-cov,nextest
 

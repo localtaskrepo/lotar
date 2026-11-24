@@ -9,7 +9,7 @@ use dtor::dtor;
 use lotar::Storage;
 use serde_json::Value;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 // Re-export shared environment mutex for tests that mutate global env vars.
@@ -28,15 +28,15 @@ pub struct TestFixtures {
 
 /// A binary of the root package (`lotar`, `lotar-agent-wrapper`, DEV-497).
 /// Cargo sets no `CARGO_BIN_EXE_*` for these tests of crates/lotar-lib; the
-/// binaries land in the profile directory above this test binary's `deps/`.
-/// Cargo builds them when the tests run for the whole workspace (the default);
-/// with `-p lotar-lib` alone they may be stale or missing.
+/// binaries land in the profile directory, an ancestor of this test binary
+/// (`target/<profile>/deps/` up to Rust 1.99, `target/<profile>/build/<pkg>/<hash>/out/`
+/// from 1.100 on). Cargo builds them when the tests run for the whole workspace
+/// (the default); with `-p lotar-lib` alone they may be stale or missing.
 pub fn workspace_bin(name: &str) -> PathBuf {
     let test_exe = std::env::current_exe().expect("path of the test binary");
-    let profile_dir = test_exe.parent().and_then(Path::parent).expect("the test binary is in target/<profile>/deps");
-    let bin = profile_dir.join(format!("{name}{}", std::env::consts::EXE_SUFFIX));
-    assert!(bin.is_file(), "{} is missing: build the whole workspace (cargo build, or run the tests without -p)", bin.display());
-    bin
+    let file = format!("{name}{}", std::env::consts::EXE_SUFFIX);
+    let bin = test_exe.ancestors().skip(1).map(|dir| dir.join(&file)).find(|bin| bin.is_file());
+    bin.unwrap_or_else(|| panic!("{file} is missing next to {}: build the whole workspace (cargo build, or run the tests without -p)", test_exe.display()))
 }
 
 /// The `lotar` binary of the root package.

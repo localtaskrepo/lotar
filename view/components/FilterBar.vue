@@ -133,8 +133,7 @@
       <dl class="filter-bar__help-types">
         <div v-for="item in filterHelp" :key="item.syntax">
           <dt>
-            <code>{{ item.syntax }}</code
-            ><span>{{ item.label }}</span>
+            <code>{{ item.syntax }}</code><span>{{ item.label }}</span>
           </dt>
           <dd>
             {{ item.description }}<span v-if="item.aliases"> Aliases: {{ item.aliases }}.</span>

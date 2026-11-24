@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM alpine:3.21 AS downloader
+FROM alpine:3.24 AS downloader
 ARG LOTAR_VERSION
 ARG TARGETARCH
 ENV LOTAR_VERSION=${LOTAR_VERSION}
@@ -29,7 +29,7 @@ RUN set -euxo pipefail \
 # Alpine rather than scratch: history, stats, changelog, scans and agent
 # worktrees run the git executable, and automation `run:` actions need /bin/sh
 # (DEV-289). The base image already ships the CA bundle.
-FROM alpine:3.21 AS runtime
+FROM alpine:3.24 AS runtime
 LABEL org.opencontainers.image.source="https://github.com/localtaskrepo/lotar" \
       org.opencontainers.image.description="LoTaR CLI packaged in a minimal image" \
       org.opencontainers.image.licenses="MIT"

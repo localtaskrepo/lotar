@@ -211,13 +211,13 @@ describe('TaskPanel layout styles', () => {
         await flushPromises()
         await flushPromises()
 
-        const overlay = document.querySelector('.task-panel__overlay') as HTMLElement | null
+        const overlay = document.querySelector<HTMLElement>('.task-panel__overlay')
         expect(overlay).not.toBeNull()
         if (!overlay) {
             wrapper.unmount()
             return
         }
-        const panel = overlay.querySelector('.task-panel') as HTMLElement | null
+        const panel = overlay.querySelector<HTMLElement>('.task-panel')
         expect(panel).not.toBeNull()
 
         const styleContent = extractStyle(TaskPanelSource)

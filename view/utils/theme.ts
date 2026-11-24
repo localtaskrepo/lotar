@@ -202,7 +202,7 @@ function getEffectiveTheme(): 'light' | 'dark' {
 
 function updateChromeThemeColor() {
     if (typeof document === 'undefined') return
-    const metaTags = document.querySelectorAll('meta[name="theme-color"]') as NodeListOf<HTMLMetaElement>
+    const metaTags = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
     if (!metaTags.length) return
     // The browser chrome matches the theme's page background.
     const themed =

@@ -3,13 +3,7 @@ use std::process::Command;
 use tempfile::TempDir;
 
 fn get_test_binary_path() -> std::path::PathBuf {
-    let mut path = std::env::current_exe().unwrap();
-    path.pop(); // Remove test executable name
-    if path.ends_with("deps") {
-        path.pop(); // Remove deps directory
-    }
-    path.push("lotar");
-    path
+    crate::common::lotar_bin()
 }
 
 #[test]

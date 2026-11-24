@@ -51,8 +51,7 @@
         <p v-else-if="error" class="task-move__error" role="alert" data-testid="task-move-error">{{ error }}</p>
         <template v-else-if="preview">
           <p data-testid="task-move-new-id">
-            It becomes <strong>{{ preview.to }}</strong
-            >. {{ taskId }} keeps working as a link to it.
+            It becomes <strong>{{ preview.to }}</strong>. {{ taskId }} keeps working as a link to it.
           </p>
           <ul v-if="otherChanges.length" class="task-move__changes">
             <li v-for="change in otherChanges" :key="change.field">

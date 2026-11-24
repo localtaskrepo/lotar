@@ -40,8 +40,7 @@
         <h4>Warnings</h4>
         <ul>
           <li v-for="warning in statusWarnings" :key="warning.code || warning.message">
-            <strong>{{ warning.code }}</strong
-            >: {{ warning.message }}
+            <strong>{{ warning.code }}</strong>: {{ warning.message }}
           </li>
         </ul>
       </div>

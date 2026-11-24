@@ -233,14 +233,14 @@ const openReferencesTab = async (wrapper: ReturnType<typeof mount>) => {
 // VTU trigger() does not reach Vue listeners inside the dialog's stubbed
 // Teleport subtree, so dialog interactions click the live DOM node directly.
 const docClick = async (selector: string) => {
-    const element = document.querySelector(selector) as HTMLElement | null
+    const element = document.querySelector<HTMLElement>(selector)
     expect(element, `missing ${selector} in document`).toBeTruthy()
     element!.click()
     await nextTick()
 }
 
 const setInputValue = async (selector: string, value: string) => {
-    const input = document.querySelector(selector) as HTMLInputElement | null
+    const input = document.querySelector<HTMLInputElement>(selector)
     expect(input, `missing ${selector} in document`).toBeTruthy()
     input!.value = value
     input!.dispatchEvent(new Event('input', { bubbles: true }))
@@ -408,7 +408,7 @@ describe('TaskPanel typed reference kinds (DEV-61)', () => {
         await docClick('[data-testid="references-add-tab-file"]')
         await setInputValue('#task-panel-add-file-input', 'docs/extra.md')
 
-        const form = document.querySelector('.task-panel__references-dialog form') as HTMLFormElement | null
+        const form = document.querySelector<HTMLFormElement>('.task-panel__references-dialog form')
         expect(form).toBeTruthy()
         form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
         await flushPromises()

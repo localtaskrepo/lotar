@@ -43,8 +43,8 @@ export async function html5DragAndDrop(
 ): Promise<void> {
     await page.evaluate(
         ({ src, tgt, opts }) => {
-            const source = document.querySelector(src) as HTMLElement | null;
-            const target = document.querySelector(tgt) as HTMLElement | null;
+            const source = document.querySelector<HTMLElement>(src);
+            const target = document.querySelector<HTMLElement>(tgt);
             if (!source || !target) {
                 throw new Error(`DnD: could not find source (${src}) or target (${tgt})`);
             }

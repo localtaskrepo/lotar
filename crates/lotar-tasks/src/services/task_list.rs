@@ -567,10 +567,7 @@ fn dto_matches_list_filter(storage: &Storage, id: &str, task: &TaskDTO, filter: 
             return false;
         }
     }
-    if !filter.sprints.is_empty() && !task.sprints.iter().any(|s| filter.sprints.contains(s)) {
-        return false;
-    }
-    true
+    filter.sprints.is_empty() || task.sprints.iter().any(|s| filter.sprints.contains(s))
 }
 
 /// IDs of the tasks a search in the web syntax selects, for commands that

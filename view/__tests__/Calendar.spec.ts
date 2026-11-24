@@ -367,7 +367,7 @@ describe('Calendar task hover cards', () => {
         await more.trigger('click')
         await flushPromises()
 
-        const overlay = document.querySelector('.ui-modal__overlay') as HTMLElement | null
+        const overlay = document.querySelector<HTMLElement>('.ui-modal__overlay')
         expect(overlay).not.toBeNull()
         if (!overlay) return
 

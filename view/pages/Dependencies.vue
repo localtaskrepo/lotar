@@ -165,8 +165,9 @@
         <summary>Validation results ({{ check.issues.length }})</summary>
         <ul aria-label="Relationship check issues">
           <li v-for="(issue, index) in check.issues" :key="index">
-            <strong>{{ issue.code }}</strong
-            >: {{ issue.message }} ({{ issue.repairable ? 'safe repair available' : 'manual review required' }})
+            <strong>{{ issue.code }}</strong>: {{ issue.message }} ({{
+              issue.repairable ? 'safe repair available' : 'manual review required'
+            }})
           </li>
         </ul>
       </details>
@@ -179,12 +180,13 @@
       >
         <h2>{{ repairIssue ? 'Review this problem fix' : 'Review safe repairs' }}</h2>
         <p v-if="repairIssue">
-          Selected problem: <strong>{{ repairIssue.message }}</strong
-          >. Only this problem is included; unrelated safe fixes will not be applied.
+          Selected problem: <strong>{{ repairIssue.message }}</strong>. Only this problem is included; unrelated safe
+          fixes will not be applied.
         </p>
         <p v-else>
-          Scope: <strong>{{ scope.project ? `project ${projectName(scope.project)}` : 'the entire workspace' }}</strong
-          >, not just this graph neighborhood. Nothing changes until you confirm.
+          Scope:
+          <strong>{{ scope.project ? `project ${projectName(scope.project)}` : 'the entire workspace' }}</strong>, not
+          just this graph neighborhood. Nothing changes until you confirm.
         </p>
         <p v-if="preview.changed_tasks.length">
           {{ preview.changed_tasks.length }} {{ preview.changed_tasks.length === 1 ? 'task' : 'tasks' }} will be

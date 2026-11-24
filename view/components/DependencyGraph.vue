@@ -245,8 +245,7 @@
             <ul class="dependency-problem-list" aria-label="Problems in displayed graph">
               <li v-for="(issue, index) in visibleIssues" :key="index" :class="`dependency-problem--${issue.severity}`">
                 <header>
-                  <strong>{{ issueTitle(issue.code) }}</strong
-                  ><span class="dependency-problem-severity">{{
+                  <strong>{{ issueTitle(issue.code) }}</strong><span class="dependency-problem-severity">{{
                     issue.severity === 'error' ? 'Error' : issue.severity === 'warning' ? 'Warning' : 'Info'
                   }}</span>
                 </header>
