@@ -87,6 +87,45 @@ mod auth {
     }
 
     #[test]
+    fn a_token_or_email_with_characters_no_credential_holds_is_refused_without_its_value() {
+        // DEV-848: a token wrapped onto a second line inside double quotes
+        // (YAML folds the break into a space), curly quotes or a zero-width
+        // space reached Jira and earned a bare 401.
+        let jira = |email: &str, token: &str| SyncAuthProfile {
+            email_env: Some(email.into()),
+            token_env: Some(token.into()),
+            base_url: Some("https://jira.example.com".into()),
+            ..Default::default()
+        };
+        let cases = [
+            ("ATATT3xFfGF0abc def=A1B2C3D4", "a space at character 16"),
+            ("\u{201c}ATATT3xFfGF0abc=A1B2C3D4\u{201d}", "U+201C at character 1"),
+            ("ATATT3xFfGF0abc\u{200b}=A1B2C3D4", "U+200B at character 16"),
+            ("ATATT3xFfGF0abc\tdef", "a control character at character 16"),
+        ];
+        for (token, expected) in cases {
+            let message = error(SyncProvider::Jira, &jira("me@example.com", token));
+            assert!(message.contains("Auth profile 'profile' token in the profile holds"), "{message}");
+            assert!(message.contains(expected), "{expected}: {message}");
+            assert!(!message.contains("ATATT3xFfGF0"), "the error must not show the token: {message}");
+        }
+        let message = error(SyncProvider::Jira, &jira("me @example.com", "secret"));
+        assert!(message.contains("email in the profile holds a space at character 3"), "{message}");
+
+        // Values from the environment get the same check, naming the variable.
+        let var = "LOTAR_TEST_DEV848_TOKEN";
+        // SAFETY: only this test reads or writes this variable.
+        unsafe { env::set_var(var, "  abc\u{a0}def  ") };
+        let message = error(SyncProvider::Jira, &jira("me@example.com", var));
+        unsafe { env::remove_var(var) };
+        assert!(message.contains(&format!("token in ${var} holds U+00A0 at character 4")), "{message}");
+
+        // Surrounding whitespace is trimmed and token punctuation passes.
+        let (auth, _) = build(SyncProvider::Github, &SyncAuthProfile { token_env: Some("  a+b/c=-_.~  \n".into()), ..Default::default() });
+        assert_eq!(auth.unwrap().auth_header.as_deref(), Some("Bearer a+b/c=-_.~"));
+    }
+
+    #[test]
     fn a_profile_for_another_provider_wins_with_a_warning() {
         let (auth, warnings) = build(
             SyncProvider::Github,

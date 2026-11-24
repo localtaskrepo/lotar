@@ -1,11 +1,11 @@
 title: 'docs: assignee picker search and profiles API omit the agent profile description (DEV-768)'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-23T07:46:13.287811+00:00
-modified: 2026-11-25T12:34:09.396291+00:00
+modified: 2026-11-26T00:03:53.466137+00:00
 relationships:
   depends_on:
   - DEV-768
@@ -142,6 +142,17 @@ comments:
     - command: npm run lint / npm test / npm run smoke
       result: not_run
       reason: docs-only, the merge runs them
+- date: 2026-11-26T00:03:47.501674+00:00
+  author: claude
+  text: |-
+    Review: passed – both docs lines now name the agent profile description; nothing blocking, no tickets filed.
+
+    - Reviewed `ac9f9e632` (only commit in `main..HEAD`; `agent/DEV-829` has nothing newer), 2 files, 2 lines
+    - `docs/help/serve.md:96`: description (`agents.<name>.description`, when set) under the name, search matches it – holds: `view/components/AssigneePicker.vue:110` renders it on its own line below label/detail, `view/utils/assigneeOptions.ts:84` puts it in the search haystack
+    - `docs/help/api-quick-reference.md:48`: `(name, runner, description?, model?, effort?, provider?, permissions)` matches `AgentProfileInfo` in `crates/lotar-core/src/api_types.rs:1190` and `view/api/types.ts:2058`, same order
+    - `grep -rn` over `docs/help`: no other page lists picker search fields or profile fields without description
+    - Reran: `npx prettier --check` on both files passed; `npm ci` passed; `git merge-tree main HEAD` merges clean (main moved on since, `d3bed079b`, not these lines)
+    - No UI change, no owner decision touched, no stray files
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad20053c42d089766490447cbb98e7d8b13ab2cf0dc91e8199c3406ffae1b97b4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8b7878b8e0e67d93adf4738ce59a4e0f45e9c49654f8148827e59a3e2344e76f
@@ -449,3 +460,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T00:03:47.501674+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:03:53.466137+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

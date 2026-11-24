@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-25T19:54:16.477950+00:00
+modified: 2026-11-26T00:03:42.460756+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -27,6 +27,7 @@ relationships:
   - DEV-807
   - DEV-811
   - DEV-823
+  - DEV-777
 comments:
 - date: 2026-11-24T19:37:14.500501+00:00
   author: automation
@@ -911,3 +912,9 @@ history:
   - field: tags
     old: ui, web-ui, job-paused, review-returned, review-returned-twice
     new: ui, web-ui
+- at: 2026-11-26T00:03:42.460756+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805","DEV-875","DEV-789","DEV-803","DEV-807","DEV-811","DEV-823"]}'
+    new: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805","DEV-875","DEV-789","DEV-803","DEV-807","DEV-811","DEV-823","DEV-777"]}'

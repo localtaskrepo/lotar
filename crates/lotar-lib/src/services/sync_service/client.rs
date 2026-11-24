@@ -89,23 +89,44 @@ pub(super) fn resolve_auth_value(name_or_value: &str, profile_name: &str, label:
         return Err(LoTaRError::ValidationError(format!("Auth profile '{}' {} value is empty", profile_name, label)));
     }
 
-    match env::var(trimmed) {
+    let (resolved, source) = match env::var(trimmed) {
         Ok(value) => {
             let resolved = value.trim();
             if resolved.is_empty() {
-                Err(LoTaRError::ValidationError(format!("Environment variable '{}' is empty", trimmed)))
-            } else {
-                Ok(resolved.to_string())
+                return Err(LoTaRError::ValidationError(format!("Environment variable '{}' is empty", trimmed)));
             }
+            (resolved.to_string(), format!("${trimmed}"))
         }
         // A value shaped like a variable name (`LOTAR_GITHUB_TOKEN`) is never
         // a real token or email: sending it would only earn a 401 (DEV-300).
-        Err(_) if looks_like_env_var(trimmed) => Err(LoTaRError::ValidationError(format!(
-            "Environment variable '{}' is not set (auth profile '{}' {}); export it, or put the {} itself in the profile",
-            trimmed, profile_name, label, label
-        ))),
-        Err(_) => Ok(trimmed.to_string()),
+        Err(_) if looks_like_env_var(trimmed) => {
+            return Err(LoTaRError::ValidationError(format!(
+                "Environment variable '{}' is not set (auth profile '{}' {}); export it, or put the {} itself in the profile",
+                trimmed, profile_name, label, label
+            )));
+        }
+        Err(_) => (trimmed.to_string(), "the profile".to_string()),
+    };
+    // Tokens and emails are printable ASCII without spaces. Anything else
+    // (a token wrapped onto two lines in quotes, curly quotes, a zero-width
+    // space) reaches the server changed and earns a bare 401 (DEV-848).
+    // The error says where, never the value.
+    if let Some((index, ch)) = resolved.chars().enumerate().find(|(_, ch)| !ch.is_ascii_graphic()) {
+        let kind = match ch {
+            ' ' => "a space".to_string(),
+            c if c.is_ascii_control() => "a control character".to_string(),
+            c => format!("U+{:04X}", c as u32),
+        };
+        return Err(LoTaRError::ValidationError(format!(
+            "Auth profile '{}' {} in {} holds {} at character {}; it must be one line of plain ASCII: remove line breaks, spaces, curly quotes and invisible characters",
+            profile_name,
+            label,
+            source,
+            kind,
+            index + 1
+        )));
     }
+    Ok(resolved)
 }
 
 pub(super) fn looks_like_env_var(value: &str) -> bool {

@@ -3,9 +3,9 @@ status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-25T22:12:12.755608+00:00
+modified: 2026-11-26T00:29:36.818654+00:00
 relationships:
   related:
   - DEV-777
@@ -138,6 +138,15 @@ comments:
     - Reran: `npm ci` passed; `cargo nextest run -E 'test(/dev584|dev626|dev510|dev600|dev639|resumed/)'` 29 passed; `cargo nextest run -p lotar-agent` 236 passed; `cargo clippy -p lotar-agent -p lotar-lib --all-targets -- -D warnings` clean; `rustfmt --check` and `prettier --check` on the changed files clean. Working tree restored and clean.
     - Not run: `npm run lint`, `npm test`, `npm run smoke` (the merge runs them, DEV-797). Also not run: a live count of sessions after a real reset. No UI changed, so no screenshots.
     - `docs/help/agent.md` matches the code. The 1-hour retry wait stays with [DEV-855](https://lotar.pyxzl.net/task/DEV-855).
+- date: 2026-11-26T00:04:56.258631+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-832` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-agent/src/services/agent_job_service/resumed.rs`, `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-832` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-26T00:29:36.818654+00:00
+  author: automation
+  text: The merge agent's job job-20261126T000450.279Z-195 failed (lotar agent logs job-20261126T000450.279Z-195); the fix agent retries it on branch agent/DEV-832.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7ed476434fcb4e018626487ba8c6d2a47dc50f277c86920bab74a5e08d2a6b29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6399386a6cea6eeb5ad94b21639914a2a3cbeac4c6d5e80ec5a4bd8b60b2deb
@@ -146,6 +155,7 @@ description: 'Found 2026-11-24 ~08:00 PT, after the weekly limit reset: ListAgen
 tags:
 - health
 - job-paused
+- merge-retried
 custom_fields:
   finding: agent-jobs:duplicate-resume
 history:
@@ -289,3 +299,20 @@ history:
   - field: priority
     old: Medium
     new: High
+- at: 2026-11-26T00:04:56.258631+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:29:36.355241+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health, job-paused
+    new: health, job-paused, merge-retried
+- at: 2026-11-26T00:29:36.818654+00:00
+  actor: automation
+  changes:
+  - field: comment_added

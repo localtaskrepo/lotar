@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T19:02:19.747340+00:00
-modified: 2026-11-25T21:10:17.557269+00:00
+modified: 2026-11-26T00:03:42.465122+00:00
 relationships:
   related:
   - DEV-869
+  - DEV-777
 comments:
 - date: 2026-11-24T19:42:49.025356+00:00
   author: automation
@@ -226,3 +227,9 @@ history:
   - field: tags
     old: health, job-paused
     new: health
+- at: 2026-11-26T00:03:42.465122+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-869"]}'
+    new: '{"related":["DEV-869","DEV-777"]}'

@@ -126,6 +126,8 @@ export LOTAR_GITHUB_TOKEN=...     # your GitHub token
 
 A value written like a variable name (capital letters, digits and `_`, such as `LOTAR_GITHUB_TOKEN`) must name a set environment variable; if it is not set, sync stops with an error instead of sending the name as the token. Any other value is used as the token or email itself. Environment variables are the safer choice.
 
+A token or email is one line of plain ASCII. Sync stops before sending anything when the value holds a space, a line break, curly quotes or an invisible character such as a zero-width space, and says which character and where, never the value. A long token wrapped onto a second line inside quotes is the usual cause: YAML turns the line break into a space. Put the token on one line.
+
 Where to get a token:
 
 - **Jira**: Atlassian account settings → Security → API tokens. Use it with your Atlassian email and `method: basic`. Sign-in with OAuth is not supported.

@@ -1,11 +1,11 @@
 title: A continue job treats any ACP error on resume as a session that can't be resumed, not only a refused session/resume or session/load
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-25T20:15:43.540979+00:00
+modified: 2026-11-26T00:03:50.329610+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -18,6 +18,13 @@ relationships:
   - DEV-833
   - DEV-767
   - DEV-876
+  - DEV-769
+  - DEV-819
+  - DEV-831
+  - DEV-842
+  - DEV-845
+  - DEV-847
+  - DEV-859
 comments:
 - date: 2026-11-22T02:54:19.137208+00:00
   author: claude
@@ -300,6 +307,33 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-777` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-777` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T00:03:41.985050+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `1d326e6e4` is on `main` and `origin/main`.
+
+    - Rebase conflict in `crates/lotar-agent/src/services/agent_job_service.rs`: I took main's version. The branch only adapted the `ToolStarted`/`ToolFinished` arms and test fixtures to harnessmux 0.3, and main (DEV-769) already covers the full 0.3 API. The branch's diff is now `dev503_harness_jobs_test.rs` and `docs/help/agent.md`.
+    - Main moved 6 times while the checks ran (DEV-831, DEV-847, DEV-859, DEV-845, DEV-842, DEV-819). Each rebase was clean, and I ran lint, test and smoke again each time; all three passed on the final `82439b3e8`.
+    - One smoke run failed under load (load ~30) with an unhandled `Response has been disposed` in `smoke/tests/ui.panel-safety.smoke.spec.ts:42`. It passed 3 of 3 runs alone, so I added it to `WALL_CLOCK_SPECS` in `smoke/vitest.config.ts` (in this commit, per AGENTS.md).
+    - One smoke run failed in `smoke/tests/ui.agent-jobs.smoke.spec.ts` (Settings table timeout). That spec is already in the wall-clock group and passed 2 of 2 alone; the next full smoke passed.
+    - `.tasks` changes in the main checkout were amended into the merge commit. No rules or config changed, so `lotar trust` wasn't needed.
+  report:
+    commits:
+    - hash: 1d326e6e4
+      what: DEV-777 fix test, docs, ui.panel-safety spec in the smoke wall-clock group (on main, pushed)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+      reason: on 82439b3e8
+    - command: npm run -s test:agent
+      result: passed
+      reason: on 82439b3e8, 2546 nextest + 1616 vitest
+    - command: npm run -s smoke
+      result: passed
+      reason: on 82439b3e8, 411 of 411
+    next: 'None: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0a7852970afa0266056fb48bf89fa0fd177b850a6e9b43958fbb0a2c9930ee39
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75a6d2ce35fd6bba59cd70aa8ab5c6579794cbcc6a508ad1ea655ac420701bf
@@ -330,9 +364,6 @@ description: |-
   - [ ] A test with the fake ACP agent refusing `initialize` on resume: the job fails and the session keeps its name
 tags:
 - backend
-- merge-retried
-- job-paused
-- fix-retried
 history:
 - at: 2026-11-21T23:46:55.716106+00:00
   actor: claude
@@ -771,3 +802,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T00:03:41.985050+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T00:03:42.462037+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876"]}'
+    new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876","DEV-769","DEV-819","DEV-831","DEV-842","DEV-845","DEV-847","DEV-859"]}'
+- at: 2026-11-26T00:03:50.329610+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: backend, merge-retried, job-paused, fix-retried
+    new: backend

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T08:21:23.478863+00:00
-modified: 2026-11-25T20:36:44.433151+00:00
+modified: 2026-11-26T00:03:42.463497+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -15,6 +15,7 @@ relationships:
   - DEV-832
   - DEV-834
   - DEV-833
+  - DEV-777
 comments:
 - date: 2026-11-23T09:21:13.458713+00:00
   author: automation
@@ -551,3 +552,9 @@ history:
   - field: tags
     old: job-paused, fix-retried
     new: ''
+- at: 2026-11-26T00:03:42.463497+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832","DEV-834","DEV-833"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832","DEV-834","DEV-833","DEV-777"]}'
