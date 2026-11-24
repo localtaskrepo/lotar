@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:27:41.962615+00:00
-modified: 2026-11-27T08:50:35.645667+00:00
+modified: 2026-11-27T09:17:02.449166+00:00
 relationships:
   related:
   - DEV-858
@@ -13,6 +13,8 @@ relationships:
   - DEV-810
   - DEV-912
   - TEST-1
+  - DEV-914
+  - DEV-913
 comments:
 - date: 2026-11-26T21:04:01.768789+00:00
   author: claude
@@ -277,3 +279,15 @@ history:
   - field: tags
     old: health, small-diff, job-paused, review-returned
     new: health, small-diff
+- at: 2026-11-27T09:10:32.367951+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-858","DEV-801","DEV-810","DEV-912","TEST-1"]}'
+    new: '{"related":["DEV-858","DEV-801","DEV-810","DEV-912","TEST-1","DEV-914"]}'
+- at: 2026-11-27T09:17:02.449166+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-858","DEV-801","DEV-810","DEV-912","TEST-1","DEV-914"]}'
+    new: '{"related":["DEV-858","DEV-801","DEV-810","DEV-912","TEST-1","DEV-914","DEV-913"]}'

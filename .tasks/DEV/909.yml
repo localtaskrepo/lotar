@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-27T05:44:20.788279+00:00
+modified: 2026-11-27T09:23:50.528315+00:00
 relationships:
   blocks:
   - DEV-918
@@ -170,6 +170,15 @@ comments:
 
     **Minor, not filed again**
     - [DEV-918](https://lotar.pyxzl.net/task/DEV-918) is still open for the kept-copy name prefix.
+- date: 2026-11-27T09:17:37.992528+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-909` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-agent/src/services/agent_job_service/kept.rs`, `view/api/client.ts`; lotar aborted the rebase, `agent/DEV-909` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-27T09:23:50.528315+00:00
+  author: automation
+  text: Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-843 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-843 (pid 61697), since 09:11 UTC; the merge agent starts now.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
 - attachment: dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png
@@ -458,3 +467,11 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T09:17:37.992528+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:23:50.528315+00:00
+  actor: automation
+  changes:
+  - field: comment_added

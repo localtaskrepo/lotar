@@ -1,17 +1,18 @@
 title: Copy STD-370's shared automation.yml and drop lotar's own 'Login expired' rule, or a login pause files two owner tickets
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:41:56.315913+00:00
-modified: 2026-11-27T09:01:53.203021+00:00
+modified: 2026-11-27T09:10:42.752369+00:00
 relationships:
   related:
   - DEV-892
   - DEV-835
   - DEV-653
   - DEV-884
+  - DEV-908
 comments:
 - date: 2026-11-27T01:13:38.666771+00:00
   author: claude
@@ -59,6 +60,29 @@ comments:
 - date: 2026-11-27T09:01:53.203021+00:00
   author: automation
   text: Waited 12 min for the machine's check lock, held by lotar's merge checks of STD-379 in /Users/mallox/Development/.lotar-worktrees/standards/STD-379 (pid 76228), since 07:52 UTC; the merge agent starts now.
+- date: 2026-11-27T09:10:32.077825+00:00
+  author: claude
+  text: |-
+    Merged, pushed and trusted: `8efc6c8aa` on main.
+
+    - Rebase conflict in `.tasks/DEV/automation.yml`: DEV-892 (`352c12d85`) landed first with the STD-354 copy + Waiting rule + old Login rule. This branch has the STD-370 copy (which contains STD-354) + the same Waiting rule. Main's side matched standards `a8f9a62e` exactly and the Waiting rule was the same text, so I kept this branch's file. That's the outcome the fix comment asked for.
+    - After the merge: first 1343 lines `diff` empty against standards `configs/lotar/automation.yml`, and `grep -c 'Login expired'` gives 1.
+    - `npm ci`, then `lint:agent`, `test:agent` and `smoke` passed on the rebased commit.
+    - Amended the main checkout's pending `.tasks` edits (DEV-908, 912, 914) into the commit. `lotar trust` ran, and `--status` says Trusted. Pushed `8f8365754..8efc6c8aa`.
+  report:
+    commits:
+    - hash: 8efc6c8aa
+      what: DEV-914 shared automation.yml at STD-370, one Login expired rule (rebased onto main, with the pending .tasks edits)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: lotar automation simulate --ticket DEV-406
+      result: passed
+      reason: scratch copy of main's .tasks
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45ab338036c3819f2b1bfb98fa1220ef8844a7f4b07497578c6c53f9d4a063dc
 description: |-
@@ -137,3 +161,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T09:10:32.077825+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:10:32.368413+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-892","DEV-835","DEV-653","DEV-884"]}'
+    new: '{"related":["DEV-892","DEV-835","DEV-653","DEV-884","DEV-908"]}'
+- at: 2026-11-27T09:10:42.752369+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

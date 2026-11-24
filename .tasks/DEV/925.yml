@@ -1,0 +1,36 @@
+title: Merge-agent tests in dev503 wait on the machine's real check lock and time out while a real merge runs
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T09:17:10.615601+00:00
+modified: 2026-11-27T09:17:12.051476+00:00
+relationships:
+  related:
+  - DEV-867
+  - DEV-797
+  - DEV-913
+description: |-
+  Found in the DEV-867 review (2026-11-27).
+
+  - `a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env` and `a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread` (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`) start merge agents on the default lock port 47586.
+  - While DEV-913's merge held that port, both failed with "timed out waiting for the merge" (60 s); with `LOTAR_CHECK_LOCK_HELD=1` both pass in 2 s.
+  - Inside a merge run they pass because lotar sets `LOTAR_CHECK_LOCK_HELD=1`; a fix or review job's targeted run, or `npm test` by hand, fails whenever a merge runs on the machine.
+  - DEV-867's and DEV-797's own tests already bind a free port via `LOTAR_CHECK_LOCK_PORT`.
+
+  ## Done when
+  - [ ] Tests that start a merge agent don't use the machine's lock port (the test harness sets `LOTAR_CHECK_LOCK_PORT` to a free port, or `LOTAR_CHECK_LOCK_HELD=1`, unless a test sets its own).
+  - [ ] Both tests pass while port 47586 is held from outside.
+history:
+- at: 2026-11-27T09:17:11.697267+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-867","DEV-797"]}'
+    new: '{"related":["DEV-867","DEV-797","DEV-913"]}'
+- at: 2026-11-27T09:17:12.051476+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

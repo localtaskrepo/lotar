@@ -1,14 +1,26 @@
 title: 'Agent queue: no test covers a queued entry whose ticket was deleted and not re-created'
-status: Todo
+status: Blocked
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T04:02:53.831434+00:00
-modified: 2026-11-27T04:02:54.957058+00:00
+modified: 2026-11-27T09:11:37.328776+00:00
 relationships:
+  depends_on:
+  - DEV-843
   related:
   - DEV-843
+comments:
+- date: 2026-11-27T09:11:29.108523+00:00
+  author: claude
+  text: |-
+    Waits for DEV-843: the code this test covers isn't on main yet.
+
+    - `drop_stale_entry` and the test `an_entry_whose_ticket_was_deleted_leaves_the_queue_without_starting` exist only on `agent/DEV-843` (`4d12bb5c0`), status Merging; main `8efc6c8aa` has neither.
+    - Writing the test now would build on unmerged code. Continue when DEV-843 lands: add a test in `crates/lotar-agent/src/services/agent_queue_service.rs` that hard-deletes the queued ticket without re-creating it.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A028b7825cedd9d889f13fe98fc9c83df6c45dc4198d6be79bfc5618f2ad7019f
 description: |-
   Found in the DEV-843 review. `drop_stale_entry` has two reasons: the ticket no longer exists (`TaskNotFound`), or a new ticket reuses its ID. The test `an_entry_whose_ticket_was_deleted_leaves_the_queue_without_starting` (`crates/lotar-agent/src/services/agent_queue_service.rs`) covers only the reuse case.
 
@@ -16,6 +28,7 @@ description: |-
   - [ ] A test hard-deletes a queued ticket without re-creating it: the worker drops the entry, starts no job, spends no attempts and comments nowhere.
 tags:
 - agent
+- waits
 history:
 - at: 2026-11-27T04:02:54.561755+00:00
   actor: claude
@@ -28,3 +41,36 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T09:10:47.606395+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T09:10:48.245662+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A028b7825cedd9d889f13fe98fc9c83df6c45dc4198d6be79bfc5618f2ad7019f
+- at: 2026-11-27T09:11:28.119403+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-843"]}'
+    new: '{"depends_on":["DEV-843"],"related":["DEV-843"]}'
+- at: 2026-11-27T09:11:28.920666+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent
+    new: agent, waits
+- at: 2026-11-27T09:11:29.108523+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:11:37.328776+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

@@ -266,6 +266,10 @@ pub struct AgentQueueEntry {
     /// one whose start fails goes back there.
     #[serde(skip)]
     pub taken_from: Option<usize>,
+    /// When the entry's ticket was created: a ticket deleted and re-created
+    /// under the same ID is another ticket, whose entry this is not (DEV-843).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ticket_created: Option<String>,
 }
 
 /// A moved entry and its place in the queue, from 1.
@@ -356,6 +360,7 @@ impl AgentQueueEntry {
             priority: None,
             pinned: false,
             taken_from: None,
+            ticket_created: None,
         }
     }
 
@@ -417,17 +422,19 @@ impl AgentQueueService {
     pub fn enqueue(tasks_dir: &Path, req: AgentJobCreateRequest) -> LoTaRResult<bool> {
         let mut entry = queue_entry(&req)?;
         entry.priority = ticket_priority(tasks_dir, &entry.ticket_id);
+        entry.ticket_created = ticket_created(tasks_dir, &entry.ticket_id);
         let (ticket_id, agent, runner) = (entry.ticket_id.clone(), entry.agent.clone(), entry.runner.clone());
 
         let mut inserted = false;
         with_locked_queue(tasks_dir, |state| {
             // Alias-aware duplicate check: legacy padded entries already in
             // the persisted queue denote the same ticket.
-            if state
-                .pending
-                .iter()
-                .any(|item| crate::storage::identity::aliases_match(&item.ticket_id, &ticket_id) && item.agent == agent && item.runner == runner)
-            {
+            let same =
+                |item: &AgentQueueEntry| crate::storage::identity::aliases_match(&item.ticket_id, &ticket_id) && item.agent == agent && item.runner == runner;
+            // An entry left by a deleted ticket whose ID this one reuses
+            // gives way to this one (DEV-843).
+            state.pending.retain(|item| !(same(item) && is_other_ticket(item, entry.ticket_created.as_deref())));
+            if state.pending.iter().any(same) {
                 return;
             }
             place(tasks_dir, &mut state.pending, entry.clone());
@@ -446,7 +453,7 @@ impl AgentQueueService {
     /// (thread name, commit retry, carried outcome). `status` is the ticket's
     /// status before it was blocked; `None` keeps the one parked before.
     pub fn park(tasks_dir: &Path, entry: &AgentQueueEntry, status: Option<&str>) -> LoTaRResult<()> {
-        let entry = AgentQueueEntry { queued_at: time::now_rfc3339(), attempts: 0, held_by: None, ..entry.clone() };
+        let entry = AgentQueueEntry { queued_at: time::now_rfc3339(), attempts: 0, held_by: None, ..with_ticket_created(tasks_dir, entry) };
         with_locked_queue(tasks_dir, |state| {
             let earlier = state.parked.iter().position(|item| crate::storage::identity::aliases_match(&item.entry.ticket_id, &entry.ticket_id));
             let earlier = earlier.map(|index| state.parked.remove(index));
@@ -468,10 +475,10 @@ impl AgentQueueService {
                 return;
             };
             let parked = &state.parked[index].entry;
-            let (commit_retry, carried_outcome) = (parked.commit_retry.clone(), parked.carried_outcome.clone());
+            let (commit_retry, carried_outcome, ticket_created) = (parked.commit_retry.clone(), parked.carried_outcome.clone(), parked.ticket_created.clone());
             let priority = ticket_priority(tasks_dir, &parked.ticket_id);
             moved = queue_entry(&parked.request()).map(|entry| {
-                let entry = AgentQueueEntry { commit_retry, carried_outcome, priority, ..entry };
+                let entry = AgentQueueEntry { commit_retry, carried_outcome, priority, ticket_created, ..entry };
                 state.parked.remove(index);
                 if !state.pending.iter().any(|item| {
                     crate::storage::identity::aliases_match(&item.ticket_id, &entry.ticket_id) && item.agent == entry.agent && item.runner == entry.runner
@@ -731,6 +738,7 @@ impl AgentQueueService {
         let next_try_at = next_try_at_from(now);
         let priority = retry.priority.clone().or_else(|| ticket_priority(tasks_dir, &retry.ticket_id));
         let mut paused = None;
+        let retry = &with_ticket_created(tasks_dir, retry);
         with_locked_queue(tasks_dir, |state| {
             let open = state.pauses.iter().position(|open| reason.joins(provider, open)).map(|index| state.pauses.remove(index));
             let opened = open.as_ref().is_none_or(|open| open.reason != reason && open.reason != PauseReason::Disk);
@@ -766,6 +774,7 @@ impl AgentQueueService {
     /// session can't be resumed starts next (DEV-734).
     pub fn requeue_first(tasks_dir: &Path, retry: &AgentQueueEntry) -> LoTaRResult<()> {
         let priority = retry.priority.clone().or_else(|| ticket_priority(tasks_dir, &retry.ticket_id));
+        let retry = &with_ticket_created(tasks_dir, retry);
         with_locked_queue(tasks_dir, |state| {
             state.pending.retain(|item| !same_entry(item, retry));
             state.pending.insert(0, AgentQueueEntry { pinned: true, priority: priority.clone(), ..retry.clone() });
@@ -1092,6 +1101,10 @@ fn worker_slot_free(tasks_dir: &Path) -> LoTaRResult<bool> {
 }
 
 fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
+    if let Some(reason) = entry_ticket_gone(tasks_dir, &entry) {
+        drop_stale_entry(tasks_dir, &entry, &reason);
+        return Ok(());
+    }
     let last_try = entry.attempts >= MAX_ATTEMPTS;
     let req = entry.request();
     if !crate::services::automation_service::queued_stage_allows_start(tasks_dir, &req) {
@@ -1107,6 +1120,52 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
     }
     let _ = AgentJobService::start_queued_job(req, tasks_dir, entry.commit_retry, entry.carried_outcome, entry.not_before.is_some(), &entry.queued_at)?;
     Ok(())
+}
+
+/// When the ticket `ticket_id` (or the one it moved to) was created; `None`
+/// when it can't be read. A deleted ticket is not found.
+fn ticket_created(tasks_dir: &Path, ticket_id: &str) -> Option<String> {
+    read_ticket_created(tasks_dir, ticket_id).ok()
+}
+
+fn read_ticket_created(tasks_dir: &Path, ticket_id: &str) -> LoTaRResult<String> {
+    let storage = crate::storage::manager::Storage::new(tasks_dir);
+    crate::services::task_service::TaskService::get(&storage, ticket_id, None).map(|task| task.created)
+}
+
+/// `entry` with its ticket's created time, read now when it has none.
+fn with_ticket_created(tasks_dir: &Path, entry: &AgentQueueEntry) -> AgentQueueEntry {
+    let ticket_created = entry.ticket_created.clone().or_else(|| ticket_created(tasks_dir, &entry.ticket_id));
+    AgentQueueEntry { ticket_created, ..entry.clone() }
+}
+
+/// Whether `entry` belongs to another ticket than the one created at
+/// `created`. An entry or ticket without a known time counts as the same.
+fn is_other_ticket(entry: &AgentQueueEntry, created: Option<&str>) -> bool {
+    matches!((entry.ticket_created.as_deref(), created), (Some(queued), Some(now)) if queued != now)
+}
+
+/// Why `entry` must not start: its ticket was deleted, or deleted and
+/// created again under the same ID (DEV-843). `None` for an entry queued
+/// before entries knew their ticket, or when the ticket can't be read for
+/// another reason: the start then fails and is retried as before.
+fn entry_ticket_gone(tasks_dir: &Path, entry: &AgentQueueEntry) -> Option<String> {
+    entry.ticket_created.as_ref()?;
+    match read_ticket_created(tasks_dir, &entry.ticket_id) {
+        Err(LoTaRError::TaskNotFound(_)) => Some(format!("{} no longer exists", entry.ticket_id)),
+        Ok(created) if is_other_ticket(entry, Some(&created)) => {
+            Some(format!("it was queued for an earlier {} that was deleted; this ticket reuses its ID", entry.ticket_id))
+        }
+        _ => None,
+    }
+}
+
+/// Drop an entry whose ticket is gone, without starting a job or spending
+/// retries, and say so (DEV-843).
+fn drop_stale_entry(tasks_dir: &Path, entry: &AgentQueueEntry, reason: &str) {
+    let text = format!("The queued {} job left the queue without starting: {reason}.", entry_label(entry));
+    eprintln!("[lotar][warn] {}: {text}", entry.ticket_id);
+    let _ = comment_entry_ticket(tasks_dir, entry, &text);
 }
 
 /// The queue entry for `req`, checked and with the canonical ticket id, so
@@ -2561,5 +2620,69 @@ mod tests {
         queue(&tasks_dir, "PRQ-2", "review");
         let ambiguous = AgentQueueService::move_entry(&tasks_dir, "PRQ-2", None, QueueMove::Up).unwrap_err().to_string();
         assert!(ambiguous.contains("PRQ-2 is queued for @fix, @review"), "{ambiguous}");
+    }
+
+    /// A tasks dir with project RID and one ticket, RID-1, queued for @fix.
+    fn queued_ticket_that_gets_reused(dir: &Path) -> (PathBuf, crate::storage::manager::Storage) {
+        let tasks_dir = dir.join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: RID\n").unwrap();
+        let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
+        let create = |storage: &mut crate::storage::manager::Storage, title: &str| {
+            crate::services::task_service::TaskService::create(
+                storage,
+                crate::api_types::TaskCreate { title: title.to_string(), project: Some("RID".to_string()), ..Default::default() },
+            )
+            .unwrap()
+        };
+        assert_eq!(create(&mut storage, "Example ticket").id, "RID-1");
+        let req = AgentJobCreateRequest { ticket_id: "RID-1".into(), prompt: "Work the example".into(), agent: Some("fix".into()), ..Default::default() };
+        assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+        crate::services::task_service::TaskService::delete_with_options(&mut storage, "RID-1", None, true).unwrap();
+        assert_eq!(create(&mut storage, "The finding").id, "RID-1", "a hard delete frees the ID");
+        (tasks_dir, storage)
+    }
+
+    /// DEV-843: the new ticket's job replaces the one queued for the deleted ticket.
+    #[test]
+    fn a_ticket_that_reuses_a_deleted_tickets_id_replaces_its_queued_job() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let (tasks_dir, storage) = queued_ticket_that_gets_reused(dir.path());
+
+        let req = AgentJobCreateRequest { ticket_id: "RID-1".into(), prompt: "Work the finding".into(), agent: Some("fix".into()), ..Default::default() };
+        assert!(AgentQueueService::enqueue(&tasks_dir, req.clone()).unwrap());
+        let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+        let created = crate::services::task_service::TaskService::get(&storage, "RID-1", None).unwrap().created;
+        assert_eq!(
+            pending.iter().map(|entry| (entry.prompt.as_str(), entry.ticket_created.as_deref())).collect::<Vec<_>>(),
+            [("Work the finding", Some(created.as_str()))]
+        );
+        assert!(!AgentQueueService::enqueue(&tasks_dir, req).unwrap(), "the same ticket's job is still queued once");
+    }
+
+    /// DEV-843: an entry whose ticket was deleted (and its ID reused) leaves the queue unstarted.
+    #[test]
+    fn an_entry_whose_ticket_was_deleted_leaves_the_queue_without_starting() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let (tasks_dir, storage) = queued_ticket_that_gets_reused(dir.path());
+
+        let entry = dequeue_startable(&tasks_dir, false).unwrap().remove(0);
+        assert!(entry_ticket_gone(&tasks_dir, &entry).is_some());
+        start_entry(&tasks_dir, entry.clone()).unwrap();
+        settle_taken(&tasks_dir, &entry, None).unwrap();
+
+        assert!(AgentQueueService::list_pending(&tasks_dir).unwrap().is_empty());
+        let task = crate::services::task_service::TaskService::get(&storage, "RID-1", None).unwrap();
+        let said: Vec<_> = task.comments.iter().map(|comment| comment.text.as_str()).collect();
+        assert_eq!(
+            said,
+            ["The queued @fix job left the queue without starting: it was queued for an earlier RID-1 that was deleted; this ticket reuses its ID."]
+        );
+        let legacy = AgentQueueEntry { ticket_created: None, ..entry };
+        assert_eq!(entry_ticket_gone(&tasks_dir, &legacy), None, "an entry queued before entries knew their ticket is not checked");
     }
 }

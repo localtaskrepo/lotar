@@ -218,6 +218,13 @@ impl PendingJob {
     }
 }
 
+/// The request with its `${{ticket.*}}` filled in from the ticket: a rule's
+/// prompt keeps them until the job starts, so they show the ticket as it is
+/// then, not as it was when the job was queued (DEV-843).
+fn ticket_prompt(task: &crate::api_types::TaskDTO, request: &str) -> String {
+    crate::automation::template::TemplateContext::from_task(task).expand_ticket_only(request).trim().to_string()
+}
+
 /// What a job's prompt is built from besides the ticket and the request.
 struct PromptInputs<'a> {
     tasks_dir: &'a std::path::Path,
@@ -230,12 +237,12 @@ struct PromptInputs<'a> {
 }
 
 impl PromptInputs<'_> {
-    /// The prompt and the request text with `${{ticket.title}}` filled from
-    /// the ticket's title (DEV-845).
+    /// The prompt and the request text with its `${{ticket.*}}` filled from
+    /// the ticket as it is now (DEV-843).
     fn build(&self, task: &crate::api_types::TaskDTO, request: &str) -> LoTaRResult<(JobPrompt, String)> {
         let Self { tasks_dir, config, profile, runner_kind, agent, job_id, is_merge_job } = *self;
         let ticket_id = task.id.as_str();
-        let user_prompt = crate::automation::template::fill_ticket_title(request, &task.title);
+        let user_prompt = ticket_prompt(task, request);
         let context = AgentContextService::load(tasks_dir, config, ticket_id)?;
         let template = instruction_template(tasks_dir, config, task, job_id, runner_kind, agent);
         let instructions = resolve_agent_instructions(tasks_dir, config, profile)?.map(|text| template.expand(&text));
@@ -459,7 +466,7 @@ impl AgentJobService {
         }
 
         let request = req.prompt.trim();
-        if crate::automation::template::fill_ticket_title(request, &task.title).is_empty() {
+        if ticket_prompt(&task, request).is_empty() {
             return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
         }
         let job_id = make_job_id();
@@ -7641,12 +7648,12 @@ mod tests {
         let registry = JOB_REGISTRY.lock().unwrap();
         let pending = registry.pending_queue.iter().find(|pending| pending.job_id == job.id).unwrap();
         assert!(pending.prompt.text.contains("- Title: first\n"));
-        assert_eq!(pending.user_prompt, "${{ticket.id}} first: do the thing");
+        assert_eq!(pending.user_prompt, "AJB-1 first: do the thing");
         let (started, user_prompt) = pending.current_prompt();
         assert!(started.text.contains("- Title: The real title\n"), "{}", started.text);
-        assert!(started.text.contains("${{ticket.id}} The real title: do the thing"), "{}", started.text);
+        assert!(started.text.contains("AJB-1 The real title: do the thing"), "{}", started.text);
         assert!(!started.text.contains("first"), "{}", started.text);
-        assert_eq!(user_prompt, "${{ticket.id}} The real title: do the thing");
+        assert_eq!(user_prompt, "AJB-1 The real title: do the thing");
 
         // The ticket can't be read at the start: the prompt built at create.
         std::fs::remove_file(&file).unwrap();

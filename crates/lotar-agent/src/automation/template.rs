@@ -386,12 +386,17 @@ impl TemplateContext {
         result
     }
 
-    /// Expand a queued agent job's prompt, leaving `${{ticket.title}}` for
-    /// [`fill_ticket_title`] when the job starts: a job can wait in the queue
-    /// for hours, and its commit message must carry the title the ticket has
-    /// then, as its "Ticket context" does (DEV-845).
-    pub fn expand_for_queued_job(&self, input: &str) -> String {
-        replace_placeholders(input, |key, placeholder| if key == TICKET_TITLE { Some(placeholder.to_string()) } else { self.lookup(key) })
+    /// Like [`Self::expand`], but `${{ticket.*}}` placeholders stay as they
+    /// are: a queued job's prompt fills them in with [`Self::expand_ticket_only`]
+    /// when it starts, from the ticket as it is then (DEV-843).
+    pub fn expand_keeping_ticket(&self, input: &str) -> String {
+        replace_placeholders(input, |key, placeholder| if is_ticket_key(key) { Some(placeholder.to_string()) } else { self.lookup(key) })
+    }
+
+    /// Fill in only the `${{ticket.*}}` placeholders; any other stays as
+    /// written. Used on a job's prompt when it starts (DEV-843).
+    pub fn expand_ticket_only(&self, input: &str) -> String {
+        replace_placeholders(input, |key, placeholder| if is_ticket_key(key) { self.lookup(key) } else { Some(placeholder.to_string()) })
     }
 
     fn expand_inner(&self, input: &str) -> String {
@@ -399,13 +404,8 @@ impl TemplateContext {
     }
 }
 
-const TICKET_TITLE: &str = "ticket.title";
-
-/// Fill the `${{ticket.title}}` that [`TemplateContext::expand_for_queued_job`]
-/// left in a job's prompt with the ticket's title at the job's start; other
-/// text stays as it is.
-pub fn fill_ticket_title(input: &str, title: &str) -> String {
-    replace_placeholders(input, |key, placeholder| Some(if key == TICKET_TITLE { title.to_string() } else { placeholder.to_string() }))
+fn is_ticket_key(key: &str) -> bool {
+    key.starts_with("ticket.")
 }
 
 /// Replace each `${{key}}` in `input` with what `value` returns for the
@@ -558,17 +558,24 @@ mod tests {
         assert_eq!(ctx.expand("Working on ${{ticket.id}}: ${{ticket.title}}"), "Working on PROJ-1: Fix bug");
     }
 
-    /// DEV-845: a queued job's prompt takes the title the ticket has when
-    /// the job starts, not the one it had when the rule queued it.
+    /// DEV-843, DEV-845: event values fill in when the rule fires, ticket
+    /// values when the job starts; a filled-in value isn't expanded again.
     #[test]
-    fn a_queued_job_prompt_fills_the_title_when_the_job_starts() {
+    fn a_queued_job_prompt_fills_ticket_values_when_the_job_starts() {
         let mut ctx = TemplateContext::new();
         ctx.set("ticket.id", "PROJ-1");
         ctx.set("ticket.title", "first");
-        let queued = ctx.expand_for_queued_job("Commit \"${{ticket.id}} ${{ ticket.title }}\" ${{unknown}}${{ticket.id");
-        assert_eq!(queued, "Commit \"PROJ-1 ${{ ticket.title }}\" ${{ticket.id");
-        assert_eq!(fill_ticket_title(&queued, "Real ${{ticket.id}} title"), "Commit \"PROJ-1 Real ${{ticket.id}} title\" ${{ticket.id");
-        assert_eq!(fill_ticket_title("Keep ${{agent.job_id}}", "T"), "Keep ${{agent.job_id}}");
+        ctx.set("comment.text", "see ${{agent.job_id}} and ${{ticket.title}}");
+        let queued = ctx.expand_keeping_ticket("Commit \"${{ticket.id}} ${{ ticket.title }}\": ${{comment.text}} ${{unknown}}${{ticket.id");
+        assert_eq!(queued, "Commit \"${{ticket.id}} ${{ ticket.title }}\": see ${{agent.job_id}} and ${{ticket.title}} ${{ticket.id");
+        let mut now = TemplateContext::new();
+        now.set("ticket.id", "PROJ-1");
+        now.set("ticket.title", "Real ${{ticket.id}} title");
+        assert_eq!(
+            now.expand_ticket_only(&queued),
+            "Commit \"PROJ-1 Real ${{ticket.id}} title\": see ${{agent.job_id}} and Real ${{ticket.id}} title ${{ticket.id"
+        );
+        assert_eq!(now.expand_ticket_only("Keep ${{agent.job_id}}"), "Keep ${{agent.job_id}}");
     }
 
     #[test]

@@ -619,6 +619,53 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     assert!(prompt.contains("Make concrete changes"), "{prompt}");
 }
 
+/// DEV-843: a job's prompt shows the ticket as it is when the job starts.
+/// A rule's prompt keeps its `${{ticket.*}}` placeholders while the job
+/// waits in the queue; the ticket renamed meanwhile gets its new title.
+#[cfg(unix)]
+#[test]
+fn a_jobs_prompt_shows_the_tickets_title_when_the_job_starts() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let stdin = root.join("fix.stdin");
+    let script = write_stub_agent_script(
+        root,
+        "stub-fix.sh",
+        &format!(
+            "#!/bin/sh\n\
+printf '%s' \"$LOTAR_AGENT_PROMPT\" > \"{}\"\n\
+echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+            stdin.display()
+        ),
+    );
+    fixtures.create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  fix:\n    runner: command\n    command: \"{}\"\n", script.display()));
+
+    let mut storage = fixtures.create_storage();
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate { title: "Example ticket".to_string(), project: Some("TITL".to_string()), reporter: Some("sam".to_string()), ..Default::default() },
+    )
+    .expect("create task");
+    // The prompt as a rule queues it: its ticket values not filled in yet.
+    let req = AgentJobCreateRequest {
+        ticket_id: created.id.clone(),
+        prompt: "Work ticket ${{ticket.id}} (\"${{ticket.title}}\"), keep ${{comment.text}}".to_string(),
+        agent: Some("fix".to_string()),
+        ..Default::default()
+    };
+    TaskService::update(&mut storage, &created.id, TaskUpdate { title: Some("The finding".to_string()), ..Default::default() }).expect("rename");
+    AgentJobService::start_job_with_tasks_dir(req, &fixtures.tasks_root).expect("start job");
+    wait_for_ticket_jobs(&created.id, 10_000, |jobs| {
+        !jobs.is_empty() && jobs.iter().all(|job| job.finished_at.is_some() && AgentJobService::job_settled(&job.id))
+    });
+
+    let prompt = fs::read_to_string(&stdin).unwrap();
+    assert!(prompt.contains(&format!("Work ticket {} (\"The finding\"), keep ${{{{comment.text}}}}", created.id)), "{prompt}");
+    assert!(!prompt.contains("Example ticket"), "{prompt}");
+}
+
 /// DEV-316: a rule can take the model and effort from the ticket; a ticket
 /// without those fields gets the profile's own (never an empty `--model`).
 #[cfg(unix)]
