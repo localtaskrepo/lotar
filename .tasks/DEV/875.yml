@@ -1,11 +1,11 @@
 title: Smoke 'shows the prompt and settings a finished job ran with behind its Instructions button' failed once in the full suite
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T19:53:56.034648+00:00
-modified: 2026-11-26T01:19:03.368608+00:00
+modified: 2026-11-26T06:17:24.004725+00:00
 relationships:
   related:
   - DEV-769
@@ -40,6 +40,18 @@ comments:
       result: not_run
       reason: the merge runs it
     next: Review, then merge
+- date: 2026-11-26T06:17:14.085303+00:00
+  author: claude
+  text: |-
+    Review: passed. The test fix in `9bb8c306a` matches the cause, and the targeted test passed 5 of 5.
+
+    - Read: the ticket and fix comment, DEV-888, DEV-769, `smoke/vitest.config.ts` (the spec is already in `wall-clock`), and the recent commits on main to the touched files.
+    - The cause holds in the code. In `view/pages/AgentJobs.vue:280-285`, while `logsLoading` is true the page shows a standalone `AgentRunInputs` with its own Instructions button. Once the log arrives, `AgentJobLog` (`v-else`) replaces it, and its panel starts closed. `loadLogs` runs only once, when the logs open (`:780`), so the header can't remount after the test waits for it.
+    - The fix waits for `.job-log__header` and takes the button from it, which covers what "Done" asks: the test waits on the cause. The product side is DEV-888, and the test still works with that fix.
+    - Only the spec file changed: no stray files, no second branch. UI review is not needed because no pages, components or styles changed.
+    - Reran: `npm ci` passed. `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'Instructions button'` passed 5 of 5 after `npm run -s build:smoke`. The first 3 tries failed before running because the worktree had no binary. `npx prettier --check` and `npx oxlint` on the file are clean.
+    - Not rerun: the fix agent's 1.5 s delay repro (it needs a temporary edit). Instead, the cause was confirmed by reading the code.
+    - Findings: none. Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa2d85a7e532ad07ff1783c51ac60fb06c0ad8feb5ce12117534dd7aa8b25650f
 description: 'Found: in DEV-769''s merge, `npm run -s smoke` on `bd4c626cb` failed this test in `smoke/tests/ui.agent-jobs.smoke.spec.ts` (already in the serial `wall-clock` group): `/api/jobs/inputs` answered ok, but `getByRole(''table'', { name: ''Settings'' })` never became visible (15 s). It passed 5 out of 5 alone and in 3 more full runs. Check: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t ''Instructions button''` repeated, and the full `npm run -s smoke`. Done: the cause is found (for example the log remounting and closing the panel, or an inputs response with no record yet) and the test waits on it, so it no longer fails under load.'
@@ -89,3 +101,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T06:17:14.085303+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:17:24.004725+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

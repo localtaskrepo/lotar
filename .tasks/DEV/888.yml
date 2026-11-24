@@ -1,19 +1,48 @@
 title: 'Agents page: Instructions opened while a job''s logs load closes when the log arrives'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T01:18:52.353749+00:00
-modified: 2026-11-26T06:10:45.587699+00:00
+modified: 2026-11-26T06:15:29.947586+00:00
 relationships:
   related:
   - DEV-875
+comments:
+- date: 2026-11-26T06:15:21.322835+00:00
+  author: claude
+  text: |-
+    Fixed: an Instructions panel opened while the logs load stays open when the log arrives.
+
+    - `AgentRunInputs` (`v-model:open`) and `AgentJobLog` (`v-model:instructions-open`) now take the open state from the page; `view/pages/AgentJobs.vue` keeps it per job, so the swap keeps the panel open.
+    - Same swap in the task panel timeline (`TaskPanelTimelineTab.vue`), fixed the same way.
+    - Unit test in `view/__tests__/AgentJobs.spec.ts` (fails without the fix: `expected 'Instructions' to be 'Hide instructions'`); smoke test in `smoke/tests/ui.agent-jobs.smoke.spec.ts` holds `/api/jobs/logs` with `page.route` as the ticket's check says.
+    - Screenshots attached: `DEV-888-before.png` (panel gone after the log arrives), `DEV-888-after.png` (panel stays open, button reads Hide instructions).
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: aa504a2ed
+      what: Instructions open state shared by the loading button and the log's header button
+    checks:
+    - command: npm run test:ui:agent -- __tests__/AgentJobs.spec.ts __tests__/AgentRunInputs.spec.ts __tests__/AgentJobLog.spec.ts __tests__/TaskPanel
+      result: passed
+    - command: npm run test:smoke:quick:agent -- tests/ui.agent-jobs.smoke.spec.ts -t Instructions
+      result: passed
+    - command: vue-tsc, smoke tsc, oxlint, eslint, prettier on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke (full)
+      result: not_run
+      reason: merge runs them (DEV-797)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A038063cbc62a9008d25ebe42791e04e1b9b8bb44d87c11815642b1e7f481e2cf
+- attachment: DEV-888-before.53340ace512ce77337a1963f3be62ff4.png
+- attachment: DEV-888-after.dd820e010551501c6196551098057cfc.png
 description: 'Found: in DEV-875, while a job card''s logs load, `view/pages/AgentJobs.vue` shows a standalone `AgentRunInputs` with its own Instructions button; once the logs arrive it unmounts and `AgentJobLog` mounts with its panel closed, so a panel the user opened is gone. Check: delay `/api/jobs/logs` (page.route), click Instructions before the log shows, and the panel should stay open. Done: the open state carries over to the log''s header button (or the placeholder button is not offered while loading).'
 tags:
 - health
+- ui
 custom_fields:
   finding: ui:agent-jobs-instructions-remount
 history:
@@ -39,3 +68,32 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A038063cbc62a9008d25ebe42791e04e1b9b8bb44d87c11815642b1e7f481e2cf
+- at: 2026-11-26T06:15:13.848771+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, ui
+- at: 2026-11-26T06:15:13.911429+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-before.53340ace512ce77337a1963f3be62ff4.png
+- at: 2026-11-26T06:15:13.955219+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-after.dd820e010551501c6196551098057cfc.png
+- at: 2026-11-26T06:15:21.322835+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:15:29.947586+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

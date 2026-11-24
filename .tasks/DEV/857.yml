@@ -1,17 +1,19 @@
 title: T3 thread row says Finished while the thread waits on background work
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T22:44:15.700672+00:00
-modified: 2026-11-26T05:04:14.795715+00:00
+modified: 2026-11-26T06:19:50.638480+00:00
 relationships:
   depends_on:
   - DEV-849
   related:
   - DEV-849
   - DEV-729
+  - DEV-853
+  - DEV-876
 comments:
 - date: 2026-11-25T12:39:40.114035+00:00
   author: claude
@@ -196,6 +198,29 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-857` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-857` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T06:14:56.658326+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `0e78bed6b` is on `main` and `origin/main`.
+
+    - Rebase conflict in `docs/help/agent.md`: main (DEV-853) extended the "thread runs on the T3 Code server" bullet, the fix extended the "Show logs panel" bullet above it. They were separate bullets, so I kept both changes.
+    - `npm ci` ran in the worktree after the rebase.
+    - Checks on the rebased commit: `lint:agent`, `test:agent` and `smoke` all passed.
+    - Fast-forwarded the main checkout, then amended the pending `.tasks` changes into the commit and pushed `c7d2dd4d6..0e78bed6b`.
+    - No rules or config changed, so no `lotar trust` was needed. This isn't a health ticket, so there were no finding checks to rerun.
+  report:
+    commits:
+    - hash: 0e78bed6b
+      what: DEV-857 fix on main (rebased from 794094f97, .tasks amended in)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2559 Rust, 1622 frontend; a first run was cut off by the job's 30-min background limit, rerun passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 411 tests
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a8fde63d3da51b14097b1f1ced5fc01af6d027e69cfab0dfe58d128c01170e4
@@ -213,8 +238,6 @@ description: |-
 tags:
 - agent
 - ui
-- review-returned
-- fix-retried
 history:
 - at: 2026-11-24T22:44:16.379275+00:00
   actor: claude
@@ -429,3 +452,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T06:14:56.658326+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:14:56.978139+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-729"]}'
+    new: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-729","DEV-853"]}'
+- at: 2026-11-26T06:15:05.555957+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: agent, ui, review-returned, fix-retried
+    new: agent, ui
+- at: 2026-11-26T06:19:50.638480+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-729","DEV-853"]}'
+    new: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-729","DEV-853","DEV-876"]}'

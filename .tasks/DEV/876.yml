@@ -1,11 +1,11 @@
 title: 'T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T19:54:54.013521+00:00
-modified: 2026-11-26T01:26:00.547597+00:00
+modified: 2026-11-26T06:20:04.922542+00:00
 relationships:
   related:
   - DEV-777
@@ -16,6 +16,7 @@ relationships:
   - DEV-808
   - DEV-836
   - DEV-842
+  - DEV-857
 comments:
 - date: 2026-11-26T01:25:45.401486+00:00
   author: claude
@@ -49,6 +50,19 @@ comments:
       result: not_run
       reason: the merge runs them (owner 2026-11-22, DEV-797)
     next: 'Review on another model, then merge. DEV-810 changes kept.rs settle_ticket and settle_superseded too: the second of the two to merge rebases.'
+- date: 2026-11-26T06:19:50.219492+00:00
+  author: claude
+  text: |-
+    Review: passed. `5b4629984` does what the ticket asks; one ticket-record problem below, no code findings.
+
+    - Read: the diff (`kept.rs`, `dev503_harness_jobs_test.rs`, `dev626_resumed_t3_threads_test.rs`, `docs/help/agent.md`), the fix comment, the timeline, DEV-836/DEV-747 behaviour it widens, and main's newer `t3_state.rs` change (DEV-857 `0e78bed6b`)
+    - Done when (original text, see below): a new job settles the earlier threads (`settle_superseded`, any ended status, not the continued one), a done ticket settles all ended threads (`settle`), and a test covers each. Threads still running or waiting stay alone, as documented. The non-done path is unchanged (`completed` only)
+    - `npm ci`: passed. `cargo nextest run --cargo-profile dev -E 'test(/t3/) | test(/dev503_harness/) | test(/dev626/) | test(/settle/) | test(/kept/)'`: 106 passed
+    - Both new tests fail against main's `kept.rs` (swapped in, then restored with `git checkout`), so they are real regression tests
+    - `cargo clippy -p lotar-agent -p lotar-lib --tests`: no warnings. `rustfmt --check` and `prettier --check` on the changed files: clean. `git merge-tree main HEAD`: merges cleanly with main's DEV-857 `agent.md` edit
+    - **Ticket record:** the fix agent's `lotar task edit -D -` at 01:21Z replaced the description with a lone `-` (the DEV-842 bug, in the older lotar build that ran the job). The fix agent's "Done when" checklist was never saved. The lost text, to put back: "Found 2026-11-25: 205 unsettled T3 threads; 86 are older attempts on open tickets (DEV-810 15 threads, DEV-828 13, DEV-827..831 and DEV-777 about 12 each), 31 belong to Done tickets. Each retry or review job starts a new thread and never settles the previous one. Done when: starting a job settles the ticket's earlier job threads, closing a ticket settles all of them, and a test covers both. Owner chose to file this 2026-11-25."
+    - Still open, as the fix agent said: threads no harnessmux session or job log names stay unsettled until DEV-810 lands. Whichever of DEV-810 and DEV-876 merges second has to rebase over `kept.rs`
+    - Tickets filed: none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9
 description: '-'
@@ -106,3 +120,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T06:19:50.219492+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:19:50.639119+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828","DEV-747","DEV-808","DEV-836","DEV-842"]}'
+    new: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828","DEV-747","DEV-808","DEV-836","DEV-842","DEV-857"]}'
+- at: 2026-11-26T06:20:04.922542+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

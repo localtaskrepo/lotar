@@ -1,14 +1,15 @@
 title: 'Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log''s visible area'
-status: Reviewing
+status: Merging
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T20:09:11.247882+00:00
-modified: 2026-11-26T01:38:10.116412+00:00
+modified: 2026-11-26T06:25:07.684745+00:00
 relationships:
   related:
   - DEV-859
+  - DEV-797
 comments:
 - date: 2026-11-26T01:37:58.758699+00:00
   author: claude
@@ -38,6 +39,24 @@ comments:
       result: not_run
       reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
     next: Review on another model, then the merge agent lands agent/DEV-880
+- date: 2026-11-26T06:25:01.034556+00:00
+  author: claude
+  text: |-
+    Review: passed. `73ffa834f` meets every "Done when" item, and I have no findings and filed no tickets.
+
+    - Read: the ticket and its timeline, DEV-859, the diff of `main..HEAD` (one commit, 3 files), and `AgentJobLog.vue` around the follow, highlight and "Full height" code. None of the 8 newer commits on `main` touch these files.
+    - Choice: the original "Done when" offered either scrolling to the first match or Next/Previous buttons, so picking one was within the ticket, not an owner decision.
+    - Code: `seekMatch` is set only by changes to the search, the view or the Thinking toggle, then cleared on the next highlight. So new entries don't scroll the list (`view/components/AgentJobLog.vue:418-438`). It skips "Full height" (`scrollHeight <= clientHeight`) and matches without a box. Calling `onScroll()` after the scroll turns off following, unless the list hit the bottom, where following stays on as "Done when" says. jsdom has no `Range.getBoundingClientRect`, so the test's `Reflect.deleteProperty` cleanup brings back the original state.
+    - Reran `npm ci`: passed.
+    - Reran `npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobLog.spec.ts view/__tests__/AgentJobs.spec.ts`: 46 passed. With `main`'s `AgentJobLog.vue` the DEV-880 test fails (`expected +0 to be 660`), then I restored the file.
+    - Reran `npm run build:smoke`, then `npm run test:smoke:quick -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t "DEV-880|filters the log, folds"`: both passed.
+    - Screenshots: I read the fix agent's before and after shots (light and dark at 1920, 1440 and 390 px). Before, the match is hidden; after, it shows.
+    - My own run on a scratch server, using the same log plus 30 lines after the match, in light and dark at 1920, 1440 and 390 px:
+      - The match lands exactly 140 px from the top of the 420 px list.
+      - Switching views with a search on scrolls to the match again.
+      - The page never moves, including with "Full height".
+      - No visible problems.
+    - Not run: the full `npm run lint`, `npm test` and `npm run smoke`. The merge runs them (DEV-797).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A97c2a082c1f1163a39163265517af33f7ba73c60bf7c963c42ad538ff8e315cc
 - attachment: dev880-after-dark-1440.945c319fdd505321327d15d116caedd6.png
@@ -209,3 +228,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T06:25:01.034556+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:25:01.448499+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-859"]}'
+    new: '{"related":["DEV-859","DEV-797"]}'
+- at: 2026-11-26T06:25:07.684745+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
