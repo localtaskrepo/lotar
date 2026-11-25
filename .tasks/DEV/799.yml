@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-26T01:55:01.102120+00:00
+modified: 2026-11-26T06:54:43.236364+00:00
 relationships:
   related:
   - DEV-464
@@ -218,6 +218,18 @@ comments:
       result: not_run
       reason: the merge runs the full suite
     next: 'Merge: full smoke; ui.relationships plot-height flake stays on DEV-873'
+- date: 2026-11-26T06:54:43.236364+00:00
+  author: claude
+  text: |-
+    Review: passed. The task-view test fix is right, and the watcher and release-list changes still hold.
+
+    - Reviewed `0079a1677`, the only commit on `main...HEAD`. It merges cleanly onto main `d03a0d408`, and main hasn't touched the 6 files since `c0fe875d6`. `npm ci` ok.
+    - `smoke/tests/ui.task-view.smoke.spec.ts:20-28`: `panelSettled` waits on `.task-panel__overlay`. That element carries both the `task-panel-enter-from` transform (`translateX(40px)`, `view/components/TaskPanel.vue:3675`) and the `transition: all` (`:3786`), so `getAnimations()` on it, without subtree, catches the slide-in. It only waits, and the measurements are unchanged.
+    - `view/composables/useReleases.ts:56-57`: `open` replaces `onReconnect`. `useSse` replays `open` to a late subscriber on an already open shared stream (`view/composables/useSse.ts:87`), so first opens and reconnects both reload.
+    - Reran: `cargo nextest run -p lotar-lib -E 'test(/watch|sse|release/)'` 49 of 49 passed. `vitest --config view/vitest.config.ts useReleases.spec.ts Dependencies.navigation.spec.ts` 5 of 5 passed. `npm run build:smoke`, then `tests/ui.releases.smoke.spec.ts` with `tests/ui.task-view.smoke.spec.ts` passed 3 of 3 runs, 4 of 4 tests each (macOS).
+    - Not rerun: the task-view failure before the fix (the fix agent showed it with animation frames delayed 400 ms), the full suites (the merge runs them) and a GitHub runner.
+    - UI screenshots: not needed. No page, component or style changed: the composable only reloads more often and the test only waits.
+    - No findings and no tickets filed. DEV-873 (relationships spec, red on main too) stays separate.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adfb741c2086c10a924409cd5752026c76392856e3a908ac33e047e23a887365e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9da4fd47475753f0b0d0c8242fb2ad47f1fc665533f5957bcb491c2b3c787e4
@@ -417,3 +429,7 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T06:54:43.236364+00:00
+  actor: claude
+  changes:
+  - field: comment_added

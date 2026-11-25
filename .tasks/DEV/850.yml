@@ -1,11 +1,11 @@
 title: Design inline transcript review on the ticket timeline
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Research
 reporter: codex
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-26T03:32:05.952077+00:00
+modified: 2026-11-26T06:51:45.508328+00:00
 relationships:
   related:
   - DEV-849
@@ -107,6 +107,30 @@ comments:
     - T3 tool calls (lines 72–81): checked against the sources. The harnessmux README says 0.3.0 sends T3 tool calls (lines 132, 172, 196). The 0.2.0 `backend/t3.rs` reads the activity only for a failed run's errors. `v0.15.6` `Cargo.lock` links harnessmux `0.2.0`. `lotar-95e687-DEV-849-fix.events.jsonl` has 0 `tool.*` events.
     - The write-up says a log written by 0.3.0 is not verified; that is stated honestly.
     - Facts carry links. It ends with one recommendation, its cost and one open choice.
+- date: 2026-11-26T06:51:45.307610+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-850` is in `main`.
+
+    - Rebased `agent/DEV-850` onto `main` (`0e78bed6b7b0`): `78c91182ead8`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `78c91182ead8`
+    - Amended the pending `.tasks` changes into the merged commit: `d03a0d4089c3`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: d03a0d408
+      what: DEV-850 Design inline transcript review on the ticket timeline
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
@@ -130,8 +154,6 @@ description: |-
 tags:
 - agent
 - ui
-- job-paused
-- review-returned
 history:
 - at: 2026-11-24T20:22:36.316999+00:00
   actor: codex
@@ -266,3 +288,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887"]}'
     new: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887","DEV-889"]}'
+- at: 2026-11-26T06:51:45.307610+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:51:45.508328+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+  - field: tags
+    old: agent, ui, job-paused, review-returned
+    new: agent, ui

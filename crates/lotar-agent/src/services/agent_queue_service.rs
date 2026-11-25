@@ -481,9 +481,7 @@ impl AgentQueueService {
     /// `pending` entries (DEV-522). Without a limit in this process's
     /// registry, the configured global limit (DEV-771).
     pub fn queue_stats(tasks_dir: &Path, pending: &[AgentQueueEntry]) -> AgentQueueStats {
-        let mut stats = AgentJobService::queue_stats();
-        stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
-        stats.queued = stats.queued.max(pending.len());
+        let mut stats = combined_stats(AgentJobService::queue_stats(), crate::services::agent_active_jobs::list(tasks_dir).len(), pending.len());
         if stats.max_parallel.is_none() {
             stats.max_parallel = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
                 .ok()
@@ -964,6 +962,16 @@ fn comment_entry_ticket(tasks_dir: &Path, entry: &AgentQueueEntry, text: &str) -
 
 fn same_entry(a: &AgentQueueEntry, b: &AgentQueueEntry) -> bool {
     a.ticket_id == b.ticket_id && a.agent == b.agent && a.runner == b.runner
+}
+
+/// This process's counts with the job records of every process and the queue
+/// file's tickets. The records include this process's running jobs, so the
+/// larger count wins; its queued jobs left the queue file when they started,
+/// so the two queued counts add up (DEV-865).
+fn combined_stats(mut own: AgentQueueStats, recorded_running: usize, pending: usize) -> AgentQueueStats {
+    own.running = own.running.max(recorded_running);
+    own.queued += pending;
+    own
 }
 
 /// Drop a taken entry, once its job is registered or it is given up, and
@@ -1712,6 +1720,17 @@ mod tests {
         let reason = AgentQueueService::slot_wait_reason(&tasks_dir, "GLA-2", running[..1].to_vec()).unwrap();
         assert_eq!(reason.as_deref(), Some("waiting for a free slot (1 of GLA's agent.worktree.max_parallel_jobs 1 running)"));
         assert_eq!(AgentQueueService::slot_wait_reason(&tasks_dir, "GLB-3", running[..1].to_vec()).unwrap(), None);
+    }
+
+    /// DEV-865: this process's queued jobs and the queue file's tickets are
+    /// different jobs, so Queued adds them; running jobs are in both counts.
+    #[test]
+    fn queued_adds_this_process_jobs_to_the_queue_file_tickets() {
+        let own = AgentQueueStats { running: 1, queued: 1, max_parallel: Some(2) };
+        let stats = combined_stats(own, 2, 3);
+        assert_eq!((stats.running, stats.queued, stats.max_parallel), (2, 4, Some(2)));
+        let stats = combined_stats(AgentQueueStats { running: 2, queued: 0, max_parallel: None }, 1, 0);
+        assert_eq!((stats.running, stats.queued), (2, 0));
     }
 
     /// DEV-771: each waiting entry says what it waits for, in the order the

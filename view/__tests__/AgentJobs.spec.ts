@@ -1282,8 +1282,8 @@ describe('AgentJobs setup when no agents exist', () => {
 describe('AgentJobs queue of every process (DEV-771)', () => {
     it('lists the waiting tickets in queue order with what they wait for', async () => {
         ;(api.listAgentJobs as any).mockResolvedValue({
-            jobs: [runningJob],
-            queue_stats: { running: 2, queued: 3, max_parallel: 2 },
+            jobs: [runningJob, queuedJob],
+            queue_stats: { running: 2, queued: 4, max_parallel: 2 },
             queue: {
                 worker_state: 'active',
                 reason: 'waiting for a free slot (2 of the global agent.worktree.max_parallel_jobs 2 running)',
@@ -1319,9 +1319,10 @@ describe('AgentJobs queue of every process (DEV-771)', () => {
         })
         const wrapper = await mountAgentJobs()
         try {
-            expect(wrapper.find('.queue-stats-card').text()).toContain('3 Queued')
+            // DEV-865: 1 queued job and 3 waiting tickets; the job waiting for prerequisites doesn't count.
+            expect(wrapper.find('.queue-stats-card').text()).toContain('4 Queued')
             const queuedTab = wrapper.findAll('.filter-tab').find((tab) => tab.text().startsWith('Queued'))!
-            expect(queuedTab.find('.tab-count').text()).toBe('3')
+            expect(queuedTab.find('.tab-count').text()).toBe('4')
             const entries = wrapper.findAll('[data-testid="agent-queue-entry"]')
             expect(entries.map((entry) => entry.find('.chip').text())).toEqual(['DEV-7', 'DEV-3', 'DEV-4'])
             expect(entries[0]!.text()).toContain('@fix')
