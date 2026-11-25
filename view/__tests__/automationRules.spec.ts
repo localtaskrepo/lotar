@@ -116,6 +116,32 @@ describe('automationRules utilities', () => {
         expect(describeConditions(rule.when).items).toEqual(['job error matches /rate limit/'])
     })
 
+    it('keeps question comments yaml-only and names the question', () => {
+        const rule = {
+            name: 'Ask',
+            on: {
+                created: {
+                    comment: {
+                        text: 'What next for ${{ticket.id}}?',
+                        question: {
+                            options: [
+                                { key: 'close', label: 'Close it', set: { status: 'Done' } },
+                                { key: 'keep', label: 'Keep' },
+                            ],
+                        },
+                    },
+                },
+            },
+        }
+        const state = getEditableRuleState(rule)
+
+        expect(state.editable).toBe(false)
+        expect(state.unsupportedReasons).toEqual(['Task created: comments with a question are currently YAML-only.'])
+        expect(summarizeAutomationRule(rule).actions.join(' ')).toContain('ask: What next for ${{ticket.id}}?')
+        expect(describeActionSteps(rule.on.created)).toEqual(['ask “What next for ${{ticket.id}}?” (close, keep)'])
+        expect(getEditableRuleState({ name: 'Plain', on: { created: { comment: 'hi' } } }).editable).toBe(true)
+    })
+
     it('describes tell_agent actions and keeps them yaml-only', () => {
         const rule = {
             name: 'Comments reach the agent',

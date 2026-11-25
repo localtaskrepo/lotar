@@ -283,8 +283,9 @@ pub struct AutomationAction {
     pub remove: Option<AutomationTagAction>,
     #[serde(default)]
     pub run: Option<AutomationRunAction>,
+    /// A plain comment, or a question with options (DEV-852).
     #[serde(default)]
-    pub comment: Option<String>,
+    pub comment: Option<AutomationComment>,
     /// Settings for the agent job this action starts by assigning the
     /// ticket to an agent profile.
     #[serde(default)]
@@ -356,6 +357,56 @@ pub struct AutomationRunCommand {
 
 fn default_wait() -> bool {
     true
+}
+
+/// A `comment` action: the text alone, or a map with the text and the
+/// question it asks (DEV-852), the fields `lotar comment --question` writes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum AutomationComment {
+    Text(String),
+    Map(AutomationCommentMap),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct AutomationCommentMap {
+    /// The comment, or the question itself; takes `${{...}}` templates.
+    #[serde(default)]
+    pub text: String,
+    /// Options to answer with; their labels take `${{...}}` templates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub question: Option<crate::types::CommentQuestion>,
+    /// Keys this version does not know; validation refuses them.
+    #[serde(flatten, default)]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+impl From<String> for AutomationComment {
+    fn from(text: String) -> Self {
+        Self::Text(text)
+    }
+}
+
+impl From<&str> for AutomationComment {
+    fn from(text: &str) -> Self {
+        Self::Text(text.to_string())
+    }
+}
+
+impl AutomationComment {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::Text(text) => text,
+            Self::Map(map) => &map.text,
+        }
+    }
+
+    pub fn question(&self) -> Option<&crate::types::CommentQuestion> {
+        match self {
+            Self::Text(_) => None,
+            Self::Map(map) => map.question.as_ref(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

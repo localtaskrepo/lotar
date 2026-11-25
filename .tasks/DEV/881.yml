@@ -1,10 +1,50 @@
 title: 'Status feed: a small standard endpoint with each instance''s running jobs, queue and who it waits on'
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T21:43:44.403743+00:00
+modified: 2026-11-26T02:07:06.711209+00:00
+comments:
+- date: 2026-11-26T02:07:06.711209+00:00
+  author: claude
+  text: |-
+    Added `GET /api/status`: one small, versioned JSON document per instance, with every link absolute.
+
+    - `version: 1`, `instance` (`ui.name`, else the repo folder; `url` = `server.public_url`, else `http://<Host>`), `generated_at`
+    - `running`: jobs from this process's memory and the other processes' job records, with ticket, title, profile, started, `job_url` (`/agents?job=<id>`), `ticket_url`
+    - `queue`: `count`, `held` + `held_reason` (memory hold or paused queue), and entries in start order as `lotar agent queue` lists them (ticket, profile, queued_at, waits_for)
+    - `waiting`: HelpNeeded/Blocked tickets with assignee, `since` (when they got that status) and link
+    - Cheap: the waiting list is read in full once, then kept current ticket by ticket from the task events (the server's own writes and the file watcher). A full read happens again only after a project/config change or every 15 min. Code is in `crates/lotar-lib/src/services/status_feed.rs`
+    - Docs: `docs/openapi.json` (`StatusFeed` schemas), `docs/help/serve.md#status-feed`, `api-quick-reference.md`, `view/api/types.ts`
+    - Test: `crates/lotar-lib/tests/dev881_status_feed_test.rs` covers a running job, a memory-held queue, a HelpNeeded ticket and a Blocked ticket announced by an event
+    - Staff connector on the same Mac: `GET http://localhost:<port>/api/status`, server-side. It needs no auth, as for the other endpoints. It must not send a browser `Origin` from another site.
+    - No UI, no aggregation in lotar
+  report:
+    commits:
+    - hash: 7e1d92369
+      what: GET /api/status status feed, docs, tests
+    checks:
+    - command: cargo nextest run --test integration -E 'test(dev881) | test(openapi) | test(dev771) | test(contract)'
+      result: passed
+      reason: 74 tests
+    - command: cargo clippy -p lotar-lib -p lotar-core --all-targets
+      result: passed
+    - command: rustfmt + prettier --check on changed files
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full gates (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full gates (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change; the merge runs it
+    next: Review, then merge; then the staff aggregator page can read the feed
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85ab6982e8b10a529998e720ae87709922febb25e5570efd75bed6f19ac4f22d
 description: |-
   Owner by voice 2026-11-25 13:40 PST (as the voice assistant relayed it): "Status overview: each lotar instance exposes a small standard status feed (running jobs, queue, waiting on whom) without knowing about other instances; a thin aggregator, starting as a page in the staff app, reads all the feeds and links into each instance's UI. No pluggable lotar UI for now." And: "File the lotar status feed endpoint as the first step."
 
@@ -18,3 +58,19 @@ description: |-
   - [ ] Access as the other API endpoints; say in the hand-off how the staff connector on the same Mac should reach it.
   - [ ] Tests cover an instance with running jobs, a held queue and a HelpNeeded ticket.
   - [ ] No pluggable UI, no aggregation in lotar (owner: "No pluggable lotar UI for now").
+history:
+- at: 2026-11-26T01:58:01.994735+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:58:02.559283+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85ab6982e8b10a529998e720ae87709922febb25e5570efd75bed6f19ac4f22d
+- at: 2026-11-26T02:07:06.711209+00:00
+  actor: claude
+  changes:
+  - field: comment_added

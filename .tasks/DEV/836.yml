@@ -1,11 +1,10 @@
 title: 'T3''s usage-limit resume restarts every paused job thread of one ticket at once: 10 on STD-328 in one worktree'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-fable'
 created: 2026-11-24T16:20:40.092908+00:00
-modified: 2026-11-26T01:25:45.666218+00:00
+modified: 2026-11-26T01:55:59.009855+00:00
 relationships:
   related:
   - DEV-626
@@ -179,15 +178,38 @@ comments:
     choice:
     - fix-fable
     note: (answered in INBOX-720)
+- date: 2026-11-26T01:55:53.087206+00:00
+  author: claude
+  text: |-
+    Nothing left to fix: the fix is already in `main` (`1d3c89bce`, merged without an agent on 2026-11-25 14:39 UTC, before the answer "fix-fable").
+
+    - The branch commit `9b48e4ed6` and `1d3c89bce` differ only in `.tasks` files, so there is nothing more to commit or merge.
+    - The ticket's check passes: no STD-328 thread runs, all 14 are settled.
+    - The second review never ran (it stalled twice), so I read the queued-job fix in `resumed.rs` `on_ticket` myself: the newest thread is left for the queued job, the others are stopped, and a Blocked ticket has all stopped. It matches the review's finding.
+    - Not live yet: the installed `lotar` 0.15.6 (`/opt/homebrew/Cellar/lotar/0.15.6`, built 2026-11-22) still has the old "takes over only one per ticket" code. `main` is 56 commits past `v0.15.6`. The fix works from the next release on.
+  report:
+    checks:
+    - command: t3_thread_list titleContains STD-328
+      result: passed
+      reason: 14 threads, none running, all settled
+    - command: git diff 9b48e4ed6 1d3c89bce
+      result: passed
+      reason: only .tasks files differ
+    - command: cargo nextest / npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: no file changed; the merge ran lint:agent, test:agent and smoke on this code
+    - command: live limit reset on the fixed build
+      result: not_run
+      reason: the installed lotar 0.15.6 predates the fix
+    next: Release lotar so the worker runs the fix; after the next limit reset, check that one thread per ticket runs
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70c52b10bd13cd0459d347c14d4325819b5792c1a6b83f2c2d377cbd62bc0e5d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6e1b6cd8ad7b5209381a5abaeda94bee06a34b3812d95b9f2cf16bf0f890292f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8531e9e9d417d7977cb5f76d8825ae085b657f2f319c5f848681dde63055ddb
 description: 'Found: on 2026-11-24 at 16:00 UTC, T3 Code''s limit-resume message (''Continue where you left off.'') restarted 10 STD-328 fix threads from jobs filed hourly on 2026-11-23 (07:51 to 18:30). All of them run Opus in /Users/mallox/Development/.lotar-worktrees/standards/STD-328, with no lotar job (lotar agent list-jobs shows only failed jobs). lotar commented ''Stop it in T3 Code'', but nobody acts on that, and the threads would race on one worktree and on its dependency updates. DEV-626 (Done) covered resume after a restart, not resume after a limit. Check: t3_thread_list titleContains STD-328 shows several threads running at once. Done when a limit resume runs at most one thread per ticket (the newest tracked job, or none while the ticket is Blocked), and lotar''s job retries don''t leave a T3 thread behind that T3 can resume later.'
 tags:
 - health
-- job-paused
-- review-returned
 custom_fields:
   finding: duplicate-threads:limit-resume
 history:
@@ -391,3 +413,32 @@ history:
   - field: relationships
     old: '{"related":["DEV-626","DEV-835","DEV-769","DEV-800","DEV-810","DEV-811"]}'
     new: '{"related":["DEV-626","DEV-835","DEV-769","DEV-800","DEV-810","DEV-811","DEV-876"]}'
+- at: 2026-11-26T01:55:05.760426+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T01:55:06.321555+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8531e9e9d417d7977cb5f76d8825ae085b657f2f319c5f848681dde63055ddb
+- at: 2026-11-26T01:55:53.087206+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:55:58.633337+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-fable'
+- at: 2026-11-26T01:55:59.009855+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, job-paused, review-returned
+    new: health

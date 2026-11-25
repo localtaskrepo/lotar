@@ -23,6 +23,7 @@ const WALL_CLOCK_SPECS = [
     'tests/ui.dialogs.smoke.spec.ts',
     'tests/ui.filter-autocomplete.smoke.spec.ts',
     'tests/ui.panel-safety.smoke.spec.ts',
+    'tests/ui.relationships.smoke.spec.ts',
     'tests/ui.sort-export.smoke.spec.ts',
     'tests/ui.sprints-responsive.smoke.spec.ts',
     'tests/ui.sync-scope.smoke.spec.ts',

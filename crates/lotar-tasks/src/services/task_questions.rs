@@ -97,6 +97,19 @@ impl TaskService {
     /// Add a question comment: `prompt` is the question; the stored text
     /// adds the options in prose.
     pub fn ask_question(storage: &mut Storage, id: &str, prompt: &str, question: CommentQuestion) -> LoTaRResult<TaskDTO> {
+        Self::ask_question_with_context(storage, id, prompt, question, CommentContext::default())
+    }
+
+    /// `ask_question` with the author and `on.commented` dispatch of
+    /// `context`, as an automation rule asks (DEV-852).
+    pub fn ask_question_with_context(
+        storage: &mut Storage,
+        id: &str,
+        prompt: &str,
+        question: CommentQuestion,
+        context: CommentContext,
+    ) -> LoTaRResult<TaskDTO> {
+        let fire_commented = context.fire_commented;
         let prompt = prompt.trim();
         if prompt.is_empty() {
             return Err(LoTaRError::ValidationError("the question needs its text".to_string()));
@@ -105,13 +118,13 @@ impl TaskService {
         let config =
             crate::config::resolution::config_for_project(&storage.root_path, Some(&project)).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
         let question = validate_question(question, &config)?;
-        let pushed = Self::push_comment(storage, id, CommentContext::default(), |_, now, actor| {
+        let pushed = Self::push_comment(storage, id, context, |_, now, actor| {
             let text = crate::services::task_service::strip_author_prefix(prompt, actor.as_deref())?;
             let mut comment = TaskComment::new(now, actor, question_text(text, &question));
             comment.question = Some(question);
             Ok(comment)
         })?;
-        Ok(Self::finish_comment(storage, pushed, true))
+        Ok(Self::finish_comment(storage, pushed, fire_commented))
     }
 
     /// Publish the answer and option fields together, then fire comment rules.

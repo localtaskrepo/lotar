@@ -226,6 +226,14 @@ export function describeActionSteps(action: unknown): string[] {
         }
     }
     if (typeof record.comment === 'string' && record.comment.trim()) steps.push(`comment ${quote(record.comment)}`)
+    else if (record.comment && typeof record.comment === 'object') {
+        const comment = record.comment as AutomationRecord
+        const text = typeof comment.text === 'string' ? comment.text : ''
+        const question = comment.question as AutomationRecord | undefined
+        const options = Array.isArray(question?.options) ? (question.options as AutomationRecord[]) : []
+        if (question) steps.push(`ask ${quote(text)} (${options.map((option) => option.key).join(', ')})`)
+        else if (text.trim()) steps.push(`comment ${quote(text)}`)
+    }
     if (record.run) {
         if (typeof record.run === 'string') steps.push(`run ${quote(record.run, 40)}`)
         else if (typeof record.run === 'object') {

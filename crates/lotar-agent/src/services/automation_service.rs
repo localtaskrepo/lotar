@@ -1,7 +1,9 @@
 use crate::api_types::{AgentJobCreateRequest, TaskDTO, TaskUpdate};
 use crate::automation::persistence as automation_persistence;
 use crate::automation::template::{Prerequisite, TemplateContext};
-use crate::automation::types::{AutomationAction, AutomationActionSet, AutomationFile, AutomationRule, AutomationRunAction, AutomationTagAction, StringOrVec};
+use crate::automation::types::{
+    AutomationAction, AutomationActionSet, AutomationComment, AutomationFile, AutomationRule, AutomationRunAction, AutomationTagAction, StringOrVec,
+};
 use crate::config::trust::{SkippedRun, TrustService};
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::ValidationResult;
@@ -350,6 +352,20 @@ impl AutomationService {
         let effective_yaml = automation_persistence::to_canonical_yaml(&effective)?;
 
         Ok(AutomationInspectResult { scope, source, scope_exists, scope_yaml, effective_yaml })
+    }
+
+    /// Check the automation file of a scope (the project's, else the
+    /// repository's) as saving it would; `None` when there is no file.
+    pub fn validate_scope(tasks_dir: &Path, project: Option<&str>) -> LoTaRResult<Option<ValidationResult>> {
+        let file = match project {
+            Some(prefix) => automation_persistence::load_project_automation(tasks_dir, prefix)?,
+            None => automation_persistence::load_global_automation(tasks_dir)?,
+        };
+        let Some(file) = file else {
+            return Ok(None);
+        };
+        let config = resolve_config_for_project(tasks_dir, project)?;
+        Ok(Some(validate_rules(&file, &config)))
     }
 
     pub fn set(tasks_dir: &Path, project: Option<&str>, yaml: &str) -> LoTaRResult<AutomationSetOutcome> {
@@ -1260,7 +1276,14 @@ fn describe_action(
     }
 
     if let Some(comment) = action.comment.as_ref() {
-        actions.push(SimulatedAction { action: "add_comment".to_string(), description: format!("Add comment: {}", preview.expand(comment)) });
+        let (text, question) = expand_comment(comment, |raw| preview.expand(raw));
+        actions.push(match question {
+            Some(question) => SimulatedAction {
+                action: "ask_question".to_string(),
+                description: format!("Ask: {}", crate::services::task_questions::question_text(&text, &question)),
+            },
+            None => SimulatedAction { action: "add_comment".to_string(), description: format!("Add comment: {text}") },
+        });
     }
 
     if let Some(tell) = action.tell_agent.as_ref() {
@@ -2655,10 +2678,15 @@ fn apply_action(
 
     let task_for_env = next_task.as_ref().unwrap_or(&base);
 
-    if let Some(comment_template) = action.comment.as_ref() {
-        let text = tmpl.expand(comment_template);
+    if let Some(comment) = action.comment.as_ref() {
+        let (text, question) = expand_comment(comment, |raw| tmpl.expand(raw));
         if !text.trim().is_empty() {
-            append_automation_comment(storage, &current.id, &text)?;
+            match question {
+                Some(question) => {
+                    TaskService::ask_question_with_context(storage, &current.id, &text, question, CommentContext::automation())?;
+                }
+                None => append_automation_comment(storage, &current.id, &text)?,
+            }
         }
     }
 
@@ -3045,6 +3073,19 @@ fn apply_sprint_action(storage: &mut Storage, task_id: &str, sprint_ref: &str, a
 /// by the automation comment action). The comment is recorded under the
 /// `automation` actor and never re-dispatches `on.commented` rules, so
 /// comment actions cannot recurse.
+/// A comment action's text and question with their `${{...}}` templates
+/// filled in: the text and each option's label (DEV-852).
+fn expand_comment(comment: &AutomationComment, mut expand: impl FnMut(&str) -> String) -> (String, Option<crate::types::CommentQuestion>) {
+    let text = expand(comment.text());
+    let question = comment.question().cloned().map(|mut question| {
+        for option in &mut question.options {
+            option.label = expand(&option.label);
+        }
+        question
+    });
+    (text, question)
+}
+
 fn append_automation_comment(storage: &mut Storage, task_id: &str, text: &str) -> LoTaRResult<()> {
     TaskService::add_comment_with_context(storage, task_id, text, CommentContext::automation()).map(|_| ())
 }

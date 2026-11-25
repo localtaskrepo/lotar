@@ -1,11 +1,11 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-26T01:41:22.512265+00:00
+modified: 2026-11-26T02:06:36.906843+00:00
 relationships:
   blocks:
   - DEV-801
@@ -148,6 +148,47 @@ comments:
 - date: 2026-11-25T20:38:49.983961+00:00
   author: mallox
   text: 'Answer: fold (Rework DEV-797 on DEV-784''s socket lock: add only the merge-agent hold, hand-off and wait comment; drop checks_lock.rs) (answered in INBOX-730)'
+- date: 2026-11-26T02:06:23.547836+00:00
+  author: claude
+  text: |-
+    Folded onto DEV-784's socket lock as decided (INBOX-730). `checks_lock.rs` is gone; rebased on `main`, now `164c930dd` (was `3c444f069`).
+
+    - **Hand-off keeps the lock:** in `merge.rs`, the lock taken for a round's checks now lives on the merge. A check that fails twice hands off with it (`Outcome::HandOff(summary, lock)`), and the merge agent keeps it until the job ends. After the checks the lock is still freed, as in DEV-784.
+    - **Merge agent takes it:** in `run_job`, a merge agent with no lock yet waits for it on port 47586, in any repo, and holds it until the job ends. This happens before the agent starts, so the wait is no stall.
+    - **No self-deadlock:** a merge agent that holds the lock gets `LOTAR_CHECK_LOCK_HELD=1` in its environment. Its prompt also gets a "Check lock" note to run checks with it, because a T3 thread doesn't get the job's environment.
+    - **Wait comment:** lotar's merge comment says `Waited <N> for the machine's check lock, held by <holder>`. A merge agent comments the same, ending `; the merge agent starts now.`, or that it starts without the lock.
+    - **Cancel:** `lotar agent cancel` from another process ends the wait (`wait_cancelled` in `agent_job_service.rs`), in both paths.
+    - `LOTAR_CHECK_LOCK_PORT` moves the lock to another port, in lotar and `scripts/check-lock.mjs`, so the tests hold their own lock and never the machine's.
+    - Tests in `dev797_one_merge_checks_at_a_time_test.rs`:
+      - lotar's merge waits for another holder.
+      - A merge agent waits, holds the lock while it runs and sees `held=1`.
+      - A hand-off from the checks keeps the lock.
+      - A cancel from another process ends the wait.
+    - Updated `docs/help/agent.md` (new section "Merge checks, once and one at a time"). Dropped the unrelated Prettier changes to `AGENTS.md`.
+    - Note: dev605 tests timed out once when run without `LOTAR_CHECK_LOCK_HELD=1`: they then wait for the machine's real lock. They passed when run the way the test runner runs them.
+  report:
+    commits:
+    - hash: 164c930dd
+      what: DEV-797 folded onto DEV-784's socket lock, rebased on main
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: LOTAR_CHECK_LOCK_HELD=1 cargo nextest run -p lotar-lib --test integration -E 'test(dev797) or test(dev605) or test(dev783)'
+      result: passed
+      reason: 25 passed
+    - command: cargo nextest run -p lotar-agent check_lock merge
+      result: passed
+      reason: 12 passed
+    - command: node --test scripts/tests/check-lock.test.mjs
+      result: passed
+      reason: 5 passed
+    - command: npm run test:agent
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'Merge: rebased on main already, no conflicts expected'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
@@ -421,3 +462,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa00fe7bc5eb2894b055779cd369595cb28dabc9e9c397115b41d9f6674492e0a
+- at: 2026-11-26T02:06:23.547836+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:06:36.906843+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

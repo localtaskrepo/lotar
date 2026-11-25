@@ -1,11 +1,11 @@
 title: 'Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-25T20:38:59.135275+00:00
+modified: 2026-11-26T01:55:01.102120+00:00
 relationships:
   related:
   - DEV-464
@@ -185,9 +185,43 @@ comments:
 - date: 2026-11-25T20:38:57.345760+00:00
   author: mallox
   text: 'Answer: hold (Hold until the task-view race is understood) (answered in INBOX-729)'
+- date: 2026-11-26T01:54:52.975870+00:00
+  author: claude
+  text: |-
+    Task-view race understood and fixed: the test measured while the panel's open animation was still at its start. It's a test race, not caused by this branch's code.
+
+    - The overlay opens from `translateX(40px)` (`task-panel-enter-from` in `view/components/TaskPanel.vue`). Vue holds that start for two animation frames before the transition runs.
+    - In those frames the toggle doesn't move, so Playwright's click goes through. The large view then measures 40 px right of center: |left − right| = 80, the exact failure.
+    - Reproduced with animation frames delayed 400 ms: `expected 80 to be less than 4`, 2 of 2 runs. On a busy runner frames slow the same way. This branch's extra release reload on page load adds work then, which likely made the window more frequent, not the cause.
+    - Fix in `smoke/tests/ui.task-view.smoke.spec.ts`: after the toggle shows, wait until the overlay has no `task-panel-enter*` class and no running transition, then measure.
+    - Amended into the ticket's commit: `0079a1677`.
+  report:
+    commits:
+    - hash: 0079a1677
+      what: task-view smoke waits for the panel's open transition (amended into the DEV-799 commit)
+    checks:
+    - command: npx vitest run --config smoke/vitest.config.ts tests/ui.task-view.smoke.spec.ts tests/ui.releases.smoke.spec.ts
+      result: passed
+      reason: 4 of 4 runs
+    - command: task-view test with animation frames delayed 400 ms
+      result: passed
+      reason: failed before the fix 2 of 2 (expected 80 to be less than 4), passed after 2 of 2
+    - command: npx tsc --project smoke/tsconfig.json --noEmit
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: commit hook's oxlint and prettier passed; the merge runs the full lint
+    - command: npm test
+      result: not_run
+      reason: no app code changed; the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suite
+    next: 'Merge: full smoke; ui.relationships plot-height flake stays on DEV-873'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adfb741c2086c10a924409cd5752026c76392856e3a908ac33e047e23a887365e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9da4fd47475753f0b0d0c8242fb2ad47f1fc665533f5957bcb491c2b3c787e4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94bed39cdc4615b0e2f548ba0f25f05d3d79c554a408e5eb530a991d60453735
 description: |-
   Found in Quality Assurance run 45057966596 (attempt 1) on main `78c006d4b`, the v0.15.6 release commit (DEV-725): `tests/ui.releases.smoke.spec.ts` > offers Add to release in the row menu once a release appears (DEV-464) failed at line 125, `expect.poll(() => item.isEnabled())`: the Add to release item did not become enabled in time after the release was created. 1 of 407 smoke tests failed on the GitHub runner, so this is not the local machine's load. DEV-615 fixed an earlier failure of the same test at the release creation step.
 
@@ -359,3 +393,27 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-26T01:49:56.193253+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T01:49:56.758713+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94bed39cdc4615b0e2f548ba0f25f05d3d79c554a408e5eb530a991d60453735
+- at: 2026-11-26T01:54:52.975870+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:55:01.102120+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

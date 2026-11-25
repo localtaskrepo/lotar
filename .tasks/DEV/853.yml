@@ -1,11 +1,11 @@
 title: 'Agent jobs: lotar sets the comment author to the job''s agent name (LOTAR_DEFAULT_REPORTER)'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:03:52.499574+00:00
-modified: 2026-11-26T01:27:20.329228+00:00
+modified: 2026-11-26T01:49:51.558745+00:00
 relationships:
   blocks:
   - DEV-796
@@ -78,6 +78,30 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-853` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-853` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T01:49:43.819624+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `c7d2b1663` is on `main` and `origin/main`.
+
+    - Rebased onto `530c77fd9`. The conflict in `docs/help/agent.md` was main's DEV-849 bullets (Links, Show logs) above the T3 env bullet. I kept both and used the branch's extended env bullet
+    - Checks ran on the rebased commit: `npm ci`, `lint:agent`, `test:agent`, `smoke` (411 tests) all passed
+    - Fast-forwarded the main checkout, then amended the pending `.tasks` changes into the commit (`aeb8e40fe` → `c7d2b1663`)
+    - No rule or profile files changed, so `lotar trust` wasn't needed
+    - Pushed `530c77fd9..c7d2b1663`; nothing unfinished was waiting
+  report:
+    commits:
+    - hash: c7d2b1663
+      what: DEV-853 job's agent name as LOTAR_DEFAULT_REPORTER, rebased onto 530c77fd9
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 411 tests
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6bd9f491ce149b694b17e3c83860a5ec42c3891d300777f4c6d15265cd66607
 description: |-
@@ -269,3 +293,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T01:49:43.819624+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:49:51.558745+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

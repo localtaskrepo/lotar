@@ -261,7 +261,7 @@ on:
 - `set`: any task field (status, assignee, reporter, priority, type, title, description, due_date, effort, tags, custom_fields)
 - `add/remove`: tags/labels, sprint membership (`sprint: <sprint reference or @active>`), release membership (`release: <release ID, version or label, or @next>`; adding keeps the ticket's other releases, an unknown release is skipped), and relationships (`depends_on`, `blocks`, `related`)
 - `run`: execute a command when the action fires
-- `comment`: add a comment to the task
+- `comment`: add a comment to the task, or ask a question with options (see [Asking a question](#asking-a-question))
 - `agent`: `model`, `effort` and `prompt` for the agent job this action starts by assigning the ticket to an agent profile (see below)
 - `tell_agent`: a message for the ticket's agent, queued to its running job or starting the agent (see [Telling the ticket's agent](#telling-the-tickets-agent))
 - `archive`: `true` moves the task into its project's `@archive` folder, `false` brings it back (see `lotar task archive`). It runs after every other part of the action, because archived tasks are read-only. To archive tasks some time after they finish, use a manual rule run from cron (below), or `lotar task archive --select 'status:done -recent:30d'`.
@@ -285,6 +285,33 @@ legacy one-sided data, not only a task's stored `depends_on` array. Missing,
 deleted, or unreadable prerequisites remain unresolved. Each prerequisite is
 evaluated against its own project's done-state policy. Relationship repair is
 maintenance and does not itself request a status change or agent launch.
+
+### Asking a question
+
+`comment` takes the comment's text, or a map with `text` and a `question`. The question has the fields `lotar comment --question` writes ([Questions and answers](./comment.md#questions-and-answers)): `options` (each a `key`, a `label` and an optional `set`), `recommended` (an option's key), `multiple` (several options may be chosen; default `false`) and `other` (a free-text answer is allowed; default `true`). The comment's author is `automation`, as for other rule comments, and it fires no `commented` rules. `lotar list --has question` finds the ticket, and an answer (`lotar comment <ID> --answer <key>`, the web UI) applies the chosen option's `set`: `status`, `assignee`, `reporter`, `priority`, `type`, `due_date`, `effort` or `tags`. A map without `question` writes a plain comment.
+
+`text` and each option's `label` take `${{...}}` templates; keys, `recommended` and the `set` values are taken as written. A `text` that comes out empty writes no comment.
+
+```yaml
+automation:
+  rules:
+    - name: Ask about stale work
+      when:
+        status: InProgress
+        modified: { older_than: 30d }
+      on:
+        manual:
+          comment:
+            text: "${{ticket.id}} hasn't moved for a month. What should happen?"
+            question:
+              options:
+                - { key: close, label: "Close it", set: { status: WontDo } }
+                - { key: keep, label: "Keep it, I'm on it" }
+                - { key: hand, label: "Hand it to ${{ticket.reporter}}", set: { assignee: "@reporter" } }
+              recommended: keep
+```
+
+Saving the rules (web UI, REST) and `lotar config validate` refuse a question without options, a key that isn't letters, digits, `-` or `_`, a key used twice (case doesn't matter), an option without a label, a `recommended` that is no option, a `set` field an answer can't set, an unknown status, priority or type in `set`, an empty `text`, and unknown fields in `comment` or `question`; the message names the rule and the event (`Rule 'Ask about stale work' (manual): comment question: option key 'a' is used twice`). A rule file edited by hand with such a question fails that action when it runs: no comment is written and the error is reported like that of other failed actions. The web rule builder shows a rule with a question as YAML-only, so it is edited in the YAML view. `lotar automation simulate` lists the question with its options (`Ask: ...`).
 
 ### Agent run settings
 
@@ -591,4 +618,4 @@ The preview applies the matched actions the same way a real run would, without w
 
 ## Validation
 
-LoTaR validates status/type/priority values against the project config. Invalid values are skipped at runtime and reported as warnings when saving the automation file.
+LoTaR validates status/type/priority values against the project config. Invalid values are skipped at runtime and reported as warnings when saving the automation file. Saving the file also refuses a [question](#asking-a-question) that can't be asked. `lotar config validate` checks the automation file of the scope it validates (`.tasks/automation.yml` for the global scope, `.tasks/<PREFIX>/automation.yml` with `--project`) the same way.

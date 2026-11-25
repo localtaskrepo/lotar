@@ -96,6 +96,7 @@ lotar config validate [--project=PREFIX] [--global] [--fix] [--errors-only]
 Behavior:
 - With no flags, only the global configuration is validated. Pass `--project=PREFIX` to check a specific project directory, or combine `--global` and `--project` to validate both scopes in one run.
 - `--project` expects the canonical project prefix/folder name.
+- Each scope's automation rules file is checked too, as saving it would (see [Automation validation](./automation.md#validation)).
 - `--errors-only` limits the report to validation errors (warnings stay hidden unless a JSON format consumer inspects them separately).
 - `--fix` is reserved for future automated remediation. Today it only prints guidance when errors are present—you must still edit files manually.
 

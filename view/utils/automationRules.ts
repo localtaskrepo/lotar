@@ -563,8 +563,10 @@ function summarizeAction(action: unknown): string[] {
         }
     }
 
-    if (record.comment) {
-        summary.push(`comment: ${formatValue(record.comment)}`)
+    if (typeof record.comment === 'string' && record.comment) {
+        summary.push(`comment: ${record.comment}`)
+    } else if (isRecord(record.comment)) {
+        summary.push(`${isRecord(record.comment.question) ? 'ask' : 'comment'}: ${formatValue(record.comment.text)}`)
     }
 
     if (isRecord(record.agent)) {
@@ -783,6 +785,10 @@ function collectUnsupportedActionReasons(action: unknown, event: AutomationEvent
                 }
             }
         }
+    }
+
+    if (record.comment !== undefined && typeof record.comment !== 'string') {
+        reasons.push(`${EVENT_LABELS[event]}: comments with a question are currently YAML-only.`)
     }
 
     if (record.run) {

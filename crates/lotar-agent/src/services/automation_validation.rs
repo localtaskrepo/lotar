@@ -1,4 +1,4 @@
-use crate::automation::types::{AutomationAction, AutomationConditionGroup, AutomationFieldCondition, AutomationFile, AutomationRunAction};
+use crate::automation::types::{AutomationAction, AutomationComment, AutomationConditionGroup, AutomationFieldCondition, AutomationFile, AutomationRunAction};
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
 use crate::services::automation_service::{SetEnumField, SetPlan};
@@ -21,7 +21,8 @@ pub(crate) fn parse_cooldown(value: &str) -> Option<Duration> {
 
 pub(crate) fn validate_rules(file: &AutomationFile, config: &ResolvedConfig) -> ValidationResult {
     let mut result = ValidationResult::new();
-    for rule in file.automation.rules() {
+    for (index, rule) in file.automation.rules().iter().enumerate() {
+        let name = rule.name.clone().unwrap_or_else(|| format!("Rule {}", index + 1));
         if let Some(cooldown) = rule.cooldown.as_deref()
             && parse_cooldown(cooldown).is_none()
         {
@@ -34,23 +35,23 @@ pub(crate) fn validate_rules(file: &AutomationFile, config: &ResolvedConfig) -> 
             validate_condition_group(group, config, &mut result);
         }
         // Legacy catch-all
-        validate_action(rule.on.start.as_ref(), config, &mut result);
+        validate_action(rule.on.start.as_ref(), (&name, "start"), config, &mut result);
         // Ticket events
-        validate_action(rule.on.created.as_ref(), config, &mut result);
-        validate_action(rule.on.updated.as_ref(), config, &mut result);
-        validate_action(rule.on.assigned.as_ref(), config, &mut result);
-        validate_action(rule.on.commented.as_ref(), config, &mut result);
-        validate_action(rule.on.sprint_changed.as_ref(), config, &mut result);
-        validate_action(rule.on.release_changed.as_ref(), config, &mut result);
+        validate_action(rule.on.created.as_ref(), (&name, "created"), config, &mut result);
+        validate_action(rule.on.updated.as_ref(), (&name, "updated"), config, &mut result);
+        validate_action(rule.on.assigned.as_ref(), (&name, "assigned"), config, &mut result);
+        validate_action(rule.on.commented.as_ref(), (&name, "commented"), config, &mut result);
+        validate_action(rule.on.sprint_changed.as_ref(), (&name, "sprint_changed"), config, &mut result);
+        validate_action(rule.on.release_changed.as_ref(), (&name, "release_changed"), config, &mut result);
         // Job events
-        validate_action(rule.on.job_started.as_ref(), config, &mut result);
-        validate_action(rule.on.job_completed.as_ref(), config, &mut result);
-        validate_action(rule.on.job_failed.as_ref(), config, &mut result);
-        validate_action(rule.on.job_cancelled.as_ref(), config, &mut result);
-        validate_action(rule.on.job_paused.as_ref(), config, &mut result);
+        validate_action(rule.on.job_started.as_ref(), (&name, "job_started"), config, &mut result);
+        validate_action(rule.on.job_completed.as_ref(), (&name, "job_completed"), config, &mut result);
+        validate_action(rule.on.job_failed.as_ref(), (&name, "job_failed"), config, &mut result);
+        validate_action(rule.on.job_cancelled.as_ref(), (&name, "job_cancelled"), config, &mut result);
+        validate_action(rule.on.job_paused.as_ref(), (&name, "job_paused"), config, &mut result);
         // Started on purpose (DEV-241)
-        validate_action(rule.on.manual.as_ref(), config, &mut result);
-        validate_action(rule.on.unblocked.as_ref(), config, &mut result);
+        validate_action(rule.on.manual.as_ref(), (&name, "manual"), config, &mut result);
+        validate_action(rule.on.unblocked.as_ref(), (&name, "unblocked"), config, &mut result);
     }
     result
 }
@@ -173,7 +174,7 @@ fn validate_condition_value(field: &str, condition: &AutomationFieldCondition, c
     }
 }
 
-fn validate_action(action: Option<&AutomationAction>, config: &ResolvedConfig, result: &mut ValidationResult) {
+fn validate_action(action: Option<&AutomationAction>, (rule, event): (&str, &str), config: &ResolvedConfig, result: &mut ValidationResult) {
     let Some(action) = action else {
         return;
     };
@@ -199,6 +200,12 @@ fn validate_action(action: Option<&AutomationAction>, config: &ResolvedConfig, r
         }
     }
 
+    if let Some(comment) = action.comment.as_ref() {
+        for message in comment_problems(comment, config) {
+            result.add_error(ValidationError::error(Some("automation".to_string()), format!("Rule '{rule}' ({event}): {message}")));
+        }
+    }
+
     if let Some(tell) = action.tell_agent.as_ref() {
         if tell.message.trim().is_empty() {
             result.add_error(ValidationError::error(Some("automation".to_string()), "tell_agent needs a message.".to_string()));
@@ -209,6 +216,28 @@ fn validate_action(action: Option<&AutomationAction>, config: &ResolvedConfig, r
             result.add_error(ValidationError::warning(Some("automation".to_string()), format!("tell_agent names unknown agent profile '{agent}'.")));
         }
     }
+}
+
+/// What is wrong with a comment action's map form (DEV-852): unknown keys,
+/// no text, or a question `lotar comment --question` would refuse.
+fn comment_problems(comment: &AutomationComment, config: &ResolvedConfig) -> Vec<String> {
+    let AutomationComment::Map(map) = comment else {
+        return Vec::new();
+    };
+    let mut problems: Vec<String> = map.extra.keys().map(|key| format!("unknown comment field '{key}' (expected text, question)")).collect();
+    if map.text.trim().is_empty() {
+        problems.push(if map.question.is_some() { "the comment's question needs its text" } else { "the comment needs its text" }.to_string());
+    }
+    if let Some(question) = map.question.clone()
+        && let Err(err) = crate::services::task_questions::validate_question(question, config)
+    {
+        let message = match err {
+            crate::errors::LoTaRError::ValidationError(message) => message,
+            other => other.to_string(),
+        };
+        problems.push(format!("comment question: {message}"));
+    }
+    problems
 }
 
 #[cfg(test)]
@@ -250,6 +279,33 @@ mod tests {
         let result = validate("automation:\n  rules:\n    - on:\n        commented:\n          tell_agent: { message: ' ', agent: nobody }\n");
         assert!(result.errors.iter().any(|error| error.to_string().contains("tell_agent needs a message")), "{:?}", result.errors);
         assert!(result.warnings.iter().any(|error| error.to_string().contains("unknown agent profile 'nobody'")), "{:?}", result.warnings);
+    }
+
+    /// DEV-852: a comment's question is checked as `lotar comment
+    /// --question` checks it, and the message names the rule.
+    #[test]
+    fn checks_comment_questions() {
+        let errors = |comment: &str| {
+            let yaml = format!("automation:\n  rules:\n    - name: Ask\n      on:\n        updated:\n          comment: {comment}\n");
+            validate(&yaml).errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n")
+        };
+        let ok = errors("{ text: Pick, question: { options: [{ key: a, label: 'A ${{ticket.id}}', set: { status: Done } }], recommended: A } }");
+        assert!(ok.is_empty(), "{ok}");
+        assert!(errors("plain text").is_empty());
+        for (comment, expected) in [
+            ("{ text: Pick, question: { options: [] } }", "Rule 'Ask' (updated): comment question: a question needs at least one option"),
+            ("{ text: Pick, question: { options: [{ key: a, label: A }, { key: A, label: B }] } }", "option key 'A' is used twice"),
+            ("{ text: Pick, question: { options: [{ key: 'a b', label: A }] } }", "option key 'a b' must be"),
+            ("{ text: Pick, question: { options: [{ key: a, label: ' ' }] } }", "option 'a' needs a label"),
+            ("{ text: Pick, question: { options: [{ key: a, label: A }], recommended: b } }", "recommended 'b' is not one of the options"),
+            ("{ text: Pick, question: { options: [{ key: a, label: A, set: { title: x } }] } }", "set: cannot change 'title'"),
+            ("{ text: Pick, question: { options: [{ key: a, label: A }], multi: true } }", "unknown question field 'multi'"),
+            ("{ text: ' ', question: { options: [{ key: a, label: A }] } }", "the comment's question needs its text"),
+            ("{ txt: Pick }", "unknown comment field 'txt'"),
+        ] {
+            let found = errors(comment);
+            assert!(found.contains(expected), "{comment}: {found}");
+        }
     }
 
     #[test]

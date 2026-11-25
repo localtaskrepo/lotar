@@ -8,7 +8,7 @@ impl ConfigHandler {
     pub(super) fn handle_config_validate(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
-        project: Option<String>,
+        project: Option<&str>,
         global: bool,
         fix: bool,
         errors_only: bool,
@@ -56,7 +56,7 @@ impl ConfigHandler {
             }
         }
 
-        if let Some(project_name) = project {
+        if let Some(project_name) = project.map(str::to_string) {
             let project_display_name = crate::utils::project::project_display_name_from_config(&resolver.path, &project_name);
             let project_label = crate::utils::project::format_project_label(&project_name, project_display_name.as_deref());
             renderer.emit_info(format_args!("Validating project configuration for '{}'", project_label));
@@ -110,6 +110,31 @@ impl ConfigHandler {
             } else {
                 renderer.emit_error(format_args!("Project config file not found: {}", project_config_path.display()));
                 has_errors = true;
+            }
+        }
+
+        // The automation rules of the same scopes (DEV-852).
+        let mut automation_scopes: Vec<Option<&str>> = Vec::new();
+        if global || project.is_none() {
+            automation_scopes.push(None);
+        }
+        if let Some(prefix) = project {
+            automation_scopes.push(Some(prefix));
+        }
+        for automation_scope in automation_scopes {
+            let label = automation_scope.map_or_else(|| "Automation (global)".to_string(), |prefix| format!("Automation ({prefix})"));
+            match crate::services::automation_service::AutomationService::validate_scope(&resolver.path, automation_scope) {
+                Ok(None) => {}
+                Ok(Some(result)) if result.has_errors() || result.has_warnings() => {
+                    has_errors |= result.has_errors();
+                    let scope = automation_scope.map_or(ValidationScope::Global, |prefix| ValidationScope::Project(prefix.to_string()));
+                    all_results.push((scope, label, result));
+                }
+                Ok(Some(_)) => renderer.emit_success(format_args!("{label} rules are valid")),
+                Err(e) => {
+                    renderer.emit_error(format_args!("{label}: could not read the rules: {e}"));
+                    has_errors = true;
+                }
             }
         }
 

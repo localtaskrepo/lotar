@@ -29,7 +29,7 @@ impl CommandHandler for ConfigHandler {
             }
             ConfigAction::Init(args) => Self::handle_config_init(resolver, renderer, args.as_ref()),
             ConfigAction::Validate(ConfigValidateArgs { project, global, fix, errors_only }) => {
-                Self::handle_config_validate(resolver, renderer, project, global, fix, errors_only)
+                Self::handle_config_validate(resolver, renderer, project.as_deref(), global, fix, errors_only)
             }
             ConfigAction::Templates => {
                 renderer.emit_success("Available Workflow Presets:");
