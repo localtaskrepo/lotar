@@ -1,11 +1,11 @@
 title: 'A relative --tasks-dir (.tasks) gives every repo the same agent queue file: DEV and STD tickets wait in it with no worker'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T01:01:39.223004+00:00
-modified: 2026-11-26T19:16:45.814340+00:00
+modified: 2026-11-26T19:32:47.927398+00:00
 relationships:
   related:
   - DEV-865
@@ -20,6 +20,12 @@ relationships:
   - DEV-837
   - TEST-1
   - DEV-897
+  - DEV-804
+  - DEV-882
+  - DEV-883
+  - DEV-878
+  - DEV-860
+  - DEV-786
 comments:
 - date: 2026-11-26T04:58:34.505827+00:00
   author: claude
@@ -110,6 +116,30 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T19:17:16.058521+00:00
+  author: claude
+  text: |-
+    Merged on local `main` as `0cf94860d`. Not pushed yet: local `main` and `origin/main` have diverged.
+
+    - lotar's merge fast-forwarded `main` to `059b337b4` and amended `.tasks` into it. I amended the newer `.tasks/DEV/887.yml` changes as well: `0cf94860d`. The main checkout is clean.
+    - Checks: lint, `test:agent` and smoke passed in lotar's merge on `059b337b4`. I didn't rerun them.
+    - No rules or agent profiles changed, so no `lotar trust` was needed.
+    - Not pushed: `origin/main` has the release commit `71791a991` (DEV-804 v0.15.7), which local `main` lacks, so local `main` is 9 commits ahead and 1 behind. The owner already approved rebasing local `main` onto `origin/main` and pushing; that is queued on DEV-882 and DEV-883 (Todo, @fix). A merge job doesn't rewrite the main checkout, so DEV-887 gets pushed with that rebase.
+  report:
+    commits:
+    - hash: 0cf94860d
+      what: DEV-887 fix plus the pending .tasks changes, on local main
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge, on 059b337b4
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge, on 059b337b4
+    - command: npm run -s smoke
+      result: passed
+      reason: lotar's merge, on 059b337b4
+    next: Push waits for the DEV-882/DEV-883 rebase of local main onto origin/main (owner-approved, queued for @fix)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8013082b72e0bfd4b9e6194ee238a6d9d376eecd3f849f16d034532dfc5bd182
 description: |-
@@ -242,3 +272,37 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T19:17:16.058521+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:17:16.453779+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883"]}'
+- at: 2026-11-26T19:17:23.146809+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-26T19:18:05.984800+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883","DEV-878"]}'
+- at: 2026-11-26T19:20:46.283845+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883","DEV-878"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883","DEV-878","DEV-860"]}'
+- at: 2026-11-26T19:32:47.927398+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883","DEV-878","DEV-860"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883","DEV-878","DEV-860","DEV-786"]}'

@@ -1,11 +1,11 @@
 title: REST test for GET /api/jobs/t3-thread (400, 404, unavailable)
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T22:44:17.550162+00:00
-modified: 2026-11-26T16:55:05.997467+00:00
+modified: 2026-11-26T19:28:13.696306+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -14,6 +14,8 @@ relationships:
   - DEV-849
   - DEV-872
   - TEST-1
+  - DEV-908
+  - DEV-853
 comments:
 - date: 2026-11-25T12:40:26.825930+00:00
   author: claude
@@ -156,6 +158,19 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Merge agent rebases agent/DEV-858 onto main (10 commits behind) and lands it
+- date: 2026-11-26T19:28:05.312505+00:00
+  author: claude
+  text: |-
+    Review: passed. The REST test covers every "Done when" item, changes only the test file, and passes on the branch and rebased onto main.
+
+    - Work: one commit `9305ce413`, +60 lines in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`, no production code
+    - The assertions match `crates/lotar-lib/src/routes/jobs.rs:90`: 200 with `thread`, `bad_request` for the runner error and for a missing `id`, 404 `Job '<id>' not found`. The `unavailable` reason ends with the fake t3's `No thread thread-2` (test file line 877)
+    - `npm ci`: passed
+    - Branch: `cargo build --workspace` then `cargo nextest run --workspace --test integration dev503`: 54/54 passed
+    - Rebased onto main `0cf94860d` in a scratch worktree (removed afterwards): the cherry-pick conflicts at the end of the file, because DEV-853 added tests there too. Keeping both sides is enough. `rustfmt --check` was clean and dev503 passed 59/59
+    - The helpers the test uses (`t3_harness_and`, `run_t3`, the fake `t3 thread show`) are unchanged on main
+    - Unrelated flake: the first rebased run failed two continued-merge tests at about 60 s, right after a cold build. The rerun passed. Filed as [DEV-908](https://lotar.pyxzl.net/task/DEV-908)
+    - Not run: `npm run lint`, `npm test`, `npm run smoke` (the merge runs the full suites)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b1c83e2cf0d2436f0b72ea63e6750f769de0de33c35f3204adaa0b9888d2d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad158317efeb4c09caef52d93f060c84098ee0ec393e83112798470246e9fa9e3
@@ -405,3 +420,28 @@ history:
     new: Reviewing
   - field: assignee
     new: '@review'
+- at: 2026-11-26T19:27:43.056731+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849","DEV-872"],"related":["DEV-849","DEV-872","TEST-1"]}'
+    new: '{"depends_on":["DEV-849","DEV-872"],"related":["DEV-849","DEV-872","TEST-1","DEV-908"]}'
+- at: 2026-11-26T19:28:05.312505+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:28:05.644003+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-849","DEV-872"],"related":["DEV-849","DEV-872","TEST-1","DEV-908"]}'
+    new: '{"depends_on":["DEV-849","DEV-872"],"related":["DEV-849","DEV-872","TEST-1","DEV-908","DEV-853"]}'
+- at: 2026-11-26T19:28:13.696306+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

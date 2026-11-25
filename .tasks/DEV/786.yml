@@ -1,11 +1,11 @@
 title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-26T16:56:29.564389+00:00
+modified: 2026-11-26T19:32:54.867083+00:00
 relationships:
   related:
   - DEV-725
@@ -25,6 +25,8 @@ relationships:
   - DEV-793
   - DEV-835
   - DEV-837
+  - DEV-882
+  - DEV-887
 comments:
 - date: 2026-11-22T05:07:00.362925+00:00
   author: claude
@@ -547,6 +549,40 @@ comments:
 - date: 2026-11-26T16:56:29.564389+00:00
   author: claude
   text: 'Stalled since 2026-11-26T16:02Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:32:47.647179+00:00
+  author: claude
+  text: |-
+    Review: passed. The rebased `4a0204ecb` is the reviewed `ba43e9632` plus correct conflict fixes for DEV-835 and DEV-837; tests, the queue smoke test and the page all work.
+
+    **What I read**
+    - `git range-diff` from `ba43e9632` to `4a0204ecb`: the only changes are the rebase onto `eeb1ad55d`
+      - `pause` keeps DEV-835's list of `pauses`, and its retry is still put first, pinned, with the ticket's priority
+      - `dequeue_startable` keeps DEV-837's `disk_held` check before this branch's busy-ticket skip
+      - 5 test calls use the new signatures
+      - DEV-837's `under_the_disk_floor_only_merge_entries_start` now finds its entries by ticket ID, not by position. The test still checks the same thing (the merge entry starts, the fix waits for disk space)
+      - `docs/help/agent.md` keeps DEV-798's tab-count sentences, `pauses`/`disk_hold` and the T3 **Show logs** bullet
+    - `main` moved on since then (`0cf94860d`). DEV-887 now keys the queue file by the canonical tasks dir and DEV-882 records queued times; neither conflicts with this branch's logic
+    - The ticket, all 30 comments and the 14 `dev786-card-*` screenshots (I read after light 1440 and before dark 1440)
+
+    **Reran on `4a0204ecb`**
+    - `npm ci`: passed
+    - `cargo nextest run -p lotar-agent -E 'test(/queue|pause|requeue|disk/)'`: 38 passed
+    - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev786|dev771|dev837|queue/)'`: 29 passed
+    - `vitest view/__tests__/AgentJobs.spec.ts`: 43 passed
+    - Smoke `ui.agent-jobs` "lists the queue by priority with kinds and moves an entry to the top": passed
+    - Not run: full lint, test and smoke (the merge runs them)
+
+    **My own check** (scratch workspace with 5 tickets, worker off)
+    - CLI order: High merge, High fix, Medium release, Medium review, Low fix
+    - `move DEMO-1 --up` → "place 4 of 5", pinned. `DEMO-9` → "not in the queue". `--up --down` is refused
+    - `GET /api/jobs` `queue` lists the same order, with `kind`, `priority` and `pinned`. A move for a ticket that isn't queued gives a 400
+    - Agents page at 1920/1440/390 in light and dark, plus a click on "Move to the top": the order, kind chips, priority, "Kept in place" and the disabled end arrows are right, and nothing is clipped at 390 px. Screenshots are in `/tmp/dev786-rev2/shots`, outside the repo
+
+    **For the merge**
+    - `git merge-tree main HEAD` now conflicts in `crates/lotar-core/src/api_types.rs`, `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/tests/integration.rs` and `view/api/types.ts`. The merge has to rebase onto `0cf94860d` again
+    - The "Done when" still names `GET /api/agent-queue`. An earlier review had that route dropped: `GET /api/jobs` `queue` lists the queue, and the docs say so
+
+    **Tickets filed:** none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -1317,3 +1353,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:32:47.647179+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:32:47.925051+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856","DEV-874","DEV-806","DEV-833","DEV-793","DEV-835","DEV-837"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856","DEV-874","DEV-806","DEV-833","DEV-793","DEV-835","DEV-837","DEV-882","DEV-887"]}'
+- at: 2026-11-26T19:32:54.867083+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,0 +1,47 @@
+title: 'Timeline: read a job''s conversation inline from its harnessmux event log'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T19:31:53.927572+00:00
+modified: 2026-11-26T19:31:55.215291+00:00
+relationships:
+  related:
+  - DEV-849
+  - DEV-850
+description: |-
+  Ravi asked on 2026-11-24 to review the full chain of agent work in the ticket timeline. The approach is agreed in DEV-850: [docs/research/inline-transcript-review.md](https://github.com/localtaskrepo/lotar/blob/main/docs/research/inline-transcript-review.md). Ravi chose on 2026-11-26: "expand (Load on open only)".
+
+  ## Scope (the write-up's Smallest slice)
+
+  1. Job log: when lotar sends a turn, write one typed transcript reference event `{source: "harnessmux", session, agent, agent_session, turn, format: 1, link?}` (`link` = the T3 thread for t3 jobs). Docs in `docs/help/agent.md`.
+  2. `GET /api/jobs/transcript?id=<job>&after=<seq>&limit=<n>`: takes a job id only, never a path; reads only `<harnessmux home>/sessions/<name>.events.jsonl` with a validated name; returns the referenced turn's events in pages by `seq`. Job logs without a reference fall back to the job's time window. `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree.
+  3. Timeline: a **Conversation** section under Show thread in `view/components/task-panel/TaskPanelTimelineTab.vue`, loaded only when opened.
+
+  Not in scope: native Claude/Codex session files, other machines, selective import, live T3 state (DEV-849).
+
+  ## Done when
+
+  - [ ] A job started or continued after this change has a transcript reference in its job log, with the turn `Session::send` returned; a continued session's second job references turn 2, not turn 1.
+  - [ ] The endpoint returns only the referenced turn's events, paged; an id with no job, a session name with `/` or `..`, or a path parameter is refused (4xx), and nothing outside the harnessmux sessions directory is read.
+  - [ ] An old job log without a reference shows the events within the job's start and end time; with no match it shows the unsupported state.
+  - [ ] Nothing loads until the phase's conversation is opened (no request on page load, checked in the smoke test).
+  - [ ] States in the phase: loading; expired ("The conversation is no longer on this machine.", summary, commits and checks stay); offline/reader error with a retry; unsupported `v` (or no match) with `harnessmux attach <name> --from-start` to copy.
+  - [ ] t3 jobs render like the others plus **Open in T3** (the recorded thread link). A t3 log without `tool.*` events (harnessmux 0.2.0) shows its replies and "Tool calls are in T3".
+  - [ ] Playwright smoke test with a seeded harnessmux home: a Claude turn, a reused session with two turns, a t3 log with tool events and one without, and an expired one. Before and after screenshots at phone width.
+tags:
+- agent
+- ui
+history:
+- at: 2026-11-26T19:31:54.873044+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-849","DEV-850"]}'
+- at: 2026-11-26T19:31:55.215291+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

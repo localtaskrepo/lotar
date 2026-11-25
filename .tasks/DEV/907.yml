@@ -1,0 +1,33 @@
+title: config show leaves out agent.worktree and labels every default (home) when a home config exists
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T19:25:32.394470+00:00
+modified: 2026-11-26T19:25:33.174476+00:00
+relationships:
+  related:
+  - DEV-905
+description: |-
+  Found by the DEV-905 job (2026-11-26), also with the installed build: in a workspace whose `.tasks/config.yml` sets `agent.worktree.enabled` and `build_root`, and a home config that sets only `agent.worktree.max_parallel_jobs`, `lotar config show --explain --full` prints no `agent.worktree` keys, and every key the home config doesn't set is labelled `(home)`. JSON (`--format json`) has the values and labels the repo's keys `global` after DEV-905.
+
+  Check: the command above with `HOME` pointing at a temp folder and `LOTAR_IGNORE_HOME_CONFIG=0`.
+
+  Done when: the YAML shows `agent.worktree.*`, and a key the home config doesn't set isn't labelled `(home)`.
+tags:
+- health
+custom_fields:
+  finding: config-show:agent-worktree-and-home-labels
+history:
+- at: 2026-11-26T19:25:32.838531+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-905"]}'
+- at: 2026-11-26T19:25:33.174476+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

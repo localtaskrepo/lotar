@@ -122,7 +122,7 @@ lotar list --has question
 
 ## Edit, delete and restore
 
-Each comment in `lotar comment <ID>` and `lotar show` starts with its number, `#N`, counted from 1 in the order stored. `--edit`, `--delete` and `--restore` take that number or the comment's date (exact, or a unique start of it).
+Each comment in `lotar comment <ID>` and `lotar show` starts with its number, `#N`, counted from 1 in the order stored. In JSON output each comment carries it as `number`; with deleted comments left out, counting the items would name the wrong one. `--edit`, `--delete` and `--restore` take that number or the comment's date (exact, or a unique start of it).
 
 ```bash
 # Fix a typo in comment #3

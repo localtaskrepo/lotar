@@ -1,16 +1,18 @@
 title: 'Automation service: expand_comment took append_automation_comment''s doc comment'
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T20:00:38.684959+00:00
-modified: 2026-11-26T16:54:51.188808+00:00
+modified: 2026-11-26T19:18:12.288434+00:00
 relationships:
   depends_on:
   - DEV-852
   related:
   - DEV-852
+  - DEV-835
+  - DEV-887
 comments:
 - date: 2026-11-26T01:26:43.184495+00:00
   author: claude
@@ -47,6 +49,17 @@ comments:
       result: not_run
       reason: the merge runs it
     next: Merge agent lands agent/DEV-878
+- date: 2026-11-26T19:18:05.586097+00:00
+  author: claude
+  text: |-
+    Review: passed. The doc comment is back on `append_automation_comment`; only comments changed.
+
+    - Read: `git diff main...HEAD` (one commit `9fb6cb5e7`, one file, 4 lines moved), the ticket, DEV-852, AGENTS.md, `git log -5 main -- crates/lotar-agent/src/services/automation_service.rs`
+    - Done when holds: `expand_comment` keeps only its two-line DEV-852 doc; the four-line "Append a comment ..." block sits on `append_automation_comment` (`automation_service.rs:3085`)
+    - Main moved on (DEV-835 `e82f2c7ca`, DEV-887 `0cf94860d` touch the file), but main still has the misplaced doc (`main:3081-3087`), and `git merge-tree main HEAD` merges cleanly
+    - No stray files, no test needed (comment only, no behavior)
+    - Reran: `npm ci` passed; `rustfmt --edition 2024 --check` on the file passed; `cargo check -p lotar-agent` passed
+    - No findings, no tickets filed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3c730bbb7b1de4ce7ab9712e9d8588f04853f7bcbb2aaf3b61803817d42ba0f6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad67dcfc1511141da2aef79713adc8daaf01e68bd00130b47d7a3ce91fe74b2c9
@@ -146,3 +159,22 @@ history:
     new: Reviewing
   - field: assignee
     new: '@review'
+- at: 2026-11-26T19:18:05.586097+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:18:05.984488+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-852"],"related":["DEV-852"]}'
+    new: '{"depends_on":["DEV-852"],"related":["DEV-852","DEV-835","DEV-887"]}'
+- at: 2026-11-26T19:18:12.288434+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -2,6 +2,7 @@
 
 use crate::api_types::TaskDTO;
 use crate::cli::args::TaskShowArgs;
+use crate::cli::handlers::comment::numbered_comment_json;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::load_task_including_deleted;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -33,21 +34,24 @@ pub fn handle_show(args: &TaskShowArgs, project: Option<&str>, resolver: &TasksD
         renderer.emit_raw_stdout(render_task_text(&task, &resolver.path, args.brief));
         return Ok(());
     }
+    if args.brief {
+        for comment in &mut task.comments {
+            comment.text = brief_line(&comment.text);
+            comment.report = None;
+            comment.review = None;
+        }
+    }
     // Deleted comments are left out (DEV-809), so whatever reads this
-    // (the inbox mirror) sees a withdrawn question as gone.
-    task.comments.retain(|comment| !comment.is_deleted());
-    if !args.brief {
-        renderer.emit_json(&task);
-        return Ok(());
-    }
-    for comment in &mut task.comments {
-        comment.text = brief_line(&comment.text);
-        comment.report = None;
-        comment.review = None;
-    }
-    let mut value = serde_json::to_value(&task).map_err(|e| e.to_string())?;
+    // (the inbox mirror) sees a withdrawn question as gone; the others
+    // carry their stored `number` (DEV-828).
+    let comments: Vec<_> =
+        task.comments.iter().enumerate().filter(|(_, comment)| !comment.is_deleted()).map(|(index, comment)| numbered_comment_json(index, comment)).collect();
+    let mut value = serde_json::to_value(&task).map_err(|e| format!("Failed to serialize {}: {e}", task.id))?;
     if let Some(object) = value.as_object_mut() {
-        object.remove("history");
+        object.insert("comments".to_string(), serde_json::Value::Array(comments));
+        if args.brief {
+            object.remove("history");
+        }
     }
     renderer.emit_json(&value);
     Ok(())

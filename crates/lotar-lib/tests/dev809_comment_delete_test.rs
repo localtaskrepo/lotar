@@ -91,6 +91,30 @@ fn cli_deletes_restores_and_edits_by_number_or_date() {
     assert!(fails(dir, &["comment", &id, "--delete", "2", "text"]).contains("text"));
 }
 
+/// DEV-828: JSON lists carry each comment's stored number, the one
+/// `--edit/--delete/--restore` take, so a reader needn't count positions.
+#[test]
+fn json_lists_number_comments_as_stored() {
+    let tf = TestFixtures::new();
+    let dir = tf.get_temp_path();
+    let id = add_task(dir);
+    for text in ["first note", "second note", "third note"] {
+        run(dir, "claude", &["comment", &id, text]);
+    }
+    run(dir, "claude", &["comment", &id, "--delete", "2"]);
+
+    let numbers = |items: &Value| -> Vec<(u64, String)> {
+        items.as_array().unwrap().iter().map(|c| (c["number"].as_u64().unwrap(), c["text"].as_str().unwrap().to_string())).collect()
+    };
+    let expected = vec![(1, "first note".to_string()), (3, "third note".to_string())];
+    let listed = json_of(&run(dir, "claude", &["--format", "json", "comment", &id]));
+    assert_eq!(numbers(&listed["items"]), expected, "{listed}");
+    let shown = json_of(&run(dir, "claude", &["--format", "json", "show", &id]));
+    assert_eq!(numbers(&shown["comments"]), expected, "{shown}");
+    let all = json_of(&run(dir, "claude", &["--format", "json", "comment", &id, "--deleted"]));
+    assert_eq!(numbers(&all["items"]).iter().map(|(n, _)| *n).collect::<Vec<_>>(), [1, 2, 3], "{all}");
+}
+
 #[test]
 fn withdrawn_question_is_closed_and_deleted_answer_reopens_it() {
     let tf = TestFixtures::new();

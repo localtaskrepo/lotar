@@ -1,11 +1,11 @@
 title: Design inline transcript review on the ticket timeline
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Research
 reporter: codex
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-26T17:48:49.822122+00:00
+modified: 2026-11-26T19:32:29.281715+00:00
 relationships:
   related:
   - DEV-849
@@ -15,6 +15,7 @@ relationships:
   - DEV-887
   - DEV-889
   - DEV-865
+  - DEV-909
 comments:
 - date: 2026-11-24T20:22:41.002771+00:00
   author: automation
@@ -146,9 +147,34 @@ comments:
 - date: 2026-11-26T16:57:55.104548+00:00
   author: claude
   text: 'Stalled since 2026-11-26T06:57Z with no lotar job: the live check restarted @fix as the next turn of its thread, the answered retry started no job, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:32:20.648465+00:00
+  author: claude
+  text: |-
+    Recorded Ravi's "expand (Load on open only)" and filed the implementation ticket DEV-909.
+
+    - `docs/research/inline-transcript-review.md`: "Open choice for Ravi" is now "Decision", dated 2026-11-26, in his words; prefetch is marked not chosen (5 lines added, 4 removed).
+    - [DEV-909](https://lotar.pyxzl.net/task/DEV-909) takes the write-up's smallest slice: typed transcript reference in the job log, `GET /api/jobs/transcript` by job id, and a Conversation section that loads only when opened. It has checkboxes for each state and for a reused session's turn. Linked as related.
+    - The three "Done when" boxes are ticked: the write-up covers all three, and the reviewer passed it (comment #7).
+    - The branch still holds `78c91182e`, whose content is already in main as `d03a0d408`. The rebase drops it.
+    - No UI changed, so no screenshots. The ui tag stays because the ticket designs UI, so it gets the full review, not small-diff.
+  report:
+    commits:
+    - hash: 52897a817
+      what: write-up records the decision
+    checks:
+    - command: npx prettier --check docs/research/inline-transcript-review.md
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: documentation only
+    - command: npm test
+      result: not_run
+      reason: documentation only
+    next: Review 52897a817; the merge drops 78c91182e, already in main as d03a0d408
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1cd1fe090fc47d510c0b2189ed10002b47bfe1fa6100dd1f8d65280031089e13
 releases:
 - 12
 description: |-
@@ -163,9 +189,9 @@ description: |-
 
   ## Done when
 
-  - [ ] Record a recommendation, with source links and a mobile-sized sketch of a ticket with T3 and headless jobs. Show a collapsed phase, an expanded conversation and a missing transcript.
-  - [ ] Exercise the existing read paths on one T3 job and retained Claude Code and Codex headless examples, or record exactly which source could not be verified. Include a reused session and explain how the view gets the right turn.
-  - [ ] Recommend the smallest implementation slice and identify any open choice for Ravi. This ticket is for research and design. Implementation gets its own ticket once the approach is agreed.
+  - [x] Record a recommendation, with source links and a mobile-sized sketch of a ticket with T3 and headless jobs. Show a collapsed phase, an expanded conversation and a missing transcript.
+  - [x] Exercise the existing read paths on one T3 job and retained Claude Code and Codex headless examples, or record exactly which source could not be verified. Include a reused session and explain how the view gets the right turn.
+  - [x] Recommend the smallest implementation slice and identify any open choice for Ravi. This ticket is for research and design. Implementation gets its own ticket once the approach is agreed.
 
   Start with the ticket timeline in `view/components/task-panel/TaskPanelTimelineTab.vue`, job logs in `view/pages/AgentJobs.vue`, and `lotar task timeline <ID> --threads`. DEV-849 covers reciprocal links and live T3 state.
 tags:
@@ -352,3 +378,27 @@ history:
   changes:
   - field: releases
     new: '#12'
+- at: 2026-11-26T19:31:08.930902+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1cd1fe090fc47d510c0b2189ed10002b47bfe1fa6100dd1f8d65280031089e13
+- at: 2026-11-26T19:31:54.872498+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887","DEV-889","DEV-865"]}'
+    new: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887","DEV-889","DEV-865","DEV-909"]}'
+- at: 2026-11-26T19:32:20.648465+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:32:29.281715+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

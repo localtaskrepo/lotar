@@ -326,7 +326,7 @@ fn render_comment_list(
     let listed = listed_comments(&task.comments, include_deleted);
     match renderer.format {
         OutputFormat::Json => {
-            let items: Vec<_> = listed.iter().map(|(_, comment)| comment_to_json(comment)).collect();
+            let items: Vec<_> = listed.iter().map(|(index, comment)| numbered_comment_json(*index, comment)).collect();
             let mut payload = build_comment_payload("ok", "task.comment.list", task_id, items.len());
             payload.insert("items".to_string(), Value::Array(items));
             insert_project(&mut payload, project);
@@ -438,6 +438,17 @@ pub(crate) fn comment_marker(comment: &TaskComment, open_question: bool) -> Stri
 
 fn comment_to_json(comment: &TaskComment) -> Value {
     serde_json::to_value(comment).unwrap_or_else(|_| serde_json::json!({ "date": comment.date, "text": comment.text }))
+}
+
+/// A listed comment with `number`, its 1-based stored position (DEV-828):
+/// the `#N` that `--edit/--delete/--restore` take, which counting the
+/// items gets wrong once a comment above is deleted.
+pub(crate) fn numbered_comment_json(index: usize, comment: &TaskComment) -> Value {
+    let mut value = comment_to_json(comment);
+    if let Value::Object(map) = &mut value {
+        map.insert("number".to_string(), Value::from(index + 1));
+    }
+    value
 }
 
 /// A report as text lines, e.g. "check npm test: not run (no browser)", so a

@@ -1,15 +1,46 @@
 title: A repo's agent.worktree.build_root is ignored when the home config has an agent.worktree section
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T18:53:10.893672+00:00
-modified: 2026-11-26T18:59:41.516119+00:00
+modified: 2026-11-26T19:25:47.944799+00:00
 relationships:
   related:
   - DEV-778
   - DEV-841
+  - DEV-906
+  - DEV-907
+comments:
+- date: 2026-11-26T19:25:26.201729+00:00
+  author: claude
+  text: |-
+    A repo's `agent.worktree` keys now survive a home config that sets other `agent.worktree` keys.
+
+    - Cause: the repo's `.tasks/config.yml` is the global layer, and a home or env section replaced the whole `agent.worktree` section (`crates/lotar-core/src/config/resolution.rs`). Layer keys also stopped at `agent.worktree`, so a home key set back to its default couldn't win.
+    - Fix: `merge_agent_worktree` takes each key the layer sets or that differs from the default. `collect_layer_keys` now records the section's keys one by one.
+    - `config show` source labels for `agent.worktree.*` are now per key (`source_labels.rs`), so `build_root` shows `global`.
+    - Test: `dev265_config_presence_test::home_agent_worktree_section_merges_key_by_key` (failed before the fix, passes now).
+    - Docs: `docs/help/config-reference.md` and `docs/help/precedence.md` say the section merges key by key, with the usual precedence per key.
+    - Seen, not fixed: `config show` YAML leaves out `agent.worktree` and labels every default `(home)` when a home config exists, also in the installed build.
+  report:
+    commits:
+    - hash: b3d0631fd
+      what: agent.worktree merges key by key across global, home and env layers, with a test and docs
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run --cargo-profile dev --workspace -E 'test(/config|worktree|precedence|source_label/)'
+      result: failed
+      reason: 283 passed, 2 failed in dev61_reference_kinds_test; they fail the same way without this change (job worktree's target links to the build root), filed as DEV-906
+    - command: npm test
+      result: not_run
+      reason: fix job runs targeted checks
+    - command: npm run smoke
+      result: not_run
+      reason: fix job runs targeted checks
+    next: Merge; DEV-906 fixes the two dev61 tests in build-root worktrees
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85f25e5a8f110969372450105671b218f10d8b75b5b58d56574d63c4cf888d5b
 description: |-
@@ -38,3 +69,28 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85f25e5a8f110969372450105671b218f10d8b75b5b58d56574d63c4cf888d5b
+- at: 2026-11-26T19:25:17.709716+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-778","DEV-841"]}'
+    new: '{"related":["DEV-778","DEV-841","DEV-906"]}'
+- at: 2026-11-26T19:25:26.201729+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:25:32.838091+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-778","DEV-841","DEV-906"]}'
+    new: '{"related":["DEV-778","DEV-841","DEV-906","DEV-907"]}'
+- at: 2026-11-26T19:25:47.944799+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

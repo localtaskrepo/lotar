@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-26T16:55:33.648842+00:00
+modified: 2026-11-26T19:30:35.069620+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -497,6 +497,27 @@ comments:
     - The live check doesn't restart a ticket whose last job failed, so it stayed Reviewing with no job (`stalled:DEV-810`, LOCA-673).
     - I ran `lotar status DEV-810 InProgress`, `lotar assignee DEV-810 --clear` and `lotar automation run "Answered in the thread: review on Codex" --select 'id:DEV-810'`. A review job is queued (Codex, as the fix ran on Claude).
     - No code change.
+- date: 2026-11-26T19:30:22.777625+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix is right and tested, but it no longer merges: DEV-876 (`59b8ac172`, on main since 2026-11-25 17:25 PST) rewrote the same functions, and settling the conflict means choosing behaviour, not just merging text.
+
+    **Read and reran**
+    - Branch `b7f520caf`, one commit on base `d4084d484`: `kept.rs`, `resumed.rs`, `dev503_harness_jobs_test.rs`, `docs/help/agent.md`. No stray files; `npm ci` ran fine.
+    - `cargo nextest run --test integration -E 'test(/dev503_harness_jobs_test/)'`: 56 of 56 pass.
+    - With the base's `kept.rs` and `resumed.rs` put back, all 3 new tests fail (`a_kept_thread_whose_session_holds_a_newer_thread_is_settled`, `a_kept_thread_whose_worktree_is_gone_is_settled`, `a_done_tickets_job_thread_without_a_job_log_is_settled_by_its_title`). Files restored afterwards; the worktree is clean.
+    - Every "Done when" code item is covered: a fresh in-memory record when the session record holds a newer thread, `t3` run in the checkout when the worktree is gone, threads found by title (done ticket, `completed`, `full-access`, not `auto`), T3 asked only with a `t3` profile (`runs_t3`), and `[lotar] <ID>: …` lines on stderr. `SessionRecord::new` writes nothing to disk.
+    - Live `t3 thread list --json` does emit `title` and `runtimeMode`. In lotar, all 527 `full-access` threads with a ticket-ID title were created by an agent (`creationSource: mcp`), so the title rule doesn't catch the owner's own threads.
+
+    **Blocking**
+    - `git merge-tree --write-tree main HEAD`: conflicts in `crates/lotar-agent/src/services/agent_job_service/kept.rs` (`settle`, `settle_superseded`) and `docs/help/agent.md` (the settle paragraph).
+    - DEV-876 changed the rule this fix relies on. On a done ticket, main's `settle` now settles every thread whose run has ended, using its `ended()` helper. This branch's `unlogged()` (`kept.rs` ~line 151) still requires `status == "completed"`. A plain merge would leave a done ticket's failed or interrupted threads unsettled whenever their job log is gone, though logged ones get settled. Fix: rebase onto main, make `unlogged()` use `ended(&shown.status)` like main's `settle`, and add one case to the title test (a done ticket's `failed` thread with no job log gets settled).
+    - Main's `settle_superseded` uses `thread.job_id`, which this fix moved into `job: Option<(String, String)>`. Keep main's DEV-876 notes and read the id from `job`, as the earlier rebase did for DEV-836.
+    - `docs/help/agent.md`: merge both paragraphs, and say that a thread found by title also counts once its run ended in any way.
+
+    **Not run**
+    - `npm run lint`, `npm test`, `npm run smoke`: the merge runs them.
+    - The count after the release still needs the owner's OK. For reference, lotar's T3 project shows 0 unsettled `completed` threads today, out of 1550.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
@@ -539,6 +560,7 @@ tags:
 - job-paused
 - fix-retried
 - retry-fix
+- review-returned-twice
 history:
 - at: 2026-11-22T21:19:09.309565+00:00
   actor: claude
@@ -1060,3 +1082,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:30:22.777625+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:30:23.121420+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned, job-paused, fix-retried, retry-fix
+    new: review-returned, job-paused, fix-retried, retry-fix, review-blocked
+- at: 2026-11-26T19:30:35.069620+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-returned, job-paused, fix-retried, retry-fix, review-blocked
+    new: review-returned, job-paused, fix-retried, retry-fix, review-returned-twice

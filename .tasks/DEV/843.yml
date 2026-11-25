@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-26T16:57:48.665493+00:00
+modified: 2026-11-26T19:32:58.786081+00:00
 relationships:
   related:
   - DEV-786
@@ -108,6 +108,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A35620d562edee7ad67d0a936a157ef093b4d1e4ccf1881314d2ec132cc560c8e
 description: |-
   Found in the DEV-818 review. On 2026-11-22 a review job's scratch lotar add created DEV-818 'Example ticket for the Agents page' (assignee @fix, 22:42Z) in the real backlog and hard-deleted it. At 22:45Z the finding ticket got the same ID DEV-818 and was also assigned @fix. The fix job that started 2026-11-23 04:32Z (job-20261123T043208.499Z-57) got the prompt 'Work ticket DEV-818 ("Example ticket for the Agents page")' and the order to commit as 'DEV-818 Example ticket for the Agents page'. So commit 4cf6a8cd7 carries the deleted ticket's title.
 
@@ -317,3 +318,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:32:58.786081+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A35620d562edee7ad67d0a936a157ef093b4d1e4ccf1881314d2ec132cc560c8e

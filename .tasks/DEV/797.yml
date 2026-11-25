@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-26T18:40:40.318277+00:00
+modified: 2026-11-26T19:20:46.281770+00:00
 relationships:
   blocks:
   - DEV-801
@@ -29,6 +29,7 @@ relationships:
   - DEV-883
   - DEV-876
   - DEV-888
+  - DEV-860
 comments:
 - date: 2026-11-22T21:30:02.840094+00:00
   author: claude
@@ -638,3 +639,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882","DEV-883","DEV-876"]}'
     new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882","DEV-883","DEV-876","DEV-888"]}'
+- at: 2026-11-26T19:20:46.281770+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882","DEV-883","DEV-876","DEV-888"]}'
+    new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882","DEV-883","DEV-876","DEV-888","DEV-860"]}'
