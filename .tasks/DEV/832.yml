@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-26T02:41:02.640579+00:00
+modified: 2026-11-26T03:04:29.146080+00:00
 relationships:
   related:
   - DEV-777
@@ -26,6 +26,7 @@ relationships:
   - DEV-797
   - DEV-806
   - DEV-809
+  - DEV-801
 comments:
 - date: 2026-11-24T16:07:52.652624+00:00
   author: claude
@@ -147,10 +148,60 @@ comments:
 - date: 2026-11-26T00:29:36.818654+00:00
   author: automation
   text: The merge agent's job job-20261126T000450.279Z-195 failed (lotar agent logs job-20261126T000450.279Z-195); the fix agent retries it on branch agent/DEV-832.
+- date: 2026-11-26T03:03:30.597666+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+         ✓ shows externally edited tasks after background updates 2046ms
+     ✓ |wall-clock| tests/ui.panel-safety.smoke.spec.ts (1 test) 2768ms
+       ✓ UI panel scope safety (1)
+         ✓ blocks create during pending and failed project config, then submits refreshed defaults 2767ms
+
+    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+     FAIL  |wall-clock| tests/ui.agent-jobs.smoke.spec.ts > UI Agent Jobs page smoke tests > shows the prompt and settings a finished job ran with behind its Instructions button
+    TimeoutError: locator.waitFor: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('table', { name: 'Settings' }) to be visible
+
+     ❯ tests/ui.agent-jobs.smoke.spec.ts:317:40
+        315|
+        316|                         const settings = page.getByRole('table', { nam…
+        317|                         await settings.waitFor({ state: 'visible', tim…
+           |                                        ^
+        318|                         // The button sits in the log's header, the pa…
+        319|                         expect(await page.locator('.job-log__header .r…
+     ❯ helpers/ui.ts:112:20
+     ❯ withBrowser helpers/ui.ts:92:20
+     ❯ tests/ui.agent-jobs.smoke.spec.ts:304:21
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+     Test Files  1 failed | 117 passed (118)
+          Tests  1 failed | 410 passed (411)
+       Start at  18:57:53
+       Duration  336.45s (tests 96%, import 3%, transform 1%)
+    ```.
+
+    - Rebased `agent/DEV-832` onto `main` (`2e49a88db5dc`): `3fe7be122f1b`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7ed476434fcb4e018626487ba8c6d2a47dc50f277c86920bab74a5e08d2a6b29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6399386a6cea6eeb5ad94b21639914a2a3cbeac4c6d5e80ec5a4bd8b60b2deb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A47244efc33641b5d379dce4b8cfdccdd3ddfa91a2ffdf7038fc68ea31b117a32
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa1f8f887e534880d8b2ae3b73b31d0fd24d345072aebaeb2dc1a300b65f6a408
 description: 'Found 2026-11-24 ~08:00 PT, after the weekly limit reset: ListAgents lists four ''DEV-811 rework'' sessions (2b0465, 876756, 25d2e3, c8b9a8) busy at once in .lotar-worktrees/lotar/DEV-811, and also 2-5 copies for DEV-777, DEV-778, DEV-796, DEV-800, DEV-824, DEV-828, DEV-830, DEV-831 and STD-328. They edit the same files at once: on DEV-811 one session changed yaml_patch.rs between another''s read and its write. Check: after a resume, count the live sessions per job (ListAgents or ps of claude --add-dir <worktree>). Done: one session per job resumes, with a test.'
 tags:
 - health
@@ -322,3 +373,18 @@ history:
   - field: status
     old: Merging
     new: InProgress
+- at: 2026-11-26T03:03:30.597666+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T03:03:30.795448+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa1f8f887e534880d8b2ae3b73b31d0fd24d345072aebaeb2dc1a300b65f6a408
+- at: 2026-11-26T03:04:29.146080+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809"]}'
+    new: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801"]}'

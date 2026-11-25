@@ -42,7 +42,7 @@ Edits made through LoTaR itself (the web UI, REST, MCP, `lotar config set`) keep
 
 `lotar trust` runs the rule `run` commands it skipped while the repository was untrusted, oldest first, as they would have run then: same command, same ticket values in the `LOTAR_TICKET_*` variables and templates. A skipped run whose rule's `run` changed since is listed and not run. Each one is listed in the output and in a comment on its ticket (the rule ran, failed, or didn't run because its run command changed), and then dropped, so a second `lotar trust` doesn't run it again. LoTaR's own merge, when it trusts the merged rules again, does the same.
 
-The skipped commands are kept in the trust file under `skipped_runs`, with the ticket, the rule and the time they were skipped. Each process that writes the trust file (`lotar serve`, the CLI, agent jobs) locks it while it writes, through a lock file beside it, so no skipped run is lost when two write at once. A run skipped while `lotar trust` was already replaying runs right after its skip is recorded.
+The skipped commands are kept in the trust file under `skipped_runs`, with the ticket, the rule and the time they were skipped. Each process that writes the trust file (`lotar serve`, the CLI, agent jobs) locks it while it writes, through a lock file beside it, so no skipped run is lost when two write at once. A run skipped while `lotar trust` was already replaying runs is replayed right after its skip is recorded.
 
 ## CI and containers
 

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T07:46:13.287811+00:00
-modified: 2026-11-26T00:03:53.466137+00:00
+modified: 2026-11-26T03:14:11.132675+00:00
 relationships:
   depends_on:
   - DEV-768
@@ -153,6 +153,55 @@ comments:
     - `grep -rn` over `docs/help`: no other page lists picker search fields or profile fields without description
     - Reran: `npx prettier --check` on both files passed; `npm ci` passed; `git merge-tree main HEAD` merges clean (main moved on since, `d3bed079b`, not these lines)
     - No UI change, no owner decision touched, no stray files
+- date: 2026-11-26T03:14:11.132675+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+       ✓ UI advanced smoke scenarios (5)
+         ✓ keeps multiple browser sessions in sync when tasks are added 2630ms
+         ✓ reflects branch switches in the task list UI 1353ms
+         ✓ surfaces analytics on the insights dashboard 6732ms
+         ✓ shows externally edited tasks after background updates 2019ms
+     ✓ |wall-clock| tests/ui.panel-safety.smoke.spec.ts (1 test) 2561ms
+       ✓ UI panel scope safety (1)
+         ✓ blocks create during pending and failed project config, then submits refreshed defaults 2560ms
+
+    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+     FAIL  |parallel| tests/ui.task-view.smoke.spec.ts > DEV-239 large task view (actual backend/browser) > switches between the side panel and the large view, and opens in the preferred view
+    AssertionError: expected 18.951950073242188 to be less than 4
+     ❯ tests/ui.task-view.smoke.spec.ts:52:84
+         50|                         expect(await toggle.getAttribute('aria-pressed…
+         51|                         const large = await panelBox(page);
+         52|                         expect(Math.abs(large.x - (1440 - large.x - la…
+           |                                                                                    ^
+         53|                         await expect.poll(() => panel.getAttribute('cl…
+         54|                         const details = await panel
+     ❯ withBrowser helpers/ui.ts:92:20
+     ❯ tests/ui.task-view.smoke.spec.ts:32:17
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+     Test Files  1 failed | 117 passed (118)
+          Tests  1 failed | 410 passed (411)
+       Start at  19:00:47
+       Duration  803.16s (tests 94%, import 5%, transform 1%)
+    ```.
+
+    - Rebased `agent/DEV-829` onto `main` (`2e49a88db5dc`): `e05c36a3c089`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad20053c42d089766490447cbb98e7d8b13ab2cf0dc91e8199c3406ffae1b97b4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8b7878b8e0e67d93adf4738ce59a4e0f45e9c49654f8148827e59a3e2344e76f
@@ -473,3 +522,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T03:14:11.132675+00:00
+  actor: automation
+  changes:
+  - field: comment_added
