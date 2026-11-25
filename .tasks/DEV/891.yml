@@ -1,14 +1,34 @@
 title: 'Finding bundles: no test covers a finding joining an InProgress bundle whose fix job takes the message'
-status: Todo
+status: Blocked
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T04:56:14.463740+00:00
-modified: 2026-11-26T04:56:15.109519+00:00
+modified: 2026-11-26T13:53:21.981114+00:00
 relationships:
+  depends_on:
+  - DEV-864
   related:
   - DEV-864
+comments:
+- date: 2026-11-26T12:09:21.800862+00:00
+  author: claude
+  text: |-
+    Waits for DEV-864 to land: the code this test covers isn't on main yet.
+
+    - The InProgress-bundle path (`open_bundle` taking a bundle whose job can take a message, `tell_running_job` in `lotar add --bundle`) is only in `78263b6a8` on `agent/DEV-864`, which is in Merging.
+    - On main (`09c9ae6a0`) an InProgress bundle never takes a finding, so there's nothing to test yet.
+    - Next: once DEV-864 is on main, add the test to `crates/lotar-lib/tests/dev800_finding_bundle_test.rs`, with a stand-in session that takes the message.
+- date: 2026-11-26T13:53:21.981114+00:00
+  author: claude
+  text: |-
+    Set to Blocked: it waits for DEV-864 (Merging), as its last comment says.
+
+    - It sat in Todo on `@fix` with tag `waits` and no job: the move to Blocked didn't happen at 12:09Z (LOCA-644).
+    - "Prerequisites done" continues it once DEV-864 is Done.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6dadfbbb42e68dd68425b4eadeda1492dfe8a3eded7363266d1f74b0dcceaa52
 description: |-
   Found in the review of DEV-864 (`78263b6a8`).
 
@@ -18,6 +38,8 @@ description: |-
   ## Done when
 
   - [ ] A test runs `lotar add --finding <key> --bundle health` against an InProgress bundle whose fix job takes the message (a harnessmux session this test owns, or a stand-in), and asserts the message text arrived and the output is `{"state": "bundled"}` with the bundle's id.
+tags:
+- waits
 history:
 - at: 2026-11-26T04:56:14.783444+00:00
   actor: claude
@@ -30,3 +52,34 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T11:52:18.305199+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6dadfbbb42e68dd68425b4eadeda1492dfe8a3eded7363266d1f74b0dcceaa52
+- at: 2026-11-26T12:09:20.812783+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-864"]}'
+    new: '{"depends_on":["DEV-864"],"related":["DEV-864"]}'
+- at: 2026-11-26T12:09:21.718952+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-26T12:09:21.800862+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T13:53:07.509757+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Blocked
+- at: 2026-11-26T13:53:21.981114+00:00
+  actor: claude
+  changes:
+  - field: comment_added

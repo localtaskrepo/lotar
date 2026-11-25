@@ -1,6 +1,9 @@
 //! DEV-800: `lotar add --finding <key> --bundle <name>` adds a finding to the
 //! project's open bundle ticket of the day instead of a ticket of its own.
+//! DEV-864: a bundle whose fix job runs takes a finding the job is told of.
+use crate::common::env_mutex::EnvVarGuard;
 use crate::common::{TestFixtures, cargo_bin_in};
+use lotar::services::agent_active_jobs::{self, ActiveJob};
 use serde_json::{Value, json};
 
 const CONFIG: &str = "default:\n  project: REPO\nissue:\n  states: [Todo, InProgress, Reviewing, Merging, Done, WontDo]\n  done_states: [Done, WontDo]\ncustom:\n  fields: [product]\n";
@@ -84,6 +87,69 @@ fn a_wont_do_bundle_suppresses_its_keys() {
     // A new key doesn't join a won't-do bundle.
     let new = report(&fixtures, "Old dependency", "c:z", "jest 29");
     assert_eq!(outcome(&new), (json!(true), json!("new"), json!("REPO-2")));
+}
+
+/// A fix job of `ticket` another process (this test) runs, in session `session`.
+fn fix_job(id: &str, ticket: &str, session: Option<&str>, merge: bool) -> ActiveJob {
+    ActiveJob {
+        job_id: id.into(),
+        ticket_id: ticket.into(),
+        runner: "t3".into(),
+        agent: Some("fix".into()),
+        owner_pid: std::process::id(),
+        child_pid: 0,
+        started_at: "2026-11-25T10:00:00Z".into(),
+        session_id: session.map(str::to_string),
+        merge,
+        assignee_at_start: None,
+        in_setup: false,
+        request: None,
+    }
+}
+
+#[test]
+fn a_running_fix_job_that_cant_take_the_finding_leaves_it_to_a_new_bundle() {
+    let fixtures = TestFixtures::new();
+    fixtures.create_config_in_dir(&fixtures.tasks_root, CONFIG);
+    let queue = fixtures.temp_dir.path().join("queue");
+    let _env = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", queue.to_str().unwrap());
+    let report_with_jobs = |title: &str, key: &str| -> Value {
+        let output = cargo_bin_in(&fixtures)
+            .env("LOTAR_DEFAULT_REPORTER", "scanner")
+            .env("LOTAR_AGENT_QUEUE_DIR", &queue)
+            .args(["--tasks-dir", fixtures.tasks_root.to_str().unwrap(), "--format", "json", "add", title, "--finding", key, "--bundle", "health"])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        serde_json::from_slice(&output.stdout).unwrap()
+    };
+    report(&fixtures, "Stale worktree", "a:x", "2 left");
+    set_status(&fixtures, "REPO-1", "InProgress");
+    // Its session is gone: the job can't hear of the finding, so it doesn't get it.
+    agent_active_jobs::register(&fixtures.tasks_root, &fix_job("job-gone", "REPO-1", Some("dev864-no-such-session"), false));
+    assert_eq!(outcome(&report_with_jobs("Red CI", "b:y")), (json!(true), json!("new"), json!("REPO-2")));
+    // A merge job doesn't fix findings.
+    set_status(&fixtures, "REPO-2", "InProgress");
+    agent_active_jobs::register(&fixtures.tasks_root, &fix_job("job-merge", "REPO-2", Some("dev864-merge"), true));
+    assert_eq!(outcome(&report_with_jobs("Old dependency", "c:z")), (json!(true), json!("new"), json!("REPO-3")));
+    assert_eq!(listed_ids(&fixtures, "finding=a:x"), vec!["REPO-1".to_string()]);
+}
+
+#[test]
+fn a_running_fix_job_with_a_session_keeps_its_bundle_open() {
+    let fixtures = TestFixtures::new();
+    fixtures.create_config_in_dir(&fixtures.tasks_root, CONFIG);
+    let _env = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.temp_dir.path().join("queue").to_str().unwrap());
+    report(&fixtures, "Stale worktree", "a:x", "2 left");
+    set_status(&fixtures, "REPO-1", "InProgress");
+    let storage = lotar::storage::manager::Storage::new(&fixtures.tasks_root);
+    let config = lotar::config::resolution::load_and_merge_configs(Some(&fixtures.tasks_root)).unwrap();
+    let today = lotar::services::finding_service::FindingService::bundle_of_today("health");
+    let open = || lotar::services::finding_service::FindingService::open_bundle(&storage, "REPO", &today, &config);
+    assert_eq!(open(), None);
+    let job = fix_job("job-fix", "REPO-1", Some("dev864-fix"), false);
+    agent_active_jobs::register(&fixtures.tasks_root, &job);
+    assert_eq!(open(), Some(("REPO-1".to_string(), Some(job))));
 }
 
 #[test]

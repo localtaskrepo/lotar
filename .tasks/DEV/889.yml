@@ -1,11 +1,11 @@
 title: 'Agent queue: 7 jobs sit in a queue file keyed by the relative path .tasks, which no worker reads'
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T04:58:33.643514+00:00
+modified: 2026-11-26T07:30:28.243746+00:00
 relationships:
   related:
   - DEV-860
@@ -26,6 +26,17 @@ comments:
     - DEV-850: `Merging`
     - Requeueing any of them would rerun finished work; the file (`queue-b06823c0….json`) is untouched.
     - DEV-887 (`ca7122f52`) keys the queue by the canonical tasks dir, so no new `.tasks` entries land there.
+- date: 2026-11-26T07:30:18.950375+00:00
+  author: claude
+  text: |-
+    Question: drop all 7 entries and delete the stranded queue file? (I recommend yes; requeue none.)
+
+    - Checked 2026-11-26 07:30Z: `queue-b06823c0….json` still holds the same 7 pending entries, `tasks_dir: ".tasks"`, no new ones since STD-359 (2026-11-25 22:14Z).
+    - Ticket states now: DEV-849, DEV-848, DEV-827, DEV-872, STD-336, STD-359 `Done`; DEV-850 `HelpNeeded` (waits on you, its queued `research` job is from 2026-11-24). Requeueing any would rerun finished or owner-held work.
+    - The file's `updated_at` is 2026-11-26 06:09Z: a lotar call with relative `.tasks` still rewrites it. DEV-887 (`ca7122f52`) fixes that but is only on `agent/DEV-887`, not on `main`.
+    - On your yes: I delete the file (no code change) and close this ticket.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
 description: |-
   Found (DEV-860 review): `~/Library/Caches/lotar/agent-queue/queue-b06823c05bdb7cda4004b1281c7001744d021ba39e3f81993eb5805f188f6f3e.json` (tasks_dir `.tasks`, last written 2026-11-25 22:14Z) holds DEV-850, DEV-849, DEV-848, DEV-827, STD-336, DEV-872 and STD-359. Since DEV-822 the resolver makes the path absolute, so nothing reads that file again.
 
@@ -59,3 +70,27 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T07:29:30.803088+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T07:29:31.451541+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
+- at: 2026-11-26T07:30:18.950375+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:30:28.243746+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

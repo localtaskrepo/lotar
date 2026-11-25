@@ -1,0 +1,43 @@
+title: Cancelling a t3 job leaves its T3 thread running, and lotar takes it over as a new job
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+created: 2026-11-26T14:08:41.238397+00:00
+modified: 2026-11-26T14:08:41.600332+00:00
+relationships:
+  related:
+  - DEV-626
+  - DEV-836
+description: |-
+  Cancelling a t3 job doesn't stop its T3 Code thread's run, so lotar takes the still-running thread over as a new job, even after the ticket went to the owner. Found by the communication review (STD-17), 2026-11-26; the chief of staff saw it the night before and hadn't filed it.
+
+  ## What happened (local, LOCA-630)
+  - The owner wanted dyson off for the night (staff chief of staff thread, 2026-11-26 06:05Z). The install job could wake it again.
+  - `job-20261126T060534.660Z-1`: at 06:09:04 LOCA-630 was assigned to mallox; lotar cancelled the job at 06:09:11.
+  - `job-20261126T060956.554Z-1` started 45 s later: "T3 Code runs the thread of the job job-20261126T052423.795Z-1 again, with no lotar job; this job takes it over", then "Resumed the session local-6de9fa-LOCA-630-fix". The chief of staff had to cancel that one too.
+  - The ticket was on mallox when the takeover started.
+
+  ## Why it matters
+  - A cancel is how agents and the owner stop work that must not run (here: a machine he wanted off). A takeover of the same thread undoes it.
+  - Each extra job also filed an inbox entry: LOCA-630 got four (INBOX-758, 761, 763, 764) in 11 minutes, three triage runs with nothing to do.
+
+  ## Check
+  - `lotar --tasks-dir ~/Development/local/.tasks agent logs job-20261126T060956.554Z-1 | head -8`
+  - Related: DEV-626 (takeover of threads T3 resumes after a restart), DEV-836.
+
+  ## Done when
+  - [ ] Cancelling a t3 job interrupts its T3 thread's run (or marks the thread so no later takeover adopts it).
+  - [ ] No takeover starts for a ticket assigned to a person, or one whose last job was cancelled.
+  - [ ] A test covers cancel, then T3 still running the thread: no new job.
+tags:
+- health
+custom_fields:
+  finding: comms:cancel-takeover
+history:
+- at: 2026-11-26T14:08:41.600332+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-626","DEV-836"]}'

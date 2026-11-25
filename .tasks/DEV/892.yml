@@ -5,11 +5,26 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T05:03:35.190384+00:00
-modified: 2026-11-26T05:03:36.055025+00:00
+modified: 2026-11-26T14:01:26.766753+00:00
 relationships:
+  depends_on:
+  - standards:STD-371
   related:
   - DEV-793
   - DEV-725
+comments:
+- date: 2026-11-26T14:01:26.766753+00:00
+  author: claude
+  text: |-
+    Waits for [STD-371](https://standards.pyxzl.net/task/STD-371): the fix belongs in the shared rule in standards, not in lotar's copy.
+
+    - The Done comes from "Merge agent lifecycle" in `.tasks/DEV/automation.yml`, a copy of `~/Development/standards/configs/lotar/automation.yml` (its header says so). An edit only to lotar's copy would be overwritten the next time the config is copied.
+    - A rule in lotar's own section (after line 1252) can't undo it: each action is committed before the next rule runs, so Done and the `unblocked` event (which starts the tickets waiting for the release) have already happened.
+    - Planned fix, written into STD-371: "Merge agent lifecycle" skips `title: { matches: '^Release v' }`, and a new rule hands a merged release ticket to @fix (fresh session) to run release skill steps 3 to 8. Step 7 sets Done after the tag is on origin.
+    - When STD-371 is done: copy the config into `.tasks/DEV/automation.yml` (lotar's copy is behind its source anyway, for example the small-diff rules from STD-362). Then add a test that runs `AutomationService::simulate` with `JobCompleted` against the real file, on a `Release v9.9.9` ticket and on another @merge ticket, and commit.
+    - I wrote nothing to the branch: `git log main..HEAD` is empty.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
 description: |-
   Found by the DEV-793 review, 2026-11-25.
 
@@ -25,6 +40,7 @@ description: |-
   - A release ticket (title `Release vX.Y.Z` or field `release`) isn't set Done by its merge job until `vX.Y.Z` is on origin, or its merge doesn't run the Done rule. There's a test for it.
 tags:
 - health
+- waits
 custom_fields:
   finding: review:release-done-before-tag
 history:
@@ -33,3 +49,24 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T13:57:09.583784+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
+- at: 2026-11-26T14:01:26.202873+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-793","DEV-725"]}'
+    new: '{"depends_on":["standards:STD-371"],"related":["DEV-793","DEV-725"]}'
+- at: 2026-11-26T14:01:26.720157+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-26T14:01:26.766753+00:00
+  actor: claude
+  changes:
+  - field: comment_added

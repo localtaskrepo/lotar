@@ -5,11 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-26T00:48:58.355185+00:00
-modified: 2026-11-26T03:48:26.214095+00:00
+modified: 2026-11-26T11:05:28.671938+00:00
 relationships:
   related:
   - DEV-860
   - DEV-566
+  - DEV-835
+  - DEV-804
+  - DEV-897
 comments:
 - date: 2026-11-26T03:48:15.461422+00:00
   author: claude
@@ -45,6 +48,18 @@ comments:
       result: not_run
       reason: the merge runs it
     next: Review, then merge; rerun the dev605 tests alone if they time out
+- date: 2026-11-26T10:12:46.684739+00:00
+  author: claude
+  text: |-
+    Review: passed. With `58f8f1fa0`, a `@fix` retry on a `Merging` ticket runs its agent and not lotar's merge.
+
+    - Read: the diff (4 files), DEV-886, DEV-566 and DEV-860, the rules in `.tasks/*/automation.yml` of all repos, and main's 7 newer commits. DEV-835 touches `agent_job_service.rs` and `agent.md`, but `git merge-tree main HEAD` merges cleanly.
+    - Claim holds: every repo's rules start merges only as `"@merge"` (82 uses, no other merge profile). Profile names are matched exactly (`resolve_profile`), so moving the decision to the profile can't miss a merge.
+    - DEV-566 still holds: a `@merge` job, or a job without a profile on a `Merging` ticket, stays blocked by `review-blocked`. The removed test case blocked a `@fix` job, which is the rework that clears that tag, so removing it is right. DEV-566's own bug (a review job counted as a merge job) is fixed by the same rule.
+    - The test failed before the fix: in a scratch copy with the old `agent_job_service.rs`, `a_fix_job_on_a_merging_ticket_runs_its_agent` fails with "the fix agent ran".
+    - Reran (all passed): `npm ci`; `cargo nextest` for the new unit test, `a_taken_over_job*`, the new dev605 test, `merge_job_does_not_start_while_review_blocked`, `a_ticket_nothing_was_built_for_is_not_done` and the dev566 tests (6/6); `cargo clippy -p lotar-agent --all-targets -D warnings`; `rustfmt --check` and `prettier --check` on the changed files.
+    - Docs: all 4 "a ticket in `Merging`" sentences in `docs/help/agent.md` were updated; no other doc uses the old rule.
+    - No stray files, no second branch. No minor findings and no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6
 description: |-
@@ -99,3 +114,25 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T10:12:46.684739+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T10:12:47.035344+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860","DEV-566"]}'
+    new: '{"related":["DEV-860","DEV-566","DEV-835"]}'
+- at: 2026-11-26T11:05:10.614576+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860","DEV-566","DEV-835"]}'
+    new: '{"related":["DEV-860","DEV-566","DEV-835","DEV-804"]}'
+- at: 2026-11-26T11:05:28.671938+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860","DEV-566","DEV-835","DEV-804"]}'
+    new: '{"related":["DEV-860","DEV-566","DEV-835","DEV-804","DEV-897"]}'

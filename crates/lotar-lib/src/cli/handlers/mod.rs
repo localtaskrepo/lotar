@@ -482,7 +482,11 @@ impl AddHandler {
                 // Today's bundle takes the report, or it starts one (DEV-800).
                 if let Some(name) = bundle.as_deref() {
                     let today = FindingService::bundle_of_today(name);
-                    if let Some(id) = FindingService::open_bundle(&storage, &project_for_storage, &today, &config) {
+                    // A running fix job hears of the finding first; one that doesn't take it leaves the finding to a new bundle.
+                    let open = FindingService::open_bundle(&storage, &project_for_storage, &today, &config).filter(|(id, job)| {
+                        job.as_ref().is_none_or(|job| FindingService::tell_bundle_job(job, id, key, &task.title, task.description.as_deref()))
+                    });
+                    if let Some((id, _)) = open {
                         let related = task.relationships.related.last().filter(|_| finding_state == Some(FindingState::Recurred)).cloned();
                         FindingService::join_bundle(&mut storage, &id, key, &task.title, task.description.as_deref(), related.as_deref())
                             .map_err(|e| e.to_string())?;

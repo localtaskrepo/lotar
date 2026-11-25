@@ -5,10 +5,12 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-25T05:29:21.102795+00:00
-modified: 2026-11-26T04:41:12.374965+00:00
+modified: 2026-11-26T11:05:28.671636+00:00
 relationships:
   related:
   - DEV-789
+  - DEV-804
+  - DEV-897
 comments:
 - date: 2026-11-25T14:14:19.135057+00:00
   author: claude
@@ -76,6 +78,19 @@ comments:
       result: not_run
       reason: merge runs the full suites
     next: Review again
+- date: 2026-11-26T10:14:28.120513+00:00
+  author: claude
+  text: |-
+    Review: passed. `serve` now keeps the value of every serve option that takes one, also when no port comes before it.
+
+    - Read: `31866fa9e` (HEAD, the only commit on `main..HEAD`; it changes only `crates/lotar-lib/src/cli/preprocess.rs`), the ticket and its comments, `docs/help/serve.md`, `ServeArgs` (`crates/lotar-lib/src/cli/args/serve.rs`) and the globals in `crates/lotar-lib/src/cli/mod.rs`. The only recent commit on main to the file is `3ec533d60`, which this change doesn't depend on.
+    - Last review's finding is fixed: `--config` is now in `SERVE_VALUE_OPTIONS` (`preprocess.rs:181`).
+    - Completeness: `SERVE_VALUE_OPTIONS` covers every option that takes a value: `--host`, `--allow-host`, `--web-ui-path`, plus the globals `--tasks-dir`, `--config`, `--format`/`-f`, `--log-level`/`-l` and `--project`. The rest are flags: `--open`, `--web-ui-embedded`, `--exit-on-upgrade`, `-v`, `--force-archived`.
+    - Tests: `keeps_web_ui_path_and_allow_host_values_when_port_missing` and `keeps_config_value_when_port_missing` would fail on the old code, which turned the value into `--port <value>`.
+    - Reran: `npm ci` (ok), `cargo build -p lotar`, `cargo nextest run -p lotar-lib preprocess` (23 passed), `rustfmt --edition 2024 --check` on the file (clean).
+    - Manual: `lotar serve --tasks-dir <dir> --web-ui-path <dir> --allow-host tasks.example --config server.port=18793` starts on port 18793 and serves the custom UI.
+    - No stray files or second branch. No tickets filed.
+    - Not run: `npm run lint`, `npm test`, `npm run smoke`. The merge runs them.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af7c853bc72540dd8dd160e793ee215ee636fb7378dea9f82c7f46d1dfbc0eb6d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab01ace2febfeb2b4d0c8224b3a2de98d83376549136189cb8171d1b7baf76f44
@@ -177,3 +192,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T10:14:28.120513+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T11:05:10.614280+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789"]}'
+    new: '{"related":["DEV-789","DEV-804"]}'
+- at: 2026-11-26T11:05:28.671636+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-789","DEV-804"]}'
+    new: '{"related":["DEV-789","DEV-804","DEV-897"]}'

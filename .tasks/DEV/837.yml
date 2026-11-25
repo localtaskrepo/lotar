@@ -1,11 +1,11 @@
 title: 'Proposal: a disk gate in the queue: no new job worktree while free disk is under a floor, idle builds cleaned first'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:34:28.930701+00:00
-modified: 2026-11-26T07:28:22.448549+00:00
+modified: 2026-11-26T13:56:56.749101+00:00
 relationships:
   related:
   - DEV-623
@@ -17,6 +17,8 @@ relationships:
   - DEV-827
   - DEV-885
   - DEV-819
+  - DEV-898
+  - DEV-887
 comments:
 - date: 2026-11-24T16:34:46.203543+00:00
   author: claude
@@ -218,6 +220,30 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T07:29:19.969027+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `1b03039b7`.
+
+    - lotar's merge had already rebased, run the checks, fast-forwarded and amended the `.tasks` changes. I didn't repeat any of those steps.
+    - The main checkout had new changes in `.tasks/DEV/832.yml`, `833.yml` and `837.yml` since then. I amended them into the merged commit (`1f450a1e7` → `1b03039b7`). The main checkout is clean.
+    - No rules or config changed, so `lotar trust` wasn't needed.
+    - Pushed `eb9b383f7..1b03039b7` to `origin/main`. The pre-push hook passed. That was the only unpushed commit.
+  report:
+    commits:
+    - hash: 1b03039b7
+      what: disk gate in the queue (with pending .tasks changes)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: run by lotar's merge
+    - command: npm run -s test:agent
+      result: passed
+      reason: run by lotar's merge
+    - command: npm run -s smoke
+      result: passed
+      reason: run by lotar's merge
+    next: 'None: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e50ed7331f1c1454dca4b704bafbafba48f76bd1261bfe3101c6502de1904c3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65e86708fd02583215565a3ac4f491a402a9da97617e83ef5e45676fece55760
@@ -245,8 +271,6 @@ description: |-
   - [ ] Config and docs name the floor; the default is set on this Mac.
 tags:
 - proposal
-- job-paused
-- review-returned
 history:
 - at: 2026-11-24T16:34:29.644380+00:00
   actor: claude
@@ -403,3 +427,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T07:29:19.969027+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:29:26.991923+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: proposal, job-paused, review-returned
+    new: proposal
+- at: 2026-11-26T13:56:08.338370+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885","DEV-819"]}'
+    new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885","DEV-819","DEV-898"]}'
+- at: 2026-11-26T13:56:56.749101+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885","DEV-819","DEV-898"]}'
+    new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885","DEV-819","DEV-898","DEV-887"]}'

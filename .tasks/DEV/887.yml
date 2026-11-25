@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-26T01:01:39.223004+00:00
-modified: 2026-11-26T04:58:48.249571+00:00
+modified: 2026-11-26T13:56:56.749798+00:00
 relationships:
   related:
   - DEV-865
@@ -16,6 +16,9 @@ relationships:
   - DEV-850
   - DEV-872
   - DEV-889
+  - DEV-898
+  - DEV-837
+  - TEST-1
 comments:
 - date: 2026-11-26T04:58:34.505827+00:00
   author: claude
@@ -51,6 +54,19 @@ comments:
       result: not_run
       reason: the merge runs them (DEV-797)
     next: 'Review, then merge. The 7 old entries: owner''s call in DEV-889'
+- date: 2026-11-26T13:56:56.499361+00:00
+  author: claude
+  text: |-
+    Review: passed. `ca7122f52` meets every "Done when" item; one minor follow-up filed as [DEV-898](https://lotar.pyxzl.net/task/DEV-898).
+
+    - Read: the diff of `main...HEAD` (1 commit, 6 files), the ticket and the fix comment, DEV-889, AGENTS.md, the last commits to the touched files on main. `npm ci` ran without errors.
+    - `canonical_tasks_dir` (`crates/lotar-agent/src/services/agent_queue_service.rs:1401`) resolves the real path, falling back to `std::path::absolute` for a missing folder. The queue file, worker lock, recorded `tasks_dir`, memory gate, active jobs and end actions all use it.
+    - The test `relative_tasks_dir_shares_the_absolute_paths_queue` would fail before the fix: both repos' `.tasks` hashed to one file, so `other_pending` would hold TEST-1. I worked this out from the code and didn't rerun it on the old code.
+    - Existing queues keep their names: `realpath` of lotar's `.tasks` is the path already hashed. The old file with the 7 entries is untouched, and its state is reported on DEV-889 (owner tag). The fix decides nothing for the owner.
+    - Reran: `cargo nextest run -p lotar-agent` 255/255 passed. `agent_safety_test::` (integration) 42/42 passed. `rustfmt --check` and `prettier --check` on the changed files pass.
+    - It merges cleanly onto main (`git merge-tree`).
+    - Minor (DEV-898): `crates/lotar-agent/src/services/disk_gate.rs:427` on main (DEV-837, added after this branch) still hashes the raw `tasks_dir` for disk-gate state. The fix: `canonical_tasks_dir` there too. This merge doesn't introduce it.
+    - No UI changes, no stray files, no second branch. Guidance: no durable finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8013082b72e0bfd4b9e6194ee238a6d9d376eecd3f849f16d034532dfc5bd182
 description: |-
@@ -140,3 +156,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T13:56:08.339772+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898"]}'
+- at: 2026-11-26T13:56:56.499361+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T13:56:56.749798+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898"]}'
+    new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1"]}'

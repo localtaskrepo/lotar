@@ -1,0 +1,44 @@
+title: 'lotar''s own .tasks/DEV/automation.yml doesn''t load in the installed lotar 0.15.6: the rule ''Login expired'' (DEV-835) uses job.pause'
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+created: 2026-11-26T11:05:28.365161+00:00
+modified: 2026-11-26T12:10:34.236499+00:00
+relationships:
+  related:
+  - DEV-835
+  - DEV-855
+  - DEV-866
+  - DEV-886
+  - DEV-890
+description: |-
+  ## Found
+
+  Since DEV-835 landed (e82f2c7ca), the last rule of `.tasks/DEV/automation.yml` ("Login expired: ask the owner to sign in", `when: job: { pause: auth }`) uses a condition the installed lotar 0.15.6 (`/opt/homebrew/bin/lotar`) doesn't know. `lotar automation simulate --ticket DEV-866` in this repo fails with `Serialization error: data did not match any variant of untagged enum AutomationRuleSet at line 10 column 1`; cutting the file after rule 52 loads it. So no DEV rule runs: DEV-866, DEV-886 (Reviewing, @review), DEV-835 and DEV-855 (Merging) don't move on (LOCA-639: stalled:DEV-866), and repos.ts reports the file as "does not parse". STD's file loads fine.
+
+  ## Check
+
+  `lotar automation simulate --ticket DEV-866` in this repo prints a rule, not the serialization error.
+
+  ## Done when
+
+  - [ ] The DEV rules load with the lotar binary that runs jobs: either install a build that has `job.pause` (patch release 0.15.7 or a local build) or take the 'Login expired' rule out of `.tasks/DEV/automation.yml` until then. A rule that needs a condition lotar doesn't have yet isn't merged before the release that adds it.
+  - [ ] Then `lotar trust` in this repo (its run commands changed) and the stalled DEV tickets restart: `node ~/Development/standards/scripts/repos.ts --live` lists no stalled DEV ticket.
+tags:
+- health
+custom_fields:
+  finding: automation-file:DEV-835
+history:
+- at: 2026-11-26T11:05:28.672183+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886"]}'
+- at: 2026-11-26T12:10:34.236499+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886"]}'
+    new: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890"]}'

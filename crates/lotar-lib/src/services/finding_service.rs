@@ -10,8 +10,9 @@
 //! A report with a bundle name and no ticket of its own joins the project's
 //! open bundle ticket of the day (DEV-800): its key goes into the bundle's
 //! `finding` list and its title and description become a section of the
-//! bundle's description. A bundle an agent job works on takes no new
-//! findings, so the report starts the next bundle instead.
+//! bundle's description. A bundle whose fix job runs (InProgress) takes a
+//! new finding when the job takes a message about it (DEV-864); a bundle
+//! in review or merge takes none, so the report starts the next bundle.
 
 use std::path::Path;
 use std::time::Duration;
@@ -20,6 +21,7 @@ pub use crate::api_types::{FindingReport, FindingState};
 use crate::api_types::{TaskCreate, TaskDTO, TaskUpdate};
 use crate::config::types::ResolvedConfig;
 use crate::errors::{LoTaRError, LoTaRResult};
+use crate::services::agent_active_jobs::ActiveJob;
 use crate::services::automation_service::AutomationService;
 use crate::services::task_service::{CommentContext, CreateOptions, TaskService};
 use crate::storage::layout::ArchiveFilter;
@@ -35,8 +37,12 @@ const REPORT_PREFIX: &str = "Reported again by ";
 const WONT_DO_NAMES: &[&str] = &["wontdo", "wontfix", "cancelled", "canceled", "rejected", "declined"];
 
 /// Status names of a ticket an agent job works on, compared like
-/// [`WONT_DO_NAMES`]: a bundle in one of them takes no new findings.
+/// [`WONT_DO_NAMES`]: a bundle in one of them takes no new findings, except
+/// one in [`FIX_JOB_NAME`] whose job is told about them.
 const IN_JOB_NAMES: &[&str] = &["inprogress", "reviewing", "merging"];
+
+/// The status of a bundle its fix job works on, compared like [`WONT_DO_NAMES`].
+const FIX_JOB_NAME: &str = "inprogress";
 
 /// Titles that share at least this percentage of their words (Dice
 /// coefficient) name the same problem (DEV-562).
@@ -90,9 +96,12 @@ impl FindingService {
 
     /// The newest ticket of `project` in bundle `bundle` (a
     /// [`bundle_of_today`](Self::bundle_of_today) value) that takes new
-    /// findings: not done, not won't do, not archived and not in an agent
-    /// job (InProgress, Reviewing, Merging).
-    pub fn open_bundle(storage: &Storage, project: &str, bundle: &str, config: &ResolvedConfig) -> Option<String> {
+    /// findings: not done, not won't do, not archived, and not in an agent
+    /// job (InProgress, Reviewing, Merging) unless it is InProgress with a
+    /// fix job that takes messages (DEV-864). That job comes with it: tell
+    /// it with [`tell_bundle_job`](Self::tell_bundle_job) before the
+    /// finding joins.
+    pub fn open_bundle(storage: &Storage, project: &str, bundle: &str, config: &ResolvedConfig) -> Option<(String, Option<ActiveJob>)> {
         let done = crate::services::completion::effective_done_statuses(config);
         let filter = TaskFilter { project: Some(project.to_string()), ..Default::default() };
         storage
@@ -102,12 +111,33 @@ impl FindingService {
                 crate::utils::custom_fields::extract_value_strings(&task.custom_fields, FINDING_BUNDLE_FIELD)
                     .is_some_and(|values| values.iter().any(|value| value.trim() == bundle))
             })
-            .filter(|(_, task)| {
+            .filter_map(|(id, task)| {
                 let status = task.status.as_str();
-                !is_wont_do(status) && !is_in_job(status) && !done.contains(&status.to_ascii_lowercase())
+                if is_wont_do(status) || done.contains(&status.to_ascii_lowercase()) {
+                    return None;
+                }
+                if !is_in_job(status) {
+                    return Some((id, None));
+                }
+                if normalized_status(status) != FIX_JOB_NAME {
+                    return None;
+                }
+                let job = crate::services::agent_active_jobs::for_ticket(&storage.root_path, &id).filter(takes_messages)?;
+                Some((id, Some(job)))
             })
-            .map(|(id, _)| id)
-            .max_by_key(|id| TaskId::parse(id).map(|id| id.number).unwrap_or(0))
+            .max_by_key(|(id, _)| TaskId::parse(id).map(|id| id.number).unwrap_or(0))
+    }
+
+    /// Tell bundle `id`'s running fix job about a finding that joins it.
+    /// `false` when the job doesn't take the message: then the finding
+    /// starts a new bundle instead.
+    pub fn tell_bundle_job(job: &ActiveJob, id: &str, key: &str, title: &str, description: Option<&str>) -> bool {
+        let message = format!(
+            "A new finding joined {id} while you work on it: its section below is in the ticket's description now. Fix it in this job too, \
+             the way the section says; the merge runs the finding check for every key of the bundle.\n\n{}",
+            bundle_section(key, title, description)
+        );
+        crate::services::agent_job_service::tell_running_job(job, &message)
     }
 
     /// The title and description a new bundle ticket starts with.
@@ -331,6 +361,13 @@ fn is_wont_do(status: &str) -> bool {
 
 fn is_in_job(status: &str) -> bool {
     IN_JOB_NAMES.contains(&normalized_status(status).as_str())
+}
+
+/// A fix job that can get a message: a session runner's job, not a merge,
+/// and not the job that files the finding (it filed it to leave it).
+fn takes_messages(job: &ActiveJob) -> bool {
+    let own = std::env::var("LOTAR_AGENT_JOB_ID").is_ok_and(|id| id == job.job_id);
+    !job.merge && !own && (job.owner_pid == std::process::id() || job.session_id.is_some())
 }
 
 /// One finding of a bundle: a heading, the description and the key.

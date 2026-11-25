@@ -5,8 +5,10 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T05:05:15.164063+00:00
-modified: 2026-11-26T04:56:34.826779+00:00
+modified: 2026-11-26T12:09:20.811890+00:00
 relationships:
+  blocks:
+  - DEV-891
   related:
   - DEV-800
   - standards:STD-299
@@ -299,3 +301,9 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-26T12:09:20.811890+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800","standards:STD-299","DEV-384","DEV-891"]}'
+    new: '{"blocks":["DEV-891"],"related":["DEV-800","standards:STD-299","DEV-384","DEV-891"]}'

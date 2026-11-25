@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-26T03:41:04.878755+00:00
+modified: 2026-11-26T07:33:55.382480+00:00
 relationships:
   related:
   - DEV-767
@@ -58,9 +58,40 @@ comments:
     - **Install:** `npm ci` passed.
     - **New test:** `dev861_test_loops_end_with_the_test_test.rs` covers the helper. It kills its owner process and checks that the loop ends with no release file.
     - **Scope:** nothing outside the ticket, no stray files, no owner decisions touched. No UI is involved, so no ui-review.
+- date: 2026-11-26T07:33:45.111129+00:00
+  author: claude
+  text: |-
+    Review finding fixed: the dev370 job loop now also ends when the test process is gone.
+
+    - The review read `e70f97356`, which was HEAD at the time, so the finding applied.
+    - `crates/lotar-lib/tests/dev370_release_waiting_checks_test.rs`: the loop is now `while [ ! -f GO ] && [ -d <root> ] && kill -0 <test pid>` (`crate::common::while_this_test_runs()`), the same as `dev592` and `dev630`. A nextest timeout kill no longer leaves it running.
+    - Amended into signed commit `9917a7c17`.
+    - The `dev370` and `dev861` tests pass (2 of 2). Afterwards `ps` shows no scratch loops or workers left from this run.
+  report:
+    commits:
+    - hash: 9917a7c17
+      what: test wait loops end with the test process, dev370 included
+    checks:
+    - command: cargo nextest run --workspace -E 'binary(integration) & package(lotar-lib) & test(/dev861|dev370/)'
+      result: passed
+    - command: rustfmt --edition 2024 --check dev370_release_waiting_checks_test.rs
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review 9917a7c17 again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee04bdf043a3a4837a3d6ca86f89cdab589c09c41fd9d82e8783b4f912920104
 description: |-
   Found 2026-11-24 18:10 PST: 12 orphaned processes under /var/folders/*/T/lotar-rust-temp-*/.lotar-test-scratch/, from 4 test runs whose cargo test process had exited (oldest from 2026-11-22 18:18, DEV-767's job worktree). Each run left a 'lotar --tasks-dir <scratch>/.tasks agent worker' (ppid 1) plus its job shell, a 'sh -c ... while [ ! -f <scratch>/release ]; do sleep 0.05; done' loop that forks sleep about 20 times a second until reboot. Tests that start a worker or a job with a release file must stop the worker and remove or release the loops on drop, also when the test fails or times out. Killed by the chief of staff with the owner's OK (2026-11-22, 'Kill and file').
 
@@ -162,3 +193,27 @@ history:
   - field: tags
     old: fix-retried, review-blocked
     new: fix-retried, review-returned
+- at: 2026-11-26T07:32:20.229983+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T07:32:21.087045+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee04bdf043a3a4837a3d6ca86f89cdab589c09c41fd9d82e8783b4f912920104
+- at: 2026-11-26T07:33:45.111129+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:33:55.382480+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

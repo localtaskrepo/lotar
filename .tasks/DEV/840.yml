@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-26T07:16:47.574169+00:00
+modified: 2026-11-26T11:05:10.613732+00:00
 relationships:
   blocks:
   - DEV-782
@@ -17,6 +17,7 @@ relationships:
   - DEV-782
   - DEV-778
   - DEV-805
+  - DEV-804
 comments:
 - date: 2026-11-24T19:13:00.928345+00:00
   author: automation
@@ -143,6 +144,37 @@ comments:
     - **What would fix it:** make the queue's read-only accessors (`list_pending`, `list_parked`, `pending_count`) read through `read_state`, so nothing that only reads can recreate the folder. Then find the remaining writer: log the writer's pid/backtrace in `with_locked_queue` when it has to create the folder. Or have both tests wait until the worker process has exited, not only until its lock is free. Check it with the same 2-test loop, about 10 runs, while the machine is busy (for example beside a full `npm run -s test:agent`).
     - Fine as is: the runner's `--no-run` build step (`scripts/rust-test-runner.mjs:557-565`) and its 2 tests, and the `waiting_after_exit` change and its test (the old `pending_count` would create `queue_base`).
     - Not run: the full `npm test` and `npm run smoke` (the merge runs them). Nothing changed in the worktree; I removed the scratch temp folders.
+- date: 2026-11-26T10:13:00.335383+00:00
+  author: claude
+  text: |-
+    Fixed the review's findings from both sides: the queue's read-only calls never write it, and both tests now wait for the worker process to exit.
+
+    - **Readers wrote the queue:** in `agent_queue_service.rs`, `list_pending`, `list_parked` and `pending_count` now go through `read_queue`, which only reads under a shared lock. A missing file counts as empty, and a broken one is still an error. They no longer use `with_locked_queue`, so their `create_dir_all` plus file write is gone, and so is the gap between their `exists()` check and that write. That covers the ticket-save hook (`task_hooks.rs` `agent_work_pending`) and the worker loop. `waiting_after_exit` is gone; the exit check is `pending_count` again, now read-only.
+    - **Test wait ended too early:** dev732 and dev733 now record the pid of the worker their job runs under (`FIND_AGENT_WORKER_SH` in `tests/common/mod.rs`). They wait until that process has exited (`wait_for_worker_exit`), not just until its lock is free. Once the worker is gone, nothing of it can write into the fixture, however busy the machine is. The old wait also ended on `stopped`; that check is gone.
+    - **Unit test:** `reading_the_queue_leaves_a_removed_queue_folder_removed` calls all three readers on a missing queue folder and checks it stays missing. The old `pending_count` failed it.
+    - **Not reproduced first:** with temporary logging in `with_locked_queue`, 22 loaded runs (40 `yes` loops at load about 70, then beside a full suite) showed only the expected first write from `lotar add`. The review's load of about 44 came from a full suite. The exit wait removes the race without depending on load.
+    - **Evidence:** I ran dev732 and dev733 60 times, each with a fresh `TMPDIR`, beside a full `cargo nextest run` in its own target folder (load 5 to 18). All 60 passed and none left anything. That full run left nothing in its temp folder either.
+    - Amended into `14182422c` (signed). No push.
+  report:
+    commits:
+    - hash: 14182422c
+      what: queue readers only read; dev732/dev733 wait for their worker process to exit
+    checks:
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2489/2489, nothing left in the temp folder
+    - command: npm run -s lint
+      result: passed
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+      reason: 237/237
+    - command: dev732+dev733 loop, fresh TMPDIR, beside a full nextest run
+      result: passed
+      reason: 60 of 60 runs left nothing
+    - command: npm test (frontend) and npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
@@ -363,3 +395,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac4c03e545637a8a9598829eba9ffbbd9c225361ee2487eb73e4140bad00ac8dd
+- at: 2026-11-26T10:13:00.335383+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T11:05:10.613732+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805"]}'
+    new: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804"]}'

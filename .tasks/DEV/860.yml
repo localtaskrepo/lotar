@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-24T23:49:30.471883+00:00
-modified: 2026-11-26T03:32:29.216472+00:00
+modified: 2026-11-26T07:32:17.273010+00:00
 relationships:
   related:
   - DEV-576
@@ -66,9 +66,38 @@ comments:
     - **Cause, OK:** I accept the relative-path cause for STD-336 even though the description quotes `~/…/.tasks`: STD-336 is in the `.tasks`-keyed queue file.
     - **Filed:** [DEV-889](https://lotar.pyxzl.net/task/DEV-889) (tag owner): the 7 entries stuck in that queue file, which your "next" left with the owner and no ticket.
     - **Not rerun:** clippy, `npm run lint`/`test`/`smoke` (the merge runs them). No UI change.
+- date: 2026-11-26T07:32:05.976552+00:00
+  author: claude
+  text: |-
+    Rework done: the branch now sits on main and keeps only the regression test and the doc sentence. The code fix is DEV-822's.
+
+    - **Review read HEAD:** it named `2b4d67d0a`, which was HEAD.
+    - **Duplicate fix:** dropped. I rebuilt the branch on main `1b03039b7`, without the `absolute()` helper in `crates/lotar-core/src/workspace.rs`. main's `absolute_from_cwd` (DEV-822, `87f6d2cf1`) is the fix.
+    - **Merge conflicts:** gone. The edits to `project_integration_test.rs` and `relative_path_parent_search_test.rs` are dropped; the branch differs from main only in `dev860_relative_tasks_dir_test.rs`, the `mod` line in `tests/integration.rs`, and `docs/help/precedence.md`.
+    - **Kept:** the regression test (answer with `--tasks-dir .tasks` queues the job in the queue the worker reads, no run rule fails) and the precedence sentence.
+    - New commit: `834650ddc` (replaces `2b4d67d0a`).
+  report:
+    commits:
+    - hash: 834650ddc
+      what: regression test for answer -> queue with relative --tasks-dir, precedence.md sentence; code fix is DEV-822
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration dev860
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration relative_path
+      result: passed
+      reason: 11/11
+    - command: cargo clippy -p lotar-lib --tests
+      result: passed
+    - command: rustfmt/prettier --check on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: 'Review again: branch is main + test + doc sentence'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae97157ffb604bb7fcfc52baba1b3bbc0834c21f614f80ba1935c9098e6ebea9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5e4bb562ec08602a2f08f993f1d7a10ae175be4be5f116a4db5cf48d2e23d257
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7bf8c08e39f25d857ee5c2c4e1356f557ec06a92a17d3ad6149c61f6ce0f3c4a
 description: |-
   Found (STD-343): the triage answered STD-336's retry question with `lotar --tasks-dir ~/Development/standards/.tasks comment STD-336 --answer fix` at 2026-11-24 23:13Z. The option's set changed the assignee mallox -> @fix (timeline), but `lotar agent list-jobs` in standards shows no job between job-20261124T231242.639Z-51 (failed 23:12) and a manual restart at 23:46. Assigning an agent profile should start its job (DEV-576). A guess to check: `maybe_queue_agent_on_assignment` (crates/lotar-agent/src/services/automation_service.rs) only enqueues outside server mode and doesn't call `AgentQueueService::ensure_worker`, as `tell_agent` does; or the answer path skips it.
 
@@ -178,3 +207,27 @@ history:
   - field: tags
     old: health, fix-retried, review-blocked
     new: health, fix-retried, review-returned
+- at: 2026-11-26T07:30:30.230351+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T07:30:30.792431+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7bf8c08e39f25d857ee5c2c4e1356f557ec06a92a17d3ad6149c61f6ce0f3c4a
+- at: 2026-11-26T07:32:05.976552+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T07:32:17.273010+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'
