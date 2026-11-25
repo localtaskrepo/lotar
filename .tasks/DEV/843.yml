@@ -1,17 +1,18 @@
 title: A job queued for a hard-deleted ticket runs on the new ticket that reuses its ID, with the deleted ticket's title in its prompt
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-26T19:32:58.786081+00:00
+modified: 2026-11-26T19:38:17.158912+00:00
 relationships:
   related:
   - DEV-786
   - DEV-818
   - DEV-833
   - DEV-845
+  - DEV-837
 comments:
 - date: 2026-11-24T19:18:18.982167+00:00
   author: automation
@@ -105,6 +106,33 @@ comments:
 - date: 2026-11-26T16:57:48.665493+00:00
   author: claude
   text: 'Stalled since 2026-11-26T06:59Z with no lotar job: the live check restarted @fix as the next turn of its thread, the answered retry started no job, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:38:06.572783+00:00
+  author: claude
+  text: |-
+    Rebuilt as the owner answered: DEV-843's design on main's `replace_placeholders`, DEV-845's tests ported. Commit `59cd30519`.
+
+    - Rebased onto main `0cf94860d`. In the 4 conflicting files I took main's side and then redid DEV-843 on top.
+    - `template.rs`: `expand_keeping_ticket` and `expand_ticket_only` now go through `replace_placeholders`. DEV-845's `expand_for_queued_job`, `fill_ticket_title` and `TICKET_TITLE` are gone; no other code used them.
+    - The test from DEV-845 is ported: a title with `${{ticket.id}}` in it is not expanded a second time. So is a comment's text that contains `${{agent.job_id}}`/`${{ticket.title}}`: only `${{ticket.*}}` gets filled in at start.
+    - `agent_job_service.rs` start: `TemplateContext::from_task(&task).expand_ticket_only(...)`. The rule test in `automation_service.rs` now covers both tickets, and the docs use DEV-843's sentence.
+    - Fixed one test call after main's DEV-837 added `disk_held` to `dequeue_startable`.
+    - The first test run failed 10 integration tests because `-p` didn't build the `lotar` binary. Without `-p`, all 107 passed.
+  report:
+    commits:
+    - hash: 59cd30519
+      what: 'DEV-843 rebuilt on main (DEV-845''s replace_placeholders): ticket values fill in at job start, stale queue entries dropped'
+    checks:
+    - command: cargo nextest run -E '(package(lotar-agent) and test(/template::|rules_prompt|prompt|deleted|ticket_created|park|agent_queue_service/)) or (binary(=integration) and test(/agent_automation_integration_test/))'
+      result: passed
+      reason: 107 tests
+    - command: cargo clippy -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --check and prettier --check on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: full suites run once at merge (DEV-797)
+    next: 'Review, then merge: branch now sits on main 0cf94860d'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
@@ -323,3 +351,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A35620d562edee7ad67d0a936a157ef093b4d1e4ccf1881314d2ec132cc560c8e
+- at: 2026-11-26T19:38:06.572783+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:38:06.847665+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-786","DEV-818","DEV-833","DEV-845"]}'
+    new: '{"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837"]}'
+- at: 2026-11-26T19:38:17.158912+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

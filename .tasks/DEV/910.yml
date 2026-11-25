@@ -1,0 +1,34 @@
+title: lotar agent queue says idle (nothing queued) while it counts jobs queued in lotar serve's memory
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T19:40:17.216351+00:00
+modified: 2026-11-26T19:40:18.481961+00:00
+relationships:
+  related:
+  - DEV-871
+description: |-
+  Found in the review of DEV-871.
+
+  - `crates/lotar-agent/src/services/agent_queue_service.rs:518`: `worker_state` returns `idle` when the queue file has no `pending` entries
+  - Since DEV-871, `queue_stats` (line 558) adds the jobs other processes hold in memory (`queued_elsewhere`) to Queued
+  - So with `lotar serve` holding 1 queued job and an empty queue file, `lotar agent queue` shows Queued 1 and state `idle`, which `docs/help/agent.md` explains as "nothing queued"
+
+  ## Done when
+
+  - [ ] With jobs queued only in another process, `lotar agent queue` doesn't say `idle`/nothing queued: it says the jobs wait in that process (for example "queued in lotar serve, waiting for a free slot"), or the docs' `idle` wording says it covers only the queue file
+  - [ ] A test covers the case
+history:
+- at: 2026-11-26T19:40:18.139003+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-871"]}'
+- at: 2026-11-26T19:40:18.481961+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

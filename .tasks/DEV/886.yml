@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T00:48:58.355185+00:00
-modified: 2026-11-26T16:57:22.483053+00:00
+modified: 2026-11-26T19:46:35.539554+00:00
 relationships:
   related:
   - DEV-860
@@ -63,6 +63,56 @@ comments:
 - date: 2026-11-26T16:57:22.483053+00:00
   author: claude
   text: 'Stalled since 2026-11-26T11:05Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:46:35.539554+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed, and again when rerun on its own:
+    ```
+      stderr ───
+
+        thread 'services::automation_service::pending_outcome_tests::a_queued_job_does_not_start_after_its_ticket_moved_on' (382545401) panicked at crates/lotar-agent/src/services/automation_service.rs:4825:9:
+        a job on a Merging ticket is a merge job
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+      Cancelling due to test failure: 13 tests still running
+    ────────────
+         Summary [  15.024s] 190/2596 tests run: 189 passed, 1 failed, 0 skipped
+            FAIL [   0.227s] ( 177/2596) lotar-agent services::automation_service::pending_outcome_tests::a_queued_job_does_not_start_after_its_ticket_moved_on
+      stdout ───
+
+        running 1 test
+        test services::automation_service::pending_outcome_tests::a_queued_job_does_not_start_after_its_ticket_moved_on ... FAILED
+
+        failures:
+
+        failures:
+            services::automation_service::pending_outcome_tests::a_queued_job_does_not_start_after_its_ticket_moved_on
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.21s
+
+      stderr ───
+
+        thread 'services::automation_service::pending_outcome_tests::a_queued_job_does_not_start_after_its_ticket_moved_on' (382545401) panicked at crates/lotar-agent/src/services/automation_service.rs:4825:9:
+        a job on a Merging ticket is a merge job
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 2406/2596 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    ```.
+
+    - Rebased `agent/DEV-886` onto `main` (`577caa2ff507`): `4ad3541a4d0a`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+      reason: first run
+    - command: npm run -s test:agent
+      result: failed
+      reason: rerun
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6
 description: |-
@@ -154,5 +204,9 @@ history:
     new: '@merge'
 - at: 2026-11-26T16:57:22.483053+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:46:35.539554+00:00
+  actor: automation
   changes:
   - field: comment_added

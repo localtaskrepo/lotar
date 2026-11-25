@@ -1,11 +1,11 @@
 title: 'A merge job that ends while its agent waits on a check still lands: DEV-725 (v0.15.6) went to main with smoke failed, and is Done without push or tag'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-26T16:56:45.564530+00:00
+modified: 2026-11-26T19:37:16.163198+00:00
 relationships:
   related:
   - DEV-725
@@ -17,6 +17,7 @@ relationships:
   - DEV-892
   - DEV-786
   - DEV-835
+  - DEV-797
 comments:
 - date: 2026-11-22T18:46:53.150110+00:00
   author: claude
@@ -220,6 +221,22 @@ comments:
 - date: 2026-11-26T16:56:45.564530+00:00
   author: claude
   text: 'Stalled since 2026-11-26T15:53Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Claude"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:37:08.557123+00:00
+  author: claude
+  text: |-
+    Review: passed. The rebase onto main (`2a5887c11`) keeps the reviewed fix intact, and it still builds and passes its tests on today's main.
+
+    - **Read:** the diff (5 files), the 13 comments, `git range-diff 1b2a836ec^! 2a5887c11^!`, and main's 10 newer commits (`eeb1ad55d..0cf94860d`), including DEV-797's check-lock hand-off in `merge.rs` and `run_job`.
+    - **Rebase:** the only change since the last passed review is the `pause_queue` conflict. DEV-835's `provider` and DEV-793's `checks_since` and `main_head_at_start` are all kept (`agent_job_service.rs`). It is correct.
+    - **Current main:** `git merge-tree main HEAD` is clean. The hand-off still gets the `--check` note beside DEV-797's check-lock note. Lotar's skip of a check already passed on an unchanged head counts through `passed_checks`, so it doesn't trip the gate.
+    - **Done when:** bullet 1 is met: the code and its tests cover a failed check, a check that never ran, a reworked landing, a commit retry and a takeover. Bullet 2 is met outside the code: DEV-725 is released (`v0.15.6`). The Done-before-tag gap is [DEV-892](https://lotar.pyxzl.net/task/DEV-892), which is InProgress.
+    - **Reran** in a detached copy of the branch merged with main `0cf94860d`, since removed:
+      - `npm ci` passed, here and in the copy.
+      - `cargo nextest run -p lotar-agent -E 'test(/merge|hand_off|takeover|taken_over|commit_retry|reworked|checks|pause/)'`: 36 of 36 passed.
+      - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev797|dev605|dev783|dev411|merge/)'`: 52 of 52 passed.
+      - `npm run -s lint:agent` passed.
+    - **Not run:** the full `npm test` and `npm run smoke`, which the merge runs. They failed last time under load, on UI tests unrelated to this change.
+    - No UI changes, no stray files, one commit. Nothing new to file.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
@@ -495,3 +512,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:37:08.557123+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:37:09.009287+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767","DEV-892","DEV-786","DEV-835"]}'
+    new: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767","DEV-892","DEV-786","DEV-835","DEV-797"]}'
+- at: 2026-11-26T19:37:16.163198+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

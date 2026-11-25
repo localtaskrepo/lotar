@@ -1,11 +1,11 @@
 title: 'JSON comment lists leave deleted comments out without their #N, so counting positions picks the wrong comment for --edit/--delete'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T07:19:10.376712+00:00
-modified: 2026-11-26T18:09:35.707390+00:00
+modified: 2026-11-26T19:37:27.525902+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -14,6 +14,9 @@ relationships:
   - DEV-809
   - DEV-832
   - DEV-876
+  - DEV-882
+  - DEV-883
+  - DEV-884
 comments:
 - date: 2026-11-23T08:58:27.711836+00:00
   author: automation
@@ -228,6 +231,34 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-828` onto `main` conflicts in `crates/lotar-lib/src/cli/handlers/task/show.rs`; lotar aborted the rebase, `agent/DEV-828` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T19:37:14.411869+00:00
+  author: claude
+  text: |-
+    Merged on local `main` as `577caa2ff`. Not pushed: local `main` and `origin/main` have diverged.
+
+    - **Conflict:** `crates/lotar-lib/src/cli/handlers/task/show.rs`. Main's DEV-884 had rewritten `handle_show` (`--brief`, `--comment N`). I kept main's version and added DEV-828's numbering to both JSON paths, full and `--brief`. Comments are numbered before deleted ones are filtered out, so `number` is still the stored `#N`. `--comment N` is unchanged.
+    - **Main moved during the checks**, by `279d3423c`..`0cf94860d`. I rebased again (clean, now `2f224c4f2`) and reran every check on that commit: lint, test (2594 Rust + 1624 view) and smoke (412) all passed.
+    - **lotar files:** `.tasks` changes were amended into `577caa2ff`. No rule or config files changed, so `lotar trust` wasn't needed.
+    - **Push:** not run. `origin/main` has `71791a991` (Release v0.15.7), which local `main` lacks. The rebase-and-push decision on DEV-882/DEV-883 covers it, and DEV-828 goes out with that push.
+  report:
+    commits:
+    - hash: 577caa2ff
+      what: JSON comment items from comment and show carry their stored number
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2594 Rust, 1624 view tests
+    - command: npm run -s smoke
+      result: passed
+      reason: 412 tests
+    - command: git push
+      result: not_run
+      reason: origin/main has release commit 71791a991 that local main lacks
+    next: Push comes with DEV-882/DEV-883's recorded rebase of local main onto origin/main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60
@@ -252,10 +283,6 @@ description: |-
   - [ ] Each JSON comment item from `lotar comment <ID>` and `lotar show <ID>` carries its 1-based stored number (e.g. `number`), the one `--edit/--delete/--restore` take; deleted ones stay out as now.
   - [ ] Test: delete #2 of three, JSON lists numbers 1 and 3.
   - [ ] `docs/help/comment.md` says so.
-tags:
-- job-paused
-- fix-retried
-- retry-fix
 history:
 - at: 2026-11-23T07:19:13.361734+00:00
   actor: claude
@@ -573,3 +600,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T19:37:14.411869+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:37:14.684309+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-809"],"related":["DEV-809","DEV-832","DEV-876"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-809"],"related":["DEV-809","DEV-832","DEV-876","DEV-882","DEV-883","DEV-884"]}'
+- at: 2026-11-26T19:37:27.525902+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused, fix-retried, retry-fix
+    new: ''

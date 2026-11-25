@@ -1,17 +1,19 @@
 title: A release ticket's merge job still sets it Done before its tag is pushed when the checks pass
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T05:03:35.190384+00:00
-modified: 2026-11-26T16:56:53.653321+00:00
+modified: 2026-11-26T19:44:13.174553+00:00
 relationships:
   depends_on:
   - standards:STD-371
   related:
   - DEV-793
   - DEV-725
+  - DEV-835
+  - DEV-884
 comments:
 - date: 2026-11-26T14:01:26.766753+00:00
   author: claude
@@ -26,8 +28,38 @@ comments:
 - date: 2026-11-26T16:56:53.653321+00:00
   author: claude
   text: 'Stalled since 2026-11-26T14:01Z with no lotar job: the live check restarted @fix in a new thread, its job never started, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:43:59.354009+00:00
+  author: claude
+  text: |-
+    Fixed: a merged `Release v…` ticket now goes to @fix to tag and finish the release; Done comes with the release skill's step 7.
+
+    - STD-371 is done. Copied `~/Development/standards/configs/lotar/automation.yml` into `.tasks/DEV/automation.yml` again: lines 1–1320 now match the source exactly, followed by lotar's own rules.
+    - Main's copy from `17cd3a49f` (DEV-884) had already brought in "Release merged", but it was an older copy: it lost lotar's own rules "Waiting: drop the workspace build output" and "Login expired: ask the owner to sign in" (DEV-835). This commit puts them back and also takes STD-354's prompt change.
+    - New test `crates/lotar-lib/tests/dev892_release_merge_done_test.rs` runs the real file through `AutomationService::simulate` with `job_completed`. A `Release v9.9.9` @merge ticket gets "Release merged: finish the release" (@fix, InProgress, not Done) and not "Merge agent lifecycle". Another @merge ticket goes Done. The test fails on the old copy (`["Merge agent lifecycle"]`) and passes on the new one.
+    - I rebased onto main (`577caa2ff`); the only conflict was the `integration.rs` module list.
+    - No small-diff tag: the change is 43 lines outside `.tasks`.
+  report:
+    commits:
+    - hash: 15a6d7cf1
+      what: copy the standards rules (STD-371) into .tasks/DEV/automation.yml, test
+    checks:
+    - command: cargo nextest run --workspace -E 'test(dev892) | test(dev370)'
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: targeted checks only, the merge runs the suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or CLI change
+    next: Review, then merge; after the merge run lotar trust in the main checkout (rules changed)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A854085c4248d6f5c9a16429c96ad2b629a5d948136b69a3e98de6af32a725cda
 description: |-
   Found by the DEV-793 review, 2026-11-25.
 
@@ -43,7 +75,6 @@ description: |-
   - A release ticket (title `Release vX.Y.Z` or field `release`) isn't set Done by its merge job until `vX.Y.Z` is on origin, or its merge doesn't run the Done rule. There's a test for it.
 tags:
 - health
-- waits
 custom_fields:
   finding: review:release-done-before-tag
 history:
@@ -83,3 +114,33 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:39:06.783116+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A854085c4248d6f5c9a16429c96ad2b629a5d948136b69a3e98de6af32a725cda
+- at: 2026-11-26T19:43:59.354009+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:43:59.776895+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-371"],"related":["DEV-793","DEV-725"]}'
+    new: '{"depends_on":["standards:STD-371"],"related":["DEV-793","DEV-725","DEV-835","DEV-884"]}'
+- at: 2026-11-26T19:44:03.799139+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, waits
+    new: health
+- at: 2026-11-26T19:44:13.174553+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,17 +1,18 @@
 title: lotar agent queue doesn't count the jobs queued in lotar serve's memory
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T14:02:30.792755+00:00
-modified: 2026-11-26T16:56:35.001851+00:00
+modified: 2026-11-26T19:40:51.412262+00:00
 relationships:
   related:
   - DEV-865
   - DEV-864
   - DEV-900
   - DEV-862
+  - DEV-910
 comments:
 - date: 2026-11-26T01:00:37.633350+00:00
   author: claude
@@ -73,6 +74,36 @@ comments:
 - date: 2026-11-26T16:56:35.001851+00:00
   author: claude
   text: 'Stalled since 2026-11-26T16:01Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:40:39.167874+00:00
+  author: claude
+  text: |-
+    Review: passed. `87d878d83` counts the jobs other live processes hold in their own job queue as Queued. One minor follow-up is filed as DEV-910.
+
+    - Read: the diff on `main..HEAD` (one commit; nothing newer on the ticket branch), the comments, DEV-865 (its Done when names this follow-up), and the recent main commits to the 3 Rust files
+    - `register_queued` and `unregister_queued` cover every place `pending_queue` changes (`start`, `cancel_job`, `reset_for_tests`, `process_pending_queue`), and `unregister` removes the record too. Both sides use the same canonical `dir(tasks_dir)`
+    - `records_in` and `list_pending` only read `.json`, `.pending.json` and `.ended`, so a `.queued` file doesn't show up as a running job
+    - `queued_elsewhere` skips this process's own records, so `lotar serve` doesn't count its own jobs twice. Records of dead pids are removed
+    - DEV-865's sum rule is on main (`combined_stats`, `agent_queue_service.rs:1075`). The added line at `:558` builds on it
+    - Test: `queued_counts_the_jobs_other_processes_queue` would give 3 instead of 4 without line `:558`
+    - Minor, filed: DEV-910. `worker_state` (`:518`) still says `idle` ("nothing queued") when only `lotar serve` holds queued jobs, while Queued shows them
+    - Not checked: a live `lotar serve` against the CLI (same as the fix agent). No UI changes, so no screenshots. No stray files
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: cargo nextest run -p lotar-agent -E 'test(queued_counts_the_jobs) | test(queued_records_of_other) | test(records_are_visible)'
+      result: passed
+      reason: 3/3
+    - command: cargo nextest run --workspace -E 'binary_id(lotar-lib::integration) & (test(/agent_safety_test::/) | test(/dev646/) | test(/dev771/) | test(/dev279/))'
+      result: passed
+      reason: 47/47
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10eb79315e69bb050f3ef09b865df6903f423d6fa2c7100ad862ad363ae7c104
 description: '-'
@@ -202,3 +233,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:40:18.138408+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-864","DEV-900","DEV-862"]}'
+    new: '{"related":["DEV-865","DEV-864","DEV-900","DEV-862","DEV-910"]}'
+- at: 2026-11-26T19:40:39.167874+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:40:51.412262+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

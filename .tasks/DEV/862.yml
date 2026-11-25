@@ -1,11 +1,11 @@
 title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-26T17:48:50.142069+00:00
+modified: 2026-11-26T19:39:02.213776+00:00
 relationships:
   related:
   - DEV-584
@@ -120,6 +120,14 @@ comments:
 - date: 2026-11-26T16:56:40.564804+00:00
   author: claude
   text: 'Stalled since 2026-11-26T16:01Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Claude"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:38:58.107758+00:00
+  author: claude
+  text: |-
+    Review: nothing to review. The work is already on main.
+
+    - `git log main..HEAD` is empty: `09c9ae6a0` (DEV-862) is an ancestor of `main` (now `577caa2ff`), and `agent/DEV-862` has no other commits.
+    - The merge landed after comment #5's `test:agent` rerun passed; comment #4 had already passed the review of the earlier `701c218b5`.
+    - Nothing reran; no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
@@ -291,3 +299,16 @@ history:
   changes:
   - field: releases
     new: '#12'
+- at: 2026-11-26T19:38:58.107758+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:39:02.213776+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

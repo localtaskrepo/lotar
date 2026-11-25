@@ -1,11 +1,11 @@
 title: 'An expired provider login fails every job into retries, owner questions and inbox triage: pause that provider''s queue like a signing failure (DEV-604)'
-status: Reviewing
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T16:08:21.742893+00:00
-modified: 2026-11-26T19:18:05.983800+00:00
+modified: 2026-11-26T19:43:59.775719+00:00
 relationships:
   related:
   - DEV-604
@@ -21,6 +21,7 @@ relationships:
   - DEV-786
   - DEV-881
   - DEV-878
+  - DEV-892
 comments:
 - date: 2026-11-24T19:10:54.135862+00:00
   author: automation
@@ -162,6 +163,14 @@ comments:
 - date: 2026-11-26T16:56:21.506478+00:00
   author: claude
   text: 'Stalled since 2026-11-26T16:02Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:38:37.240226+00:00
+  author: claude
+  text: |-
+    Review: nothing to review. The fix is already on `main`.
+
+    - `git log main..HEAD` is empty. `agent/DEV-835` HEAD `e82f2c7ca` is an ancestor of `main` (`577caa2ff`), and the branch has no other commits (`git log HEAD..agent/DEV-835` is empty)
+    - The merge session landed `e82f2c7ca` on 2026-11-26. The 16:56Z "stalled" check then restarted the review on a ticket that had already merged
+    - Next: close the ticket after the merge. The merge ran the full suites, so this job ran no checks
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ff06e8317883aa88fd31e0eb8d7df2aa53ee9d651f0dbc2a23a0118cdec8a29
@@ -427,3 +436,22 @@ history:
   - field: relationships
     old: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864","DEV-793","DEV-786","DEV-881"]}'
     new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864","DEV-793","DEV-786","DEV-881","DEV-878"]}'
+- at: 2026-11-26T19:38:37.240226+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:38:43.647417+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-26T19:43:59.775719+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864","DEV-793","DEV-786","DEV-881","DEV-878"]}'
+    new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864","DEV-793","DEV-786","DEV-881","DEV-878","DEV-892"]}'

@@ -1,11 +1,11 @@
 title: 'Finding bundles: no test covers a finding joining an InProgress bundle whose fix job takes the message'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T04:56:14.463740+00:00
-modified: 2026-11-26T16:57:00.675771+00:00
+modified: 2026-11-26T19:44:24.222530+00:00
 relationships:
   depends_on:
   - DEV-864
@@ -30,8 +30,40 @@ comments:
 - date: 2026-11-26T16:57:00.675771+00:00
   author: claude
   text: 'Stalled since 2026-11-26T13:53Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:44:15.109415+00:00
+  author: claude
+  text: |-
+    Added the missing test: a finding joins an InProgress bundle whose fix job takes the message.
+
+    - Branch fast-forwarded to main (`577caa2ff`), which has DEV-864 (`eeb1ad55d`).
+    - New test `a_finding_joins_an_in_progress_bundle_whose_fix_job_takes_the_message` in `crates/lotar-lib/tests/dev800_finding_bundle_test.rs`.
+    - Stand-in session: the test answers on harnessmux's socket for session `dev891-fix` (scratch `HARNESSMUX_HOME`), as a session owner does, and records the prompt.
+    - `lotar add --finding b:y --bundle health` runs in its own process and reaches the job through that socket.
+    - Asserts: `state: bundled`, id `REPO-1`, the message starts "A new finding joined REPO-1" and holds the `## Red CI` section with ``Finding: `b:y` ``, and the bundle lists `a:x` and `b:y`.
+    - Unix only (`#[cfg(unix)]`): on Windows harnessmux uses named pipes.
+  report:
+    commits:
+    - hash: 3d6bacf39
+      what: test a finding joining an InProgress bundle whose fix job takes the message
+    checks:
+    - command: cargo nextest run --test integration dev800
+      result: passed
+      reason: 7 of 7
+    - command: cargo clippy -p lotar-lib --tests -- -D warnings
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: test-only change, no UI
+    next: 'Merge: run the full suites and land 3d6bacf39'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6dadfbbb42e68dd68425b4eadeda1492dfe8a3eded7363266d1f74b0dcceaa52
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A48897fb147121a4d50f75c87d9eebd57bd4ff8712056ffd9740ef7c8479deb94
 description: |-
   Found in the review of DEV-864 (`78263b6a8`).
 
@@ -100,3 +132,21 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:40:55.879145+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A48897fb147121a4d50f75c87d9eebd57bd4ff8712056ffd9740ef7c8479deb94
+- at: 2026-11-26T19:44:15.109415+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:44:24.222530+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

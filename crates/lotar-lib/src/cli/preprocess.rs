@@ -177,6 +177,10 @@ fn is_log_level(value: &str) -> bool {
     crate::output::LogLevel::from_str(value, true).is_ok()
 }
 
+/// Options of `serve` (and globals given after it) that take the next token as their value.
+const SERVE_VALUE_OPTIONS: &[&str] =
+    &["--host", "--allow-host", "--web-ui-path", "--tasks-dir", "--config", "--format", "--log-level", "--project", "-f", "-l"];
+
 fn normalize_serve_args(raw_args: &[String]) -> Result<Vec<String>, String> {
     let Some(serve_idx) = find_serve_index(raw_args) else {
         return Ok(raw_args.to_vec());
@@ -243,55 +247,12 @@ fn normalize_serve_args(raw_args: &[String]) -> Result<Vec<String>, String> {
             continue;
         }
 
-        // Options that require a value (without =)
-        match token.as_str() {
-            "--host" => {
-                normalized.push(token.clone());
-                pending_value = Some(Cow::Borrowed("--host"));
-                i += 1;
-                continue;
-            }
-            "--tasks-dir" => {
-                normalized.push(token.clone());
-                pending_value = Some(Cow::Borrowed("--tasks-dir"));
-                i += 1;
-                continue;
-            }
-            "--format" => {
-                normalized.push(token.clone());
-                pending_value = Some(Cow::Borrowed("--format"));
-                i += 1;
-                continue;
-            }
-            "--log-level" => {
-                normalized.push(token.clone());
-                pending_value = Some(Cow::Borrowed("--log-level"));
-                i += 1;
-                continue;
-            }
-            "--project" => {
-                normalized.push(token.clone());
-                pending_value = Some(Cow::Borrowed("--project"));
-                i += 1;
-                continue;
-            }
-            "-f" => {
-                normalized.push(token.clone());
-                pending_value = Some(Cow::Borrowed("-f"));
-                i += 1;
-                continue;
-            }
-            "-l" => {
-                normalized.push(token.clone());
-                pending_value = Some(Cow::Borrowed("-l"));
-                i += 1;
-                continue;
-            }
-            _ => {
-                normalized.push(token.clone());
-                i += 1;
-            }
+        // Options that require a value (without =): their value is not the port
+        if let Some(name) = SERVE_VALUE_OPTIONS.iter().find(|name| **name == token) {
+            pending_value = Some(Cow::Borrowed(name));
         }
+        normalized.push(token.clone());
+        i += 1;
     }
 
     if let Some(name) = pending_value {
@@ -468,6 +429,20 @@ mod tests {
         let args = to_vec(&["lotar", "serve", "--host", "0.0.0.0"]);
         let normalized = normalize_args(&args).unwrap();
         assert_eq!(normalized, to_vec(&["lotar", "serve", "--host", "0.0.0.0"]));
+    }
+
+    #[test]
+    fn keeps_web_ui_path_and_allow_host_values_when_port_missing() {
+        let args = to_vec(&["lotar", "serve", "--web-ui-path", "/tmp/web", "--allow-host", "tasks.example", "--port", "18791"]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(normalized, args);
+    }
+
+    #[test]
+    fn keeps_config_value_when_port_missing() {
+        let args = to_vec(&["lotar", "serve", "--config", "server.port=1"]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(normalized, args);
     }
 
     #[test]

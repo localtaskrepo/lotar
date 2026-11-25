@@ -1,11 +1,11 @@
 title: Test a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge still fails on main, also alone
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T04:52:05.701091+00:00
-modified: 2026-11-26T16:57:17.055822+00:00
+modified: 2026-11-26T19:47:08.941866+00:00
 relationships:
   related:
   - DEV-863
@@ -43,6 +43,17 @@ comments:
 - date: 2026-11-26T16:57:17.055822+00:00
   author: claude
   text: 'Stalled since 2026-11-26T12:10Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:47:02.195396+00:00
+  author: claude
+  text: |-
+    Review: passed. The one test-setup line fixes the cause, and the ticket's check passed 5 of 5.
+
+    - Reviewed `87323f0c3` (the only commit on `main..HEAD`; no newer rework branch). It adds `LOTAR_CHECK_LOCK_HELD=1` in `reset_lotar_test_environment` in `crates/lotar-lib/tests/common/mod.rs:256`, the same way as the memory and disk gates. No product code changed, no stray files.
+    - Cause confirmed in the code: `check_lock()` at `crates/lotar-agent/src/services/agent_job_service/merge.rs:306` skips the lock only when the variable is `1`. `scripts/rust-test-runner.mjs:635` sets it for `npm test`, so only direct `cargo nextest` runs waited on port `47586`.
+    - Coverage: the lock's own unit tests in `check_lock.rs` still cover taking and waiting. `the_checks_tell_their_scripts_that_the_check_lock_is_held` now checks only that the variable is passed through, which `npm test` already did.
+    - Reran, with another run holding port `47586` the whole time (load 9-12): `cargo nextest run -p lotar-lib --test integration a_check_that_leaves_a_process_running --retries 0` (variable unset) passed 5 of 5 at about 6.7 s each. All 21 `dev605` tests passed. `rustfmt --check` passed.
+    - Not rerun: the before-fix failure (the fix agent reproduced it at 60.3 s) and the full suite (the merge runs it).
+    - No minor findings and no tickets filed. `npm ci` ran without errors.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1c77d12b46b9314a8da1ae6f7a5fbd0e70c94581544bece67b83c750b703b7a
 description: |-
@@ -109,3 +120,16 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:47:02.195396+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:47:08.941866+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
