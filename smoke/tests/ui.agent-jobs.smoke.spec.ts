@@ -972,7 +972,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         event('agent_job_started', 1) +
                         event('agent_job_progress', 2, { message: 'Session lotar-x (`harnessmux attach lotar-x`).' }) +
                         event('agent_job_progress', 3, { message: 'Wrote .claude/settings.local.json in /tmp/x' }) +
-                        tool(4, 'a', 'completed', 'git status') +
+                        tool(4, 'a', 'completed', 'git status', 'nothing to commit') +
                         tool(5, 'b', 'completed', 'cargo build') +
                         tool(6, 'c', 'failed', 'npm test', 'parser test FAILED') +
                         event('agent_job_message', 7, { message: 'One test fails; fixing the parser.' }) +
@@ -1003,6 +1003,23 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     await expect
                         .poll(() => panel.locator('.tool-call__what').allTextContents())
                         .toEqual(['cargo build']);
+
+                    // A word only in a call's output opens that call and highlights it (DEV-859).
+                    await panel.getByRole('searchbox', { name: 'Search the log' }).fill('commit');
+                    await expect
+                        .poll(() => panel.locator('.tool-call__what').allTextContents())
+                        .toEqual(['git status']);
+                    const output = panel.locator('.tool-call__pre', { hasText: 'nothing to commit' });
+                    await expect.poll(() => output.isVisible()).toBe(true);
+                    await expect
+                        .poll(() =>
+                            page.evaluate(() =>
+                                [...(CSS.highlights.get('job-log-search') ?? [])].map((range) =>
+                                    range instanceof Range ? range.toString() : '',
+                                ),
+                            ),
+                        )
+                        .toEqual(['commit']);
                 });
             } finally {
                 await server.stop();

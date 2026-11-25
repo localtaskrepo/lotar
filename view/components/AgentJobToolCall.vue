@@ -1,5 +1,10 @@
 <template>
-  <details v-if="expandable" class="tool-call" :class="`tool-call--${call.status}`" :open="call.status === 'failed'">
+  <details
+    v-if="expandable"
+    class="tool-call"
+    :class="`tool-call--${call.status}`"
+    :open="call.status === 'failed' || matches"
+  >
     <summary class="tool-call__line">
       <span class="tool-call__glyph" aria-hidden="true">{{ call.glyph }}</span>
       <span class="tool-call__label">{{ call.label }}</span>
@@ -15,9 +20,14 @@
       <template v-if="call.output">
         <span class="tool-call__heading">Output</span>
         <pre class="tool-call__pre" :class="{ 'tool-call__pre--failed': call.status === 'failed' }">{{
-          showAll ? call.output : clipped.text
+          fullOutput ? call.output : clipped.text
         }}</pre>
-        <button v-if="clipped.clipped" type="button" class="tool-call__more" @click="showAll = !showAll">
+        <button
+          v-if="clipped.clipped && !matchClipped"
+          type="button"
+          class="tool-call__more"
+          @click="showAll = !showAll"
+        >
           {{ showAll ? 'Show less' : 'Show all' }}
         </button>
         <span v-if="call.outputBytes" class="tool-call__cut muted"
@@ -41,11 +51,18 @@
 import { computed, ref } from 'vue'
 import { clipOutput, type ToolCall } from '../utils/agentJobLog'
 
-const props = defineProps<{ call: ToolCall }>()
+// `query` is the log's search: a call whose input or output holds it opens, so the highlight shows.
+const props = defineProps<{ call: ToolCall; query?: string }>()
 
 const showAll = ref(false)
 const expandable = computed(() => !!(props.call.input || props.call.output))
 const clipped = computed(() => clipOutput(props.call.output ?? ''))
+const needle = computed(() => props.query?.trim().toLowerCase() ?? '')
+const holds = (text: string | undefined) => !!needle.value && !!text?.toLowerCase().includes(needle.value)
+const matches = computed(() => holds(props.call.input) || holds(props.call.output))
+// A match only past the clipped start shows the whole output.
+const matchClipped = computed(() => clipped.value.clipped && holds(props.call.output) && !holds(clipped.value.text))
+const fullOutput = computed(() => showAll.value || matchClipped.value)
 const statusText = computed(() =>
   props.call.status === 'failed' || props.call.status === 'running' ? props.call.status : '',
 )

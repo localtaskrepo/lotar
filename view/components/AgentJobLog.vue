@@ -84,7 +84,7 @@
               formatLogTime(item.at)
             }}</time>
             <span class="log-kind">Tool</span>
-            <AgentJobToolCall :call="(item.calls[0] as ToolLeaf).call" />
+            <AgentJobToolCall :call="(item.calls[0] as ToolLeaf).call" :query="query" />
           </div>
 
           <details
@@ -103,7 +103,7 @@
               >
             </summary>
             <div class="log-group__calls">
-              <AgentJobToolCall v-for="leaf in item.calls" :key="leaf.key" :call="leaf.call" />
+              <AgentJobToolCall v-for="leaf in item.calls" :key="leaf.key" :call="leaf.call" :query="query" />
             </div>
           </details>
 

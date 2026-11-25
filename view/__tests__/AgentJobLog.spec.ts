@@ -129,6 +129,30 @@ describe('AgentJobLog (DEV-766, DEV-769)', () => {
         expect(wrapper.get('.log-list').text()).not.toContain('Tests pass.')
     })
 
+    it('opens each call whose output holds the search, also past the clipped start', async () => {
+        const long = [...Array.from({ length: 20 }, (_, index) => `line ${index}`), 'npm notice'].join('\n')
+        const entries: AgentJobLogEntry[] = [
+            tool(1, { id: 'a', input: 'make build', output: 'ran npm ci' }),
+            tool(2, { id: 'b', input: 'make test', output: long }),
+            tool(3, { id: 'c', input: 'git status', output: 'clean' }),
+        ]
+        const wrapper = mount(AgentJobLog, { props: { entries } })
+        const calls = () => wrapper.findAll<HTMLDetailsElement>('details.tool-call')
+        expect(calls().map((call) => call.element.open)).toEqual([false, false, false])
+
+        await wrapper.get('input.job-log__search').setValue('npm')
+        expect(wrapper.get('.job-log__matches').text()).toBe('2 matches')
+        expect(wrapper.get<HTMLDetailsElement>('details.log-group--tools').element.open).toBe(true)
+        expect(calls().map((call) => call.element.open)).toEqual([true, true])
+        const outputs = wrapper.findAll('.tool-call__pre').map((pre) => pre.text())
+        expect(outputs).toContain('ran npm ci')
+        expect(outputs.some((text) => text.endsWith('npm notice'))).toBe(true)
+        expect(wrapper.find('.tool-call__more').exists()).toBe(false)
+
+        await wrapper.get('input.job-log__search').setValue('')
+        expect(calls().map((call) => call.element.open)).toEqual([false, false, false])
+    })
+
     it('shows the result once: the final reply in the result card, a repeated failure note dropped', () => {
         const done = mount(AgentJobLog, {
             props: {
