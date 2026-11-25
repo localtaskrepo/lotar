@@ -1,16 +1,17 @@
 title: 'Rule builder: a comment map without a question is called ''comments with a question'''
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T20:00:39.778177+00:00
-modified: 2026-11-26T20:06:50.874148+00:00
+modified: 2026-11-26T20:28:52.794589+00:00
 relationships:
   depends_on:
   - DEV-852
   related:
   - DEV-852
+  - DEV-835
 comments:
 - date: 2026-11-26T01:27:08.234017+00:00
   author: claude
@@ -62,6 +63,30 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-879` onto `main` conflicts in `view/__tests__/automationRules.spec.ts`; lotar aborted the rebase, `agent/DEV-879` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T20:28:46.239422+00:00
+  author: claude
+  text: |-
+    Merged into main and pushed as `6d77a20df`
+
+    - Rebase conflict in `view/__tests__/automationRules.spec.ts`: main (DEV-835) and this ticket each added a new test at the same spot; kept both
+    - Main moved on during the checks, so I rebased again (no conflict) and reran everything on `677e1ee04`
+    - `npm ci`, `lint:agent`, `test:agent` and `smoke` passed (412 smoke tests)
+    - Fast-forwarded main from `97611a47d`, then amended the `.tasks` changes into the commit (`6d77a20df`), then pushed `97611a47d..6d77a20df`
+    - No rule or config files changed, so no `lotar trust` was needed
+  report:
+    commits:
+    - hash: 6d77a20df
+      what: comment maps without a question get their own YAML-only reason
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 412 tests
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8550d9ef314bccf32436fc0a30369bbe508616d4599363b7b3e2c9fe2fd6d8ec
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92224bf0efbfeddca815d33ded1caf820d6f85e3deae5190bfcc8bae1a3c8f34
@@ -179,3 +204,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T20:28:46.239422+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:28:46.648255+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-852"],"related":["DEV-852"]}'
+    new: '{"depends_on":["DEV-852"],"related":["DEV-852","DEV-835"]}'
+- at: 2026-11-26T20:28:52.794589+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

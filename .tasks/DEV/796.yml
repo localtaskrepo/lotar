@@ -1,11 +1,11 @@
 title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T20:15:42.573163+00:00
+modified: 2026-11-26T20:39:30.974843+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -497,6 +497,53 @@ comments:
 - date: 2026-11-26T17:27:56.691326+00:00
   author: claude
   text: 'Correction to the comment above, which lost the ticket ID: the minor finding is [DEV-902](https://lotar.pyxzl.net/task/DEV-902), related to this ticket. It is not blocking.'
+- date: 2026-11-26T20:39:19.760449+00:00
+  author: claude
+  text: |-
+    Rework: finding 1 fixed in `2b01c8b1c`; finding 2 waits on your choice of review runner (question below).
+
+    - Review read `c2c24bcca`, which was HEAD, so the findings applied.
+    - **Finding 1 (comments reach the wrong job):** the rule now fires only on HelpNeeded tickets and on InProgress tickets that `@implement`/`@implement-retry` holds (`agent-team.yml`, "Comments: a person's comment reaches the agent"). A comment during the review or the merge stays on the ticket. The review reads the comments, and a blocking review hands them to the rework. A ticket a person works on stays with them. `docs/help/templates.md` says so.
+    - I dropped Reviewing and Merging from the rule rather than adding a "keep your role" bullet: when no review job runs yet, `tell_agent` starts `@review` with only the comment as its prompt, so the review prompt is never sent and the merge follows anyway.
+    - Tests that fail on the old template:
+      - `shipped_agent_team_template_reworks_a_blocked_review_and_merges`: a person comments while the review job runs. The old template queued a `review` job with the implementer's "commit on your branch" message. Now nothing is queued, and the run still takes exactly 5 jobs.
+      - New `shipped_agent_team_template_tells_implement_only_what_it_should_act_on`: a comment on an InProgress ticket held by `alex` leaves it with `alex` (the old template moved it to `@implement`). A comment on a HelpNeeded ticket starts `@implement` with the comment.
+    - **Finding 2 (review runner):** only you can decide this. See the question.
+  report:
+    commits:
+    - hash: 2b01c8b1c
+      what: agent-team comment rule only tells @implement; tests for a comment during review and on a person's ticket
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(agent_team) | test(agent_templates) | test(shipped_agent)'
+      result: passed
+      reason: 6 passed
+    - command: cargo clippy -p lotar-lib --tests
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change; the merge runs it
+    next: Owner picks the default @review runner (question below), then review again
+- date: 2026-11-26T20:39:20.015668+00:00
+  author: claude
+  text: |-
+    Which runner should agent-team's @review use by default?
+
+    Options:
+    - claude: Claude (as built). A new project works with only one provider installed. The config comment and docs/help/templates.md say to switch @review to a second runner (recommended)
+    - codex: Codex, as the ticket asks (a second provider). A project without Codex then fails its first review until someone changes it
+  question:
+    options:
+    - key: claude
+      label: Claude (as built). A new project works with only one provider installed. The config comment and docs/help/templates.md say to switch @review to a second runner
+    - key: codex
+      label: Codex, as the ticket asks (a second provider). A project without Codex then fails its first review until someone changes it
+    recommended: claude
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
@@ -1077,3 +1124,20 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb541fcd6e15ba778ed8405c010783d3268361f87afb7447799721c914886f23
+- at: 2026-11-26T20:39:19.760449+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:39:20.015668+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:39:30.974843+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

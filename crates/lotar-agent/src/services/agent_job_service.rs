@@ -180,11 +180,77 @@ struct PendingJob {
     profile: AgentProfileDetail,
     tasks_dir: std::path::PathBuf,
     ticket_id: String,
+    /// Built at create; the start builds them again from the ticket and
+    /// `request` ([`PendingJob::current_prompt`]).
     prompt: JobPrompt,
     user_prompt: String,
+    /// The request text as asked, `${{ticket.title}}` not yet filled.
+    request: String,
+    agent: Option<String>,
     config: ResolvedConfig,
     is_merge_job: bool,
     scope: JobScope,
+}
+
+impl PendingJob {
+    /// The prompt from the ticket as it is now: a job can wait in the queue
+    /// for hours, and its title, ticket context and comments change meanwhile
+    /// (DEV-870). The job keeps the settings it was queued with. When the
+    /// ticket or instructions can't be read, the prompt built at create.
+    /// Returns the prompt and the request text with the current title.
+    fn current_prompt(&self) -> (JobPrompt, String) {
+        let storage = Storage::new(&self.tasks_dir);
+        let inputs = PromptInputs {
+            tasks_dir: &self.tasks_dir,
+            config: &self.config,
+            profile: &self.profile,
+            runner_kind: self.runner_kind,
+            agent: self.agent.as_deref(),
+            job_id: &self.job_id,
+            is_merge_job: self.is_merge_job,
+        };
+        TaskService::get(&storage, &self.ticket_id, None)
+            .and_then(|task| inputs.build(&task, &self.request))
+            .unwrap_or_else(|_| (self.prompt.clone(), self.user_prompt.clone()))
+    }
+}
+
+/// What a job's prompt is built from besides the ticket and the request.
+struct PromptInputs<'a> {
+    tasks_dir: &'a std::path::Path,
+    config: &'a ResolvedConfig,
+    profile: &'a AgentProfileDetail,
+    runner_kind: AgentRunnerKind,
+    agent: Option<&'a str>,
+    job_id: &'a str,
+    is_merge_job: bool,
+}
+
+impl PromptInputs<'_> {
+    /// The prompt and the request text with `${{ticket.title}}` filled from
+    /// the ticket's title (DEV-845).
+    fn build(&self, task: &crate::api_types::TaskDTO, request: &str) -> LoTaRResult<(JobPrompt, String)> {
+        let Self { tasks_dir, config, profile, runner_kind, agent, job_id, is_merge_job } = *self;
+        let ticket_id = task.id.as_str();
+        let user_prompt = crate::automation::template::fill_ticket_title(request, &task.title);
+        let context = AgentContextService::load(tasks_dir, config, ticket_id)?;
+        let template = instruction_template(tasks_dir, config, task, job_id, runner_kind, agent);
+        let instructions = resolve_agent_instructions(tasks_dir, config, profile)?.map(|text| template.expand(&text));
+        // A T3 Code thread runs in its project's runtime mode, whatever the
+        // profile's permissions say.
+        let read_only = runner_kind != AgentRunnerKind::T3 && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
+        let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && crate::services::agent_runner::takes_mcp_servers(runner_kind);
+        let mut notes = job_notes(tasks_dir, config, ticket_id, is_merge_job, read_only, lotar_mcp);
+        if runner_kind == AgentRunnerKind::T3 {
+            let reporter = job_reporter(profile, runner_kind);
+            notes.push_str(&t3_thread_notes(tasks_dir, config, ticket_id, is_merge_job, reporter.as_deref()));
+        }
+        let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, ticket_id, agent));
+        let history = PromptHistory { full: profile.full_history.unwrap_or(false), entries: profile.context_entries.unwrap_or(DEFAULT_CONTEXT_ENTRIES) };
+        let mut prompt = build_prompt(task, &user_prompt, context.as_ref(), history, earlier.as_deref(), instructions.as_deref(), Some(&notes));
+        prompt.instructions_source = run_inputs::instructions_source(tasks_dir, config, profile);
+        Ok((prompt, user_prompt))
+    }
 }
 
 struct JobRegistry {
@@ -389,27 +455,13 @@ impl AgentJobService {
             return Err(LoTaRError::ValidationError("Merge agent jobs require agent.worktree.enabled=true so merges run on isolated branches.".to_string()));
         }
 
-        let user_prompt = crate::automation::template::fill_ticket_title(req.prompt.trim(), &task.title);
-        if user_prompt.is_empty() {
+        let request = req.prompt.trim();
+        if crate::automation::template::fill_ticket_title(request, &task.title).is_empty() {
             return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
         }
         let job_id = make_job_id();
-        let context = AgentContextService::load(tasks_dir, &config, &ticket_id)?;
-        let template = instruction_template(tasks_dir, &config, &task, &job_id, runner_kind, req.agent.as_deref());
-        let instructions = resolve_agent_instructions(tasks_dir, &config, &profile)?.map(|text| template.expand(&text));
-        // A T3 Code thread runs in its project's runtime mode, whatever the
-        // profile's permissions say.
-        let read_only = runner_kind != AgentRunnerKind::T3 && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
-        let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && crate::services::agent_runner::takes_mcp_servers(runner_kind);
-        let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp);
-        if runner_kind == AgentRunnerKind::T3 {
-            let reporter = job_reporter(&profile, runner_kind);
-            notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id, is_merge_job, reporter.as_deref()));
-        }
-        let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, &ticket_id, req.agent.as_deref()));
-        let history = PromptHistory { full: profile.full_history.unwrap_or(false), entries: profile.context_entries.unwrap_or(DEFAULT_CONTEXT_ENTRIES) };
-        let mut prompt = build_prompt(&task, &user_prompt, context.as_ref(), history, earlier.as_deref(), instructions.as_deref(), Some(&notes));
-        prompt.instructions_source = run_inputs::instructions_source(tasks_dir, &config, &profile);
+        let inputs = PromptInputs { tasks_dir, config: &config, profile: &profile, runner_kind, agent: req.agent.as_deref(), job_id: &job_id, is_merge_job };
+        let (prompt, user_prompt) = inputs.build(&task, request)?;
 
         let created_at = time::now_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
@@ -519,6 +571,8 @@ impl AgentJobService {
                     ticket_id: ticket_id.clone(),
                     prompt: prompt.clone(),
                     user_prompt: user_prompt.clone(),
+                    request: request.to_string(),
+                    agent: req.agent.clone(),
                     config: config.clone(),
                     is_merge_job,
                     scope,
@@ -6464,16 +6518,8 @@ fn process_pending_queue() {
     // Start the jobs outside the lock
     for pending in started {
         thread::spawn(move || {
-            run_job(
-                pending.job_id,
-                pending.runner_kind,
-                pending.profile,
-                pending.tasks_dir,
-                pending.ticket_id,
-                pending.prompt,
-                pending.user_prompt,
-                pending.config,
-            );
+            let (prompt, user_prompt) = pending.current_prompt();
+            run_job(pending.job_id, pending.runner_kind, pending.profile, pending.tasks_dir, pending.ticket_id, prompt, user_prompt, pending.config);
         });
     }
 }
@@ -7332,10 +7378,55 @@ mod tests {
 
         // No slot limit: only the hold keeps the job queued, also when the
         // queue is tried again (DEV-623).
-        let job = AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-1"), &tasks_dir).unwrap();
+        let request = AgentJobCreateRequest { prompt: "${{ticket.id}} ${{ticket.title}}: do the thing".to_string(), ..dev56_job_request("AJB-1") };
+        let job = AgentJobService::start_job_with_tasks_dir(request, &tasks_dir).unwrap();
         assert_eq!(job.status, "queued");
         process_pending_queue();
         assert!(AgentJobService::waiting_reason(&job.id).unwrap().starts_with("it waits for memory: macOS reports memory pressure warn"));
+    }
+
+    /// DEV-870: a job that waited in the pending queue starts with the
+    /// ticket as it is then, not as it was when the job was queued.
+    #[test]
+    fn a_job_from_the_pending_queue_builds_its_prompt_when_it_starts() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks_dir = tmp.path().join("main").join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(
+            crate::utils::paths::global_config_path(&tasks_dir),
+            "default:\n  project: AJB\nagent:\n  memory_gate:\n    enabled: true\n  worktree:\n    enabled: false\n",
+        )
+        .unwrap();
+        Storage::new(&tasks_dir)
+            .add(&crate::storage::task::Task::new(tasks_dir.clone(), "first".to_string(), crate::types::Priority::from("Medium")), "AJB", None)
+            .unwrap();
+        // SAFETY: test-local override of the queue directory (nextest runs
+        // each test in its own process).
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", tmp.path().join("queue")) };
+        crate::services::memory_gate::hold_for_test(&tasks_dir, "macOS reports memory pressure warn");
+        let request = AgentJobCreateRequest { prompt: "${{ticket.id}} ${{ticket.title}}: do the thing".to_string(), ..dev56_job_request("AJB-1") };
+        let job = AgentJobService::start_job_with_tasks_dir(request, &tasks_dir).unwrap();
+        assert_eq!(job.status, "queued");
+
+        let file = tasks_dir.join("AJB").join("1.yml");
+        let yaml = std::fs::read_to_string(&file).unwrap();
+        std::fs::write(&file, yaml.replace("title: first", "title: The real title")).unwrap();
+
+        let registry = JOB_REGISTRY.lock().unwrap();
+        let pending = registry.pending_queue.iter().find(|pending| pending.job_id == job.id).unwrap();
+        assert!(pending.prompt.text.contains("- Title: first\n"));
+        assert_eq!(pending.user_prompt, "${{ticket.id}} first: do the thing");
+        let (started, user_prompt) = pending.current_prompt();
+        assert!(started.text.contains("- Title: The real title\n"), "{}", started.text);
+        assert!(started.text.contains("${{ticket.id}} The real title: do the thing"), "{}", started.text);
+        assert!(!started.text.contains("first"), "{}", started.text);
+        assert_eq!(user_prompt, "${{ticket.id}} The real title: do the thing");
+
+        // The ticket can't be read at the start: the prompt built at create.
+        std::fs::remove_file(&file).unwrap();
+        let (fallback, user_prompt) = pending.current_prompt();
+        assert_eq!(fallback.text, pending.prompt.text);
+        assert_eq!(user_prompt, pending.user_prompt);
     }
 
     fn dev56_job_request(ticket: &str) -> AgentJobCreateRequest {

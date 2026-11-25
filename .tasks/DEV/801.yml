@@ -1,11 +1,11 @@
 title: Flaky tests
-status: Blocked
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-26T17:48:24.820212+00:00
+modified: 2026-11-26T20:29:01.595735+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -99,6 +99,8 @@ comments:
     Reported again by claude on 2026-11-26.
 
     dev605_merge_without_agent_test (a_check_that_fails_once_then_passes_lands_without_an_agent, a_refused_push_hands_off and others with agent.merge checks): timed out at 60 s in 'Waiting for the machine's check lock', held by another worktree's Rust suite (DEV-883); pass on retry. The tests take the machine's real check lock. DEV-896 job.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
 description: |-
   The repo's flaky list (owner 2026-11-22, "No ticket per flaky test", standards STD-299): a test that fails under machine load and passes when run alone is reported here as a comment (`lotar add "Flaky tests" --finding flaky:tests --tag flaky -D "<test>: <how it failed>, passes alone; <ticket or job>"`), not as a ticket of its own. A test that also fails alone is a bug with its own ticket.
 
@@ -227,3 +229,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T20:29:00.714136+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T20:29:01.595735+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
