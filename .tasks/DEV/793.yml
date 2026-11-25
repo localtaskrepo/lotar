@@ -1,11 +1,11 @@
 title: 'A merge job that ends while its agent waits on a check still lands: DEV-725 (v0.15.6) went to main with smoke failed, and is Done without push or tag'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-26T01:03:28.006079+00:00
+modified: 2026-11-26T05:04:02.538086+00:00
 relationships:
   related:
   - DEV-725
@@ -14,6 +14,7 @@ relationships:
   - DEV-411
   - DEV-604
   - DEV-767
+  - DEV-892
 comments:
 - date: 2026-11-22T18:46:53.150110+00:00
   author: claude
@@ -155,6 +156,32 @@ comments:
       result: not_run
       reason: the merge runs it
     next: Review on another model, then merge
+- date: 2026-11-26T05:03:47.845383+00:00
+  author: claude
+  text: |-
+    Review: passed. `1b2a836ec` fixes both findings of the last review. The gate holds back only lotar's own fast-forward, and a commit retry counts the paused run's reports. I filed one minor follow-up, [DEV-892](https://lotar.pyxzl.net/task/DEV-892).
+
+    - **Read:** the diff (5 files), the ticket and its 9 comments, `ensure_branch_merged`, `run_job`/`start_job`, `merge::run`/`check`/`unpassed_checks`, the release skill, and the last 5 main commits on the touched files.
+    - **Holds:**
+      - The reworked landing (DEV-411) is checked before the gate's `Err` (`agent_job_service.rs` `landed_reworked`). A branch already on main returns before the gate.
+      - The DEV-725 case (failed check, never passed) stays unmerged.
+      - The DEV-780 case (no logged branch) falls back to the ticket's branch.
+      - The `started_at` of lotar's own merge carries over to the agent's start (`merge_started_at`), so the hand-off's `failed` report counts.
+      - A rerun lotar's merge passed (DEV-783) reports `failed` then `passed`, so the latest result wins.
+      - A failed finding check can't trip the gate: it runs after the fast-forward, so the branch is already landed.
+      - The new `CommitRetry` fields are serde-default, so old queue files still load.
+      - The docs in `docs/help/agent.md` match the code.
+    - **Side effect, fine:** `start_job` now keeps the first `main_head_at_start` (`get_or_insert_with`). A hand-off therefore counts main's commits from before lotar's own merge, not from after it. That matches "since the job started" (DEV-411).
+    - **Done-when 2:** DEV-725 is Done, and `v0.15.6` is tagged and installed (`lotar 0.15.6`). The code doesn't stop a release ticket's merge with green checks from setting it Done before its tag is pushed. Filed as [DEV-892](https://lotar.pyxzl.net/task/DEV-892), so it doesn't hold this merge.
+    - **Branch:** one commit, no stray files. It merges cleanly with main `c7d2dd4d6`, 23 commits ahead (`git merge-tree`).
+    - **Reran:**
+      - `npm ci` passed.
+      - `cargo nextest run --cargo-profile dev -p lotar-agent -E 'test(/merge|hand_off|takeover|taken_over|commit_retry|reworked|checks/)'`: 26 of 26 passed.
+      - `npm run -s lint:agent` passed.
+    - **Not run:**
+      - Full `npm test` and `npm run smoke`: the merge runs them.
+      - A build of the branch merged with the current main.
+    - No UI changes, so no screenshots needed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
@@ -355,3 +382,22 @@ history:
   - field: assignee
     old: '@fix-retry'
     new: '@review-claude'
+- at: 2026-11-26T05:03:35.497891+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767"]}'
+    new: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767","DEV-892"]}'
+- at: 2026-11-26T05:03:47.845383+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T05:04:02.538086+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

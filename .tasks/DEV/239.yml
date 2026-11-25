@@ -5,7 +5,10 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-29T01:14:42.029215+00:00
-modified: 2026-10-29T20:38:39.540937+00:00
+modified: 2026-11-26T04:56:08.135738+00:00
+relationships:
+  related:
+  - DEV-798
 comments:
 - date: 2026-10-29T19:53:23.021430+00:00
   text: 'Plan (developer chose per-browser Preferences for the settings): a header button in TaskPanel switches between the side panel and a large centered view (two columns on wide screens: summary, details and activity on the left; people, sprints and custom fields in a sticky right column; single column below ~960px; button hidden on phones where both are full screen). Preferences > Task panel gets ''Open existing tasks in'' and ''Open new tasks in'' (Side panel | Large view, default Side panel); each open of the panel starts from them, switching applies until the panel closes and survives moving to another task. Files: view/utils/preferences.ts, view/components/TaskPanel.vue, view/pages/Preferences.vue, docs/help/preferences.md + serve.md. Checks: unit tests (toggle, preference choice), smoke with screenshots at 1440/1024/390, lint/test/smoke.'
@@ -73,3 +76,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-11-26T04:56:08.135738+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-798"]}'

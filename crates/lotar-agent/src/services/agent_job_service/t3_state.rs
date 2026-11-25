@@ -87,14 +87,19 @@ fn ask(command: &mut Command, thread: &str, link: Option<String>) -> AgentJobT3T
     }
 }
 
-/// The state of a thread `t3 thread show --json` describes.
+/// The state of a thread `t3 thread show --json` describes. A question for
+/// the owner wins over everything; a thread that ended its turn on
+/// `t3_background_wait` (T3 shows it `waiting` or `completed`) still works
+/// (DEV-857): its job ends after the wake run.
 pub(super) fn from_shown(thread: &str, link: Option<String>, shown: &serde_json::Value) -> AgentJobT3Thread {
     let status = shown.get("status").and_then(serde_json::Value::as_str).map(str::to_string);
     let active = shown.get("activeRunId").is_some_and(|run| !run.is_null());
-    let state = if t3_thread_waits(shown) || status.as_deref() == Some("waiting") {
+    let state = if t3_thread_waits(shown) {
         "waiting"
-    } else if active {
+    } else if active || waits_on_background_work(shown) {
         "running"
+    } else if status.as_deref() == Some("waiting") {
+        "waiting"
     } else {
         match status.as_deref() {
             Some("running" | "preparing" | "queued" | "starting") => "running",
@@ -115,6 +120,12 @@ pub(super) fn from_shown(thread: &str, link: Option<String>, shown: &serde_json:
         updated_at: shown.get("updatedAt").and_then(serde_json::Value::as_str).map(str::to_string),
         checked_at: crate::utils::time::now_rfc3339(),
     }
+}
+
+/// Whether the thread waits on its background commands or on another thread.
+fn waits_on_background_work(shown: &serde_json::Value) -> bool {
+    shown.get("pendingBackgroundTasks").and_then(serde_json::Value::as_array).is_some_and(|tasks| !tasks.is_empty())
+        || shown.get("blockedOnThreadWait").and_then(serde_json::Value::as_bool) == Some(true)
 }
 
 fn unavailable(thread: Option<String>, link: Option<String>, reason: &str) -> AgentJobT3Thread {
@@ -202,6 +213,19 @@ mod tests {
         assert_eq!(state(serde_json::json!({"status": "failed"})), "failed");
         assert_eq!(state(serde_json::json!({"status": "interrupted"})), "stopped");
         assert_eq!(state(serde_json::json!({"status": "something-new"})), "unknown");
+    }
+
+    #[test]
+    fn a_thread_waiting_on_background_work_runs() {
+        let state = |shown: serde_json::Value| from_shown("t", None, &shown).state;
+        assert_eq!(state(serde_json::json!({"status": "completed", "activeRunId": null, "pendingBackgroundTasks": [{"id": "bg:1"}]})), "running");
+        assert_eq!(state(serde_json::json!({"status": "completed", "activeRunId": null, "blockedOnThreadWait": true})), "running");
+        assert_eq!(state(serde_json::json!({"status": "completed", "pendingBackgroundTasks": [], "blockedOnThreadWait": false})), "finished");
+        assert_eq!(state(serde_json::json!({"status": "completed", "pendingRequestCount": 1, "blockedOnThreadWait": true})), "waiting");
+        assert_eq!(state(serde_json::json!({"status": "waiting", "activeRunId": null, "pendingBackgroundTasks": ["npm test"]})), "running");
+        assert_eq!(state(serde_json::json!({"status": "waiting", "activeRunId": null, "blockedOnThreadWait": true})), "running");
+        assert_eq!(state(serde_json::json!({"status": "waiting", "pendingRequestCount": 1, "pendingBackgroundTasks": ["npm test"]})), "waiting");
+        assert_eq!(state(serde_json::json!({"status": "waiting", "pendingBackgroundTasks": [], "blockedOnThreadWait": false})), "waiting");
     }
 
     #[test]

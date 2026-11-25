@@ -1,11 +1,11 @@
 title: REST test for GET /api/jobs/t3-thread (400, 404, unavailable)
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T22:44:17.550162+00:00
-modified: 2026-11-26T01:07:05.339697+00:00
+modified: 2026-11-26T06:09:55.991272+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -130,10 +130,37 @@ comments:
 - date: 2026-11-26T01:00:50.598257+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-872. It starts once they are done.'
+- date: 2026-11-26T06:09:47.550718+00:00
+  author: claude
+  text: |-
+    DEV-872 is done; the REST test from the earlier round passes, no new changes.
+
+    - Commit `9305ce413` (signed) adds `the_t3_thread_route_answers_each_jobs_thread_and_refuses_other_jobs` to `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`; only that file changed
+    - `cargo nextest run --workspace --test integration dev503`: 54/54 passed
+    - That run needs the `lotar` binary built first (`cargo build --workspace`); without it every dev503 test panics with "lotar is missing next to ..."
+    - Branch is 10 commits behind `main`; not rebased here, the merge does that
+  report:
+    commits:
+    - hash: 9305ce413
+      what: REST test for GET /api/jobs/t3-thread
+    checks:
+    - command: cargo nextest run --workspace --test integration dev503
+      result: passed
+      reason: 54/54 after cargo build --workspace
+    - command: rustfmt --edition 2024 --check crates/lotar-lib/tests/dev503_harness_jobs_test.rs
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests
+      result: passed
+      reason: no warnings
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Merge agent rebases agent/DEV-858 onto main (10 commits behind) and lands it
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aff4b1c83e2cf0d2436f0b72ea63e6750f769de0de33c35f3204adaa0b9888d2d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad158317efeb4c09caef52d93f060c84098ee0ec393e83112798470246e9fa9e3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A008fc82fbca2290200a5087eb98a48d25fb2b2b77db1f4a489f774478f3610cd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3f070c2184ccf6c7e741f30b13bddb6e1604f63d54e346c81876d11742ba4c06
 description: |-
   Found in the DEV-849 review: the endpoint in `crates/lotar-lib/src/routes/jobs.rs` has unit tests for parsing and mapping and a UI test, but no REST test. The 400 for a non-t3 job, 404 for an unknown job, and Unavailable from a failing `t3` were only checked by hand.
 
@@ -335,3 +362,27 @@ history:
   - field: assignee
     old: claude
     new: '@fix'
+- at: 2026-11-26T06:07:52.982282+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T06:07:53.493766+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3f070c2184ccf6c7e741f30b13bddb6e1604f63d54e346c81876d11742ba4c06
+- at: 2026-11-26T06:09:47.550718+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:09:55.991272+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

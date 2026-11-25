@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-20T05:17:29.812031+00:00
-modified: 2026-11-22T19:39:31.259681+00:00
+modified: 2026-11-26T05:03:35.496989+00:00
 relationships:
   related:
   - DEV-702
@@ -43,6 +43,7 @@ relationships:
   - DEV-799
   - DEV-464
   - DEV-804
+  - DEV-892
 comments:
 - date: 2026-11-21T15:01:56.811998+00:00
   author: claude
@@ -456,3 +457,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464"]}'
     new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464","DEV-804"]}'
+- at: 2026-11-26T05:03:35.496989+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464","DEV-804"]}'
+    new: '{"related":["DEV-702","DEV-714","DEV-729","DEV-734","DEV-747","DEV-711","DEV-726","DEV-740","DEV-754","DEV-755","DEV-763","DEV-771","DEV-760","DEV-786","DEV-756","DEV-757","DEV-761","DEV-764","DEV-793","DEV-739","DEV-762","DEV-779","DEV-780","DEV-781","DEV-783","DEV-765","DEV-766","DEV-770","DEV-772","DEV-773","DEV-775","DEV-776","DEV-799","DEV-464","DEV-804","DEV-892"]}'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T05:09:26.871873+00:00
-modified: 2026-11-26T01:02:08.965195+00:00
+modified: 2026-11-26T04:56:17.584902+00:00
 relationships:
   related:
   - DEV-798
@@ -60,6 +60,12 @@ comments:
     - Reran: `npm ci` ok; `cargo nextest run -p lotar-agent -E 'test(queued_adds) | test(each_waiting_entry)'` 2/2 passed; `npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobs.spec.ts` 32/32 passed; `rustfmt --check` and `prettier --check` on the changed files: clean
     - UI: read the fix agent's before/after screenshots (before 3/4, after 4/4, light and dark at 1920/1440/390). My own run: scratch `lotar serve` from this branch, 1 running job, 1 queued in the server, 3 tickets in the queue file. API `queue_stats.queued` 4; page shows 4 at the top and 4 in the tab in all 6 shots (`/tmp/rev865/shots/`). No layout problems
     - Found while setting it up, not caused by this change: a relative `--tasks-dir .tasks` shares one queue file across repos, and 7 DEV/STD tickets wait there with no worker. Filed DEV-887 (related)
+- date: 2026-11-26T04:56:17.584902+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-865` onto `main` conflicts in `docs/help/agent.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-865` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9ec040da7165f66ae7f20beab25592efd7239b25810382cf64cb6177d4cf70ed
 - attachment: after-dark-1440.f5c3d0549f2cecff8883f0c457c143a9.png
@@ -294,3 +300,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T04:56:17.584902+00:00
+  actor: automation
+  changes:
+  - field: comment_added

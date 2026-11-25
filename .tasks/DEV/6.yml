@@ -5,7 +5,10 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.720192+00:00
-modified: 2026-10-29T19:07:39.474571+00:00
+modified: 2026-11-26T05:07:32.139426+00:00
+relationships:
+  related:
+  - DEV-825
 comments:
 - date: 2026-09-06T11:21:52.641675+00:00
   text: 'Backlog reconciliation: Remains Todo: MarkdownContent currently renders sanitized GFM without task-ID transformation or hover-card binding. Existing general task hover components do not fulfill markdown references. Remaining acceptance: recognize task references while preserving code blocks/ordinary links and sanitization, then attach the shared hover UI.'
@@ -81,3 +84,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-11-26T05:07:32.139426+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-825"]}'

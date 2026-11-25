@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T22:44:15.700672+00:00
-modified: 2026-11-26T01:04:36.246649+00:00
+modified: 2026-11-26T05:04:14.795715+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -190,6 +190,12 @@ comments:
     - Reran: `cargo nextest run -p lotar-agent t3_state` (7 passed), `cargo clippy -p lotar-agent --all-targets -- -D warnings` (clean), `rustfmt --edition 2024 --check` on the file (clean).
     - UI: no page, component or style changed, only which existing label shows. So there were no screenshots to check and I didn't start the app.
     - No minor tickets filed.
+- date: 2026-11-26T05:04:14.795715+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-857` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-857` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a8fde63d3da51b14097b1f1ced5fc01af6d027e69cfab0dfe58d128c01170e4
@@ -419,3 +425,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T05:04:14.795715+00:00
+  actor: automation
+  changes:
+  - field: comment_added

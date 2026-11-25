@@ -1,11 +1,11 @@
 title: 'JSON comment lists leave deleted comments out without their #N, so counting positions picks the wrong comment for --edit/--delete'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-23T07:19:10.376712+00:00
-modified: 2026-11-26T01:04:41.166758+00:00
+modified: 2026-11-26T06:07:50.350987+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -209,6 +209,19 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review on another model, then the merge agent lands 4aa38189b
+- date: 2026-11-26T06:07:41.124776+00:00
+  author: claude
+  text: |-
+    Review: passed. `4aa38189b` does all three "Done when" items and nothing beyond them.
+
+    - **Read:** the diff of `main..HEAD` (one commit; `agent/DEV-828` has nothing HEAD lacks), the ticket, DEV-809, DEV-832 and DEV-876 (no overlap, no second copy of the fix), and the `git log -5 main` history of the touched files (nothing since `8180a5e1e` DEV-809).
+    - **Correctness:** `render_comment_list` and `handle_show` number comments by their stored index (`listed_comments` / `enumerate` run before the filter), so `number` is the `#N` that `--edit/--delete/--restore` take. Deleted comments still stay out. `comment --deleted` lists 1, 2, 3.
+    - **Test:** `json_lists_number_comments_as_stored` deletes #2 of three and expects 1 and 3 from both `comment` and `show`. It would fail on main, which has no `number` field (`.as_u64().unwrap()` panics).
+    - **Consumers:** the extra key is additive. `TaskComment.extra` and the standards `inbox.test.ts` only read named fields. `docs/help/comment.md` documents `number`.
+    - **Reran:** `npm ci` (ok); `cargo nextest run -E 'binary(integration) & test(/dev809|dev18_|dev488|dev327|output_format|comment/)'` (107 passed); `cargo clippy -p lotar-lib --all-targets -- -D warnings` (clean); `rustfmt --check` and `prettier --check` on the changed files (clean). The worktree is still clean.
+    - **Note:** a first run with `-p lotar-lib` failed with "lotar is missing" because this fresh worktree had no binary. The workspace run above passed, so the code is not at fault.
+    - **Not run:** `npm run lint`, `npm test`, `npm run smoke` (the merge runs them). No UI changes, so no UI review was needed.
+    - **Tickets filed:** none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60
@@ -527,3 +540,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T06:07:41.124776+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T06:07:50.350987+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

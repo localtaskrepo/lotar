@@ -1,11 +1,11 @@
 title: 'Agents page tab counts disagree with the queue it lists: All 0 beside 3 waiting tickets, Queued counts prerequisite waits'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:10:25.728494+00:00
-modified: 2026-11-26T03:47:14.094301+00:00
+modified: 2026-11-26T04:56:14.835219+00:00
 relationships:
   depends_on:
   - DEV-771
@@ -19,6 +19,7 @@ relationships:
   - DEV-800
   - DEV-865
   - DEV-769
+  - DEV-239
 comments:
 - date: 2026-11-22T21:10:09.829931+00:00
   author: claude
@@ -262,6 +263,30 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-798` onto `main` conflicts in `docs/help/agent.md`, `view/pages/AgentJobs.vue`; lotar aborted the rebase, `agent/DEV-798` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T04:56:07.692071+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `c7d2dd4d6` is on main and on origin.
+
+    - **Rebase:** the conflicts with DEV-769 (`56de78e33`) in `view/pages/AgentJobs.vue` and `docs/help/agent.md` came apart cleanly. I kept main's `searchedJobs` counts and its T3 docs line, then added the fix: All = `searchedJobs.value.length + queueWaiting.value`, Queued = `… + queuePending.value`, and the docs sentence on the count rule. The rebased commit is `48e3928a8`. I amended the main checkout's `.tasks` changes into it, which gives `c7d2dd4d6`
+    - **Checks:** all ran on the rebased commit. `npm ci`, `lint:agent` and `test:agent` passed. The first `test:agent` run was stopped by my harness's 30-minute background limit, not by a failure; the rerun passed
+    - **Smoke:** the first full run failed 1 test, `smoke/tests/ui.task-view.smoke.spec.ts` (DEV-239 large view centering, `|wall-clock|` group). The panel was 18.9 px off center, likely read mid-transition. It doesn't touch the Agents page, passed 3 of 3 runs alone, and the full rerun passed 411 of 411. It is already in the wall-clock group
+    - **Trust:** not needed, no rule or config files changed
+  report:
+    commits:
+    - hash: c7d2dd4d6
+      what: tab counts include waiting tickets; Queued leaves out prerequisite waits (with the day's ticket files)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2558 Rust, 1622 Vitest
+    - command: npm run -s smoke
+      result: passed
+      reason: 411 on the second run; the first failed 1 wall-clock test (ui.task-view), which then passed 3 of 3 alone
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f2cf92fa6872f2c564eefe71cdf3f838044e29cd640d405d056eb3a11d82d3b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77140068723ec150f5d9f0e01ad962d4aec2578c1a4725d7c5a0232c48bd8cb2
@@ -297,9 +322,6 @@ description: |-
   Done when: All and Queued tab counts include the waiting tickets consistently with the top counts; a Vitest covers it.
 tags:
 - ui
-- job-paused
-- fix-retried
-- review-returned
 history:
 - at: 2026-11-22T19:10:26.105371+00:00
   actor: claude
@@ -726,3 +748,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T04:56:07.692071+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T04:56:08.136067+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834","DEV-833","DEV-800","DEV-865","DEV-769"]}'
+    new: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834","DEV-833","DEV-800","DEV-865","DEV-769","DEV-239"]}'
+- at: 2026-11-26T04:56:14.835219+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: ui, job-paused, fix-retried, review-returned
+    new: ui

@@ -1,0 +1,32 @@
+title: 'Finding bundles: no test covers a finding joining an InProgress bundle whose fix job takes the message'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T04:56:14.463740+00:00
+modified: 2026-11-26T04:56:15.109519+00:00
+relationships:
+  related:
+  - DEV-864
+description: |-
+  Found in the review of DEV-864 (`78263b6a8`).
+
+  - `crates/lotar-lib/tests/dev800_finding_bundle_test.rs` tests only the refusals (gone session, merge job) and that `FindingService::open_bundle` returns the job.
+  - The path the feature exists for is untested: `lotar add --finding --bundle` sends the section through `tell_running_job`, gets `true`, and the finding joins the bundle (`state: bundled`).
+
+  ## Done when
+
+  - [ ] A test runs `lotar add --finding <key> --bundle health` against an InProgress bundle whose fix job takes the message (a harnessmux session this test owns, or a stand-in), and asserts the message text arrived and the output is `{"state": "bundled"}` with the bundle's id.
+history:
+- at: 2026-11-26T04:56:14.783444+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-864"]}'
+- at: 2026-11-26T04:56:15.109519+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,0 +1,35 @@
+title: A release ticket's merge job still sets it Done before its tag is pushed when the checks pass
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T05:03:35.190384+00:00
+modified: 2026-11-26T05:03:36.055025+00:00
+relationships:
+  related:
+  - DEV-793
+  - DEV-725
+description: |-
+  Found by the DEV-793 review, 2026-11-25.
+
+  ## What happened
+  - DEV-793's Done-when asks: "A release ticket isn't set Done before its tag is pushed". Its fix (`1b2a836ec`) gates lotar's fast-forward on checks reported passed, which stops the DEV-725 route (smoke failed). It doesn't look at tags.
+  - A release ticket whose merge job lands with green checks still completes, so `job_completed` rules set it Done. That happens before the release skill's step 4 (signed tag, pushed) and step 7 (close the release ticket): `.github/skills/release/SKILL.md`.
+
+  ## How to check
+  - `grep -n 'tag' crates/lotar-agent/src/services/agent_job_service.rs`: `ensure_branch_merged` and `finalize_job` don't check for a release tag.
+  - `.lotar.yml` / `lotar config show --project DEV`: the merge job's `job_completed` rule sets Done for every ticket.
+
+  ## Done when
+  - A release ticket (title `Release vX.Y.Z` or field `release`) isn't set Done by its merge job until `vX.Y.Z` is on origin, or its merge doesn't run the Done rule. There's a test for it.
+tags:
+- health
+custom_fields:
+  finding: review:release-done-before-tag
+history:
+- at: 2026-11-26T05:03:36.055025+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

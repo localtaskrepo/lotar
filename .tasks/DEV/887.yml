@@ -1,11 +1,11 @@
 title: 'A relative --tasks-dir (.tasks) gives every repo the same agent queue file: DEV and STD tickets wait in it with no worker'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T01:01:39.223004+00:00
-modified: 2026-11-26T04:43:07.453286+00:00
+modified: 2026-11-26T04:58:48.249571+00:00
 relationships:
   related:
   - DEV-865
@@ -16,6 +16,41 @@ relationships:
   - DEV-850
   - DEV-872
   - DEV-889
+comments:
+- date: 2026-11-26T04:58:34.505827+00:00
+  author: claude
+  text: |-
+    Fixed: the agent queue is keyed by the tasks dir's real path, so `.tasks` and its absolute path share one queue and repos no longer share one.
+
+    - `canonical_tasks_dir` (`crates/lotar-agent/src/services/agent_queue_service.rs`): canonicalizes, or makes absolute a folder that doesn't exist yet. Used for the queue file, worker lock, the queue's recorded `tasks_dir`, the memory-gate state (`memory_gate.rs`), and now also active jobs and end actions, which already canonicalized.
+    - Caller: lotar 0.15.6 passed `--tasks-dir .tasks` through unchanged (the `lotar-dev-tracking` skill tells agents to use it). DEV-822 already makes CLI paths absolute on main; this change protects the queue whichever way a caller spells the path, `/tmp` vs `/private/tmp` included.
+    - Real repos keep their queue files: `realpath` of the lotar and standards `.tasks` equals the path already hashed.
+    - Test `relative_tasks_dir_shares_the_absolute_paths_queue`: queue with `.tasks` from one repo, list with the absolute path → same entry; another repo's `.tasks` → empty. Fails before the fix.
+    - `agent_safety_test.rs` wrote a queue file under the raw temp path; it now hashes the canonical one.
+    - The 7 old entries: all their tickets are Done or Merging; file left untouched, noted on [DEV-889](https://lotar.pyxzl.net/task/DEV-889) (owner decides).
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: ca7122f52
+      what: queue, worker lock and memory-gate paths keyed by the canonical tasks dir; test; agent.md
+    checks:
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+      reason: 255 tests; new test fails without the fix
+    - command: cargo nextest run --workspace integration filter agent|queue|memory_gate|relative|dev860|dev822|tasks_dir
+      result: passed
+      reason: 222 tests
+    - command: dev605_merge_without_agent_test alone, --retries 0, twice
+      result: passed
+      reason: flaky once under load, already in the wall-clock group
+    - command: cargo clippy --workspace --all-targets
+      result: passed
+    - command: rustfmt and prettier on changed files
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    next: 'Review, then merge. The 7 old entries: owner''s call in DEV-889'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8013082b72e0bfd4b9e6194ee238a6d9d376eecd3f849f16d034532dfc5bd182
 description: |-
@@ -92,3 +127,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872"]}'
     new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889"]}'
+- at: 2026-11-26T04:58:34.505827+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T04:58:48.249571+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

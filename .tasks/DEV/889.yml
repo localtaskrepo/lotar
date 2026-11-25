@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T04:43:07.453524+00:00
+modified: 2026-11-26T04:58:33.643514+00:00
 relationships:
   related:
   - DEV-860
@@ -16,6 +16,16 @@ relationships:
   - DEV-850
   - DEV-872
   - DEV-887
+comments:
+- date: 2026-11-26T04:58:33.643514+00:00
+  author: claude
+  text: |-
+    State of the 7 stranded entries on 2026-11-25 (from DEV-887): all their tickets moved on without them.
+
+    - DEV-849, DEV-848, DEV-827, DEV-872, STD-336, STD-359: `Done`
+    - DEV-850: `Merging`
+    - Requeueing any of them would rerun finished work; the file (`queue-b06823c0….json`) is untouched.
+    - DEV-887 (`ca7122f52`) keys the queue by the canonical tasks dir, so no new `.tasks` entries land there.
 description: |-
   Found (DEV-860 review): `~/Library/Caches/lotar/agent-queue/queue-b06823c05bdb7cda4004b1281c7001744d021ba39e3f81993eb5805f188f6f3e.json` (tasks_dir `.tasks`, last written 2026-11-25 22:14Z) holds DEV-850, DEV-849, DEV-848, DEV-827, STD-336, DEV-872 and STD-359. Since DEV-822 the resolver makes the path absolute, so nothing reads that file again.
 
@@ -45,3 +55,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872"]}'
     new: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-887"]}'
+- at: 2026-11-26T04:58:33.643514+00:00
+  actor: claude
+  changes:
+  - field: comment_added
