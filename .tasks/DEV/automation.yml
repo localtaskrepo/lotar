@@ -162,7 +162,7 @@ automation:
           agent:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
-            prompt: |
+            prompt: &research-prompt |
               Research ticket ${{ticket.id}} ("${{ticket.title}}"): answer its question. Change no code. Run lotar with
               LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex).
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
@@ -1154,6 +1154,17 @@ automation:
         manual:
           tell_agent:
             message: *fix-prompt
+    # An answered "Retry with @research" sets only the assignee; when that starts no job, repos.ts sets the ticket
+    # InProgress and runs this (STD-345).
+    - name: "Stalled: restart the research agent"
+      when:
+        all:
+          - status: InProgress
+          - assignee: "@research"
+      on:
+        manual:
+          tell_agent:
+            message: *research-prompt
     # A Blocked fix ticket whose prerequisites are all in its repo and done but whose unblocked event was lost: lotar
     # replays unblocked only across repos (lotar DEV-663), so repos.ts sets it InProgress and runs this, which keeps the
     # unblocked message and its release-check branch; the fix prompt would have it fix what the owner decides (STD-201).
