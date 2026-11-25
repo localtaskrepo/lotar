@@ -1346,3 +1346,24 @@ describe('AgentJobs queue of every process (DEV-771)', () => {
         }
     })
 })
+
+describe('AgentJobs Max parallel stat (DEV-856)', () => {
+    it.each([
+        [0, '0', 'Max parallel (paused)'],
+        [null, '∞', 'Max parallel'],
+        [3, '3', 'Max parallel'],
+    ])('shows max_parallel %s as %s', async (maxParallel, value, label) => {
+        ;(api.listAgentJobs as any).mockResolvedValue({
+            jobs: [],
+            queue_stats: { running: 0, queued: 0, max_parallel: maxParallel },
+        })
+        const wrapper = await mountAgentJobs()
+        try {
+            const stat = wrapper.findAll('.queue-stats-card .stat-item')[2]!
+            expect(stat.find('.stat-value').text()).toBe(value)
+            expect(stat.find('.stat-label').text()).toBe(label)
+        } finally {
+            wrapper.unmount()
+        }
+    })
+})

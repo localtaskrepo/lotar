@@ -1,11 +1,47 @@
 title: A bad value in the home config's agents block drops every agent profile, and config validate still passes
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-25T22:17:22.988210+00:00
+modified: 2026-11-26T02:12:07.259532+00:00
+comments:
+- date: 2026-11-26T02:11:58.070807+00:00
+  author: claude
+  text: |-
+    Fixed: `config validate` fails on a bad home config and names the key; every load warns that the home config is ignored.
+
+    - Cause: one bad value fails the whole `~/.lotar` parse, and every load skips the home layer silently (`if let Ok(...)`); validate never looked at the home config
+    - `crates/lotar-core/src/config/normalization.rs`: the parse error names the key path, found by dropping one key at a time: `Invalid type for config field 'agents.bad.stall_timeout_seconds'` (key names only, values may be credentials)
+    - `crates/lotar-core/src/config/persistence.rs`: `load_home_config` warns once per run on stderr: `Home config … is ignored: … Run lotar config validate.`
+    - `crates/lotar-lib/src/cli/handlers/config/validate.rs`: `Invalid home config (~/.lotar): …`, exit 1
+    - Ticket check with the new build: validate fails with exit 1 and names `agents.bad.stall_timeout_seconds`; `config show` prints the warning
+    - Tests: `names_the_agent_profile_and_key` (unit), `test_config_validate_fails_on_unparsable_home_agent_profile` (CLI); doc in `docs/help/config.md`
+    - Guidance: no durable finding
+  report:
+    commits:
+    - hash: 73ef3fa65
+      what: validate fails on an unparsable home config, naming the key; loads warn once
+    checks:
+    - command: cargo nextest run -p lotar-core
+      result: passed
+    - command: cargo nextest run -p lotar-lib -E 'test(/config/)'
+      result: passed
+    - command: cargo clippy -p lotar-core -p lotar-lib --all-targets
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: merge runs full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: merge runs full suites
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs full suites
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5c0e14fefe77d3359acb346194b4cf06156d9ad0840605fb0ea326fa090959f
 description: 'Found (STD-360): in a home .lotar whose agents block sets stall_timeout_seconds: notanumber on one profile, lotar --format json config show lists no agent_profiles at all, and lotar config validate prints ''Global configuration is valid''. A one-character typo in one profile silently removes all of them, so no job starts. Check: HOME=<tmp> with that .lotar, run lotar config validate and lotar --format json config show. Done: validate names the profile and key and fails, and the other profiles still load (or the load fails loudly).'
 tags:
 - health
@@ -17,3 +53,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T02:07:23.362466+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T02:07:24.110149+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5c0e14fefe77d3359acb346194b4cf06156d9ad0840605fb0ea326fa090959f
+- at: 2026-11-26T02:11:58.070807+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:12:07.259532+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

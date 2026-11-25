@@ -30,8 +30,8 @@
           ><span class="stat-value queued">{{ queueStats.queued }}</span> <span class="stat-label">Queued</span></span
         >
         <span class="stat-item"
-          ><span class="stat-value">{{ queueStats.max_parallel || '∞' }}</span>
-          <span class="stat-label">Max parallel</span></span
+          ><span class="stat-value">{{ queueStats.max_parallel ?? '∞' }}</span>
+          <span class="stat-label">Max parallel{{ queueStats.max_parallel === 0 ? ' (paused)' : '' }}</span></span
         >
       </div>
       <div v-if="profiles.length" class="profile-list" aria-label="Agent profiles">

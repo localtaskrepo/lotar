@@ -1,11 +1,11 @@
 title: 'A t3 job paused on Claude''s weekly limit retries hourly: the reset time is only in the thread''s message'
-status: Blocked
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-24T21:39:09.103486+00:00
-modified: 2026-11-25T23:16:33.412388+00:00
+modified: 2026-11-26T02:20:44.020189+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-31
@@ -29,9 +29,36 @@ comments:
 - date: 2026-11-25T23:16:33.412388+00:00
   author: claude
   text: 'Stalled since 2026-11-25T22:12Z with no lotar job: the live check restarted @fix-retry, its prerequisites are done (lotar rule "Prerequisites done: continue the waiting ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T02:20:27.074051+00:00
+  author: claude
+  text: |-
+    Fixed: lotar now uses harnessmux 0.3.1, which gives a t3 limit failure the reset from T3's own notice.
+
+    - Released harnessmux `v0.3.1` (signed tag on `f481466`, `origin/main`); release.yml run `45740889916` built it and published the crate. Its AGENTS.md lets agents release harnessmux.
+    - `Cargo.toml`/`Cargo.lock`: harnessmux `0.3.0` → `0.3.1`.
+    - New test `a_t3_limit_waits_for_the_reset_t3s_notice_names` (`crates/lotar-agent/src/services/usage_limit.rs`): the failure as harnessmux builds it for the 2026-11-23 run, with `resets_at` from the notice, resumes at that reset, not after the default hour.
+    - No end-to-end test with a fake T3 server: that needs harnessmux's fake MCP/OAuth server, which harnessmux's own `usage_limit_notice_gives_the_reset` covers.
+  report:
+    commits:
+    - hash: '514851624'
+      what: bump harnessmux to 0.3.1, test a t3 limit failure waits for the notice's reset
+    checks:
+    - command: cargo nextest run usage_limit t3 (lotar-agent)
+      result: passed
+    - command: cargo nextest run dev584
+      result: passed
+    - command: cargo clippy -q -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check usage_limit.rs
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Merge agent/DEV-855
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae62a87351aceefc08e381281dfb92af0b04239bbe4ef6d135c49d6cf3e112f84
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aef83f80acc839a4d7f09243dd7af7e36aef01d903c74244e1c1fdcf59d5f736b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75d02c736f9646ff354d91f5d9b1481893dac76c53bc7d7bf0d4b9f86e7f05f
 description: 'Found 2026-11-24 (DEV-832): DEV-811''s t3 jobs on 2026-11-23 paused with `after the default wait (the provider named no reset time)` and retried every hour until the reset. The runner error was `Usage limit reached: Claude API rate limit reached. Try again later.`; the reset was only in the job''s agent message `You''ve hit your weekly limit · resets Nov 24 at 8am (America/Los_Angeles)`, which usage_limit.rs ignores on purpose (DEV-711: the agent''s words don''t count). Check: `lotar agent logs job-20261123T085509.723Z-112`. Done: a t3 job paused on such a limit waits until the reset that line names (for example, read T3''s own limit notice, not the agent''s replies), with a test.'
 tags:
 - health
@@ -117,3 +144,27 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T02:12:14.622698+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T02:12:15.529561+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae75d02c736f9646ff354d91f5d9b1481893dac76c53bc7d7bf0d4b9f86e7f05f
+- at: 2026-11-26T02:20:27.074051+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:20:44.020189+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

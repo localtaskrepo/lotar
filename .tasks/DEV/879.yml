@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T20:00:39.778177+00:00
-modified: 2026-11-26T01:27:17.621847+00:00
+modified: 2026-11-26T02:07:57.404894+00:00
 relationships:
   depends_on:
   - DEV-852
@@ -31,8 +31,6 @@ description: |-
 
   - [ ] A `comment` map without `question` gets a reason that fits it (or, if the owner prefers, is edited in the builder as a plain comment, saved back in the same form)
   - [ ] A test in `view/__tests__/automationRules.spec.ts` covers it
-tags:
-- waits
 history:
 - at: 2026-11-25T20:00:40.701640+00:00
   actor: claude
@@ -72,3 +70,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-26T02:07:57.404894+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: waits
+    new: ''

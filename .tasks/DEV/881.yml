@@ -1,11 +1,11 @@
 title: 'Status feed: a small standard endpoint with each instance''s running jobs, queue and who it waits on'
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T21:43:44.403743+00:00
-modified: 2026-11-26T02:07:06.711209+00:00
+modified: 2026-11-26T02:07:18.899077+00:00
 comments:
 - date: 2026-11-26T02:07:06.711209+00:00
   author: claude
@@ -74,3 +74,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T02:07:18.899077+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

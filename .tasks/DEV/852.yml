@@ -1,11 +1,11 @@
 title: 'Automation: a rule''s comment can ask a question with options'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:03:41.684865+00:00
-modified: 2026-11-26T01:27:07.624602+00:00
+modified: 2026-11-26T02:14:43.540877+00:00
 relationships:
   blocks:
   - DEV-796
@@ -17,6 +17,8 @@ relationships:
   - DEV-851
   - DEV-878
   - DEV-879
+  - DEV-853
+  - DEV-884
 comments:
 - date: 2026-11-25T08:02:46.204900+00:00
   author: claude
@@ -79,6 +81,33 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-852` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-852` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T02:07:49.218096+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `2e49a88db` is on main and origin.
+
+    - Rebase conflict in `crates/lotar-lib/tests/integration.rs`: two `mod` lines in the list (main's `dev842_…`, the branch's `dev852_…`). I kept both
+    - Main then moved on (DEV-853 `c7d2b1663`), so I rebased again with no conflict and reran the checks
+    - `npm ci`, `lint:agent` and `test:agent` passed on both rebases. `smoke` passed 411/411 on the first rebase
+    - The second smoke run had 2 UI timeouts, `ui.relationships` ("exposes Dependencies in navigation…") and `ui.sync-scope` ("editor saves global edits…"). Both pass alone (27/27), and DEV-852 touches neither
+    - Wall-clock test: `tests/ui.relationships.smoke.spec.ts` now runs in the serial wall-clock group (`smoke/vitest.config.ts`), as AGENTS.md asks; `ui.sync-scope` was already there. I amended this into the DEV-852 commit, and full `smoke` then passed 411/411
+    - Main checkout's `.tasks` changes are amended into the merge commit
+    - Trust: not needed, no rule or config file changed
+    - Guidance: no durable finding
+  report:
+    commits:
+    - hash: 2e49a88db
+      what: rule comment can ask a question with options; ui.relationships smoke spec joins the wall-clock group
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411 after moving ui.relationships to wall-clock
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae300be0eb1776a74acd7f47cd42c1d251db1f4df2ca39cae4f189033f9da6082
 description: |-
@@ -251,3 +280,25 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-796","DEV-878"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'
     new: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'
+- at: 2026-11-26T02:07:49.218096+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:07:49.469729+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'
+    new: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879","DEV-853"]}'
+- at: 2026-11-26T02:07:56.045056+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-26T02:14:43.540877+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879","DEV-853"]}'
+    new: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879","DEV-853","DEV-884"]}'

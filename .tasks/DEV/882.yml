@@ -1,14 +1,46 @@
 title: Record memory-gate holds and each job's queued time in the job records
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T22:11:53.112006+00:00
-modified: 2026-11-26T02:06:43.902422+00:00
+modified: 2026-11-26T02:14:42.239715+00:00
 relationships:
   related:
   - DEV-827
+comments:
+- date: 2026-11-26T02:14:30.503383+00:00
+  author: claude
+  text: |-
+    Jobs now record when they were queued, and every memory-gate hold is kept in a history that `lotar agent queue holds` lists.
+
+    - Job `queued_at`: taken from the queue entry when the worker starts it, or the job's own time when `lotar serve` holds it as queued. It is stored in the job log header and shown in `AgentJob` (`agent status`, `list-jobs --format json`, `GET /api/jobs`). A job that started right away has none.
+    - Hold history: `memory_gate::check` adds each hold that ends (reason, since, until) to `memory-gate-<hash>-holds.jsonl` next to the state file, keeping the last 1000. A hold ended by two processes is listed once.
+    - `lotar agent queue holds` lists the holds plus the one in effect: since, until, minutes, reason. JSON gives `holds[]` with `seconds`.
+    - Contract: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/agent.md`.
+    - Tests: unit tests in `memory_gate.rs` (recorded once, a failed reading ends a hold, history cap). `dev623_memory_gate_test.rs` covers `queued_at` in `list-jobs` and the hold in effect in `queue holds`.
+  report:
+    commits:
+    - hash: 4a46916a2
+      what: queued_at on jobs, memory-gate hold history, lotar agent queue holds
+    checks:
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+    - command: cargo nextest run -p lotar-lib -E 'test(/contract|openapi|jobs|dev623/)'
+      result: passed
+    - command: cargo clippy -p lotar-agent -p lotar-lib --all-targets
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change; the merge runs it
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf75b0019e9a04d1379a692646fbceb73e18d6a69e7cad88070db40e0a4c5b8a
 description: 'From standards STD-359 proposal F (owner 2026-11-25: all of A-F). The throughput measurement couldn''t count memory-gate hours (holds only go to the server log, DEV-827) and gives queue waits only as a lower bound: the queue keeps no time an entry was queued. Store queued_at per queue entry and job, and each gate hold (start, end, reason) where lotar agent jobs or a stats command can read them.'
@@ -41,3 +73,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf75b0019e9a04d1379a692646fbceb73e18d6a69e7cad88070db40e0a4c5b8a
+- at: 2026-11-26T02:14:30.503383+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:14:42.239715+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T21:11:09.195177+00:00
-modified: 2026-11-26T01:30:56.966711+00:00
+modified: 2026-11-26T02:38:58.914593+00:00
 relationships:
   depends_on:
   - DEV-812
@@ -113,6 +113,9 @@ comments:
       result: not_run
       reason: targeted checks only, the merge runs the full suites
     next: 'When STD-369 lands: check an inbox answer relays within seconds while git hangs, then set Done'
+- date: 2026-11-26T02:38:58.914593+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T01:30Z with no lotar job: the live check restarted @fix, its prerequisites are done (lotar rule "Prerequisites done: continue the waiting ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A802f16b984a97e31b9f3796a54cdc37a2bf74d7da732e9e59834d045069ff063
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae2a42a50f17c7dda6a6f5b7cb09ae216a1ec5a60a06db0bc33b6a6bb4724b0c6
@@ -131,7 +134,6 @@ description: |-
   - [ ] npm run lint, npm test, npm run smoke pass (passed for the first commit; the merge runs them for the second).
 tags:
 - fix-retried
-- waits
 history:
 - at: 2026-11-22T21:11:09.477794+00:00
   actor: claude
@@ -424,3 +426,13 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-26T02:38:57.928890+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: fix-retried, waits
+    new: fix-retried
+- at: 2026-11-26T02:38:58.914593+00:00
+  actor: claude
+  changes:
+  - field: comment_added

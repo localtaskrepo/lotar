@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T20:00:38.684959+00:00
-modified: 2026-11-26T01:26:53.086119+00:00
+modified: 2026-11-26T02:07:56.868855+00:00
 relationships:
   depends_on:
   - DEV-852
@@ -30,8 +30,6 @@ description: |-
   ## Done when
 
   - [ ] The "Append a comment to a task ..." doc comment sits on `append_automation_comment` again, and `expand_comment` keeps only its own
-tags:
-- waits
 history:
 - at: 2026-11-25T20:00:39.500224+00:00
   actor: claude
@@ -71,3 +69,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-26T02:07:56.868855+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: waits
+    new: ''

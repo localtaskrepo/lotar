@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-26T00:01:17.685875+00:00
+modified: 2026-11-26T02:41:00.438772+00:00
 relationships:
   blocks:
   - DEV-782
@@ -131,6 +131,18 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review again
+- date: 2026-11-26T02:40:51.557213+00:00
+  author: claude
+  text: |-
+    Review: blocking. Under load, dev732/dev733 still leave a queue folder in the temp folder (2 of 8 runs), so "a full run under load leaves nothing" doesn't hold yet.
+
+    - Read: `git diff main...HEAD` at HEAD `e084e0c2e` (4 files), the ticket and all its comments, `agent_queue_service.rs` (worker exit, `with_locked_queue`, `read_state`), dev732/dev733, `task_hooks.rs`, and the recent main commits to the touched files.
+    - Reran: `npm ci` passed. `node --test scripts/tests/rust-test-runner.test.mjs` passed 48/48. `cargo nextest run -p lotar-agent -E 'test(exit_check_leaves)'` passed.
+    - **Leak still there:** I ran the fix agent's reproduction 8 times, `TMPDIR=<fresh> cargo nextest run -E 'test(/a_worker_started_from_another_folder|worker_drops_agent_session/)'`, with load average about 44. All runs passed, but runs 1 and 8 left `.lotar-test-scratch/<pid>/.tmpXXXXXX/queue/agent-queue/queue-<hash>.json` with `"pending": []`. There was no `worker-*.lock` beside it, so no late worker made it. The file was written about 1.7 s after the fixture's folder was created, right at the test's end. The fix agent's 10 clean runs in 10 were probably on a quieter machine.
+    - **Likely cause:** `waiting_after_exit` (`agent_queue_service.rs:1146`) closes one path. But every other queue reader still goes through `with_locked_queue` (`:1150`), which runs `create_dir_all` and writes the file. That includes `list_pending` and `list_parked`, which the ticket-save hook calls (`crates/lotar-agent/src/task_hooks.rs:53-60`, `agent_work_pending`), and `pending_count` in the worker loop (`:684`, `:711`). One of those calls still lands after the test's idle wait (`dev732_..._test.rs:74-90`, `dev733_..._test.rs:58-73`) and recreates the removed `TempDir`. Also, that wait treats `stopped` as done, because its condition is `worker_state != "active"`.
+    - **What would fix it:** make the queue's read-only accessors (`list_pending`, `list_parked`, `pending_count`) read through `read_state`, so nothing that only reads can recreate the folder. Then find the remaining writer: log the writer's pid/backtrace in `with_locked_queue` when it has to create the folder. Or have both tests wait until the worker process has exited, not only until its lock is free. Check it with the same 2-test loop, about 10 runs, while the machine is busy (for example beside a full `npm run -s test:agent`).
+    - Fine as is: the runner's `--no-run` build step (`scripts/rust-test-runner.mjs:557-565`) and its 2 tests, and the `waiting_after_exit` change and its test (the old `pending_count` would create `queue_base`).
+    - Not run: the full `npm test` and `npm run smoke` (the merge runs them). Nothing changed in the worktree; I removed the scratch temp folders.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
@@ -144,6 +156,7 @@ tags:
 - job-paused
 - fix-retried
 - review-returned
+- review-returned-twice
 custom_fields:
   finding: test:rust-temp-leftover
 history:
@@ -319,3 +332,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T02:40:51.557213+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:40:51.593478+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, job-paused, fix-retried, review-returned
+    new: health, job-paused, fix-retried, review-returned, review-blocked
+- at: 2026-11-26T02:41:00.438772+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, job-paused, fix-retried, review-returned, review-blocked
+    new: health, job-paused, fix-retried, review-returned, review-returned-twice

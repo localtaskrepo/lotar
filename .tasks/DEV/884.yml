@@ -1,11 +1,48 @@
 title: 'Job prompts tell agents to run lotar --format json show, which prints every comment and the history: the largest Bash output in job sessions'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T22:18:53.793616+00:00
-modified: 2026-11-25T22:18:54.141688+00:00
+modified: 2026-11-26T02:14:53.658198+00:00
+relationships:
+  related:
+  - DEV-797
+  - DEV-852
+comments:
+- date: 2026-11-26T02:14:43.270837+00:00
+  author: claude
+  text: |-
+    `lotar show <ID> --brief` cuts each comment to one line; `--comment <N>` prints one in full. The job block now names them.
+
+    - `crates/lotar-lib/src/cli/handlers/task/show.rs`: `--brief` (text and JSON, no `history`, no report/review details), `--comment <N>` (error with the range for 0, past the end or deleted). Default `show` and `--format json show` unchanged, so `standards/scripts/repos.ts` and `staff/src/lotar.rs` keep the full JSON.
+    - On the real backlog: DEV-852 9.7 k → 4.3 k characters, DEV-797 19.9 k → 6.5 k (JSON 33.6 k → 6.8 k). The rest is the description.
+    - `docs/help/agent-instructions.md`: `show <ID> --brief   # one comment in full: --comment <N>`. Test `job_instructions_show_command_runs` runs that line against a scratch workspace.
+    - Docs: `docs/help/task.md`, `main.md`, the `lotar-workflow` and `lotar-dev-tracking` skills.
+    - Left as is: the prompt's Comments section still says "All of them: `lotar show <ID>`" (`agent_job_service.rs:1525`); that's outside the "Done when".
+    - Mishap, fixed: the installed lotar 0.15.6 took `task edit -D -` literally and set this description to `-`. I restored it from my first read and added "## Done when".
+    - No guidance correction.
+  report:
+    commits:
+    - hash: 73273bccb
+      what: lotar show --brief and --comment N; job block names them
+    checks:
+    - command: cargo nextest run --test integration dev18
+      result: passed
+    - command: cargo nextest run -p lotar-agent instruction
+      result: passed
+    - command: cargo nextest run --workspace -E test(/skill|help|show|docs/)
+      result: passed
+      reason: 65 tests
+    - command: cargo clippy -p lotar-lib -p lotar-agent --all-targets
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    next: review on another model, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeff1cfbe31fb12cdfad7876478dd3aca9edb62d4210eb869e49435fa4f8c35dd
 description: |-
   Found by STD-362 (owner 2026-11-25: all of STD-359's proposals A-F, among them "keep long check output out of the conversation").
 
@@ -16,10 +53,88 @@ description: |-
 
   Each character stays in the session for every later request (cache reads, 95% of job tokens per STD-359).
 
-  Done when: the job instructions' LoTaR CLI block names a compact form (for example `lotar show <ID>` without history, comments cut to their first lines with a way to read one in full), and the show command offers it; a test covers the block's command.
+  Done when (reporter's words): the job instructions' LoTaR CLI block names a compact form (for example `lotar show <ID>` without history, comments cut to their first lines with a way to read one in full), and the show command offers it; a test covers the block's command.
+
+  ## Done when
+  - [x] `lotar show <ID> --brief` (text) prints the fields, relationships, description, acceptance criteria and references as today, and each live comment as one line: `#N`, date, marker, author and the comment's first line, cut at 200 characters; `…` marks a cut or a comment with more lines. Report details (commits, checks, next) are left out. A last line names `lotar show <ID> --comment <N>` to read one in full. No history (text show has none today).
+  - [x] `lotar --format json show <ID> --brief` prints the task as today without `history`, each comment's `text` cut to its first line the same way, `report` and `review` left out.
+  - [x] `lotar show <ID> --comment <N>` prints comment N (the `#N` shown) in full: header line, all text lines, report lines; `--format json` prints that comment object. N that is 0, past the last comment or a deleted comment: error naming the range, exit 1, nothing else printed.
+  - [x] `--brief` and `--comment` together: refused ("cannot be used with", exit 1). Without either flag, `lotar show` and `--format json show` are unchanged (scripts in standards `scripts/repos.ts`, staff `src/lotar.rs` read the full JSON).
+  - [x] The job instructions' LoTaR CLI block (`docs/help/agent-instructions.md`) names `show <ID> --brief` and `--comment <N>` instead of `--format json show`; the builtin-template test asserts it, and a test runs the block's show command against a workspace and checks it succeeds with the cut comments.
+  - [x] `docs/help/task.md` (show), `docs/help/main.md`, `docs/help/skills/lotar-workflow/SKILL.md` and `.github/skills/lotar-dev-tracking/SKILL.md` name the brief form for reading a ticket.
 history:
 - at: 2026-11-25T22:18:54.141688+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T02:08:00.745545+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T02:08:01.303564+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeff1cfbe31fb12cdfad7876478dd3aca9edb62d4210eb869e49435fa4f8c35dd
+- at: 2026-11-26T02:09:16.434362+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found by STD-362 (owner 2026-11-25: all of STD-359's proposals A-F, among them "keep long check output out of the conversation").
+
+      Measured over the 7 days to 2026-11-25 in ~/.claude/projects/*lotar-worktrees*/*.jsonl (Bash tool results by command):
+      - lotar show: 2,157 results, 7.8 M characters, 152 over 10 k. The largest group, ahead of git diff (5.8 M).
+      - Check commands (cargo nextest, vitest, node --test, test:agent, npm run check): under 2.5 M in all, medians 300-600 characters; the quiet reporters already work.
+      - `lotar --format json show STD-359` prints 44 k characters (one long comment plus history); the job prompt already carries the description and relationships, so most of it repeats.
+
+      Each character stays in the session for every later request (cache reads, 95% of job tokens per STD-359).
+
+      Done when: the job instructions' LoTaR CLI block names a compact form (for example `lotar show <ID>` without history, comments cut to their first lines with a way to read one in full), and the show command offers it; a test covers the block's command.
+    new: '-'
+- at: 2026-11-26T02:14:31.869173+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: '-'
+    new: |-
+      Found by STD-362 (owner 2026-11-25: all of STD-359's proposals A-F, among them "keep long check output out of the conversation").
+
+      Measured over the 7 days to 2026-11-25 in ~/.claude/projects/*lotar-worktrees*/*.jsonl (Bash tool results by command):
+      - lotar show: 2,157 results, 7.8 M characters, 152 over 10 k. The largest group, ahead of git diff (5.8 M).
+      - Check commands (cargo nextest, vitest, node --test, test:agent, npm run check): under 2.5 M in all, medians 300-600 characters; the quiet reporters already work.
+      - `lotar --format json show STD-359` prints 44 k characters (one long comment plus history); the job prompt already carries the description and relationships, so most of it repeats.
+
+      Each character stays in the session for every later request (cache reads, 95% of job tokens per STD-359).
+
+      Done when (reporter's words): the job instructions' LoTaR CLI block names a compact form (for example `lotar show <ID>` without history, comments cut to their first lines with a way to read one in full), and the show command offers it; a test covers the block's command.
+
+      ## Done when
+      - [x] `lotar show <ID> --brief` (text) prints the fields, relationships, description, acceptance criteria and references as today, and each live comment as one line: `#N`, date, marker, author and the comment's first line, cut at 200 characters; `…` marks a cut or a comment with more lines. Report details (commits, checks, next) are left out. A last line names `lotar show <ID> --comment <N>` to read one in full. No history (text show has none today).
+      - [x] `lotar --format json show <ID> --brief` prints the task as today without `history`, each comment's `text` cut to its first line the same way, `report` and `review` left out.
+      - [x] `lotar show <ID> --comment <N>` prints comment N (the `#N` shown) in full: header line, all text lines, report lines; `--format json` prints that comment object. N that is 0, past the last comment or a deleted comment: error naming the range, exit 1, nothing else printed.
+      - [x] `--brief` and `--comment` together: refused ("cannot be used with", exit 1). Without either flag, `lotar show` and `--format json show` are unchanged (scripts in standards `scripts/repos.ts`, staff `src/lotar.rs` read the full JSON).
+      - [x] The job instructions' LoTaR CLI block (`docs/help/agent-instructions.md`) names `show <ID> --brief` and `--comment <N>` instead of `--format json show`; the builtin-template test asserts it, and a test runs the block's show command against a workspace and checks it succeeds with the cut comments.
+      - [x] `docs/help/task.md` (show), `docs/help/main.md`, `docs/help/skills/lotar-workflow/SKILL.md` and `.github/skills/lotar-dev-tracking/SKILL.md` name the brief form for reading a ticket.
+- at: 2026-11-26T02:14:43.270837+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:14:43.541346+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-797","DEV-852"]}'
+- at: 2026-11-26T02:14:53.658198+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

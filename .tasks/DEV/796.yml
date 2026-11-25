@@ -1,11 +1,11 @@
 title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-24T22:01:32.863028+00:00
+modified: 2026-11-26T02:07:56.563336+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -898,3 +898,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T02:07:56.563336+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress

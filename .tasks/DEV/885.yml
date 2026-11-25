@@ -1,15 +1,25 @@
 title: 'Test a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge fails alone: the merge job stays running for 60 s'
-status: Todo
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-25T23:52:10.484956+00:00
-modified: 2026-11-25T23:52:11.376459+00:00
+modified: 2026-11-26T02:16:26.980853+00:00
 relationships:
   related:
   - DEV-748
   - DEV-837
+comments:
+- date: 2026-11-26T02:16:19.583200+00:00
+  author: claude
+  text: |-
+    Nothing to fix: the test passes alone on main, 4 of 4 runs, under load 13.
+
+    - `cargo nextest run --workspace -E 'test(a_check_that_leaves_a_process_running)' --retries 0` on `2e49a88db` (main): passed in 6.7 s each time
+    - The failure showed up only on `agent/DEV-837` (`27d567117`), so the cause is that branch or the job's sandbox there, not main
+    - No commits on `agent/DEV-885`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A645392cc0985f331d049c8fbbb14baffd91d32ca105e2aff0e4c2e71cdcfe14b
 description: |-
   Found: on 2026-11-25, `cargo nextest run --workspace -E 'test(a_check_that_leaves_a_process_running)' --retries 0` fails alone on branch agent/DEV-837 at `dev605_merge_without_agent_test.rs:132` ('the merge job didn't end: running'), with and without the DEV-837 rework (rebased on main 43dbd75da); load average 6-10. So it is not the load flake DEV-748 fixed: the merge waits for the check's background `sleep 600`. Not yet checked on main itself.
   Check: run the command above in a checkout of main.
@@ -30,3 +40,26 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T02:14:45.657253+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T02:14:46.210948+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A645392cc0985f331d049c8fbbb14baffd91d32ca105e2aff0e4c2e71cdcfe14b
+- at: 2026-11-26T02:16:19.583200+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T02:16:26.980853+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
