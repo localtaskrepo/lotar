@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-26T21:07:29.006064+00:00
+modified: 2026-11-26T23:42:41.809253+00:00
 relationships:
   related:
   - DEV-725
@@ -587,6 +587,12 @@ comments:
   author: automation
   text: |
     lotar's merge needs the merge agent: rebasing `agent/DEV-786` onto `main` conflicts in `crates/lotar-core/src/api_types.rs`, `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/tests/integration.rs`, `view/api/types.ts`; lotar aborted the rebase, `agent/DEV-786` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-26T23:42:41.809253+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-786` onto `main` conflicts in `crates/lotar-core/src/api_types.rs`, `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/tests/integration.rs`, `docs/help/agent.md`, `view/api/types.ts`; lotar aborted the rebase, `agent/DEV-786` is unchanged.
   report:
     next: The merge agent takes over in a new session
 references:
@@ -1379,6 +1385,10 @@ history:
     old: '@review'
     new: '@merge'
 - at: 2026-11-26T21:07:29.006064+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:42:41.809253+00:00
   actor: automation
   changes:
   - field: comment_added

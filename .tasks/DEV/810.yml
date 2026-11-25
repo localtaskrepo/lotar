@@ -1,11 +1,11 @@
 title: 'Kept T3 Code threads of done tickets stay unsettled: 56 completed job threads in the sidebar on 0.15.6'
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-26T23:11:07.597213+00:00
+modified: 2026-11-26T23:29:37.842586+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -22,6 +22,7 @@ relationships:
   - DEV-774
   - DEV-836
   - DEV-876
+  - DEV-908
 comments:
 - date: 2026-11-22T21:22:50.394391+00:00
   author: claude
@@ -521,6 +522,36 @@ comments:
 - date: 2026-11-26T23:11:07.597213+00:00
   author: automation
   text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A203e8c6c32d413b7f02fbd4bd166d640c726e4be39315dedd938736acc6b3a79 of the job job-20261126T210414.187Z-52 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231107.551Z-93: DEV-810 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:29:29.312048+00:00
+  author: claude
+  text: |-
+    Review findings fixed: rebased onto main with DEV-876, now `1c909e027`.
+
+    - **Conflict in `kept.rs`:** kept main's `ended()` and DEV-876's notes in `settle_superseded`, which now read the job id from `job`. The `settle` doc names both rules.
+    - **`unlogged()` required `completed`:** it now uses `ended(&shown.status)`, so a done ticket's thread found by its title is settled whatever way its run ended.
+    - **Test:** `a_done_tickets_job_thread_without_a_job_log_is_settled_by_its_title` adds a `failed` thread (settled) and a running one (left alone). With the old `completed` rule it fails: `left: ["thread-0"]`, `right: ["thread-0", "thread-9"]`.
+    - **`docs/help/agent.md`:** kept main's paragraph and added this fix's sentences. A thread found by title counts once its run ended in any way.
+    - **Flaky tests:** two `dev503` continued-merge tests timed out at 60 s during one busy run, also when run alone, and also with main's code (files put back afterwards). Rerun, the module passed 61 of 61. That is [DEV-908](https://lotar.pyxzl.net/task/DEV-908): they fail alone too while the machine is busy.
+  report:
+    commits:
+    - hash: 1c909e027
+      what: rebased onto main bec2f45a4; unlogged threads use DEV-876's ended rule
+    checks:
+    - command: cargo nextest run --test integration -E 'test(/dev503_harness_jobs_test/)'
+      result: passed
+      reason: 61 of 61
+    - command: cargo nextest run --test integration -E 'test(/dev626_resumed_t3_threads_test/)'
+      result: passed
+      reason: 13 of 13
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review again; after the release (owner's OK) count unsettled job threads of done tickets
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
@@ -1120,3 +1151,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:29:29.312048+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:29:29.607054+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876","DEV-908"]}'
+- at: 2026-11-26T23:29:37.842586+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

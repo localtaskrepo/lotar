@@ -1,11 +1,11 @@
 title: A repo's agent.worktree.build_root is ignored when the home config has an agent.worktree section
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T18:53:10.893672+00:00
-modified: 2026-11-26T23:20:40.781003+00:00
+modified: 2026-11-26T23:42:25.835876+00:00
 relationships:
   related:
   - DEV-778
@@ -13,6 +13,7 @@ relationships:
   - DEV-906
   - DEV-907
   - DEV-883
+  - DEV-843
 comments:
 - date: 2026-11-26T19:25:26.201729+00:00
   author: claude
@@ -160,6 +161,32 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-26T23:29:33.801357+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `a9459740d` is on main and origin.
+
+    - Rebased onto `97bb47b65` (main had moved on since lotar's rebase); no conflicts.
+    - lotar's `test:agent` failure was DEV-906, not this change: `dev61_reference_kinds_test` makes its workspace in `CARGO_TARGET_TMPDIR`, and in this job worktree `target` links to `/Volumes/Builds/jobs/lotar/DEV-905`, which is outside any git repo.
+    - For the checks I swapped the `target` link for a real folder, ran all checks, then put the link back. Result: `test:agent` 2605/2605 Rust tests passed, UI/release/hooks/seed tests passed, `smoke` 412/412.
+    - `.tasks` changes in the main checkout amended into the merge commit.
+    - No rule or config files changed, so no `lotar trust` needed. Pushed: only this commit was unpushed.
+    - Until DEV-906 lands, lotar's own merge will hit the same failure in every job worktree with a build root.
+  report:
+    commits:
+    - hash: a9459740d
+      what: DEV-905 home agent.worktree merges key by key
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2605/2605 Rust, run with a real target dir
+    - command: npm run -s smoke
+      result: passed
+      reason: 412/412
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85f25e5a8f110969372450105671b218f10d8b75b5b58d56574d63c4cf888d5b
 description: |-
@@ -170,8 +197,6 @@ description: |-
   ## Done when
   - A project's `agent.worktree.*` keys override the home config key by key (or lotar warns when a project key is dropped), with a test.
   - docs/help/config-reference.md says which wins.
-tags:
-- job-paused
 history:
 - at: 2026-11-26T18:53:17.560878+00:00
   actor: claude
@@ -252,3 +277,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:29:33.801357+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:29:39.678454+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused
+    new: ''
+- at: 2026-11-26T23:42:25.835876+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-778","DEV-841","DEV-906","DEV-907","DEV-883"]}'
+    new: '{"related":["DEV-778","DEV-841","DEV-906","DEV-907","DEV-883","DEV-843"]}'

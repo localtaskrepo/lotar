@@ -1,11 +1,11 @@
 title: A release ticket's merge job still sets it Done before its tag is pushed when the checks pass
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T05:03:35.190384+00:00
-modified: 2026-11-26T21:17:44.719145+00:00
+modified: 2026-11-26T23:42:16.027333+00:00
 relationships:
   depends_on:
   - standards:STD-371
@@ -14,6 +14,8 @@ relationships:
   - DEV-725
   - DEV-835
   - DEV-884
+  - DEV-914
+  - DEV-897
 comments:
 - date: 2026-11-26T14:01:26.766753+00:00
   author: claude
@@ -60,6 +62,16 @@ comments:
 - date: 2026-11-26T21:17:44.719145+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T211740.642Z-62 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T211740.642Z-62 why.'
+- date: 2026-11-26T23:42:08.354028+00:00
+  author: claude
+  text: |-
+    Review: passed. `15a6d7cf1` keeps a merged `Release v…` ticket from going Done: it goes to @fix to tag and finish the release.
+
+    - Read: the ticket and its Done when, the fix comment, DEV-793/DEV-835/DEV-884/DEV-897, the release skill (step 7 sets Done), and main's history of `.tasks/DEV/automation.yml` (unchanged since `17cd3a49f`).
+    - Main already had "Release merged" from DEV-884's copy. What this commit adds is the test. It also puts back lotar's own rules "Waiting: drop the workspace build output" and "Login expired" (DEV-835), which that copy had lost, and brings in STD-354's prompt change. That change is safe: lotar sets `LOTAR_DEFAULT_REPORTER` in the job env (`agent_job_service.rs:4280`).
+    - `npm ci` passed. `cargo nextest run -p lotar-lib --test integration dev892` passed. With the copy from before DEV-884 (`17cd3a49f~1`) it failed with `["Merge agent lifecycle"]`, so the test catches the bug. `rustfmt --check` and clippy: clean.
+    - The branch's rules file loads with the installed lotar 0.15.7 (`lotar automation simulate`). DEV-897's parse error came from 0.15.6.
+    - Minor, filed as [DEV-914](https://lotar.pyxzl.net/task/DEV-914): later today STD-370 (standards `380f51c2`) added its own "Login expired" rule to the shared file. The next copy would then hold two of them, so one login pause would file two sign-in tickets.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A854085c4248d6f5c9a16429c96ad2b629a5d948136b69a3e98de6af32a725cda
@@ -158,3 +170,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:41:57.098607+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-371"],"related":["DEV-793","DEV-725","DEV-835","DEV-884"]}'
+    new: '{"depends_on":["standards:STD-371"],"related":["DEV-793","DEV-725","DEV-835","DEV-884","DEV-914"]}'
+- at: 2026-11-26T23:42:08.354028+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:42:08.635760+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["standards:STD-371"],"related":["DEV-793","DEV-725","DEV-835","DEV-884","DEV-914"]}'
+    new: '{"depends_on":["standards:STD-371"],"related":["DEV-793","DEV-725","DEV-835","DEV-884","DEV-914","DEV-897"]}'
+- at: 2026-11-26T23:42:16.027333+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,16 +1,17 @@
 title: 'Finding bundles: no test covers a finding joining an InProgress bundle whose fix job takes the message'
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T04:56:14.463740+00:00
-modified: 2026-11-26T21:17:51.572445+00:00
+modified: 2026-11-26T23:40:38.759435+00:00
 relationships:
   depends_on:
   - DEV-864
   related:
   - DEV-864
+  - DEV-800
 comments:
 - date: 2026-11-26T12:09:21.800862+00:00
   author: claude
@@ -64,6 +65,17 @@ comments:
 - date: 2026-11-26T21:17:51.572445+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T211748.263Z-63 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T211748.263Z-63 why.'
+- date: 2026-11-26T23:40:31.552941+00:00
+  author: claude
+  text: |-
+    Review: passed. The new test covers the "Done when" and passes; nothing blocking, no tickets filed.
+
+    - Reviewed: `3d6bacf39`, the only new commit. The other commits in `main..HEAD` are on main under other hashes (`git cherry -v main HEAD`). It adds one test to `crates/lotar-lib/tests/dev800_finding_bundle_test.rs`, with nothing else in the change.
+    - "Done when" is met. `a_finding_joins_an_in_progress_bundle_whose_fix_job_takes_the_message` runs `lotar add --finding b:y --bundle health` in its own process against the InProgress `REPO-1`. A stand-in answers on harnessmux's socket under a scratch `HARNESSMUX_HOME`. The test asserts `state: bundled`, the id `REPO-1`, the message text ("A new finding joined REPO-1…" and the `## Red CI` section with `b:y`), and both keys on the bundle.
+    - The test proves its point. Because `owner_pid` is the test's own pid, the separate `lotar` process takes the `send_to_session` branch of `tell_running_job` (`crates/lotar-agent/src/services/agent_job_service.rs:2426`). Without a session that takes the message, the result would be `new`, which the existing gone-session test already shows.
+    - The touched file's recent history on main is DEV-864 `eeb1ad55d` and DEV-800 `d79bf634c`. The helpers the test uses (`fix_job`, `outcome`, `listed_ids`) are unchanged there.
+    - Reran: `cargo nextest run -p lotar-lib --test integration dev800` passed (7/7). `cargo clippy -p lotar-lib --tests --all-features -- -D warnings` was clean, and `rustfmt --edition 2024 --check` on the file passed. `npm ci` ran.
+    - Not UI work, so no screenshots were needed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6dadfbbb42e68dd68425b4eadeda1492dfe8a3eded7363266d1f74b0dcceaa52
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A48897fb147121a4d50f75c87d9eebd57bd4ff8712056ffd9740ef7c8479deb94
@@ -165,3 +177,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:40:31.552941+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:40:31.885816+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-864"],"related":["DEV-864"]}'
+    new: '{"depends_on":["DEV-864"],"related":["DEV-864","DEV-800"]}'
+- at: 2026-11-26T23:40:38.759435+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

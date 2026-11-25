@@ -4,7 +4,7 @@ priority: High
 type: Bug
 reporter: claude
 created: 2026-11-26T11:05:28.365161+00:00
-modified: 2026-11-26T23:11:10.109673+00:00
+modified: 2026-11-26T23:42:08.636143+00:00
 relationships:
   related:
   - DEV-835
@@ -17,6 +17,7 @@ relationships:
   - DEV-863
   - DEV-884
   - DEV-861
+  - DEV-892
 comments:
 - date: 2026-11-26T14:32:15.747008+00:00
   author: claude
@@ -286,3 +287,9 @@ history:
   - field: tags
     old: health, merge-retried, fix-retried, job-paused
     new: health
+- at: 2026-11-26T23:42:08.636143+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890","DEV-887","DEV-808","DEV-863","DEV-884","DEV-861"]}'
+    new: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890","DEV-887","DEV-808","DEV-863","DEV-884","DEV-861","DEV-892"]}'

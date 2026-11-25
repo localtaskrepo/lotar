@@ -1,11 +1,11 @@
 title: dev61_reference_kinds_test fails in a job worktree whose target links to agent.worktree.build_root
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T19:25:16.556571+00:00
-modified: 2026-11-26T21:35:37.205342+00:00
+modified: 2026-11-26T23:35:03.051101+00:00
 relationships:
   related:
   - DEV-762
@@ -43,6 +43,19 @@ comments:
 - date: 2026-11-26T21:35:37.205342+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T213533.553Z-79 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T213533.553Z-79 why.'
+- date: 2026-11-26T23:34:56.405416+00:00
+  author: claude
+  text: |-
+    Review: passed. `f565ec57a` makes the dev61 tests pass in a job worktree whose `target` links to the build root, and only touches the test fixture.
+
+    - Read: the diff (`crates/lotar-lib/tests/dev61_reference_kinds_test.rs`, `.gitignore`), the ticket and fix comment, DEV-762/905/907/801, AGENTS.md, and the last 5 main commits to both files. None of those commits conflicts with the fix.
+    - `fixture_base()` keeps `CARGO_TARGET_TMPDIR` when its canonical path lies inside the checkout. Otherwise it uses `<checkout>/.test-tmp/`, which `.gitignore` covers. Normal checkouts behave as before.
+    - `npm ci`: passed.
+    - Failed before: the main version of the test file in this worktree gave 6 of 18 failing with `--no-fail-fast`. That includes both tests the ticket names. The fix agent reported 3, probably because the run stopped at the first failures.
+    - After: `cargo nextest run --cargo-profile dev -p lotar-lib --test integration -E 'test(/dev61_reference_kinds_test::/)'` passed 18/18, and `--no-capture` printed no "skipping" lines, so all 18 really ran.
+    - `rustfmt --edition 2024 --check` on the file and `cargo clippy -p lotar-lib --tests`: clean. I restored the test file afterwards, and `git status` is clean.
+    - Minor, not filed: the tests leave an empty, ignored `.test-tmp/` folder in the checkout. Other test files still put workspaces in `CARGO_TARGET_TMPDIR`, but they don't check paths against the repository root and the ticket doesn't ask about them.
+    - No owner decision involved, no stray files, no second branch.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A201112dca23f251d4b5095e69820b4cf1300d02be05094b8089eb90a024f14bb
 description: |-
@@ -116,3 +129,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:34:56.405416+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:35:03.051101+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

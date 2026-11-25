@@ -1,0 +1,39 @@
+title: A t3 job that hits Claude's 5-hour limit fails into retries and an owner question instead of pausing (local LOCA-631, 2026-11-26)
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T23:29:18.207980+00:00
+modified: 2026-11-26T23:29:19.668066+00:00
+relationships:
+  related:
+  - DEV-584
+  - DEV-833
+  - DEV-855
+  - DEV-901
+description: |-
+  Same usage-limit stop, two outcomes, lotar 0.15.7, both t3 runner, 17 minutes apart:
+
+  - local LOCA-631, job-20261126T204940.803Z-13, 21:10:12Z: "the T3 Code thread's run ended with status 'failed': Usage limit reached: Claude API rate limit reached. Try again later." then [agent_job_failed] "The t3 runner exited with code 1", then rule 'Fix failed again: hand to mallox' put an open question on the ticket (LOCA-631 comment #26). The thread's messages said "You've hit your 5-hour limit · resets 3:10pm (America/Los_Angeles)".
+  - lotar DEV-901, job-20261126T212746.696Z-71, 21:27:51Z: the same line, then [agent_job_paused] "Paused, not failed: claudeAgent hit its usage limit"; it resumed after the reset (DEV-901 #4, #6).
+
+  Differences to check: the repo (local vs lotar: which lotar serve/worker handled it, its automation and config), and that LOCA-631's job had run ~20 minutes with tool calls before the limit while DEV-901's hit it at once. The owner saw this as "errors with jobs on Dyson" (2026-11-26, chief of staff thread).
+
+  Related: DEV-584 (Done: pause on usage limit instead of failing), DEV-855 (weekly limit reset time), DEV-833, standards STD-346.
+
+  Done when:
+  - [ ] A failing test reproduces LOCA-631's case, then passes: a t3 job whose run ends 'failed' with "Usage limit reached" pauses until the reset in every repo, after any amount of work; no failed job, no retry, no owner question.
+  - [ ] The cause is named in a comment (why the local repo's job failed where DEV-901's paused).
+history:
+- at: 2026-11-26T23:29:19.285663+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-584","DEV-833","DEV-855","DEV-901"]}'
+- at: 2026-11-26T23:29:19.668066+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

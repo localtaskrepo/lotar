@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-26T21:07:48.008069+00:00
+modified: 2026-11-26T23:42:36.496965+00:00
 relationships:
   related:
   - DEV-786
@@ -13,6 +13,10 @@ relationships:
   - DEV-833
   - DEV-845
   - DEV-837
+  - DEV-860
+  - DEV-870
+  - DEV-887
+  - DEV-905
 comments:
 - date: 2026-11-24T19:18:18.982167+00:00
   author: automation
@@ -136,6 +140,18 @@ comments:
 - date: 2026-11-26T21:07:48.008069+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T210742.685Z-57 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210742.685Z-57 why.'
+- date: 2026-11-26T23:42:25.558022+00:00
+  author: claude
+  text: |-
+    Review: blocking. `59cd30519` is right on its own base, but it no longer applies to main: main's DEV-870 (`e4214c47d`) added new callers of the `fill_ticket_title` that this commit deletes.
+
+    - **Read:** `git show 59cd30519` (6 files), the ticket, its comments and the owner's answer (rebuild on `replace_placeholders`), the commits on main since the branch base `17cd3a49f` that touch these files (DEV-870 `e4214c47d`, DEV-860, DEV-905).
+    - **Branch base is stale:** main was rewritten after the rebase (DEV-887 is `379b7fb10` on main, `0cf94860d` here). Applying just the fix with `git merge-tree --merge-base 59cd30519^ main 59cd30519` gives a **conflict in `crates/lotar-agent/src/services/agent_job_service.rs`** (create, around line 458).
+    - **Not a mechanical conflict:** DEV-870 moved prompt building into `PromptInputs::build` (`agent_job_service.rs:232` on main). Line 235 calls `fill_ticket_title(request, &task.title)` and the empty check at line 459 calls it too. This commit removes `fill_ticket_title` from `template.rs`, so the merged tree doesn't compile. Keeping `fill_ticket_title` instead would fill only the title, and a job held in the in-process pending queue (DEV-870's `PendingJob::current_prompt`) would then start with literal `${{ticket.id}}`/`${{ticket.status}}` in its prompt.
+    - **Fix:** rebase onto current main. In `PromptInputs::build`, use `TemplateContext::from_task(task).expand_ticket_only(request)` in place of `fill_ticket_title`, and do the same in the empty-prompt check in create. Drop the old create line. Then check that DEV-870's pending-queue start still gets the current title (its test) and that this ticket's tests pass.
+    - **The rest is fine:** `ticket_created` is set on enqueue, park, pause and `requeue_first`, and `unpark` carries it. A stale entry is replaced on enqueue. `start_entry` drops it with a stderr line and an automation comment, without spending retries. Legacy entries aren't checked. The docs sentence matches. DEV-845's test is ported. No stray files.
+    - **Reran on this branch:** `npm ci` passed. The targeted `cargo nextest run --workspace -E '…'` (the ticket's 5 new or changed tests plus `template::`) ran 15 tests, all passed. Lint, clippy and the full suites didn't run (the merge runs them).
+    - No UI changes, so no screenshots needed. No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
@@ -159,6 +175,7 @@ description: |-
 tags:
 - agent
 - job-paused
+- review-returned
 history:
 - at: 2026-11-24T17:22:39.294489+00:00
   actor: claude
@@ -384,3 +401,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:42:25.558022+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:42:25.833673+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837"]}'
+    new: '{"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905"]}'
+- at: 2026-11-26T23:42:26.212661+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, job-paused
+    new: agent, job-paused, review-blocked
+- at: 2026-11-26T23:42:36.496965+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, job-paused, review-blocked
+    new: agent, job-paused, review-returned

@@ -3,13 +3,19 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-26T21:27:24.959107+00:00
+modified: 2026-11-26T23:38:37.249071+00:00
 relationships:
   related:
   - DEV-849
   - DEV-320
+  - DEV-857
+  - DEV-870
+  - DEV-871
+  - DEV-876
+  - DEV-886
+  - DEV-895
 comments:
 - date: 2026-11-26T01:26:18.391829+00:00
   author: claude
@@ -73,6 +79,28 @@ comments:
 - date: 2026-11-26T21:27:24.959107+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T212721.037Z-69 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212721.037Z-69 why.'
+- date: 2026-11-26T23:38:21.996678+00:00
+  author: claude
+  text: |-
+    Review: blocking. After a rebase onto main, the job view's milestone rule brings back DEV-857's bug: a thread waiting on background work shows Finished.
+
+    - **Bug:** `with_milestone` (`crates/lotar-agent/src/services/agent_job_service/t3_state.rs:201-214`) lets the newest milestone win whenever its log time is later than `thread show`'s `updatedAt`.
+      - On main, DEV-857 (`0e78bed6b`) makes `from_shown` return `running` for a thread that is `completed` but has `pendingBackgroundTasks` or `blockedOnThreadWait`. This branch lacks that commit.
+      - When the agent ends its turn on `t3_background_wait`, the run settles `completed` and lotar logs the milestone right after T3's `updatedAt`. The milestone then turns DEV-857's `running` back into `finished`, until the wake run starts.
+      - The Done when says that for harnessmux ("pending background tasks keep the turn following"), but the view doesn't do the same.
+      - **Fix:** let the milestone win only over the stale case (`thread show` still has the milestone's run as `activeRunId`, or T3 doesn't answer), or at least never over a `running` that comes from background work. Add a `t3_state` test with `{"status":"completed","pendingBackgroundTasks":[…]}` plus a newer settled milestone that expects `running`.
+    - **Rebase:** `git merge-tree main HEAD` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs` and `docs/help/agent.md`. Main has 11+ newer commits to those files (DEV-895, DEV-871, DEV-870, DEV-886, DEV-876, …). Rebase first, then check the fix against DEV-857.
+    - **While there (minor):** `AgentJobT3Thread.t3_status` and `updated_at` now also carry the milestone's outcome and lotar's log time. Their docs still say "When T3 Code last changed the thread" in `crates/lotar-core/src/api_types.rs:804-810`, `view/api/types.ts:1972` and `docs/openapi.json:11148`. Update those three places together.
+    - **Holds:**
+      - The summary-only result follows the owner's 2026-11-26 decision. Only the t3 runner asks for it (`agent_runner.rs` `t3_result_schema`, `asks_result`), and nothing besides `summary` is read.
+      - harnessmux `v0.4.0` (`710c2f5`) is on crates.io. It has the CHANGELOG entry and fake-t3 tests in `tests/cli.rs` for a submitted result, a missing result, a milestone end while `thread show` is behind, needs-input, and the events fallback.
+    - **Reran in this worktree (after `npm ci`), all passed:**
+      - `cargo nextest run -p lotar-agent -E 'test(/dev877|t3_turn|milestone|t3_state/)'` (10 tests)
+      - `cargo nextest run -p lotar-agent -E 'test(/dev520_session_events/)'` (10 tests)
+      - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev510_t3_session_test|dev849|dev626/)'` (25 tests)
+      - `cargo clippy -p lotar-agent --all-targets`, with no warnings
+      - `rustfmt --check` and `prettier --check` on the changed files
+    - **Not done:** the bug comes from reading the code, not from a failing run on the rebased tree. No UI work, so no screenshots. Full suites not run (they run at merge). No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21ab9d8a75352d745b41e79794c66c74598112d86f236b011a4aa7af178a5344
@@ -101,6 +129,7 @@ description: |-
   - [x] The harnessmux change ships as release 0.4.0 that lotar's `Cargo.toml` uses; harnessmux README/CHANGELOG and lotar `docs/help/agent.md` (T3 Code threads) describe the result and the live state.
 tags:
 - job-paused
+- review-returned
 history:
 - at: 2026-11-25T19:54:55.315038+00:00
   actor: claude
@@ -311,3 +340,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:38:21.996678+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:38:22.444612+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-320"]}'
+    new: '{"related":["DEV-849","DEV-320","DEV-857","DEV-870","DEV-871","DEV-876","DEV-886","DEV-895"]}'
+- at: 2026-11-26T23:38:23.959209+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused
+    new: job-paused, review-blocked
+- at: 2026-11-26T23:38:37.249071+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: job-paused, review-blocked
+    new: job-paused, review-returned

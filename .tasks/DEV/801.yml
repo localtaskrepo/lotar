@@ -1,11 +1,11 @@
 title: Flaky tests
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@review-claude'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-26T21:35:06.638945+00:00
+modified: 2026-11-26T23:35:20.589293+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -333,3 +333,12 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:35:20.589293+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-retry'
+    new: '@review-claude'

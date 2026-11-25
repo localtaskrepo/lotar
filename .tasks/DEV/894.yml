@@ -1,11 +1,11 @@
 title: 'docs/help/agent.md: created_at is not when a job left the queue for a job lotar serve held as queued'
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T07:08:32.438639+00:00
-modified: 2026-11-26T21:27:17.221869+00:00
+modified: 2026-11-26T23:38:00.497274+00:00
 relationships:
   related:
   - DEV-882
@@ -34,6 +34,18 @@ comments:
 - date: 2026-11-26T21:27:17.221869+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T212714.529Z-68 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212714.529Z-68 why.'
+- date: 2026-11-26T23:37:42.117018+00:00
+  author: claude
+  text: |-
+    Review: passed. The doc line in `63a6e526f` matches the code. It changes only `docs/help/agent.md:18`.
+
+    - Done when: the ticket offered the option "the doc describes created_at for both". The line now separates the log header (`created_at` = when the job left the queue) from `lotar serve`'s own record (`created_at` = `queued_at`).
+    - Checked in the code: `agent_job_service.rs:414` sets `created_at` and `:458` sets `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`. Nothing reassigns `record.created_at` later. `init_job_log` (`:4008`) gets `started_at`.
+    - "also once it runs and ends": holds. `list_jobs_in` (`:592`) lets the in-memory record win over the log until `prune_finished_jobs` (`:6701`, 24 h or 500 jobs) removes it. "That server's own record" covers that limit.
+    - The examples of holds (slot, memory/disk, paused queue) match `should_queue` (`:457`). A busy merge slot also queues a job and fits under "a full slot".
+    - Not changing the record (the Agents page sorts by `created_at`) was within the options the ticket gave, not an owner decision.
+    - Checks: `npm ci` passed. `npx prettier --check docs/help/agent.md` passed. `git merge-tree --write-tree main HEAD` merges cleanly with `main` `a9459740d`. Main's later commits to the file (`bd6c94d37`, `e4214c47d`) touch other lines. It's a doc-only bug, so no failing test applies. No stray files.
+    - No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A470c11b34c29bb4c843c90ed862b3d00652bc82aabe62bbd4762e4028a98de0f
 description: 'Found in review of DEV-882 (4a46916a2). docs/help/agent.md list-jobs line says `created_at` is when a job left the queue. For a job that `lotar serve` holds as queued, the in-memory record (`GET /api/jobs` while it is queued or running) keeps `created_at` = the time it was queued, which equals `queued_at` (agent_job_service.rs start_job_inner: `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`). Only the saved log header takes `created_at` from `started_at` (start_job -> init_job_log). Check: hold a job in serve, read GET /api/jobs. Done: the doc describes created_at for both, or the record''s created_at matches the log header''s.'
@@ -85,3 +97,40 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:37:42.117018+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:37:54.037096+00:00
+  actor: claude
+  changes:
+  - field: comment#3
+    old: |-
+      Review: passed. The doc line in `63a6e526f` matches the code. It changes only `docs/help/agent.md:18`.
+
+      - Done when: the ticket offered the option "the doc describes created_at for both". The line now separates the log header (`created_at` = when the job left the queue) from `lotar serve`'s own record (`created_at` = `queued_at`).
+      - Checked in the code: `agent_job_service.rs:414` sets `created_at` and `:458` sets `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`. Nothing reassigns `record.created_at` later. `init_job_log` (`:4008`) gets `started_at`.
+      - "also once it runs and ends": holds. `list_jobs_in` (`:592`) lets the in-memory record win over the log until `prune_finished_jobs` (`:6701`, 24 h or 500 jobs) removes it. "That server's own record" covers that limit.
+      - The examples of holds (slot, memory/disk, paused queue) match `should_queue` (`:448`). A busy merge slot also queues a job and fits under "a full slot".
+      - Not changing the record (the Agents page sorts by `created_at`) was within the options the ticket gave, not an owner decision.
+      - Checks: `npm ci` passed. `npx prettier --check docs/help/agent.md` passed. `git merge-tree --write-tree main HEAD` merges cleanly with `main` `a9459740d`. Main's later commits to the file (`bd6c94d37`, `e4214c47d`) touch other lines. It's a doc-only bug, so no failing test applies. No stray files.
+      - No tickets filed.
+    new: |-
+      Review: passed. The doc line in `63a6e526f` matches the code. It changes only `docs/help/agent.md:18`.
+
+      - Done when: the ticket offered the option "the doc describes created_at for both". The line now separates the log header (`created_at` = when the job left the queue) from `lotar serve`'s own record (`created_at` = `queued_at`).
+      - Checked in the code: `agent_job_service.rs:414` sets `created_at` and `:458` sets `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`. Nothing reassigns `record.created_at` later. `init_job_log` (`:4008`) gets `started_at`.
+      - "also once it runs and ends": holds. `list_jobs_in` (`:592`) lets the in-memory record win over the log until `prune_finished_jobs` (`:6701`, 24 h or 500 jobs) removes it. "That server's own record" covers that limit.
+      - The examples of holds (slot, memory/disk, paused queue) match `should_queue` (`:457`). A busy merge slot also queues a job and fits under "a full slot".
+      - Not changing the record (the Agents page sorts by `created_at`) was within the options the ticket gave, not an owner decision.
+      - Checks: `npm ci` passed. `npx prettier --check docs/help/agent.md` passed. `git merge-tree --write-tree main HEAD` merges cleanly with `main` `a9459740d`. Main's later commits to the file (`bd6c94d37`, `e4214c47d`) touch other lines. It's a doc-only bug, so no failing test applies. No stray files.
+      - No tickets filed.
+- at: 2026-11-26T23:38:00.497274+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

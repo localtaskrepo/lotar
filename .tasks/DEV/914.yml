@@ -1,0 +1,30 @@
+title: Copy STD-370's shared automation.yml and drop lotar's own 'Login expired' rule, or a login pause files two owner tickets
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T23:41:56.315913+00:00
+modified: 2026-11-26T23:41:57.684350+00:00
+relationships:
+  related:
+  - DEV-892
+  - DEV-835
+description: |-
+  ## Found
+  Found by the DEV-892 review, 2026-11-26. DEV-892 (`15a6d7cf1`) copied the standards automation.yml into `.tasks/DEV/automation.yml` at STD-354 and kept lotar's own rule 'Login expired: ask the owner to sign in' (DEV-835) after it. STD-370 (standards `380f51c2`, later the same day) puts its own 'Login expired' rule into the shared file. The next copy brings in both, so one auth pause files two sign-in tickets for mallox.
+
+  ## Check
+  `diff <(head -1320 .tasks/DEV/automation.yml) ~/Development/standards/configs/lotar/automation.yml` shows STD-370's changes; `grep -c 'Login expired' .tasks/DEV/automation.yml` after a copy.
+
+  ## Done when
+  - The shared part matches the standards file again, and only one 'Login expired' rule is left (the shared one, unless lotar's own does something the shared one can't).
+  - `lotar automation simulate` loads the file with the installed lotar.
+tags:
+- health
+history:
+- at: 2026-11-26T23:41:57.684350+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

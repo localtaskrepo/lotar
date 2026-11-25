@@ -1,11 +1,11 @@
 title: 'Timeline: read a job''s conversation inline from its harnessmux event log'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-26T23:13:35.266446+00:00
+modified: 2026-11-26T23:38:43.801755+00:00
 relationships:
   related:
   - DEV-849
@@ -29,8 +29,53 @@ comments:
     - `GET /api/jobs/transcript?id=&after=&limit=`: finds the session from the reference, else from the job log's `harnessmux attach <name>` line plus the job's time window; reads only `<harnessmux state>/sessions/<name>.events.jsonl` (and its kept `<name>.<stamp>` copies), names checked with harnessmux's `validate_name`. Tool calls and thoughts are merged server-side, `raw` is dropped. Unknown job: 404.
     - UI: Show conversation under Show thread, request only on open; states loading, expired, error + retry, unsupported with the attach command; t3: Open in T3 and "Tool calls are in T3" when the turn has no tool events.
     - Told DEV-901, DEV-867 and DEV-782 threads about the shared files.
+- date: 2026-11-26T23:38:29.800560+00:00
+  author: claude
+  text: |-
+    The Timeline now reads a job's conversation from its harnessmux event log, and only when you open it.
+
+    - **Reference:** each job logs an `agent_job_transcript` entry with the turn `Session::send` returned. A continued session's second job logs turn 2, and a message sent to a running job adds its turn.
+    - **REST:** `GET /api/jobs/transcript?id=&after=&limit=` returns only the job's turns, in pages by harnessmux `seq`.
+      - It takes the job id only. Any other parameter is a 400, an unknown job a 404.
+      - The session name from the job log must pass harnessmux `validate_name`, and only `<sessions>/<name>.events.jsonl` and its kept copies are read.
+    - **Old logs** without a reference read the session their progress line names, the turns that started while the job ran. With no match, they show the unsupported state.
+    - **UI:** Show thread → **Show conversation** on Timeline jobs (not `command` jobs).
+      - States: loading; expired ("The conversation is no longer on this machine.", the summary stays); offline or error with Retry; unsupported with `harnessmux attach <name> --from-start` to copy.
+      - "Turn N of M" header and Load more.
+      - t3 jobs: **Open in T3**, and "Tool calls are in T3" when the log has no tool events.
+    - **Contract:** `api_types.rs`, `types.ts`, `openapi.json`, `agent.md`, `api-quick-reference.md` and `sse.md` agree. I also changed `AgentJobLogEntry`'s `nullable` (inert in OpenAPI 3.1) to `type: [.., "null"]`, so the published schema now validates.
+    - **Screenshots** at phone width, 390px: [before](attachment:dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png) · [Claude turn](attachment:dev909-after-claude.298a81cf368d1b239d68e7e0ff93b451.png) · [reused session, turn 2](attachment:dev909-after-reused.4a320b1a036d3c2bd3dcd9e5588b2db0.png) · [t3 without tools](attachment:dev909-after-t3-without-tools.da6aa91325d8cbd6194730883e83e38c.png) · [expired](attachment:dev909-after-expired.7d39dd080addb79ce12fed29c644cfd5.png)
+    - **Guidance:** no durable finding. One thing to know: `cargo nextest -p lotar-lib` doesn't rebuild the root `lotar` bin that the CLI tests run, so build it first.
+  report:
+    commits:
+    - hash: 865efba73
+      what: DEV-909 job transcript reference, /api/jobs/transcript, Timeline conversation, smoke
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+      reason: 280 tests
+    - command: cargo nextest run -p lotar-lib (dev503, timeline, contract, openapi, transcript filters)
+      result: passed
+      reason: 137 tests
+    - command: npm run test:ui:agent -- AgentJobTranscript AgentJobs AgentJobLog agentJobs TaskPanel
+      result: passed
+      reason: 224 tests
+    - command: npm run test:smoke:agent -- smoke/tests/ui.task-timeline
+      result: passed
+      reason: 2 specs, embedded UI
+    - command: full npm test and npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review 865efba73 and merge; the full suites run at the merge.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
+- attachment: dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png
+- attachment: dev909-after-claude.298a81cf368d1b239d68e7e0ff93b451.png
+- attachment: dev909-after-reused.4a320b1a036d3c2bd3dcd9e5588b2db0.png
+- attachment: dev909-after-t3-without-tools.da6aa91325d8cbd6194730883e83e38c.png
+- attachment: dev909-after-expired.7d39dd080addb79ce12fed29c644cfd5.png
 description: |-
   Ravi asked on 2026-11-24 to review the full chain of agent work in the ticket timeline. The approach is agreed in DEV-850: [docs/research/inline-transcript-review.md](https://github.com/localtaskrepo/lotar/blob/main/docs/research/inline-transcript-review.md). Ravi chose on 2026-11-26: "expand (Load on open only)".
 
@@ -102,3 +147,41 @@ history:
   - field: relationships
     old: '{"related":["DEV-849","DEV-850"]}'
     new: '{"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901"]}'
+- at: 2026-11-26T23:38:13.414508+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png
+- at: 2026-11-26T23:38:13.470178+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev909-after-claude.298a81cf368d1b239d68e7e0ff93b451.png
+- at: 2026-11-26T23:38:13.520681+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev909-after-reused.4a320b1a036d3c2bd3dcd9e5588b2db0.png
+- at: 2026-11-26T23:38:13.573256+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev909-after-t3-without-tools.da6aa91325d8cbd6194730883e83e38c.png
+- at: 2026-11-26T23:38:13.621804+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev909-after-expired.7d39dd080addb79ce12fed29c644cfd5.png
+- at: 2026-11-26T23:38:29.800560+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:38:43.801755+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

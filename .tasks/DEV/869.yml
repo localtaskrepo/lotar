@@ -1,16 +1,17 @@
 title: lotar trust --status shows a structured run command as a JSON blob with its default fields
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-26T21:27:07.583488+00:00
+modified: 2026-11-26T23:39:26.494440+00:00
 relationships:
   related:
   - DEV-847
   - DEV-873
   - DEV-904
+  - DEV-844
 comments:
 - date: 2026-11-25T20:15:17.945536+00:00
   author: claude
@@ -99,6 +100,16 @@ comments:
 - date: 2026-11-26T21:27:07.583488+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T212704.558Z-66 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212704.558Z-66 why.'
+- date: 2026-11-26T23:39:20.582860+00:00
+  author: claude
+  text: |-
+    Review: passed. `6c501d7ed` is the same change reviewed before (`d29944678`), rebased; no blocking or minor findings.
+
+    - Read: the diff (`trust.rs`, `docs/help/trust.md` only), the ticket and its comments, the owner's answer in INBOX-766 (land despite the DEV-873 smoke flake), recent main commits to both files (`b372deae7` DEV-847, `866027326` DEV-844): both are already in the branch base
+    - Main is 28 commits past the base `eb9b383f7`; none touch the two files, `git merge-tree` main vs HEAD is clean
+    - Reran: `npm ci` passed; `rustfmt --check` and `prettier --check` passed; `cargo nextest run -p lotar-lib --lib trust::` passed 3/3
+    - Real binary on a scratch repo: `runs echo 'a b' x (env A=2 Z=1, no wait)`, string run `runs echo hi`, `--format json` `commands` holds the same strings
+    - Not rerun: clippy, dev259 integration tests, smoke (the merge runs the full suites)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A89f5e47dea5086fcd262030d8410b807f6b5bde2aa107868f6c68782c5ff9fd8
@@ -257,3 +268,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:39:20.582860+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:39:20.913998+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-847","DEV-873","DEV-904"]}'
+    new: '{"related":["DEV-847","DEV-873","DEV-904","DEV-844"]}'
+- at: 2026-11-26T23:39:26.494440+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

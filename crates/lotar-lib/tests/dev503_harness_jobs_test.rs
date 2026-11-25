@@ -2055,3 +2055,63 @@ fn a_t3_jobs_prompt_names_the_reporter_to_set() {
     let prompt = std::fs::read_to_string(root.join("t3.log.prompt-1")).unwrap();
     assert!(prompt.contains("Put `LOTAR_DEFAULT_REPORTER=<your agent name>` (`claude`, `codex`)"), "{prompt}");
 }
+
+/// DEV-858: `GET /api/jobs/t3-thread` over REST. Each t3 job of one ticket answers with its own thread and T3 Code's
+/// state of it; a `t3` that fails on a thread answers `unavailable` with its reason; a job of another runner is a 400,
+/// a missing id too, and an unknown job a 404.
+#[test]
+fn the_t3_thread_route_answers_each_jobs_thread_and_refuses_other_jobs() {
+    let (fixtures, _env) = t3_harness_and(&[("fix", "", ""), ("rework", "", ""), ("review", "", "")], "  quick:\n    runner: command\n    command: 'true'\n");
+    let root = fixtures.get_temp_path();
+    for profile in ["fix", "rework", "review", "quick"] {
+        run_t3(&fixtures, profile).success();
+    }
+    let mut jobs = lotar::services::agent_log_service::AgentLogService::load_jobs(root, &fixtures.tasks_root.join("@agent-logs").to_string_lossy());
+    jobs.sort_by(|a, b| a.header.created_at.cmp(&b.header.created_at));
+    let ids: Vec<(String, String)> = jobs.iter().map(|job| (job.header.runner.clone(), job.header.job_id.clone())).collect();
+    let [(_, fix), (_, rework), (_, review), (quick_runner, quick)] = ids.as_slice() else { panic!("four jobs: {ids:?}") };
+    assert_eq!(quick_runner, "command", "{ids:?}");
+    // T3 Code no longer knows the review's thread: `t3 thread show` exits with an error.
+    std::fs::remove_dir_all(root.join("t3-threads/thread-2")).unwrap();
+
+    let mut api = lotar::api_server::ApiServer::new();
+    lotar::routes::initialize(&mut api);
+    let get = |id: Option<&str>| {
+        let query = id.map(|id| std::collections::HashMap::from([("id".to_string(), id.to_string())])).unwrap_or_default();
+        let response = api.handle_request(&lotar::api_server::HttpRequest {
+            method: "GET".into(),
+            path: "/api/jobs/t3-thread".into(),
+            query,
+            headers: std::collections::HashMap::new(),
+            body: Vec::new(),
+        });
+        let body: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+        (response.status, body)
+    };
+
+    for (job, thread) in [(fix, "thread-0"), (rework, "thread-1")] {
+        let (status, body) = get(Some(job));
+        assert_eq!(status, 200, "{body}");
+        let answer = &body["data"]["thread"];
+        assert_eq!(answer["thread_id"], thread, "each job of the ticket has its own thread: {body}");
+        assert_eq!(answer["link"], format!("https://t3.test/{thread}"), "{body}");
+        assert_eq!(answer["state"], "finished", "{body}");
+        assert_eq!(answer["t3_status"], "completed", "{body}");
+    }
+
+    let (status, body) = get(Some(review));
+    assert_eq!(status, 200, "{body}");
+    let answer = &body["data"]["thread"];
+    assert_eq!(answer["thread_id"], "thread-2", "{body}");
+    assert_eq!(answer["state"], "unavailable", "{body}");
+    assert!(answer["reason"].as_str().unwrap_or_default().ends_with("No thread thread-2"), "t3's error is the reason: {body}");
+
+    let (status, body) = get(Some(quick));
+    assert_eq!(status, 400, "{body}");
+    assert!(body.to_string().contains("runs on command, not in a T3 Code thread"), "{body}");
+    let (status, body) = get(None);
+    assert_eq!(status, 400, "{body}");
+    let (status, body) = get(Some("job-unknown-1"));
+    assert_eq!(status, 404, "{body}");
+    assert!(body.to_string().contains("Job 'job-unknown-1' not found"), "{body}");
+}

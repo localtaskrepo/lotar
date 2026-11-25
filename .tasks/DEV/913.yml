@@ -1,0 +1,29 @@
+title: Smoke comment says the loaded log closes an Instructions panel opened while loading, which DEV-888 fixes
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T23:36:28.876091+00:00
+modified: 2026-11-26T23:36:29.746965+00:00
+relationships:
+  related:
+  - DEV-875
+  - DEV-888
+description: 'Found: reviewing DEV-888. smoke/tests/ui.agent-jobs.smoke.spec.ts:307-308 on main (cb61901d7, DEV-875) says the loaded log replaces the loading-state Instructions button ''closing a panel opened there''. Once DEV-888 lands, the panel stays open, so the comment describes a bug that no longer exists. Check: read the comment after DEV-888 is on main. Done: the comment says why the test waits for the log header (it checks the header button), without claiming the panel closes.'
+tags:
+- health
+custom_fields:
+  finding: review:smoke-stale-comment
+history:
+- at: 2026-11-26T23:36:29.379234+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-875","DEV-888"]}'
+- at: 2026-11-26T23:36:29.746965+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

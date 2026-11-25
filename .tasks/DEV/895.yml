@@ -5,10 +5,11 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T07:11:26.742561+00:00
-modified: 2026-11-26T21:46:38.434203+00:00
+modified: 2026-11-26T23:38:22.446532+00:00
 relationships:
   related:
   - DEV-884
+  - DEV-877
 comments:
 - date: 2026-11-26T17:33:52.869496+00:00
   author: claude
@@ -152,3 +153,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-26T23:38:22.446532+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-884"]}'
+    new: '{"related":["DEV-884","DEV-877"]}'

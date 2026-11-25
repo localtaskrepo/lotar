@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-26T21:07:37.585404+00:00
+modified: 2026-11-26T23:42:20.185910+00:00
 relationships:
   related:
   - DEV-725
@@ -238,6 +238,12 @@ comments:
     - **Not run:** the full `npm test` and `npm run smoke`, which the merge runs. They failed last time under load, on UI tests unrelated to this change.
     - No UI changes, no stray files, one commit. Nothing new to file.
 - date: 2026-11-26T21:07:37.585404+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-793` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-793` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
+- date: 2026-11-26T23:42:20.185910+00:00
   author: automation
   text: |
     lotar's merge needs the merge agent: rebasing `agent/DEV-793` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-793` is unchanged.
@@ -538,6 +544,10 @@ history:
     old: '@review-claude'
     new: '@merge'
 - at: 2026-11-26T21:07:37.585404+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:42:20.185910+00:00
   actor: automation
   changes:
   - field: comment_added
