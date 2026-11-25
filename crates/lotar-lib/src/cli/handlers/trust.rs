@@ -1,6 +1,7 @@
 //! `lotar trust`: approve this repository's automation commands and agent
 //! profiles (DEV-259), like `direnv allow`.
 
+use crate::automation::types::{AutomationRunAction, AutomationRunCommand};
 use crate::config::trust::{TrustService, TrustState};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::automation_service::AutomationService;
@@ -139,15 +140,50 @@ fn run_commands(content: &str) -> Vec<(String, String, String)> {
         for (event, action) in map {
             // A serialized action without a run command holds `run: null`.
             if let Some(run) = action.get("run").filter(|run| !run.is_null()) {
-                let command = match run {
-                    serde_yaml_ng::Value::String(raw) => raw.clone(),
-                    other => serde_json::to_string(other).unwrap_or_default(),
+                let command = match serde_yaml_ng::from_value::<AutomationRunAction>(run.clone()) {
+                    Ok(AutomationRunAction::Shell(raw)) => raw,
+                    Ok(AutomationRunAction::Command(command)) => describe_run_command(&command),
+                    Err(_) => serde_json::to_string(run).unwrap_or_default(),
                 };
                 out.push((name.clone(), event.as_str().unwrap_or_default().to_string(), command));
             }
         }
     }
     out
+}
+
+/// A structured `run` as its command line, then the settings that differ
+/// from their defaults: `echo 'a b' (env A=1, cwd sub)`.
+fn describe_run_command(run: &AutomationRunCommand) -> String {
+    let line = std::iter::once(&run.command).chain(&run.args).map(|word| quote_word(word)).collect::<Vec<_>>().join(" ");
+    let mut settings = Vec::new();
+    if !run.env.is_empty() {
+        let mut env: Vec<_> = run.env.iter().collect();
+        env.sort();
+        let env = env.into_iter().map(|(key, value)| format!("{key}={}", quote_word(value))).collect::<Vec<_>>().join(" ");
+        settings.push(format!("env {env}"));
+    }
+    if let Some(cwd) = &run.cwd {
+        settings.push(format!("cwd {}", quote_word(cwd)));
+    }
+    if run.ignore_failure {
+        settings.push("ignore_failure".to_string());
+    }
+    if !run.wait {
+        settings.push("no wait".to_string());
+    }
+    if let Some(timeout) = &run.timeout {
+        settings.push(format!("timeout {timeout}"));
+    }
+    if settings.is_empty() { line } else { format!("{line} ({})", settings.join(", ")) }
+}
+
+/// Single-quotes a word a shell would split or unquote.
+fn quote_word(word: &str) -> String {
+    if !word.is_empty() && !word.chars().any(|c| c.is_whitespace() || c == '\'' || c == '"') {
+        return word.to_string();
+    }
+    format!("'{}'", word.replace('\'', "'\\''"))
 }
 
 #[cfg(test)]
@@ -160,10 +196,12 @@ mod tests {
         let tasks = dir.path();
         std::fs::write(tasks.join("config.yml"), "default:\n  project: A\nagents:\n  bot:\n    runner: command\n    command: sh\n").unwrap();
         std::fs::create_dir_all(tasks.join("A")).unwrap();
-        std::fs::write(tasks.join("A").join("automation.yml"), "automation:\n  rules:\n    - name: hi\n      on:\n        created:\n          run: echo hi\n")
-            .unwrap();
+        std::fs::write(tasks.join("A").join("automation.yml"), "automation:\n  rules:\n    - name: hi\n      on:\n        created:\n          run: echo hi\n    - name: args\n      on:\n        updated:\n          run: {command: echo, args: [x]}\n",
+        )
+        .unwrap();
         let described = describe(tasks).join("\n");
         assert!(described.contains("rule 'hi' on created runs echo hi"), "{described}");
+        assert!(described.lines().any(|line| line.ends_with("rule 'args' on updated runs echo x")), "{described}");
         assert!(described.contains("agent profile 'bot'"), "{described}");
     }
 
@@ -185,5 +223,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(describe(tasks), vec!["automation.yml: no run commands"]);
+    }
+
+    #[test]
+    fn describes_a_structured_run_like_its_command_line() {
+        let parse = |yaml: &str| serde_yaml_ng::from_str::<AutomationRunCommand>(yaml).unwrap();
+        assert_eq!(describe_run_command(&parse("{command: echo, args: [x]}")), "echo x");
+        assert_eq!(describe_run_command(&parse("{command: echo, args: ['a b', '', \"it's\"]}")), "echo 'a b' '' 'it'\\''s'");
+        assert_eq!(
+            describe_run_command(&parse("{command: sh, env: {B: '2', A: 'x y'}, cwd: sub, ignore_failure: true, wait: false, timeout: 10s}")),
+            "sh (env A='x y' B=2, cwd sub, ignore_failure, no wait, timeout 10s)"
+        );
     }
 }

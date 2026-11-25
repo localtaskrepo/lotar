@@ -1,15 +1,16 @@
 title: config show leaves out agent.worktree and labels every default (home) when a home config exists
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:25:32.394470+00:00
-modified: 2026-11-27T00:18:07.346541+00:00
+modified: 2026-11-27T00:59:33.913379+00:00
 relationships:
   related:
   - DEV-905
   - DEV-906
+  - DEV-793
 comments:
 - date: 2026-11-26T21:02:05.539044+00:00
   author: claude
@@ -106,6 +107,37 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-27T00:59:26.772351+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `c292a058e` is on main.
+
+    - **lotar's failure:** `dev61_reference_kinds_test` failed because of DEV-906, not this change. The job worktree's `target` links to `/Volumes/Builds`, so the test workspace sat outside the repo. Smoke's `ui.reference-kinds` spec failed for the same reason.
+    - **Checks:** main moved to `5f7f70b65` (DEV-793), so I rebased. Then I ran lint, `test:agent` and smoke with `target` as a real folder inside the worktree, and all three passed. I put the link back afterwards.
+    - **Main moved again** to `5f2024492`: DEV-906's fix for exactly those tests, plus one doc line. None of it touches DEV-907's files. I rebased and ran only the changed tests (dev61, the reference-kinds smoke spec, config_explain) with the normal linked `target`. All passed. I didn't rerun the full suites on this last base.
+    - **Ticket check:** with a temp `HOME` and `LOTAR_IGNORE_HOME_CONFIG=0`, `enabled: true # (global)`, `build_root: /tmp/builds # (global)` and `max_parallel_jobs: 3 # (home)`. That is the only `(home)` line.
+    - `.tasks` changes were folded into the merged commit. No rules or config files changed, so no `lotar trust`. Pushed `5f2024492..c292a058e`.
+  report:
+    commits:
+    - hash: c292a058e
+      what: DEV-907 fix on main, pushed
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2623 Rust + 1629 UI on 5f7f70b65 base, real target folder
+    - command: npm run -s smoke
+      result: passed
+      reason: 413 on 5f7f70b65 base, real target folder
+    - command: cargo nextest dev61_reference_kinds + config_explain
+      result: passed
+      reason: 21, on final base 5f2024492
+    - command: vitest ui.reference-kinds.smoke.spec.ts
+      result: passed
+      reason: 5, on final base
+    - command: ticket check (config show --explain --full, temp HOME)
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab16f27083c5f528df245bcfb6b6173afb0e70c46ca82ae243eb6648699b9929a
 description: |-
@@ -116,7 +148,6 @@ description: |-
   Done when: the YAML shows `agent.worktree.*`, and a key the home config doesn't set isn't labelled `(home)`.
 tags:
 - health
-- job-paused
 custom_fields:
   finding: config-show:agent-worktree-and-home-labels
 history:
@@ -188,3 +219,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T00:59:26.772351+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:59:27.066302+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-905","DEV-906"]}'
+    new: '{"related":["DEV-905","DEV-906","DEV-793"]}'
+- at: 2026-11-27T00:59:33.913379+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health

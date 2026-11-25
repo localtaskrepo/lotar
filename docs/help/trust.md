@@ -32,7 +32,7 @@ Rules from your home automation file (`~/.lotar.automation.yml`), agent jobs sta
 
 `lotar trust` records a fingerprint of the automation files and the `agents:`, `agent.merge` and `agent.worktree.waiting_run` sections of the config files, keyed by the tasks directory. The record lives in your home directory: `~/.lotar.trust.yml`, or `~/.lotar/trust.yml` when `~/.lotar` is a directory. Set `LOTAR_TRUST_FILE` to use another file.
 
-Any change to those files made outside LoTaR (an edit, a pull, a merge) makes the repository untrusted again until you review it and run `lotar trust`. `lotar trust --status` lists every `run` command, agent profile, merge and waiting command so you can review them. Changes to other settings in `config.yml` do not affect trust.
+Any change to those files made outside LoTaR (an edit, a pull, a merge) makes the repository untrusted again until you review it and run `lotar trust`. `lotar trust --status` lists every `run` command, agent profile, merge and waiting command so you can review them. A structured `run` (`command` with `args`) is listed as its command line, followed by the settings that differ from their defaults: `runs echo x (env A=1, cwd sub)`. Changes to other settings in `config.yml` do not affect trust.
 
 A new LoTaR version that adds a kind of setting to this list doesn't make a trusted repository untrusted: the record names the kinds it covers, and settings of a kind added later count from your next `lotar trust`. A version that stops checking a kind shows the repository as changed until you run `lotar trust` again.
 

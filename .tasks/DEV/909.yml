@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-26T23:38:43.801755+00:00
+modified: 2026-11-27T01:02:56.494024+00:00
 relationships:
   related:
   - DEV-849
@@ -13,6 +13,7 @@ relationships:
   - DEV-782
   - DEV-867
   - DEV-901
+  - DEV-918
 comments:
 - date: 2026-11-26T21:07:08.577168+00:00
   author: automation
@@ -69,6 +70,41 @@ comments:
       result: not_run
       reason: the merge runs the full suites (DEV-797)
     next: Review 865efba73 and merge; the full suites run at the merge.
+- date: 2026-11-27T01:02:48.535659+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code works and its checks pass, but the screenshot set is incomplete.
+
+    **Blocking**
+    - **Screenshots missing** (owner 2026-11-13, STD-97: every changed page, before and after, light and dark, at 1920, 1440 and 390 px).
+      - Attached: light mode at 390 px only, with one "before".
+      - Missing: dark mode, 1920 and 1440 px, and "before" at those widths.
+      - Fix: in the `shot` helper (`smoke/tests/ui.task-timeline-conversation.smoke.spec.ts:248`), loop over the widths with `page.setViewportSize` and over the modes with `page.emulateMedia({ colorScheme })`. Attach the set with `lotar task reference add upload DEV-909 <file>` and link it.
+      - I took that set myself in `/tmp/dev909-review-shots` (30 images): no visible problem in light or dark at any width.
+
+    **Checked, OK**
+    - Read `865efba73` against "Done when", DEV-850's write-up and the owner's "expand (Load on open only)". Each item is covered. No scope beyond the ticket. No owner decision taken.
+    - Contract: `api_types.rs`, `types.ts`, `openapi.json`, `agent.md`, `api-quick-reference.md` and `sse.md` agree. The route test checks the published schema.
+    - Security:
+      - Only `id`, `after` and `limit` are accepted; anything else is a 400.
+      - The session name goes through `validate_name`; `../etc/passwd`, `a/b`, `..` and `.hidden` are refused (tested).
+      - Only `<sessions>/<name>.events.jsonl` and kept copies of it are read.
+    - Turn 2 of a continued session: `dev503 a_job_records_its_turn…` shows one reference per job (`[1]`, then `[2]`), with no duplicate from `drive_turns`.
+
+    **Reran**
+    - `npm ci`: passed
+    - `npm run lint`: passed
+    - `cargo nextest run -p lotar-agent transcript`: passed (5 tests)
+    - `cargo nextest run -p lotar-lib` on the transcript, openapi and contract tests: passed (74 tests)
+    - `npm run test:ui:agent -- AgentJobTranscript TaskPanel`: passed (163 tests)
+    - `npm run test:smoke:agent -- smoke/tests/ui.task-timeline-conversation`: passed
+    - The worktree is clean afterwards.
+
+    **For the merge**
+    - `main` is 13 commits ahead. The rebase conflicts in `view/api/client.ts` (both sides add a method next to `getAgentJobT3Thread`).
+
+    **Minor, filed**
+    - [DEV-918](https://lotar.pyxzl.net/task/DEV-918): the transcript reader can take a kept copy of a session whose name merely starts the same.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
 - attachment: dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png
@@ -100,6 +136,7 @@ tags:
 - agent
 - ui
 - job-paused
+- review-returned
 history:
 - at: 2026-11-26T19:31:54.873044+00:00
   actor: claude
@@ -185,3 +222,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T01:02:36.065673+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901"]}'
+    new: '{"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918"]}'
+- at: 2026-11-27T01:02:48.535659+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:02:48.843976+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui, job-paused
+    new: agent, ui, job-paused, review-blocked
+- at: 2026-11-27T01:02:56.494024+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, ui, job-paused, review-blocked
+    new: agent, ui, job-paused, review-returned

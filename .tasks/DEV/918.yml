@@ -1,0 +1,26 @@
+title: Transcript reader takes a kept copy of a longer-named session for the job's own
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T01:02:35.316395+00:00
+modified: 2026-11-27T01:02:36.682811+00:00
+relationships:
+  related:
+  - DEV-909
+description: |-
+  Found in the DEV-909 review.
+
+  - `candidates()` in `crates/lotar-agent/src/services/agent_job_service/transcript.rs` accepts any kept log `<base>.<stamp>.events.jsonl` where the job's session name starts with `base`.
+  - `keep_session` in `agent_runner.rs` only cuts `base` when the name is longer than 47 characters. A kept copy of a shorter session, such as `lotar-x-DEV-1-fix`, also counts for the session `lotar-x-DEV-1-fix-ui`.
+  - The turn and time-window check usually prevents a wrong match. But two jobs whose sessions share a name prefix and ran at the same time can show each other's turn.
+  - Fix: accept `base != name` only when `base` is exactly 47 characters, the cut length. Add a test with a kept copy of a prefix-named session.
+tags:
+- agent
+history:
+- at: 2026-11-27T01:02:36.682811+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

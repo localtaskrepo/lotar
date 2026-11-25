@@ -1,11 +1,11 @@
 title: 'T3 runner: read job results through t3_submit_output and milestones through MCP Events'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-27T00:55:20.499422+00:00
+modified: 2026-11-27T01:04:30.892396+00:00
 relationships:
   related:
   - DEV-849
@@ -16,6 +16,7 @@ relationships:
   - DEV-876
   - DEV-886
   - DEV-895
+  - DEV-862
 comments:
 - date: 2026-11-26T01:26:18.391829+00:00
   author: claude
@@ -101,6 +102,45 @@ comments:
       - `cargo clippy -p lotar-agent --all-targets`, with no warnings
       - `rustfmt --check` and `prettier --check` on the changed files
     - **Not done:** the bug comes from reading the code, not from a failing run on the rebased tree. No UI work, so no screenshots. Full suites not run (they run at merge). No tickets filed.
+- date: 2026-11-27T01:04:17.156156+00:00
+  author: claude
+  text: |-
+    Fixed: the job view's milestone no longer overrides a thread that waits on background work; the branch is rebased onto main.
+
+    - **Blocking finding (DEV-857 regression):** `with_milestone` (`crates/lotar-agent/src/services/agent_job_service/t3_state.rs`) now lets a milestone give the state only when:
+      - T3 Code doesn't answer, or
+      - a settled run is still `thread show`'s `activeRunId` (it hasn't caught up), or
+      - a `thread.needs_input` came after `updatedAt` (a question wins everything anyway).
+      - A thread shown past the run (`pendingBackgroundTasks`, `blockedOnThreadWait`, a newer run) keeps its own state, so it stays Running.
+      - The `t3 thread show` answer is now cached together with its active run (`Answer`).
+      - New tests: `a_thread_waiting_on_background_work_stays_running_after_its_run_settled`, `a_settled_milestone_wins_over_a_thread_show_still_running_its_run_and_an_unavailable_one`, `a_question_wins_when_it_came_after_the_thread_s_last_change`.
+    - **Rebase:** onto main `c292a058e`.
+      - Conflicts resolved: `TurnSettings` now has both `usage_source` (DEV-862) and `asks_result`.
+      - `Cargo.toml` and `Cargo.lock` keep main's 0.15.7 and move only harnessmux from 0.3.1 to 0.4.0.
+      - `docs/help/agent.md` keeps main's DEV-857 and DEV-870 text and states the new milestone rule.
+    - **Minor finding:** the `t3_status` and `updated_at` docs now say what a milestone puts there. Changed together in `api_types.rs`, `view/api/types.ts` and `docs/openapi.json`.
+    - **Note:** `dev626` failed at first only because the `lotar` binary was stale. After `cargo build` it passed.
+    - No guidance finding. Diff is 340+/37−, no `small-diff` tag to remove.
+  report:
+    commits:
+    - hash: 29daeb041
+      what: DEV-877 rebased onto main c292a058e; milestone rule fixed; API docs
+    checks:
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+      reason: 299 tests
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev510_t3_session_test|dev849|dev626|dev857|dev876|t3/)'
+      result: passed
+      reason: 40 tests, after cargo build
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it; no UI change
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21ab9d8a75352d745b41e79794c66c74598112d86f236b011a4aa7af178a5344
@@ -377,3 +417,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62ff6f8adf791bf76d3d0b906e810fd03ee6c984d2439da3a277568864ce0ede
+- at: 2026-11-27T01:04:17.156156+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:04:17.458788+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-320","DEV-857","DEV-870","DEV-871","DEV-876","DEV-886","DEV-895"]}'
+    new: '{"related":["DEV-849","DEV-320","DEV-857","DEV-870","DEV-871","DEV-876","DEV-886","DEV-895","DEV-862"]}'
+- at: 2026-11-27T01:04:30.892396+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
