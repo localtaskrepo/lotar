@@ -1,11 +1,11 @@
 title: Smoke test 'reports the whole stderr of a child that exits before ready' passes without the stderr wait it guards
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T04:07:55.489110+00:00
-modified: 2026-11-24T19:22:11.651116+00:00
+modified: 2026-11-25T05:04:48.144980+00:00
 relationships:
   depends_on:
   - DEV-788
@@ -13,6 +13,9 @@ relationships:
   related:
   - DEV-788
   - DEV-832
+  - DEV-800
+  - DEV-802
+  - DEV-838
 comments:
 - date: 2026-11-23T06:57:08.693767+00:00
   author: claude
@@ -317,6 +320,81 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-25T03:03:43.774701+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s smoke` failed:
+    ```
+    TestTimeoutError: Test timed out in 120000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ tests/ui.sync-empty-reports.smoke.spec.ts:7:5
+          5|
+          6| describe.concurrent('SyncHub required empty report list', () => {
+          7|     it('renders an empty array as No reports yet without an error in e…
+           |     ^
+          8|         const workspace = await SmokeWorkspace.create({
+          9|             name: 'sync-empty-reports-',
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+     FAIL  |parallel| tests/ui.task-panel-values.smoke.spec.ts > UI task panel suggestions > offers the names of other tasks without listing whole tasks
+    TestTimeoutError: Test timed out in 120000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ tests/ui.task-panel-values.smoke.spec.ts:9:5
+          7| // `/api/tasks/values`, not from a list of 200 whole tasks.
+          8| describe('UI task panel suggestions', () => {
+          9|     it('offers the names of other tasks without listing whole tasks', …
+           |     ^
+         10|         const workspace = await SmokeWorkspace.create();
+         11|         try {
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+     Test Files  8 failed | 110 passed (118)
+          Tests  8 failed | 401 passed (409)
+       Start at  18:25:06
+       Duration  2317.60s (tests 97%, import 2%)
+    ```.
+
+    - Rebased `agent/DEV-824` onto `main` (`1a5e2dedef34`): `2625ae7f4040`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+    next: The merge agent takes over in a new session
+- date: 2026-11-25T05:04:47.642855+00:00
+  author: claude
+  text: |-
+    Landed: main is at `6c2aa4916` after the owner set Done (05:02Z). Not pushed by this job.
+
+    - I rebased onto `a63022225` (main had gained DEV-838 and DEV-802), which made `6c2aa4916`
+    - `npm ci` and `lint:agent` passed on `6c2aa4916`
+    - `test:agent` was cut off when the worktree was removed at 21:02 PST, during the fast-forward. 2420 tests passed; 1 exec failed (`agent_safety_test::a_new_worktree_clones_...`) because its binary was deleted
+    - Smoke didn't run on this hash. The earlier run's 8 failures were 120 s timeouts at load average 15–20, with a 2317 s run time, so most likely machine load, not this change
+    - Not pushed: the main checkout has uncommitted `.tasks` edits (DEV-800, 802, 807, 824, 838)
+  report:
+    commits:
+    - hash: 6c2aa4916
+      what: DEV-824 rebased onto a63022225, on main
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: not_run
+      reason: worktree removed mid-run; 2420 of 2491 passed, 1 exec failed because its binary was deleted
+    - command: npm run -s smoke
+      result: not_run
+      reason: owner closed the ticket first
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa69cbbdd2a44b55d844c8a5f39390563a2376a0791d8fb6760d688388011248d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9183159929a72f8b9fd25d156524de1b1628ac399b6f7846978613cef8656bd
@@ -333,8 +411,6 @@ references:
 description: 'Found: reviewing DEV-788 (commit 830fe5ba3). The new test in smoke/tests/harness.server.smoke.spec.ts:196 passes 3/3 with the stderrClosed(child.stderr) call in smoke/helpers/server.ts:267 removed, so it does not show the exit-before-stderr race it names. The fix agent said so too. Check: remove that call, run npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t ''whole stderr''. Done: the test fails without the wait (for example a child whose stderr pipe is still written after its exit), or the test is reworded as a plain regression check.'
 tags:
 - health
-- job-paused
-- fix-retried
 custom_fields:
   finding: review:DEV-788-stderr-test
 history:
@@ -629,3 +705,26 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-25T03:03:43.774701+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:02:03.135459+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused, fix-retried
+    new: health
+- at: 2026-11-25T05:04:47.642855+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:04:48.144980+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-788","local:LOCA-601"],"related":["DEV-788","DEV-832"]}'
+    new: '{"depends_on":["DEV-788","local:LOCA-601"],"related":["DEV-788","DEV-832","DEV-800","DEV-802","DEV-838"]}'

@@ -1,11 +1,11 @@
 title: A review job's lotar add in its worktree gives the new ticket an ID main already has (DEV-788 twice)
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:26:48.779913+00:00
-modified: 2026-11-24T23:16:01.372550+00:00
+modified: 2026-11-25T05:04:48.144169+00:00
 relationships:
   related:
   - DEV-738
@@ -15,6 +15,7 @@ relationships:
   - DEV-818
   - DEV-801
   - DEV-778
+  - DEV-824
 comments:
 - date: 2026-11-22T22:11:29.406284+00:00
   author: claude
@@ -360,12 +361,58 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-25T02:54:46.668632+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed:
+    ```
+     ❯ listOnTimeout ../node:internal/timers:644:9
+     ❯ process.processTimers ../node:internal/timers:618:7
+     ❯ Pool.schedule ../node_modules/vitest/dist/chunks/index.ER9afepi.js:6037:5
+
+    Caused by: Error: [vitest-pool-runner]: Timeout waiting for worker to respond
+     ❯ Timeout.<anonymous> ../node_modules/vitest/dist/chunks/index.ER9afepi.js:5477:58
+     ❯ listOnTimeout ../node:internal/timers:685:17
+     ❯ process.processTimers ../node:internal/timers:618:7
+
+
+    ⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+    Error: [vitest-pool]: Failed to start threads worker for test files /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-802/view/__tests__/SprintsList.columnDrag.spec.ts.
+     ❯ ../node_modules/vitest/dist/chunks/index.ER9afepi.js:6037:94
+     ❯ runNextTicks ../node:internal/process/task_queues:65:5
+     ❯ process.processTimers ../node:internal/timers:615:9
+     ❯ Pool.schedule ../node_modules/vitest/dist/chunks/index.ER9afepi.js:6037:5
+
+    Caused by: Error: [vitest-pool-runner]: Timeout waiting for worker to respond
+     ❯ Timeout.<anonymous> ../node_modules/vitest/dist/chunks/index.ER9afepi.js:5477:58
+     ❯ listOnTimeout ../node:internal/timers:685:17
+     ❯ process.processTimers ../node:internal/timers:618:7
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+     Test Files  4 failed | 130 passed (134)
+          Tests  4 failed | 1517 passed (1521)
+         Errors  9 errors
+       Start at  18:34:41
+       Duration  215.09s (tests 87%, environment 9%, transform 2%, import 2%)
+    ```.
+
+    - Rebased `agent/DEV-802` onto `main` (`1a5e2dedef34`): `1cbf13bc662d`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6b8de6dee0c38aaf4f039850e5ecfc1d554b84abbcbc572423d73dc89c735ee8
 description: 'Found: the DEV-738 review job filed its docs follow-up with lotar add in the DEV-738 worktree. Its .tasks copy predates main''s DEV-788 (flaky smoke, 2026-11-22T07:34), so the new ticket got DEV-788 too (commit c1dc25aa2 on agent/DEV-738 adds .tasks/DEV/788.yml). Its fix job then ran on agent/DEV-788, the flaky-smoke ticket''s branch, and merging agent/DEV-738 would hit an add/add conflict on .tasks/DEV/788.yml. Check: from a job worktree, lotar add allocates an ID that is already taken in the main checkout''s .tasks. Done: tickets filed from a job''s worktree go to the main checkout''s tasks directory (or get an ID free there), and a test covers it.'
 tags:
 - health
-- job-paused
 custom_fields:
   finding: lotar:ticket-id-collision
 history:
@@ -513,3 +560,22 @@ history:
   - field: relationships
     old: '{"related":["DEV-738","DEV-788","DEV-803","DEV-825","DEV-818","DEV-801"]}'
     new: '{"related":["DEV-738","DEV-788","DEV-803","DEV-825","DEV-818","DEV-801","DEV-778"]}'
+- at: 2026-11-25T02:54:46.668632+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-25T03:02:10.945884+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health
+- at: 2026-11-25T05:04:48.144169+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-738","DEV-788","DEV-803","DEV-825","DEV-818","DEV-801","DEV-778"]}'
+    new: '{"related":["DEV-738","DEV-788","DEV-803","DEV-825","DEV-818","DEV-801","DEV-778","DEV-824"]}'

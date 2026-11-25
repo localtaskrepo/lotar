@@ -1,0 +1,30 @@
+title: 'Agent merge: no test covers finding_check, which now runs once per key of a bundle'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T05:05:13.706118+00:00
+modified: 2026-11-25T05:05:14.856122+00:00
+relationships:
+  related:
+  - DEV-800
+description: |-
+  The merge's `finding_check` (`crates/lotar-agent/src/services/agent_job_service/merge.rs`, `fn finding_check`) has no test. Since DEV-800 it runs once per key of a bundle ticket and stops at the first key the check still lists. Found in the review of DEV-800: `grep -rn finding_check crates smoke` finds only the code and its config type.
+
+  ## Done when
+
+  - [ ] A test with a ticket that has two finding keys: a check that lists neither passes the merge, and a check that still lists the second key hands off with that key named.
+  - [ ] A ticket without a finding key, or with no `finding_check` set, skips the check.
+history:
+- at: 2026-11-25T05:05:14.057536+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-800"]}'
+- at: 2026-11-25T05:05:14.856122+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,0 +1,36 @@
+title: 'Agents page: top Queued takes the larger of this process''s queued jobs and the queue file''s tickets, the Queued tab adds them'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-25T05:09:26.871873+00:00
+modified: 2026-11-25T05:09:27.580605+00:00
+relationships:
+  related:
+  - DEV-798
+description: |-
+  Found in the review of DEV-798.
+
+  - `crates/lotar-agent/src/services/agent_queue_service.rs:486`: `stats.queued = stats.queued.max(pending.len())` takes the larger count
+  - `view/pages/AgentJobs.vue:409`: the Queued tab adds this process's queued jobs to the queue file's waiting tickets
+  - The two lists don't overlap (`registry.pending_queue` holds jobs already started from the queue), so with 1 queued job and 3 waiting tickets the top shows 3 Queued and the tab shows 4
+  - `docs/help/agent.md` says the tab counts "as the Queued count at the top does"
+
+  Check: 1 queued job in this process and 3 tickets in the queue file give the same Queued count at the top, in the tab and in `lotar agent queue`.
+
+  Done when: `queue_stats` adds the two counts (or the docs give the one rule both follow); a Rust test and a Vitest cover it.
+tags:
+- ui
+history:
+- at: 2026-11-25T05:09:27.236749+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-798"]}'
+- at: 2026-11-25T05:09:27.580605+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

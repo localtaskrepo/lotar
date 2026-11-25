@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, watch, type CSSProperties } from 'vue'
 import type { AgentProfileInfo } from '../api/types'
 import {
   buildAssigneeGroups,
@@ -174,7 +174,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: 'picked', value: string): void }>()
 
-const uid = `assignee-picker-${Math.random().toString(36).slice(2, 8)}`
+const uid = `assignee-picker-${useId()}`
 const listId = `${uid}-list`
 const SHEET_QUERY = '(max-width: 640px)'
 

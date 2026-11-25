@@ -1,11 +1,11 @@
 title: lotar config set drops every YAML comment in the project config it rewrites
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T21:21:07.483127+00:00
-modified: 2026-11-24T21:39:09.459425+00:00
+modified: 2026-11-25T05:25:40.909963+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -16,6 +16,8 @@ relationships:
   - DEV-834
   - DEV-833
   - DEV-855
+  - DEV-768
+  - DEV-821
 comments:
 - date: 2026-11-23T03:03:10.100714+00:00
   author: claude
@@ -254,6 +256,30 @@ comments:
       result: passed
       reason: 407/407
     next: Review again
+- date: 2026-11-25T05:25:31.977061+00:00
+  author: claude
+  text: |-
+    Review: passed. `config set` now changes only the key it sets, and both findings from the last review are fixed.
+
+    Read: `f23ef7081` (`git diff main...HEAD`, 12 files), the last review, DEV-266, DEV-407, `docs/help/config.md`, every caller of `save_project_config`/`save_global_config`, and the changes on main since the merge base `f95414e5a` (DEV-768 IndexMap agents, DEV-821 trust lock). It merges cleanly onto main `6c2aa4916`.
+
+    Reran:
+    - `npm ci`: passed
+    - `npm run -s lint:agent`: passed
+    - `cargo nextest run -p lotar-core yaml_patch`: 8/8 passed
+    - `cargo nextest run -p lotar-lib --test integration -E 'test(/dev811|dev407|dev266|config/)'`: 276/276 passed
+    - `npm run -s test:smoke:agent -- smoke/tests/ui.scan-settings.smoke.spec.ts`: 1/1 passed
+    - Ticket check on a copy of the real `.tasks/DEV/config.yml`, run with the built binary in a scratch repo: only the two new `issue.types` items changed; owner comments and `waiting_run: [cargo, clean, --workspace]` stayed
+    - Not rerun: full `npm test` and smoke (the merge runs them)
+
+    Findings:
+    - Last review #1 fixed: a comment between list items and a column-0 comment inside a section both survive (tests in `yaml_patch.rs` and `dev811_config_set_comments_test.rs`).
+    - Last review #2 fixed: `config init --force` writes canonical YAML through `overwrite_project_config`/`overwrite_global_config` and has tests. `config normalize` still writes canonical YAML.
+    - Edge cases probed in scratch, all as `docs/help/config.md` describes: clearing a key, clearing a section's last key, a flow list with a quoted `#`, a flow-mapping section, the flat `issue_types` spelling, deeper item indent, a reordered list (only the comments inside that list are lost).
+    - The DEV-266 test now expects a hand-written map's order to stay as written. Its goal, a stable order across writes, still holds.
+    - No owner decision touched. No stray files and no second branch.
+
+    Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A508e0ebf43f1f9aaa7b9edc3d8fc73b587c37ed4800680dc69324be71448685a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8435be66684173a210f69bf1ba918360cbe73777913cb48de46ae057dbc10700
@@ -618,3 +644,22 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833"]}'
     new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833","DEV-855"]}'
+- at: 2026-11-25T05:25:31.977061+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:25:32.359603+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833","DEV-855"]}'
+    new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833","DEV-855","DEV-768","DEV-821"]}'
+- at: 2026-11-25T05:25:40.909963+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

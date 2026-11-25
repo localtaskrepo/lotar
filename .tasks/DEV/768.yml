@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-21T20:47:05.414784+00:00
-modified: 2026-11-24T23:28:36.625768+00:00
+modified: 2026-11-25T05:25:32.357045+00:00
 relationships:
   blocks:
   - DEV-829
@@ -19,6 +19,7 @@ relationships:
   - DEV-840
   - DEV-825
   - DEV-805
+  - DEV-811
 comments:
 - date: 2026-11-21T23:36:23.239354+00:00
   author: automation
@@ -1964,3 +1965,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-829"],"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806","DEV-812","DEV-829","DEV-840","DEV-825"]}'
     new: '{"blocks":["DEV-829"],"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806","DEV-812","DEV-829","DEV-840","DEV-825","DEV-805"]}'
+- at: 2026-11-25T05:25:32.357045+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-829"],"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806","DEV-812","DEV-829","DEV-840","DEV-825","DEV-805"]}'
+    new: '{"blocks":["DEV-829"],"related":["DEV-769","DEV-776","DEV-756","DEV-765","DEV-806","DEV-812","DEV-829","DEV-840","DEV-825","DEV-805","DEV-811"]}'

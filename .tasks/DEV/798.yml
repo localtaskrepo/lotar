@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-22T19:10:25.728494+00:00
-modified: 2026-11-24T17:13:56.423193+00:00
+modified: 2026-11-25T05:09:55.768629+00:00
 relationships:
   depends_on:
   - DEV-771
@@ -17,6 +17,7 @@ relationships:
   - DEV-834
   - DEV-833
   - DEV-800
+  - DEV-865
 comments:
 - date: 2026-11-22T21:10:09.829931+00:00
   author: claude
@@ -200,6 +201,17 @@ comments:
       result: not_run
       reason: covered by the Vitest on the tab counts
     next: Merge agent/DEV-798
+- date: 2026-11-25T05:09:48.321285+00:00
+  author: claude
+  text: |-
+    Review: blocking. The fix is correct, but its before and after screenshots are missing.
+
+    - **Blocking:** the ticket has no screenshots of the changed Agents page (`view/pages/AgentJobs.vue:404-409` changes the tab counts it shows), before or after, light and dark, at 1920, 1440 and 390 px. ui-review requires them (owner 2026-11-13, STD-97). Fix: take both sets in the ticket's state (3 waiting tickets, 1 prerequisite wait, no jobs), upload them with `lotar task reference add upload DEV-798 <file>` and link them in the hand-off comment
+    - Code is right: All = jobs + waiting tickets + prerequisite waits; Queued = queued jobs + waiting tickets. `docs/help/agent.md:363` states this rule
+    - Reviewed `42046bfde` against main `a63022225`. It merges cleanly; commits on main since then touch the same files but not these lines
+    - `npm ci` passed. `npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobs.spec.ts`: 33 passed. With the old `AgentJobs.vue`, the new test fails (`expected '0' to be '4'`), so the test proves the bug. The file is restored and the tree is clean
+    - My own screenshots (Vite UI with a mocked `/api/jobs` in the ticket's state, scratch `lotar serve` for the rest): light and dark at 1920, 1440 and 390 px all show tabs `All 4 · Running 0 · Queued 3` and top `3 Queued`. No visible problems
+    - Minor, filed: [DEV-865](https://lotar.pyxzl.net/task/DEV-865). The top Queued takes the larger of this process's queued jobs and the queue file's tickets (`agent_queue_service.rs:486`), while the tab adds them. With jobs and tickets both waiting, the help's "as the top does" stops holding. This predates DEV-798
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f2cf92fa6872f2c564eefe71cdf3f838044e29cd640d405d056eb3a11d82d3b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77140068723ec150f5d9f0e01ad962d4aec2578c1a4725d7c5a0232c48bd8cb2
@@ -224,6 +236,7 @@ tags:
 - ui
 - job-paused
 - fix-retried
+- review-returned
 history:
 - at: 2026-11-22T19:10:26.105371+00:00
   actor: claude
@@ -518,3 +531,28 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-25T05:09:27.235641+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834","DEV-833","DEV-800"]}'
+    new: '{"depends_on":["DEV-771","local:LOCA-601"],"related":["DEV-771","DEV-818","DEV-786","DEV-834","DEV-833","DEV-800","DEV-865"]}'
+- at: 2026-11-25T05:09:48.321285+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:09:48.613885+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, job-paused, fix-retried
+    new: ui, job-paused, fix-retried, review-blocked
+- at: 2026-11-25T05:09:55.768629+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, job-paused, fix-retried, review-blocked
+    new: ui, job-paused, fix-retried, review-returned

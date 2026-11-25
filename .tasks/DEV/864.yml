@@ -1,0 +1,70 @@
+title: 'Proposal: finding bundles: a health bundle starts its fix agent when created, so later findings of the day start new bundles'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-25T05:05:15.164063+00:00
+modified: 2026-11-25T05:05:44.437289+00:00
+relationships:
+  related:
+  - DEV-800
+  - standards:STD-299
+comments:
+- date: 2026-11-25T05:05:31.886292+00:00
+  author: claude
+  text: |-
+    A health bundle starts its fix agent as soon as it is created, so later findings that day start new bundles. How should agent findings be bundled?
+
+    Options:
+    - later: The bundle's fix agent starts later (daily run or a set delay) (recommended)
+    - job: New findings reach the running job
+    - single: Agent findings stay one ticket each; only the daily run bundles
+  question:
+    options:
+    - key: later
+      label: The bundle's fix agent starts later (daily run or a set delay)
+    - key: job
+      label: New findings reach the running job
+    - key: single
+      label: Agent findings stay one ticket each; only the daily run bundles
+    recommended: later
+description: |-
+  `lotar add --finding <key> --bundle health` (DEV-800) puts a new finding into the day's open bundle only while no agent job holds it. With the shared rules, a health bundle starts its fix agent as soon as it is created, so a bundle will rarely collect more than one finding. STD-299's goal, one health ticket per repo per day, then isn't met for findings agents file.
+
+  ## Cause
+
+  - `.tasks/DEV/automation.yml` "Health: start the fix agent" runs `on: created` for tag `health`. "Health: fix agent lifecycle" sets `InProgress` on `job_started`.
+  - `FindingService::open_bundle` (`crates/lotar-lib/src/services/finding_service.rs`) skips a bundle in `InProgress`, `Reviewing` or `Merging`. The next report of the day starts a new bundle, and that one starts its own fix agent.
+  - Agents file their findings spread over the day (about 55 in 72 h, STD-299). So only reports that come in while the job waits in the queue are bundled.
+  - DEV-800's tests pass because they run without automation rules.
+
+  ## Options (owner decides)
+
+  - A bundle's fix agent starts later, like the flaky list (STD-301): for example the daily `repos.ts --report` run, or a set time after the bundle was created.
+  - A new finding reaches the running job: the job gets it as a message, and the merge's `finding_check` runs on every key.
+  - Keep one ticket per finding for agent-filed findings, and bundle only the daily run (that is how it works today).
+
+  ## Done when
+
+  - [ ] The owner picked one option, and it is recorded here in his words.
+  - [ ] Agent findings of one day give about one bundle per repo with the standards rules in place.
+tags:
+- proposal
+history:
+- at: 2026-11-25T05:05:15.494355+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-800"]}'
+- at: 2026-11-25T05:05:31.886292+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:05:44.437289+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-800"]}'
+    new: '{"related":["DEV-800","standards:STD-299"]}'

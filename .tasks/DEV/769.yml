@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-25T02:23:07.617481+00:00
+modified: 2026-11-25T05:19:56.490614+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -147,6 +147,50 @@ comments:
       result: not_run
       reason: one CSS line changed; the merge runs the full suites
     next: Review again; the commands in tool rows can be checked once a release with DEV-774 records a job
+- date: 2026-11-25T05:09:53.063710+00:00
+  author: claude
+  text: |-
+    Review: blocking. An open Instructions panel now renders inside the log's header row, which breaks the header and pushes the log down.
+
+    - **Instructions panel in the header:** `view/pages/AgentJobs.vue:283` and `view/components/task-panel/TaskPanelTimelineTab.vue:107` put the whole `AgentRunInputs` into the `#actions` slot (`view/components/AgentJobLog.vue:35`, a flex row). Its panel (`run-inputs__panel`: settings table and prompt sections) then opens in that row. At 1440 px the chips, search box and `Link`/`Full height` sit centred beside a ~400 px panel, and the log starts below it. At 390 px the panel fills the header, with `Link Full height` stuck under it. On main the panel opened full width below the log. The plan asked to put the *button* in the header, not the panel.
+    - Evidence: attached `review-instructions-open-light-1440.png` and `review-instructions-open-dark-390.png`. The fix agent's set has no shot with Instructions open, so it missed this: no real job has recorded inputs yet (DEV-767 is unreleased). I faked a recorded `/api/jobs/inputs` response in Playwright.
+    - Fix: keep only the toggle in the header and render the panel full width between the header and the list. For example, split `AgentRunInputs` into a button and a panel with a shared `open` state, or give `AgentJobLog` a slot below the header. Then add an "Instructions open" screenshot (light and dark, 1920, 1440 and 390 px) and a smoke assertion that the panel sits below the header.
+    - **The rest checks out:** the views, counts, folded tools, failed call open with output, setup row, result card, search highlight, the `/agents?job=` link and the list filters all match the plan. No console errors in my run. The fix agent's 42 screenshots show no layout problems. The earlier CSS fix is in (`margin: 0 6px 4px;`).
+    - **Done when:** the limit stays the same. Real logs show `RUN Terminal` without the command until a release includes DEV-774 (`504d8b538`).
+    - **Read:** `main..HEAD` is one commit, `cc5a852c9`, based on `855ff6f46`. It merges cleanly onto main `a63022225`. I also read the ticket and its comments, and DEV-766, DEV-767 and DEV-774 on the touched files.
+    - **Reran, all passed:** `npm ci`; `npm run test:ui:agent` on `AgentJobLog`, `AgentJobs` and `agentJobLogLayout` (44 tests); `npm run lint:frontend`; `oxlint`, `eslint` and `prettier --check` on the changed files; `build:web` and `cargo build --bins`, then `test:smoke:quick:agent smoke/tests/ui.agent-jobs.smoke.spec.ts` (14 tests).
+    - **My screenshots:** worktree build served on a copy of `.tasks` with automation removed and the queue worker off. Job `job-20261124T173855.041Z-13`, light and dark at 1920, 1440 and 390 px: All, Problems, tools open, search, Instructions. Kept in `/tmp/dev769-review/shots`.
+    - No new tickets: the hidden search match in a folded call is already DEV-859.
+- date: 2026-11-25T05:19:48.441974+00:00
+  author: claude
+  text: |-
+    Rework done: the Instructions panel now opens full width below the log header. The header holds only the button.
+
+    - **Review read HEAD:** the review read `cc5a852c9`, the HEAD of this branch, so I fixed the finding
+    - **Fix:** I moved the panel into its own component, `view/components/AgentRunInputsPanel.vue`. `AgentJobLog` has a new `instructions` prop: it puts the Instructions button in the header and the panel between the header and the list, with `aria-controls` linking them. The panel stays mounted after the first open, so it loads only once. `AgentJobs.vue` and `TaskPanelTimelineTab.vue` pass `instructions` and no longer use the `#actions` slot, which I removed. `AgentRunInputs.vue` (button and panel) is still used when a job has no log yet
+    - **Tests:** a new Vitest case in `AgentJobLog.spec.ts` checks the button is in the header and the panel is the header's next sibling, not inside it. The smoke test `ui.agent-jobs.smoke.spec.ts` (real recorded inputs from the mock profile) checks that the panel is not in the header, starts below it and is as wide as it
+    - **Screenshots:** 12 attached as `after-instructions-open-{agents,task-thread}-{light,dark}-{1920,1440,390}.png`. They show job `job-20261124T173855.041Z-13` with faked recorded inputs, served from a copy of `.tasks` with no queue worker. I checked light at 1440 and dark at 390 on both pages: the chips, search box, `Link` and `Full height` stay in one header row, the panel follows at full width, and the list keeps its 420 px height
+    - **Done when:** the limit hasn't changed. Real logs show `RUN Terminal` without the command until a release includes DEV-774
+    - No guidance correction
+  report:
+    commits:
+    - hash: b29879cb9
+      what: Instructions button in the log header, its panel full width below it
+    checks:
+    - command: npm run test:ui:agent (AgentJobLog, AgentRunInputs, AgentJobs)
+      result: passed
+      reason: 46 tests
+    - command: npm run lint:frontend
+      result: passed
+    - command: oxlint, eslint, prettier --check on changed files
+      result: passed
+    - command: build:web + cargo build --bins + test:smoke:quick:agent ui.agent-jobs.smoke.spec.ts
+      result: passed
+      reason: 14 tests
+    - command: npm test, npm run lint, npm run smoke (full suites)
+      result: not_run
+      reason: the merge runs them
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A38f9ce1840c3a937b227e02e5e61ea330a8e130718e29d27dbd9c6b926e42655
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d3f6b399f3becc20e4ff6d9bb4e12692a038b41b3a2e1268b73b12b1ba22392
@@ -193,6 +237,21 @@ references:
 - attachment: before-task-thread-light-1440.030b58b432e931a02dadab9c8b8cd3e0.png
 - attachment: before-task-thread-light-1920.ed555052d04da73d6df0e501ac631db1.png
 - attachment: before-task-thread-light-390.0106ba3fd48ff038292e49959b220c59.png
+- attachment: review-instructions-open-light-1440.f72e9e910cbddbdb6470c3b3a21975ce.png
+- attachment: review-instructions-open-dark-390.d2e318db1296fdad6f5e0539adb94351.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d11be24d32c117939fedc9635f75f16c9c5731347d65a23766d3f46348be219
+- attachment: after-instructions-open-agents-dark-1440.34bd405543695157ca23cfc86893f24f.png
+- attachment: after-instructions-open-agents-dark-1920.3a4a875d08a8e0180f6fa7f68c0d56bc.png
+- attachment: after-instructions-open-agents-dark-390.13542393e02da883c0703f4424c84a4f.png
+- attachment: after-instructions-open-agents-light-1440.81098822b53f02f82c32fa9db557e9bd.png
+- attachment: after-instructions-open-agents-light-1920.578d568bfdfb420401ed1aa8ba4bd399.png
+- attachment: after-instructions-open-agents-light-390.83c66343134f84688d44cc937f120fc5.png
+- attachment: after-instructions-open-task-thread-dark-1440.129d2f0c61b9092316fb1ada9681e164.png
+- attachment: after-instructions-open-task-thread-dark-1920.6e3d9210000f04047715ad6851748941.png
+- attachment: after-instructions-open-task-thread-dark-390.cb5f24dbdbc0e59421c691e4a7b82887.png
+- attachment: after-instructions-open-task-thread-light-1440.5349b55f318642edc5e4384687ab7e49.png
+- attachment: after-instructions-open-task-thread-light-1920.6413124ee0e8b56ae91123c1ff4557d6.png
+- attachment: after-instructions-open-task-thread-light-390.19ce38ba4ae31db850f8f81c066f2bed.png
 description: |-
   The job log viewer (`view/components/AgentJobLog.vue`, used by `view/pages/AgentJobs.vue` and the task panel thread in `view/components/task-panel/TaskPanelTimelineTab.vue`) is one flat list with no filter or search. The owner asked on 2026-11-21 to "look at some of the project logs to see what else could maybe be done to make it easier to understand what's going [on], how to filter down to the data you need, and be smart about the UI and UX".
 
@@ -226,6 +285,7 @@ tags:
 - web-ui
 - job-paused
 - review-returned
+- review-returned-twice
 history:
 - at: 2026-11-21T20:47:26.221887+00:00
   actor: claude
@@ -605,6 +665,119 @@ history:
     old: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774"]}'
     new: '{"depends_on":["DEV-766","DEV-767"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805"]}'
 - at: 2026-11-25T02:23:07.617481+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-25T05:09:40.095538+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:review-instructions-open-light-1440.f72e9e910cbddbdb6470c3b3a21975ce.png
+- at: 2026-11-25T05:09:40.148082+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:review-instructions-open-dark-390.d2e318db1296fdad6f5e0539adb94351.png
+- at: 2026-11-25T05:09:53.063710+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:09:53.354054+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, web-ui, job-paused, review-returned
+    new: ui, web-ui, job-paused, review-returned, review-blocked
+- at: 2026-11-25T05:10:01.052905+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, web-ui, job-paused, review-returned, review-blocked
+    new: ui, web-ui, job-paused, review-returned, review-returned-twice
+- at: 2026-11-25T05:11:18.787767+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-25T05:11:20.190383+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d11be24d32c117939fedc9635f75f16c9c5731347d65a23766d3f46348be219
+- at: 2026-11-25T05:19:34.343204+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-agents-dark-1440.34bd405543695157ca23cfc86893f24f.png
+- at: 2026-11-25T05:19:34.398154+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-agents-dark-1920.3a4a875d08a8e0180f6fa7f68c0d56bc.png
+- at: 2026-11-25T05:19:34.446840+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-agents-dark-390.13542393e02da883c0703f4424c84a4f.png
+- at: 2026-11-25T05:19:34.491636+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-agents-light-1440.81098822b53f02f82c32fa9db557e9bd.png
+- at: 2026-11-25T05:19:34.536166+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-agents-light-1920.578d568bfdfb420401ed1aa8ba4bd399.png
+- at: 2026-11-25T05:19:34.581055+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-agents-light-390.83c66343134f84688d44cc937f120fc5.png
+- at: 2026-11-25T05:19:34.625032+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-task-thread-dark-1440.129d2f0c61b9092316fb1ada9681e164.png
+- at: 2026-11-25T05:19:34.669020+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-task-thread-dark-1920.6e3d9210000f04047715ad6851748941.png
+- at: 2026-11-25T05:19:34.713400+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-task-thread-dark-390.cb5f24dbdbc0e59421c691e4a7b82887.png
+- at: 2026-11-25T05:19:34.757396+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-task-thread-light-1440.5349b55f318642edc5e4384687ab7e49.png
+- at: 2026-11-25T05:19:34.804453+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-task-thread-light-1920.6413124ee0e8b56ae91123c1ff4557d6.png
+- at: 2026-11-25T05:19:34.851375+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-instructions-open-task-thread-light-390.19ce38ba4ae31db850f8f81c066f2bed.png
+- at: 2026-11-25T05:19:48.441974+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T05:19:56.490614+00:00
   actor: mallox
   changes:
   - field: status

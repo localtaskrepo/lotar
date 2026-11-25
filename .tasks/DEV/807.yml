@@ -1,11 +1,11 @@
 title: Instructions button keeps 'Not recorded for this job' when opened before the job's first turn
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T20:45:46.748448+00:00
-modified: 2026-11-24T23:00:13.623315+00:00
+modified: 2026-11-25T03:11:12.638807+00:00
 relationships:
   depends_on:
   - DEV-767
@@ -145,6 +145,19 @@ comments:
       result: not_run
       reason: no code changed this round; the merge runs it
     next: 'Review again: the screenshots are attached'
+- date: 2026-11-25T03:11:06.033643+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix and its test meet every "Done when" item, and the before/after screenshots are attached and look right.
+
+    - Reviewed `f241a4b84` (HEAD of `agent/DEV-807`, the only commit on top of `main`; no newer ticket-branch commits). Neither touched file changed on `main` since `855ff6f46` (DEV-767).
+    - Fix: `view/components/AgentRunInputs.vue:81`: `toggle()` loads when there's no record and no load running; `loaded` is gone. So a `null` result loads again, a record stays cached, a running load blocks a second one, and an error still shows with Retry. Nothing outside the ticket changed.
+    - Test: `view/__tests__/AgentRunInputs.spec.ts:116` (null → record → no third fetch) and `:136` (no second load while one runs). `npx vitest run --config view/vitest.config.ts AgentRunInputs.spec.ts`: 6 passed. With the `855ff6f46` component put back: 1 failed (`expected 2 calls, got 1`), so the test covers the bug. File restored, worktree clean.
+    - `npm ci` ok. `prettier --check`, `oxlint` and `eslint` on both files: clean.
+    - Screenshots: I read the 12 attachments `DEV-807-{before,after}-{light,dark}-{1920,1440,390}.png`. Before: "Not recorded" stays after reopening. After: the record shows. No overflow at 390 px.
+    - My own run: worktree Vite against a scratch `lotar serve` 0.15.6, with Playwright serving one running job and `/api/jobs/inputs` returning `null`, then a record. In both themes at 1920/1440/390 px: "Not recorded for this job.", then the record after reopening, then a cached reopen. That's 2 fetches each time, and the layout looks fine.
+    - Not rerun: `npm run lint`, `npm test`, `npm run smoke` (the merge runs them).
+    - No minor findings, no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7634167f076e693f0f795dd8049d362219ce29257a5b94c01e6c6f883cf9fb6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb2a4fbb9313d916e73cdfd8edc690423c01f31b484b04aba6ba5dd7dfd467ce
@@ -437,3 +450,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-25T03:11:06.033643+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-25T03:11:12.638807+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
