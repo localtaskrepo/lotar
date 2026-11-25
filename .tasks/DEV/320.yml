@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-11T18:42:57.575800+00:00
-modified: 2026-11-14T07:32:08.028041+00:00
+modified: 2026-11-26T01:26:10.041782+00:00
 relationships:
   related:
   - DEV-322
@@ -16,6 +16,7 @@ relationships:
   - DEV-524
   - DEV-531
   - DEV-516
+  - DEV-877
 comments:
 - date: 2026-11-11T19:10:36.924789+00:00
   text: |-
@@ -97,3 +98,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-322","DEV-323","DEV-325","DEV-348","DEV-528","DEV-524","DEV-531"]}'
     new: '{"related":["DEV-322","DEV-323","DEV-325","DEV-348","DEV-528","DEV-524","DEV-531","DEV-516"]}'
+- at: 2026-11-26T01:26:10.041782+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-322","DEV-323","DEV-325","DEV-348","DEV-528","DEV-524","DEV-531","DEV-516"]}'
+    new: '{"related":["DEV-322","DEV-323","DEV-325","DEV-348","DEV-528","DEV-524","DEV-531","DEV-516","DEV-877"]}'

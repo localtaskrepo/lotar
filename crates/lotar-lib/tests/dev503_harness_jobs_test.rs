@@ -1996,3 +1996,41 @@ fn a_job_from_before_says_its_inputs_were_not_recorded() {
     let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(harness.root()).args(["agent", "logs", "job-none-1", "--inputs"]).assert().failure();
 }
+
+/// The newest comment's author on TEST-1.
+fn last_comment_author(fixtures: &TestFixtures) -> Option<String> {
+    let task = TaskService::get(&fixtures.create_storage(), "TEST-1", None).unwrap();
+    task.comments.last().and_then(|comment| comment.author.clone())
+}
+
+/// DEV-853: a job's agent that runs `lotar comment` without setting `LOTAR_DEFAULT_REPORTER` comments as its agent,
+/// not as the person whose lotar runs the job.
+#[test]
+fn a_jobs_comment_carries_its_agents_name() {
+    let harness = harness("", &[("FAKE_RUN", "$LOTAR_BIN comment TEST-1 from-the-agent".into())]);
+    let _person = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "person");
+    harness.run(&[]).success();
+    assert_eq!(last_comment_author(&harness.fixtures).as_deref(), Some("claude"));
+}
+
+/// DEV-853: a profile whose `env` sets `LOTAR_DEFAULT_REPORTER` keeps its own name.
+#[test]
+fn a_profiles_own_reporter_wins_over_the_agents_name() {
+    let harness = harness("", &[("FAKE_RUN", "$LOTAR_BIN comment TEST-1 from-the-bot".into()), ("LOTAR_DEFAULT_REPORTER", "reviewer-bot".into())]);
+    harness.run(&[]).success();
+    assert_eq!(last_comment_author(&harness.fixtures).as_deref(), Some("reviewer-bot"));
+}
+
+/// DEV-853: a T3 Code thread gets no job environment, so its prompt names the reporter to set: the provider's agent,
+/// or the agent's own name when the profile names no provider.
+#[test]
+fn a_t3_jobs_prompt_names_the_reporter_to_set() {
+    let (fixtures, _guards) = t3_harness_with(&[("fix", "", "    provider: claudeAgent\n    model: sonnet\n"), ("review", "", "")]);
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let prompt = std::fs::read_to_string(root.join("t3.log.prompt-0")).unwrap();
+    assert!(prompt.contains("Put `LOTAR_DEFAULT_REPORTER=claude` in front of every lotar command"), "{prompt}");
+    run_t3(&fixtures, "review").success();
+    let prompt = std::fs::read_to_string(root.join("t3.log.prompt-1")).unwrap();
+    assert!(prompt.contains("Put `LOTAR_DEFAULT_REPORTER=<your agent name>` (`claude`, `codex`)"), "{prompt}");
+}

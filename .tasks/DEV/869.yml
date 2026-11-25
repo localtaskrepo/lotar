@@ -1,11 +1,11 @@
 title: lotar trust --status shows a structured run command as a JSON blob with its default fields
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-25T20:15:27.766939+00:00
+modified: 2026-11-26T01:41:19.028584+00:00
 relationships:
   related:
   - DEV-847
@@ -38,6 +38,17 @@ comments:
       result: not_run
       reason: the merge runs the full suites (DEV-797)
     next: Review on another model, then merge
+- date: 2026-11-26T01:41:11.507840+00:00
+  author: claude
+  text: |-
+    Review: passed. `d29944678` does what "Done when" asks; no blocking or minor findings.
+
+    - Read: the diff, the ticket and fix comment, DEV-847 (`b372deae7`, the last change to `trust.rs` on main), `AutomationRunCommand` in `crates/lotar-agent/src/automation/types.rs`. The fields and defaults match what `describe_run_command` leaves out.
+    - The described strings are only shown to the user. The trust fingerprint hashes the raw file contents, so existing trust records stay valid.
+    - Reran: `npm ci` passed; `rustfmt --check` and `prettier --check` on the two changed files passed; `cargo nextest run -p lotar-lib --lib trust::` passed 2/2; `dev259` integration tests passed 6/6 once `cargo build --bin lotar` was run; `cargo clippy -p lotar-lib --all-targets` showed no warnings.
+    - Test failed before the fix: the new `ends_with("runs echo x")` assertion in the `describe` test fails against the old JSON output.
+    - Real binary on a scratch repo: `runs echo 'a b' x (env A=2 Z=1, no wait)`, string `runs echo hi` unchanged, `--format json` `commands` holds the same strings, a broken file still shows `(file does not parse)`.
+    - Only `trust.rs` and `docs/help/trust.md` changed: no stray files, no second branch.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
 description: |-
@@ -107,3 +118,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T01:41:11.507840+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:41:19.028584+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

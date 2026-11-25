@@ -1,20 +1,68 @@
 title: 'Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log''s visible area'
-status: Todo
+status: Reviewing
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T20:09:11.247882+00:00
-modified: 2026-11-25T20:09:18.781007+00:00
+modified: 2026-11-26T01:38:10.116412+00:00
 relationships:
   related:
   - DEV-859
+comments:
+- date: 2026-11-26T01:37:58.758699+00:00
+  author: claude
+  text: |-
+    Done: a search now scrolls the job log to the first match.
+
+    - Chose "scroll to first match" of the ticket's two options; "Done when" spells out the cases.
+    - `view/components/AgentJobLog.vue`: after the highlight, `scrollToMatch` puts the first match with a box a third from the list's top, unless it's in view already. Runs on typing the search or switching the view while one is on; new entries, clearing the search and "Full height" don't move anything; the page itself never scrolls.
+    - `view/__tests__/AgentJobLog.spec.ts`: new Vitest (jsdom layout stubbed): scrolls, stays when in view, stays on new entries and on clearing.
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts`: new smoke test at 1440 px, 40 lines then `npm notice`: highlight inside the list's visible part.
+    - Screenshots attached to the ticket: `dev880-before-*` and `dev880-after-*`, light and dark at 1920, 1440, 390 px. Before: match hidden below the list; after: in view.
+    - No other T3 threads were running in the project; no guidance correction.
+  report:
+    commits:
+    - hash: 73ffa834f
+      what: search scrolls the job log to the first match
+    checks:
+    - command: npx vitest run --config view/vitest.config.ts view/__tests__/AgentJobLog.spec.ts view/__tests__/AgentJobs.spec.ts
+      result: passed
+      reason: new test fails without the fix
+    - command: npx vitest run --config smoke/vitest.config.ts smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'DEV-880|filters the log, folds'
+      result: passed
+      reason: new test fails without the fix (match 360 px below the list)
+    - command: vue-tsc + tsc smoke (npm run lint:frontend), oxlint, prettier on changed files
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
+    next: Review on another model, then the merge agent lands agent/DEV-880
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A97c2a082c1f1163a39163265517af33f7ba73c60bf7c963c42ad538ff8e315cc
+- attachment: dev880-after-dark-1440.945c319fdd505321327d15d116caedd6.png
+- attachment: dev880-after-dark-1920.80843e667997fa78d5e51bafa11a98ba.png
+- attachment: dev880-after-dark-390.a785d840e6d2e31feca0680c9f69c0d8.png
+- attachment: dev880-after-light-1440.f9636ee9cc1595a74f0ca5a506b1ad67.png
+- attachment: dev880-after-light-1920.3303c5811fadd0a7d0b0db051433fcae.png
+- attachment: dev880-after-light-390.ae0d1989cea4d7fb1de387427f02a65e.png
+- attachment: dev880-before-dark-1440.8bf3e499d84d3f1fcf2551d8cdfc8d77.png
+- attachment: dev880-before-dark-1920.14b2c4d798a9fa4144fd8c2a55a7745f.png
+- attachment: dev880-before-dark-390.da6a42f2822814d243e3a236aca3f3d2.png
+- attachment: dev880-before-light-1440.7165185e427fdd30330ddaa8c321bde2.png
+- attachment: dev880-before-light-1920.bf69d0a234788bb811ef0caa0b6425e3.png
+- attachment: dev880-before-light-390.a5e9e179a60a61dfd309c43cd4d39ee5.png
 description: |-
   Found in the DEV-859 review. A search opens the matching tool call and shows its whole output, but the log list scrolls internally. With a long output, for example 20 lines followed by 'npm notice' at 1440 px, the highlighted word sits below the visible part of the log, and the user has to scroll to find it.
 
+  Chosen of the two options: scroll to the first match (no Next/Previous buttons).
+
   ## Done when
-  - [ ] Searching scrolls the log to the first match, or Next and Previous buttons step through the matches.
-  - [ ] A Vitest and a smoke test cover it.
+  - [ ] Typing or changing the search, or switching the view (All, Conversation, Problems, Thinking) while a search is on, scrolls the log list so the first visible match (document order) shows, about a third from the list's top (or as far as the list scrolls). A match already in view leaves the list where it is.
+  - [ ] Only the log list scrolls; the page doesn't move. With "Full height" the list doesn't scroll itself, so nothing moves.
+  - [ ] New entries arriving while a search is on don't move the list back to the match; "Jump to latest" and following the end work as before once the reader is at the bottom.
+  - [ ] No match, a cleared search, or a browser without layout (match has no box, e.g. inside a folded setup group): the list stays where it is.
+  - [ ] A Vitest and a smoke test cover it (smoke: 40 lines then 'npm notice' at 1440 px, the highlight inside the list's visible area).
 tags:
 - ui
 - web-ui
@@ -30,3 +78,134 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T01:31:27.120676+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:31:27.671261+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A97c2a082c1f1163a39163265517af33f7ba73c60bf7c963c42ad538ff8e315cc
+- at: 2026-11-26T01:32:11.613773+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-859 review. A search opens the matching tool call and shows its whole output, but the log list scrolls internally. With a long output, for example 20 lines followed by 'npm notice' at 1440 px, the highlighted word sits below the visible part of the log, and the user has to scroll to find it.
+
+      ## Done when
+      - [ ] Searching scrolls the log to the first match, or Next and Previous buttons step through the matches.
+      - [ ] A Vitest and a smoke test cover it.
+    new: |-
+      Found in the DEV-859 review. A search opens the matching tool call and shows its whole output, but the log list scrolls internally. With a long output, for example 20 lines followed by 'npm notice' at 1440 px, the highlighted word sits below the visible part of the log, and the user has to scroll to find it.
+
+      Chosen of the two options: scroll to the first match (no Next/Previous buttons).
+
+      ## Done when
+      - [ ] Typing or changing the search, or switching the view (All, Conversation, Problems, Thinking) while a search is on, scrolls the log list so the first visible match (document order) shows, about a third from the list's top. A match already in view leaves the list where it is.
+      - [ ] Only the log list scrolls; the page doesn't move. With "Full height" the list doesn't scroll itself, so nothing moves.
+      - [ ] New entries arriving while a search is on don't move the list back to the match; "Jump to latest" and following the end work as before once the reader is at the bottom.
+      - [ ] No match, a cleared search, or a browser without layout (match has no box, e.g. inside a folded setup group): the list stays where it is.
+      - [ ] A Vitest and a smoke test cover it (smoke: 20 lines then 'npm notice' at 1440 px, the highlight inside the list's visible area).
+- at: 2026-11-26T01:37:45.310045+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-after-dark-1440.945c319fdd505321327d15d116caedd6.png
+- at: 2026-11-26T01:37:45.363775+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-after-dark-1920.80843e667997fa78d5e51bafa11a98ba.png
+- at: 2026-11-26T01:37:45.414787+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-after-dark-390.a785d840e6d2e31feca0680c9f69c0d8.png
+- at: 2026-11-26T01:37:45.464396+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-after-light-1440.f9636ee9cc1595a74f0ca5a506b1ad67.png
+- at: 2026-11-26T01:37:45.515267+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-after-light-1920.3303c5811fadd0a7d0b0db051433fcae.png
+- at: 2026-11-26T01:37:45.563715+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-after-light-390.ae0d1989cea4d7fb1de387427f02a65e.png
+- at: 2026-11-26T01:37:45.612481+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-before-dark-1440.8bf3e499d84d3f1fcf2551d8cdfc8d77.png
+- at: 2026-11-26T01:37:45.661553+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-before-dark-1920.14b2c4d798a9fa4144fd8c2a55a7745f.png
+- at: 2026-11-26T01:37:45.709444+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-before-dark-390.da6a42f2822814d243e3a236aca3f3d2.png
+- at: 2026-11-26T01:37:45.759254+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-before-light-1440.7165185e427fdd30330ddaa8c321bde2.png
+- at: 2026-11-26T01:37:45.807403+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-before-light-1920.bf69d0a234788bb811ef0caa0b6425e3.png
+- at: 2026-11-26T01:37:45.856425+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev880-before-light-390.a5e9e179a60a61dfd309c43cd4d39ee5.png
+- at: 2026-11-26T01:37:58.714254+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-859 review. A search opens the matching tool call and shows its whole output, but the log list scrolls internally. With a long output, for example 20 lines followed by 'npm notice' at 1440 px, the highlighted word sits below the visible part of the log, and the user has to scroll to find it.
+
+      Chosen of the two options: scroll to the first match (no Next/Previous buttons).
+
+      ## Done when
+      - [ ] Typing or changing the search, or switching the view (All, Conversation, Problems, Thinking) while a search is on, scrolls the log list so the first visible match (document order) shows, about a third from the list's top. A match already in view leaves the list where it is.
+      - [ ] Only the log list scrolls; the page doesn't move. With "Full height" the list doesn't scroll itself, so nothing moves.
+      - [ ] New entries arriving while a search is on don't move the list back to the match; "Jump to latest" and following the end work as before once the reader is at the bottom.
+      - [ ] No match, a cleared search, or a browser without layout (match has no box, e.g. inside a folded setup group): the list stays where it is.
+      - [ ] A Vitest and a smoke test cover it (smoke: 20 lines then 'npm notice' at 1440 px, the highlight inside the list's visible area).
+    new: |-
+      Found in the DEV-859 review. A search opens the matching tool call and shows its whole output, but the log list scrolls internally. With a long output, for example 20 lines followed by 'npm notice' at 1440 px, the highlighted word sits below the visible part of the log, and the user has to scroll to find it.
+
+      Chosen of the two options: scroll to the first match (no Next/Previous buttons).
+
+      ## Done when
+      - [ ] Typing or changing the search, or switching the view (All, Conversation, Problems, Thinking) while a search is on, scrolls the log list so the first visible match (document order) shows, about a third from the list's top (or as far as the list scrolls). A match already in view leaves the list where it is.
+      - [ ] Only the log list scrolls; the page doesn't move. With "Full height" the list doesn't scroll itself, so nothing moves.
+      - [ ] New entries arriving while a search is on don't move the list back to the match; "Jump to latest" and following the end work as before once the reader is at the bottom.
+      - [ ] No match, a cleared search, or a browser without layout (match has no box, e.g. inside a folded setup group): the list stays where it is.
+      - [ ] A Vitest and a smoke test cover it (smoke: 40 lines then 'npm notice' at 1440 px, the highlight inside the list's visible area).
+- at: 2026-11-26T01:37:58.758699+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:38:10.116412+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

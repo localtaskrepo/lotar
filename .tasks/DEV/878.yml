@@ -1,14 +1,27 @@
 title: 'Automation service: expand_comment took append_automation_comment''s doc comment'
-status: Todo
+status: Blocked
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T20:00:38.684959+00:00
-modified: 2026-11-25T20:00:39.500224+00:00
+modified: 2026-11-26T01:26:53.086119+00:00
 relationships:
+  depends_on:
+  - DEV-852
   related:
   - DEV-852
+comments:
+- date: 2026-11-26T01:26:43.184495+00:00
+  author: claude
+  text: |-
+    Waits for DEV-852: the misplaced doc comment exists only on its unmerged branch.
+
+    - `main` has no `expand_comment`; `append_automation_comment` keeps its doc comment there (`crates/lotar-agent/src/services/automation_service.rs:3044`)
+    - The flaw is in `01daa6380` on `agent/DEV-852` (status Merging), lines 3072-3089
+    - No change made on `agent/DEV-878`; once DEV-852 is on main, rebase onto it and move the doc block back onto `append_automation_comment`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3c730bbb7b1de4ce7ab9712e9d8588f04853f7bcbb2aaf3b61803817d42ba0f6
 description: |-
   Found in the DEV-852 review.
 
@@ -17,9 +30,44 @@ description: |-
   ## Done when
 
   - [ ] The "Append a comment to a task ..." doc comment sits on `append_automation_comment` again, and `expand_comment` keeps only its own
+tags:
+- waits
 history:
 - at: 2026-11-25T20:00:39.500224+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T01:26:04.098110+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:26:04.573653+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3c730bbb7b1de4ce7ab9712e9d8588f04853f7bcbb2aaf3b61803817d42ba0f6
+- at: 2026-11-26T01:26:42.537445+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-852"]}'
+    new: '{"depends_on":["DEV-852"],"related":["DEV-852"]}'
+- at: 2026-11-26T01:26:43.134733+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-26T01:26:43.184495+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:26:53.086119+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

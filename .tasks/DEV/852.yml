@@ -5,10 +5,12 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:03:41.684865+00:00
-modified: 2026-11-25T20:01:07.491695+00:00
+modified: 2026-11-26T01:27:07.624602+00:00
 relationships:
   blocks:
   - DEV-796
+  - DEV-878
+  - DEV-879
   related:
   - DEV-796
   - DEV-488
@@ -71,6 +73,12 @@ comments:
       - [DEV-878](https://lotar.pyxzl.net/task/DEV-878): in `automation_service.rs:3072`, `expand_comment` took over `append_automation_comment`'s doc comment.
       - [DEV-879](https://lotar.pyxzl.net/task/DEV-879): in `view/utils/automationRules.ts:790`, the builder says "comments with a question" for a `comment:` map that has no question.
     - UI: there is no `ui` tag and only `view/utils` changed (no pages, components or styles), so there was no screenshot review.
+- date: 2026-11-26T01:26:55.480804+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-852` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-852` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae300be0eb1776a74acd7f47cd42c1d251db1f4df2ca39cae4f189033f9da6082
 description: |-
@@ -227,3 +235,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T01:26:42.536772+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'
+    new: '{"blocks":["DEV-796","DEV-878"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'
+- at: 2026-11-26T01:26:55.480804+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:27:07.624602+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-796","DEV-878"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'
+    new: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879"]}'

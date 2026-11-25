@@ -6,7 +6,7 @@ Central reference for identity resolution and people fields.
 ## Sources and resolution order
 
 Used for the current user: `@me`, `whoami`, a comment's author, a history entry's actor, and a new ticket's reporter when `--reporter` isn't given:
-1) The merged config `default_reporter`, in the order every setting uses ([config.md](./config.md)): a `--config default.reporter=NAME` override, then `LOTAR_DEFAULT_REPORTER`, then project → home → global. So an agent that sets the variable is recorded as itself, also as the reporter of the tickets it creates, even where the project names a default reporter
+1) The merged config `default_reporter`, in the order every setting uses ([config.md](./config.md)): a `--config default.reporter=NAME` override, then `LOTAR_DEFAULT_REPORTER`, then project → home → global. So an agent that sets the variable is recorded as itself, also as the reporter of the tickets it creates, even where the project names a default reporter. An [agent job](agent.md#environment-variables) sets it to the agent's name (`claude`, `codex`) for its agent
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user

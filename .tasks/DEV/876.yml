@@ -1,20 +1,57 @@
 title: 'T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T19:54:54.013521+00:00
-modified: 2026-11-26T01:19:22.210904+00:00
+modified: 2026-11-26T01:26:00.547597+00:00
 relationships:
   related:
   - DEV-777
   - DEV-810
   - DEV-827
   - DEV-828
+  - DEV-747
+  - DEV-808
+  - DEV-836
+  - DEV-842
+comments:
+- date: 2026-11-26T01:25:45.401486+00:00
+  author: claude
+  text: |-
+    A new `t3` job now settles every earlier thread of its ticket whose run ended, and a done ticket gets all of its ended threads settled, not only the `completed` ones.
+
+    - Cause: `kept::settle_superseded` (DEV-836) settled only `failed` earlier threads, and `kept::settle` (DEV-747) settled only `completed` threads on done tickets
+    - `crates/lotar-agent/src/services/agent_job_service/kept.rs`: new `ended()` check: any status except `running`, `waiting`, `queued`, `starting`, `preparing`. Threads still running are left to the 30 s look, and the thread the job continues stays as it is
+    - New log line: `Settled the T3 Code thread <link> of the earlier job <job> (<status>): this job is the ticket's attempt now.`
+    - Tests: `a_new_job_settles_the_ended_threads_of_the_earlier_jobs_on_the_ticket` (failed, completed and interrupted settled, running left alone) and `a_done_tickets_ended_threads_are_settled_whatever_their_outcome` (failed, interrupted, cancelled, idle)
+    - `docs/help/agent.md` updated
+    - Not part of this ticket: threads no harnessmux session holds any more ("no harnessmux session holds it", e.g. DEV-842's older threads) and threads no job log names. DEV-810's fix (`agent/DEV-810`, `b7f520caf`) covers those, and it touches the same functions
+    - The running T3 threads: only DEV-808 runs, on other files, so nobody needed telling
+  report:
+    commits:
+    - hash: 5b4629984
+      what: settle every ended earlier thread on a new job, and every ended thread of a done ticket
+    checks:
+    - command: cargo nextest run --cargo-profile dev -E 'test(/t3/) | test(/dev503_harness/) | test(/dev626/)'
+      result: passed
+      reason: 97 tests
+    - command: both new tests against main's kept.rs
+      result: failed
+      reason: as expected, they fail without the fix
+    - command: cargo clippy -p lotar-agent -p lotar-lib --tests
+      result: passed
+      reason: no warnings
+    - command: rustfmt --check and prettier --check on the changed files
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs them (owner 2026-11-22, DEV-797)
+    next: 'Review on another model, then merge. DEV-810 changes kept.rs settle_ticket and settle_superseded too: the second of the two to merge rebases.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9
-description: 'Found 2026-11-25: 205 unsettled T3 threads; 86 are older attempts on open tickets (DEV-810 15 threads, DEV-828 13, DEV-827..831 and DEV-777 about 12 each), 31 belong to Done tickets. Each retry or review job starts a new thread and never settles the previous one. Done when: starting a job settles the ticket''s earlier job threads, closing a ticket settles all of them, and a test covers both. Owner chose to file this 2026-11-25.'
+description: '-'
 history:
 - at: 2026-11-25T19:54:54.341828+00:00
   actor: claude
@@ -44,3 +81,28 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9
+- at: 2026-11-26T01:21:50.711684+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'Found 2026-11-25: 205 unsettled T3 threads; 86 are older attempts on open tickets (DEV-810 15 threads, DEV-828 13, DEV-827..831 and DEV-777 about 12 each), 31 belong to Done tickets. Each retry or review job starts a new thread and never settles the previous one. Done when: starting a job settles the ticket''s earlier job threads, closing a ticket settles all of them, and a test covers both. Owner chose to file this 2026-11-25.'
+    new: '-'
+- at: 2026-11-26T01:25:45.401486+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:25:45.667280+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828"]}'
+    new: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828","DEV-747","DEV-808","DEV-836","DEV-842"]}'
+- at: 2026-11-26T01:26:00.547597+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

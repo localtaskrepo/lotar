@@ -1,15 +1,49 @@
 title: 'T3 runner: read job results through t3_submit_output and milestones through MCP Events'
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-25T19:54:55.628551+00:00
+modified: 2026-11-26T01:26:30.696723+00:00
 relationships:
   related:
   - DEV-849
-description: 'T3 Code 0.1.12 adds typed turn results (t3_submit_output) and MCP Events webhooks/streams for milestones. lotar''s T3 runner could take a structured result instead of parsing the final reply, and get live state instead of polling (related DEV-849). Done when: the runner asks for a typed result and uses it, takes events for live state, and tests cover both with the fake t3. Owner chose to file this 2026-11-25.'
+  - DEV-320
+comments:
+- date: 2026-11-26T01:26:18.391829+00:00
+  author: claude
+  text: |-
+    Question: what should the typed result from `t3_submit_output` hold, and what should lotar do with it?
+
+    - Today lotar parses nothing from the final reply. The outcome comes from the ticket (status and assignee set during the job) and the hand-off comment (`lotar comment --commit --check --next`), on every runner.
+    - A t3-only result would give t3 jobs a second way to report what claude and codex jobs report through the CLI.
+    - The live-state half is clear: T3's `/mcp` serves `thread.run_settled` and `thread.needs_input` events. That work lands mostly in harnessmux (`src/backend/t3.rs`, polls `t3 thread show` every 2 s) and needs a harnessmux release.
+    - **Options:**
+      1. **Summary only** (recommended): `{summary}` becomes the job's last message in place of the final reply's text. Outcomes still come from the ticket.
+      2. **Hand-off fields** (summary, status, commits, checks, next): lotar writes the hand-off comment and applies status from it, for t3 jobs only.
+      3. **No typed result**: do only the events half; that part of the ticket becomes WontDo.
+    - The Done when in the description has the rest; only the result line waits on this.
+    - No code changed yet; no commits on `agent/DEV-877`.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
+description: |-
+  T3 Code 0.1.12 adds typed turn results (t3_submit_output) and MCP Events webhooks/streams for milestones. lotar's T3 runner could take a structured result instead of parsing the final reply, and get live state instead of polling (related DEV-849). Owner chose to file this 2026-11-25: "the runner asks for a typed result and uses it, takes events for live state, and tests cover both with the fake t3."
+
+  ## Found (2026-11-26)
+
+  - lotar parses no result from a job's final reply. The outcome comes from the ticket (status and assignee set during the job, DEV-320) and the hand-off comment (`lotar comment --commit --check --next`). The reply only becomes the job's last message.
+  - The T3 runner is harnessmux's t3 backend (`src/backend/t3.rs`, crate `harnessmux` 0.3.0 from crates.io). It follows a run by polling `t3 thread show --json` every 2 s. lotar's job view (DEV-849, `t3_state.rs`) reads `t3 thread show` at most every 10 s while the view is open.
+  - `t3 thread start` and `t3 thread send` take `--output-schema <file>`. T3 tells the agent to call `t3_submit_output`, asks again when a turn ends without an accepted result, and `--wait --json` prints it as `output`.
+  - T3's `/mcp` serves milestones as MCP events (SEP-3415): `thread.run_settled` (completed, failed, interrupted, cancelled), `thread.needs_input`, `thread.input_resolved`, filtered by `threadIds`, through `events/poll` (cursor, `nextPollMs`) and `events/stream`.
+
+  ## Done when
+
+  - [ ] The result the agent submits (contents: the owner's answer, pending) is read from `output` and used as he decides. A turn whose result is missing or doesn't fit, after T3's own retry, ends as today: lotar falls back to the ticket and the final reply, and the job log says the result was missing.
+  - [ ] harnessmux's t3 backend learns that a run ended or waits for an answer from `thread.run_settled` / `thread.needs_input` events for its thread, not from polling `thread show`. When events can't be read (older T3, a refused sign-in, a stream that drops), it falls back to the current 2 s polling and says so once in the session log. The milestone wins over a stale `thread show` read.
+  - [ ] lotar's job view (DEV-849) shows the thread's state from the same events where it has them, else from `t3 thread show` as now. The ticket status and the job outcome never change from it.
+  - [ ] Tests with the fake t3 (`crates/lotar-lib/tests/dev510_t3_session_test.rs`, and harnessmux's own) cover: a submitted result, a missing result, an event-driven end, a needs-input event, and the fallback when events fail.
+  - [ ] The harnessmux change ships as a release that lotar's `Cargo.toml` uses; `docs/help/agent.md` (T3 Code threads) describes the result and the live state.
 history:
 - at: 2026-11-25T19:54:55.315038+00:00
   actor: claude
@@ -22,3 +56,55 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T01:22:41.353869+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:22:41.870469+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
+- at: 2026-11-26T01:26:09.762797+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: 'T3 Code 0.1.12 adds typed turn results (t3_submit_output) and MCP Events webhooks/streams for milestones. lotar''s T3 runner could take a structured result instead of parsing the final reply, and get live state instead of polling (related DEV-849). Done when: the runner asks for a typed result and uses it, takes events for live state, and tests cover both with the fake t3. Owner chose to file this 2026-11-25.'
+    new: |-
+      T3 Code 0.1.12 adds typed turn results (t3_submit_output) and MCP Events webhooks/streams for milestones. lotar's T3 runner could take a structured result instead of parsing the final reply, and get live state instead of polling (related DEV-849). Owner chose to file this 2026-11-25: "the runner asks for a typed result and uses it, takes events for live state, and tests cover both with the fake t3."
+
+      ## Found (2026-11-26)
+
+      - lotar parses no result from a job's final reply. The outcome comes from the ticket (status and assignee set during the job, DEV-320) and the hand-off comment (`lotar comment --commit --check --next`). The reply only becomes the job's last message.
+      - The T3 runner is harnessmux's t3 backend (`src/backend/t3.rs`, crate `harnessmux` 0.3.0 from crates.io). It follows a run by polling `t3 thread show --json` every 2 s. lotar's job view (DEV-849, `t3_state.rs`) reads `t3 thread show` at most every 10 s while the view is open.
+      - `t3 thread start` and `t3 thread send` take `--output-schema <file>`. T3 tells the agent to call `t3_submit_output`, asks again when a turn ends without an accepted result, and `--wait --json` prints it as `output`.
+      - T3's `/mcp` serves milestones as MCP events (SEP-3415): `thread.run_settled` (completed, failed, interrupted, cancelled), `thread.needs_input`, `thread.input_resolved`, filtered by `threadIds`, through `events/poll` (cursor, `nextPollMs`) and `events/stream`.
+
+      ## Done when
+
+      - [ ] The result the agent submits (contents: the owner's answer, pending) is read from `output` and used as he decides. A turn whose result is missing or doesn't fit, after T3's own retry, ends as today: lotar falls back to the ticket and the final reply, and the job log says the result was missing.
+      - [ ] harnessmux's t3 backend learns that a run ended or waits for an answer from `thread.run_settled` / `thread.needs_input` events for its thread, not from polling `thread show`. When events can't be read (older T3, a refused sign-in, a stream that drops), it falls back to the current 2 s polling and says so once in the session log. The milestone wins over a stale `thread show` read.
+      - [ ] lotar's job view (DEV-849) shows the thread's state from the same events where it has them, else from `t3 thread show` as now. The ticket status and the job outcome never change from it.
+      - [ ] Tests with the fake t3 (`crates/lotar-lib/tests/dev510_t3_session_test.rs`, and harnessmux's own) cover: a submitted result, a missing result, an event-driven end, a needs-input event, and the fallback when events fail.
+      - [ ] The harnessmux change ships as a release that lotar's `Cargo.toml` uses; `docs/help/agent.md` (T3 Code threads) describes the result and the live state.
+- at: 2026-11-26T01:26:10.042109+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849"]}'
+    new: '{"related":["DEV-849","DEV-320"]}'
+- at: 2026-11-26T01:26:18.391829+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:26:30.696723+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

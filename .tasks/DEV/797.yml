@@ -1,11 +1,11 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: HelpNeeded
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-26T01:14:50.982748+00:00
+modified: 2026-11-26T01:41:22.512265+00:00
 relationships:
   blocks:
   - DEV-801
@@ -151,6 +151,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa00fe7bc5eb2894b055779cd369595cb28dabc9e9c397115b41d9f6674492e0a
 description: |-
   Owner decision 2026-11-22 (chief of staff's options picker, after a 72 h pipeline measurement): picked "Full suites once, one at a time": fix and review jobs run only the tests for what changed; only the merge runs the full suites; one full suite runs on the machine at a time (a shared lock in lotar). Not picked: the lock alone, or 2 parallel jobs instead of 3.
 
@@ -409,3 +410,14 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784"]}'
     new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873"]}'
+- at: 2026-11-26T01:41:22.081631+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T01:41:22.512265+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa00fe7bc5eb2894b055779cd369595cb28dabc9e9c397115b41d9f6674492e0a

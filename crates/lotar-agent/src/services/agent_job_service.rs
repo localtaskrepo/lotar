@@ -397,7 +397,8 @@ impl AgentJobService {
         let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && crate::services::agent_runner::takes_mcp_servers(runner_kind);
         let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp);
         if runner_kind == AgentRunnerKind::T3 {
-            notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id, is_merge_job));
+            let reporter = job_reporter(&profile, runner_kind);
+            notes.push_str(&t3_thread_notes(tasks_dir, &config, &ticket_id, is_merge_job, reporter.as_deref()));
         }
         let earlier = harness_agent(runner_kind).and_then(|_| earlier_sessions_text(tasks_dir, &ticket_id, req.agent.as_deref()));
         let history = PromptHistory { full: profile.full_history.unwrap_or(false), entries: profile.context_entries.unwrap_or(DEFAULT_CONTEXT_ENTRIES) };
@@ -1869,13 +1870,24 @@ fn clonefile(_from: &std::path::Path, _to: &std::path::Path) -> std::io::Result<
 /// that hold uncommitted work. They stay there after a job carried them
 /// over or dropped them, so the note leaves them to a job that takes the
 /// work over; a merge job doesn't get it (DEV-608).
-fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool) -> String {
+fn t3_thread_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool, reporter: Option<&str>) -> String {
     let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
     let mut notes = format!(
         "- A T3 Code thread doesn't get LoTaR's environment: add `--tasks-dir \"{}\"` to every lotar command, \
 so it changes the ticket in the main checkout, not a worktree copy.\n",
         dir.display()
     );
+    // Nor the job's reporter (DEV-853): the agent sets it per command.
+    match reporter {
+        Some("") => {}
+        Some(name) => notes.push_str(&format!(
+            "- Put `{REPORTER_VAR}={}` in front of every lotar command, so your comments and tickets carry the agent's name, not the person's.\n",
+            shell_word(name)
+        )),
+        None => notes.push_str(&format!(
+            "- Put `{REPORTER_VAR}=<your agent name>` (`claude`, `codex`) in front of every lotar command, so your comments and tickets carry the agent's name, not the person's.\n"
+        )),
+    }
     if is_merge_job {
         return notes;
     }
@@ -3842,7 +3854,7 @@ fn run_job(
     if let Some((record, events)) = handoff_from.as_ref() {
         prompt.append("Handoff", &handoff_text(&tasks_dir, &ticket_id, &ticket_ref, record, events, handoff_why));
     }
-    let env = job_env(&job_id, &tasks_dir, &ticket_id, &config);
+    let env = job_env(&job_id, &tasks_dir, &ticket_id, &config, &profile, runner_kind);
     let end = match agent {
         _ if commit_retry.is_some() => RunEnd::Exited(Some(0)),
         None => run_command(&job_id, &profile, &prompt, env, &worktree_context.working_dir, &tasks_dir, &ticket_id, active_record),
@@ -4098,14 +4110,64 @@ fn worktree_context_at(tasks_dir: &std::path::Path, dir: &std::path::Path) -> Wo
     }
 }
 
+/// The identity variable a job's agent records comments and tickets under.
+const REPORTER_VAR: &str = "LOTAR_DEFAULT_REPORTER";
+
+/// The name a job's lotar commands record as author and reporter (DEV-853):
+/// the profile's own `env` value, else the agent's name, the runner's or, for
+/// t3, its provider's (`claudeAgent` is `claude`), so `comment.author`
+/// conditions on `claude` or `codex` match. `None` for a `command` runner,
+/// which can be any program, and a t3 profile without a provider.
+fn job_reporter(profile: &AgentProfileDetail, runner_kind: AgentRunnerKind) -> Option<String> {
+    if let Some(value) = crate::services::agent_runner::expand_env_map(&profile.env).remove(REPORTER_VAR) {
+        return Some(value);
+    }
+    match runner_kind {
+        AgentRunnerKind::Command => None,
+        AgentRunnerKind::T3 => profile.provider.as_deref().map(t3_provider_agent).filter(|name| !name.is_empty()),
+        kind => Some(kind.as_str().to_string()),
+    }
+}
+
+/// The agent a T3 Code provider instance id names: `claude` for Claude's
+/// (`claudeAgent`), `codex` for Codex's, another id lowercased.
+fn t3_provider_agent(provider: &str) -> String {
+    let provider = provider.trim().to_ascii_lowercase();
+    if provider.contains("claude") {
+        "claude".to_string()
+    } else if provider.contains("codex") {
+        "codex".to_string()
+    } else {
+        provider
+    }
+}
+
+/// `value` as one shell word: as it is when it needs no quotes, else in
+/// single quotes.
+fn shell_word(value: &str) -> String {
+    if value.chars().all(|c| c.is_ascii_alphanumeric() || "._@+-".contains(c)) { value.to_string() } else { format!("'{}'", value.replace('\'', "'\\''")) }
+}
+
 /// The environment of a job's agent: LOTAR_* variables with the task it
 /// works on, and this lotar build first on PATH.
-fn job_env(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> HashMap<String, String> {
+fn job_env(
+    job_id: &str,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    profile: &AgentProfileDetail,
+    runner_kind: AgentRunnerKind,
+) -> HashMap<String, String> {
     let mut env = HashMap::new();
     if let Some(storage) = Storage::try_open(tasks_dir)
         && let Ok(task) = TaskService::get(&storage, ticket_id, None)
     {
         env.extend(build_lotar_env(&task, config, tasks_dir, None, job_context_for(job_id).as_ref()));
+    }
+    // The agent's lotar commands record it as author and reporter, not the
+    // person whose lotar runs the job (DEV-853).
+    if let Some(reporter) = job_reporter(profile, runner_kind) {
+        env.insert(REPORTER_VAR.to_string(), reporter);
     }
     // Not an automation `run` command, also when this lotar was started by
     // one: the agent's status and assignee changes are the job's outcome
@@ -8258,5 +8320,56 @@ mod dev520_session_events_tests {
         assert_eq!(failed.message.as_deref(), Some("Failed: cat nope"));
         let tool = failed.tool.as_ref().unwrap();
         assert_eq!((tool.input.as_deref(), tool.output.as_deref()), (Some("cat nope"), Some("error: no such file")));
+    }
+}
+
+#[cfg(test)]
+mod dev853_job_reporter_tests {
+    use super::*;
+    use crate::config::types::GlobalConfig;
+    use tempfile::tempdir;
+
+    fn profile_of(runner: &str, provider: Option<&str>, env: &[(&str, &str)]) -> AgentProfileDetail {
+        AgentProfileDetail {
+            runner: runner.to_string(),
+            provider: provider.map(str::to_string),
+            env: env.iter().map(|(key, value)| (key.to_string(), value.to_string())).collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_job_env_names_the_agent_as_reporter_unless_its_profile_does() {
+        let dir = tempdir().unwrap();
+        let config = ResolvedConfig::from_global(GlobalConfig::default());
+        let reporter = |runner: &str, kind: AgentRunnerKind, env: &[(&str, &str)]| {
+            job_env("job-1", dir.path(), "NONE-1", &config, &profile_of(runner, None, env), kind).remove(REPORTER_VAR)
+        };
+        assert_eq!(reporter("claude", AgentRunnerKind::Claude, &[]).as_deref(), Some("claude"));
+        assert_eq!(reporter("codex", AgentRunnerKind::Codex, &[]).as_deref(), Some("codex"));
+        assert_eq!(reporter("codex", AgentRunnerKind::Codex, &[(REPORTER_VAR, "reviewer-bot")]).as_deref(), Some("reviewer-bot"));
+        assert_eq!(reporter("command", AgentRunnerKind::Command, &[]), None);
+        assert_eq!(reporter("command", AgentRunnerKind::Command, &[(REPORTER_VAR, "script")]).as_deref(), Some("script"));
+    }
+
+    #[test]
+    fn a_t3_job_reporter_is_its_providers_agent() {
+        let reporter = |provider: Option<&str>, env: &[(&str, &str)]| job_reporter(&profile_of("t3", provider, env), AgentRunnerKind::T3);
+        assert_eq!(reporter(Some("claudeAgent"), &[]).as_deref(), Some("claude"));
+        assert_eq!(reporter(Some("codex"), &[]).as_deref(), Some("codex"));
+        assert_eq!(reporter(Some("Cursor"), &[]).as_deref(), Some("cursor"));
+        assert_eq!(reporter(None, &[]), None);
+        assert_eq!(reporter(Some("codex"), &[(REPORTER_VAR, "Jane Doe")]).as_deref(), Some("Jane Doe"));
+    }
+
+    #[test]
+    fn t3_thread_notes_tell_the_agent_its_reporter() {
+        let dir = tempdir().unwrap();
+        let config = ResolvedConfig::from_global(GlobalConfig::default());
+        let notes = |reporter| t3_thread_notes(dir.path(), &config, "NONE-1", true, reporter);
+        assert!(notes(Some("claude")).contains("Put `LOTAR_DEFAULT_REPORTER=claude` in front of every lotar command"), "{}", notes(Some("claude")));
+        assert!(notes(Some("Jane O'Doe")).contains("`LOTAR_DEFAULT_REPORTER='Jane O'\\''Doe'`"), "{}", notes(Some("Jane O'Doe")));
+        assert!(notes(None).contains("`LOTAR_DEFAULT_REPORTER=<your agent name>` (`claude`, `codex`)"), "{}", notes(None));
+        assert!(!notes(Some("")).contains(REPORTER_VAR), "{}", notes(Some("")));
     }
 }

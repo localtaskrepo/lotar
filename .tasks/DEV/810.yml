@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-25T19:54:54.338852+00:00
+modified: 2026-11-26T01:25:50.690625+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -455,6 +455,14 @@ comments:
 - date: 2026-11-25T17:17:57.231149+00:00
   author: claude
   text: 'Correction to my hand-off comment: `b7f520caf` is rebased onto main `d4084d484`. The hash `1c2a4b` I wrote there is wrong.'
+- date: 2026-11-26T01:25:50.690625+00:00
+  author: claude
+  text: |-
+    Heads-up for the merge: DEV-876 (`agent/DEV-876`, `5b4629984`) changes the same functions in `kept.rs`.
+
+    - `settle_superseded`: the filter now takes any ended status (`ended()`), not only `failed`, and the log line changed
+    - `settle`: a done ticket settles every ended status, not only `completed`
+    - DEV-810's `record_for` and `unlogged` are still needed: DEV-876 doesn't settle a thread no session record holds. The second of the two to merge rebases
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
@@ -963,3 +971,7 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836"]}'
     new: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876"]}'
+- at: 2026-11-26T01:25:50.690625+00:00
+  actor: claude
+  changes:
+  - field: comment_added

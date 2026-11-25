@@ -1,11 +1,11 @@
 title: Design inline transcript review on the ticket timeline
-status: Reviewing
+status: Merging
 priority: Medium
 type: Research
 reporter: codex
-assignee: '@review-light'
+assignee: '@merge'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-26T01:01:40.649517+00:00
+modified: 2026-11-26T01:31:22.300081+00:00
 relationships:
   related:
   - DEV-849
@@ -97,6 +97,15 @@ comments:
       result: not_run
       reason: none exists until a lotar release with DEV-774 runs a t3 job
     next: Source check reads 13c0fe2e3
+- date: 2026-11-26T01:31:18.998605+00:00
+  author: claude
+  text: |-
+    Review: passed. Read HEAD `13c0fe2e3`; the earlier blocking finding is fixed.
+
+    - Read: `git log 855ff6f46..HEAD` is one commit. It changes only `docs/research/inline-transcript-review.md` (the full 211 lines). `main` has moved past the branch point, so I compared against the parent `855ff6f46`.
+    - T3 tool calls (lines 72–81): checked against the sources. The harnessmux README says 0.3.0 sends T3 tool calls (lines 132, 172, 196). The 0.2.0 `backend/t3.rs` reads the activity only for a failed run's errors. `v0.15.6` `Cargo.lock` links harnessmux `0.2.0`. `lotar-95e687-DEV-849-fix.events.jsonl` has 0 `tool.*` events.
+    - The write-up says a log written by 0.3.0 is not verified; that is stated honestly.
+    - Facts carry links. It ends with one recommendation, its cost and one open choice.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
@@ -237,3 +246,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860"]}'
     new: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887"]}'
+- at: 2026-11-26T01:31:18.998605+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:31:22.300081+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-light'
+    new: '@merge'

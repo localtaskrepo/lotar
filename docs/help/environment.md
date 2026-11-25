@@ -75,6 +75,7 @@ All rows below are defined inside the same override table and map directly to th
 | Variable | Values | Effect |
 | --- | --- | --- |
 | `LOTAR_AGENT_WRAPPER` | Absolute path | Overrides the wrapper binary that runs `command` runner programs (and that `list-running` looks for). |
+| `LOTAR_DEFAULT_REPORTER` (set for jobs) | Agent name | A job's agent gets it set to its runner's name (`claude`, `codex`, …), unless its profile's `env` sets it; `command` runners and T3 Code threads don't (a thread's instructions name the value). See [agent jobs](agent.md#environment-variables). |
 | `HARNESSMUX_HOME` | Directory | Puts harnessmux's sessions, adapters and `agents.toml` under one directory (read by the harnessmux crate that runs agent jobs; for tests and sandboxes). |
 
 ### Automation & branching behavior

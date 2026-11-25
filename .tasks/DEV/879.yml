@@ -1,14 +1,27 @@
 title: 'Rule builder: a comment map without a question is called ''comments with a question'''
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T20:00:39.778177+00:00
-modified: 2026-11-25T20:00:40.701640+00:00
+modified: 2026-11-26T01:27:17.621847+00:00
 relationships:
+  depends_on:
+  - DEV-852
   related:
   - DEV-852
+comments:
+- date: 2026-11-26T01:27:08.234017+00:00
+  author: claude
+  text: |-
+    Waits for DEV-852 to land on main: the code this fixes isn't on main yet.
+
+    - The "comments with a question are currently YAML-only" reason exists only on `agent/DEV-852` (`01daa6380`, `view/utils/automationRules.ts:791`); main (`530c77fd9`) has no comment-map check at all
+    - DEV-852 is in Merging; once it's on main, this branch rebases and gives a `comment` map without `question` its own reason, plus a test in `view/__tests__/automationRules.spec.ts`
+    - No changes or commits on `agent/DEV-879`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8550d9ef314bccf32436fc0a30369bbe508616d4599363b7b3e2c9fe2fd6d8ec
 description: |-
   Found in the DEV-852 review.
 
@@ -18,9 +31,44 @@ description: |-
 
   - [ ] A `comment` map without `question` gets a reason that fits it (or, if the owner prefers, is edited in the builder as a plain comment, saved back in the same form)
   - [ ] A test in `view/__tests__/automationRules.spec.ts` covers it
+tags:
+- waits
 history:
 - at: 2026-11-25T20:00:40.701640+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T01:26:34.574751+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T01:26:35.188177+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8550d9ef314bccf32436fc0a30369bbe508616d4599363b7b3e2c9fe2fd6d8ec
+- at: 2026-11-26T01:27:07.625179+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-852"]}'
+    new: '{"depends_on":["DEV-852"],"related":["DEV-852"]}'
+- at: 2026-11-26T01:27:08.186540+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-26T01:27:08.234017+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T01:27:17.621847+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
