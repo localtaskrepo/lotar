@@ -1,11 +1,11 @@
 title: After the usage-limit reset, T3 Code resumed 2-4 sessions per job in the same worktree
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-26T03:04:29.146080+00:00
+modified: 2026-11-26T03:44:13.369847+00:00
 relationships:
   related:
   - DEV-777
@@ -27,6 +27,9 @@ relationships:
   - DEV-806
   - DEV-809
   - DEV-801
+  - DEV-844
+  - DEV-856
+  - DEV-862
 comments:
 - date: 2026-11-24T16:07:52.652624+00:00
   author: claude
@@ -197,6 +200,31 @@ comments:
     - command: npm run -s smoke
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T03:23:13.767213+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `5d3223431` on main and origin.
+
+    - lotar's smoke failure was a flaky test: `smoke/tests/ui.agent-jobs.smoke.spec.ts` "shows the prompt and settings…" timed out on the Settings table under load, passes alone (14/14 in 5 s). It's already in the `wall-clock` group; added to the flaky list (DEV-801).
+    - Main moved twice (DEV-856, DEV-844). Rebased each time; `npm ci`, then full `lint:agent`, `test:agent`, `smoke` passed on the DEV-856 base.
+    - DEV-844 changed only one line of `docs/help/trust.md` and some tickets, so I reran the help/docs Rust tests (47 passed) and not the full suites.
+    - Folded the pending `.tasks/DEV/844.yml` edit into the merge commit. No rule or config files changed, so no `lotar trust`.
+  report:
+    commits:
+    - hash: 5d3223431
+      what: test that a t3 job's usage-limit retry continues the paused thread (fix itself is on main via DEV-833)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411 on 4c1360b17 base
+    - command: cargo nextest run --cargo-profile dev -E 'test(/help|docs|trust/)'
+      result: passed
+      reason: 47, after rebase onto DEV-844 (docs/help/trust.md, one line)
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7ed476434fcb4e018626487ba8c6d2a47dc50f277c86920bab74a5e08d2a6b29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6399386a6cea6eeb5ad94b21639914a2a3cbeac4c6d5e80ec5a4bd8b60b2deb
@@ -388,3 +416,28 @@ history:
   - field: relationships
     old: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809"]}'
     new: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801"]}'
+- at: 2026-11-26T03:23:13.767213+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T03:23:14.030561+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801"]}'
+    new: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856"]}'
+- at: 2026-11-26T03:23:24.368488+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-26T03:44:13.369847+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856"]}'
+    new: '{"related":["DEV-777","DEV-778","DEV-796","DEV-800","DEV-811","DEV-824","DEV-828","DEV-830","DEV-831","DEV-849","DEV-835","DEV-769","DEV-840","DEV-842","DEV-855","DEV-797","DEV-806","DEV-809","DEV-801","DEV-844","DEV-856","DEV-862"]}'

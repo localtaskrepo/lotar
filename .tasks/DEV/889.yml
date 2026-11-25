@@ -1,0 +1,40 @@
+title: 'Agent queue: 7 jobs sit in a queue file keyed by the relative path .tasks, which no worker reads'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T03:32:05.108189+00:00
+modified: 2026-11-26T03:32:06.293830+00:00
+relationships:
+  related:
+  - DEV-860
+  - DEV-822
+  - DEV-827
+  - DEV-848
+  - DEV-849
+  - DEV-850
+  - DEV-872
+description: |-
+  Found (DEV-860 review): `~/Library/Caches/lotar/agent-queue/queue-b06823c05bdb7cda4004b1281c7001744d021ba39e3f81993eb5805f188f6f3e.json` (tasks_dir `.tasks`, last written 2026-11-25 22:14Z) holds DEV-850, DEV-849, DEV-848, DEV-827, STD-336, DEV-872 and STD-359. Since DEV-822 the resolver makes the path absolute, so nothing reads that file again.
+
+  Check: `ls ~/Library/Caches/lotar/agent-queue/` and read the file's entries.
+
+  Done: the owner decides per entry: requeue under the absolute tasks dir or drop; then the file is removed. Moving it as-is would start 7 jobs at once.
+tags:
+- health
+- owner
+custom_fields:
+  finding: bug:stranded-relative-queue
+history:
+- at: 2026-11-26T03:32:05.952806+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860"]}'
+    new: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872"]}'
+- at: 2026-11-26T03:32:06.293830+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

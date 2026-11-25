@@ -1,14 +1,17 @@
 title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
-status: Reviewing
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-26T00:55:17.041299+00:00
+modified: 2026-11-26T03:44:25.713694+00:00
 relationships:
   related:
   - DEV-584
+  - DEV-777
+  - DEV-832
+  - DEV-853
 comments:
 - date: 2026-11-25T13:24:09.600579+00:00
   author: automation
@@ -53,6 +56,18 @@ comments:
       result: not_run
       reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
     next: Review on another model, then merge
+- date: 2026-11-26T03:44:12.990355+00:00
+  author: claude
+  text: |-
+    Review: passed. `701c218b5` does what "Done when" asks; nothing blocking, no tickets filed.
+
+    - Read: the ticket and its comments, DEV-584, the diff, `docs/help/agent.md`, and main's commits since the base `46fb767aa` (DEV-832, DEV-853, DEV-777 touch `agent_job_service.rs`). `git merge-tree` shows the branch merges onto main `5d3223431` without conflicts.
+    - Pause path: `usage_limit_pause` now always calls `resolve_profile`. The request's `provider` still wins there (`agent_job_service.rs:1163`), so the provider named in the pause comment stays the same. If the profile no longer resolves, it falls back to the runner.
+    - It records for every runner: `usage_limit_pause` runs on every failed job end (`agent_job_service.rs:5606`). A reset more than 7 days away is saved as `null`, which the docs say.
+    - Reran: `npm ci` ok. `cargo nextest run -p lotar-agent -E 'test(provider_usage) | test(a_usage_window…) | test(usage_limit)'`: 20 passed. `-E 'test(/^dev584_usage_limit_pause_test::/)'`: 6 passed. `cargo clippy --workspace --all-targets -D warnings`: clean. `rustfmt --check` and `prettier --check` on the changed files: clean.
+    - By hand in a scratch dir with no `.tasks`: `lotar usage` with no file prints an info line, exit 0. JSON gives `{"file", "readings": []}`. A written reading shows as a table. A malformed file is exit 1 naming the file, and so is an unreadable one (`Permission denied`). It creates no tasks dir. `lotar help usage` shows the new page.
+    - No UI change, so no screenshots needed. No stray files. It decides nothing that is the owner's to decide: the OAuth poll is left to him.
+    - Not run: full `npm test`, `npm run lint`, `npm run smoke` (the merge runs them).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
@@ -153,3 +168,22 @@ history:
   - field: assignee
     old: '@fix-retry'
     new: '@review-claude'
+- at: 2026-11-26T03:44:12.990355+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T03:44:13.370923+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584"]}'
+    new: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853"]}'
+- at: 2026-11-26T03:44:25.713694+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'

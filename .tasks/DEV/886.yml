@@ -1,14 +1,16 @@
 title: 'A fix job retried after a failed merge fails in 2s with the merge job''s verdict: STD-336 job-20261124T231242.639Z-51'
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T00:48:58.355185+00:00
-modified: 2026-11-26T00:48:58.998640+00:00
+modified: 2026-11-26T03:23:47.720831+00:00
 relationships:
   related:
   - DEV-860
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6
 description: |-
   Found (DEV-860): in standards, STD-336's merge job job-20261124T231238.232Z-50 failed ('no commit named after STD-336 is on the main checkout's branch'); the retry rule moved it to @fix, whose t3 job job-20261124T231242.639Z-51 failed 2s later with the same summary. Its log (lotar agent logs job-20261124T231242.639Z-51 in ~/Development/standards) shows the worktree rules and 'Nothing to merge: agent/STD-336 is in main already', then agent_job_failed with the merge verdict, and no agent turn. The fix agent never ran, and the ticket went to the owner as 'failed again'.
 
@@ -31,3 +33,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T03:23:46.928662+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T03:23:47.720831+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6

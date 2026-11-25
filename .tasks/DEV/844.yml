@@ -5,12 +5,13 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:30:03.578015+00:00
-modified: 2026-11-26T03:21:25.865336+00:00
+modified: 2026-11-26T03:23:14.031187+00:00
 relationships:
   depends_on:
   - DEV-821
   related:
   - DEV-821
+  - DEV-832
 comments:
 - date: 2026-11-24T19:19:12.397970+00:00
   author: automation
@@ -231,3 +232,9 @@ history:
   - field: tags
     old: job-paused
     new: ''
+- at: 2026-11-26T03:23:14.031187+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-821"],"related":["DEV-821"]}'
+    new: '{"depends_on":["DEV-821"],"related":["DEV-821","DEV-832"]}'

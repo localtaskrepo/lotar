@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 // Specs that wait on wall-clock budgets (DEV-785): each failed in a full run under
 // load and passed alone (DEV-750, DEV-751, DEV-755, DEV-775, DEV-781, DEV-785
-// review, DEV-811 merge, DEV-777 merge). They run in the `wall-clock` project after the parallel files finish,
+// review, DEV-811 merge, DEV-777 merge, DEV-829 merge). They run in the `wall-clock` project after the parallel files finish,
 // one file at a time.
 // A spec that flakes under load joins this list instead of getting its own ticket
 // (AGENTS.md).
@@ -27,6 +27,7 @@ const WALL_CLOCK_SPECS = [
     'tests/ui.sort-export.smoke.spec.ts',
     'tests/ui.sprints-responsive.smoke.spec.ts',
     'tests/ui.sync-scope.smoke.spec.ts',
+    'tests/ui.task-view.smoke.spec.ts',
     'tests/ui.theming.smoke.spec.ts',
 ];
 

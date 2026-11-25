@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review-claude'
+assignee: '@fix-retry'
 created: 2026-11-24T23:49:30.471883+00:00
-modified: 2026-11-26T00:50:20.870229+00:00
+modified: 2026-11-26T03:32:29.216472+00:00
 relationships:
   related:
   - DEV-576
@@ -15,6 +15,8 @@ relationships:
   - DEV-849
   - DEV-850
   - DEV-872
+  - DEV-889
+  - DEV-822
 comments:
 - date: 2026-11-25T13:07:40.912522+00:00
   author: automation
@@ -52,6 +54,18 @@ comments:
       result: not_run
       reason: the merge runs them (DEV-797)
     next: Review, then merge. Separately, the owner decides what happens to the 7 stranded entries in the old .tasks-keyed queue file (below)
+- date: 2026-11-26T03:32:17.011496+00:00
+  author: claude
+  text: |-
+    Review: blocking. main already has this fix from DEV-822, so the branch fixes it a second time and conflicts with main.
+
+    - **Duplicate fix:** `87f6d2cf1` DEV-822 (on main since 2026-11-25 12:11 PST, after this branch's base `46fb767aa`) already makes a relative `--tasks-dir` / `LOTAR_TASKS_DIR` absolute (`absolute_from_cwd`, `crates/lotar-core/src/workspace.rs:247`). `2b4d67d0a` adds a second helper, `absolute()` (`workspace.rs:8`), for the same job.
+    - **Proof:** I copied `dev860_relative_tasks_dir_test.rs` into a detached checkout of main (`5d3223431`) without the `workspace.rs` change. `cargo nextest run -p lotar-lib --test integration dev860` passed there. The test passes on the branch too (12/12 with `relative_path`).
+    - **Merge:** `git merge-tree main HEAD` conflicts in `tests/integration.rs`, `tests/project_integration_test.rs:576` and `tests/relative_path_parent_search_test.rs:67`. DEV-822 changed the same two asserts. `workspace.rs` merges cleanly but then applies `absolute_from_cwd` and `absolute` one after the other (`:61`/`:66`, `:95`/`:100`).
+    - **What would fix it:** rebase onto main and drop the `workspace.rs` change and both test edits. Keep `dev860_relative_tasks_dir_test.rs` as a regression test for the answer → queue path, and the `docs/help/precedence.md` sentence (main doesn't document this yet). Point the comment at DEV-822 as the code fix.
+    - **Cause, OK:** I accept the relative-path cause for STD-336 even though the description quotes `~/…/.tasks`: STD-336 is in the `.tasks`-keyed queue file.
+    - **Filed:** [DEV-889](https://lotar.pyxzl.net/task/DEV-889) (tag owner): the 7 entries stuck in that queue file, which your "next" left with the owner and no ticket.
+    - **Not rerun:** clippy, `npm run lint`/`test`/`smoke` (the merge runs them). No UI change.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae97157ffb604bb7fcfc52baba1b3bbc0834c21f614f80ba1935c9098e6ebea9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5e4bb562ec08602a2f08f993f1d7a10ae175be4be5f116a4db5cf48d2e23d257
@@ -64,6 +78,7 @@ description: |-
 tags:
 - health
 - fix-retried
+- review-returned
 custom_fields:
   finding: bug:answer-assign-no-job
 history:
@@ -132,3 +147,34 @@ history:
   - field: assignee
     old: '@fix-retry'
     new: '@review-claude'
+- at: 2026-11-26T03:32:05.409426+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-576","DEV-886","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872"]}'
+    new: '{"related":["DEV-576","DEV-886","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889"]}'
+- at: 2026-11-26T03:32:17.011496+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T03:32:17.263589+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-576","DEV-886","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889"]}'
+    new: '{"related":["DEV-576","DEV-886","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-822"]}'
+- at: 2026-11-26T03:32:17.570307+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health, fix-retried, review-blocked
+- at: 2026-11-26T03:32:29.216472+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review-claude'
+    new: '@fix-retry'
+  - field: tags
+    old: health, fix-retried, review-blocked
+    new: health, fix-retried, review-returned

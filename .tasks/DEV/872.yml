@@ -4,7 +4,7 @@ priority: High
 type: Feature
 reporter: triage
 created: 2026-11-25T17:09:40.877284+00:00
-modified: 2026-11-26T01:07:04.565068+00:00
+modified: 2026-11-26T03:32:05.952505+00:00
 relationships:
   blocks:
   - DEV-858
@@ -15,6 +15,7 @@ relationships:
   - DEV-887
   - DEV-808
   - DEV-873
+  - DEV-889
 comments:
 - date: 2026-11-25T18:15:15.542511+00:00
   author: claude
@@ -110,3 +111,9 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-26T03:32:05.952505+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858","DEV-860","DEV-887","DEV-808","DEV-873"]}'
+    new: '{"blocks":["DEV-858","DEV-810"],"related":["DEV-858","DEV-860","DEV-887","DEV-808","DEV-873","DEV-889"]}'

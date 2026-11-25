@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review-claude'
+assignee: '@fix-retry'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-26T00:54:10.997830+00:00
+modified: 2026-11-26T03:41:04.878755+00:00
 relationships:
   related:
   - DEV-767
@@ -45,6 +45,19 @@ comments:
       result: not_run
       reason: the merge runs it (DEV-797)
     next: Review, then merge
+- date: 2026-11-26T03:40:57.685212+00:00
+  author: claude
+  text: |-
+    Review: blocking. One release-file loop still outlives a test that nextest kills.
+
+    - **Reviewed:** `e70f97356` on `agent/DEV-861`, the only commit past `main`. It merges into `main` (`5d3223431`) without conflicts, and no new shell wait loops have landed on main since.
+    - **Blocking:** `crates/lotar-lib/tests/dev370_release_waiting_checks_test.rs:62`. The job loop is `while [ ! -f GO ] && [ -d <temp root> ]`. Its only bound is the temp dir, and only `TempDir`'s Drop removes that. On a nextest timeout (SIGKILL) no Drop runs, so this loop and the worker the rule's `lotar` starts keep running. The ticket says "also when the test fails or times out", and Done-when item 2 says "no Drop needs to run". Item 1's "with no bound" wording left this loop out, but item 2 still covers it.
+    - **Fix:** add `&& {alive}` (`crate::common::while_this_test_runs()`) to that loop, the same way as `dev592` and `dev630`.
+    - **Everything else holds:** every other unbounded `while [ ! -f` loop, the `while :` loop and the fake `git` in `crates/lotar-lib/tests` check `kill -0 <test pid>`. The bounded loops (`agent_safety_test.rs:385`, `dev604:227`, `agent_automation_integration_test.rs:1403/3001`) end on their own. The helper contains no quotes, so it is safe inside YAML and single-quoted shell.
+    - **Tests:** `cargo nextest run --workspace -E 'binary(integration) & package(lotar-lib) & test(/dev861|dev320|dev361|dev592|dev630|dev646|dev660|dev370|agent_safety/)'` ran 65 tests and all passed. Afterwards `ps` showed no `lotar-test-scratch` or `lotar-rust-temp` processes.
+    - **Install:** `npm ci` passed.
+    - **New test:** `dev861_test_loops_end_with_the_test_test.rs` covers the helper. It kills its owner process and checks that the loop ends with no release file.
+    - **Scope:** nothing outside the ticket, no stray files, no owner decisions touched. No UI is involved, so no ui-review.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
@@ -60,6 +73,7 @@ description: |-
   - [ ] The changed tests still pass (targeted nextest run).
 tags:
 - fix-retried
+- review-returned
 history:
 - at: 2026-11-25T02:10:53.640703+00:00
   actor: claude
@@ -129,3 +143,22 @@ history:
   - field: assignee
     old: '@fix-retry'
     new: '@review-claude'
+- at: 2026-11-26T03:40:57.685212+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T03:40:57.724113+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, review-blocked
+- at: 2026-11-26T03:41:04.878755+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review-claude'
+    new: '@fix-retry'
+  - field: tags
+    old: fix-retried, review-blocked
+    new: fix-retried, review-returned
