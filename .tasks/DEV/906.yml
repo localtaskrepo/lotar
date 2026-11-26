@@ -1,11 +1,11 @@
 title: dev61_reference_kinds_test fails in a job worktree whose target links to agent.worktree.build_root
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:25:16.556571+00:00
-modified: 2026-11-27T00:38:28.849713+00:00
+modified: 2026-11-27T00:46:14.521972+00:00
 relationships:
   related:
   - DEV-762
@@ -73,6 +73,32 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-27T00:46:06.344596+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `5f5300f15` on main. Smoke had failed for the same reason as the Rust tests, so I fixed the smoke spec too.
+
+    - Cause of the smoke failure: `smoke/tests/ui.reference-kinds.smoke.spec.ts` put its workspaces in `target/smoke-scratch`. In a job worktree `target` links to `/Volumes/Builds/...`, so the backend rejected "Add file" as escaping the repository. Main has the same failure in job worktrees; this branch didn't cause it.
+    - Fix: a new `scratchParent()` keeps `target/smoke-scratch` when `target` really lies in the checkout, otherwise it uses `.test-tmp/smoke-scratch`. This is the same approach as the Rust fix. I amended it into the ticket's commit, so it wasn't reviewed separately.
+    - Checks: the spec alone passed 5/5; `npm run -s lint:agent` passed; `npm run -s smoke` passed 413/413. lotar's merge had already passed `test:agent`, and I didn't rerun it.
+    - Landed with `git merge --ff-only`. The main checkout's `.tasks` changes were amended into the commit. No rules or config changed, so no `lotar trust`. Pushed `5f7f70b65..5f5300f15`.
+    - Ticket check re-run: the dev61 nextest filter passed 18/18.
+  report:
+    commits:
+    - hash: 5f5300f15
+      what: dev61 Rust tests and the reference-kinds smoke spec use the checkout's .test-tmp/ when target links outside it
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: by lotar's merge before the smoke fix, which touches only a smoke spec
+    - command: npm run -s smoke
+      result: passed
+      reason: 413/413 after the fix
+    - command: cargo nextest run --cargo-profile dev -p lotar-lib --test integration -E 'test(/dev61_reference_kinds_test::/)'
+      result: passed
+      reason: 18/18
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A201112dca23f251d4b5095e69820b4cf1300d02be05094b8089eb90a024f14bb
 description: |-
@@ -85,7 +111,6 @@ description: |-
   Done when: these tests pass there too (e.g. a temp workspace inside the worktree, or resolve the link).
 tags:
 - health
-- job-paused
 custom_fields:
   finding: nextest:dev61_reference_kinds_test
 history:
@@ -169,3 +194,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T00:46:06.344596+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:46:14.521972+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health
