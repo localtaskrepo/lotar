@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-26T23:42:36.496965+00:00
+modified: 2026-11-27T01:27:56.279626+00:00
 relationships:
   related:
   - DEV-786
@@ -152,10 +152,36 @@ comments:
     - **The rest is fine:** `ticket_created` is set on enqueue, park, pause and `requeue_first`, and `unpark` carries it. A stale entry is replaced on enqueue. `start_entry` drops it with a stderr line and an automation comment, without spending retries. Legacy entries aren't checked. The docs sentence matches. DEV-845's test is ported. No stray files.
     - **Reran on this branch:** `npm ci` passed. The targeted `cargo nextest run --workspace -E '…'` (the ticket's 5 new or changed tests plus `template::`) ran 15 tests, all passed. Lint, clippy and the full suites didn't run (the merge runs them).
     - No UI changes, so no screenshots needed. No minor tickets filed.
+- date: 2026-11-27T01:27:47.645620+00:00
+  author: claude
+  text: |-
+    Fixed the review's finding: rebased onto current main and DEV-870's prompt building now fills in every `${{ticket.*}}` at start. Commit `4d12bb5c0`.
+
+    - Review read `59cd30519`, which was HEAD: finding applies.
+    - Rebased onto main `352c12d85`. Conflicts in `agent_queue_service.rs` (DEV-786's `priority`/`pinned`/`taken_from` next to `ticket_created`; `unpark` keeps both priority and `ticket_created`; both sides' tests kept) and `agent_job_service.rs`.
+    - `agent_job_service.rs`: new `ticket_prompt(task, request)` = `TemplateContext::from_task(task).expand_ticket_only(request).trim()`. `PromptInputs::build` and the empty-prompt check in create use it in place of `fill_ticket_title`, which is gone. The old create line is dropped.
+    - DEV-870's test `a_job_from_the_pending_queue_builds_its_prompt_when_it_starts` asserted a literal `${{ticket.id}}` in the started prompt, the bug the review named. It now expects `AJB-1` there, and still gets the renamed title at start.
+    - Checks: the targeted nextest runs (39 and 193 tests) and `npm run lint` passed. The full suites didn't run; the merge runs them.
+  report:
+    commits:
+    - hash: 4d12bb5c0
+      what: DEV-843 rebased onto main 352c12d85, DEV-870's prompt building fills every ${{ticket.*}}
+    checks:
+    - command: 'cargo nextest run --workspace (template, DEV-843 queue tests, DEV-870 pending-queue test, prompt/park tests: 39)'
+      result: passed
+    - command: cargo nextest run --workspace -E 'test(automation)' plus the DEV-843 rule and integration tests (193)
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test, npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review 4d12bb5c0 again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A35620d562edee7ad67d0a936a157ef093b4d1e4ccf1881314d2ec132cc560c8e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A22fcbd3003e3ed02f21517996974047fdadfcec50f1b94121397bb5e48805f42
 description: |-
   Found in the DEV-818 review. On 2026-11-22 a review job's scratch lotar add created DEV-818 'Example ticket for the Agents page' (assignee @fix, 22:42Z) in the real backlog and hard-deleted it. At 22:45Z the finding ticket got the same ID DEV-818 and was also assigned @fix. The fix job that started 2026-11-23 04:32Z (job-20261123T043208.499Z-57) got the prompt 'Work ticket DEV-818 ("Example ticket for the Agents page")' and the order to commit as 'DEV-818 Example ticket for the Agents page'. So commit 4cf6a8cd7 carries the deleted ticket's title.
 
@@ -426,3 +452,27 @@ history:
   - field: tags
     old: agent, job-paused, review-blocked
     new: agent, job-paused, review-returned
+- at: 2026-11-27T01:23:42.221975+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-27T01:23:43.683858+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A22fcbd3003e3ed02f21517996974047fdadfcec50f1b94121397bb5e48805f42
+- at: 2026-11-27T01:27:47.645620+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:27:56.279626+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

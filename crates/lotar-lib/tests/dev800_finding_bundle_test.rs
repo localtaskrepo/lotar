@@ -152,6 +152,75 @@ fn a_running_fix_job_with_a_session_keeps_its_bundle_open() {
     assert_eq!(open(), Some(("REPO-1".to_string(), Some(job))));
 }
 
+/// A stand-in owner of harnessmux session `session` (DEV-891): it answers on the
+/// session's socket as harnessmux's owner does, `status` and `send` alike, and
+/// hands over the first prompt it is sent. Unix only: Windows uses named pipes.
+#[cfg(unix)]
+fn session_owner(session: &str) -> std::sync::mpsc::Receiver<String> {
+    use harnessmux::ipc::{Reply, Request};
+    use std::io::{BufRead, BufReader, Write};
+    let socket = std::path::PathBuf::from(harnessmux::Registry::default().socket_name(session));
+    std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+    let _ = std::fs::remove_file(&socket);
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let (sent, received) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let mut stream = stream.unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let mut reply = Reply::ok();
+            let prompt = match serde_json::from_str(&line).unwrap() {
+                Request::Send { prompt } => {
+                    reply.turn = Some(2);
+                    Some(prompt)
+                }
+                _ => None,
+            };
+            writeln!(stream, "{}", serde_json::to_string(&reply).unwrap()).unwrap();
+            if let Some(prompt) = prompt {
+                let _ = sent.send(prompt);
+                break;
+            }
+        }
+        let _ = std::fs::remove_file(&socket);
+    });
+    received
+}
+
+#[cfg(unix)]
+#[test]
+fn a_finding_joins_an_in_progress_bundle_whose_fix_job_takes_the_message() {
+    let fixtures = TestFixtures::new();
+    fixtures.create_config_in_dir(&fixtures.tasks_root, CONFIG);
+    let queue = fixtures.temp_dir.path().join("queue");
+    let home = fixtures.temp_dir.path().join("harnessmux");
+    let _env = [EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", queue.to_str().unwrap()), EnvVarGuard::set("HARNESSMUX_HOME", home.to_str().unwrap())];
+    report(&fixtures, "Stale worktree", "a:x", "2 left");
+    set_status(&fixtures, "REPO-1", "InProgress");
+    let received = session_owner("dev891-fix");
+    agent_active_jobs::register(&fixtures.tasks_root, &fix_job("job-fix", "REPO-1", Some("dev891-fix"), false));
+
+    // `lotar add` runs in its own process: it reaches the job through the session's owner.
+    let output = cargo_bin_in(&fixtures)
+        .env("LOTAR_DEFAULT_REPORTER", "scanner")
+        .env("LOTAR_AGENT_QUEUE_DIR", &queue)
+        .env("HARNESSMUX_HOME", &home)
+        .args(["--tasks-dir", fixtures.tasks_root.to_str().unwrap(), "--format", "json"])
+        .args(["add", "Red CI", "--finding", "b:y", "--bundle", "health", "-D", "main is red"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let joined: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(outcome(&joined), (json!(false), json!("bundled"), json!("REPO-1")), "{joined}");
+
+    let prompt = received.recv_timeout(std::time::Duration::from_secs(30)).expect("the fix job's session got a message");
+    assert!(prompt.starts_with("A new finding joined REPO-1 while you work on it"), "{prompt}");
+    assert!(prompt.contains("## Red CI\n\nmain is red\n\nFinding: `b:y`"), "{prompt}");
+    assert_eq!(joined["task"]["custom_fields"]["finding"], json!(["a:x", "b:y"]));
+    assert_eq!(listed_ids(&fixtures, "finding=b:y"), vec!["REPO-1".to_string()]);
+}
+
 #[test]
 fn a_bundle_in_a_job_takes_no_new_findings() {
     let fixtures = TestFixtures::new();

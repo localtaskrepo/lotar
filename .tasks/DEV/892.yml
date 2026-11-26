@@ -1,11 +1,11 @@
 title: A release ticket's merge job still sets it Done before its tag is pushed when the checks pass
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T05:03:35.190384+00:00
-modified: 2026-11-26T23:42:16.027333+00:00
+modified: 2026-11-27T01:23:35.579024+00:00
 relationships:
   depends_on:
   - standards:STD-371
@@ -72,6 +72,33 @@ comments:
     - `npm ci` passed. `cargo nextest run -p lotar-lib --test integration dev892` passed. With the copy from before DEV-884 (`17cd3a49f~1`) it failed with `["Merge agent lifecycle"]`, so the test catches the bug. `rustfmt --check` and clippy: clean.
     - The branch's rules file loads with the installed lotar 0.15.7 (`lotar automation simulate`). DEV-897's parse error came from 0.15.6.
     - Minor, filed as [DEV-914](https://lotar.pyxzl.net/task/DEV-914): later today STD-370 (standards `380f51c2`) added its own "Login expired" rule to the shared file. The next copy would then hold two of them, so one login pause would file two sign-in tickets.
+- date: 2026-11-27T01:23:35.209990+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-892` is in `main`.
+
+    - Rebased `agent/DEV-892` onto `main` (`ab943d959537`): `ad6853e53ece`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `ad6853e53ece`
+    - Amended the pending `.tasks` changes into the merged commit: `352c12d8573d`
+    - The merge changed rules, agent profiles or `agent.merge`: ran `lotar trust`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[review:release-done-before-tag]`
+  report:
+    commits:
+    - hash: 352c12d85
+      what: DEV-892 A release ticket's merge job still sets it Done before its tag is pushed when the checks pass
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A854085c4248d6f5c9a16429c96ad2b629a5d948136b69a3e98de6af32a725cda
@@ -90,7 +117,6 @@ description: |-
   - A release ticket (title `Release vX.Y.Z` or field `release`) isn't set Done by its merge job until `vX.Y.Z` is on origin, or its merge doesn't run the Done rule. There's a test for it.
 tags:
 - health
-- job-paused
 custom_fields:
   finding: review:release-done-before-tag
 history:
@@ -195,3 +221,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T01:23:35.209990+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:23:35.579024+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused
+    new: health
