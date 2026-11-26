@@ -199,6 +199,7 @@ mod dev842_description_from_stdin_test;
 mod dev852_rule_question_comment_test;
 mod dev860_relative_tasks_dir_test;
 mod dev881_status_feed_test;
+mod dev892_release_merge_done_test;
 mod dev89_cli_add_transaction_test;
 mod dev92_cli_soft_delete_test;
 mod dev92_soft_deletion_test;

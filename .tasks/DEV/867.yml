@@ -1,11 +1,11 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: Blocked
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-27T00:09:14.418077+00:00
+modified: 2026-11-27T01:10:25.306872+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -141,6 +141,9 @@ comments:
 - date: 2026-11-26T23:11:11.417584+00:00
   author: automation
   text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ce7499cac79969a6af3e6141c7a9ed4b3f29d7ae6c82fb8ac4a332a79245b97 of the job job-20261126T213510.936Z-77 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231111.397Z-94: DEV-867 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-27T01:10:25.306872+00:00
+  author: claude
+  text: 'Stalled since 2026-11-27T00:09Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
@@ -161,7 +164,6 @@ description: |-
 tags:
 - agent
 - fix-retried
-- waits
 - retry-fix
 - job-paused
 history:
@@ -379,3 +381,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909"]}'
     new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909","DEV-579"]}'
+- at: 2026-11-27T01:10:22.226267+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T01:10:22.857510+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, fix-retried, waits, retry-fix, job-paused
+    new: agent, fix-retried, retry-fix, job-paused
+- at: 2026-11-27T01:10:25.306872+00:00
+  actor: claude
+  changes:
+  - field: comment_added

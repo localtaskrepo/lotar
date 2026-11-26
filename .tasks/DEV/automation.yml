@@ -24,8 +24,7 @@ automation:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
             prompt: &fix-prompt |
-              Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}"). Run lotar with
-              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex): lotar records it as the comment's author.
+              Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}").
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Read the ticket: what was found, how to check it, what done looks like. Run its check command (a
@@ -106,10 +105,9 @@ automation:
             provider: "${{ticket.field:provider}}"
             prompt: &work-prompt |
               Work ticket ${{ticket.id}} ("${{ticket.title}}"): read it and its relationships, then do it the way this
-              repo's AGENTS.md says, with targeted tests and checks for what you change, not the full suites: the
-              merge runs them once (owner 2026-11-22, lotar DEV-797). Run lotar with LOTAR_DEFAULT_REPORTER set to
-              your agent name (claude, codex). After a failed merge your branch may hold earlier commits
-              (git log <main>..HEAD): build on them.
+              repo's AGENTS.md says, with targeted tests and checks for what you change, not the full suites: the merge
+              runs them once (owner 2026-11-22, lotar DEV-797). After a failed merge your branch may hold earlier
+              commits (git log <main>..HEAD): build on them.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Before you code: a ticket without "## Done when", or with one that doesn't say what each surface and
@@ -169,8 +167,7 @@ automation:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
             prompt: &research-prompt |
-              Research ticket ${{ticket.id}} ("${{ticket.title}}"): answer its question. Change no code. Run lotar with
-              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex).
+              Research ticket ${{ticket.id}} ("${{ticket.title}}"): answer its question. Change no code.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Read the ticket, its comments and relationships, and the owner decisions it names (docs/decisions):
@@ -251,11 +248,10 @@ automation:
             # A new session on the fix branch, also on the author's provider and model (lotar DEV-414).
             session: fresh
             prompt: |
-              Review the work for ticket ${{ticket.id}} ("${{ticket.title}}") before it is merged. A fix agent
-              committed it on your worktree's branch; you didn't write it. Run lotar with LOTAR_DEFAULT_REPORTER set
-              to your agent name (claude, codex). Change no files, commit nothing and leave status and assignee as
-              they are: when your job ends the rules send the work on by tag review-blocked. You run headless: nobody
-              reads this session, so never ask in it; what you find goes into the ticket's comments.
+              Review the work for ticket ${{ticket.id}} ("${{ticket.title}}") before it is merged. A fix agent committed
+              it on your worktree's branch; you didn't write it. Change no files, commit nothing and leave status and
+              assignee as they are: when your job ends the rules send the work on by tag review-blocked. You run
+              headless: nobody reads this session, so never ask in it; what you find goes into the ticket's comments.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. The work: git log <main>..HEAD and its diff, main being the main checkout's branch (git -C <root>
@@ -339,10 +335,10 @@ automation:
             session: fresh
             prompt: |
               Check the write-up for Research ticket ${{ticket.id}} ("${{ticket.title}}") before it lands on main. A
-              research agent committed it on your worktree's branch; you didn't write it. Run lotar with
-              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Change no files, commit nothing and leave
-              status and assignee as they are: when your job ends the rules send it on by tag review-blocked. You run
-              headless: nobody reads this session, so never ask in it; what you find goes into the ticket's comments.
+              research agent committed it on your worktree's branch; you didn't write it. Change no files, commit
+              nothing and leave status and assignee as they are: when your job ends the rules send it on by tag
+              review-blocked. You run headless: nobody reads this session, so never ask in it; what you find goes into
+              the ticket's comments.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. The work: git log <main>..HEAD and its diff, main being the main checkout's branch (git -C <root>
@@ -406,11 +402,10 @@ automation:
             session: continue
             prompt: &merge-prompt |
               Merge the work for ticket ${{ticket.id}} ("${{ticket.title}}") into the main checkout (<root>, the
-              first entry of git worktree list). When this session did the review, this turn is the merge: it
-              replaces the earlier "Change no files". Your worktree's branch holds the fix agent's commits. Run lotar
-              with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). You run headless: nobody reads this
-              session, so never ask in it. To hand back, comment one question, set the status to HelpNeeded, assign
-              the ticket to mallox and stop: that files it in his inbox.
+              first entry of git worktree list). When this session did the review, this turn is the merge: it replaces
+              the earlier "Change no files". Your worktree's branch holds the fix agent's commits. You run headless:
+              nobody reads this session, so never ask in it. To hand back, comment one question, set the status to
+              HelpNeeded, assign the ticket to mallox and stop: that files it in his inbox.
               When lotar's own merge handed off (its comment comes before this prompt), it ran these steps until one
               needed judgment: start at that step, keep what it landed, and redo no step it finished.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
@@ -511,8 +506,7 @@ automation:
             provider: "${{ticket.field:provider}}"
             prompt: |
               The review of ticket ${{ticket.id}} ("${{ticket.title}}") found blocking problems: its last comments name
-              them. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Your worktree's
-              branch holds the earlier commits (git log <main>..HEAD): build on them.
+              them. Your worktree's branch holds the earlier commits (git log <main>..HEAD): build on them.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. First check the review read your branch's HEAD (git log -1 --format=%h): its comment names the commit
@@ -589,8 +583,7 @@ automation:
             provider: "${{ticket.field:provider}}"
             prompt: |
               The source check of Research ticket ${{ticket.id}} ("${{ticket.title}}") found blocking problems: its last
-              comments name them. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Your
-              worktree's branch holds the write-up commit (git log <main>..HEAD): build on it.
+              comments name them. Your worktree's branch holds the write-up commit (git log <main>..HEAD): build on it.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. First check the check read your branch's HEAD (git log -1 --format=%h): its comment names the commit
@@ -880,7 +873,7 @@ automation:
             session: fresh
             prompt: |
               Finish the release of ticket ${{ticket.id}} ("${{ticket.title}}"): its version bump is merged on main,
-              the tag is not pushed yet. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex).
+              the tag is not pushed yet.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Work in the main checkout (<root>, the first entry of git worktree list), not in your worktree:
@@ -969,9 +962,8 @@ automation:
             provider: "${{ticket.field:provider}}"
             prompt: |
               The merge of Research ticket ${{ticket.id}} ("${{ticket.title}}") failed: the merge agent's job
-              ${{agent.job_id}} (lotar agent logs ${{agent.job_id}}, and the ticket's last comments). Run lotar with
-              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Your worktree's branch holds the
-              write-up commit. Change no code: only the write-up under docs/research.
+              ${{agent.job_id}} (lotar agent logs ${{agent.job_id}}, and the ticket's last comments). Your worktree's
+              branch holds the write-up commit. Change no code: only the write-up under docs/research.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               1. Main is the main checkout's branch (git -C <root> branch --show-current, <root> the first entry of
@@ -1045,9 +1037,8 @@ automation:
           tell_agent:
             agent: fix
             message: |
-              Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{unblocked.by}}, which is done now. Run lotar
-              with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Read the ticket and its comments:
-              what it waited to do and what done looks like.
+              Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{unblocked.by}}, which is done now. Read the
+              ticket and its comments: what it waited to do and what done looks like.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
               - It waited only to run a check against a lotar release ("Release v..."): that release is installed
@@ -1096,8 +1087,7 @@ automation:
               ${{comment.text}}
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
-              Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Read the ticket and act on
-              his comment:
+              Read the ticket and act on his comment:
               - The ticket was InProgress, Reviewing or Merging with an agent (@...) as assignee: this is a further
                 turn of the job that runs on it. Answer in a comment, change the work as he asks and carry on as before.
               - It answers what the ticket waits for, or asks for a change: do the work the way this repo's AGENTS.md
@@ -1296,8 +1286,7 @@ automation:
             # The message of "Prerequisites done" with the prerequisites by ID: a manual run has no ${{unblocked.by}}.
             message: |
               Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{ticket.relationships.depends_on[*]}}, which are
-              done now: lotar task relationships ${{ticket.id}} shows their titles. Run lotar
-              with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Read the ticket and its comments:
+              done now: lotar task relationships ${{ticket.id}} shows their titles. Read the ticket and its comments:
               what it waited to do and what done looks like.
               Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
               findings or evidence, with paths, commands and hashes in backticks.
@@ -1329,3 +1318,53 @@ automation:
           agent:
             session: continue
             prompt: *merge-prompt
+    # lotar's own rules follow.
+    # Note on "Prerequisites done: continue the waiting ticket" above: a ticket whose job the dependency check held
+    # back gets that job instead, as it was (DEV-530).
+    # A ticket that starts to wait (HelpNeeded, Blocked) keeps only its dependencies' build output: cargo clean
+    # --workspace drops target/debug/incremental and the workspace crates' artifacts (3.4 GB to 0.7 GB in DEV-653's
+    # worktree), which the resumed job rebuilds in about a minute (owner 2026-11-18, DEV-653: "Yes, build the waiting-state
+    # rule and run it on a real ticket"; this changes STD-95's "build output stays until Done" for waiting tickets).
+    # It fires on a person's status change and on an agent's hand-back, applied once its job ended. Waits that a rule
+    # or lotar sets fire no rule (rules that hand a ticket to mallox, a T3 thread waiting for an answer, Blocked on open
+    # prerequisites): `agent.worktree.waiting_run` in DEV/config.yml runs the same command for those at the job's end
+    # or the held-back start (DEV-712). The fix, review and merge steps keep their build output: the next
+    # step reuses it (DEV-653's measurements). lotar runs nothing while a job runs for the ticket; a lotar without
+    # `agent worktree run` (before DEV-653) fails it.
+    - name: "Waiting: drop the workspace build output"
+      when:
+        any:
+          - status: HelpNeeded
+          - status: Blocked
+      on:
+        updated:
+          run:
+            command: lotar
+            args: [agent, worktree, run, "${{ticket.id}}", --, cargo, clean, --workspace]
+            ignore_failure: true
+    # A provider's expired login pauses that provider's jobs (DEV-835): only the job that opened the pause matches
+    # job.pause, so the owner gets one ticket per pause in his inbox, not one per held ticket. Its own ticket, not the
+    # paused one: that one's retry is queued and moves it on when it completes.
+    - name: "Login expired: ask the owner to sign in"
+      when:
+        job: { pause: auth }
+      on:
+        job_paused:
+          run:
+            command: lotar
+            args:
+              - add
+              - "Sign in to ${{agent.provider}} again: its agent jobs wait"
+              - --project
+              - DEV
+              - --type
+              - Chore
+              - --status
+              - HelpNeeded
+              - --assignee
+              - mallox
+              - --tag
+              - owner
+              - -D
+              - "The ${{agent.provider}} login fails, so lotar paused that provider's jobs (job ${{agent.job_id}} on ${{ticket.id}}). Sign in again (claude auth login, codex login); the next try resumes them, every 10 minutes. Then close this ticket."
+            ignore_failure: true

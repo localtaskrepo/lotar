@@ -1,15 +1,47 @@
 title: Copy STD-370's shared automation.yml and drop lotar's own 'Login expired' rule, or a login pause files two owner tickets
-status: Todo
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review-light'
 created: 2026-11-26T23:41:56.315913+00:00
-modified: 2026-11-26T23:41:57.684350+00:00
+modified: 2026-11-27T01:13:47.033729+00:00
 relationships:
   related:
   - DEV-892
   - DEV-835
+  - DEV-653
+  - DEV-884
+comments:
+- date: 2026-11-27T01:13:38.666771+00:00
+  author: claude
+  text: |-
+    Shared automation.yml copied again; one 'Login expired' rule left (the shared one).
+
+    - `.tasks/DEV/automation.yml` = standards `configs/lotar/automation.yml` (`380f51c2`, STD-370) plus lotar's own section.
+    - lotar's own section keeps only "Waiting: drop the workspace build output". DEV-884 (`17cd3a49f`) had dropped that whole section from main by mistake, so the Waiting rule (DEV-653) was gone too; restored from DEV-892's copy.
+    - lotar's old Login rule dropped: the shared one does everything it did (HelpNeeded, mallox, owner tag) and adds a finding so there's one ticket per provider, a link to the paused ticket, an answer button and the inbox.
+    - DEV-892 (`15a6d7cf1`, Merging) still has the older file with both Login rules. Whichever merges second has to keep this version.
+  report:
+    commits:
+    - hash: 0fcafda98
+      what: copy standards automation.yml (STD-370), keep only lotar's Waiting rule after it
+    checks:
+    - command: diff <(head -1343 .tasks/DEV/automation.yml) ~/Development/standards/configs/lotar/automation.yml
+      result: passed
+      reason: no differences
+    - command: grep -c 'Login expired' .tasks/DEV/automation.yml
+      result: passed
+      reason: '1'
+    - command: lotar automation simulate --ticket DEV-406 --event updated (installed 0.15.x, scratch env)
+      result: passed
+      reason: file loads, rules match
+    - command: npm run lint / tests
+      result: not_run
+      reason: only .tasks YAML changed
+    next: 'Review, then merge; run lotar trust after the merge. DEV-892''s branch still carries the old tail with lotar''s own Login rule: its merge must take this file'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45ab338036c3819f2b1bfb98fa1220ef8844a7f4b07497578c6c53f9d4a063dc
 description: |-
   ## Found
   Found by the DEV-892 review, 2026-11-26. DEV-892 (`15a6d7cf1`) copied the standards automation.yml into `.tasks/DEV/automation.yml` at STD-354 and kept lotar's own rule 'Login expired: ask the owner to sign in' (DEV-835) after it. STD-370 (standards `380f51c2`, later the same day) puts its own 'Login expired' rule into the shared file. The next copy brings in both, so one auth pause files two sign-in tickets for mallox.
@@ -22,9 +54,46 @@ description: |-
   - `lotar automation simulate` loads the file with the installed lotar.
 tags:
 - health
+- small-diff
 history:
 - at: 2026-11-26T23:41:57.684350+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T01:12:24.043686+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T01:12:24.645966+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45ab338036c3819f2b1bfb98fa1220ef8844a7f4b07497578c6c53f9d4a063dc
+- at: 2026-11-27T01:13:38.617953+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, small-diff
+- at: 2026-11-27T01:13:38.666771+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:13:38.955355+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-892","DEV-835"]}'
+    new: '{"related":["DEV-892","DEV-835","DEV-653","DEV-884"]}'
+- at: 2026-11-27T01:13:47.033729+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review-light'

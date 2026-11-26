@@ -1,11 +1,11 @@
 title: lotar trust --status shows a structured run command as a JSON blob with its default fields
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-26T23:39:26.494440+00:00
+modified: 2026-11-27T01:11:13.333456+00:00
 relationships:
   related:
   - DEV-847
@@ -110,6 +110,29 @@ comments:
     - Reran: `npm ci` passed; `rustfmt --check` and `prettier --check` passed; `cargo nextest run -p lotar-lib --lib trust::` passed 3/3
     - Real binary on a scratch repo: `runs echo 'a b' x (env A=2 Z=1, no wait)`, string run `runs echo hi`, `--format json` `commands` holds the same strings
     - Not rerun: clippy, dev259 integration tests, smoke (the merge runs the full suites)
+- date: 2026-11-27T01:11:12.769406+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-869` is in `main`.
+
+    - Rebased `agent/DEV-869` onto `main` (`c292a058e17b`): `eb88b9356dc0`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `eb88b9356dc0`
+    - Amended the pending `.tasks` changes into the merged commit: `ab943d959537`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: ab943d959
+      what: DEV-869 lotar trust --status shows a structured run command as a JSON blob with its default fields
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A89f5e47dea5086fcd262030d8410b807f6b5bde2aa107868f6c68782c5ff9fd8
@@ -126,8 +149,6 @@ description: |-
   - [ ] A string `run` still shows as written (`runs echo hi`); a file that doesn't parse still shows `(file does not parse)`.
   - [ ] `--format json` lists the same strings in `commands`.
   - [ ] A unit test in `trust.rs` covers the plain, quoted and non-default cases.
-tags:
-- job-paused
 history:
 - at: 2026-11-25T08:19:54.296572+00:00
   actor: claude
@@ -287,3 +308,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T01:11:12.769406+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:11:13.333456+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused
+    new: ''
