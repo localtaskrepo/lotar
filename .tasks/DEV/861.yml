@@ -1,11 +1,11 @@
 title: Tests leave lotar agent workers and wait loops running after the test run ends
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-27T02:56:10.669508+00:00
+modified: 2026-11-27T03:57:18.501861+00:00
 relationships:
   blocks:
   - DEV-916
@@ -15,6 +15,9 @@ relationships:
   - DEV-916
   - DEV-796
   - DEV-579
+  - DEV-810
+  - DEV-863
+  - DEV-896
 comments:
 - date: 2026-11-25T13:39:50.915818+00:00
   author: automation
@@ -111,6 +114,32 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-861` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-861` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-27T03:57:11.671576+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-861 is on `main` as `8c30ba685`.
+
+    - **Conflict:** `crates/lotar-lib/tests/integration.rs`, only the `mod` list. Kept both sides, `mod dev861_...` after `mod dev860_...`.
+    - **Rebased three times:** main moved twice while the checks ran (DEV-896, then DEV-863, DEV-810 and the v0.16.0 release). Both rebases were clean. Each time I reran the checks on the new commit.
+    - **Checks on `28a3b82a1`**, the commit that landed: `npm run -s lint:agent` passed, `npm run -s test:agent` passed (2641 of 2641), `npm run -s smoke` passed (414 of 414). `npm ci` ran after the first rebase; the lockfile didn't change after that.
+    - **`.tasks`:** the ticket changes left in the main checkout were amended into the merge commit, which became `8c30ba685`.
+    - **Trust:** not needed, since no rules or config changed.
+    - **Push:** `git push` sent `e1bedb96f..8c30ba685` to `origin/main`. It was the only unpushed commit.
+  report:
+    commits:
+    - hash: 8c30ba685
+      what: DEV-861 test wait loops end with the test process (on main, pushed)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2641 of 2641
+    - command: npm run -s smoke
+      result: passed
+      reason: 414 of 414
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
@@ -125,9 +154,6 @@ description: |-
   - [ ] With its loops ended, a detached `lotar agent worker` has no running job and exits on its own (its existing idle exit); queued entries it still starts end at once for the same reason.
   - [ ] A test shows a loop built with the helper ends once its owning process is gone, without the release file.
   - [ ] The changed tests still pass (targeted nextest run).
-tags:
-- fix-retried
-- review-returned
 history:
 - at: 2026-11-25T02:10:53.640703+00:00
   actor: claude
@@ -313,3 +339,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T03:57:11.671576+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:57:11.960968+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-916"],"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579"]}'
+    new: '{"blocks":["DEV-916"],"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579","DEV-810","DEV-863","DEV-896"]}'
+- at: 2026-11-27T03:57:18.501861+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried, review-returned
+    new: ''

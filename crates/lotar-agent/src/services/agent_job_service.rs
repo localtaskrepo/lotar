@@ -730,6 +730,14 @@ impl AgentJobService {
         })
     }
 
+    /// The tickets of the jobs waiting in this process's queue for the tasks directory.
+    pub fn queued_tickets(tasks_dir: &std::path::Path) -> Vec<String> {
+        JOB_REGISTRY
+            .lock()
+            .map(|registry| registry.pending_queue.iter().filter(|pending| pending.tasks_dir == tasks_dir).map(|pending| pending.ticket_id.clone()).collect())
+            .unwrap_or_default()
+    }
+
     /// The tickets and jobs this process runs (or queues).
     pub fn active_jobs() -> Vec<(String, String)> {
         JOB_REGISTRY.lock().map(|registry| registry.active_by_ticket.iter().map(|(ticket, job)| (ticket.clone(), job.clone())).collect()).unwrap_or_default()

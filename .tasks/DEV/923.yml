@@ -1,0 +1,30 @@
+title: 'Agent queue: no test covers a queued entry whose ticket was deleted and not re-created'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T04:02:53.831434+00:00
+modified: 2026-11-27T04:02:54.957058+00:00
+relationships:
+  related:
+  - DEV-843
+description: |-
+  Found in the DEV-843 review. `drop_stale_entry` has two reasons: the ticket no longer exists (`TaskNotFound`), or a new ticket reuses its ID. The test `an_entry_whose_ticket_was_deleted_leaves_the_queue_without_starting` (`crates/lotar-agent/src/services/agent_queue_service.rs`) covers only the reuse case.
+
+  ## Done when
+  - [ ] A test hard-deletes a queued ticket without re-creating it: the worker drops the entry, starts no job, spends no attempts and comments nowhere.
+tags:
+- agent
+history:
+- at: 2026-11-27T04:02:54.561755+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-843"]}'
+- at: 2026-11-27T04:02:54.957058+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

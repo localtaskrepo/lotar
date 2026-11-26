@@ -1,11 +1,11 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-27T01:10:25.306872+00:00
+modified: 2026-11-27T03:57:47.828150+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -144,10 +144,33 @@ comments:
 - date: 2026-11-27T01:10:25.306872+00:00
   author: claude
   text: 'Stalled since 2026-11-27T00:09Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-27T03:57:39.735855+00:00
+  author: claude
+  text: |-
+    Restarted after the stall: the fix is already committed, nothing left to change.
+
+    - `616b3bc38` on `agent/DEV-867` is unchanged, worktree clean; diff vs `main` is 3 files, 96 lines.
+    - No new edits, so no checks rerun. No guidance correction.
+  report:
+    commits:
+    - hash: 616b3bc38
+      what: a taken-over merge job takes the check lock before it resumes its session
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: in the earlier run, no edits since
+    - command: targeted nextest (lotar-lib dev503_harness_jobs_test, lotar-agent check_lock)
+      result: passed
+      reason: in the earlier run, no edits since
+    - command: full suites
+      result: not_run
+      reason: the merge runs them
+    next: Merge agent lands agent/DEV-867
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ce7499cac79969a6af3e6141c7a9ed4b3f29d7ae6c82fb8ac4a332a79245b97
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A736722c74faf1b38d5648de0cb8468b1ec646ddd290fddf77a364b4ddc84acc6
 description: |-
   Found in the DEV-797 review: `adopt_orphaned_job` → `finish_orphaned_job` (`crates/lotar-agent/src/services/agent_job_service.rs`) resumes a merge job's agent session (a t3 thread may still run its full suites) but never takes the machine's check lock (`agent_job_service/check_lock.rs`, port 47586). The OS freed the lock when the old lotar exited, so a second merge can run its suites beside the adopted one, which DEV-797 forbids (a merge agent "holds it until the job ends").
 
@@ -397,3 +420,21 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-27T03:57:27.382027+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A736722c74faf1b38d5648de0cb8468b1ec646ddd290fddf77a364b4ddc84acc6
+- at: 2026-11-27T03:57:39.735855+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:57:47.828150+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

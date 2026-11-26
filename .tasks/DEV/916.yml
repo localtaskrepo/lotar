@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T00:07:42.828735+00:00
-modified: 2026-11-27T02:56:05.598977+00:00
+modified: 2026-11-27T03:57:19.276672+00:00
 relationships:
   depends_on:
   - DEV-861
@@ -32,8 +32,6 @@ description: |-
 
   - [ ] The loop is `while [ ! -f "{go}" ] && {alive}; do ...` with `crate::common::while_this_test_runs()`, once both DEV-796 and DEV-861 are on main.
   - [ ] A `git grep` for `while [ ! -f` in `crates/lotar-lib/tests` shows no unbounded loop without the helper.
-tags:
-- waits
 history:
 - at: 2026-11-27T00:07:44.234959+00:00
   actor: claude
@@ -79,3 +77,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T03:57:19.276672+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''

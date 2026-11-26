@@ -629,12 +629,12 @@ impl AgentQueueService {
         let pauses = Self::pauses(tasks_dir);
         if !Self::is_worker_running(tasks_dir) {
             if pending.is_empty() {
-                return (WorkerState::Idle, None);
+                return (WorkerState::Idle, held_in_memory(tasks_dir));
             }
             return (WorkerState::Stopped, Some("no worker process runs; start one with `lotar agent queue resume`".to_string()));
         }
         if pending.is_empty() {
-            return (WorkerState::Active, None);
+            return (WorkerState::Active, held_in_memory(tasks_dir));
         }
         if !pauses.is_empty() {
             let summaries: Vec<String> = pauses.iter().map(QueuePause::summary).collect();
@@ -1230,6 +1230,27 @@ fn same_entry(a: &AgentQueueEntry, b: &AgentQueueEntry) -> bool {
 /// file's tickets. The records include this process's running jobs, so the
 /// larger count wins; its queued jobs left the queue file when they started,
 /// so the two queued counts add up (DEV-865).
+/// With the queue file empty, the jobs a lotar process (`lotar serve`, this
+/// one or another) holds in its memory, which Queued counts (DEV-871): they
+/// wait there, and that process starts them (DEV-910).
+fn held_in_memory(tasks_dir: &Path) -> Option<String> {
+    let mut held: Vec<(String, u32)> = AgentJobService::queued_tickets(tasks_dir).into_iter().map(|ticket| (ticket, std::process::id())).collect();
+    held.extend(crate::services::agent_active_jobs::queued_elsewhere(tasks_dir).into_iter().map(|job| (job.ticket_id, job.owner_pid)));
+    if held.is_empty() {
+        return None;
+    }
+    held.sort_by_key(|(_, pid)| *pid);
+    let parts: Vec<String> = held
+        .chunk_by(|a, b| a.1 == b.1)
+        .filter_map(|chunk| {
+            let pid = chunk.first()?.1;
+            let tickets: Vec<&str> = chunk.iter().map(|(ticket, _)| ticket.as_str()).collect();
+            Some(format!("{} in lotar process {pid}", tickets.join(", ")))
+        })
+        .collect();
+    Some(format!("nothing in the queue file; queued in a lotar process's memory (such as `lotar serve`'s), which starts them: {}", parts.join("; ")))
+}
+
 fn combined_stats(mut own: AgentQueueStats, recorded_running: usize, pending: usize) -> AgentQueueStats {
     own.running = own.running.max(recorded_running);
     own.queued += pending;
@@ -1823,7 +1844,8 @@ mod tests {
     }
 
     /// DEV-871: a job queued in another live process's memory counts as
-    /// queued here; one of a process that is gone doesn't.
+    /// queued here; one of a process that is gone doesn't. DEV-910: the
+    /// worker state's reason names it.
     #[cfg(unix)]
     #[test]
     fn queued_counts_the_jobs_other_processes_queue() {
@@ -1841,6 +1863,22 @@ mod tests {
         std::fs::write(records.join("job-1.queued"), record("job-1", std::os::unix::process::parent_id())).unwrap();
         std::fs::write(records.join("job-2.queued"), record("job-2", 0)).unwrap();
         assert_eq!(AgentQueueService::queue_stats(&tasks_dir, &pending).queued, 4, "the other process's queued job counts, the dead one's doesn't");
+
+        // DEV-910: with the queue file empty, the state doesn't say nothing is queued.
+        let (state, reason) = AgentQueueService::worker_state(&tasks_dir, &[], None, None);
+        assert_eq!(state, WorkerState::Idle, "no worker runs for the queue file");
+        assert_eq!(
+            reason.as_deref(),
+            Some(
+                format!(
+                    "nothing in the queue file; queued in a lotar process's memory (such as `lotar serve`'s), which starts them: TEST-4 in lotar process {}",
+                    std::os::unix::process::parent_id()
+                )
+                .as_str()
+            )
+        );
+        std::fs::remove_file(records.join("job-1.queued")).unwrap();
+        assert_eq!(AgentQueueService::worker_state(&tasks_dir, &[], None, None), (WorkerState::Idle, None), "nothing queued anywhere");
     }
 
     /// DEV-604: a signing pause holds only jobs that commit, a disk pause
