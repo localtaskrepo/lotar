@@ -106,9 +106,9 @@ All read-only, on 2026-11-24.
   stays backwards compatible.
 
 **2. When it loads.**
-- *On expand* (recommended): it matches how **Show thread** works today. One turn is tens to hundreds of KB (the logs
+- *On expand* (Ravi's choice, 2026-11-26): it matches how **Show thread** works today. One turn is tens to hundreds of KB (the logs
   above); a ticket can have many runs (DEV-791 has 19 job logs). Prefetching would load megabytes no one reads.
-- *Limited prefetch* (e.g. the last run): saves one tap; worth it later if expanding feels slow.
+- *Limited prefetch* (e.g. the last run): saves one tap. Not chosen.
 
 **3. How it is read.**
 - *Reuse `/api/jobs/logs`*: it returns the whole job log unpaged and reads only `@agent-logs`. Folding a transcript
@@ -206,6 +206,7 @@ Open in T3.
 - Upkeep: low. It follows one documented format (harnessmux, owned by the same owner); a new `v` shows the unsupported
   state until the reader learns it.
 
-## Open choice for Ravi
+## Decision
 
-Load on expand only (recommended), or also prefetch the latest run's conversation so it shows without a tap?
+Ravi, 2026-11-26 ([DEV-850](https://lotar.pyxzl.net/task/DEV-850), answered in INBOX-765): "expand (Load on open only)".
+A run's conversation loads only when its phase is opened; nothing is prefetched.

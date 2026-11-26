@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-26T23:52:05.161591+00:00
+modified: 2026-11-27T01:36:37.317455+00:00
 relationships:
   depends_on:
   - DEV-765
@@ -406,6 +406,12 @@ comments:
 
     **Findings**
     - None blocking, no new tickets. The known gap (the live Agents page doesn't show the question box) stays with DEV-826.
+- date: 2026-11-27T01:36:37.317455+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-782` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `view/__tests__/AgentActivityIndicator.spec.ts`; lotar aborted the rebase, `agent/DEV-782` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A213f6f4501a6f08135284814b3c429c20077b295d8c5df00ce09be201fb88dad
@@ -1050,3 +1056,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T01:36:37.317455+00:00
+  actor: automation
+  changes:
+  - field: comment_added
