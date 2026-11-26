@@ -90,7 +90,7 @@ pub struct ConfigInitArgs {
     #[arg(long, short = 'y', alias = "non-interactive")]
     pub yes: bool,
 
-    /// Add scaffolds: comma-separated list (automation, agents, agents:pipeline, agents:reviewed, sync:jira, sync:github)
+    /// Add scaffolds: comma-separated list (automation, agents, agents:pipeline, agents:reviewed, agents:team, sync:jira, sync:github)
     #[arg(long, value_delimiter = ',')]
     pub with: Vec<String>,
 

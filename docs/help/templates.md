@@ -55,6 +55,10 @@ lotar config templates
   - `issue.states`: Todo, InProgress, Testing, Review, Merging, Done, HelpNeeded
   - Agent profiles `@implement`, `@test`, `@merge` (Claude by default)
   - After testing, the ticket goes to the reporter in `Review`; assigning it to `@merge` merges it
+- **agent-team** — Agent workflow that runs without a person watching each step.
+  - `issue.states`: Todo, InProgress, Reviewing, Merging, Blocked, HelpNeeded, Done, WontDo (Done and WontDo are done)
+  - Agent profiles `@implement`, `@implement-retry`, `@review`, `@merge` (Claude by default)
+  - An agent review in a fresh session, rework rounds, one retry, prerequisites and comments that reach the agent (see below)
 
 Each template file includes metadata (`name`, `description`) plus a `config:` block, and the agent templates an `automation:` block.
 
@@ -81,22 +85,40 @@ Every `init` call serializes the merged YAML, validates it, and writes the canon
 
 ## Agent templates
 
-`lotar init --template agent-pipeline` (or `agent-reviewed`) sets up a project the agent workflow can run in:
+`lotar init --template agent-pipeline` (or `agent-reviewed`, `agent-team`) sets up a project the agent workflow can run in:
 
-- The project config gets the template's statuses, types, priorities, agent profiles and `agent.worktree` settings, and `issue.done_states: [Done]` so a handed-back `HelpNeeded` ticket doesn't count as finished. `--states`, `--types`, `--priorities` and `--tags` still override the vocabularies; with `--states` the done states are inferred from your list (see [Done States](config.md#done-states)).
+- The project config gets the template's statuses, types, priorities, agent profiles and `agent.worktree` settings, and `issue.done_states: [Done]` (agent-team: `[Done, WontDo]`) so a handed-back `HelpNeeded` ticket doesn't count as finished. `--states`, `--types`, `--priorities` and `--tags` still override the vocabularies; with `--states` the done states are inferred from your list (see [Done States](config.md#done-states)).
 - `.tasks/<PREFIX>/automation.yml` gets the phase rules.
 
 Assign a ticket to `@implement` to start. Each phase works in the ticket's own worktree and branch and commits there (LoTaR commits anything an agent leaves uncommitted); when a job finishes, the automation rules move the ticket to the next phase:
 
 - **agent-pipeline**: Implementation → Testing → Merging → Done. The merge agent rebases the branch onto main, reruns the checks and fast-forwards the main checkout (LoTaR fast-forwards it if the agent can't; the job fails if the branch can't be fast-forwarded). It does not push unless your repository guidance says to.
 - **agent-reviewed**: Implementation → Testing → Review. The reporter reviews the branch, then assigns the ticket to `@merge` (or comments and assigns it to `@implement` for changes). Merging → Done.
+- **agent-team**: Implementation → Review → Merging → Done, with agents in every step (described below).
 
 When something goes wrong the ticket goes back to a person instead of moving on:
 
 - An agent that needs a decision, or finds the work can't be finished, comments, sets `HelpNeeded` and assigns the reporter. Because the assignee is no longer the phase agent, no rule moves the ticket when the job ends.
-- A job whose runner crashes ends up in `HelpNeeded` with the reporter and the `agent-failed` tag. A cancelled job is assigned to the reporter.
+- agent-pipeline and agent-reviewed: a job whose runner crashes ends up in `HelpNeeded` with the reporter and the `agent-failed` tag, and a cancelled job is assigned to the reporter. agent-team retries first (below).
 
-Each profile runs `claude`; change `runner` to `codex`, `copilot` or `gemini`, and set `model` and `effort` per phase (see [Agents](agent.md#model-and-effort)). Profile `instructions` describe the phase; LoTaR adds its own instructions to every job (see [Agents](agent.md#default-instructions)).
+### agent-team
+
+agent-team comes from the rules LoTaR itself is developed with, without what only that project needs. What it adds over agent-reviewed:
+
+- **An agent review instead of a person.** When `@implement` finishes, `@review` reads the branch in a fresh session, changes nothing and comments its findings. A blocking review tags the ticket `review-blocked`. Give `@review` another runner than `@implement` (`codex` while `@implement` runs `claude`, for example), so the review isn't the same model checking its own work. There is no Testing phase: the implementer tests, the reviewer reruns the quick checks, the merge runs the checks the repository names.
+- **Rework rounds.** A blocking review goes back to `@implement` as the next turn of its session, twice; the third asks the reporter.
+- **One retry.** A failed `@implement` job runs once more on `@implement-retry`, then asks the reporter. A failed merge goes back to `@implement` once. A failed review asks the reporter: the work is never merged unreviewed.
+- **Questions with options.** When the agents can't go on, the ticket goes to its reporter in `HelpNeeded` with a question (try again, review again, merge, close as WontDo, …). Answering it in the web UI or with `lotar comment <ID> --answer <key>` sends the ticket on; an answer in your own words reaches `@implement` like a comment.
+- **Comments reach the agent.** A comment by a person on a HelpNeeded ticket, or on an InProgress one that `@implement` (or `@implement-retry`) holds, goes to the running job as its next turn, else `@implement` starts with it ([`tell_agent`](automation.md#telling-the-tickets-agent)). A comment during the review or the merge stays on the ticket: those jobs keep their own role, the review reads the comments, and a blocking review hands them to the rework. A ticket a person works on stays with them. Agent jobs comment under their runner's name (`claude`, `codex`, …), and the rule skips those names and `automation`; a person whose name is a runner's is skipped too.
+- **Prerequisites.** An agent that finds the ticket waits for another one adds the `depends-on` relationship and the tag `waits`; the ticket goes `Blocked` instead of to review, and `@implement` continues it when its last prerequisite is done.
+- **Closing without a change.** A job with nothing to commit sets the ticket Done (or WontDo) itself, so no review or merge follows.
+- **Paused jobs.** A job stopped by a usage limit says so once and runs again by itself.
+
+Assigning `@implement` by hand starts it with the work prompt, `@review` with the review prompt and `@merge` with the merge prompt: a profile assigned by hand gets the prompt of the first rule that assigns it ([Agent run settings](automation.md#agent-run-settings)), so keep the failure rules above the review rules when you reorder them.
+
+### Runners and models
+
+Each profile runs `claude`; change `runner` to `codex`, `copilot` or `gemini`, and set `model` and `effort` per phase (see [Agents](agent.md#model-and-effort)). Profile `instructions` (agent-pipeline, agent-reviewed) or the rules' `agent.prompt` (agent-team) describe the phase; LoTaR adds its own instructions to every job (see [Agents](agent.md#default-instructions)).
 
 See [automation.md](automation.md) for the full automation rule syntax.
 

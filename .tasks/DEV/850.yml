@@ -1,11 +1,10 @@
 title: Design inline transcript review on the ticket timeline
-status: Merging
+status: Done
 priority: Medium
 type: Research
 reporter: codex
-assignee: '@merge'
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-26T23:46:21.425930+00:00
+modified: 2026-11-27T01:48:06.862173+00:00
 relationships:
   related:
   - DEV-849
@@ -189,6 +188,39 @@ comments:
 - date: 2026-11-26T23:46:15.625379+00:00
   author: claude
   text: 'Correction to my review: Ravi''s answer is comment #9, not #10.'
+- date: 2026-11-27T01:48:05.618999+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-850` is in `main`.
+
+    - Rebased `agent/DEV-850` onto `main` (`352c12d8573d`): `cb4e43f91bd2`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-850` onto `main` (`2e7016a01264`): `98517ade9655`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `98517ade9655`
+    - Amended the pending `.tasks` changes into the merged commit: `bcfe9af4de24`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: 2e7016a01
+      what: 'DEV-891 Finding bundles: no test covers a finding joining an InProgress bundle whose fix job takes the message'
+    - hash: bcfe9af4d
+      what: DEV-850 Design inline transcript review on the ticket timeline
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+- date: 2026-11-27T01:48:06.205517+00:00
+  author: claude
+  text: 'Merged; its question is answered already, so nothing waits for the owner: Done.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abf5db1d982f5df5d0bc94525b1965dcea999e48c7b62ac34c1fad3561879909c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82483b3bb8bf6439b4b2165e6bdc1b7f690066ddd97263d3a86f92d630fd7339
@@ -215,7 +247,6 @@ description: |-
 tags:
 - agent
 - ui
-- job-paused
 history:
 - at: 2026-11-24T20:22:36.316999+00:00
   actor: codex
@@ -448,3 +479,34 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T01:48:05.618999+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:48:05.894007+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+  - field: tags
+    old: agent, ui, job-paused
+    new: agent, ui
+- at: 2026-11-27T01:48:06.205517+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:48:06.265629+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-27T01:48:06.862173+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox

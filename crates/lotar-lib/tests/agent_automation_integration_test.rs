@@ -2906,6 +2906,183 @@ exit 0
         assert_eq!(phases, vec!["REV-1|implement", "REV-1|test", "REV-1|test", "REV-1|test", "REV-1|merge",]);
     }
 
+    /// DEV-796: agent-team runs implement, a blocking review, the rework, a
+    /// passing review and the merge without a person, and a ticket assigned
+    /// to @implement by hand gets the work prompt, the rework only the rework.
+    /// A person's comment during the review starts no further job.
+    #[cfg(unix)]
+    #[test]
+    fn shipped_agent_team_template_reworks_a_blocked_review_and_merges() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+        // A job queued for later (what tell_agent does for a command job) stays in the queue file.
+        let _queue = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+        let _no_worker = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+
+        let run_log = fixtures.get_temp_path().join("template-team-run.log");
+        let reviews = fixtures.get_temp_path().join("team-reviews.count");
+        let go = fixtures.get_temp_path().join("team-review.go");
+        let agent_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "template-team-agent.sh",
+            &format!(
+                r#"#!/bin/sh
+profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
+# The request is the line after "User request:"; earlier prompts are quoted above it.
+case "$(sed -n '/^User request:/{{n;p;q;}}' "$LOTAR_AGENT_PROMPT_FILE")" in
+  "Work ticket"*) prompt=work ;;
+  "The review of ticket"*) prompt=rework ;;
+  "Review the work"*) prompt=review ;;
+  "Merge the work"*) prompt=merge ;;
+  *) prompt=other ;;
+esac
+printf '%s|%s|%s\n' "$LOTAR_TICKET_ID" "$profile" "$prompt" >> "{log}"
+sid="${{profile}}-$$"
+printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+case "$profile" in
+  implement)
+    echo "$prompt" >> feature.txt && git add feature.txt && git commit -qm "$LOTAR_TICKET_ID $prompt" || exit 4 ;;
+  review)
+    n=$(cat "{count}" 2>/dev/null || echo 0)
+    n=$((n + 1))
+    echo "$n" > "{count}"
+    if [ "$n" = 1 ]; then
+      # The test comments as a person while this review runs.
+      while [ ! -f "{go}" ]; do sleep 0.1; done
+      "{lotar}" comment "$LOTAR_TICKET_ID" "Review: blocking, feature.txt lacks a test" >/dev/null || exit 3
+      "{lotar}" task edit "$LOTAR_TICKET_ID" --tag review-blocked >/dev/null || exit 3
+    fi ;;
+esac
+printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+exit 0
+"#,
+                log = run_log.to_string_lossy(),
+                count = reviews.to_string_lossy(),
+                go = go.to_string_lossy(),
+                lotar = crate::common::lotar_bin().display(),
+            ),
+        );
+
+        install_template_workflow(
+            &fixtures,
+            "TEAM",
+            "agent-team",
+            &[
+                ("implement", agent_script.as_path()),
+                ("implement-retry", agent_script.as_path()),
+                ("review", agent_script.as_path()),
+                ("merge", agent_script.as_path()),
+            ],
+        );
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Shipped team template".to_string(),
+                project: Some("TEAM".to_string()),
+                status: None,
+                reporter: Some("Agent Tests".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+            .expect("assign implementation agent");
+
+        // A person's comment during the review job stays on the ticket: it
+        // gives neither the review nor the merge the implementer's turn.
+        let reviewing = || {
+            AgentJobService::list_jobs().into_iter().any(|job| job.ticket_id == created.id && job.agent.as_deref() == Some("review") && job.status == "running")
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(JOB_END_LIMIT_MS);
+        while !reviewing() {
+            assert!(std::time::Instant::now() < deadline, "the review job should run");
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        {
+            let _author = crate::common::env_mutex::EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "alex");
+            TaskService::add_comment(&mut fixtures.create_storage(), &created.id, "Please also update the docs").expect("comment");
+        }
+        let queued = AgentQueueService::list_pending(&fixtures.tasks_root).expect("read the queue");
+        assert!(queued.is_empty(), "the comment queued no job: {:?}", queued.iter().map(|e| (&e.agent, &e.prompt)).collect::<Vec<_>>());
+        fs::write(&go, "").expect("let the review go on");
+
+        let jobs = wait_for_completed_jobs(&created.id, 5, JOB_END_LIMIT_MS);
+        assert_eq!(jobs.len(), 5, "expected implement, review, implement, review and merge jobs: {jobs:?}");
+        let done = wait_for_task_state(&storage, &created.id, "Done", None, JOB_END_LIMIT_MS).expect("task should be Done after the merge");
+        for tag in ["review-blocked", "review-returned", "review-returned-twice", "retried", "merge-retried"] {
+            assert!(!done.tags.iter().any(|t| t == tag), "tag {tag} should be cleared on Done: {:?}", done.tags);
+        }
+        assert!(done.comments.iter().any(|c| c.text.contains("Review: blocking")));
+        assert!(done.comments.iter().any(|c| c.author.as_deref() == Some("alex")), "{:?}", done.comments);
+        let all_jobs: Vec<_> = AgentJobService::list_jobs().into_iter().filter(|job| job.ticket_id == created.id).map(|job| (job.agent, job.status)).collect();
+        assert_eq!(all_jobs.len(), 5, "alex's comments started no job: {all_jobs:?}\n{:?}", done.comments.iter().map(|c| &c.text).collect::<Vec<_>>());
+
+        let run_output = fs::read_to_string(&run_log).expect("read team run log");
+        let phases: Vec<_> = run_output.lines().collect();
+        assert_eq!(phases, vec!["TEAM-1|implement|work", "TEAM-1|review|review", "TEAM-1|implement|rework", "TEAM-1|review|review", "TEAM-1|merge|merge"]);
+        // LoTaR fast-forwarded main to the branch after the merge job.
+        let feature = fs::read_to_string(fixtures.get_temp_path().join("feature.txt")).expect("the work reaches main");
+        assert_eq!(feature, "work\nrework\n");
+    }
+
+    /// DEV-796: in agent-team, a comment on a ticket a person works on leaves
+    /// it with them; on a ticket handed back to a person it reaches @implement.
+    #[cfg(unix)]
+    #[test]
+    fn shipped_agent_team_template_tells_implement_only_what_it_should_act_on() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+        let prompt_file = fixtures.get_temp_path().join("team-told.prompt");
+        let script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "team-told.sh",
+            &format!(
+                "#!/bin/sh\nprintf '%s|%s' \"$LOTAR_AGENT_PROFILE\" \"$LOTAR_AGENT_PROMPT\" > \"{}\"\necho '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+                prompt_file.display()
+            ),
+        );
+        install_template_workflow(
+            &fixtures,
+            "TOLD",
+            "agent-team",
+            &[("implement", script.as_path()), ("implement-retry", script.as_path()), ("review", script.as_path()), ("merge", script.as_path())],
+        );
+        let _author = crate::common::env_mutex::EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "alex");
+        let mut storage = fixtures.create_storage();
+        let mut create = |status: &str| {
+            let task =
+                TaskService::create(&mut storage, TaskCreate { title: format!("{status} with alex"), project: Some("TOLD".to_string()), ..Default::default() })
+                    .expect("create task");
+            let update = TaskUpdate { status: Some(status.to_string()), assignee: Some("alex".to_string()), ..Default::default() };
+            TaskService::update(&mut storage, &task.id, update).expect("hand to alex");
+            task.id
+        };
+        let working = create("InProgress");
+        let asked = create("HelpNeeded");
+        let mut storage = fixtures.create_storage();
+
+        TaskService::add_comment(&mut storage, &working, "I'm on it").expect("comment");
+        let task = TaskService::get(&storage, &working, None).expect("get task");
+        assert_eq!(task.assignee.as_deref(), Some("alex"), "a ticket alex works on stays with alex");
+        assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != working), "no agent starts on it");
+
+        TaskService::add_comment(&mut storage, &asked, "Use the second option").expect("comment");
+        let job = job_for_ticket(&asked);
+        assert!(wait_for_job_status(&job.id, "completed", JOB_END_LIMIT_MS), "the told job runs");
+        let told = fs::read_to_string(&prompt_file).expect("told prompt");
+        assert!(told.starts_with("implement|") && told.contains("alex commented on ticket"), "{told}");
+        assert!(told.contains("Use the second option"), "{told}");
+    }
+
     /// Backward compatibility: old YAML keys (job_start, complete, error, cancel) still work.
     #[cfg(unix)]
     #[test]

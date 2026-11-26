@@ -15,7 +15,7 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 - [x] Orchestrator modes — Server (in-memory), Standalone (file queue), Worker (background dequeuer)
 - [x] Git worktree isolation — Per-ticket worktrees with branch prefix, parallel limits, cleanup config
 - [x] Agent context — Per-ticket `.context` files for resume/continue
-- [x] Project templates — `agent-pipeline` and `agent-reviewed` (default to Claude; init merges their statuses, profiles and worktree settings into the config)
+- [x] Project templates — `agent-pipeline`, `agent-reviewed` and `agent-team` (default to Claude; init merges their statuses, profiles and worktree settings into the config)
 - [x] `command` runner — Arbitrary commands as agent jobs with full lifecycle
 - [x] Send message to running agents — Runner-specific stdin formatting
 - [x] Agent skill template — Built-in instructions for agents using lotar
@@ -226,7 +226,7 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 | MCP handlers | `crates/lotar-lib/src/mcp/server/handlers/agent.rs` |
 | UI page | `view/pages/AgentJobs.vue` |
 | UI types | `view/api/types.ts` |
-| Templates | `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-pipeline.yml`, `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-reviewed.yml` |
+| Templates | `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-pipeline.yml`, `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-reviewed.yml`, `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml` |
 | Integration tests | `crates/lotar-lib/tests/agent_automation_integration_test.rs`, `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-agent/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs` |
 | Smoke: CLI automation | `smoke/tests/cli.automation.smoke.spec.ts` |
 | Smoke: CLI agent commands | `smoke/tests/cli.agent-commands.smoke.spec.ts` |

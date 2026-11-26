@@ -276,7 +276,7 @@ fn render_scaffold_plan(tasks_root: &Path, prefix: Option<&str>, plan: &Scaffold
     match plan.agents {
         AgentsScaffold::None => {}
         AgentsScaffold::Example => renderer.emit_raw_stdout("  • Agents scaffold (commented): example profile appended to the config"),
-        AgentsScaffold::Pipeline | AgentsScaffold::Reviewed => {
+        AgentsScaffold::Pipeline | AgentsScaffold::Reviewed | AgentsScaffold::Team => {
             renderer.emit_raw_stdout("  • Agent template: statuses, agent profiles and worktree settings merged into the config")
         }
     }
@@ -336,6 +336,9 @@ fn resolve_template_alias(raw: &str) -> Result<(WorkflowPreset, ScaffoldPlan), S
         "agent-reviewed" => {
             Ok((WorkflowPreset::Default, ScaffoldPlan { automation: AutomationScaffold::Reviewed, agents: AgentsScaffold::Reviewed, sync_remotes: vec![] }))
         }
+        "agent-team" => {
+            Ok((WorkflowPreset::Default, ScaffoldPlan { automation: AutomationScaffold::Team, agents: AgentsScaffold::Team, sync_remotes: vec![] }))
+        }
         "jira" => Ok((
             WorkflowPreset::Default,
             ScaffoldPlan { automation: AutomationScaffold::None, agents: AgentsScaffold::None, sync_remotes: vec![SyncRemote::Jira] },
@@ -348,9 +351,10 @@ fn resolve_template_alias(raw: &str) -> Result<(WorkflowPreset, ScaffoldPlan), S
             WorkflowPreset::Default,
             ScaffoldPlan { automation: AutomationScaffold::None, agents: AgentsScaffold::None, sync_remotes: vec![SyncRemote::Jira, SyncRemote::GitHub] },
         )),
-        other => {
-            Err(format!("Unknown workflow/template '{}'. Supported: default, agile, kanban, agent-pipeline, agent-reviewed, jira, github, jira-github.", other))
-        }
+        other => Err(format!(
+            "Unknown workflow/template '{}'. Supported: default, agile, kanban, agent-pipeline, agent-reviewed, agent-team, jira, github, jira-github.",
+            other
+        )),
     }
 }
 

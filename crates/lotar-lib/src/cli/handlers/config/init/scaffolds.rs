@@ -25,6 +25,7 @@ pub enum AutomationScaffold {
     Example,
     Pipeline,
     Reviewed,
+    Team,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -34,6 +35,7 @@ pub enum AgentsScaffold {
     Example,
     Pipeline,
     Reviewed,
+    Team,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,8 +50,8 @@ impl ScaffoldPlan {
     }
 
     /// Parse comma-separated `--with=` tokens. Accepts:
-    /// `automation`, `automation:pipeline`, `automation:reviewed`,
-    /// `agents`, `agents:pipeline`, `agents:reviewed`,
+    /// `automation`, `automation:pipeline`, `automation:reviewed`, `automation:team`,
+    /// `agents`, `agents:pipeline`, `agents:reviewed`, `agents:team`,
     /// `sync:jira`, `sync:github`.
     pub fn parse(tokens: &[String]) -> Result<Self, String> {
         let mut plan = ScaffoldPlan::default();
@@ -62,9 +64,11 @@ impl ScaffoldPlan {
                 "automation" => plan.automation = AutomationScaffold::Example,
                 "automation:pipeline" => plan.automation = AutomationScaffold::Pipeline,
                 "automation:reviewed" => plan.automation = AutomationScaffold::Reviewed,
+                "automation:team" => plan.automation = AutomationScaffold::Team,
                 "agents" => plan.agents = AgentsScaffold::Example,
                 "agents:pipeline" => plan.agents = AgentsScaffold::Pipeline,
                 "agents:reviewed" => plan.agents = AgentsScaffold::Reviewed,
+                "agents:team" => plan.agents = AgentsScaffold::Team,
                 "sync:jira" => {
                     if !plan.sync_remotes.contains(&SyncRemote::Jira) {
                         plan.sync_remotes.push(SyncRemote::Jira);
@@ -77,7 +81,7 @@ impl ScaffoldPlan {
                 }
                 other => {
                     return Err(format!(
-                        "Unknown scaffold '{}'. Supported: automation[:pipeline|:reviewed], agents[:pipeline|:reviewed], sync:jira, sync:github.",
+                        "Unknown scaffold '{}'. Supported: automation[:pipeline|:reviewed|:team], agents[:pipeline|:reviewed|:team], sync:jira, sync:github.",
                         other
                     ));
                 }
@@ -162,11 +166,13 @@ automation:
         ),
         AutomationScaffold::Pipeline => Some(extract_section(AGENT_PIPELINE_TEMPLATE, "automation")),
         AutomationScaffold::Reviewed => Some(extract_section(AGENT_REVIEWED_TEMPLATE, "automation")),
+        AutomationScaffold::Team => Some(extract_section(AGENT_TEAM_TEMPLATE, "automation")),
     }
 }
 
 const AGENT_PIPELINE_TEMPLATE: &str = include_str!("templates/agent-pipeline.yml");
 const AGENT_REVIEWED_TEMPLATE: &str = include_str!("templates/agent-reviewed.yml");
+const AGENT_TEAM_TEMPLATE: &str = include_str!("templates/agent-team.yml");
 
 /// The `config:` block of the agent template behind a scaffold, as YAML.
 /// Its statuses, agent profiles and worktree settings are what the
@@ -176,6 +182,7 @@ pub fn agent_template_config(scaffold: &AgentsScaffold) -> Option<String> {
     let template = match scaffold {
         AgentsScaffold::Pipeline => AGENT_PIPELINE_TEMPLATE,
         AgentsScaffold::Reviewed => AGENT_REVIEWED_TEMPLATE,
+        AgentsScaffold::Team => AGENT_TEAM_TEMPLATE,
         AgentsScaffold::None | AgentsScaffold::Example => return None,
     };
     let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(template).ok()?;

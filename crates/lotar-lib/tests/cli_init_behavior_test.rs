@@ -296,6 +296,53 @@ fn agent_templates_produce_a_project_their_automation_can_drive() {
     }
 }
 
+/// DEV-796: agent-team validates, and every status and agent its rules,
+/// questions and messages name exists in the config it writes.
+#[test]
+fn agent_team_template_validates_and_names_only_its_own_statuses_and_agents() {
+    common::reset_lotar_test_environment();
+    let tmp = TempDir::new().unwrap();
+    run_ok(&["init", "--yes", "--project=TEAM", "--template=agent-team"], tmp.path());
+    let validated = run_ok(&["config", "validate", "--project=TEAM"], tmp.path());
+    assert!(validated.contains("Automation (TEAM) rules are valid"), "{validated}");
+
+    let project_dir = tmp.path().join(".tasks/TEAM");
+    let shown: serde_json::Value =
+        serde_json::from_str(&run_ok(&["--format", "json", "config", "show", "--project=TEAM"], tmp.path())).expect("config show json");
+    assert_eq!(shown["config"]["issue_done_states"], serde_json::json!(["Done", "WontDo"]));
+    let config = yaml(&project_dir.join("config.yml"));
+    assert_eq!(config["agent"]["worktree"]["enabled"].as_bool(), Some(true));
+    let states: Vec<&str> = config["issue"]["states"].as_sequence().expect("states").iter().filter_map(|v| v.as_str()).collect();
+    let agents: Vec<&str> = config["agents"].as_mapping().expect("agents").keys().filter_map(|k| k.as_str()).collect();
+
+    let text = read(&project_dir.join("automation.yml"));
+    let automation: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text).expect("automation yaml");
+    let mut sets = Vec::new();
+    let mut told = Vec::new();
+    for rule in automation["automation"]["rules"].as_sequence().expect("rules") {
+        for (_, action) in rule["on"].as_mapping().expect("on") {
+            sets.push(&action["set"]);
+            for option in action["comment"]["question"]["options"].as_sequence().into_iter().flatten() {
+                sets.push(&option["set"]);
+            }
+            if let Some(agent) = action["tell_agent"]["agent"].as_str() {
+                told.push(agent);
+            }
+        }
+    }
+    for set in sets {
+        if let Some(status) = set["status"].as_str() {
+            assert!(states.contains(&status), "unknown status {status}: {states:?}");
+        }
+        if let Some(name) = set["assignee"].as_str().and_then(|a| a.strip_prefix('@')).filter(|name| *name != "reporter") {
+            assert!(agents.contains(&name), "unknown agent @{name}: {agents:?}");
+        }
+    }
+    for agent in told {
+        assert!(agents.contains(&agent), "tell_agent names unknown agent {agent}");
+    }
+}
+
 #[test]
 fn rerun_without_force_errors() {
     common::reset_lotar_test_environment();

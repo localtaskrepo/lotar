@@ -40,6 +40,7 @@ impl CommandHandler for ConfigHandler {
                 renderer.emit_success("Legacy template aliases (produce preset + scaffolds):");
                 renderer.emit_raw_stdout("  • agent-pipeline - agent statuses, profiles and worktrees + --with=agents:pipeline,automation:pipeline");
                 renderer.emit_raw_stdout("  • agent-reviewed - agent statuses, profiles and worktrees + --with=agents:reviewed,automation:reviewed");
+                renderer.emit_raw_stdout("  • agent-team     - agent statuses, profiles and worktrees + --with=agents:team,automation:team");
                 renderer.emit_raw_stdout("  • jira           - default workflow + --with=sync:jira");
                 renderer.emit_raw_stdout("  • github         - default workflow + --with=sync:github");
                 renderer.emit_raw_stdout("  • jira-github    - default workflow + --with=sync:jira,sync:github");
