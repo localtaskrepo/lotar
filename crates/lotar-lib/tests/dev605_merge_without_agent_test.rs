@@ -271,6 +271,52 @@ fn a_fix_job_on_a_merging_ticket_runs_its_agent() {
     assert_eq!(status, "completed");
 }
 
+/// DEV-896: DEV-832's fix job, on a ticket a failed merge left in `Merging`,
+/// ran as a merge job and landed the branch, and the fix's end rule then sent
+/// work already on main to review. Now the fix job leaves the branch for the
+/// merge, and the merge job that lands it ends the ticket Done, also when it
+/// runs while the ticket is in another status.
+#[test]
+fn only_the_merge_job_lands_a_merging_tickets_branch_and_ends_it_done() {
+    // No checks: they would wait for the machine's check lock.
+    let repo = Repo::new("  merge:\n    checks: []\n");
+    let config_path = repo.fixtures.tasks_root.join("config.yml");
+    let config = fs::read_to_string(&config_path).expect("read config").replace("[Todo, Merging, Done]", "[Todo, InProgress, Reviewing, Merging, Done]");
+    fs::write(&config_path, config).expect("write config");
+    fs::write(
+        repo.fixtures.tasks_root.join("automation.yml"),
+        "automation:\n  rules:\n    - name: fix lifecycle\n      when: { assignee: '@fix' }\n      on:\n        job_started: { set: { status: InProgress } }\n        job_completed: { set: { status: Reviewing } }\n    - name: merge lifecycle\n      when: { assignee: '@merge' }\n      on:\n        job_completed: { set: { status: Done } }\n",
+    )
+    .expect("write rules");
+    let assign = |assignee: &str, status: Option<&str>| {
+        let update = TaskUpdate { status: status.map(str::to_string), assignee: Some(assignee.to_string()), ..Default::default() };
+        TaskService::update_with_context(
+            &mut repo.fixtures.create_storage(),
+            TICKET,
+            update,
+            lotar::services::task_service::TaskUpdateContext::automation_disabled(),
+        )
+        .expect("assign");
+    };
+    let ticket = || TaskService::get(&repo.fixtures.create_storage(), TICKET, None).expect("ticket");
+    repo.commit_fix("feature.txt", "feature\n");
+
+    assign("@fix", Some("Merging"));
+    let (_, status, prompt) = repo.job_of("fix");
+
+    assert_eq!(status, "completed");
+    assert!(prompt.is_some(), "the fix agent ran");
+    assert!(!repo.on_main("feature.txt"), "the fix job left the branch for the merge");
+    assert_eq!(ticket().status.as_str(), "Reviewing");
+
+    assign("@merge", None);
+    let (status, _) = repo.merge();
+
+    assert_eq!(status, "completed");
+    assert!(repo.on_main("feature.txt"));
+    assert_eq!(ticket().status.as_str(), "Done", "the merge's end rule moved it on from Reviewing");
+}
+
 /// DEV-685: the same ticket, merged by an agent that exits 1. Its empty
 /// branch is on main already, but that doesn't complete the job.
 #[test]

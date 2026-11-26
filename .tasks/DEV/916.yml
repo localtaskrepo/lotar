@@ -1,15 +1,28 @@
 title: Test stub template-team-agent.sh waits for its go file with no bound (DEV-796 branch)
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T00:07:42.828735+00:00
-modified: 2026-11-27T00:07:44.811717+00:00
+modified: 2026-11-27T02:56:05.598977+00:00
 relationships:
+  depends_on:
+  - DEV-861
   related:
   - DEV-796
   - DEV-861
+comments:
+- date: 2026-11-27T02:55:57.150615+00:00
+  author: claude
+  text: |-
+    Waits for DEV-861: its helper isn't on main yet.
+
+    - DEV-796 is on main: the unbounded loop is at `crates/lotar-lib/tests/agent_automation_integration_test.rs:2954` (`while [ ! -f "{go}" ]; do sleep 0.1; done`)
+    - `git grep -n 'fn while_this_test_runs' crates/lotar-lib/tests` on main: no match. DEV-861 is still Merging
+    - Added depends-on DEV-861 and tag `waits`. Next: once DEV-861 lands, add `&& {alive}` with `crate::common::while_this_test_runs()` there, then re-run the `while [ ! -f` grep (DEV-861 may cover the other unbounded loops it lists, e.g. in `agent_safety_test.rs`, `dev320`, `dev592`, `dev630`, `dev646`, `dev660`)
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A367ce76bdd74d6b2c9958f1b72bf14db3c8b03cfb9dbb9380e87009f17bca911
 description: |-
   Found 2026-11-26 in the DEV-861 review: the DEV-796 branch adds `while [ ! -f "{go}" ]; do sleep 0.1; done` in the stub script `template-team-agent.sh` (`crates/lotar-lib/tests/agent_automation_integration_test.rs`, about line 2966 on that branch). Two of these scripts from test runs started at 12:37 and 12:38 were still running at 16:07 (ppid 1), under `$TMPDIR/.lotar-test-scratch/`.
 
@@ -19,6 +32,8 @@ description: |-
 
   - [ ] The loop is `while [ ! -f "{go}" ] && {alive}; do ...` with `crate::common::while_this_test_runs()`, once both DEV-796 and DEV-861 are on main.
   - [ ] A `git grep` for `while [ ! -f` in `crates/lotar-lib/tests` shows no unbounded loop without the helper.
+tags:
+- waits
 history:
 - at: 2026-11-27T00:07:44.234959+00:00
   actor: claude
@@ -31,3 +46,36 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T02:55:40.290359+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T02:55:41.101528+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A367ce76bdd74d6b2c9958f1b72bf14db3c8b03cfb9dbb9380e87009f17bca911
+- at: 2026-11-27T02:55:56.262093+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-796","DEV-861"]}'
+    new: '{"depends_on":["DEV-861"],"related":["DEV-796","DEV-861"]}'
+- at: 2026-11-27T02:55:57.013607+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-27T02:55:57.150615+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T02:56:05.598977+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

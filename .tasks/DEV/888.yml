@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T01:18:52.353749+00:00
-modified: 2026-11-27T02:30:27.605840+00:00
+modified: 2026-11-27T02:55:03.737652+00:00
 relationships:
   related:
   - DEV-875
@@ -16,6 +16,7 @@ relationships:
   - DEV-796
   - DEV-893
   - DEV-894
+  - DEV-782
 comments:
 - date: 2026-11-26T06:15:21.322835+00:00
   author: claude
@@ -391,3 +392,9 @@ history:
   - field: tags
     old: health, ui, review-returned, job-paused
     new: health, ui
+- at: 2026-11-27T02:55:03.737652+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913","DEV-796","DEV-893","DEV-894"]}'
+    new: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913","DEV-796","DEV-893","DEV-894","DEV-782"]}'

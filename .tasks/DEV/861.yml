@@ -5,8 +5,10 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-27T00:09:14.417581+00:00
+modified: 2026-11-27T02:56:10.669508+00:00
 relationships:
+  blocks:
+  - DEV-916
   related:
   - DEV-767
   - DEV-897
@@ -103,6 +105,12 @@ comments:
     - **Merge note:** `crates/lotar-lib/tests/integration.rs` conflicts with `main`. Only the `mod` list differs: keep both sides, and keep `mod dev861_...` after `mod dev860_...`.
     - **Reran:** `npm ci` passed. `cargo nextest run --workspace -E 'binary(integration) & package(lotar-lib) & test(/dev861|dev320|dev361|dev370|dev592|dev630|dev646|dev660|agent_safety/)'`: 65 of 65 passed. `rustfmt --edition 2024 --check` on the changed files passed. After the run, `ps` showed no loops or workers left from it.
     - **Filed [DEV-916](https://lotar.pyxzl.net/task/DEV-916) (minor):** the DEV-796 branch, now in Merging, adds a new unbounded `while [ ! -f "{go}" ]` loop to the stub `template-team-agent.sh`. Two of these from test runs at 12:37 were still running at 16:07 (ppid 1). I left them running because they aren't from my run. Whichever of the two tickets lands second has to add the helper there.
+- date: 2026-11-27T02:56:10.669508+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-861` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-861` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
@@ -295,3 +303,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-767","DEV-897","DEV-916","DEV-796"]}'
     new: '{"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579"]}'
+- at: 2026-11-27T02:55:56.261404+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579"]}'
+    new: '{"blocks":["DEV-916"],"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579"]}'
+- at: 2026-11-27T02:56:10.669508+00:00
+  actor: automation
+  changes:
+  - field: comment_added

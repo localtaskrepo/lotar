@@ -1,11 +1,11 @@
 title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-27T01:36:37.317455+00:00
+modified: 2026-11-27T02:55:10.906746+00:00
 relationships:
   depends_on:
   - DEV-765
@@ -24,6 +24,8 @@ relationships:
   - DEV-909
   - DEV-789
   - DEV-853
+  - DEV-888
+  - DEV-893
 comments:
 - date: 2026-11-22T06:37:21.509101+00:00
   author: claude
@@ -412,6 +414,31 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-782` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `view/__tests__/AgentActivityIndicator.spec.ts`; lotar aborted the rebase, `agent/DEV-782` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-27T02:55:03.407679+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `5ae578620` is on `main` and `origin/main`.
+
+    - Rebase conflicts in `agent_job_service.rs` (DEV-853's test module) and `AgentActivityIndicator.spec.ts` (DEV-789's case): both sides only added code, kept both
+    - Main moved twice during the checks (DEV-893, DEV-888, DEV-778); rebased cleanly each time and reran all checks on the final `ceaced54a`
+    - `npm ci`, `lint:agent`, `test:agent`, `smoke` all passed on the final commit
+    - Pending `.tasks` changes in the main checkout amended into the merge commit, as the owner asked (2026-11-12)
+    - No rules or config changed, so `lotar trust` was not needed
+  report:
+    commits:
+    - hash: 5ae578620
+      what: logged job reports the question its last event asks; pill shows Asks after a reload
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2632 nextest + 1631 vitest
+    - command: npm run -s smoke
+      result: passed
+      reason: 414 tests
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A213f6f4501a6f08135284814b3c429c20077b295d8c5df00ce09be201fb88dad
@@ -470,7 +497,6 @@ description: |-
 tags:
 - ui
 - agent
-- job-paused
 history:
 - at: 2026-11-22T02:36:08.788363+00:00
   actor: claude
@@ -1060,3 +1086,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T02:55:03.407679+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T02:55:03.736296+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909","DEV-789","DEV-853"]}'
+    new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909","DEV-789","DEV-853","DEV-888","DEV-893"]}'
+- at: 2026-11-27T02:55:10.906746+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: ui, agent, job-paused
+    new: ui, agent
