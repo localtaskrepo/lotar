@@ -33,6 +33,7 @@ mod resumed;
 mod run_inputs;
 mod t3_state;
 mod tools;
+mod transcript;
 mod watch;
 
 pub use follow::LogFollower;
@@ -1032,6 +1033,7 @@ fn saved_events(saved: &crate::services::agent_log_service::SavedJob) -> Vec<Age
             message: entry.message.clone(),
             tool: entry.tool.clone(),
             plan: entry.plan.clone(),
+            transcript: entry.transcript.clone(),
         })
         .collect()
 }
@@ -5071,6 +5073,7 @@ fn drive_session(
 ) -> RunEnd {
     let status = block_on(session.status()).map_err(|err| err.to_string());
     let agent = status.as_ref().map(|status| status.agent.clone()).unwrap_or_default();
+    let agent_session = status.as_ref().ok().and_then(|status| status.agent_session.clone());
     let (mut events, earlier) = SessionEvents::open(status.map(|status| status.events), || session.events());
     // A resumed session starts before the job listens: its start is only in the log.
     let link = last_session_link(&earlier);
@@ -5081,6 +5084,7 @@ fn drive_session(
         Ok(turn) => turn,
         Err(err) => return RunEnd::Failed(format!("Could not send the prompt to the session {}: {err}", session.name())),
     };
+    record_transcript(job_id, &transcript_ref(session.name(), &agent, agent_session.as_deref(), first, link));
     let usage_source = crate::services::provider_usage::Source::of(profile);
     let settings = TurnSettings {
         first,
@@ -5088,6 +5092,7 @@ fn drive_session(
         budget: profile.max_budget_usd,
         stall_timeout_seconds: profile.stall_timeout_seconds,
         agent: &agent,
+        agent_session: agent_session.as_deref(),
         link,
         usage_source: &usage_source,
         asks_result: matches!(profile.runner.parse(), Ok(AgentRunnerKind::T3)),
@@ -5104,8 +5109,9 @@ struct TurnSettings<'a> {
     budget: Option<f64>,
     /// The profile's `stall_timeout_seconds`.
     stall_timeout_seconds: Option<u64>,
-    /// The session's agent and link when the job started.
+    /// The session's agent, the agent's own session and the link when the job started.
     agent: &'a str,
+    agent_session: Option<&'a str>,
     link: Option<&'a str>,
     /// Whom the agent's usage-limit readings are for (DEV-862).
     usage_source: &'a crate::services::provider_usage::Source,
@@ -5146,7 +5152,7 @@ fn drive_turns(
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
     use harnessmux::EventBody;
-    let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, link, usage_source, asks_result } = settings;
+    let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, agent_session, link, usage_source, asks_result } = settings;
     // The turn's final reply and the summary its result holds (DEV-877).
     let mut final_reply: Option<String> = None;
     let mut summary: Option<String> = None;
@@ -5196,6 +5202,7 @@ fn drive_turns(
     let ticket_id = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.record.ticket_id.clone())).unwrap_or_default();
     let ticket_id = ticket_id.as_str();
     let mut agent_name = agent.to_string();
+    let mut agent_session = agent_session.map(str::to_string);
     let mut link = link.map(str::to_string);
     if let Some(link) = link.as_deref() {
         link_session(job_id, tasks_dir, ticket_id, link);
@@ -5248,9 +5255,12 @@ fn drive_turns(
         }
         let at = event.ts.clone();
         match event.body {
-            EventBody::SessionStarted { agent, how, agent_session, link: session_link, .. } => {
+            EventBody::SessionStarted { agent, how, agent_session: started_session, link: session_link, .. } => {
                 meter.total = 0.0;
-                let id = agent_session.map(|id| format!(", {id}")).unwrap_or_default();
+                let id = started_session.as_deref().map(|id| format!(", {id}")).unwrap_or_default();
+                if started_session.is_some() {
+                    agent_session = started_session;
+                }
                 let at = session_link.as_deref().map(|link| format!(": {link}")).unwrap_or_default();
                 update_job(job_id, |state| {
                     record_and_emit(state, "agent_job_init", Some(format!("{agent} session {how}{id}{at}")));
@@ -5266,6 +5276,9 @@ fn drive_turns(
                 update_job(job_id, |state| {
                     record_and_emit(state, "agent_job_input", Some(prompt.clone()));
                 });
+                if let Some(turn) = event.turn {
+                    record_transcript(job_id, &transcript_ref(session.name(), &agent_name, agent_session.as_deref(), turn, link.as_deref()));
+                }
             }
             EventBody::MessageDelta { text } => {
                 if let Some(part) = reply.push(&text) {
@@ -6919,6 +6932,7 @@ fn push_entry(state: &mut AgentJobState, event: AgentJobEvent) -> AgentJobEvent 
                 sequence: Some(event.sequence),
                 tool: event.tool.clone(),
                 plan: event.plan.clone(),
+                transcript: event.transcript.clone(),
             },
         });
     }
@@ -6960,6 +6974,7 @@ fn job_event_payload(job: &AgentJob, event: &AgentJobEvent) -> serde_json::Value
         "message": event.message,
         "tool": event.tool,
         "plan": event.plan,
+        "transcript": event.transcript,
         "worktree_path": job.worktree_path,
         "worktree_branch": job.worktree_branch,
         "model": job.model,
@@ -7009,6 +7024,31 @@ fn record_tool(state: &mut AgentJobState, tool: crate::api_types::AgentJobTool) 
     let event = push_entry(state, AgentJobEvent { kind: "agent_job_tool".to_string(), message, tool: Some(tool), ..AgentJobEvent::default() });
     emit_job_event(&event, &state.record);
     event
+}
+
+/// The reference to a turn the job sent to its harnessmux session (DEV-909).
+fn transcript_ref(session: &str, agent: &str, agent_session: Option<&str>, turn: u64, link: Option<&str>) -> crate::api_types::AgentJobTranscriptRef {
+    crate::api_types::AgentJobTranscriptRef {
+        source: "harnessmux".to_string(),
+        session: session.to_string(),
+        agent: agent.to_string(),
+        agent_session: agent_session.map(str::to_string),
+        turn,
+        format: transcript::REFERENCE_FORMAT,
+        link: link.map(str::to_string),
+    }
+}
+
+/// Record where a turn's conversation is (DEV-909): an `agent_job_transcript` entry in the job's log.
+fn record_transcript(job_id: &str, transcript: &crate::api_types::AgentJobTranscriptRef) {
+    update_job(job_id, |state| {
+        let message = Some(format!("Turn {} of the harnessmux session {}.", transcript.turn, transcript.session));
+        let event = push_entry(
+            state,
+            AgentJobEvent { kind: "agent_job_transcript".to_string(), message, transcript: Some(transcript.clone()), ..AgentJobEvent::default() },
+        );
+        emit_job_event(&event, &state.record);
+    });
 }
 
 /// Record the agent's plan and stream it (DEV-774).
@@ -8786,6 +8826,7 @@ mod dev520_session_events_tests {
             budget: None,
             stall_timeout_seconds: None,
             agent: "fake",
+            agent_session: None,
             link: None,
             usage_source: &usage_source,
             asks_result: false,
@@ -8938,6 +8979,7 @@ mod dev520_session_events_tests {
             budget: None,
             stall_timeout_seconds: None,
             agent: "fake",
+            agent_session: None,
             link: None,
             usage_source: &usage_source,
             asks_result: false,
@@ -9000,6 +9042,7 @@ mod dev520_session_events_tests {
             budget: Some(5.0),
             stall_timeout_seconds: None,
             agent: "fake",
+            agent_session: None,
             link: None,
             usage_source: &usage_source,
             asks_result: false,
@@ -9037,6 +9080,7 @@ mod dev520_session_events_tests {
             budget: None,
             stall_timeout_seconds: None,
             agent: "t3",
+            agent_session: None,
             link: None,
             usage_source: &usage_source,
             asks_result: true,

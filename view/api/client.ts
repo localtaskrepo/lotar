@@ -13,6 +13,7 @@ import type {
     AgentJobListResponse,
     AgentJobInputsResponse,
     AgentJobT3ThreadResponse,
+    AgentJobTranscriptResponse,
     AgentQueueMoveRequest,
     AgentQueueMoveResponse,
     AgentJobLogsResponse,
@@ -522,6 +523,10 @@ export const api = {
     /** DEV-849: a t3 job's T3 Code thread and its state now. */
     getAgentJobT3Thread(id: string): Promise<AgentJobT3ThreadResponse> {
         return get('/api/jobs/t3-thread', { id })
+    },
+    /** A job's conversation from its harnessmux event log, the entries after harnessmux `seq` `after` (DEV-909). */
+    getAgentJobTranscript(id: string, after?: number, limit?: number): Promise<AgentJobTranscriptResponse> {
+        return get('/api/jobs/transcript', { id, after, limit })
     },
     sendAgentJobMessage(payload: AgentJobMessageRequest): Promise<AgentJobMessageResponse> {
         return post('/api/jobs/message', payload)

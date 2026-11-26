@@ -141,6 +141,7 @@ impl Followed {
                     message: entry.message,
                     tool: entry.tool,
                     plan: entry.plan,
+                    transcript: entry.transcript,
                 })
             }
         }

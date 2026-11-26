@@ -30,6 +30,9 @@ pub struct JobLogEntry {
     /// The plan of an `agent_job_plan` entry (DEV-774).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub plan: Option<Vec<crate::api_types::AgentJobPlanEntry>>,
+    /// The turn of an `agent_job_transcript` entry (DEV-909).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub transcript: Option<crate::api_types::AgentJobTranscriptRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -507,7 +510,15 @@ mod tests {
     use tempfile::tempdir;
 
     fn entry(kind: &str, at: &str, message: Option<&str>) -> JobLogEntry {
-        JobLogEntry { kind: kind.to_string(), at: at.to_string(), message: message.map(str::to_string), sequence: None, tool: None, plan: None }
+        JobLogEntry {
+            kind: kind.to_string(),
+            at: at.to_string(),
+            message: message.map(str::to_string),
+            sequence: None,
+            tool: None,
+            plan: None,
+            transcript: None,
+        }
     }
 
     #[test]

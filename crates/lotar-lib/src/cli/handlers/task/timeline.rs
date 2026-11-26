@@ -122,6 +122,7 @@ mod tests {
             message: Some("Looking".into()),
             tool: None,
             plan: None,
+            transcript: None,
         }];
         let timeline = TaskTimeline {
             task_id: "T-1".into(),

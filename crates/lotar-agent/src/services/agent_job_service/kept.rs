@@ -249,6 +249,14 @@ fn note(tasks_dir: &Path, thread: &Thread, message: String) {
         .ok()
         .flatten()
         .map(|saved| super::saved_events(&saved).iter().map(|event| event.sequence).max().unwrap_or(0) + 1);
-    let entry = JobLogEntry { kind: "agent_job_progress".to_string(), at: time::now_rfc3339(), message: Some(message), sequence, tool: None, plan: None };
+    let entry = JobLogEntry {
+        kind: "agent_job_progress".to_string(),
+        at: time::now_rfc3339(),
+        message: Some(message),
+        sequence,
+        tool: None,
+        plan: None,
+        transcript: None,
+    };
     let _ = AgentLogService::append_event(&root, Some(logs_dir), job_id, entry);
 }

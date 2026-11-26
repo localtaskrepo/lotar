@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-27T09:11:28.118291+00:00
+modified: 2026-11-27T09:23:51.356164+00:00
 relationships:
   blocks:
   - DEV-923
@@ -20,6 +20,8 @@ relationships:
   - DEV-887
   - DEV-905
   - DEV-923
+  - DEV-909
+  - DEV-913
 comments:
 - date: 2026-11-24T19:18:18.982167+00:00
   author: automation
@@ -202,6 +204,34 @@ comments:
       - `npm run lint`
     - **Not run:** `npm test` and `npm run smoke`; the merge runs them. No UI changed.
     - **Minor, filed:** [DEV-923](https://lotar.pyxzl.net/task/DEV-923). No test covers an entry whose ticket is deleted and not re-created; only the ID-reuse case is tested.
+- date: 2026-11-27T09:23:51.061812+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the main checkout has uncommitted changes, so lotar didn't push:
+    ```
+    M .tasks/DEV/843.yml
+     M .tasks/DEV/909.yml
+    ```.
+
+    - Rebased `agent/DEV-843` onto `main` (`8efc6c8aa599`): `ac4b7ffceb82`
+    - Waited 6 min for the machine's check lock, held by lotar's merge checks of DEV-913 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-913 (pid 61697), since 09:01 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `ac4b7ffceb82`
+    - Amended the pending `.tasks` changes into the merged commit: `03663babd491`
+  report:
+    commits:
+    - hash: ac4b7ffce
+      what: DEV-843 A job queued for a hard-deleted ticket runs on the new ticket that reuses its ID, with the deleted ticket's title in its prompt
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
@@ -526,3 +556,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923"]}'
     new: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923"]}'
+- at: 2026-11-27T09:23:50.830031+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923"]}'
+    new: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923","DEV-909"]}'
+- at: 2026-11-27T09:23:51.061812+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:23:51.356164+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923","DEV-909"]}'
+    new: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923","DEV-909","DEV-913"]}'

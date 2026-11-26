@@ -2016,6 +2016,56 @@ export interface AgentJobLogEntry {
     tool?: AgentJobTool | null
     /** The whole plan of an `agent_job_plan` entry; empty when the agent cleared it. */
     plan?: AgentJobPlanEntry[] | null
+    /** The turn of an `agent_job_transcript` entry (DEV-909). */
+    transcript?: AgentJobTranscriptRef | null
+}
+
+/** The turn a job sent to its harnessmux session, on an `agent_job_transcript` log entry (DEV-909). */
+export interface AgentJobTranscriptRef {
+    /** `harnessmux`. */
+    source: string
+    /** The harnessmux session name. */
+    session: string
+    /** The harnessmux agent the session runs. */
+    agent: string
+    /** The agent's own session id (ACP session id, T3 Code thread id). */
+    agent_session?: string
+    /** The turn number harnessmux gave the job's prompt. */
+    turn: number
+    /** The reference's format: 1. */
+    format: number
+    /** A T3 Code thread's link. */
+    link?: string
+}
+
+/** `GET /api/jobs/transcript` (DEV-909). */
+export interface AgentJobTranscriptResponse {
+    transcript: AgentJobTranscript
+}
+
+/** The conversation of a job's turns, read from its harnessmux event log, a page at a time (DEV-909). */
+export interface AgentJobTranscript {
+    /** `expired`: the session's event log is gone; `unsupported`: no session named, another format, or no turn in the job. */
+    state: 'ok' | 'expired' | 'unsupported'
+    /** `reference`: the job log names the turns; `time_window`: an older log, the turns that started while the job ran. */
+    source?: 'reference' | 'time_window'
+    /** The harnessmux session name. */
+    session?: string
+    agent?: string
+    /** The job's turns in the session. */
+    turns?: number[]
+    /** The session's turn count. */
+    session_turns?: number
+    /** The T3 Code thread's link of a t3 job. */
+    link?: string
+    /** Whether the turns hold tool calls: a t3 session written by harnessmux 0.2.0 has none. */
+    tool_events: boolean
+    /** The page, shaped like job log entries; `sequence` is the harnessmux `seq`. */
+    events: AgentJobLogEntry[]
+    /** The `after` for the next page; none on the last page. */
+    next_after?: number
+    /** Why the state isn't `ok`. */
+    reason?: string
 }
 
 /** Everything that happened on a task, oldest first (DEV-518). */

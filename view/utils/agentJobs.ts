@@ -101,6 +101,8 @@ export function describeLogEntry(entry: AgentJobLogEntry): LogEntryView {
             return { label: 'Stopped', text: text || 'Job cancelled', tone: 'danger', mono: false }
         case 'agent_job_paused':
             return { label: 'Paused', text: text || 'Job paused', tone: 'warning', mono: false }
+        case 'agent_job_transcript':
+            return { label: 'Session', text, tone: 'note', mono: false }
         case 'agent_job_raw':
             return { label: 'Output', text, tone: 'neutral', mono: true }
         case 'agent_job_progress':

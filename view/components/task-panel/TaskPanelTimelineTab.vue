@@ -120,6 +120,7 @@
                   v-model:open="instructionsOpen[item.entry.job.id]"
                   :job-id="item.entry.job.id"
                 />
+                <AgentJobTranscript v-if="item.entry.job.runner !== 'command'" :job-id="item.entry.job.id" />
               </div>
             </div>
           </li>
@@ -139,6 +140,7 @@ import type {
   AgentJob,
   AgentJobLogEntry,
   AgentJobPlanEntry,
+  AgentJobTranscriptRef,
   AgentJobTool,
   TaskHistoryChange,
   TaskTimelineEntry,
@@ -148,6 +150,7 @@ import { useSse } from '../../composables/useSse'
 import { formatCost, jobDuration, runSettings, usageDetail } from '../../utils/agentJobs'
 import AgentJobLog from '../AgentJobLog.vue'
 import AgentRunInputs from '../AgentRunInputs.vue'
+import AgentJobTranscript from '../AgentJobTranscript.vue'
 import MarkdownContent from '../MarkdownContent.vue'
 import ReloadButton from '../ReloadButton.vue'
 import UiLoader from '../UiLoader.vue'
@@ -342,6 +345,7 @@ const JOB_EVENTS = [
   'agent_job_failed',
   'agent_job_cancelled',
   'agent_job_paused',
+  'agent_job_transcript',
 ]
 const JOB_ENDS = new Set([
   'agent_job_started',
@@ -370,6 +374,7 @@ onMounted(() => {
         message?: string | null
         tool?: AgentJobTool | null
         plan?: AgentJobPlanEntry[] | null
+        transcript?: AgentJobTranscriptRef | null
       }
       try {
         payload = JSON.parse(String(ev.data || '{}'))
@@ -386,6 +391,7 @@ onMounted(() => {
             message: payload.message ?? null,
             tool: payload.tool ?? null,
             plan: payload.plan ?? null,
+            transcript: payload.transcript ?? null,
           },
         ])
       }

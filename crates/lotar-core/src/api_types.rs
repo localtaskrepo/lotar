@@ -877,6 +877,70 @@ pub struct AgentJobEvent {
     /// The whole plan of an `agent_job_plan` entry; empty when the agent cleared it.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub plan: Option<Vec<AgentJobPlanEntry>>,
+    /// Where an `agent_job_transcript` entry's turn is recorded (DEV-909).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub transcript: Option<AgentJobTranscriptRef>,
+}
+
+/// The turn a job sent to its harnessmux session, on an `agent_job_transcript` log entry (DEV-909): the
+/// conversation of that turn is in `<harnessmux state>/sessions/<session>.events.jsonl`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobTranscriptRef {
+    /// `harnessmux`.
+    pub source: String,
+    /// The harnessmux session name.
+    pub session: String,
+    /// The harnessmux agent the session runs.
+    pub agent: String,
+    /// The agent's own session id (ACP session id, T3 Code thread id).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_session: Option<String>,
+    /// The turn number `Session::send` returned.
+    pub turn: u64,
+    /// The reference's format: 1.
+    pub format: u32,
+    /// Where a person opens the agent's session: a T3 Code thread's link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+}
+
+/// `GET /api/jobs/transcript` (DEV-909): the conversation of a job's turns, read from its harnessmux event log, a
+/// page at a time.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobTranscript {
+    /// `ok`; `expired` when the session's event log is gone; `unsupported` when the job names no session, the log
+    /// has another format version, or no turn of it falls in the job.
+    pub state: String,
+    /// `reference` (the job log names the turns) or `time_window` (an older job log: the turns that started while
+    /// the job ran).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// The harnessmux session name, for `harnessmux attach <session> --from-start`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// The job's turns in the session.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub turns: Vec<u64>,
+    /// The session's turn count.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_turns: Option<u64>,
+    /// The T3 Code thread's link of a t3 job.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+    /// Whether the job's turns hold tool calls: a t3 session written by harnessmux 0.2.0 has none.
+    pub tool_events: bool,
+    /// The page: entries shaped like the job log's, `sequence` being the harnessmux `seq`.
+    pub events: Vec<AgentJobEvent>,
+    /// The `after` for the next page; none on the last page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_after: Option<u64>,
+    /// Why the state isn't `ok`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Everything that happened on a task, oldest first (DEV-518): field changes, comments, commits of the task
@@ -1416,6 +1480,9 @@ pub struct AgentJobLogEntry {
     /// The whole plan of an `agent_job_plan` entry (DEV-774); empty when the agent cleared it.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub plan: Option<Vec<AgentJobPlanEntry>>,
+    /// The turn of an `agent_job_transcript` entry (DEV-909).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub transcript: Option<AgentJobTranscriptRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

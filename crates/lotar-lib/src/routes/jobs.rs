@@ -85,6 +85,34 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
 
+    // GET /api/jobs/transcript -> a job's conversation from its harnessmux event log, a page at a time (DEV-909).
+    // It takes a job id only: the job's log names the session, never the caller.
+
+    api_server.register_handler("GET", "/api/jobs/transcript", |req: &HttpRequest| {
+        if let Some(other) = req.query.keys().find(|key| !matches!(key.as_str(), "id" | "after" | "limit")) {
+            return bad_request(format!("Unknown parameter '{other}': the transcript takes id, after and limit"));
+        }
+        let id = match req.query.get("id") {
+            Some(v) if !v.trim().is_empty() => v.clone(),
+            _ => return bad_request("Missing job id".into()),
+        };
+        let number = |name: &str| req.query.get(name).map(|value| value.trim().parse::<u64>().map_err(|_| format!("'{name}' must be a whole number")));
+        let after = match number("after").transpose() {
+            Ok(after) => after.unwrap_or(0),
+            Err(err) => return bad_request(err),
+        };
+        let limit = match number("limit").transpose() {
+            Ok(limit) => limit.map(|limit| usize::try_from(limit).unwrap_or(usize::MAX)),
+            Err(err) => return bad_request(err),
+        };
+        let resolver = try_response!(resolve_tasks_dir());
+        match crate::services::agent_job_service::AgentJobService::transcript_in(&resolver.path, &id, after, limit) {
+            Some(Ok(transcript)) => ok_json(200, json!({"data": {"transcript": transcript}})),
+            Some(Err(err)) => bad_request(err),
+            None => not_found(format!("Job '{}' not found", id)),
+        }
+    });
+
     // GET /api/jobs/t3-thread -> a t3 job's T3 Code thread and its state now (DEV-849)
 
     api_server.register_handler("GET", "/api/jobs/t3-thread", |req: &HttpRequest| {

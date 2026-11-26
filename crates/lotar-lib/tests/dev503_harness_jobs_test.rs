@@ -208,6 +208,66 @@ fn session_continue_resumes_the_tickets_session_from_another_process() {
     assert_eq!(harness.log().matches("\"method\":\"session/new\"").count(), 2, "without continue a job starts a new session");
 }
 
+/// DEV-909: each job records the turn it sent to its harnessmux session, and the transcript reader returns only that
+/// turn: a continued session's second job reads turn 2, not turn 1.
+#[test]
+fn a_job_records_its_turn_and_reads_only_that_turns_conversation() {
+    let harness = harness("", &[("FAKE_TOOL", "1".into())]);
+    harness.run(&[]).success();
+    let (second, _) = continue_job_with_id(&harness);
+    let tasks = harness.fixtures.tasks_root.as_path();
+    let jobs = AgentJobService::list_jobs_in(tasks);
+    let first = jobs.iter().find(|job| job.id != second).expect("the first job").id.clone();
+    let reference = |job: &str| {
+        let (_, events) = AgentJobService::job_with_events_in(tasks, job).expect("a known job");
+        events.into_iter().filter_map(|event| event.transcript).collect::<Vec<_>>()
+    };
+    let (first_refs, second_refs) = (reference(&first), reference(&second));
+    assert_eq!(first_refs.iter().map(|r| r.turn).collect::<Vec<_>>(), vec![1], "{first_refs:?}");
+    assert_eq!(second_refs.iter().map(|r| r.turn).collect::<Vec<_>>(), vec![2], "{second_refs:?}");
+    assert_eq!((second_refs[0].source.as_str(), second_refs[0].format, second_refs[0].agent.as_str()), ("harnessmux", 1, "claude"));
+    assert_eq!(first_refs[0].session, second_refs[0].session);
+    assert_eq!(second_refs[0].agent_session.as_deref(), Some("fake-1"));
+
+    let read = |job: &str| AgentJobService::transcript_in(tasks, job, 0, None).expect("a known job").expect("a valid session");
+    let (one, two) = (read(&first), read(&second));
+    assert_eq!((one.state.as_str(), one.turns.clone(), two.turns.clone(), two.session_turns), ("ok", vec![1], vec![2], Some(2)));
+    let texts = |transcript: &lotar::api_types::AgentJobTranscript, kind: &str| {
+        transcript.events.iter().filter(|event| event.kind == kind).filter_map(|event| event.message.clone()).collect::<Vec<_>>()
+    };
+    // The fake agent counts the turns of its own process: the resumed session's process answers its first one.
+    assert_eq!((texts(&one, "agent_job_message"), texts(&two, "agent_job_message")), (vec!["Done 1".to_string()], vec!["Done 1".to_string()]));
+    let (first_input, second_input) = (texts(&one, "agent_job_input").concat(), texts(&two, "agent_job_input").concat());
+    assert!(first_input.contains("Fix it") && !first_input.contains("Rework it"), "{first_input}");
+    assert!(second_input.trim_end().ends_with("Rework it"), "{second_input}");
+    assert!(two.tool_events && two.events.iter().any(|event| event.tool.is_some()), "{:?}", two.events);
+    assert!(AgentJobService::transcript_in(tasks, "job-no-such", 0, None).is_none());
+
+    // The route takes a job id only, and its answer is the published shape.
+    let mut api = lotar::api_server::ApiServer::new();
+    lotar::routes::initialize(&mut api);
+    let get = |query: &[(&str, &str)]| {
+        let query = query.iter().map(|(key, value)| (key.to_string(), value.to_string())).collect();
+        let request =
+            lotar::api_server::HttpRequest { method: "GET".into(), path: "/api/jobs/transcript".into(), query, headers: Default::default(), body: Vec::new() };
+        let response = api.handle_request(&request);
+        (response.status, serde_json::from_slice::<serde_json::Value>(&response.body).unwrap_or_default())
+    };
+    let (status, body) = get(&[("id", &second), ("limit", "1")]);
+    assert_eq!((status, body["data"]["transcript"]["events"].as_array().map(Vec::len)), (200, Some(1)), "{body}");
+    assert!(body["data"]["transcript"]["next_after"].is_u64(), "{body}");
+    crate::common::openapi_semantics::SpecValidator::load_published().validate_component("EnvelopeAgentJobTranscriptResponse", &body).unwrap();
+    assert_eq!(get(&[("id", "job-no-such")]).0, 404);
+    for refused in [
+        &[("id", second.as_str()), ("path", "/etc/passwd")][..],
+        &[("id", second.as_str()), ("session", "../x")],
+        &[("id", second.as_str()), ("after", "-1")],
+        &[],
+    ] {
+        assert_eq!(get(refused).0, 400, "{refused:?}");
+    }
+}
+
 /// Sets `last_used` of the ticket's fixer session `minutes` ago, as if its last turn ended then.
 fn age_session(harness: &Harness, minutes: i64) {
     let sessions = harness.root().join("harnessmux/state/sessions");

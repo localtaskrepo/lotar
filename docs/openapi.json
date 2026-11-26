@@ -476,6 +476,65 @@
         }
       }
     },
+    "/api/jobs/transcript": {
+      "get": {
+        "summary": "Read an agent job's conversation from its harnessmux event log",
+        "description": "The conversation of the job's turns, read from `<harnessmux state>/sessions/<session>.events.jsonl` on this machine (DEV-909), shaped like job log entries (`agent_job_input`, `agent_job_message`, `agent_job_thought`, `agent_job_tool`, `agent_job_plan`, `agent_job_question`, `agent_job_progress`, `agent_job_failed`) with tool calls and streamed text merged, a page at a time. The job's log names the session and turn (its `agent_job_transcript` entries); an older log without them reads the session its progress names, the turns that started while the job ran (`source` `time_window`). Only the job id is taken: a session name the job log holds is checked as a harnessmux name and read from the sessions directory, never another path. `state` `expired` when the session's event log is gone; `unsupported`, with a `reason`, when the job names no session, the log has another format version (`v`), or no turn of it falls in the job. 400 for any other query parameter, a session name that isn't one, or `after`/`limit` that aren't whole numbers.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Return the entries after this harnessmux `seq`: the last page's `next_after`.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Entries per page: 100 by default, 500 at most.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobTranscriptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/jobs/t3-thread": {
       "get": {
         "summary": "Get a t3 agent job's T3 Code thread and its state now",
@@ -11044,18 +11103,20 @@
             "type": "string"
           },
           "message": {
-            "type": "string",
-            "nullable": true
+            "type": ["string", "null"]
           },
           "tool": {
             "$ref": "#/components/schemas/AgentJobTool",
             "description": "The tool call of an agent_job_tool entry."
           },
           "plan": {
-            "type": "array",
+            "type": ["array", "null"],
             "items": { "$ref": "#/components/schemas/AgentJobPlanEntry" },
-            "nullable": true,
             "description": "The whole plan of an agent_job_plan entry; empty when the agent cleared it."
+          },
+          "transcript": {
+            "$ref": "#/components/schemas/AgentJobTranscriptRef",
+            "description": "The turn of an agent_job_transcript entry (DEV-909)."
           }
         },
         "required": [
@@ -11256,6 +11317,132 @@
         },
         "required": [
           "inputs"
+        ]
+      },
+      "AgentJobTranscriptRef": {
+        "type": "object",
+        "description": "The turn a job sent to its harnessmux session, on an agent_job_transcript log entry (DEV-909).",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "harnessmux."
+          },
+          "session": {
+            "type": "string",
+            "description": "The harnessmux session name."
+          },
+          "agent": {
+            "type": "string",
+            "description": "The harnessmux agent the session runs."
+          },
+          "agent_session": {
+            "type": "string",
+            "description": "The agent's own session id (ACP session id, T3 Code thread id)."
+          },
+          "turn": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "The turn number harnessmux gave the job's prompt."
+          },
+          "format": {
+            "type": "integer",
+            "description": "The reference's format: 1."
+          },
+          "link": {
+            "type": "string",
+            "description": "A T3 Code thread's link."
+          }
+        },
+        "required": [
+          "source",
+          "session",
+          "agent",
+          "turn",
+          "format"
+        ]
+      },
+      "AgentJobTranscript": {
+        "type": "object",
+        "description": "The conversation of a job's turns, read from its harnessmux event log, a page at a time (DEV-909).",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "expired",
+              "unsupported"
+            ],
+            "description": "expired: the session's event log is gone; unsupported: the job names no session, the log has another format version, or no turn of it falls in the job."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "reference",
+              "time_window"
+            ],
+            "description": "reference: the job log names the turns; time_window: an older job log, the turns that started while the job ran."
+          },
+          "session": {
+            "type": "string",
+            "description": "The harnessmux session name, for harnessmux attach <session> --from-start."
+          },
+          "agent": {
+            "type": "string"
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "The job's turns in the session."
+          },
+          "session_turns": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The session's turn count."
+          },
+          "link": {
+            "type": "string",
+            "description": "The T3 Code thread's link of a t3 job."
+          },
+          "tool_events": {
+            "type": "boolean",
+            "description": "Whether the job's turns hold tool calls: a t3 session written by harnessmux 0.2.0 has none."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentJobLogEntry"
+            },
+            "description": "The page: entries shaped like the job log's, sequence being the harnessmux seq."
+          },
+          "next_after": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The after for the next page; none on the last page."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the state isn't ok."
+          }
+        },
+        "required": [
+          "state",
+          "tool_events",
+          "events"
+        ]
+      },
+      "AgentJobTranscriptResponse": {
+        "type": "object",
+        "properties": {
+          "transcript": {
+            "$ref": "#/components/schemas/AgentJobTranscript"
+          }
+        },
+        "required": [
+          "transcript"
         ]
       },
       "AgentJobT3ThreadResponse": {
@@ -11592,6 +11779,17 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AgentJobInputsResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobTranscriptResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobTranscriptResponse"
           }
         },
         "required": [

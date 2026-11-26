@@ -65,6 +65,12 @@ Each job runs in the harnessmux session `<repo>-<hash>-<ticket>-<profile>` (`lot
 
 Set `session` on a profile, on a rule's [`agent` settings](automation.md#agent-run-settings), with `lotar agent run --session`, or in the `session` field of `POST /api/jobs`.
 
+#### A job's conversation
+
+A job's log holds what LoTaR made of the session; the session's harnessmux event log (`<harnessmux state>/sessions/<name>.events.jsonl`) holds the whole conversation. Each job records the turn it sent as an `agent_job_transcript` entry: `transcript` holds `source` (`harnessmux`), the `session`, the `agent`, the agent's own session id (`agent_session`), the `turn` (a continued session's second job has turn 2), `format` (1), and a `t3` job's thread `link`. A message sent to a running job is another turn and another entry.
+
+On the ticket's Timeline, **Show thread** on a job has **Show conversation**: it loads nothing until opened, then shows the job's turns read from that event log (Turn 2 of 2 in the `claude` session …), 100 entries at a time with **Load more**, as the job log shows them: your prompts, the agent's replies and thinking, its tool calls with their output, plans and questions. A `t3` job's conversation has **Open in T3**; a `t3` session written by harnessmux 0.2.0 has no tool calls and says "Tool calls are in T3". A job log from before these entries reads the session its log names, the turns that started while the job ran. When the event log is gone (harnessmux removed the session, or another machine ran the job) it says "The conversation is no longer on this machine."; the summary, commits and checks stay on the ticket. An event log of another format version, or a job none of whose turns is in it, shows `harnessmux attach <name> --from-start` to copy instead. REST: `GET /api/jobs/transcript?id=<job>[&after=<seq>&limit=<n>]`; it takes the job id only, never a session name or path.
+
 #### Context between phases and agents
 
 A ticket's phases often run on different agents (fix on Claude, review on Codex), each in a session of its own. Each job's prompt hands the ticket's earlier work to its agent:
