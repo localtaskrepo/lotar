@@ -364,6 +364,7 @@ fn adopt(
                     runner: AgentRunnerKind::T3.as_str().to_string(),
                     agent_profile: resumed.agent.clone(),
                     status: AgentJobStatus::Queued,
+                    queued_at: None,
                     created_at: started_at.clone(),
                     started_at: None,
                     finished_at: None,

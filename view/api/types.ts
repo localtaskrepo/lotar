@@ -1774,6 +1774,8 @@ export interface AgentJob {
     agent?: string | null
     status: string
     created_at: string
+    /** When the job was queued, for a job that waited in the queue (DEV-882). */
+    queued_at?: string | null
     started_at?: string | null
     finished_at?: string | null
     exit_code?: number | null

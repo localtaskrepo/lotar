@@ -107,6 +107,7 @@ struct AgentJobRecord {
     agent_profile: Option<String>,
     status: AgentJobStatus,
     created_at: String,
+    queued_at: Option<String>,
     started_at: Option<String>,
     finished_at: Option<String>,
     exit_code: Option<i32>,
@@ -288,7 +289,7 @@ impl AgentJobService {
     }
 
     pub fn start_job_with_tasks_dir_mode(req: AgentJobCreateRequest, tasks_dir: &std::path::Path, mode: JobStartMode) -> LoTaRResult<AgentJob> {
-        Self::start_job_inner(req, tasks_dir, mode, None, None, false)
+        Self::start_job_inner(req, tasks_dir, mode, None, None, false, None)
     }
 
     /// Start a job the queue worker took from the queue: right away, and
@@ -296,15 +297,16 @@ impl AgentJobService {
     /// (DEV-604).
     /// A paused job's retry also gets the status and assignee change that
     /// job recorded; `after_limit` when it retries a job paused on a usage
-    /// limit.
+    /// limit. `queued_at` is when its queue entry was queued.
     pub(crate) fn start_queued_job(
         req: AgentJobCreateRequest,
         tasks_dir: &std::path::Path,
         commit_retry: Option<CommitRetry>,
         carried_outcome: Option<CarriedOutcome>,
         after_limit: bool,
+        queued_at: &str,
     ) -> LoTaRResult<AgentJob> {
-        Self::start_job_inner(req, tasks_dir, JobStartMode::Immediate, commit_retry, carried_outcome, after_limit)
+        Self::start_job_inner(req, tasks_dir, JobStartMode::Immediate, commit_retry, carried_outcome, after_limit, Some(queued_at.to_string()))
     }
 
     /// Whether the job `req` asks for commits (so a signing pause holds it)
@@ -329,6 +331,7 @@ impl AgentJobService {
         commit_retry: Option<CommitRetry>,
         carried_outcome: Option<CarriedOutcome>,
         after_limit: bool,
+        queued_from: Option<String>,
     ) -> LoTaRResult<AgentJob> {
         let ticket_id = req.ticket_id.trim().to_string();
         if ticket_id.is_empty() {
@@ -435,6 +438,7 @@ impl AgentJobService {
         let memory_hold = matches!(mode, JobStartMode::RespectLimits)
             && (crate::services::memory_gate::check(tasks_dir).is_some() || (!is_merge_job && crate::services::disk_gate::check(tasks_dir).is_some()));
         let should_queue: bool;
+        let queued_at: Option<String>;
         {
             let registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
             let mut registry = wait_for_cleanup(registry, &ticket_id);
@@ -451,6 +455,7 @@ impl AgentJobService {
             let merge_slot_busy = is_merge_job && has_active_merge_job(&registry);
 
             should_queue = matches!(mode, JobStartMode::RespectLimits) && (memory_hold || held || slot_wait.is_some() || merge_slot_busy);
+            queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()));
             registry.max_parallel_jobs =
                 crate::config::resolution::config_for_project(tasks_dir, None).ok().and_then(|global| global.agent_worktree.max_parallel_jobs);
 
@@ -472,6 +477,7 @@ impl AgentJobService {
                         agent_profile: req.agent.clone(),
                         status: AgentJobStatus::Queued,
                         created_at: created_at.clone(),
+                        queued_at: queued_at.clone(),
                         started_at: None,
                         finished_at: None,
                         exit_code: None,
@@ -541,6 +547,7 @@ impl AgentJobService {
             agent: req.agent,
             status: AgentJobStatus::Queued.as_str().to_string(),
             created_at: created_at.clone(),
+            queued_at,
             started_at: None,
             finished_at: None,
             exit_code: None,
@@ -872,6 +879,7 @@ impl AgentJobRecord {
             agent: self.agent_profile.clone(),
             status: self.status.as_str().to_string(),
             created_at: self.created_at.clone(),
+            queued_at: self.queued_at.clone(),
             started_at: self.started_at.clone(),
             finished_at: self.finished_at.clone(),
             exit_code: self.exit_code,
@@ -970,6 +978,7 @@ fn saved_job_dto(saved: &crate::services::agent_log_service::SavedJob, running: 
         agent: header.agent_profile.clone(),
         status: status.map_or_else(|| fallback.as_str().to_string(), |status| status.status.clone()),
         created_at: header.created_at.clone(),
+        queued_at: header.queued_at.clone(),
         started_at: saved.events.iter().find(|entry| entry.kind == "agent_job_started").map(|entry| entry.at.clone()),
         finished_at: status.map(|status| status.at.clone()),
         exit_code: status.and_then(|status| status.exit_code),
@@ -2235,6 +2244,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
             ticket_id: ticket_id.clone(),
             runner: runner_kind.as_str().to_string(),
             created_at: job.started_at.clone(),
+            queued_at: None,
             worktree_path: None,
             worktree_branch: None,
             model: profile.model.clone(),
@@ -2274,6 +2284,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                     agent_profile: job.agent.clone(),
                     status: AgentJobStatus::Running,
                     created_at: header.as_ref().map(|header| header.created_at.clone()).unwrap_or_else(|| job.started_at.clone()),
+                    queued_at: header.as_ref().and_then(|header| header.queued_at.clone()),
                     started_at: Some(job.started_at.clone()),
                     finished_at: None,
                     exit_code: None,
@@ -3550,6 +3561,7 @@ fn init_job_log(
             ticket_id: ticket_id.to_string(),
             runner: runner_kind.as_str().to_string(),
             created_at: created_at.to_string(),
+            queued_at: JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.queued_at.clone())),
             worktree_path,
             worktree_branch,
             model: profile.model.clone(),
@@ -7258,6 +7270,7 @@ mod tests {
                 agent_profile: None,
                 status: AgentJobStatus::Running,
                 created_at: time::now_rfc3339(),
+                queued_at: None,
                 started_at: None,
                 finished_at: None,
                 exit_code: None,
@@ -7480,6 +7493,7 @@ mod tests {
                 ticket_id: "TEST-1".to_string(),
                 runner: "command".to_string(),
                 created_at: time::now_rfc3339(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -7533,6 +7547,7 @@ mod tests {
                 ticket_id: "TEST-1".to_string(),
                 runner: "t3".to_string(),
                 created_at: time::now_rfc3339(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: Some("agent/TEST-1".to_string()),
                 model: None,
@@ -7602,6 +7617,7 @@ mod tests {
                 ticket_id: "TEST-1".to_string(),
                 runner: "t3".to_string(),
                 created_at: time::now_rfc3339(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -7681,6 +7697,7 @@ mod tests {
                 ticket_id: "TEST-1".to_string(),
                 runner: "command".to_string(),
                 created_at: time::now_rfc3339(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -8010,6 +8027,7 @@ mod dev21_ticket_done_state_tests {
                 ticket_id: ticket.to_string(),
                 runner: "claude".to_string(),
                 created_at: "2026-11-01T00:00:00Z".to_string(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -8055,6 +8073,7 @@ mod dev21_ticket_done_state_tests {
                 ticket_id: ticket.to_string(),
                 runner: "claude".to_string(),
                 created_at: "2026-11-01T00:00:00Z".to_string(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -8103,6 +8122,7 @@ mod dev21_ticket_done_state_tests {
                 ticket_id: ticket.to_string(),
                 runner: "claude".to_string(),
                 created_at: "2026-11-01T00:00:00Z".to_string(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,
@@ -8409,6 +8429,7 @@ mod dev520_session_events_tests {
             ticket_id: "DEV-1".to_string(),
             runner: "claude".to_string(),
             created_at: "2026-11-21T00:00:00Z".to_string(),
+            queued_at: None,
             worktree_path: None,
             worktree_branch: None,
             model: None,

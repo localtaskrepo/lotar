@@ -10626,6 +10626,11 @@
           "created_at": {
             "type": "string"
           },
+          "queued_at": {
+            "type": "string",
+            "nullable": true,
+            "description": "When the job was queued, for a job that waited in the queue."
+          },
           "started_at": {
             "type": "string",
             "nullable": true

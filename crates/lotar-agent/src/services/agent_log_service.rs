@@ -38,6 +38,9 @@ pub struct JobLogHeader {
     pub ticket_id: String,
     pub runner: String,
     pub created_at: String,
+    /// When the job was queued, for a job that waited in the queue (DEV-882).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub queued_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub worktree_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -551,6 +554,7 @@ mod tests {
             ticket_id: ticket_id.to_string(),
             runner: "claude".to_string(),
             created_at: "now".to_string(),
+            queued_at: None,
             worktree_path: None,
             worktree_branch: None,
             model: None,
@@ -646,6 +650,7 @@ mod tests {
                 ticket_id: "DICE-1".to_string(),
                 runner: "claude".to_string(),
                 created_at: "2026-02-03T12:00:00Z".to_string(),
+                queued_at: None,
                 worktree_path: Some("/tmp/worktree".to_string()),
                 worktree_branch: Some("agent/DICE-1".to_string()),
                 model: Some("sonnet".to_string()),
@@ -709,6 +714,7 @@ mod tests {
                 ticket_id: "T-1".to_string(),
                 runner: "claude".to_string(),
                 created_at: created.to_string(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: Some("sonnet".to_string()),
@@ -745,6 +751,7 @@ mod tests {
                 ticket_id: "DICE-2".to_string(),
                 runner: "claude".to_string(),
                 created_at: "2026-02-03T12:00:00Z".to_string(),
+                queued_at: None,
                 worktree_path: None,
                 worktree_branch: None,
                 model: None,

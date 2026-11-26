@@ -5,7 +5,8 @@
 //!
 //! The last reading and the hold it found are kept next to the queue file,
 //! so the queue worker, `lotar serve` and `lotar agent queue` in another
-//! process see the same hold.
+//! process see the same hold. Each hold that ended is added to a history
+//! file beside it, so the hours the gate held can be counted (DEV-882).
 
 use crate::config::manager::ConfigManager;
 use crate::config::types::AgentMemoryGateConfig;
@@ -23,6 +24,8 @@ const STALE_AFTER_SECS: u64 = 2 * HELD_RECHECK_SECS;
 const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
 /// Full swap holds only while less memory than this is free, in percent.
 pub const SWAP_HOLD_FREE_PERCENT: u8 = 20;
+/// The hold history keeps this many of the last holds.
+const HISTORY_LIMIT: usize = 1000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pressure {
@@ -145,7 +148,59 @@ pub fn check(tasks_dir: &Path) -> Option<MemoryHold> {
     }
     let next = decide(&previous, read_memory(), now, &config);
     let _ = crate::storage::safety::atomic_write_file(&path, &serde_json::to_string_pretty(&next).unwrap_or_default());
+    record_if_ended(tasks_dir, &previous, &next);
     hold_of(&next)
+}
+
+/// A hold the gate kept, from the history (DEV-882); `until` is `None` for
+/// the hold in effect now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordedHold {
+    pub reason: String,
+    pub since: Timestamp,
+    pub until: Option<Timestamp>,
+}
+
+impl RecordedHold {
+    pub fn to_json(&self) -> serde_json::Value {
+        let seconds = self.until.map(|until| (until - self.since).as_secs());
+        serde_json::json!({ "reason": self.reason, "since": stamp(self.since), "until": self.until.map(stamp), "seconds": seconds })
+    }
+}
+
+/// The holds of the history, oldest first, and the one in effect now. Two
+/// processes can end the same hold; it is listed once.
+pub fn holds(tasks_dir: &Path) -> Vec<RecordedHold> {
+    let mut holds: Vec<RecordedHold> = Vec::new();
+    let history = std::fs::read_to_string(history_path(tasks_dir)).unwrap_or_default();
+    for ended in history.lines().filter_map(|line| serde_json::from_str::<EndedHold>(line).ok()) {
+        holds.retain(|hold| hold.since != ended.since);
+        holds.push(RecordedHold { reason: ended.reason, since: ended.since, until: Some(ended.until) });
+    }
+    let state = load(&state_path(tasks_dir));
+    if let Some(since) = state.held_since.filter(|since| holds.iter().all(|hold| hold.since != *since)) {
+        holds.push(RecordedHold { reason: state.short_reason(), since, until: None });
+    }
+    holds.sort_by_key(|hold| hold.since);
+    holds
+}
+
+/// Adds the hold that ended between `previous` and `next` to the history.
+fn record_if_ended(tasks_dir: &Path, previous: &GateState, next: &GateState) {
+    if let Some(ended) = next.last_hold.as_ref().filter(|ended| previous.last_hold.as_ref() != Some(*ended)) {
+        record_ended(&history_path(tasks_dir), ended);
+    }
+}
+
+/// Adds `ended` to the history, keeping the last [`HISTORY_LIMIT`] holds.
+fn record_ended(path: &Path, ended: &EndedHold) {
+    let Ok(line) = serde_json::to_string(ended) else {
+        return;
+    };
+    let mut lines: Vec<String> = std::fs::read_to_string(path).unwrap_or_default().lines().map(str::to_string).collect();
+    lines.push(line);
+    let keep = lines.split_off(lines.len().saturating_sub(HISTORY_LIMIT));
+    let _ = crate::storage::safety::atomic_write_file(path, &(keep.join("\n") + "\n"));
 }
 
 /// The last reading's hold and error. A held or failed reading that no
@@ -293,6 +348,11 @@ fn gate_config(tasks_dir: &Path) -> AgentMemoryGateConfig {
 fn state_path(tasks_dir: &Path) -> PathBuf {
     use crate::services::agent_queue_service::{queue_dir, queue_hash};
     queue_dir().join(format!("memory-gate-{}.json", queue_hash(tasks_dir)))
+}
+
+fn history_path(tasks_dir: &Path) -> PathBuf {
+    use crate::services::agent_queue_service::{queue_dir, queue_hash};
+    queue_dir().join(format!("memory-gate-{}-holds.jsonl", queue_hash(tasks_dir)))
 }
 
 /// Record a hold that a reading found just now.
@@ -654,5 +714,59 @@ mod tests {
         std::fs::write(&path, serde_json::to_string(&recent).unwrap()).unwrap();
         assert_eq!(status(&tasks_dir).hold.unwrap().reason, "swap full");
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn each_ended_hold_goes_to_the_history_once_and_holds_lists_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let tasks_dir = dir.path().join(".tasks");
+        let path = state_path(&tasks_dir);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // Held from at(0); memory settles and the hold ends at at(200).
+        let held = decide(&GateState::default(), reading("pressure=warn"), at(0), &config());
+        record_if_ended(&tasks_dir, &GateState::default(), &held);
+        let settling = decide(&held, reading("normal"), at(60), &config());
+        let ended = decide(&settling, reading("normal"), at(200), &config());
+        record_if_ended(&tasks_dir, &settling, &ended);
+        // The next readings keep the ended hold in the state: not recorded again.
+        let open = decide(&ended, reading("normal"), at(205), &config());
+        record_if_ended(&tasks_dir, &ended, &open);
+        // A second hold, still in effect.
+        let held_again = decide(&open, reading("swap=9.4/10"), at(300), &config());
+        std::fs::write(&path, serde_json::to_string(&held_again).unwrap()).unwrap();
+
+        let holds = holds(&tasks_dir);
+        assert_eq!(
+            holds,
+            vec![
+                RecordedHold { reason: "macOS reports memory pressure warn".to_string(), since: at(0), until: Some(at(200)) },
+                RecordedHold { reason: "swap 9.4 of 10.0 GB used (94%, limit 85%)".to_string(), since: at(300), until: None },
+            ]
+        );
+        assert_eq!(holds[0].to_json()["seconds"], 200);
+        assert!(holds[1].to_json()["until"].is_null());
+
+        // Ended by two processes at once, the hold is listed once; a failed reading ends one too.
+        let failed = decide(&held_again, Err("sysctl failed".to_string()), at(400), &config());
+        record_if_ended(&tasks_dir, &held_again, &failed);
+        record_if_ended(&tasks_dir, &held_again, &failed);
+        std::fs::write(&path, serde_json::to_string(&failed).unwrap()).unwrap();
+        let holds = super::holds(&tasks_dir);
+        assert_eq!(holds.len(), 2, "{holds:?}");
+        assert_eq!(holds[1].until, Some(at(400)));
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(history_path(&tasks_dir));
+    }
+
+    #[test]
+    fn the_history_keeps_the_last_holds() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("holds.jsonl");
+        for second in 0..=i64::try_from(HISTORY_LIMIT).unwrap() {
+            record_ended(&path, &EndedHold { reason: "r".to_string(), since: at(second), until: at(second + 1) });
+        }
+        let lines: Vec<String> = std::fs::read_to_string(&path).unwrap().lines().map(str::to_string).collect();
+        assert_eq!(lines.len(), HISTORY_LIMIT);
+        assert!(lines[0].contains(&stamp(at(1))), "{}", lines[0]);
     }
 }

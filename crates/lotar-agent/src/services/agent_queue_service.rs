@@ -987,7 +987,7 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
     {
         return Ok(());
     }
-    let _ = AgentJobService::start_queued_job(req, tasks_dir, entry.commit_retry, entry.carried_outcome, entry.not_before.is_some())?;
+    let _ = AgentJobService::start_queued_job(req, tasks_dir, entry.commit_retry, entry.carried_outcome, entry.not_before.is_some(), &entry.queued_at)?;
     Ok(())
 }
 

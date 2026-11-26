@@ -1,11 +1,11 @@
 title: 'lotar''s own .tasks/DEV/automation.yml doesn''t load in the installed lotar 0.15.6: the rule ''Login expired'' (DEV-835) uses job.pause'
-status: Todo
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T11:05:28.365161+00:00
-modified: 2026-11-26T14:32:16.326617+00:00
+modified: 2026-11-26T17:06:18.553399+00:00
 relationships:
   related:
   - DEV-835
@@ -14,6 +14,9 @@ relationships:
   - DEV-886
   - DEV-890
   - DEV-887
+  - DEV-808
+  - DEV-863
+  - DEV-884
 comments:
 - date: 2026-11-26T14:32:15.747008+00:00
   author: claude
@@ -23,6 +26,34 @@ comments:
     - Reproduced: with the DEV file cut after rule 52 `lotar automation run "Stalled: merge after a passed review" --select 'id:DEV-887' --dry-run` works; with the full file it gives the serialization error.
     - The lotar copy of `configs/lotar/automation.yml` is also behind standards (about 125 lines, e.g. the small-diff light review). Copy the shared part again (keep "lotar's own rules follow" and below) in the same change; copying alone doesn't fix the parse error.
     - Assigned to @fix to start the job by hand.
+- date: 2026-11-26T17:06:06.875744+00:00
+  author: claude
+  text: |-
+    The DEV rules load again; no change was needed in this job.
+
+    - `17cd3a49f` (DEV-884, on main) already took the 'Login expired' rule (`job: { pause: auth }`) out, by copying `configs/lotar/automation.yml` from standards again. `diff` against standards is empty, so the shared part is current too.
+    - `lotar automation simulate --ticket DEV-866` with 0.15.6 prints a result, not the serialization error.
+    - `lotar trust --status`: the repo is already trusted.
+    - The live check restarted what the parse error held up: DEV-835 (review), DEV-886 and DEV-866 (merge after the passed review). See `~/Library/Logs/schedules/live-checks.log`.
+    - `repos.ts --live` still lists 3 stalled DEV tickets, for other reasons:
+      - DEV-855 and DEV-808: their last jobs failed at 16:02Z with `Authentication required` (the expired login). The live check leaves failed jobs to the failure rules. Both providers are signed in again now.
+      - DEV-863: stalled since 04:52Z, before DEV-835 landed.
+      - Each has its own finding: LOCA-651, LOCA-655, LOCA-645.
+    - No commit: the branch has no changes.
+  report:
+    checks:
+    - command: lotar automation simulate --ticket DEV-866
+      result: passed
+      reason: prints 'No automation rules matched', no serialization error
+    - command: lotar trust --status
+      result: passed
+      reason: already trusted
+    - command: node ~/Development/standards/scripts/repos.ts --live
+      result: failed
+      reason: 3 stalled DEV tickets remain, none from this parse error
+    next: Nothing for this ticket; DEV-855, DEV-808, DEV-863 go through their own findings LOCA-651, LOCA-655, LOCA-645
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad504f2a05e61530d0cfa6130b6be02a1b4202fcc595ab383581b96fbb2b7623f
 description: |-
   ## Found
 
@@ -68,3 +99,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T17:03:35.141748+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T17:03:35.625498+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad504f2a05e61530d0cfa6130b6be02a1b4202fcc595ab383581b96fbb2b7623f
+- at: 2026-11-26T17:06:06.875744+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:06:07.213677+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890","DEV-887"]}'
+    new: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890","DEV-887","DEV-808","DEV-863","DEV-884"]}'
+- at: 2026-11-26T17:06:18.553399+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

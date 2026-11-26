@@ -170,6 +170,7 @@ impl AgentHandler {
                 "ticket_id": header.ticket_id,
                 "runner": header.runner,
                 "created_at": header.created_at,
+                "queued_at": header.queued_at,
                 "status": status.as_ref().map(|s| s.status.as_str()).unwrap_or("unknown"),
                 "exit_code": status.as_ref().and_then(|s| s.exit_code),
                 "summary": status.as_ref().and_then(|s| s.summary.clone()),
@@ -409,6 +410,7 @@ impl AgentHandler {
                 "model": header.model,
                 "effort": header.effort,
                 "created_at": header.created_at,
+                "queued_at": header.queued_at,
                 "status": status.as_ref().map(|s| s.status.as_str()).unwrap_or("unknown"),
                 "exit_code": status.as_ref().and_then(|s| s.exit_code),
                 "summary": status.as_ref().and_then(|s| s.summary.clone()),
@@ -494,6 +496,27 @@ impl AgentHandler {
                     renderer.emit_notice(format!("The queue worker already runs; {pending} entries wait in the queue."));
                 } else {
                     renderer.emit_warning("Queue workers are disabled (LOTAR_AGENT_QUEUE_DISABLE_WORKER); no worker started.");
+                }
+                Ok(())
+            }
+            Some(AgentQueueAction::Holds) => {
+                let holds = crate::services::memory_gate::holds(tasks_dir);
+                if matches!(renderer.format, OutputFormat::Json) {
+                    let holds: Vec<_> = holds.iter().map(crate::services::memory_gate::RecordedHold::to_json).collect();
+                    renderer.emit_json(&serde_json::json!({ "holds": holds }));
+                } else if holds.is_empty() {
+                    renderer.emit_notice("The memory gate held no jobs.");
+                } else {
+                    renderer.emit_raw_stdout(format_args!("since\tuntil\tminutes\treason"));
+                    for hold in holds.iter().map(crate::services::memory_gate::RecordedHold::to_json) {
+                        let minutes = hold["seconds"].as_i64().map_or_else(|| "-".to_string(), |seconds| format!("{:.1}", seconds as f64 / 60.0));
+                        renderer.emit_raw_stdout(format_args!(
+                            "{}\t{}\t{minutes}\t{}",
+                            hold["since"].as_str().unwrap_or("-"),
+                            hold["until"].as_str().unwrap_or("now"),
+                            hold["reason"].as_str().unwrap_or("-")
+                        ));
+                    }
                 }
                 Ok(())
             }

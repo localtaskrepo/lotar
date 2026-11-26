@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-26T07:25:26.733166+00:00
+modified: 2026-11-26T17:06:17.291657+00:00
 relationships:
   related:
   - DEV-847
@@ -83,6 +83,9 @@ comments:
       result: failed
       reason: 3 of 4 runs, unrelated UI tests (DEV-873 flake; once also agent-jobs permission question timeout)
     next: 'Owner: land 6c501d7ed despite the unrelated smoke flake, or wait for DEV-873 fix'
+- date: 2026-11-26T17:06:16.428953+00:00
+  author: mallox
+  text: 'Answer: land (Fast-forward main to 6c501d7ed despite the flake) (answered in INBOX-766)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
 description: |-
@@ -188,3 +191,13 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-26T17:06:16.428953+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:06:17.291657+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

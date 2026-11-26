@@ -1,0 +1,59 @@
+title: Run agent jobs on a second machine over ssh (dyson)
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T17:08:01.064005+00:00
+modified: 2026-11-26T17:08:17.892178+00:00
+description: |-
+  The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Ubuntu Server, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today.
+
+  ## What exists
+  - A profile's `command` and `args` replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs:53`), so `ssh -T dyson claude-agent-acp` could be the launch line.
+
+  ## Missing
+  - The worktree is created on the Mac (`t3_claude_settings.rs:109`, `disk_gate.rs:534`); it has to exist on the remote host, at the same absolute path.
+  - The lotar MCP server is a local stdio command (`agent_runner.rs:303`).
+  - Guard hooks and opgate on the remote host.
+  - Process-group cleanup on disconnect (SIGTERM, then SIGKILL); no SSH connection sharing.
+  - A job cap per host; when the host is full, jobs wait and never fall back to the Mac.
+
+  Prior art: openai/symphony (SPEC.md Appendix A, `elixir/lib/symphony_elixir/ssh.ex`), sortie-ai/sortie (`docs/architecture/27-appendix-a-ssh-worker-extension.md`). Evidence: LOCA-631 comment of 2026-11-26 14:23Z.
+
+  ## Done when
+  - [ ] A profile or runner config names a remote host; jobs for it run there in a worktree on that host.
+  - [ ] The job's MCP tools, hooks and ticket edits work as on the Mac.
+  - [ ] A per-host cap holds jobs; a lost connection ends the remote process group.
+  - [ ] Tests cover launch, cap and disconnect cleanup.
+history:
+- at: 2026-11-26T17:08:01.171137+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-26T17:08:17.892178+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: '-'
+    new: |-
+      The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Ubuntu Server, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today.
+
+      ## What exists
+      - A profile's `command` and `args` replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs:53`), so `ssh -T dyson claude-agent-acp` could be the launch line.
+
+      ## Missing
+      - The worktree is created on the Mac (`t3_claude_settings.rs:109`, `disk_gate.rs:534`); it has to exist on the remote host, at the same absolute path.
+      - The lotar MCP server is a local stdio command (`agent_runner.rs:303`).
+      - Guard hooks and opgate on the remote host.
+      - Process-group cleanup on disconnect (SIGTERM, then SIGKILL); no SSH connection sharing.
+      - A job cap per host; when the host is full, jobs wait and never fall back to the Mac.
+
+      Prior art: openai/symphony (SPEC.md Appendix A, `elixir/lib/symphony_elixir/ssh.ex`), sortie-ai/sortie (`docs/architecture/27-appendix-a-ssh-worker-extension.md`). Evidence: LOCA-631 comment of 2026-11-26 14:23Z.
+
+      ## Done when
+      - [ ] A profile or runner config names a remote host; jobs for it run there in a worktree on that host.
+      - [ ] The job's MCP tools, hooks and ticket edits work as on the Mac.
+      - [ ] A per-host cap holds jobs; a lost connection ends the remote process group.
+      - [ ] Tests cover launch, cap and disconnect cleanup.

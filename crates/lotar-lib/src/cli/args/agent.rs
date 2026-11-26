@@ -155,6 +155,8 @@ pub enum AgentQueueAction {
     },
     /// Start the queue worker for the waiting tickets without queueing a job
     Resume,
+    /// List the memory gate's holds: when each started and ended, and why
+    Holds,
 }
 
 #[derive(Args)]

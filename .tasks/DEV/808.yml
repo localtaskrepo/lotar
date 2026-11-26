@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T21:11:09.195177+00:00
-modified: 2026-11-26T07:16:44.332241+00:00
+modified: 2026-11-26T17:06:07.212020+00:00
 relationships:
   depends_on:
   - DEV-812
@@ -21,6 +21,7 @@ relationships:
   - DEV-872
   - DEV-876
   - DEV-842
+  - DEV-897
 comments:
 - date: 2026-11-23T02:46:38.539871+00:00
   author: claude
@@ -513,3 +514,9 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T17:06:07.212020+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-812","standards:STD-369"],"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823","DEV-810","DEV-872","DEV-876","DEV-842"]}'
+    new: '{"depends_on":["DEV-812","standards:STD-369"],"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823","DEV-810","DEV-872","DEV-876","DEV-842","DEV-897"]}'

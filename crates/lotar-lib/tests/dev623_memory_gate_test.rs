@@ -113,6 +113,18 @@ fn full_swap_with_free_memory_starts_the_job() {
     assert!(queue["memory_hold"].is_null(), "{queue}");
     // A reading that fails holds nothing either: the job must start on a good one.
     assert!(queue["memory_error"].is_null(), "{queue}");
+    // DEV-882: the job records when its queue entry was queued.
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let jobs = loop {
+        let jobs = json(&root, &["agent", "list-jobs"]);
+        if jobs["jobs"][0]["queued_at"].is_string() {
+            break jobs;
+        }
+        assert!(Instant::now() < deadline, "no queued_at: {jobs}");
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    let (queued_at, created_at) = (jobs["jobs"][0]["queued_at"].as_str().unwrap(), jobs["jobs"][0]["created_at"].as_str().unwrap());
+    assert!(queued_at <= created_at, "{jobs}");
 }
 
 /// DEV-819: the same full swap with little free memory still holds.
@@ -132,6 +144,10 @@ fn full_swap_with_little_free_memory_holds_the_job() {
     assert_eq!(queue["memory_hold"]["reason"], "swap 3.6 of 4.0 GB used (90%, limit 85%, 10% of memory free)", "{queue}");
     assert!(queue["memory_error"].is_null(), "{queue}");
     assert!(!root.join("ran").exists());
+    // DEV-882: the hold in effect is listed, without an end yet.
+    let holds = json(&root, &["agent", "queue", "holds"]);
+    assert_eq!(holds["holds"][0]["reason"], queue["memory_hold"]["reason"], "{holds}");
+    assert!(holds["holds"][0]["until"].is_null(), "{holds}");
 
     assert_eq!(json(&root, &["agent", "queue", "flush"])["flushed"], 1);
     let deadline = Instant::now() + Duration::from_secs(15);

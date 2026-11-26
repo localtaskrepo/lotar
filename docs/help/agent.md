@@ -15,7 +15,8 @@ LoTaR runs agent CLIs (Claude Code, Codex CLI, Copilot CLI, T3 Code and the othe
 - `lotar agent queue remove <TICKET>` — take one ticket out of the queue before its job starts, also a job that waits for prerequisites, for example `lotar agent queue remove DEV-501`
 - `lotar agent queue flush` — take every waiting ticket out of the queue, also jobs that wait for prerequisites; running jobs go on
 - `lotar agent list-running [--all]` — list the running jobs of this tasks directory, or with `--all` those of every tasks directory on this machine (see [Jobs in other processes](#jobs-in-other-processes))
-- `lotar agent list-jobs [-n <LIMIT>]` — list job logs from disk. Each open [pause](#paused-queue) of the queue is named first (`pauses` in JSON)
+- `lotar agent list-jobs [-n <LIMIT>]` — list job logs from disk. Each open [pause](#paused-queue) of the queue is named first (`pauses` in JSON). With `--format json` a job that waited in the queue has `queued_at`, when it was queued (also in `agent status`, `GET /api/jobs`); `created_at` is when it left the queue, `started_at` when its agent started, so `started_at - queued_at` is its whole wait
+- `lotar agent queue holds` — list the [memory gate](#memory-gate)'s holds, oldest first: `since`, `until` (`now` for the hold in effect), `minutes` and the reason. JSON: `holds`, each with `reason`, `since`, `until` and `seconds`
 - `lotar agent check [--status <value>] [--assignee <handle>]`
 - `lotar agent worktree list` — list agent worktrees
 - `lotar agent worktree cleanup [--all] [--delete-branches] [--dry-run]` — remove stale worktrees
@@ -516,6 +517,7 @@ LoTaR starts no new job while the machine is short of memory: macOS reports memo
 - `lotar agent queue` and `lotar agent list-jobs` say why jobs wait and since when, for example `waiting for memory: swap 9.4 of 10.0 GB used (94%, limit 85%, 12% of memory free) (held since 2026-11-16T21:30:00Z)`. With `--format json` both print `memory_hold`.
 - A memory reading that fails holds nothing; `lotar agent queue` warns about it.
 - `lotar serve` writes each hold's start and end once to its stderr (its log under launchd), whichever process decided it: `[lotar] memory hold started: <reason>, since <time>` and `[lotar] memory hold ended: <reason>, since <time>, until <time>`, with the last short-of-memory reason. It reads the shared state file every 30 s, so a hold that started and ended in between still gets both lines. A failed reading ends a hold at its time. A server started during a hold logs its start; one that ended before the server started is not logged again.
+- Each hold that ends is added to `memory-gate-<hash>-holds.jsonl` next to the state file (the last 1000 holds), whichever process ended it; `lotar agent queue holds` lists them and the hold in effect, so the hours the gate held can be counted.
 - On by default on macOS, off elsewhere. `agent.memory_gate.enabled: true` turns it on elsewhere too; on Linux it then reads swap and free memory from `/proc/meminfo` (there is no pressure level there).
 
 ```yaml

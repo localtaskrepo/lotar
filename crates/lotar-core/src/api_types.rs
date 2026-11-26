@@ -750,6 +750,9 @@ pub struct AgentJob {
     pub agent: Option<String>,
     pub status: String,
     pub created_at: String,
+    /// When the job was queued, for a job that waited in the queue (DEV-882).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub queued_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub started_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]

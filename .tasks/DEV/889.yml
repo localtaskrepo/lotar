@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T07:30:28.243746+00:00
+modified: 2026-11-26T17:08:00.727080+00:00
 relationships:
   related:
   - DEV-860
@@ -35,6 +35,9 @@ comments:
     - Ticket states now: DEV-849, DEV-848, DEV-827, DEV-872, STD-336, STD-359 `Done`; DEV-850 `HelpNeeded` (waits on you, its queued `research` job is from 2026-11-24). Requeueing any would rerun finished or owner-held work.
     - The file's `updated_at` is 2026-11-26 06:09Z: a lotar call with relative `.tasks` still rewrites it. DEV-887 (`ca7122f52`) fixes that but is only on `agent/DEV-887`, not on `main`.
     - On your yes: I delete the file (no code change) and close this ticket.
+- date: 2026-11-26T17:08:00.133416+00:00
+  author: mallox
+  text: 'Answer: drop (Drop all 7 and delete the file) (answered in INBOX-767)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
 description: |-
@@ -94,3 +97,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-26T17:08:00.133416+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:08:00.727080+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

@@ -1,16 +1,17 @@
 title: 'Job prompts tell agents to run lotar --format json show, which prints every comment and the history: the largest Bash output in job sessions'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T22:18:53.793616+00:00
-modified: 2026-11-26T16:51:58.728730+00:00
+modified: 2026-11-26T17:06:07.213301+00:00
 relationships:
   related:
   - DEV-797
   - DEV-852
   - DEV-895
+  - DEV-897
 comments:
 - date: 2026-11-26T02:14:43.270837+00:00
   author: claude
@@ -54,6 +55,29 @@ comments:
     - Callers: `standards/scripts/repos.ts` reads the full `--format json show`, which is unchanged. No other `--format json show` is left in lotar, standards or staff.
     - Minor, filed as DEV-895: `agent_job_service.rs:1525` still tells agents "All of them: `lotar show <ID>`" (the fix agent also noted this).
     - Worktree left clean; no files changed.
+- date: 2026-11-26T17:03:24.081346+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-884` is in `main`.
+
+    - Rebased `agent/DEV-884` onto `main` (`eeb1ad55de38`): `83e8ae74d521`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `83e8ae74d521`
+    - Amended the pending `.tasks` changes into the merged commit: `17cd3a49fede`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 17cd3a49f
+      what: 'DEV-884 Job prompts tell agents to run lotar --format json show, which prints every comment and the history: the largest Bash output in job sessions'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeff1cfbe31fb12cdfad7876478dd3aca9edb62d4210eb869e49435fa4f8c35dd
 description: |-
@@ -180,3 +204,19 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T17:03:24.081346+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:03:24.302188+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-26T17:06:07.213301+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-797","DEV-852","DEV-895"]}'
+    new: '{"related":["DEV-797","DEV-852","DEV-895","DEV-897"]}'
