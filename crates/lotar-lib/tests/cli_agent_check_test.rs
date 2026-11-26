@@ -111,6 +111,7 @@ fn agent_run_without_wait_still_runs_the_job() {
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
+        .env_remove("LOTAR_AGENT_QUEUE_DISABLE_WORKER")
         .args(["agent", "run", "TEST-1", "go", "--agent", "slow"])
         .assert()
         .success()
@@ -121,6 +122,13 @@ fn agent_run_without_wait_still_runs_the_job() {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     assert!(done.exists(), "the queued job never ran after the CLI exited");
+    // The worker ends before the temp folder goes, or it writes the job's
+    // end into a removed folder (DEV-801).
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while lotar::services::agent_queue_service::AgentQueueService::is_worker_running(&fixtures.tasks_root) {
+        assert!(std::time::Instant::now() < deadline, "the queue worker didn't end");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 }
 
 /// Agents call the CLI themselves; the job tells them which build started it

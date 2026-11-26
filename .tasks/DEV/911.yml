@@ -1,31 +1,87 @@
 title: Run review and triage jobs on dyson over ssh (claude/codex runners)
-status: Blocked
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-26T23:14:46.615229+00:00
-modified: 2026-11-26T23:56:13.506951+00:00
+modified: 2026-11-27T11:17:14.495628+00:00
 relationships:
   depends_on:
   - DEV-901
   related:
   - DEV-901
+  - DEV-931
 comments:
 - date: 2026-11-26T23:56:13.506951+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-901. It starts once they are done.'
+- date: 2026-11-27T11:12:13.866105+00:00
+  author: claude
+  text: |-
+    **Done**: `host` now works on `claude` and `codex` profiles too.
+
+    - **Probe**: ssh plus `python3`, the agent program, and `npx` + CLI for the adapter (`dyson: codex is not on its PATH`)
+    - **Launch**: `ssh -T ... -- sh -lc 'cd <worktree> && exec env <env> python3 -c <guard> 10 <cmd>'`
+    - **Env**: agents.toml + profile env only, no Mac PATH or LOTAR_*
+    - **Guard**: own process group; closing stdin, SIGHUP or SIGTERM sends TERM, then KILL after 10 s; leftovers are stopped too
+    - **Host setup**: no `t3 project add` and no settings files for these runners; `mcp.lotar` uses the ssh socket bridge
+    - **Threads**: T3 thread stops apply only to t3 jobs
+    - **Tests**: fake ssh (probe, setup, launch line, stdio passthrough, TERM→KILL, leftovers)
+    - **Docs**: agent.md and config-reference.md
+  report:
+    commits:
+    - hash: 7ecdf8f50
+      what: claude/codex profiles take host; their agent runs over ssh on the host under a process-group guard
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run -p lotar-agent -p lotar-core
+      result: passed
+      reason: 530 tests
+    - command: cargo nextest run -p lotar-lib --test integration -E test(dev503_harness_jobs_test::)
+      result: passed
+      reason: 65 tests
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    - command: real run on dyson
+      result: not_run
+      reason: no profile has host set yet
+    next: 'Set host: dyson (and mcp.lotar if wanted) on the review/triage profiles in standards agents.yml; triage-codex once codex is signed in on dyson (LOCA-631)'
+- date: 2026-11-27T11:17:05.698285+00:00
+  author: claude
+  text: |-
+    Review: passed. `7ecdf8f50` does what "Done when" asks. One minor follow-up is filed as [DEV-931](https://lotar.pyxzl.net/task/DEV-931).
+
+    - **Read**: the diff of `main..HEAD` (7 files), the ticket, DEV-901 and its decisions, AGENTS.md, and harnessmux 0.5.0 `AgentSpec`/`launch_command`. Also the callers of `job_agent_table` and `resume_session_to_end`.
+    - **Config**: `validate_agent_hosts` accepts `t3`, `claude` and `codex` and refuses other runners and `merge`. Tested.
+    - **Probe**: `Check::Programs` asks for `python3`, the command's program, and `npx` plus `requires` for the adapter. It is cached per program list, and a refusal keeps the job on the Mac.
+    - **Launch**: `ssh -T -o ControlMaster=no -o ControlPath=none <BatchMode…> <target> -- sh -lc 'cd … && exec env … python3 -c <guard> 10 …'`. The profile's `command` wins, else `npx --yes --package=…`. The env is the table env plus the profile env, and the local `spec.env` is taken out.
+    - **Guard**: own session, then TERM and KILL after the grace on EOF, SIGHUP, SIGTERM or the agent's own exit. The exit code is passed on.
+    - **Host setup**: no `t3 project add` and no settings files. `mcp.lotar` gives the session the ssh socket bridge. The "Agent host" note covers both cases.
+    - **Reran**: `npm ci` passed. `cargo nextest run -p lotar-agent -p lotar-core -E 'test(/hosted|agent_hosts|headless|guard|probe|an_unknown_host/)'`: 29 passed. `npm run lint` passed.
+    - **Minor, filed as DEV-931**: a lotar restart mid-job resumes a hosted claude/codex session with the Mac's table (`agent_job_service.rs:2568`, `resumed_on_host` is t3 only, `attach` has `thread: true`), so the host's commits don't come back. A job waiting for an answer leaves uncommitted changes on the host. Review and triage rarely write files, so the merge can go ahead.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A516d0b27722fd34b3ce0f2f549950eacbd305944dc80892f651586002d0fbb2f
 description: |-
   Part of the owner's route B on DEV-901 (2026-11-26, INBOX-805): besides fix and research jobs in dyson's T3 Code, the profiles lotar runs through harnessmux (`review`, `review-claude`, `review-light`, `triage`, `triage-codex`) run on dyson over ssh. `merge` stays on the Mac. Builds on DEV-901's `agent.hosts`, placement, wake, worktree push/fetch/re-sign and ticket socket.
 
   A profile's `command`/`args` already replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs` `with_profile_command`).
 
   ## Done when
-  - [ ] `host` on a `claude`/`codex` profile runs its agent as `ssh -T -o ControlMaster=no -o ControlPath=none <target> -- cd <worktree> && <agent command>`; the profile's own `command`/`args` win over the agent's default and still go through ssh.
-  - [ ] The job's lotar MCP server reaches the agent as a stdio bridge on dyson to DEV-901's forwarded socket, not `lotar mcp` on dyson.
-  - [ ] Disconnect or stop: the remote agent's process group gets SIGTERM, then SIGKILL after 10 s.
-  - [ ] codex is signed in on dyson (LOCA-631; it wasn't on 2026-11-26) before `triage-codex` gets a host.
-  - [ ] Tests with a fake ssh cover the launch line and the cleanup; docs/help names the runners `host` works for.
+  - [ ] Config: `host` is accepted on `t3`, `claude` and `codex` profiles; on any other runner (`command`, `copilot`, `amp`, ...) and on `merge` it is refused when the config loads, as today for `command`.
+  - [ ] Placement, hours, `max_jobs`, wake and the expected-duration rule are DEV-901's, unchanged. Before a `claude`/`codex` job goes there, the host has to answer over ssh and have `python3` and the agent's CLI (`claude` or `codex`; `npx` too when the agent runs its pinned adapter) on its login PATH; no `t3` version check for these runners. A host that fails it keeps the job on the Mac with the reason in the queue (`dyson: codex is not on its PATH`), as DEV-901's probe does.
+  - [ ] Launch: the agent runs as `ssh -T -o ControlMaster=no -o ControlPath=none <DEV-901's BatchMode/ConnectTimeout/ServerAlive options> <target> -- sh -lc 'cd <worktree> && exec env <profile env> python3 -c <guard> 10 <agent command>'`. A login shell, as DEV-901's ssh commands use, so PATH has the CLIs. `<agent command>` is the profile's own `command`/`args` when set (they win over the agent's default, and still go through ssh), else the pinned adapter as `npx --yes --package=<npm>@<version> -- <bin>`, else the table's command. The env is the agents.toml `env` and the profile's `env`; not the job's Mac-only variables (`PATH`, `LOTAR_BIN`, `LOTAR_TASKS_DIR`).
+  - [ ] Worktree and commits: DEV-901's push, worktree at the same path, bring-back and re-sign, also when the thread waits for an answer. No `t3 project add`, `.claude/settings.local.json` or `.mcp.json` for these runners: their rules and tools go through the ACP session as on the Mac.
+  - [ ] Tickets: with the profile's `mcp.lotar`, the agent gets lotar's MCP server as `python3 -c <bridge> <socket>` on dyson, connected to DEV-901's forwarded socket and the server on the Mac; never `lotar mcp` on dyson. The prompt gets DEV-901's "Agent host" note. Without `mcp.lotar` the note says to report ticket changes in the last message.
+  - [ ] Disconnect or stop: the guard starts the agent in its own process group and passes stdin/stdout through. When stdin closes (the ssh connection broke, or lotar closed or killed the session), or the guard gets SIGHUP/SIGTERM, the group gets SIGTERM, then SIGKILL after 10 s. When the agent exits by itself, what is left of its group gets the same. No T3 thread stop for these runners.
+  - [ ] A setup that fails runs the job on the Mac once a slot frees, as DEV-901 does.
+  - [ ] Tests with a fake ssh cover the launch line (profile `command` wins, adapter, env), the guard's SIGTERM-then-SIGKILL on a closed stdin, the probe for these runners and the config check; docs/help (`agent.md` "Agent hosts", `config-reference.md`) names the runners `host` works for.
+  - [ ] Out of this change: giving the standards profiles (`~/Development/standards/configs/lotar/agents.yml`) `host: dyson` and `mcp.lotar`, once DEV-901's dyson verification has run. `triage-codex` gets a host only after codex is signed in on dyson (LOCA-631; it wasn't on 2026-11-26).
 history:
 - at: 2026-11-26T23:14:47.409995+00:00
   actor: claude
@@ -54,3 +110,82 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T10:54:32.832825+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Todo
+- at: 2026-11-27T10:54:37.420251+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T10:54:38.076982+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A516d0b27722fd34b3ce0f2f549950eacbd305944dc80892f651586002d0fbb2f
+- at: 2026-11-27T10:58:37.788478+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Part of the owner's route B on DEV-901 (2026-11-26, INBOX-805): besides fix and research jobs in dyson's T3 Code, the profiles lotar runs through harnessmux (`review`, `review-claude`, `review-light`, `triage`, `triage-codex`) run on dyson over ssh. `merge` stays on the Mac. Builds on DEV-901's `agent.hosts`, placement, wake, worktree push/fetch/re-sign and ticket socket.
+
+      A profile's `command`/`args` already replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs` `with_profile_command`).
+
+      ## Done when
+      - [ ] `host` on a `claude`/`codex` profile runs its agent as `ssh -T -o ControlMaster=no -o ControlPath=none <target> -- cd <worktree> && <agent command>`; the profile's own `command`/`args` win over the agent's default and still go through ssh.
+      - [ ] The job's lotar MCP server reaches the agent as a stdio bridge on dyson to DEV-901's forwarded socket, not `lotar mcp` on dyson.
+      - [ ] Disconnect or stop: the remote agent's process group gets SIGTERM, then SIGKILL after 10 s.
+      - [ ] codex is signed in on dyson (LOCA-631; it wasn't on 2026-11-26) before `triage-codex` gets a host.
+      - [ ] Tests with a fake ssh cover the launch line and the cleanup; docs/help names the runners `host` works for.
+    new: |-
+      Part of the owner's route B on DEV-901 (2026-11-26, INBOX-805): besides fix and research jobs in dyson's T3 Code, the profiles lotar runs through harnessmux (`review`, `review-claude`, `review-light`, `triage`, `triage-codex`) run on dyson over ssh. `merge` stays on the Mac. Builds on DEV-901's `agent.hosts`, placement, wake, worktree push/fetch/re-sign and ticket socket.
+
+      A profile's `command`/`args` already replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs` `with_profile_command`).
+
+      ## Done when
+      - [ ] Config: `host` is accepted on `t3`, `claude` and `codex` profiles; on any other runner (`command`, `copilot`, `amp`, ...) and on `merge` it is refused when the config loads, as today for `command`.
+      - [ ] Placement, hours, `max_jobs`, wake and the expected-duration rule are DEV-901's, unchanged. Before a `claude`/`codex` job goes there, the host has to answer over ssh and have `python3` and the agent's CLI (`claude` or `codex`; `npx` too when the agent runs its pinned adapter) on its login PATH; no `t3` version check for these runners. A host that fails it keeps the job on the Mac with the reason in the queue (`dyson: codex is not on its PATH`), as DEV-901's probe does.
+      - [ ] Launch: the agent runs as `ssh -T -o ControlMaster=no -o ControlPath=none <DEV-901's BatchMode/ConnectTimeout/ServerAlive options> <target> -- sh -lc 'cd <worktree> && exec env <profile env> python3 -c <guard> 10 <agent command>'`. A login shell, as DEV-901's ssh commands use, so PATH has the CLIs. `<agent command>` is the profile's own `command`/`args` when set (they win over the agent's default, and still go through ssh), else the pinned adapter as `npx --yes --package=<npm>@<version> -- <bin>`, else the table's command. The env is the agents.toml `env` and the profile's `env`; not the job's Mac-only variables (`PATH`, `LOTAR_BIN`, `LOTAR_TASKS_DIR`).
+      - [ ] Worktree and commits: DEV-901's push, worktree at the same path, bring-back and re-sign, also when the thread waits for an answer. No `t3 project add`, `.claude/settings.local.json` or `.mcp.json` for these runners: their rules and tools go through the ACP session as on the Mac.
+      - [ ] Tickets: with the profile's `mcp.lotar`, the agent gets lotar's MCP server as `python3 -c <bridge> <socket>` on dyson, connected to DEV-901's forwarded socket and the server on the Mac; never `lotar mcp` on dyson. The prompt gets DEV-901's "Agent host" note. Without `mcp.lotar` the note says to report ticket changes in the last message.
+      - [ ] Disconnect or stop: the guard starts the agent in its own process group and passes stdin/stdout through. When stdin closes (the ssh connection broke, or lotar closed or killed the session), or the guard gets SIGHUP/SIGTERM, the group gets SIGTERM, then SIGKILL after 10 s. When the agent exits by itself, what is left of its group gets the same. No T3 thread stop for these runners.
+      - [ ] A setup that fails runs the job on the Mac once a slot frees, as DEV-901 does.
+      - [ ] Tests with a fake ssh cover the launch line (profile `command` wins, adapter, env), the guard's SIGTERM-then-SIGKILL on a closed stdin, the probe for these runners and the config check; docs/help (`agent.md` "Agent hosts", `config-reference.md`) names the runners `host` works for.
+      - [ ] Out of this change: giving the standards profiles (`~/Development/standards/configs/lotar/agents.yml`) `host: dyson` and `mcp.lotar`, once DEV-901's dyson verification has run. `triage-codex` gets a host only after codex is signed in on dyson (LOCA-631; it wasn't on 2026-11-26).
+- at: 2026-11-27T11:12:13.866105+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:12:28.516823+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T11:16:52.011043+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931"]}'
+- at: 2026-11-27T11:17:05.698285+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:17:14.495628+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

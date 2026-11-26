@@ -283,3 +283,12 @@ fn a_cancel_from_another_process_ends_the_wait() {
     std::thread::sleep(Duration::from_millis(1200));
     assert!(!log.exists(), "the cancelled merge ran its checks");
 }
+
+/// Guards DEV-890's default: the tests' merges never wait for the machine's
+/// real check lock, also in a plain `cargo nextest run` that the
+/// repository's runner didn't start, because another worktree's full suite
+/// holds it for many minutes (`reset_lotar_test_environment` sets it).
+#[test]
+fn the_tests_never_wait_for_the_machines_check_lock() {
+    assert_eq!(std::env::var("LOTAR_CHECK_LOCK_HELD").as_deref(), Ok("1"), "the test process starts as if it held the lock");
+}

@@ -1952,6 +1952,8 @@ fn a_continued_merge_thread_starts_from_the_rework_that_amended_the_ticket_branc
 fn a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread() {
     let (fixtures, _env) = t3_harness_with(&[("review", "", ""), ("merge", "touch merged", "    session: continue\n")]);
     let root = fixtures.get_temp_path();
+    // The review's end rule queues the merge, and a queue worker runs it.
+    let _worker = EnvVarGuard::clear("LOTAR_AGENT_QUEUE_DISABLE_WORKER");
     lotar::services::automation_service::AutomationService::set(
         &fixtures.tasks_root,
         None,

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T10:22:47.466073+00:00
+modified: 2026-11-27T10:54:33.186685+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -35,8 +35,6 @@ description: |-
   - [ ] A waiting host job's bridge (`ssh -R` process and local socket) closes and its `WAITING_ON_HOST` entry goes when its ticket reaches a done status (Done, WontDo, or any status the project marks done) or its question is dropped (ticket no longer waiting / reassigned away from the question's assignee), without waiting for another job or lotar's exit.
   - [ ] A new job or takeover that comes first still wins: it takes the entry, and the later close finds nothing to do.
   - [ ] A fake-ssh test covers both: a new job stops the waiting thread; a ticket closed while waiting closes the bridge.
-tags:
-- waits
 history:
 - at: 2026-11-27T10:16:43.304930+00:00
   actor: claude
@@ -100,3 +98,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T10:54:33.186685+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''

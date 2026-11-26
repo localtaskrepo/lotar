@@ -97,6 +97,14 @@ unsafe fn init_lotar_test_environment() {
     scrub_repository_routing_env();
     isolate_tmpdir_under_owned_scratch();
     reset_lotar_test_environment();
+    // No queue worker from a test's `lotar` calls: one that starts late
+    // under load, after its test removed the temp folder, recreates an empty
+    // `.tasks` there from `--tasks-dir` (DEV-801). Worker tests remove the
+    // variable for their `lotar` commands.
+    let _guard = env_mutex::lock_var("LOTAR_AGENT_QUEUE_DISABLE_WORKER");
+    unsafe {
+        std::env::set_var("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    }
     // Tests that call the services in process need automation (DEV-634).
     lotar::install_hooks();
 }

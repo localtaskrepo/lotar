@@ -1,0 +1,30 @@
+title: 'Hosted claude/codex job: lotar restart takeover and answer wait strand work on the host'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T11:16:51.136837+00:00
+modified: 2026-11-27T11:16:52.750365+00:00
+relationships:
+  related:
+  - DEV-911
+  - DEV-901
+description: |-
+  Found in the review of DEV-911 (`7ecdf8f50`). Review and triage jobs rarely change files, so the merge can go ahead. Any other `claude`/`codex` profile with `host` can strand work on the host.
+
+  ## Found
+  - **Takeover after a lotar restart**: `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2568`, `:2605`) reopens a hosted `claude`/`codex` session with the Mac's `job_agent_table`, not `Hosted::agent_table`. `resumed_on_host` runs only for `t3`, and `Hosted::attach` hard-codes `thread: true` (`hosted.rs:364`). Result: the session's resume runs the agent on the Mac, where dyson's Claude/Codex session file is missing, and the host's commits never come back. Yet `docs/help/agent.md` "Commits" says a job still brings its commits back after a restart.
+  - **Waiting for an answer**: `finish_on_host` keeps the host worktree with uncommitted changes (`bring_back_so_far`), which is right for a `t3` thread that goes on there. A headless agent's turn is over, though. The answered job does `collect_waiting_on_host` → `bring_back(.., false)`, which keeps the dirty worktree. `set_up` then refuses the host, so the job runs on the Mac without those changes.
+  - **Smaller**: when `host_check` returns `None` for a `claude`/`codex` profile, the reason reads "no t3 CLI on this Mac" (`agent_hosts.rs` `cached_probe`, `hosted.rs` `set_up`). `lost_host_connection` notes "the agent there stops" when only the MCP forward broke, but the agent's own ssh is a separate connection (`ControlMaster=no`).
+
+  ## Done when
+  - [ ] A hosted `claude`/`codex` job taken over after a lotar restart resumes with the ssh agent table (`Hosted::attach` with `thread: false`). Its commits come back at its end, as for `t3`. A test covers it.
+  - [ ] A headless host job that waits for an answer commits its leftovers there and brings everything back, so the answered job can run on either machine. A test covers it.
+  - [ ] The reasons name what is missing for these runners. The lost-connection note says what happens to the agent.
+history:
+- at: 2026-11-27T11:16:52.750365+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

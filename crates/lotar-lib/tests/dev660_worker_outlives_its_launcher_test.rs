@@ -108,3 +108,13 @@ fn a_created_rules_job_starts_after_the_launchers_process_group_is_killed() {
     std::fs::write(&ws.release, "").unwrap();
     wait_until("the second ticket's job did not start after the launcher's process group was killed", Duration::from_secs(30), || started(&ws) == 2);
 }
+
+/// A test's `lotar` call starts no queue worker unless the test asks for one
+/// (removes the variable, as `lotar` above does): a worker that starts late
+/// under load, after its test removed the temp folder, recreates an empty
+/// `.tasks` there from `--tasks-dir`, and the Rust runner's temp-folder check
+/// fails the passing run (DEV-801).
+#[test]
+fn the_tests_start_no_queue_worker_unless_they_ask_for_one() {
+    assert_eq!(std::env::var("LOTAR_AGENT_QUEUE_DISABLE_WORKER").as_deref(), Ok("1"), "the test process starts without queue workers");
+}

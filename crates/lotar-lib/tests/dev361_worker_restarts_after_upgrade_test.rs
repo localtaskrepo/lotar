@@ -80,6 +80,7 @@ fn upgraded_worker_starts_queued_jobs_while_the_old_worker_drains() {
         let mut cmd = Command::new(install_root.join("bin/lotar"));
         cmd.current_dir(&root)
             .env_remove("RUST_TEST_THREADS")
+            .env_remove("LOTAR_AGENT_QUEUE_DISABLE_WORKER")
             .env("LOTAR_IGNORE_HOME_CONFIG", "1")
             .env("LOTAR_AGENT_QUEUE_DIR", root.join("queue"))
             .env("LOTAR_BINARY_WATCH_INTERVAL_MS", "100")

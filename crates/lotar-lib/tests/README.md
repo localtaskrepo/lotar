@@ -10,6 +10,7 @@ General guidance:
 - Prefer fewer, consolidated suites over many tiny files.
 - Reuse shared helpers from `crates/lotar-lib/tests/common`.
 - For environment variables, use `EnvVarGuard::set`/`EnvVarGuard::clear` so the per-variable mutex is held and the previous value is restored on drop; do not remove or set variables directly mid-test. Fixtures (`TestFixtures::new`, `common::temp_dir`) never mutate the process environment, and child commands get test defaults child-scoped via `common::lotar_cmd`.
+- The test process starts with `LOTAR_CHECK_LOCK_HELD=1` (merges never wait for the machine's check lock; set by `reset_lotar_test_environment`, DEV-890) and `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1` (no queue worker outlives its test; set by the process constructor, DEV-801). A test that needs a worker clears the variable for its `lotar` commands (`.env_remove(...)` or `EnvVarGuard::clear`) and waits for the worker to end before its temp folder goes; check-lock tests clear the first and take a port of their own.
 - For networked tests, use readiness checks and test-fast flags (e.g., `LOTAR_TEST_FAST_*`).
 
 Runner policy:

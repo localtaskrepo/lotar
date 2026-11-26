@@ -88,6 +88,7 @@ fn worker_command(fixture: &TestFixtures, ticket: &str) -> Command {
     let mut worker = Command::new(crate::common::lotar_bin());
     worker
         .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "agent", "worker"])
+        .env_remove("LOTAR_AGENT_QUEUE_DISABLE_WORKER")
         .env("LOTAR_IGNORE_HOME_CONFIG", "1")
         .env("LOTAR_AGENT_QUEUE_DIR", &queue_root)
         .current_dir(fixture.get_temp_path())
