@@ -18,6 +18,7 @@ Commands that do not operate on a specific project simply skip step 3, so they e
 Notes:
 - The same chain powers CLI, REST, and MCP. Project-aware commands always resolve the project context first, so they inherit project-level overrides while env and CLI values still win. Use `--config KEY=VALUE` to temporarily override any field without editing YAML (existing per-command flags stay available as shorthands).
 - Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified and honor the same precedence chain.
+- `agent.worktree` merges key by key: a layer that sets some of its keys keeps the lower layers' other keys (see [Config reference](./config-reference.md)).
 - Fields that cannot be set per project skip the project layer. `tasks_folder` is a special case: only the home config can set it (see [Tasks directory resolution](#tasks-directory-resolution)).
 
 Automation rules (`automation.yml`) are resolved separately from config values:

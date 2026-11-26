@@ -504,6 +504,10 @@ fn collect_layer_keys(value: &serde_yaml_ng::Value, prefix: &str, keys: &mut std
         let path = if prefix.is_empty() { key.to_string() } else { format!("{prefix}.{key}") };
         if let Some(flat) = crate::config::fields::flat_for_alias(&path) {
             keys.insert(flat.to_string());
+            // Its keys merge one by one (DEV-905).
+            if flat == "agent_worktree" {
+                collect_layer_keys(child, "agent.worktree", keys);
+            }
             continue;
         }
         let flat_candidate = path.replace('.', "_");
@@ -680,9 +684,7 @@ pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: Global
     if keys.has("agent_automation") || override_config.agent_automation != defaults.agent_automation {
         base.agent_automation = override_config.agent_automation;
     }
-    if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
-        base.agent_worktree = override_config.agent_worktree;
-    }
+    merge_agent_worktree(&mut base.agent_worktree, override_config.agent_worktree, keys);
     if override_config.agent_merge.is_some() {
         base.agent_merge = override_config.agent_merge;
     }
@@ -881,9 +883,7 @@ pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override
     if !override_config.agents.is_empty() {
         resolved.agent_profiles.extend(override_config.agents.into_iter().map(|(k, v)| (k, v.to_detail())));
     }
-    if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
-        resolved.agent_worktree = override_config.agent_worktree;
-    }
+    merge_agent_worktree(&mut resolved.agent_worktree, override_config.agent_worktree, keys);
     if override_config.agent_merge.is_some() {
         resolved.agent_merge = override_config.agent_merge;
     }
@@ -1167,6 +1167,32 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
         resolved.remotes.extend(project_config.remotes);
     }
     // Smart toggles for branch/codeowners remain global/home/env scoped for now.
+}
+
+/// `agent.worktree` merges key by key (DEV-905): a layer's section keeps
+/// the lower layers' keys it doesn't set, so a home section doesn't drop a
+/// repository's `build_root`.
+fn merge_agent_worktree(base: &mut crate::config::types::AgentWorktreeConfig, layer: crate::config::types::AgentWorktreeConfig, keys: &LayerKeys) {
+    let defaults = crate::config::types::AgentWorktreeConfig::default();
+    macro_rules! take {
+        ($field:ident) => {
+            if keys.has(concat!("agent_worktree_", stringify!($field))) || layer.$field != defaults.$field {
+                base.$field = layer.$field;
+            }
+        };
+    }
+    take!(enabled);
+    take!(dir);
+    take!(build_root);
+    take!(branch_prefix);
+    take!(max_parallel_jobs);
+    take!(cleanup_on_done);
+    take!(cleanup_on_failure);
+    take!(cleanup_on_cancel);
+    take!(cleanup_delete_branches);
+    take!(cleanup_ignored_files);
+    take!(cleanup_paths);
+    take!(waiting_run);
 }
 
 fn apply_agent_worktree_override(target: &mut crate::config::types::AgentWorktreeConfig, override_config: crate::config::types::AgentWorktreeConfigOverride) {

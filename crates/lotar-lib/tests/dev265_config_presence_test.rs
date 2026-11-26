@@ -91,3 +91,34 @@ fn broken_config_fails_writes_closed() {
     let created = post(&api, "/api/tasks/add", json!({"title": "u", "project": "ENV", "status": "Done"}));
     assert_ne!(created.status, 201);
 }
+
+/// DEV-905: `agent.worktree` merges key by key. A home section keeps the
+/// repository's keys it doesn't set, and a key it sets back to the default
+/// still wins.
+#[test]
+fn home_agent_worktree_section_merges_key_by_key() {
+    let fixtures = TestFixtures::new();
+    std::fs::write(
+        fixtures.tasks_root.join("config.yml"),
+        "default:\n  project: ENV\nagent:\n  worktree:\n    enabled: true\n    build_root: /tmp/lotar-builds\n    cleanup_ignored_files: false\n",
+    )
+    .unwrap();
+    let home = tempfile::tempdir().unwrap();
+    std::fs::write(home.path().join(".lotar"), "agent:\n  worktree:\n    max_parallel_jobs: 2\n    cleanup_ignored_files: true\n").unwrap();
+    let output = common::lotar_cmd()
+        .unwrap()
+        .current_dir(fixtures.get_temp_path())
+        .env("HOME", home.path())
+        .env("LOTAR_IGNORE_HOME_CONFIG", "0")
+        .args(["config", "show", "--format", "json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let worktree = &json["config"]["agent_worktree"];
+    assert_eq!(worktree["build_root"], "/tmp/lotar-builds", "{json}");
+    assert_eq!(worktree["enabled"], true, "{json}");
+    assert_eq!(worktree["max_parallel_jobs"], 2, "{json}");
+    assert_eq!(worktree["cleanup_ignored_files"], true, "{json}");
+    assert_eq!(json["sources"]["agent.worktree.build_root"], "global", "{json}");
+}

@@ -1,11 +1,11 @@
 title: 'An answer that sets an agent assignee starts no job: STD-336 sat on @fix with no job'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T23:49:30.471883+00:00
-modified: 2026-11-26T21:51:04.461253+00:00
+modified: 2026-11-26T23:18:21.164085+00:00
 relationships:
   related:
   - DEV-576
@@ -120,6 +120,32 @@ comments:
 - date: 2026-11-26T21:51:04.461253+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T204618.934Z-46 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T204618.934Z-46 why.'
+- date: 2026-11-26T23:18:20.834627+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-860` is in `main`.
+
+    - Rebased `agent/DEV-860` onto `main` (`3d82aa877238`): `81a410f9e806`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `81a410f9e806`
+    - Amended the pending `.tasks` changes into the merged commit: `97bb47b6535e`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[bug:answer-assign-no-job]`
+  report:
+    commits:
+    - hash: 97bb47b65
+      what: 'DEV-860 An answer that sets an agent assignee starts no job: STD-336 sat on @fix with no job'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae97157ffb604bb7fcfc52baba1b3bbc0834c21f614f80ba1935c9098e6ebea9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5e4bb562ec08602a2f08f993f1d7a10ae175be4be5f116a4db5cf48d2e23d257
@@ -132,9 +158,6 @@ description: |-
   Done: the answer starts the job (or comments why it waits). standards' live check now restarts such a ticket (STD-343), so this is no longer a silent stall.
 tags:
 - health
-- fix-retried
-- review-returned
-- job-paused
 custom_fields:
   finding: bug:answer-assign-no-job
 history:
@@ -314,3 +337,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:18:20.834627+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:18:21.164085+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, fix-retried, review-returned, job-paused
+    new: health

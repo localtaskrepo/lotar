@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-26T23:15:45.898680+00:00
+modified: 2026-11-26T23:19:47.304253+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-33
@@ -63,6 +63,14 @@ comments:
       result: not_run
       reason: no code changed; waits for HARN-33
     next: 'When harnessmux:HARN-33 is released: bump harnessmux in Cargo.toml and build this ticket''s Done when'
+- date: 2026-11-26T23:19:47.304253+00:00
+  author: claude
+  text: |-
+    HARN-33's interface, from its job (for the build here):
+
+    - t3 profile field `environment` (id or label; CLI `--environment`); every T3 MCP call gets `environmentId`; the thread follows by polling `t3_thread_read`.
+    - The start fails when the environment is unknown, not `reachable`, or has no T3 project whose `workspaceRoot` equals the session's project path as a string. So lotar must register dyson's T3 project at exactly the main checkout's absolute path.
+    - `settle` reads the environment from the session record's profile.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
@@ -340,3 +348,7 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-26T23:19:47.304253+00:00
+  actor: claude
+  changes:
+  - field: comment_added
