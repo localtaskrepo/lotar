@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T17:08:00.727080+00:00
+modified: 2026-11-26T18:06:42.769744+00:00
 relationships:
   related:
   - DEV-860
@@ -16,6 +16,7 @@ relationships:
   - DEV-850
   - DEV-872
   - DEV-887
+  - DEV-904
 comments:
 - date: 2026-11-26T04:58:33.643514+00:00
   author: claude
@@ -107,3 +108,9 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-26T18:06:42.769744+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-887"]}'
+    new: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-887","DEV-904"]}'

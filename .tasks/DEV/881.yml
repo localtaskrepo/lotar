@@ -1,14 +1,18 @@
 title: 'Status feed: a small standard endpoint with each instance''s running jobs, queue and who it waits on'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T21:43:44.403743+00:00
-modified: 2026-11-26T17:28:10.117868+00:00
+modified: 2026-11-26T18:01:31.279884+00:00
 relationships:
   related:
   - DEV-797
+  - DEV-835
+  - DEV-837
+  - DEV-882
+  - DEV-883
 comments:
 - date: 2026-11-26T02:07:06.711209+00:00
   author: claude
@@ -65,6 +69,37 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-881` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-881` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T18:01:22.359978+00:00
+  author: claude
+  text: |-
+    Merged into main as `e709ce7e8`, not pushed: main has to be rebased onto `origin/main` first, which DEV-882 and DEV-883 are queued to do.
+
+    - First rebase: conflict in `crates/lotar-lib/tests/integration.rs`, two module lines side by side (`dev852_…` from main, `dev881_status_feed_test`). Kept both.
+    - Semantic conflict, found by lint: DEV-835 replaced `QueueOverview.pause` with `pauses: Vec<QueuePause>`, and DEV-837 added `disk: Option<DiskHold>`. `status_feed.rs` now sets `held_reason` from every hold (memory, disk, each pause), joined by `; `. The JSON format is unchanged. `docs/help/serve.md` and `docs/openapi.json` now mention the disk hold. I amended this into the ticket's commit.
+    - Main moved on (DEV-883, DEV-797) after the first full run, so I rebased again (no conflicts) and reran every check on the new hash: `npm ci`, `lint:agent`, `test:agent` and `smoke` all passed.
+    - `git merge --ff-only` landed it. The main checkout's `.tasks` changes were amended into `e709ce7e8`, and the checkout is clean.
+    - No rules or profiles changed, so no `lotar trust` was needed.
+    - Push: `main` is ahead 4 and behind 1 (`71791a991 DEV-804 Release v0.15.7`). The owner already decided on rebase-and-push in DEV-882/DEV-883, and both are Todo for `@fix`, so I left it to them.
+    - Staff on the same Mac reaches the feed at `http://localhost:<port>/api/status`.
+  report:
+    commits:
+    - hash: e709ce7e8
+      what: DEV-881 status feed GET /api/status, rebased onto main, adapted to the queue's new pauses list and disk hold
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2590 Rust tests plus the UI, release, hooks and seed suites
+    - command: npm run -s smoke
+      result: passed
+      reason: 411 tests
+    - command: git push
+      result: not_run
+      reason: main is 1 behind origin/main (71791a991 DEV-804 Release v0.15.7); DEV-882/DEV-883 hold the rebase-and-push decision
+    next: 'DEV-882/DEV-883 fix job: rebase main onto origin/main and push; that pushes e709ce7e8 too'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85ab6982e8b10a529998e720ae87709922febb25e5570efd75bed6f19ac4f22d
 description: |-
@@ -138,3 +173,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T18:01:22.359978+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:01:22.642854+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-797"]}'
+    new: '{"related":["DEV-797","DEV-835","DEV-837","DEV-882","DEV-883"]}'
+- at: 2026-11-26T18:01:31.279884+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

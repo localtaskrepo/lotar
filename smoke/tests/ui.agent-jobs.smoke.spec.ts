@@ -939,6 +939,85 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
+    it('scrolls the log to a search match deep in a long tool output (DEV-880)', async ({ expect }) => {
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-log-seek-');
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml) },
+        });
+        try {
+            const task = await workspace.addTask('Job log seek', { args: ['-p', 'UIAG'] });
+            const server = await startLotarServer(workspace);
+            const log = path.join(workspace.root, '.logs', 'job-log-seek-1.jsonl');
+            const at = new Date().toISOString();
+            const line = (value: Record<string, unknown>) => `${JSON.stringify(value)}\n`;
+            const event = (kind: string, sequence: number, fields: Record<string, unknown> = {}) =>
+                line({ type: 'event', kind, at, sequence, ...fields });
+            const long = [...Array.from({ length: 40 }, (_, index) => `line ${index}`), 'npm notice'].join('\n');
+            const messages = Array.from({ length: 20 }, (_, index) =>
+                event('agent_job_message', 2 + index, { message: `Step ${index} done.` }),
+            ).join('');
+            try {
+                await fs.outputFile(
+                    log,
+                    line({
+                        type: 'header',
+                        job_id: 'job-log-seek-1',
+                        ticket_id: task.id,
+                        runner: 'claude',
+                        created_at: at,
+                        agent_profile: 'mock',
+                    }) +
+                        line({ type: 'status', status: 'completed', at }) +
+                        event('agent_job_started', 1) +
+                        messages +
+                        event('agent_job_tool', 30, {
+                            message: 'Terminal',
+                            tool: {
+                                id: 'a',
+                                kind: 'execute',
+                                title: 'Terminal',
+                                status: 'completed',
+                                input: 'make test',
+                                started_at: at,
+                                output: long,
+                            },
+                        }) +
+                        event('agent_job_message', 31, { message: 'All green.' }),
+                );
+                await withPage(`${server.url}/agents?job=job-log-seek-1`, async (page) => {
+                    await page.setViewportSize({ width: 1440, height: 900 });
+                    await waitForText(page, '.log-panel', 'All green.');
+                    const panel = page.locator('.log-panel');
+                    const list = panel.locator('.log-list');
+                    // Scroll to the top, so the match starts below the list's visible part.
+                    await list.evaluate((el) => (el.scrollTop = 0));
+
+                    await panel.getByRole('searchbox', { name: 'Search the log' }).fill('notice');
+                    await expect.poll(() => panel.locator('.job-log__matches').textContent()).toBe('1 match');
+                    // The highlighted word lies inside the list's visible part.
+                    await expect
+                        .poll(() =>
+                            list.evaluate((el) => {
+                                const range = [...(CSS.highlights.get('job-log-search') ?? [])][0];
+                                if (!(range instanceof Range)) return 'no highlight';
+                                const box = el.getBoundingClientRect();
+                                const rect = range.getBoundingClientRect();
+                                return el.scrollTop > 0 && rect.top >= box.top && rect.bottom <= box.bottom
+                                    ? 'visible'
+                                    : `hidden at ${rect.top} in ${box.top}-${box.bottom}, scrolled ${el.scrollTop}`;
+                            }),
+                        )
+                        .toBe('visible');
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+            await agents.dispose();
+        }
+    });
+
     it('filters the log, folds its tool calls and shows what a running job does (DEV-769)', async ({ expect }) => {
         const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-log-view-');
         const workspace = await SmokeWorkspace.create({

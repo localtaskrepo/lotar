@@ -1,0 +1,55 @@
+title: 'Repo health 2026-11-26: Commits only on this Mac: branches and 2 more'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-26T18:06:40.598615+00:00
+modified: 2026-11-26T18:06:43.788239+00:00
+relationships:
+  related:
+  - DEV-869
+  - DEV-889
+description: |-
+  3 findings of the daily repo-health run on 2026-11-26 (`repos.ts --report`), in one ticket (owner 2026-11-22, STD-299). Fix each the way its section says; the ticket is done when no check command below lists its finding any more.
+
+  ## Commits only on this Mac: branches
+
+  4 commits on no remote, only on this Mac: main 4 (git log <branch> --not --remotes)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+  Done when: git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
+
+  ## Waiting for the owner without a question: DEV-889
+
+  DEV-889 (Agent queue: 7 jobs sit in a queue file keyed by the relative path .tasks, which no worker reads) is HelpNeeded, but its last comment asks no question: "Answer: drop (Drop all 7 and delete the file) (answered in INBOX-767)" (lotar show DEV-889)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-889]` while the problem is there.
+
+  Done when: The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+
+  ## Waiting for the owner without a question: DEV-869
+
+  DEV-869 (lotar trust --status shows a structured run command as a JSON blob with its default fields) is HelpNeeded, but its last comment asks no question: "Answer: land (Fast-forward main to 6c501d7ed despite the flake) (answered in INBOX-766)" (lotar show DEV-869)
+
+  Check: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-869]` while the problem is there.
+
+  Done when: The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+- light
+custom_fields:
+  finding: health:2026-11-26
+history:
+- at: 2026-11-26T18:06:42.770954+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-869","DEV-889"]}'
+- at: 2026-11-26T18:06:43.788239+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'

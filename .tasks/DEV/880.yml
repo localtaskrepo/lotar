@@ -5,11 +5,13 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T20:09:11.247882+00:00
-modified: 2026-11-26T16:53:47.207053+00:00
+modified: 2026-11-26T18:09:03.888446+00:00
 relationships:
   related:
   - DEV-859
   - DEV-797
+  - DEV-882
+  - DEV-883
 comments:
 - date: 2026-11-26T01:37:58.758699+00:00
   author: claude
@@ -57,6 +59,71 @@ comments:
       - The page never moves, including with "Full height".
       - No visible problems.
     - Not run: the full `npm run lint`, `npm test` and `npm run smoke`. The merge runs them (DEV-797).
+- date: 2026-11-26T18:08:27.241146+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    70f1095a0 DEV-883 A bad value in the home config's agents block drops every agent profile, and config validate still passes
+    fd6d2b098 DEV-882 Record memory-gate holds and each job's queued time in the job records
+    ```.
+
+    - Rebased `agent/DEV-880` onto `main` (`70f1095a0f60`): `53d955ce9dd1`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-880` onto `main` (`3d83a25ad80a`): `142c38707de2`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-880` onto `main` (`e709ce7e8fc3`): `f2992bcb288e`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `f2992bcb288e`
+    - Amended the pending `.tasks` changes into the merged commit: `e0d764c492be`
+  report:
+    commits:
+    - hash: 3d83a25ad
+      what: 'DEV-797 Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
+    - hash: e709ce7e8
+      what: 'DEV-881 Status feed: a small standard endpoint with each instance''s running jobs, queue and who it waits on'
+    - hash: f2992bcb2
+      what: 'DEV-880 Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log''s visible area'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
+- date: 2026-11-26T18:09:03.617780+00:00
+  author: claude
+  text: |-
+    Merged on local `main` as `fb0b7d79c`. Not pushed: local `main` is 1 commit behind `origin/main`.
+
+    - lotar had already fast-forwarded `main` and run lint, `test:agent` and smoke on `f2992bcb2`. I didn't rerun them.
+    - I amended lotar's handoff comment (`.tasks/DEV/880.yml`) into the merged commit: `e0d764c49` → `fb0b7d79c`.
+    - Not trusted: the merge changed no rule or config files.
+    - Not pushed: `origin/main` has `71791a991 DEV-804 Release v0.15.7`, which local `main` lacks, so a push would be refused. Triage already decided (DEV-882, DEV-883) to rebase local `main` onto `origin/main` and push. Both tickets are Todo with `@fix` for that step, and merge jobs mustn't rebase the main checkout. That push will include `fb0b7d79c`.
+  report:
+    commits:
+    - hash: fb0b7d79c
+      what: DEV-880 scroll the job log to the first search match (merged on local main)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge on f2992bcb2
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge on f2992bcb2
+    - command: npm run -s smoke
+      result: passed
+      reason: lotar's merge on f2992bcb2
+    next: Push waits on DEV-882/DEV-883's rebase of local main onto origin/main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A97c2a082c1f1163a39163265517af33f7ba73c60bf7c963c42ad538ff8e315cc
 - attachment: dev880-after-dark-1440.945c319fdd505321327d15d116caedd6.png
@@ -257,3 +324,17 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T18:08:27.241146+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:09:03.617780+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:09:03.888446+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-859","DEV-797"]}'
+    new: '{"related":["DEV-859","DEV-797","DEV-882","DEV-883"]}'

@@ -153,6 +153,53 @@ describe('AgentJobLog (DEV-766, DEV-769)', () => {
         expect(calls().map((call) => call.element.open)).toEqual([false, false, false])
     })
 
+    it('scrolls the list to the first match below its visible part, not on new entries (DEV-880)', async () => {
+        const long = [...Array.from({ length: 20 }, (_, index) => `line ${index}`), 'npm notice'].join('\n')
+        const entries: AgentJobLogEntry[] = [
+            note(1, 'Starting.', 'agent_job_message'),
+            tool(2, { id: 'a', input: 'make test', output: long }),
+        ]
+        const wrapper = mount(AgentJobLog, { props: { entries }, attachTo: document.body })
+        const list = wrapper.get('.log-list').element as HTMLElement
+        // jsdom has no layout: the list shows 420 px from y 100, the match is 800 px down its content.
+        let scrollTop = 0
+        Object.defineProperty(list, 'scrollTop', {
+            get: () => scrollTop,
+            set: (value: number) => {
+                scrollTop = value
+            },
+        })
+        Object.defineProperty(list, 'clientHeight', { value: 420 })
+        Object.defineProperty(list, 'scrollHeight', { value: 2000 })
+        list.getBoundingClientRect = () => new DOMRect(0, 100, 600, 420)
+        Range.prototype.getBoundingClientRect = () => new DOMRect(0, 100 + 800 - scrollTop, 60, 15)
+        try {
+            await wrapper.get('input.job-log__search').setValue('npm')
+            await flushPromises()
+            // The match goes a third from the list's top: 800 - 420 / 3.
+            expect(scrollTop).toBe(660)
+
+            // A match already in view leaves the list where it is.
+            await wrapper.get('input.job-log__search').setValue('notice')
+            await flushPromises()
+            expect(scrollTop).toBe(660)
+
+            // New entries don't pull the list back to the match.
+            scrollTop = 0
+            await wrapper.setProps({ entries: [...entries, note(3, 'Still on npm.', 'agent_job_message')] })
+            await flushPromises()
+            expect(scrollTop).toBe(0)
+
+            // Clearing the search doesn't move it either.
+            await wrapper.get('input.job-log__search').setValue('')
+            await flushPromises()
+            expect(scrollTop).toBe(0)
+        } finally {
+            Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect')
+            wrapper.unmount()
+        }
+    })
+
     it('shows the result once: the final reply in the result card, a repeated failure note dropped', () => {
         const done = mount(AgentJobLog, {
             props: {

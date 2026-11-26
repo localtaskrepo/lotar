@@ -407,8 +407,35 @@ function highlight() {
   }
   searchRanges.set(highlightKey, ranges)
   applyHighlights()
+  if (seekMatch) {
+    seekMatch = false
+    scrollToMatch(ranges)
+  }
 }
 watch([items, query], () => nextTick(highlight))
+
+// Typing a search, or switching the view while one is on, scrolls the list to the first match
+// that has a box (one in a folded group has none). New entries leave the list where it is.
+let seekMatch = false
+watch([query, view, thinking], () => (seekMatch = !!query.value.trim()))
+function scrollToMatch(ranges: Range[]) {
+  const el = listEl.value
+  // At full height the list doesn't scroll, and the page stays put.
+  if (!el || el.scrollHeight <= el.clientHeight) return
+  const box = el.getBoundingClientRect()
+  for (const range of ranges) {
+    // jsdom has no layout for ranges.
+    if (typeof range.getBoundingClientRect !== 'function') return
+    const rect = range.getBoundingClientRect()
+    if (!rect.width && !rect.height) continue
+    if (rect.top < box.top || rect.bottom > box.bottom) {
+      el.scrollTop += rect.top - box.top - el.clientHeight / 3
+      // Stop following now, before the scroll event, so a new entry doesn't jump to the end.
+      onScroll()
+    }
+    return
+  }
+}
 </script>
 
 <script lang="ts">
