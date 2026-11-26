@@ -57,7 +57,8 @@ impl ConfigHandler {
             if result.has_errors() || result.has_warnings() {
                 has_errors |= result.has_errors();
                 all_results.push((ValidationScope::Global, "Global Config".to_string(), result));
-            } else {
+            } else if !has_errors {
+                // Not after a home config or resolution error above it (DEV-893).
                 renderer.emit_success("Global configuration is valid");
             }
         }

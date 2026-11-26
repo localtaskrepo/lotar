@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:27:28.763305+00:00
-modified: 2026-11-26T20:15:35.925713+00:00
+modified: 2026-11-27T01:59:54.134349+00:00
 relationships:
   depends_on:
   - DEV-796
@@ -32,8 +32,6 @@ description: |-
   - [ ] A test inits a workspace from the agent-team template, makes a Blocked ticket whose prerequisites are done, runs `lotar automation run "Prerequisites done: continue the waiting ticket"` twice and gets exactly one agent job and one tell comment; the second run reports none match.
   - [ ] The ticket is InProgress after the first run, also while its job waits for a free slot.
   - [ ] `lotar config validate` still passes on a workspace from the template.
-tags:
-- waits
 history:
 - at: 2026-11-26T17:27:29.098761+00:00
   actor: claude
@@ -93,3 +91,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T01:59:54.134349+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''

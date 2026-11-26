@@ -1,11 +1,11 @@
 title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-27T00:08:19.085022+00:00
+modified: 2026-11-27T01:59:50.842376+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -608,6 +608,29 @@ comments:
       - `cargo nextest run --workspace -E 'test(agent_team) | test(templates) | test(agent_templates) | test(shipped_agent)'`: 14 passed.
       - In a scratch repo with its own queue directory: `lotar automation simulate --event commented` on an InProgress ticket held by `@implement` shows the `tell_agent` to `@implement`. The scratch repo is removed.
     - No stray files, a single commit, no UI changes. The minor finding [DEV-902](https://lotar.pyxzl.net/task/DEV-902) is already filed. No new tickets.
+- date: 2026-11-27T01:59:50.554422+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-796` is in `main`.
+
+    - Rebased `agent/DEV-796` onto `main` (`bcfe9af4de24`): `82d3c59caccd`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `82d3c59caccd`
+    - Amended the pending `.tasks` changes into the merged commit: `ba4c02f1515b`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: ba4c02f15
+      what: 'DEV-796 Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
@@ -663,9 +686,6 @@ description: |-
   - [ ] docs/help/templates.md describes it, with what it adds over agent-reviewed.
 tags:
 - proposal
-- job-paused
-- fix-retried
-- review-returned
 history:
 - at: 2026-11-22T18:50:35.515064+00:00
   actor: claude
@@ -1275,3 +1295,16 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916"]}'
     new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916","DEV-861"]}'
+- at: 2026-11-27T01:59:50.554422+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T01:59:50.842376+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: proposal, job-paused, fix-retried, review-returned
+    new: proposal

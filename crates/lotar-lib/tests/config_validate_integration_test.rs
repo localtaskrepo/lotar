@@ -320,7 +320,8 @@ project.name: "Existing Project"
 }
 
 /// DEV-883: a bad value in one agent profile of the home config skipped the whole home config, every profile with it,
-/// while validate passed. Validate now fails naming the profile and key, and every load warns that it is ignored.
+/// while validate passed. Validate now fails naming the profile and key, without a contradicting success line (DEV-893),
+/// and every load warns that it is ignored.
 #[test]
 fn test_config_validate_fails_on_unparsable_home_agent_profile() {
     let temp_dir = TempDir::new().unwrap();
@@ -349,6 +350,8 @@ fn test_config_validate_fails_on_unparsable_home_agent_profile() {
     assert!(!output.status.success(), "stdout: {stdout}\nstderr: {stderr}");
     assert!(format!("{stdout}{stderr}").contains("Invalid type for config field 'agents.bad.stall_timeout_seconds'"), "stdout: {stdout}\nstderr: {stderr}");
     assert!(!stdout.contains("All configurations are valid"), "{stdout}");
+    // DEV-893: no success line right after the home config error.
+    assert!(!format!("{stdout}{stderr}").contains("Global configuration is valid"), "stdout: {stdout}\nstderr: {stderr}");
 
     let output = run(&["--format", "json", "config", "show"]);
     let stderr = String::from_utf8_lossy(&output.stderr);
