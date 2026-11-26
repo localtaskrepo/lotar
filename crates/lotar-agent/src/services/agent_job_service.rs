@@ -4807,7 +4807,16 @@ fn drive_session(
         Ok(turn) => turn,
         Err(err) => return RunEnd::Failed(format!("Could not send the prompt to the session {}: {err}", session.name())),
     };
-    let settings = TurnSettings { first, prefixes, budget: profile.max_budget_usd, stall_timeout_seconds: profile.stall_timeout_seconds, agent: &agent, link };
+    let usage_source = crate::services::provider_usage::Source::of(profile);
+    let settings = TurnSettings {
+        first,
+        prefixes,
+        budget: profile.max_budget_usd,
+        stall_timeout_seconds: profile.stall_timeout_seconds,
+        agent: &agent,
+        link,
+        usage_source: &usage_source,
+    };
     drive_turns(job_id, tasks_dir, session, &mut events, settings, meter, context_messages)
 }
 
@@ -4823,6 +4832,8 @@ struct TurnSettings<'a> {
     /// The session's agent and link when the job started.
     agent: &'a str,
     link: Option<&'a str>,
+    /// Whom the agent's usage-limit readings are for (DEV-862).
+    usage_source: &'a crate::services::provider_usage::Source,
 }
 
 /// What the job loop asks of a session besides its events.
@@ -4858,7 +4869,7 @@ fn drive_turns(
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
     use harnessmux::EventBody;
-    let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, link } = settings;
+    let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, link, usage_source } = settings;
     let mut reply = ReplyStream::default();
     // The agent's thinking, by paragraph like its reply (DEV-766).
     let mut thought = ReplyStream::default();
@@ -5042,6 +5053,14 @@ fn drive_turns(
                 record_and_emit(state, "agent_job_progress", Some(message));
             }),
             EventBody::Usage(usage) => {
+                if let Some(limit) = &usage.rate_limit {
+                    crate::services::provider_usage::record(crate::services::provider_usage::UsageReading::from_rate_limit(
+                        usage_source,
+                        limit,
+                        job_id,
+                        jiff::Timestamp::now(),
+                    ));
+                }
                 if usage.context_used.is_some() || usage.context_size.is_some() {
                     let context = crate::api_types::AgentJobUsage { context_used: usage.context_used, context_size: usage.context_size, ..Default::default() };
                     update_job(job_id, |state| state.record.usage.get_or_insert_with(Default::default).add(&context));
@@ -5918,6 +5937,16 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
     if limit.resets_at.is_none() {
         limit.resets_at = crate::services::usage_limit::reset_named_in(failure_texts(job_id, None).iter().map(String::as_str), now);
     }
+    // The only reading Codex and T3 Code give (DEV-862); a reset too far
+    // away to believe is left out, as the retry leaves it.
+    let profile = resolve_profile(config, &request).unwrap_or_else(|_| AgentProfileDetail {
+        runner: runner.clone(),
+        provider: request.provider.clone(),
+        ..AgentProfileDetail::default()
+    });
+    let source = crate::services::provider_usage::Source::of(&profile);
+    let named_reset = limit.resets_at.filter(|_| limit.ignored_reset(now).is_none());
+    crate::services::provider_usage::record(crate::services::provider_usage::UsageReading::rejected(&source, &limit.line, named_reset, job_id, now));
     let resumes_at = limit.resume_at(now).to_rfc3339();
     request.ticket_id = ticket_id;
     // T3 Code pauses the thread's turn and resumes it at the reset by
@@ -5933,7 +5962,7 @@ fn usage_limit_pause(job_id: &str, tasks_dir: &std::path::Path, config: &Resolve
         retry.not_before = Some(resumes_at.clone());
         AgentQueueService::requeue_first(tasks_dir, &retry)
     })?;
-    let provider = request.provider.clone().or_else(|| resolve_profile(config, &request).ok()?.provider).unwrap_or_else(|| runner.clone());
+    let provider = profile.provider.clone().unwrap_or_else(|| runner.clone());
     let profile = request.agent.as_deref().map_or_else(|| format!("the {runner} runner"), |agent| format!("@{agent}"));
     let when = match (limit.resets_at, limit.ignored_reset(now)) {
         (_, Some(ignored)) => format!("after the default wait (ignored the named reset {}, more than 7 days away)", ignored.to_rfc3339()),
@@ -8158,7 +8187,9 @@ mod dev520_session_events_tests {
     }
 
     fn drive(events: &mut SessionEvents, tasks_dir: &Path, job_id: &str) -> RunEnd {
-        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None };
+        let usage_source = crate::services::provider_usage::Source { provider: "fake".into(), account: None };
+        let settings =
+            TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None, usage_source: &usage_source };
         drive_turns(job_id, tasks_dir, &Idle, events, settings, CostMeter::default(), &mut Vec::new())
     }
 
@@ -8300,7 +8331,9 @@ mod dev520_session_events_tests {
             tx.send(event(seq, 1, body)).unwrap();
         }
         tx.send(Event { turn: None, ..event(seq + 1, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
-        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None };
+        let usage_source = crate::services::provider_usage::Source { provider: "fake".into(), account: None };
+        let settings =
+            TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None, usage_source: &usage_source };
         drive_turns("dev644-test", tasks_dir, &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new())
     }
 
@@ -8319,6 +8352,27 @@ mod dev520_session_events_tests {
         let RunEnd::Failed(_) = ends_idle_after(vec![], dir.path()) else { panic!("a session that ends before the first turn ends fails the job") };
     }
 
+    /// The agent's usage window goes to `lotar usage` (DEV-862).
+    #[test]
+    fn a_usage_window_the_agent_reports_is_saved() {
+        let dir = tempfile::tempdir().unwrap();
+        // nextest runs each test in its own process.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", dir.path()) };
+        let limit = harnessmux::RateLimit {
+            status: "allowed_warning".into(),
+            window: Some("seven_day".into()),
+            resets_at: Some("2026-12-01T16:00:00.000Z".into()),
+            utilization: Some(0.89),
+        };
+        let usage = EventBody::Usage(Usage { rate_limit: Some(limit), ..Usage::default() });
+        assert!(matches!(ends_idle_after(vec![usage, finished()], dir.path()), RunEnd::Exited(Some(0))));
+        let readings = crate::services::provider_usage::readings().unwrap();
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+        let [reading] = readings.as_slice() else { panic!("one reading: {readings:?}") };
+        assert_eq!((reading.provider.as_str(), reading.window.as_deref(), reading.used_percent), ("fake", Some("seven_day"), Some(89.0)));
+        assert_eq!((reading.resets_at.as_deref(), reading.job_id.as_deref()), (Some("2026-12-01T16:00:00.000Z"), Some("dev644-test")));
+    }
+
     /// A turn that fails on a usage limit keeps its error as the job's last message, which becomes its summary;
     /// the note that the budget went unchecked is in the log only (DEV-704).
     #[test]
@@ -8331,7 +8385,9 @@ mod dev520_session_events_tests {
         let (mut events, _) = SessionEvents::open(Err("no log".into()), || rx);
         tx.send(event(1, 1, EventBody::failed(error))).unwrap();
         tx.send(Event { turn: None, ..event(2, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
-        let settings = TurnSettings { first: 1, prefixes: &[], budget: Some(5.0), stall_timeout_seconds: None, agent: "fake", link: None };
+        let usage_source = crate::services::provider_usage::Source { provider: "fake".into(), account: None };
+        let settings =
+            TurnSettings { first: 1, prefixes: &[], budget: Some(5.0), stall_timeout_seconds: None, agent: "fake", link: None, usage_source: &usage_source };
         let end = drive_turns(job_id, dir.path(), &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new());
         let state = super::JOB_REGISTRY.lock().unwrap().jobs.remove(job_id).unwrap();
         assert!(matches!(end, RunEnd::Exited(Some(1))));

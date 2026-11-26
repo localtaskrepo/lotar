@@ -253,6 +253,10 @@ pub enum Commands {
         revoke: bool,
     },
 
+    /// Each provider's newest usage-limit reading from agent jobs: used
+    /// share per window and its reset time
+    Usage,
+
     /// Git integration helpers (hooks, status checks)
     Git {
         #[command(subcommand)]

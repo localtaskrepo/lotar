@@ -53,6 +53,7 @@ fn is_valid_command(command: &str) -> bool {
             | "serve"
             | "whoami"
             | "trust"
+            | "usage"
             | "stats"
             | "sprint"
             | "release"
@@ -149,6 +150,16 @@ fn main() {
 
     // Archived tasks are read-only unless the command was forced (DEV-4).
     let _archived_writes = lotar::storage::operations::allow_archived_writes(cli.force_archived);
+
+    // Machine-wide, so no tasks directory (DEV-862).
+    if matches!(cli.command, Commands::Usage) {
+        let renderer = output::OutputRenderer::new(cli.format, if cli.verbose { output::LogLevel::Info } else { cli.log_level });
+        if let Err(error) = lotar::cli::handlers::usage::UsageHandler::execute(&renderer) {
+            renderer.emit_error(&error);
+            std::process::exit(1);
+        }
+        return;
+    }
 
     // Resolve tasks directory
     let relationship_command = matches!(&cli.command, Commands::Task { action: Some(TaskAction::Relationships(_)) });
@@ -866,6 +877,7 @@ fn main() {
         Commands::Trust { status, revoke } => {
             lotar::cli::handlers::trust::TrustHandler::execute(status, revoke, &resolver, &renderer).inspect_err(|e| renderer.emit_error(e))
         }
+        Commands::Usage => Ok(()),
         Commands::Completions(args) => {
             renderer.log_info("BEGIN COMPLETIONS");
             match CompletionsHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {

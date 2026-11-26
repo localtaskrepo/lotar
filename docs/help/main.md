@@ -35,7 +35,7 @@ lotar serve --open
 | Update ownership | `lotar assignee <id> <name|@me>` |
 | Track deadlines and estimates | `lotar due-date`, `lotar effort` |
 | Capture discussion | `lotar comment` or use the web UI task panel |
-| Run agent jobs | `lotar agent run`, `lotar agent list-running` |
+| Run agent jobs | `lotar agent run`, `lotar agent list-running`; each provider's usage limits: `lotar usage` |
 | Sync with Jira or GitHub | `lotar pull <remote>`, `lotar push <remote>`, `lotar sync check <remote>` (see [Sync](./sync.md)) |
 | Watch metrics | `lotar stats`, `lotar sprint ...`, or the Insights tab in the browser |
 | Plan and ship releases | `lotar release create 0.15.0`, `lotar release add 0.15.0 --select 'status:done'`, `lotar release release 0.15.0`, or the Releases page (see [Releases](./releases.md)) |

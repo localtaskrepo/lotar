@@ -266,6 +266,7 @@ A job that stops on its provider's usage limit doesn't fail either: it pauses un
 - **Again.** A retry that hits the limit again pauses again, as often as it happens. One that completes or fails runs its `job_completed` or `job_failed` rules.
 - **T3 Code resumes the turn.** When T3 Code itself resumes the paused job's thread after the reset, and the ticket's only queued entries are such retries, the thread is [taken over](#t3-code-threads) as a job (with the status and assignee change the retry carried) and the retries leave the queue, so the work doesn't run twice. Any other queued job still waits for the thread.
 - `lotar agent list-jobs` shows the job as `paused (until <time>)` (JSON: `resumes_at`); `lotar agent queue` shows the entry's `not_before` and, while every entry waits for a reset, `waiting for a provider's usage limit to reset`. `lotar agent queue remove <ID>` drops the retry.
+- `lotar usage` shows the limit as a `rejected` reading with its reset time, beside the windows the Claude runner reports during its turns ([usage](usage.md)).
 
 ## Status and assignee during a job
 

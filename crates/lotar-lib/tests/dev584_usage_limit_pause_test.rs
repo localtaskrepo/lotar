@@ -214,6 +214,41 @@ fn codexs_usage_limit_pauses_the_job_until_the_reset_it_names() {
     let text = lotar(&ws).args(["agent", "list-jobs"]).output().unwrap();
     let text = String::from_utf8_lossy(&text.stdout);
     assert!(text.contains(&format!("paused (until {resumes_at})")), "{text}");
+
+    // `lotar usage` has the limit as Codex's reading (DEV-862): T3 Code reports no windows.
+    let usage = json(&ws, &["usage"]);
+    let reading = &usage["readings"][0];
+    assert_eq!((&reading["provider"], &reading["status"], &reading["window"]), (&"codex".into(), &"rejected".into(), &serde_json::Value::Null), "{usage}");
+    assert_eq!(reading["resets_at"].as_str().and_then(|at| at.parse::<Timestamp>().ok()), Some(reset), "{usage}");
+    assert_eq!(usage["readings"].as_array().map(Vec::len), Some(1), "{usage}");
+}
+
+/// `lotar usage` needs no tasks directory: no file is an empty list, a
+/// broken one an error that names it (DEV-862).
+#[test]
+fn lotar_usage_lists_the_readings_from_any_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let queue = dir.path().join("queue");
+    let usage = |args: &[&str]| Command::new(common::lotar_bin()).current_dir(dir.path()).env("LOTAR_AGENT_QUEUE_DIR", &queue).args(args).output().unwrap();
+    let empty = usage(&["--format", "json", "usage"]);
+    assert!(empty.status.success(), "{empty:?}");
+    let empty: serde_json::Value = serde_json::from_slice(&empty.stdout).unwrap();
+    assert_eq!(empty["readings"], serde_json::json!([]), "{empty}");
+    assert!(!dir.path().join(".tasks").exists(), "it creates no tasks directory");
+
+    std::fs::create_dir_all(&queue).unwrap();
+    std::fs::write(
+        queue.join("usage.json"),
+        r#"{"readings":[{"provider":"claude","account":null,"window":"seven_day","status":"allowed_warning","used_percent":26.0,"resets_at":"2026-12-01T16:00:00.000Z","read_at":"2026-11-25T12:00:00Z","job_id":"j1"}]}"#,
+    )
+    .unwrap();
+    let text = usage(&["usage"]);
+    let text = String::from_utf8_lossy(&text.stdout);
+    assert!(text.contains("PROVIDER") && text.contains("seven_day  26%   allowed_warning  2026-12-01T16:00:00.000Z"), "{text}");
+
+    std::fs::write(queue.join("usage.json"), "not json").unwrap();
+    let broken = usage(&["usage"]);
+    assert!(!broken.status.success() && String::from_utf8_lossy(&broken.stderr).contains("usage.json"), "{broken:?}");
 }
 
 /// A reset more than 7 days away isn't believed (DEV-770): the job waits the

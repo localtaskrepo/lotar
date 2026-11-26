@@ -33,6 +33,7 @@ pub mod status;
 pub mod sync;
 pub mod task;
 pub mod trust;
+pub mod usage;
 
 // Re-export handlers for easy access
 pub use agent::AgentHandler;

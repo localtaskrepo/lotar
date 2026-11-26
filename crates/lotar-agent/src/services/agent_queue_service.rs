@@ -1474,7 +1474,9 @@ fn merge_paths(current: &str, login: &str) -> String {
     entries.join(":")
 }
 
-fn queue_base_dir() -> PathBuf {
+/// lotar's machine-wide state directory: the agent queue and the
+/// providers' usage readings (DEV-862).
+pub(crate) fn queue_base_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("LOTAR_AGENT_QUEUE_DIR")
         && !dir.trim().is_empty()
     {
