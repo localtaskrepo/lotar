@@ -1306,7 +1306,7 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
     if buf.trim().is_empty() {
         return Ok(AgentQueueState {
             version: QUEUE_VERSION,
-            tasks_dir: tasks_dir.to_string_lossy().to_string(),
+            tasks_dir: canonical_tasks_dir(tasks_dir).to_string_lossy().to_string(),
             updated_at: time::now_rfc3339(),
             pending: Vec::new(),
             taken: Vec::new(),
@@ -1497,17 +1497,25 @@ pub(crate) fn queue_base_dir() -> PathBuf {
 }
 
 fn queue_file_path(tasks_dir: &Path) -> PathBuf {
-    let hash = queue_hash(tasks_dir);
+    let hash = queue_hash(&canonical_tasks_dir(tasks_dir));
     queue_dir().join(format!("queue-{hash}.json"))
 }
 
 fn worker_lock_path(tasks_dir: &Path) -> Option<PathBuf> {
-    let hash = queue_hash(tasks_dir);
+    let hash = queue_hash(&canonical_tasks_dir(tasks_dir));
     Some(queue_dir().join(format!("worker-{hash}.lock")))
 }
 
 pub(crate) fn queue_dir() -> PathBuf {
     queue_base_dir().join("agent-queue")
+}
+
+/// The tasks folder that keys its queue, lock and state files: resolved
+/// through symlinks, or made absolute when it doesn't exist yet, so every
+/// spelling of one folder (`.tasks`, its absolute path) shares one queue and a
+/// relative path never joins another repo's queue (DEV-887).
+pub(crate) fn canonical_tasks_dir(tasks_dir: &Path) -> PathBuf {
+    tasks_dir.canonicalize().or_else(|_| std::path::absolute(tasks_dir)).unwrap_or_else(|_| tasks_dir.to_path_buf())
 }
 
 pub(crate) fn queue_hash(tasks_dir: &Path) -> String {
@@ -1836,6 +1844,34 @@ mod tests {
         assert_eq!(pending[0].carried_outcome.as_ref(), Some(&carried));
         let parked = AgentQueueService::list_parked(&tasks_dir).unwrap();
         assert_eq!(parked.iter().map(|item| item.entry.ticket_id.as_str()).collect::<Vec<_>>(), ["TEST-2"]);
+    }
+
+    /// DEV-887: `.tasks` from the repo root and the folder's absolute path
+    /// share one queue, and another repo's `.tasks` gets a queue of its own.
+    #[test]
+    fn relative_tasks_dir_shares_the_absolute_paths_queue() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().join("queue").to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let repo = dir.path().join("repo");
+        let other = dir.path().join("other");
+        for root in [&repo, &other] {
+            std::fs::create_dir_all(root.join(".tasks")).unwrap();
+        }
+        let previous_cwd = env::current_dir().unwrap();
+        env::set_current_dir(&repo).unwrap();
+        let req = AgentJobCreateRequest { ticket_id: "TEST-1".to_string(), prompt: "hello".to_string(), agent: Some("fix".to_string()), ..Default::default() };
+        let queued = AgentQueueService::enqueue(Path::new(".tasks"), req);
+        env::set_current_dir(&other).unwrap();
+        let other_pending = AgentQueueService::list_pending(Path::new(".tasks")).unwrap();
+        env::set_current_dir(previous_cwd).unwrap();
+
+        assert!(queued.unwrap());
+        let pending = AgentQueueService::list_pending(&repo.join(".tasks")).unwrap();
+        assert_eq!(pending.iter().map(|entry| entry.ticket_id.as_str()).collect::<Vec<_>>(), ["TEST-1"]);
+        assert!(other_pending.is_empty(), "another repo's .tasks has its own queue");
+        let state = read_state(&repo.join(".tasks")).unwrap();
+        assert_eq!(Path::new(&state.tasks_dir), repo.join(".tasks").canonicalize().unwrap());
     }
 
     #[test]

@@ -346,8 +346,8 @@ fn gate_config(tasks_dir: &Path) -> AgentMemoryGateConfig {
 }
 
 fn state_path(tasks_dir: &Path) -> PathBuf {
-    use crate::services::agent_queue_service::{queue_dir, queue_hash};
-    queue_dir().join(format!("memory-gate-{}.json", queue_hash(tasks_dir)))
+    use crate::services::agent_queue_service::{canonical_tasks_dir, queue_dir, queue_hash};
+    queue_dir().join(format!("memory-gate-{}.json", queue_hash(&canonical_tasks_dir(tasks_dir))))
 }
 
 fn history_path(tasks_dir: &Path) -> PathBuf {

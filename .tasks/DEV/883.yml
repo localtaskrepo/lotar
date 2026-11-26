@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T18:34:41.866526+00:00
+modified: 2026-11-26T18:59:29.083146+00:00
 relationships:
   blocks:
   - DEV-893
@@ -20,6 +20,7 @@ relationships:
   - DEV-880
   - DEV-875
   - DEV-876
+  - DEV-825
 comments:
 - date: 2026-11-26T02:11:58.070807+00:00
   author: claude
@@ -297,3 +298,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875"]}'
     new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876"]}'
+- at: 2026-11-26T18:59:29.083146+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876"]}'
+    new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825"]}'

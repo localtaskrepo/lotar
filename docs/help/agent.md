@@ -218,7 +218,7 @@ automation:
 
 ## Jobs in other processes
 
-A job runs inside the process that started it: `lotar serve`, the background queue worker, an MCP session, or `lotar agent run --wait`. Each running job also leaves a small record next to the agent queue (in `LOTAR_AGENT_QUEUE_DIR`, `$XDG_RUNTIME_DIR/lotar` or your cache directory), so any other `lotar` process for the same tasks directory can:
+A job runs inside the process that started it: `lotar serve`, the background queue worker, an MCP session, or `lotar agent run --wait`. Each running job also leaves a small record next to the agent queue (in `LOTAR_AGENT_QUEUE_DIR`, `$XDG_RUNTIME_DIR/lotar` or your cache directory), so any other `lotar` process for the same tasks directory can (the queue and these records belong to the tasks directory's real path, so `--tasks-dir .tasks`, its absolute path and a symlinked path share them):
 
 - list it with `lotar agent list-running` and show it with `lotar agent status <JOB_ID>`
 - cancel it with `lotar agent cancel <JOB_ID>`; the owning process stops the agent and finishes the job as cancelled, so `job_cancelled` automation runs

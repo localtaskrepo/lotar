@@ -74,7 +74,8 @@ fn worker_command(fixture: &TestFixtures, ticket: &str) -> Command {
     let queue_root = fixture.get_temp_path().join("queue");
     let queue_dir = queue_root.join("agent-queue");
     fs::create_dir_all(&queue_dir).unwrap();
-    let hash = blake3::hash(fixture.tasks_root.to_string_lossy().as_bytes()).to_hex();
+    // The queue is keyed by the canonical tasks dir (DEV-887).
+    let hash = blake3::hash(fixture.tasks_root.canonicalize().unwrap().to_string_lossy().as_bytes()).to_hex();
     fs::write(
         queue_dir.join(format!("queue-{hash}.json")),
         serde_json::to_vec(&serde_json::json!({

@@ -53,7 +53,7 @@ pub struct ActiveJob {
 pub type JobOutcome = crate::api_types::JobOutcome;
 
 fn dir(tasks_dir: &Path) -> PathBuf {
-    let canonical = tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf());
+    let canonical = crate::services::agent_queue_service::canonical_tasks_dir(tasks_dir);
     crate::services::agent_queue_service::queue_dir().join(format!("active-{}", crate::services::agent_queue_service::queue_hash(&canonical)))
 }
 

@@ -1,10 +1,10 @@
 title: 'lotar add misses worktrees created with git worktree add --relative-paths: their ID can repeat (DEV-802)'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 created: 2026-11-23T04:27:34.695967+00:00
-modified: 2026-11-26T18:58:33.781007+00:00
+modified: 2026-11-26T18:59:37.437368+00:00
 relationships:
   related:
   - DEV-802
@@ -18,6 +18,8 @@ relationships:
   - DEV-789
   - DEV-812
   - DEV-6
+  - DEV-882
+  - DEV-883
 comments:
 - date: 2026-11-23T07:49:27.544311+00:00
   author: claude
@@ -333,6 +335,27 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T18:59:28.651491+00:00
+  author: claude
+  text: |-
+    Merged: DEV-825 is on `main` as `4e0b89583`. Not pushed yet.
+
+    - lotar's merge rebased onto `59b8ac172`, ran lint, test:agent and smoke (all passed) and fast-forwarded `main` to `2b97feeb1`. This job amended the pending `.tasks` change into it: `4e0b89583`.
+    - No rules or agent profiles changed (`.tasks/**/automation.yml`, `config.yml`), so no `lotar trust` needed.
+    - Not pushed: `main` is ahead 8 and behind 1 (`71791a991 DEV-804 Release v0.15.7` is on origin only). Pushing needs a rebase of `main`, and triage gave that to the DEV-882/DEV-883 job (both Todo, `@fix`). A merge job doesn't rewrite `main`, so this one left it alone. That job's push takes `4e0b89583` with it.
+    - Health check from the description (scratch repo, `--relative-paths` worktree): `dev270_task_numbers_test::checkouts_of_one_repository_get_distinct_ids` covers it and passed in test:agent.
+  report:
+    commits:
+    - hash: 4e0b89583
+      what: the fix on main (2b97feeb1 plus the pending .tasks changes)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: Push waits for the DEV-882/DEV-883 job that rebases main over origin's 71791a991
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a14eb294736299ddcfa1a4a685c83a62e6a240e9dccc5e2e91215857e91deab
@@ -350,7 +373,6 @@ description: |-
   - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: review:DEV-802-relative-worktree-paths
 history:
@@ -663,3 +685,25 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A57b5b78fa0f5ca3535da35b47c472f5e28b7449f95244be1abb3506c857d71c3
+- at: 2026-11-26T18:59:28.651491+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:59:29.081516+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768","DEV-789","DEV-812","DEV-6"]}'
+    new: '{"related":["DEV-802","DEV-833","DEV-845","DEV-5","DEV-654","DEV-801","DEV-767","DEV-768","DEV-789","DEV-812","DEV-6","DEV-882","DEV-883"]}'
+- at: 2026-11-26T18:59:36.745018+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-26T18:59:37.437368+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health

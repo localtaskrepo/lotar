@@ -1,15 +1,17 @@
 title: A repo's agent.worktree.build_root is ignored when the home config has an agent.worktree section
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T18:53:10.893672+00:00
-modified: 2026-11-26T18:53:17.560878+00:00
+modified: 2026-11-26T18:59:41.516119+00:00
 relationships:
   related:
   - DEV-778
   - DEV-841
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85f25e5a8f110969372450105671b218f10d8b75b5b58d56574d63c4cf888d5b
 description: |-
   Found by the LOCA-571 job (local, 2026-11-26): a `build_root` set in a repo's own `.tasks/config.yml` is silently ignored when `~/.lotar` has any `agent.worktree` section, because the home section replaces the whole section instead of merging key by key. The job's first test run ran without the build root and nothing said so.
 
@@ -25,3 +27,14 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-778","DEV-841"]}'
+- at: 2026-11-26T18:59:40.849531+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T18:59:41.516119+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85f25e5a8f110969372450105671b218f10d8b75b5b58d56574d63c4cf888d5b

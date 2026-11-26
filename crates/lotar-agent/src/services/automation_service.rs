@@ -2348,7 +2348,7 @@ struct PendingEndAction {
 }
 
 fn end_actions_dir(tasks_dir: &Path) -> std::path::PathBuf {
-    let root = tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf());
+    let root = crate::services::agent_queue_service::canonical_tasks_dir(tasks_dir);
     crate::services::agent_queue_service::queue_dir().join(format!("end-actions-{}", crate::services::agent_queue_service::queue_hash(&root)))
 }
 
