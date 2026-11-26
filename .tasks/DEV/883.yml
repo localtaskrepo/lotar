@@ -5,8 +5,10 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T16:52:31.846224+00:00
+modified: 2026-11-26T17:22:55.114318+00:00
 relationships:
+  blocks:
+  - DEV-893
   related:
   - DEV-893
 comments:
@@ -140,3 +142,9 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T17:22:55.114318+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-893"]}'
+    new: '{"blocks":["DEV-893"],"related":["DEV-893"]}'

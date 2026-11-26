@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T21:43:44.403743+00:00
-modified: 2026-11-26T16:52:54.754333+00:00
+modified: 2026-11-26T17:28:10.117868+00:00
 relationships:
   related:
   - DEV-797
@@ -59,6 +59,12 @@ comments:
     - Merge note: main is 4 commits ahead, and `git merge-tree` shows a conflict only in the `mod` list of `crates/lotar-lib/tests/integration.rs` (one line each side). The rebase keeps both lines.
     - Not run: `npm run lint`, `npm test`, `npm run smoke` (the merge runs them, DEV-797). No UI change, so no screenshots needed.
     - No minor tickets filed.
+- date: 2026-11-26T17:28:10.117868+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-881` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-881` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85ab6982e8b10a529998e720ae87709922febb25e5570efd75bed6f19ac4f22d
 description: |-
@@ -128,3 +134,7 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T17:28:10.117868+00:00
+  actor: automation
+  changes:
+  - field: comment_added

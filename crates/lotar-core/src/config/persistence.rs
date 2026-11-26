@@ -52,7 +52,21 @@ pub fn load_home_config() -> Result<GlobalConfig, ConfigError> {
     let home_dir = dirs::home_dir().ok_or(ConfigError::IoError("Home directory not found".to_string()))?;
     let path = home_dir.join(".lotar");
     warn_insecure_home_config_permissions(&path);
-    load_config_file(&path)
+    let loaded = load_config_file(&path);
+    if let Err(ConfigError::ParseError(detail)) = &loaded {
+        warn_unparsable_home_config(&path, detail);
+    }
+    loaded
+}
+
+/// A home config that does not parse is skipped as a whole, its agent profiles too (DEV-883): say so once per run.
+fn warn_unparsable_home_config(path: &Path, detail: &str) {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    if WARNED.set(()).is_err() || std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1" {
+        return;
+    }
+    let renderer = crate::output::OutputRenderer::new(crate::output::OutputFormat::Text, crate::output::LogLevel::Warn);
+    renderer.emit_warning(format!("Home config {} is ignored: {detail}. Run lotar config validate.", path.display()));
 }
 
 /// Load home configuration with optional path override

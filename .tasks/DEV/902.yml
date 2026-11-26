@@ -1,0 +1,24 @@
+title: 'agent-team: Prerequisites rule keeps the ticket Blocked, so lotar automation run tells it again on every run'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T17:27:28.763305+00:00
+modified: 2026-11-26T17:27:29.440071+00:00
+relationships:
+  related:
+  - DEV-796
+description: 'Found in the DEV-796 review (2026-11-26). The rule "Prerequisites done: continue the waiting ticket" (crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml:408) has no set that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one, because lotar automation run fires unblocked on every run while the ticket matches. The ticket only leaves Blocked at job_started. While the job waits for a slot, each scheduled run tells the agent again and leaves another "told no agent on <ID> yet" comment. Done when: the rule sets status InProgress, as the doc example does, and a test runs the rule twice and gets one job.'
+history:
+- at: 2026-11-26T17:27:29.098761+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-796"]}'
+- at: 2026-11-26T17:27:29.440071+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

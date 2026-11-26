@@ -1,11 +1,11 @@
 title: 'Rule builder: a comment map without a question is called ''comments with a question'''
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T20:00:39.778177+00:00
-modified: 2026-11-26T16:52:35.239393+00:00
+modified: 2026-11-26T17:23:59.792773+00:00
 relationships:
   depends_on:
   - DEV-852
@@ -45,6 +45,17 @@ comments:
       result: not_run
       reason: the merge runs the full suites (owner 2026-11-22, DEV-797)
     next: Merge agent lands agent/DEV-879
+- date: 2026-11-26T17:23:53.414846+00:00
+  author: claude
+  text: |-
+    Review: passed
+
+    - Reviewed `f06d6093a` (only commit on `main..HEAD`; no newer ticket-branch commits). Main since then (`fd6d2b098`) doesn't touch the three changed files.
+    - Done when 1: `view/utils/automationRules.ts:790-793` says "with a question" only when the map has `question`, else "written as a map". Keeping it YAML-only is one of the two options the ticket allowed; the "same form" claim holds, since the builder saves `comment` back as a plain string (`automationRules.ts:1013`, `:1206`).
+    - Done when 2: new test in `view/__tests__/automationRules.spec.ts:145`. With the old `automationRules.ts` it fails (1 failed, 10 passed); with the fix all 11 pass.
+    - `docs/help/automation.md:314` matches the new behaviour. No stray files.
+    - Reran `npm ci` (ok), `npx vitest run view/__tests__/automationRules.spec.ts` (passed), `npx oxlint` and `npx prettier --check` on the changed files (passed). Worktree left clean.
+    - Not UI work (only a util's message text), so no screenshots needed. No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8550d9ef314bccf32436fc0a30369bbe508616d4599363b7b3e2c9fe2fd6d8ec
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A92224bf0efbfeddca815d33ded1caf820d6f85e3deae5190bfcc8bae1a3c8f34
@@ -145,3 +156,16 @@ history:
     new: Reviewing
   - field: assignee
     new: '@review'
+- at: 2026-11-26T17:23:53.414846+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:23:59.792773+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T16:52:41.421502+00:00
+modified: 2026-11-26T17:28:07.661711+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -23,6 +23,7 @@ relationships:
   - DEV-852
   - DEV-853
   - DEV-854
+  - DEV-902
 comments:
 - date: 2026-11-22T18:51:51.656944+00:00
   author: claude
@@ -463,6 +464,37 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review the branch, then merge
+- date: 2026-11-26T17:27:15.892749+00:00
+  author: claude
+  text: |-
+    Review: blocking. `c2c24bcca`: a person's comment during a review or merge job gives that job the implementer's instructions, and the review runner is a default the owner didn't pick.
+
+    **Finding 1: comments reach the wrong job with the wrong instructions**
+    - `agent-team.yml:437` lets the rule fire on Reviewing and Merging tickets. `tell_agent` hands the message to whatever job is running (`automation_service.rs:3329`, `tell_running_job`), so the review or merge agent gets it, not `@implement`.
+    - The message (`agent-team.yml:447-448`) always says "do the work, commit on your worktree's branch, don't merge or push; the review follows when your job ends". That is only true for `@implement`:
+      - During `@review`, the reviewer commits changes. "Review passed: merge" (`:251`) then merges them without any review.
+      - During `@merge`, the agent commits after it has merged. "Merge lifecycle" (`:381`) sets Done, and `cleanup_on_done` with `cleanup_delete_branches` (`:79-80`) deletes the branch, so the new commit is lost.
+    - Standards handles this in its own message (`configs/lotar/automation.yml:1071`, first bullet): "a further turn of the job that runs on it: answer, change the work as he asks and carry on as before".
+    - Fix: add that case as the message's first bullet, so a running job keeps its own role. Or drop Reviewing and Merging from `:437`. Then add a test where a person's comment during the review job doesn't lead to an unreviewed merge.
+    - Related: `:437` also matches an InProgress ticket that a person is working on. `tell_agent` then reassigns it to `@implement` (`automation_service.rs:3363`). Limit the rule to agent assignees, or to HelpNeeded.
+
+    **Finding 2: the review runner is a decision the owner didn't make**
+    - The ticket asks for review on a second provider (title, and Proposal: "review on a second runner"). `agent-team.yml:70-71` defaults `@review` to `claude`.
+    - The hand-off says the owner's answer "gaps" left this open, so the fix agent took the option marked recommended in a question nobody answered (2026-11-24 17:01).
+    - Fix: ask the owner (Claude by default, or Codex as the ticket says) and build what he answers.
+
+    **What I read and reran**
+    - Read: the diff (11 files), the ticket and all its comments, DEV-852 and DEV-853, standards `automation.yml`, `docs/help/automation.md` (tell_agent, unblocked), `tell_agent` and `ticket_agent` in `automation_service.rs`, AGENTS.md. Main's commits since the base don't touch the code this relies on.
+    - `npm ci`: passed.
+    - `cargo nextest run -p lotar-lib --test integration -E 'test(agent_team) | test(agent_templates) | test(shipped_agent)'`: 5 passed.
+    - In a scratch repo: `lotar config templates` lists agent-team. `init --template agent-team` passes `config validate`. The written `.tasks/` names no person, repo or host of ours.
+    - Checked and fine: the rest of "Done when"; manual assignment prompts (first rule that assigns each profile); answers in the person's own words reach `@implement`; the draft files are off the branch; no UI changes.
+- date: 2026-11-26T17:27:34.188797+00:00
+  author: claude
+  text: 'Minor finding filed:  (agent-team Prerequisites rule doesn''t leave Blocked, so a scheduled lotar automation run tells the agent again on every run).'
+- date: 2026-11-26T17:27:56.691326+00:00
+  author: claude
+  text: 'Correction to the comment above, which lost the ticket ID: the minor finding is [DEV-902](https://lotar.pyxzl.net/task/DEV-902), related to this ticket. It is not blocking.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
@@ -518,6 +550,7 @@ tags:
 - proposal
 - job-paused
 - fix-retried
+- review-returned
 history:
 - at: 2026-11-22T18:50:35.515064+00:00
   actor: claude
@@ -991,3 +1024,36 @@ history:
   - field: assignee
     old: claude
     new: '@review'
+- at: 2026-11-26T17:27:15.892749+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:27:16.525931+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal, job-paused, fix-retried
+    new: proposal, job-paused, fix-retried, review-blocked
+- at: 2026-11-26T17:27:29.097192+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902"]}'
+- at: 2026-11-26T17:27:34.188797+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:27:56.691326+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:28:07.661711+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: proposal, job-paused, fix-retried, review-blocked
+    new: proposal, job-paused, fix-retried, review-returned

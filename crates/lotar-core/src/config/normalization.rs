@@ -269,6 +269,46 @@ fn fields_with_properties(
     names_with_properties(names, properties, crate::config::types::CustomFieldProperties::is_empty)
 }
 
+/// The dotted path of the config key whose value does not deserialize, such as `agents.bad.stall_timeout_seconds`
+/// (DEV-883), found by dropping one key at a time: the key names, never the values, which may be credentials.
+fn invalid_field_path<T: DeserializeOwned>(defaults: &serde_yaml_ng::Mapping, input: &serde_yaml_ng::Mapping) -> Option<String> {
+    fn without(map: &serde_yaml_ng::Mapping, path: &[Value]) -> serde_yaml_ng::Mapping {
+        let mut map = map.clone();
+        match path {
+            [] => {}
+            [key] => {
+                map.remove(key);
+            }
+            [key, rest @ ..] => {
+                if let Some(Value::Mapping(child)) = map.get(key) {
+                    let child = without(child, rest);
+                    map.insert(key.clone(), Value::Mapping(child));
+                }
+            }
+        }
+        map
+    }
+    let passes = |input: &serde_yaml_ng::Mapping| {
+        let mut flat = defaults.clone();
+        flat.extend(input.clone());
+        serde_yaml_ng::from_value::<T>(Value::Mapping(flat)).is_ok()
+    };
+    let mut path: Vec<Value> = Vec::new();
+    let mut level = input;
+    loop {
+        let culprit = level.keys().find(|key| {
+            let mut trial = path.clone();
+            trial.push((*key).clone());
+            passes(&without(input, &trial))
+        });
+        let Some(key) = culprit else { break };
+        path.push(key.clone());
+        let Some(Value::Mapping(child)) = level.get(key) else { break };
+        level = child;
+    }
+    (!path.is_empty()).then(|| path.iter().map(|key| key.as_str().map_or_else(|| "?".to_string(), str::to_string)).collect::<Vec<_>>().join("."))
+}
+
 fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T, ConfigError> {
     let raw: Value = serde_yaml_ng::from_str(content).map_err(|_| ConfigError::ParseError("Invalid config YAML".into()))?;
     let raw = if raw.is_null()
@@ -283,13 +323,19 @@ fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T
     let mut data = expand_dotted_keys(raw)?;
     split_named_objects(&mut data)?;
     let input = data.as_mapping().ok_or_else(|| ConfigError::ParseError("Config root must be a mapping".into()))?;
-    let Value::Mapping(mut flat) = defaults else {
+    let Value::Mapping(defaults) = defaults else {
         return Err(ConfigError::ParseError("Config defaults must be a mapping".into()));
     };
+    let mut flat = defaults.clone();
     flat.extend(input.clone());
     // Validate flat fields even when a canonical alias will override them.
     // Do not expose deserializer messages: they may include credential values.
-    serde_yaml_ng::from_value::<T>(Value::Mapping(flat.clone())).map_err(|_| ConfigError::ParseError("Invalid type in flat config fields".into()))?;
+    serde_yaml_ng::from_value::<T>(Value::Mapping(flat.clone())).map_err(|_| {
+        ConfigError::ParseError(match invalid_field_path::<T>(&defaults, input) {
+            Some(path) => format!("Invalid type for config field '{path}'"),
+            None => "Invalid type in flat config fields".into(),
+        })
+    })?;
     for (path, field) in crate::config::fields::alias_paths() {
         let mut value = &data;
         let mut present = true;
@@ -977,4 +1023,17 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
 
     serde_yaml_ng::to_string(&Y::Mapping(root)).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod invalid_field_tests {
+    use super::parse_global_from_yaml_str;
+
+    /// DEV-883: the parse error names the profile and key of a bad agent value, not its value.
+    #[test]
+    fn names_the_agent_profile_and_key() {
+        let err = parse_global_from_yaml_str("agents:\n  good: claude\n  bad:\n    runner: claude\n    stall_timeout_seconds: notanumber\n").unwrap_err();
+        assert_eq!(err.to_string(), "Parse Error: Invalid type for config field 'agents.bad.stall_timeout_seconds'");
+        assert!(!err.to_string().contains("notanumber"));
+    }
 }

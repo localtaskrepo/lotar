@@ -1,16 +1,18 @@
 title: Record memory-gate holds and each job's queued time in the job records
-status: Merging
+status: Todo
 priority: High
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-25T22:11:53.112006+00:00
-modified: 2026-11-26T16:52:09.751012+00:00
+modified: 2026-11-26T17:21:37.727278+00:00
 relationships:
   related:
   - DEV-827
   - DEV-894
   - DEV-797
+  - DEV-804
+  - DEV-884
 comments:
 - date: 2026-11-26T02:14:30.503383+00:00
   author: claude
@@ -62,6 +64,44 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-882` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-882` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T17:21:11.703510+00:00
+  author: claude
+  text: |-
+    Landed on local main as `fd6d2b098`, not pushed: `origin/main` has a release commit local main lacks.
+
+    - Conflict in `docs/help/agent.md` (the `list-jobs` line): main renamed `pause` to the open `pauses`, the branch added `queued_at` and the `queue holds` line. Kept both.
+    - Main moved during the checks (DEV-884). I rebased again and reran all checks on `7850ca20f`; they passed. Fast-forward worked, then I amended `.tasks` in as `fd6d2b098`.
+    - No rule or config files changed, so I didn't run `lotar trust`.
+    - `git push` refused: `origin/main` has `71791a991 DEV-804 Release v0.15.7` (bumps `Cargo.toml` and `Cargo.lock`, also on branch `release-0.15.7`). It isn't in local main, and DEV-804 is still Todo. I'm not allowed to reset or rebase the main checkout.
+
+    Question: should local main be rebased onto `origin/main` (DEV-882 on top of the release commit) and pushed, or does the release session land `71791a991` itself?
+  report:
+    commits:
+    - hash: fd6d2b098
+      what: DEV-882 rebased onto main, conflict in docs/help/agent.md resolved, .tasks amended in
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: nextest 2583, vitest 1623
+    - command: npm run -s smoke
+      result: passed
+      reason: '411'
+    - command: git push
+      result: failed
+      reason: origin/main has 71791a991 DEV-804 Release v0.15.7, not in local main
+    next: 'Owner: say how main and origin/main get joined, then push'
+- date: 2026-11-26T17:21:36.774993+00:00
+  author: triage
+  text: |-
+    Answered by a recorded decision: rebase local main onto `origin/main` (DEV-882 on top of the release commit `71791a991`), rerun the checks the rebase touches, then push.
+
+    - `repos.json` has `"push": true` for lotar; finished work is pushed without asking (`docs/decisions/2026-11-12-push-finished-work.md`, `docs/decisions/2026-11-11-formatting.md` in ~/Development/standards).
+    - `git status`: main is ahead 1 (`fd6d2b098`, unpushed, finished and checked) and behind 1 (`71791a991 DEV-804 Release v0.15.7`, already on origin). Rebasing an unpushed commit is no history rewrite of shared work.
+    - Leave DEV-804 to the release session: the release commit is already on origin, so you don't land it.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf75b0019e9a04d1379a692646fbceb73e18d6a69e7cad88070db40e0a4c5b8a
 description: 'From standards STD-359 proposal F (owner 2026-11-25: all of A-F). The throughput measurement couldn''t count memory-gate hours (holds only go to the server log, DEV-827) and gives queue waits only as a lower bound: the queue keeps no time an entry was queued. Store queued_at per queue entry and job, and each gate hold (start, end, reason) where lotar agent jobs or a stats command can read them.'
@@ -146,3 +186,38 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T17:21:11.703510+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:21:12.930112+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-827","DEV-894","DEV-797"]}'
+    new: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884"]}'
+- at: 2026-11-26T17:21:22.156409+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-26T17:21:36.774993+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:21:37.377218+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-26T17:21:37.727278+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo

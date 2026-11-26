@@ -226,7 +226,7 @@ lotar config init --project=TestProject --dry-run
 ### Validation & Conflict Detection
 `lotar config set --dry-run` runs the same validation pipeline as a real write, including conflict detection against existing tasks, and exits nonzero when the change would be rejected. If the preview reports task conflicts you can either fix the underlying data or re-run with `--force` to apply anyway (schema/type validation and malformed files still block the change).
 
-`lotar config validate` surfaces the complete error and warning sets for global and project scopes. The `--fix` flag is a placeholder today—the handler prints guidance but no automated rewrite occurs yet.
+`lotar config validate` surfaces the complete error and warning sets for global and project scopes. It also fails when the home config (`~/.lotar`) doesn't parse, naming the key with the bad value (`Invalid type for config field 'agents.bad.stall_timeout_seconds'`): every command then skips the whole home config, its agent profiles too, and warns once on stderr that it is ignored. The `--fix` flag is a placeholder today—the handler prints guidance but no automated rewrite occurs yet.
 
 Validation now enforces that defaults and branch alias maps reference values that exist in the corresponding `issue.*` lists. When a mismatch is detected the CLI prints a remediation hint with concrete commands so you can adjust the list or clear the offending aliases right away.
 

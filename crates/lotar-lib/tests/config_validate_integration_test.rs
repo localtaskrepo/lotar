@@ -318,3 +318,39 @@ project.name: "Existing Project"
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Validating project configuration"));
 }
+
+/// DEV-883: a bad value in one agent profile of the home config skipped the whole home config, every profile with it,
+/// while validate passed. Validate now fails naming the profile and key, and every load warns that it is ignored.
+#[test]
+fn test_config_validate_fails_on_unparsable_home_agent_profile() {
+    let temp_dir = TempDir::new().unwrap();
+    let tasks_dir = temp_dir.path().join(".tasks");
+    let home = temp_dir.path().join("home");
+    fs::create_dir_all(&tasks_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::write(home.join(".lotar"), "agents:\n  good:\n    runner: claude\n  bad:\n    runner: claude\n    stall_timeout_seconds: notanumber\n").unwrap();
+    let run = |args: &[&str]| {
+        Command::new(get_test_binary_path())
+            .args(args)
+            .arg("--tasks-dir")
+            .arg(&tasks_dir)
+            .env("HOME", &home)
+            .env_remove("RUST_TEST_THREADS")
+            .env_remove("LOTAR_TEST_MODE")
+            .env_remove("LOTAR_IGNORE_HOME_CONFIG")
+            .env_remove("LOTAR_TEST_SILENT")
+            .output()
+            .expect("Failed to execute command")
+    };
+
+    let output = run(&["config", "validate"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "stdout: {stdout}\nstderr: {stderr}");
+    assert!(format!("{stdout}{stderr}").contains("Invalid type for config field 'agents.bad.stall_timeout_seconds'"), "stdout: {stdout}\nstderr: {stderr}");
+    assert!(!stdout.contains("All configurations are valid"), "{stdout}");
+
+    let output = run(&["--format", "json", "config", "show"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("is ignored: Invalid type for config field 'agents.bad.stall_timeout_seconds'"), "{stderr}");
+}

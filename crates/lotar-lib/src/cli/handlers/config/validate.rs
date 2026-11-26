@@ -40,6 +40,12 @@ impl ConfigHandler {
             }
         };
 
+        // A home config that does not parse is skipped by every load, its agent profiles too (DEV-883).
+        if let Err(crate::config::types::ConfigError::ParseError(detail)) = crate::config::persistence::load_home_config() {
+            renderer.emit_error(format_args!("Invalid home config (~/.lotar): {detail}"));
+            has_errors = true;
+        }
+
         if global || project.is_none() {
             renderer.emit_info("Validating global configuration");
             let result = validator.validate_global_config(&global_config);
