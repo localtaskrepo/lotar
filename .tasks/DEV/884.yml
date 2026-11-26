@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T22:18:53.793616+00:00
-modified: 2026-11-26T07:11:48.463224+00:00
+modified: 2026-11-26T16:51:58.728730+00:00
 relationships:
   related:
   - DEV-797
@@ -169,4 +169,14 @@ history:
     new: Merging
   - field: assignee
     old: '@review'
+    new: '@merge'
+- at: 2026-11-26T16:51:32.811039+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:51:58.728730+00:00
+  actor: claude
+  changes:
+  - field: assignee
     new: '@merge'

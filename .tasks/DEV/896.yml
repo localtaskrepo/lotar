@@ -1,14 +1,16 @@
 title: 'A merge agent that lands a ticket in InProgress sends it to Reviewing: DEV-832 went back to review after it was on main'
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T07:28:02.692146+00:00
-modified: 2026-11-26T07:28:03.494387+00:00
+modified: 2026-11-26T16:52:07.721135+00:00
 relationships:
   related:
   - DEV-832
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7
 description: 'Found 2026-11-26 on DEV-832: merge failed → assignee @fix, tag merge-retried; the fix job ended and set status Merging → InProgress (02:41Z); lotar''s own merge then failed smoke, the merge agent landed `5d3223431` on main and origin (03:23Z), and its job''s end moved InProgress → Reviewing, @review. A review job then ran on work already on main (branch `agent/DEV-832` holds only a copy of `5d3223431` without the .tasks edit). Check: `lotar task timeline DEV-832` lines from 00:04Z to 07:25Z. Done when: a job that lands the branch on main ends the ticket at Done (or the step after merging), whatever status it ran in, with a test.'
 tags:
 - health
@@ -24,3 +26,24 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T16:51:17.895590+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-26T16:51:17.965111+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-26T16:51:41.059533+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T16:52:07.721135+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7

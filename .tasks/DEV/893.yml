@@ -1,14 +1,21 @@
 title: config validate prints 'Global configuration is valid' right after the invalid home config error
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T07:06:01.774631+00:00
-modified: 2026-11-26T07:06:02.628617+00:00
+modified: 2026-11-26T16:53:00.199462+00:00
 relationships:
   related:
   - DEV-883
+comments:
+- date: 2026-11-26T16:53:00.199462+00:00
+  author: claude
+  text: |-
+    Restarted: its fix job had failed in 0s because the T3 server wasn't running (16:02Z).
+
+    - T3 runs again; `lotar status DEV-893 InProgress`, then `lotar automation run "Stalled: restart the health fix agent" --select 'id:DEV-893'`
 description: 'Found (DEV-883 review): with a ~/.lotar whose agents.bad.stall_timeout_seconds is notanumber, `lotar config validate` prints `❌ Invalid home config (~/.lotar): …` and then `✅ Global configuration is valid` before failing with exit 1. The success line contradicts the error above it. Check: HOME=<tmp> with that .lotar, run lotar config validate. Done: no ''Global configuration is valid'' line when the home config fails to parse (crates/lotar-lib/src/cli/handlers/config/validate.rs:43-61).'
 tags:
 - health
@@ -18,3 +25,13 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T16:52:31.471449+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T16:53:00.199462+00:00
+  actor: claude
+  changes:
+  - field: comment_added

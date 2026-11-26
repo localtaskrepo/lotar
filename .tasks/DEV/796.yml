@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T07:09:56.789651+00:00
+modified: 2026-11-26T16:52:41.421502+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -968,4 +968,26 @@ history:
     new: Reviewing
   - field: assignee
     old: '@fix'
+    new: '@review'
+- at: 2026-11-26T16:51:51.875228+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-26T16:52:41.234590+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-26T16:52:41.421502+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: claude
     new: '@review'

@@ -82,7 +82,7 @@ impl CommandHandler for TaskHandler {
                 Ok(())
             }
             TaskAction::List(args) => SearchHandler::execute(args, project, resolver, renderer),
-            TaskAction::Show(show_args) => show::handle_show(&show_args.id, project, resolver, renderer),
+            TaskAction::Show(show_args) => show::handle_show(&show_args, project, resolver, renderer),
             TaskAction::Edit(edit_args) => EditHandler::execute(edit_args, project, resolver, renderer),
             TaskAction::History { id, limit } => handle_history(&id, limit, project, resolver, renderer),
             TaskAction::Timeline { id, threads } => timeline::handle_timeline(&id, threads, project, resolver, renderer),

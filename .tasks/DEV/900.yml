@@ -1,0 +1,27 @@
+title: 'Two integration tests commit with the developer''s git signing: they fail while opgate is down'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+created: 2026-11-26T16:00:51.765811+00:00
+modified: 2026-11-26T16:00:52.155460+00:00
+relationships:
+  related:
+  - DEV-871
+description: |-
+  Found: in the DEV-871 merge run (2026-11-26), `dev626_resumed_t3_threads_test::worktree_run_runs_nothing_while_the_ticket_thread_runs_or_waits_for_an_answer` failed at `crates/lotar-lib/tests/dev626_resumed_t3_threads_test.rs:330`: its `git commit` uses the global `commit.gpgsign` and opgate was stopped (`opgate's agent holds no keys, so nothing can sign`). `crates/lotar-lib/tests/dev489_review_comments_test.rs` also commits without `-c commit.gpgsign=false`. Other tests pass that flag.
+
+  Check: with opgate stopped, run `cargo nextest run -p lotar-lib --test integration -E 'test(/dev626_resumed_t3_threads_test::/) | test(/dev489_review_comments_test::/)'`.
+
+  Done when: both tests pass with signing unavailable (for example `-c commit.gpgsign=false` on their commits, or an isolated `GIT_CONFIG_GLOBAL`).
+tags:
+- health
+custom_fields:
+  finding: test-signing:dev626_resumed_t3_threads_test
+history:
+- at: 2026-11-26T16:00:52.155460+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-871"]}'

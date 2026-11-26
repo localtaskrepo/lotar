@@ -1,11 +1,10 @@
 title: 'Proposal: finding bundles: a health bundle starts its fix agent when created, so later findings of the day start new bundles'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
 created: 2026-11-25T05:05:15.164063+00:00
-modified: 2026-11-26T12:09:20.811890+00:00
+modified: 2026-11-26T15:09:56.677954+00:00
 relationships:
   blocks:
   - DEV-891
@@ -14,6 +13,9 @@ relationships:
   - standards:STD-299
   - DEV-384
   - DEV-891
+  - DEV-835
+  - DEV-862
+  - DEV-871
 comments:
 - date: 2026-11-25T05:05:31.886292+00:00
   author: claude
@@ -125,6 +127,42 @@ comments:
     - command: npm run lint / npm test / npm run smoke
       result: not_run
       reason: the merge runs them (DEV-797)
+- date: 2026-11-26T14:23:08.344608+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `eeb1ad55d` is on `main` and on origin.
+
+    - Rebased onto `main` `09c9ae6a0` with no conflicts. The hash changed, so all checks ran again.
+    - `npm ci`, `lint:agent`, `test:agent` and `smoke` all passed. The first `test:agent` run was stopped after 30 min: its Rust part had passed (2579/2579), but the UI part was still waiting for the machine's check lock, held by DEV-871. I reran the UI, release, hooks and seed parts on their own, and they passed.
+    - Fast-forwarded `main` and amended the main checkout's pending `.tasks` changes into the commit (`3e3a950f1` → `eeb1ad55d`).
+    - Pushed `1b03039b7..eeb1ad55d`, which also carried DEV-835 and DEV-862 (both already merged).
+    - No trust needed: no rules or config changed. Not a health ticket, so there were no finding checks.
+  report:
+    commits:
+    - hash: eeb1ad55d
+      what: open_bundle accepts an InProgress bundle whose fix job takes the finding as a message
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: Rust 2579/2579; UI 1623/1623, release, hooks and seed rerun on their own after the first run was stopped waiting for the machine check lock
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    next: 'Check on real findings after release: about one health bundle per repo per day (Done when, item 2)'
+- date: 2026-11-26T15:09:56.677954+00:00
+  author: claude
+  text: |-
+    Closed: the merge agent's job finished after pushing, but left the ticket in Merging.
+
+    - `eeb1ad55d` is on `main` and `origin/main` (comment of 2026-11-26T14:23Z); job `job-20261126T120936.650Z-295` is `completed`.
+    - Nothing left to merge, so status Done and assignee cleared (LOCA-647, `stalled:DEV-864`).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1b755a5ab91c95e3b823fcce51ab6579ef57c31453ec859b3d0d1fbc4d71942
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8ddcd2dcc4c43f0e3b898aa2d3ff0ab186958018063caaf2bfdf445b3fae9f9c
@@ -307,3 +345,28 @@ history:
   - field: relationships
     old: '{"related":["DEV-800","standards:STD-299","DEV-384","DEV-891"]}'
     new: '{"blocks":["DEV-891"],"related":["DEV-800","standards:STD-299","DEV-384","DEV-891"]}'
+- at: 2026-11-26T14:23:08.344608+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T14:23:08.766641+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-891"],"related":["DEV-800","standards:STD-299","DEV-384","DEV-891"]}'
+    new: '{"blocks":["DEV-891"],"related":["DEV-800","standards:STD-299","DEV-384","DEV-891","DEV-835","DEV-862","DEV-871"]}'
+- at: 2026-11-26T15:09:54.396666+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-26T15:09:56.632110+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T15:09:56.677954+00:00
+  actor: claude
+  changes:
+  - field: comment_added

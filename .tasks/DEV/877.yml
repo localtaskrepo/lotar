@@ -1,11 +1,11 @@
 title: 'T3 runner: read job results through t3_submit_output and milestones through MCP Events'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-26T06:58:09.929265+00:00
+modified: 2026-11-26T16:57:51.759386+00:00
 relationships:
   related:
   - DEV-849
@@ -28,6 +28,9 @@ comments:
 - date: 2026-11-26T06:58:09.164379+00:00
   author: mallox
   text: 'Answer: summary (Summary only: {summary} becomes the job''s last message; outcomes still come from the ticket) (answered in INBOX-760)'
+- date: 2026-11-26T16:57:51.759386+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T06:58Z with no lotar job: the live check restarted @fix as the next turn of its thread, the answered retry started no job, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
 description: |-
@@ -121,3 +124,13 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-26T16:55:48.452223+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T16:57:51.759386+00:00
+  actor: claude
+  changes:
+  - field: comment_added

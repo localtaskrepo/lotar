@@ -693,6 +693,15 @@ pub struct TaskAddArgs {
 pub struct TaskShowArgs {
     /// Task ID (with or without project prefix)
     pub id: String,
+    /// Each comment as one line, cut at 200 characters, and no history
+    /// (DEV-884): the form agents read a ticket in
+    #[arg(long, conflicts_with = "comment")]
+    #[serde(default)]
+    pub brief: bool,
+    /// Print only comment N (the `#N` of `lotar show`) in full
+    #[arg(long, value_name = "N")]
+    #[serde(default)]
+    pub comment: Option<usize>,
 }
 
 #[derive(Args, Deserialize, Debug)]

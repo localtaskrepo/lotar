@@ -1,11 +1,11 @@
 title: A job queued for a hard-deleted ticket runs on the new ticket that reuses its ID, with the deleted ticket's title in its prompt
-status: HelpNeeded
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-26T06:59:12.294681+00:00
+modified: 2026-11-26T16:57:48.665493+00:00
 relationships:
   related:
   - DEV-786
@@ -102,6 +102,9 @@ comments:
 - date: 2026-11-26T06:59:11.701066+00:00
   author: mallox
   text: 'Answer: rebuild (Keep DEV-843''s design, rebuilt on main''s replace_placeholders; port DEV-845''s tests; then merge) (answered in INBOX-756)'
+- date: 2026-11-26T16:57:48.665493+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T06:59Z with no lotar job: the live check restarted @fix as the next turn of its thread, the answered retry started no job, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
@@ -304,3 +307,13 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-26T16:55:35.854065+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T16:57:48.665493+00:00
+  actor: claude
+  changes:
+  - field: comment_added

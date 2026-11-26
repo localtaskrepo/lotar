@@ -1,11 +1,11 @@
 title: lotar serve reads the value of --web-ui-path or --allow-host as the port when no port comes before it
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T05:29:21.102795+00:00
-modified: 2026-11-26T11:05:28.671636+00:00
+modified: 2026-11-26T16:57:34.793827+00:00
 relationships:
   related:
   - DEV-789
@@ -91,6 +91,9 @@ comments:
     - Manual: `lotar serve --tasks-dir <dir> --web-ui-path <dir> --allow-host tasks.example --config server.port=18793` starts on port 18793 and serves the custom UI.
     - No stray files or second branch. No tickets filed.
     - Not run: `npm run lint`, `npm test`, `npm run smoke`. The merge runs them.
+- date: 2026-11-26T16:57:34.793827+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T11:05Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af7c853bc72540dd8dd160e793ee215ee636fb7378dea9f82c7f46d1dfbc0eb6d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab01ace2febfeb2b4d0c8224b3a2de98d83376549136189cb8171d1b7baf76f44
@@ -208,3 +211,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-789","DEV-804"]}'
     new: '{"related":["DEV-789","DEV-804","DEV-897"]}'
+- at: 2026-11-26T16:57:31.701781+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-26T16:57:33.216535+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-26T16:57:34.793827+00:00
+  actor: claude
+  changes:
+  - field: comment_added

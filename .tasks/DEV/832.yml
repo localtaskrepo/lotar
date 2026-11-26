@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-26T07:28:32.691450+00:00
+modified: 2026-11-26T16:57:45.234844+00:00
 relationships:
   related:
   - DEV-777
@@ -248,6 +248,9 @@ comments:
     - command: npm run lint / npm test / npm run smoke
       result: not_run
       reason: full suites run at merge; merge agent ran them on 5d3223431
+- date: 2026-11-26T16:57:45.234844+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T07:28Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7ed476434fcb4e018626487ba8c6d2a47dc50f277c86920bab74a5e08d2a6b29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6399386a6cea6eeb5ad94b21639914a2a3cbeac4c6d5e80ec5a4bd8b60b2deb
@@ -489,3 +492,27 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T16:56:27.838400+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:56:27.953821+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-26T16:57:43.414312+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:57:44.125127+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-26T16:57:45.234844+00:00
+  actor: claude
+  changes:
+  - field: comment_added

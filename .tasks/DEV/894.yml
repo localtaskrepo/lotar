@@ -1,11 +1,11 @@
 title: 'docs/help/agent.md: created_at is not when a job left the queue for a job lotar serve held as queued'
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T07:08:32.438639+00:00
-modified: 2026-11-26T07:08:35.462071+00:00
+modified: 2026-11-26T16:52:13.921961+00:00
 relationships:
   related:
   - DEV-882
@@ -16,3 +16,9 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T16:52:13.921961+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

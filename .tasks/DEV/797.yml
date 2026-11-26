@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-26T07:08:46.785171+00:00
+modified: 2026-11-26T16:53:01.962075+00:00
 relationships:
   blocks:
   - DEV-801
@@ -559,3 +559,13 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881"]}'
     new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882"]}'
+- at: 2026-11-26T16:53:01.779031+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:53:01.962075+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'

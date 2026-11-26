@@ -68,12 +68,16 @@ lotar task list [QUERY...] [--assignee|-a <VALUE>] [--status|-s <VALUE>...] [--p
 
 ```bash
 lotar show <TASK_ID>            # also: lotar view, lotar task show
+lotar show <TASK_ID> --brief    # each comment as one line
+lotar show <TASK_ID> --comment <N>
 lotar --format json show <TASK_ID>
 ```
 
 - Prints the task's fields, relationships, description, acceptance criteria, references and comments. Empty sections are left out.
 - Accepts the same IDs as other commands: `DEV-12`, `12` inside a project, an old ID of a moved task, or a soft-deleted task.
-- `--format json` prints the full task as the REST API returns it.
+- `--format json` prints the full task as the REST API returns it, with its history.
+- `--brief` prints each comment as one line: `#N`, date, author and the comment's first line, cut at 200 characters; `…` marks a comment that goes on. Report details (commits, checks, next step) are left out, and a last line names `--comment <N>`. With `--format json` the task has no `history`, each comment's `text` is cut the same way, and `report` and `review` are left out. This is the form agent jobs read a ticket in (DEV-884): the full form of a long-running ticket runs to tens of thousands of characters.
+- `--comment <N>` prints only comment `#N` in full, with its report; `--format json` prints that comment. A number that is 0, past the last comment or a deleted comment is an error (exit 1) that names the range. `--brief` and `--comment` can't be used together.
 - With [`server.public_url`](./config-reference.md) set, the second line is the ticket's web link (`https://lotar.example.com/task/DEV-12`), and the JSON has it as `url`.
 
 ### edit

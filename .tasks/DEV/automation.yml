@@ -62,7 +62,10 @@ automation:
                  then lotar status ${{ticket.id}} Done (WontDo when the ticket's "Done when" says so) and
                  lotar assignee ${{ticket.id}} --clear, and stop. No review or merge follows.
               6. Otherwise comment the outcome: what you changed, the commit hash, the checks that ran. When your job
-                 ends, an agent on another model reviews it, then the merge agent takes over.
+                 ends, an agent on another model reviews it, then the merge agent takes over. A small change gets the
+                 light review: 20 changed lines or fewer (git diff --shortstat <main>...HEAD -- . ':!.tasks') and no
+                 ui tag: lotar task edit ${{ticket.id}} --tag small-diff, unless you run on Claude Sonnet. Larger, or a
+                 ui tag, on a ticket tagged small-diff (from earlier work): --untag small-diff, on any model.
                  Changed pages, components or styles: tag the ticket ui (lotar task edit ${{ticket.id}} --tag ui)
                  and attach the before and after screenshots of skill ui-review (lotar task reference add upload
                  ${{ticket.id}} <file>), linked in that comment; the reviewer blocks without them.
@@ -140,7 +143,10 @@ automation:
                  lotar status ${{ticket.id}} Done (WontDo when the ticket's "Done when" says so) and
                  lotar assignee ${{ticket.id}} --clear, and stop. No review or merge follows.
               6. Otherwise comment the outcome: what you changed, the commit hash, the checks that ran. When your job
-                 ends, an agent on another model reviews it, then the merge agent takes over.
+                 ends, an agent on another model reviews it, then the merge agent takes over. A small change gets the
+                 light review: 20 changed lines or fewer (git diff --shortstat <main>...HEAD -- . ':!.tasks') and no
+                 ui tag: lotar task edit ${{ticket.id}} --tag small-diff, unless you run on Claude Sonnet. Larger, or a
+                 ui tag, on a ticket tagged small-diff (from earlier work): --untag small-diff, on any model.
                  Changed pages, components or styles: tag the ticket ui (lotar task edit ${{ticket.id}} --tag ui)
                  and attach the before and after screenshots of skill ui-review (lotar task reference add upload
                  ${{ticket.id}} <file>), linked in that comment; the reviewer blocks without them.
@@ -235,7 +241,7 @@ automation:
           - any:
               - assignee: "@fix"
               - assignee: "@fix-fable"
-          - not: { tags: { any: [waits] } }
+          - not: { tags: { any: [waits, small-diff] } }
       on:
         job_completed:
           set:
@@ -291,17 +297,26 @@ automation:
       when:
         all:
           - assignee: "@fix-retry"
-          - not: { tags: { any: [waits] } }
+          - not: { tags: { any: [waits, small-diff] } }
       on:
         job_completed:
           set:
             assignee: "@review-claude"
             status: Reviewing
           agent: *review
+    # A small diff (tag small-diff, which the fix prompts set) gets the light review too (owner 2026-11-25: all of
+    # STD-359's proposals A-F, STD-362): reviews took 21% of tokens, review-light a tenth of review's per job.
     - name: "Fix done: light review"
       when:
         all:
-          - assignee: "@fix-light"
+          - any:
+              - assignee: "@fix-light"
+              - all:
+                  - any:
+                      - assignee: "@fix"
+                      - assignee: "@fix-fable"
+                      - assignee: "@fix-retry"
+                  - tags: { any: [small-diff] }
           - not: { tags: { any: [waits] } }
       on:
         job_completed:
@@ -438,7 +453,8 @@ automation:
               7. A health ticket names check commands (one per finding in a day's bundle): run each again; none may
                  still list its finding.
               8. Comment the outcome: the commits merged, pushed or why not, trusted or not, the checks that ran. The
-                 ticket goes to Done when your job ends (a Research ticket: to mallox with its question).
+                 ticket goes to Done when your job ends (a Research ticket: to mallox with its question; a "Release
+                 v" ticket: to @fix, which tags and finishes the release).
     # A failed review job (a crash) doesn't merge: until 2026-11-15 it merged without a review, and FND-3, STD-128 and
     # LOCA-326 reached main unreviewed (owner 2026-11-15, STD-133: "no merges without review"). It waits for mallox. A
     # review that tagged review-blocked and then failed goes the blocked way below (STD-139). A usage limit (Codex on
@@ -470,10 +486,13 @@ automation:
     # was "fix" 9 times out of 9 (owner 2026-11-15, STD-156, docs/decisions/2026-11-15-inbox-triage.md). Tag
     # review-returned marks one rework, review-returned-twice the second. Also when the review job failed after it
     # tagged review-blocked (STD-139).
+    # A light review of a small diff (tag small-diff) goes back to @fix: the author was @fix, @fix-fable or @fix-retry.
     - name: "Review blocked: back to @fix"
       when:
         all:
-          - assignee: "@review"
+          - any:
+              - assignee: "@review"
+              - all: [{ assignee: "@review-light" }, { tags: { any: [small-diff] } }]
           - tags: { any: [review-blocked] }
           - not: { tags: { any: [review-returned] } }
       on:
@@ -512,7 +531,11 @@ automation:
               2. Amend the earlier commit (it isn't pushed), signed, never with --no-verify, message
                  "${{ticket.id}} ${{ticket.title}}". Don't merge or push.
               3. Don't end your turn while tests still run. Comment the outcome: what you did about each finding, the
-                 commit hash, the checks that ran. When your job ends the work is reviewed again.
+                 commit hash, the checks that ran. When your job ends the work is reviewed again. The ticket is tagged
+                 small-diff and the diff (git diff --shortstat <main>...HEAD -- . ':!.tasks') now has more than 20
+                 changed lines, or a ui tag: lotar task edit ${{ticket.id}} --untag small-diff, on any model; it gets
+                 the full review. Still 20 changed lines or fewer and no ui tag: keep small-diff, or set it (lotar task
+                 edit ${{ticket.id}} --tag small-diff) unless you run on Claude Sonnet.
         job_failed: *back-to-fix
     - name: "Review blocked: back to @fix-retry"
       when:
@@ -534,6 +557,7 @@ automation:
           - assignee: "@review-light"
           - tags: { any: [review-blocked] }
           - not: { tags: { any: [review-returned] } }
+          - not: { tags: { any: [small-diff] } }
           - not: { type: Research }
       on:
         job_completed: &back-to-fix-light
@@ -588,7 +612,9 @@ automation:
     - name: "Review blocked again: rework on @fix"
       when:
         all:
-          - assignee: "@review"
+          - any:
+              - assignee: "@review"
+              - all: [{ assignee: "@review-light" }, { tags: { any: [small-diff] } }]
           - tags: { any: [review-blocked] }
           - tags: { any: [review-returned] }
           - not: { tags: { any: [review-returned-twice] } }
@@ -623,6 +649,7 @@ automation:
           - tags: { any: [review-blocked] }
           - tags: { any: [review-returned] }
           - not: { tags: { any: [review-returned-twice] } }
+          - not: { tags: { any: [small-diff] } }
           - not: { type: Research }
       on:
         job_completed: &again-to-fix-light
@@ -676,12 +703,18 @@ automation:
             WontDo?"
         job_failed: *to-mallox
     # A failed fix job goes to @fix-retry once before it waits for mallox (owner 2026-11-12, STD-55): STD-18's job
-    # failed only because the agent ended its turn while the commit hook ran. The retry keeps the branch and runs on
-    # the profile's model, not the ticket's fields. Tag fix-retried sends a second failure to mallox. A rate or usage
+    # failed only because the agent ended its turn while the commit hook ran. The retry keeps the branch. Tag
+    # fix-retried sends a second failure to mallox. A rate or usage
     # limit doesn't get here: the job pauses and reruns on its own profile after the reset ("Job paused: comment once"),
     # so no retry hits the limit again (owner 2026-11-16, INBOX-379: "don't retry a job that failed on a rate limit").
     # A job whose agent asked mallox ends with him: his hand-back replaces set.assignee, so no retry starts, and the run
     # leaves no retry comment over his question and takes the tag off again (repos.ts --asked, STD-320).
+    # The retry continues the failed job's session, the ticket's newest, on that session's model (owner 2026-11-25:
+    # all of STD-359's proposals A-F, STD-362): its prompt cache is warm for continue_within_minutes. After that lotar
+    # starts a new session on @fix-retry's model with a handoff (docs/help/agent.md, Sessions); a T3 thread it can't
+    # resume fails the retry, which then goes to mallox. A fresh start cost 35 k tokens before the first answer, and
+    # 22 of 84 retries started cold (STD-359). A Done ticket gets no retry: a release job's step 7 sets Done, which takes
+    # fix-retried off (done-tags), and a crash in step 8 retried it with the work prompt (STD-372).
     - name: "Fix failed: retry on @fix-retry"
       when:
         all:
@@ -691,6 +724,7 @@ automation:
               - assignee: "@fix-fable"
           - tags: { any: [health] }
           - not: { tags: { any: [fix-retried] } }
+          - not: { status: Done }
       on:
         job_failed:
           set:
@@ -703,6 +737,7 @@ automation:
             ${{ticket.id}} ${{agent.job_id}} "The fix agent's job ${{agent.job_id}} failed (lotar agent logs
             ${{agent.job_id}}); @fix-retry retries it on branch ${{agent.worktree_branch}}."
           agent:
+            session: continue
             prompt: *fix-prompt
     - name: "Fix failed: retry an agent ticket on @fix-retry"
       when:
@@ -712,6 +747,7 @@ automation:
               - assignee: "@fix-light"
               - assignee: "@fix-fable"
           - not: { tags: { any: [health, fix-retried] } }
+          - not: { status: Done }
       on:
         job_failed:
           set:
@@ -720,6 +756,7 @@ automation:
             tags: [fix-retried]
           run: *fix-retry
           agent:
+            session: continue
             prompt: *work-prompt
     # A retry, or a @fix-retry job (only retries start one). It asks a question: repos.ts reports a
     # HelpNeeded ticket whose last comment asks none (check question). Not when the job's agent asked him already
@@ -735,6 +772,7 @@ automation:
           - any:
               - assignee: "@fix-retry"
               - tags: { any: [fix-retried] }
+          - not: { status: Done }
       on:
         job_failed:
           set:
@@ -748,6 +786,38 @@ automation:
             "wontdo:status=WontDo" --set "wontdo:assignee="; node "$HOME/Development/standards/scripts/repos.ts" --inbox
             "$1"' sh ${{ticket.id}} "The fix agent's job ${{agent.job_id}} failed again (lotar agent logs
             ${{agent.job_id}}). Retry with which agent, or WontDo?" ${{agent.job_id}}
+    # A fix job that fails after its ticket went Done: a release job's step 7 sets Done and step 8 opens the next release
+    # ticket, so a crash in step 8 leaves it missing (STD-374). No retry (STD-372) and no reopening: the ticket stays
+    # Done. The inbox files no Done ticket (repos.ts waitsForOwner), so a follow-up, related to it, asks mallox; its
+    # finding adds a second failure of the same ticket to the open follow-up, which asks once. A failed add says so on the
+    # Done ticket.
+    - name: "Fix failed after Done: ask mallox in a follow-up"
+      when:
+        all:
+          - any:
+              - assignee: "@fix"
+              - assignee: "@fix-light"
+              - assignee: "@fix-fable"
+              - assignee: "@fix-retry"
+          - status: Done
+      on:
+        job_failed:
+          run: >-
+            env LOTAR_DEFAULT_REPORTER=automation sh -c 'lotar comment "$1" -m "$3"; out=$(lotar --format json add "$4"
+            --status HelpNeeded --assignee mallox --related "$1" --finding "job-failed-after-done:$1" -D "$5"); id=$(echo
+            "$out" | sed -n "s/.*\"task_id\":\"\([^\"]*\)\".*/\1/p"); if [ -z "$id" ]; then lotar comment "$1" -m
+            "Filing the follow-up for mallox failed: lotar add named no ticket."; exit 1; fi; case "$out" in
+            *\"created\":true*) lotar comment "$id" --question "$6" --option "fix: @fix does what the job left undone"
+            --set "fix:assignee=@fix" --option "done: Nothing is missing" --set "done:status=Done" --set
+            "done:assignee=" ;; esac; node
+            "$HOME/Development/standards/scripts/repos.ts" --inbox "$id"' sh ${{ticket.id}} ${{agent.job_id}} "Job
+            ${{agent.job_id}} failed after this ticket went Done (lotar agent logs ${{agent.job_id}}). It stays Done
+            and nothing reruns; a related follow-up asks mallox." "${{ticket.id}}: its job failed after it went Done"
+            "Job ${{agent.job_id}} on ${{ticket.id}} (${{ticket.title}}) failed after ${{ticket.id}} went Done (lotar
+            agent logs ${{agent.job_id}}). ${{ticket.id}} stays Done. The steps after Done may not have run: for a
+            release ticket, the release skill's step 8 opens the next release ticket." "Job ${{agent.job_id}} failed
+            after ${{ticket.id}} went Done: the steps after Done may not have run (for a release, the next release
+            ticket). Should @fix do what it left undone?"
     # A failed research job asks mallox at once: it changed no code a retry would keep (STD-305). Not when the
     # research agent asked him already (repos.ts --asked, STD-306).
     - name: "Research failed: hand to mallox"
@@ -772,6 +842,7 @@ automation:
         all:
           - assignee: "@merge"
           - not: { type: Research }
+          - not: { title: { matches: '^Release v' } }
       on:
         job_started: &merging-status
           set:
@@ -783,9 +854,50 @@ automation:
           remove: &done-tags
             tags: [merge-retried, fix-retried, review-blocked, review-returned, review-returned-twice, retry-fix,
               retry-fable, job-paused]
+    # A release ticket's merge lands only the version bump; the tag comes after it (lotar's release skill, step 4).
+    # Done here would fire unblocked and start the tickets waiting for a release that isn't out (lotar DEV-725 went
+    # Done untagged, STD-371). So the merged ticket goes to @fix, which finishes the release in a fresh session and
+    # sets Done itself (step 7). Tag fix-retried: a crashed release job goes to mallox, not to a retry with the work
+    # prompt.
+    - name: "Release merged: finish the release"
+      when:
+        all:
+          - assignee: "@merge"
+          - not: { type: Research }
+          - title: { matches: '^Release v' }
+      on:
+        job_started: *merging-status
+        job_completed:
+          set:
+            assignee: "@fix"
+            status: InProgress
+          remove: *done-tags
+          add:
+            tags: [fix-retried]
+          agent:
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+            session: fresh
+            prompt: |
+              Finish the release of ticket ${{ticket.id}} ("${{ticket.title}}"): its version bump is merged on main,
+              the tag is not pushed yet. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex).
+              Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for
+              findings or evidence, with paths, commands and hashes in backticks.
+              1. Work in the main checkout (<root>, the first entry of git worktree list), not in your worktree:
+                 the bump commit is on its branch, and the merge pushed it. git -C <root> log @{u}.. still lists
+                 it: the merge held it back (its outcome comment says why). Push nothing; comment that, set the
+                 status to HelpNeeded, assign the ticket to mallox and stop.
+              2. Follow this repo's release skill (.github/skills/release/SKILL.md) from step 3 (QA green for the
+                 bump commit) to step 8, commenting each step's result on ${{ticket.id}}. Step 7 sets it Done, which
+                 starts the tickets waiting for this release.
+              3. When step 8 is done: lotar assignee ${{ticket.id}} --clear, so no review starts, and stop.
+              A step that fails, or one the skill says needs the owner: comment what you ran and what failed or what
+              you need, set the status to HelpNeeded, assign the ticket to mallox and stop. Never set Done before the
+              release is installed (step 6). Never delete work that isn't saved elsewhere.
     # A merged write-up is on main: the research agent's question goes to mallox (STD-305). Its question comment stays
     # open after the check's and the merge's comments, so the inbox asks it. A rule's own change fires no other rule:
-    # this one files the inbox ticket itself.
+    # this one files the inbox ticket itself. A question he answered already (the merge of his answer's follow-up work)
+    # closes the ticket instead: STD-359 and QIS-213 asked him again three times (STD-373, repos.ts --research-merged).
     - name: "Research merged: the question goes to mallox"
       when:
         all:
@@ -798,7 +910,7 @@ automation:
             status: HelpNeeded
             assignee: mallox
           remove: *done-tags
-          run: *inbox
+          run: 'node "$HOME/Development/standards/scripts/repos.ts" --research-merged ${{ticket.id}}'
     # A failed merge job (a crash, or a false failure like DEV-342's) goes back to the fix agent once, which ends with
     # nothing to do when the work is on main already; tag merge-retried sends a second failure to mallox, so fix,
     # merge, fail can't loop (owner 2026-11-11, STD-46). A Research ticket's goes to @research instead (below): the fix
@@ -1217,53 +1329,3 @@ automation:
           agent:
             session: continue
             prompt: *merge-prompt
-    # lotar's own rules follow.
-    # Note on "Prerequisites done: continue the waiting ticket" above: a ticket whose job the dependency check held
-    # back gets that job instead, as it was (DEV-530).
-    # A ticket that starts to wait (HelpNeeded, Blocked) keeps only its dependencies' build output: cargo clean
-    # --workspace drops target/debug/incremental and the workspace crates' artifacts (3.4 GB to 0.7 GB in DEV-653's
-    # worktree), which the resumed job rebuilds in about a minute (owner 2026-11-18, DEV-653: "Yes, build the waiting-state
-    # rule and run it on a real ticket"; this changes STD-95's "build output stays until Done" for waiting tickets).
-    # It fires on a person's status change and on an agent's hand-back, applied once its job ended. Waits that a rule
-    # or lotar sets fire no rule (rules that hand a ticket to mallox, a T3 thread waiting for an answer, Blocked on open
-    # prerequisites): `agent.worktree.waiting_run` in DEV/config.yml runs the same command for those at the job's end
-    # or the held-back start (DEV-712). The fix, review and merge steps keep their build output: the next
-    # step reuses it (DEV-653's measurements). lotar runs nothing while a job runs for the ticket; a lotar without
-    # `agent worktree run` (before DEV-653) fails it.
-    - name: "Waiting: drop the workspace build output"
-      when:
-        any:
-          - status: HelpNeeded
-          - status: Blocked
-      on:
-        updated:
-          run:
-            command: lotar
-            args: [agent, worktree, run, "${{ticket.id}}", --, cargo, clean, --workspace]
-            ignore_failure: true
-    # A provider's expired login pauses that provider's jobs (DEV-835): only the job that opened the pause matches
-    # job.pause, so the owner gets one ticket per pause in his inbox, not one per held ticket. Its own ticket, not the
-    # paused one: that one's retry is queued and moves it on when it completes.
-    - name: "Login expired: ask the owner to sign in"
-      when:
-        job: { pause: auth }
-      on:
-        job_paused:
-          run:
-            command: lotar
-            args:
-              - add
-              - "Sign in to ${{agent.provider}} again: its agent jobs wait"
-              - --project
-              - DEV
-              - --type
-              - Chore
-              - --status
-              - HelpNeeded
-              - --assignee
-              - mallox
-              - --tag
-              - owner
-              - -D
-              - "The ${{agent.provider}} login fails, so lotar paused that provider's jobs (job ${{agent.job_id}} on ${{ticket.id}}). Sign in again (claude auth login, codex login); the next try resumes them, every 10 minutes. Then close this ticket."
-            ignore_failure: true

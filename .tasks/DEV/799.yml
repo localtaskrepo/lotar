@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-26T06:54:50.606229+00:00
+modified: 2026-11-26T16:53:33.422807+00:00
 relationships:
   related:
   - DEV-464
@@ -441,4 +441,14 @@ history:
     new: Merging
   - field: assignee
     old: '@review'
+    new: '@merge'
+- at: 2026-11-26T16:53:33.230216+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:53:33.422807+00:00
+  actor: claude
+  changes:
+  - field: assignee
     new: '@merge'

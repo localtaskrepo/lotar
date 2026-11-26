@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T22:11:53.112006+00:00
-modified: 2026-11-26T07:08:54.423380+00:00
+modified: 2026-11-26T16:52:09.751012+00:00
 relationships:
   related:
   - DEV-827
@@ -56,6 +56,12 @@ comments:
     - Minor, filed as [DEV-894](https://lotar.pyxzl.net/task/DEV-894): `docs/help/agent.md` says `created_at` is when a job left the queue. For a job that `lotar serve` holds, the job's record keeps `created_at` = `queued_at`. Only the saved log header uses the start time.
     - Not blocking: `park()` (`agent_queue_service.rs:304`) resets `queued_at` when a job waits for prerequisites. This behaviour predates this change.
     - Not rerun: `npm run lint`, `npm test`, `npm run smoke` (the merge runs them, DEV-797).
+- date: 2026-11-26T16:52:09.751012+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-882` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-882` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf75b0019e9a04d1379a692646fbceb73e18d6a69e7cad88070db40e0a4c5b8a
 description: 'From standards STD-359 proposal F (owner 2026-11-25: all of A-F). The throughput measurement couldn''t count memory-gate hours (holds only go to the server log, DEV-827) and gives queue waits only as a lower bound: the queue keeps no time an entry was queued. Store queued_at per queue entry and job, and each gate hold (start, end, reason) where lotar agent jobs or a stats command can read them.'
@@ -126,3 +132,17 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T16:52:06.147848+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:52:06.305403+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-26T16:52:09.751012+00:00
+  actor: automation
+  changes:
+  - field: comment_added

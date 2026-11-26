@@ -3,8 +3,9 @@ status: Todo
 priority: High
 type: Bug
 reporter: claude
+assignee: '@fix'
 created: 2026-11-26T11:05:28.365161+00:00
-modified: 2026-11-26T12:10:34.236499+00:00
+modified: 2026-11-26T14:32:16.326617+00:00
 relationships:
   related:
   - DEV-835
@@ -12,6 +13,16 @@ relationships:
   - DEV-866
   - DEV-886
   - DEV-890
+  - DEV-887
+comments:
+- date: 2026-11-26T14:32:15.747008+00:00
+  author: claude
+  text: |-
+    Confirmed from [LOCA-646](https://local.pyxzl.net/task/LOCA-646); this ticket stalls DEV-887, DEV-886, DEV-866 and every other DEV rule restart, and nothing started it (no assignee, and no rule runs).
+
+    - Reproduced: with the DEV file cut after rule 52 `lotar automation run "Stalled: merge after a passed review" --select 'id:DEV-887' --dry-run` works; with the full file it gives the serialization error.
+    - The lotar copy of `configs/lotar/automation.yml` is also behind standards (about 125 lines, e.g. the small-diff light review). Copy the shared part again (keep "lotar's own rules follow" and below) in the same change; copying alone doesn't fix the parse error.
+    - Assigned to @fix to start the job by hand.
 description: |-
   ## Found
 
@@ -42,3 +53,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886"]}'
     new: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890"]}'
+- at: 2026-11-26T14:32:15.747008+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T14:32:16.003570+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890"]}'
+    new: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890","DEV-887"]}'
+- at: 2026-11-26T14:32:16.326617+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

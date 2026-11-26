@@ -1,11 +1,11 @@
 title: 'A fix job retried after a failed merge fails in 2s with the merge job''s verdict: STD-336 job-20261124T231242.639Z-51'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T00:48:58.355185+00:00
-modified: 2026-11-26T11:05:28.671938+00:00
+modified: 2026-11-26T16:57:22.483053+00:00
 relationships:
   related:
   - DEV-860
@@ -60,6 +60,9 @@ comments:
     - Reran (all passed): `npm ci`; `cargo nextest` for the new unit test, `a_taken_over_job*`, the new dev605 test, `merge_job_does_not_start_while_review_blocked`, `a_ticket_nothing_was_built_for_is_not_done` and the dev566 tests (6/6); `cargo clippy -p lotar-agent --all-targets -D warnings`; `rustfmt --check` and `prettier --check` on the changed files.
     - Docs: all 4 "a ticket in `Merging`" sentences in `docs/help/agent.md` were updated; no other doc uses the old rule.
     - No stray files, no second branch. No minor findings and no tickets filed.
+- date: 2026-11-26T16:57:22.483053+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T11:05Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A922272c3283e93b3dd4913646dc365407aad022b6299a52a51fc00c60cf099a6
 description: |-
@@ -136,3 +139,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-860","DEV-566","DEV-835","DEV-804"]}'
     new: '{"related":["DEV-860","DEV-566","DEV-835","DEV-804","DEV-897"]}'
+- at: 2026-11-26T16:57:18.919737+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-26T16:57:19.697241+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-26T16:57:22.483053+00:00
+  actor: claude
+  changes:
+  - field: comment_added

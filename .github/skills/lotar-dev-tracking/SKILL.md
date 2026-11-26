@@ -17,14 +17,14 @@ harness memory. Read-only requests and tiny fixes do not require a new ticket.
 
 ```bash
 lotar --tasks-dir .tasks list -p DEV "guidance" --limit 10
-lotar --tasks-dir .tasks --format json show DEV-14
+lotar --tasks-dir .tasks show DEV-14 --brief   # one comment in full: --comment <N>
 lotar --tasks-dir .tasks config show --project DEV
 lotar --tasks-dir .tasks add "<outcome>" -p DEV --type chore --description "<scope and acceptance criteria>"
 ```
 
 The list query is positional, not `--search`. Read one ticket with `show`, not
-`list`: a list also finds tickets that mention the ID. Read comments with
-`lotar --tasks-dir .tasks comment DEV-N` when resuming; use relationships when
+`list`: a list also finds tickets that mention the ID. `--brief` cuts each comment to its
+first line; read the ones you need with `show DEV-N --comment <N>` when resuming; use relationships when
 dependencies matter.
 
 ## CLI or MCP, not both for every operation
@@ -34,7 +34,7 @@ otherwise use the CLI. MCP host prefixes vary: use the advertised tools.
 
 | Intent | MCP tool | CLI |
 | --- | --- | --- |
-| Find/read | `task_list`, `task_get` | `list -p DEV "query" --limit 10`, `--format json show DEV-N` |
+| Find/read | `task_list`, `task_get` | `list -p DEV "query" --limit 10`, `show DEV-N --brief` |
 | Create | `task_create` | `add "title" -p DEV` |
 | Status | `task_update` with `patch.status` | `status DEV-N <configured-state>` |
 | Progress | `task_comment_add` | `comment DEV-N -m "text"` |

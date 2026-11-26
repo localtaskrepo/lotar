@@ -1,11 +1,11 @@
 title: 'Finding bundles: no test covers a finding joining an InProgress bundle whose fix job takes the message'
-status: Blocked
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T04:56:14.463740+00:00
-modified: 2026-11-26T13:53:21.981114+00:00
+modified: 2026-11-26T16:57:00.675771+00:00
 relationships:
   depends_on:
   - DEV-864
@@ -27,6 +27,9 @@ comments:
 
     - It sat in Todo on `@fix` with tag `waits` and no job: the move to Blocked didn't happen at 12:09Z (LOCA-644).
     - "Prerequisites done" continues it once DEV-864 is Done.
+- date: 2026-11-26T16:57:00.675771+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T13:53Z with no lotar job: the live check restarted @fix as the next turn of its thread, its prerequisites are done (lotar rule "Stalled: continue the unblocked ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6dadfbbb42e68dd68425b4eadeda1492dfe8a3eded7363266d1f74b0dcceaa52
 description: |-
@@ -38,8 +41,6 @@ description: |-
   ## Done when
 
   - [ ] A test runs `lotar add --finding <key> --bundle health` against an InProgress bundle whose fix job takes the message (a harnessmux session this test owns, or a stand-in), and asserts the message text arrived and the output is `{"state": "bundled"}` with the bundle's id.
-tags:
-- waits
 history:
 - at: 2026-11-26T04:56:14.783444+00:00
   actor: claude
@@ -80,6 +81,22 @@ history:
     old: Todo
     new: Blocked
 - at: 2026-11-26T13:53:21.981114+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T16:56:56.737218+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T16:56:57.838116+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
+- at: 2026-11-26T16:57:00.675771+00:00
   actor: claude
   changes:
   - field: comment_added

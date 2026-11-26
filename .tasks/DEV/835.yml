@@ -1,11 +1,11 @@
 title: 'An expired provider login fails every job into retries, owner questions and inbox triage: pause that provider''s queue like a signing failure (DEV-604)'
-status: Merging
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@review'
 created: 2026-11-24T16:08:21.742893+00:00
-modified: 2026-11-26T11:05:28.670663+00:00
+modified: 2026-11-26T16:56:21.506478+00:00
 relationships:
   related:
   - DEV-604
@@ -16,6 +16,9 @@ relationships:
   - DEV-886
   - DEV-804
   - DEV-897
+  - DEV-864
+  - DEV-793
+  - DEV-786
 comments:
 - date: 2026-11-24T19:10:54.135862+00:00
   author: automation
@@ -154,6 +157,9 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-835` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`, `crates/lotar-agent/src/services/agent_queue_service.rs`, `crates/lotar-lib/src/cli/handlers/agent.rs`, `crates/lotar-lib/tests/dev584_usage_limit_pause_test.rs`, `docs/help/agent.md`, `view/__tests__/automationRules.spec.ts`; lotar aborted the rebase, `agent/DEV-835` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T16:56:21.506478+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T16:02Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c60c79050a00e86789a1a8686ab4aaf6459fe53ef6705339ef96005fd61317f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ff06e8317883aa88fd31e0eb8d7df2aa53ee9d651f0dbc2a23a0118cdec8a29
@@ -359,3 +365,44 @@ history:
   - field: relationships
     old: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804"]}'
     new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897"]}'
+- at: 2026-11-26T14:23:08.765546+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897"]}'
+    new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864"]}'
+- at: 2026-11-26T15:53:32.452053+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864"]}'
+    new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864","DEV-793"]}'
+- at: 2026-11-26T16:02:26.408819+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864","DEV-793"]}'
+    new: '{"related":["DEV-604","DEV-740","DEV-832","DEV-836","DEV-833","DEV-886","DEV-804","DEV-897","DEV-864","DEV-793","DEV-786"]}'
+- at: 2026-11-26T16:56:11.880831+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-26T16:56:13.041922+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:56:14.553490+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-26T16:56:21.506478+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
-status: Merging
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: '@review-claude'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-26T10:20:55.135875+00:00
+modified: 2026-11-26T16:56:40.564804+00:00
 relationships:
   related:
   - DEV-584
@@ -13,6 +13,8 @@ relationships:
   - DEV-832
   - DEV-853
   - DEV-890
+  - DEV-864
+  - DEV-871
 comments:
 - date: 2026-11-25T13:24:09.600579+00:00
   author: automation
@@ -115,6 +117,9 @@ comments:
     - command: npm run -s test:agent
       result: failed
     next: The merge agent takes over in a new session
+- date: 2026-11-26T16:56:40.564804+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T16:01Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Claude"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
@@ -244,3 +249,38 @@ history:
   - field: relationships
     old: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853"]}'
     new: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853","DEV-890"]}'
+- at: 2026-11-26T14:23:08.766167+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853","DEV-890"]}'
+    new: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853","DEV-890","DEV-864"]}'
+- at: 2026-11-26T16:01:01.818025+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853","DEV-890","DEV-864"]}'
+    new: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853","DEV-890","DEV-864","DEV-871"]}'
+- at: 2026-11-26T16:56:36.855399+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-26T16:56:37.099023+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:56:37.632255+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review-claude'
+- at: 2026-11-26T16:56:40.564804+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: 'A merge job that ends while its agent waits on a check still lands: DEV-725 (v0.15.6) went to main with smoke failed, and is Done without push or tag'
-status: Merging
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: '@review-claude'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-26T05:04:02.538086+00:00
+modified: 2026-11-26T16:56:45.564530+00:00
 relationships:
   related:
   - DEV-725
@@ -15,6 +15,8 @@ relationships:
   - DEV-604
   - DEV-767
   - DEV-892
+  - DEV-786
+  - DEV-835
 comments:
 - date: 2026-11-22T18:46:53.150110+00:00
   author: claude
@@ -182,6 +184,42 @@ comments:
       - Full `npm test` and `npm run smoke`: the merge runs them.
       - A build of the branch merged with the current main.
     - No UI changes, so no screenshots needed.
+- date: 2026-11-26T15:53:32.208229+00:00
+  author: claude
+  text: |-
+    Not merged: smoke didn't pass while the Mac was overloaded. Rerun the merge when it's idle?
+
+    - **Rebase:** onto main `eeb1ad55d`, now `2a5887c11`. One conflict in `pause_queue` (`agent_job_service.rs`): DEV-835 added the login pause's `provider` and the `(String, bool)` return, DEV-793 added `checks_since` and `main_head_at_start`. Both are kept. `cargo check` is clean.
+    - **Passed:** `npm ci`, `npm run -s lint:agent`, `npm run -s test:agent` (2589 Rust and 1623 UI tests).
+    - **Smoke run 1** (load ~14): 1 of 411 failed, the Agent Jobs Instructions test (`ui.agent-jobs.smoke.spec.ts`). It passes alone in 2.9 s.
+    - **Smoke run 2** (load ~19, after waiting on DEV-786's check lock): 4 different UI tests failed. Some ran for 941 s.
+    - **Failed tests alone** (load ~39, `corespotlightd` at 144% CPU): 3 `ui.config-coverage` tests timed out at `page.goto`.
+    - None of the failing tests touch the changed code, which is backend agent/queue logic. But this ticket is about not landing on a failed smoke run, so main is untouched and nothing is pushed.
+  report:
+    commits:
+    - hash: 2a5887c11
+      what: DEV-793 rebased onto main eeb1ad55d (not merged)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2589 Rust, 1623 UI
+    - command: npm run -s smoke
+      result: failed
+      reason: UI timeouts at load 19-39, different tests each run
+    next: Rerun npm run -s smoke in the worktree when the Mac is idle, then fast-forward main
+- date: 2026-11-26T16:55:44.021482+00:00
+  author: claude
+  text: |-
+    Restarted by the stall-recovery ticket LOCA-679: review again, then the merge reruns smoke.
+
+    - The rebase onto main (`2a5887c11`) is newer than the last `Review: passed`, so the live check's rule restarts the review (`Answered in the thread: review on Claude`).
+    - The ticket sat at Merging with no job after the smoke failure under load ("Rerun the merge when it's idle?").
+    - Mac load was ~39 at 08:55 local; the smoke rerun in the merge may fail again until it drops.
+- date: 2026-11-26T16:56:45.564530+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T15:53Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Claude"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
@@ -401,3 +439,59 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-26T15:53:32.208229+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T15:53:32.451475+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767","DEV-892"]}'
+    new: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767","DEV-892","DEV-786","DEV-835"]}'
+- at: 2026-11-26T16:55:35.893658+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-26T16:55:35.983646+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:55:36.112696+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review-claude'
+- at: 2026-11-26T16:55:44.021482+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T16:56:42.392556+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T16:56:42.624716+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review-claude'
+- at: 2026-11-26T16:56:43.142452+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review-claude'
+- at: 2026-11-26T16:56:45.564530+00:00
+  actor: claude
+  changes:
+  - field: comment_added

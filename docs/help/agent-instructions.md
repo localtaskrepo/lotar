@@ -5,7 +5,7 @@ You run in a LoTaR agent job on this machine, with the repository and a shell. R
 Use literal values: some agent tools refuse commands with shell variables such as `$?`.
 
 ```sh
-"${{lotar.bin}}" --format json show ${{ticket.id}}   # also: task timeline, task relationships
+"${{lotar.bin}}" show ${{ticket.id}} --brief   # one comment in full: --comment <N>; also: task timeline, task relationships
 "${{lotar.bin}}" config show --project ${{ticket.project}}   # the configured statuses
 "${{lotar.bin}}" status ${{ticket.id}} <STATUS>
 "${{lotar.bin}}" assignee ${{ticket.id}} <ASSIGNEE>

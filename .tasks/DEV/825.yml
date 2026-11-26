@@ -3,9 +3,8 @@ status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@merge'
 created: 2026-11-23T04:27:34.695967+00:00
-modified: 2026-11-26T05:07:41.086705+00:00
+modified: 2026-11-26T16:55:46.882561+00:00
 relationships:
   related:
   - DEV-802
@@ -258,6 +257,44 @@ comments:
     - Reran: `npm ci` ok; `cargo nextest run -p lotar-core checkout_tops` passed; `cargo nextest run --workspace checkouts_of_one_repository` passed (`-p lotar-lib` alone stops early because the `lotar` binary isn't built, which is expected); `rustfmt --check` and `cargo clippy -p lotar-core --all-targets` are clean. Git is 2.56.1.
     - Not rerun: the full `npm run lint`, `npm test` and `npm run smoke`, which the merge runs. The DEV-801 temp-folder flake may still trip that run; the owner decided to land anyway (INBOX-706).
     - No findings, no tickets filed.
+- date: 2026-11-26T16:01:32.114479+00:00
+  author: claude
+  text: |-
+    Not merged: the test suite stops on a test this branch doesn't touch, because opgate isn't running and git can't sign commits. Should I restart opgate (`launchctl kickstart gui/501/net.pyxzl.opgate`) and rerun the merge, or file a fix so the test turns off signing first?
+
+    - Rebased onto `main` `eeb1ad55d` with no conflicts: the branch is now `aa724ad70`. `npm ci` and `npm run -s lint:agent` passed.
+    - `npm run -s test:agent` exited 100, both in the sandbox and outside it. The failing test is `dev626_resumed_t3_threads_test::worktree_run_runs_nothing_while_the_ticket_thread_runs_or_waits_for_an_answer` (`crates/lotar-lib/tests/dev626_resumed_t3_threads_test.rs:327`). Its `git commit --allow-empty` fails with `opgate's agent holds no keys, so nothing can sign` and `No user exists for uid 501`.
+    - `opgate status`: service not reachable (connection refused on `~/.config/opgate/opgate.sock`). That test doesn't set `commit.gpgsign=false`, but other git tests do, for example `stats_stale_git_test.rs`.
+    - This branch only changes `git.rs` and two tests (DEV-825's 3 files), so the failure doesn't come from this work. Smoke didn't run, and nothing was merged or pushed.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+      reason: dev626 test can't sign its git commit, opgate down
+    - command: npm run -s smoke
+      result: not_run
+      reason: stopped after the test failure
+    next: Start opgate (or make the dev626 test turn off signing), then rerun the merge
+- date: 2026-11-26T16:55:26.799566+00:00
+  author: claude
+  text: |-
+    Waiting for you: opgate is running again (keys loaded), so should the merge run again now? The merge agent's question above went unanswered and the ticket sat in Merging with no job.
+
+    - The merge stopped on `dev626_resumed_t3_threads_test` because opgate was down and git could not sign; `agent/DEV-825` (`aa724ad70`) is unchanged and clean on `main` `eeb1ad55d`.
+    - `opgate status` now lists the agent key, so that test should pass; the missing `commit.gpgsign=false` in it stays a separate bug.
+    - Found by LOCA-677 (stalled ticket check). On yes: `lotar status DEV-825 Merging` and `lotar assignee DEV-825 --clear`, then the merge rule.
+- date: 2026-11-26T16:55:45.403769+00:00
+  author: triage
+  text: |-
+    Yes, merge again: the cause is gone and the owner already decided to land this.
+
+    - The failed run was infrastructure (opgate down, git couldn't sign), not the branch. `opgate status` lists the agent key again.
+    - Landing was decided by mallox in INBOX-706 (land despite the DEV-801 flake); re-running a merge after an infra stop is the standing rule (`docs/decisions/2026-11-15-inbox-triage.md`).
+    - Set to Merging, assignee cleared, for the merge rule.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0c5bc00bfa5ad9befc35877c222ccb3555db0b97cab07c2f0a4984c66ca10b7a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a14eb294736299ddcfa1a4a685c83a62e6a240e9dccc5e2e91215857e91deab
@@ -537,3 +574,44 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-26T16:01:32.114479+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T16:55:24.692401+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+- at: 2026-11-26T16:55:24.763337+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-26T16:55:26.799566+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T16:55:45.403769+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-26T16:55:46.072927+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-26T16:55:46.440628+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Merging
+- at: 2026-11-26T16:55:46.882561+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'

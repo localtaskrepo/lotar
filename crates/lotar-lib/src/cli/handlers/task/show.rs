@@ -1,30 +1,88 @@
 //! `lotar show <id>` (DEV-18): one task with everything on it.
 
 use crate::api_types::TaskDTO;
+use crate::cli::args::TaskShowArgs;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::load_task_including_deleted;
 use crate::output::{OutputFormat, OutputRenderer};
+use crate::types::TaskComment;
 use crate::workspace::TasksDirectoryResolver;
 
-pub fn handle_show(id: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
-    let mut ctx = TaskCommandContext::for_reading(resolver, project, Some(id))?;
-    let loaded = load_task_including_deleted(&mut ctx, id, project)?;
-    match renderer.format {
-        // Deleted comments are left out (DEV-809), so whatever reads this
-        // (the inbox mirror) sees a withdrawn question as gone.
-        OutputFormat::Json => {
-            let mut task = loaded.task;
-            task.comments.retain(|comment| !comment.is_deleted());
-            renderer.emit_json(&task)
+/// How long a comment's line in `--brief` may get (DEV-884).
+const BRIEF_COMMENT_CHARS: usize = 200;
+
+pub fn handle_show(args: &TaskShowArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+    let mut ctx = TaskCommandContext::for_reading(resolver, project, Some(&args.id))?;
+    let loaded = load_task_including_deleted(&mut ctx, &args.id, project)?;
+    let mut task = loaded.task;
+    if let Some(number) = args.comment {
+        let open = crate::types::open_questions(&task.comments);
+        let index = number.checked_sub(1).filter(|&index| task.comments.get(index).is_some_and(|comment| !comment.is_deleted()));
+        let Some(index) = index else {
+            let range = if task.comments.is_empty() { "it has no comments".to_string() } else { format!("comments are #1 to #{}", task.comments.len()) };
+            return Err(format!("{} has no comment #{number}: {range}, deleted ones left out", task.id));
+        };
+        let comment = &task.comments[index];
+        match renderer.format {
+            OutputFormat::Json => renderer.emit_json(comment),
+            OutputFormat::Text => renderer.emit_raw_stdout(comment_text(index, comment, open.contains(&index)).trim()),
         }
-        OutputFormat::Text => renderer.emit_raw_stdout(render_task_text(&loaded.task, &resolver.path)),
+        return Ok(());
     }
+    if matches!(renderer.format, OutputFormat::Text) {
+        renderer.emit_raw_stdout(render_task_text(&task, &resolver.path, args.brief));
+        return Ok(());
+    }
+    // Deleted comments are left out (DEV-809), so whatever reads this
+    // (the inbox mirror) sees a withdrawn question as gone.
+    task.comments.retain(|comment| !comment.is_deleted());
+    if !args.brief {
+        renderer.emit_json(&task);
+        return Ok(());
+    }
+    for comment in &mut task.comments {
+        comment.text = brief_line(&comment.text);
+        comment.report = None;
+        comment.review = None;
+    }
+    let mut value = serde_json::to_value(&task).map_err(|e| e.to_string())?;
+    if let Some(object) = value.as_object_mut() {
+        object.remove("history");
+    }
+    renderer.emit_json(&value);
     Ok(())
 }
 
+/// A comment's first line, cut at [`BRIEF_COMMENT_CHARS`] with `…`.
+fn brief_line(text: &str) -> String {
+    let line = text.lines().next().unwrap_or_default().trim_end();
+    let cut: String = line.chars().take(BRIEF_COMMENT_CHARS).collect();
+    let more = cut.len() < line.len() || text.trim_end().lines().nth(1).is_some();
+    if more { format!("{cut}…") } else { cut }
+}
+
+/// One comment in full: `#N`, date, marker, author and its text, then the
+/// report's lines.
+fn comment_text(index: usize, comment: &TaskComment, open: bool) -> String {
+    let mut lines = comment.text.lines();
+    let author = comment.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
+    let marker = crate::cli::handlers::comment::comment_marker(comment, open);
+    let mut out = format!("  #{}  {}  {marker}{author}{}\n", index + 1, comment.date, lines.next().unwrap_or_default());
+    for line in lines {
+        out.push_str(&format!("    {line}\n"));
+    }
+    if let Some(report) = &comment.report {
+        for line in crate::cli::handlers::comment::report_lines(report) {
+            out.push_str(&format!("    {line}\n"));
+        }
+    }
+    out
+}
+
 /// Plain-text view of a task: header, fields, relationships, description,
-/// references and comments. Empty sections are left out.
-pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String {
+/// references and comments. Empty sections are left out. `brief` cuts each
+/// comment to one line (DEV-884).
+pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path, brief: bool) -> String {
     let mut out = format!("{}  {}\n", task.id, task.title);
     if let Some(url) = &task.url {
         out.push_str(&format!("{url}\n"));
@@ -130,18 +188,16 @@ pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String 
         out.push_str(&format!("\nComments ({})\n", live.len()));
         let open = crate::types::open_questions(&task.comments);
         for (index, comment) in live {
-            let mut lines = comment.text.lines();
-            let author = comment.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
-            let marker = crate::cli::handlers::comment::comment_marker(comment, open.contains(&index));
-            out.push_str(&format!("  #{}  {}  {marker}{author}{}\n", index + 1, comment.date, lines.next().unwrap_or_default()));
-            for line in lines {
-                out.push_str(&format!("    {line}\n"));
+            if brief {
+                let author = comment.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
+                let marker = crate::cli::handlers::comment::comment_marker(comment, open.contains(&index));
+                out.push_str(&format!("  #{}  {}  {marker}{author}{}\n", index + 1, comment.date, brief_line(&comment.text)));
+            } else {
+                out.push_str(&comment_text(index, comment, open.contains(&index)));
             }
-            if let Some(report) = &comment.report {
-                for line in crate::cli::handlers::comment::report_lines(report) {
-                    out.push_str(&format!("    {line}\n"));
-                }
-            }
+        }
+        if brief {
+            out.push_str(&format!("  One in full: lotar show {} --comment <N>\n", task.id));
         }
     }
     out.trim_end().to_string()

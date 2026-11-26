@@ -1,11 +1,11 @@
 title: 'Flaky: a Rust test sometimes leaves a .tmpXXXXXX entry in the test runner''s temp folder, failing a passing run'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-26T11:05:10.613732+00:00
+modified: 2026-11-26T16:57:41.548611+00:00
 relationships:
   blocks:
   - DEV-782
@@ -175,6 +175,9 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review again
+- date: 2026-11-26T16:57:41.548611+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T11:05Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
@@ -405,3 +408,20 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805"]}'
     new: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804"]}'
+- at: 2026-11-26T16:57:37.069890+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-26T16:57:38.753492+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-26T16:57:41.548611+00:00
+  actor: claude
+  changes:
+  - field: comment_added

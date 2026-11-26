@@ -1,14 +1,17 @@
 title: lotar agent queue doesn't count the jobs queued in lotar serve's memory
-status: Merging
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@review'
 created: 2026-11-25T14:02:30.792755+00:00
-modified: 2026-11-26T04:38:40.793746+00:00
+modified: 2026-11-26T16:56:35.001851+00:00
 relationships:
   related:
   - DEV-865
+  - DEV-864
+  - DEV-900
+  - DEV-862
 comments:
 - date: 2026-11-26T01:00:37.633350+00:00
   author: claude
@@ -42,6 +45,34 @@ comments:
       result: not_run
       reason: targeted checks only, the merge runs them (DEV-797)
     next: Review; land after DEV-865 (agent/DEV-865), whose sum rule this builds on
+- date: 2026-11-26T16:01:01.531299+00:00
+  author: claude
+  text: |-
+    Not merged: one test needs commit signing, and opgate is stopped. Should I restart opgate (`launchctl kickstart gui/501/net.pyxzl.opgate`) and rerun the merge?
+
+    - Rebased `agent/DEV-871` onto main three times, because main moved twice (DEV-862, then DEV-864). The first rebase had conflicts in `agent_queue_service.rs` (separate test additions) and `docs/help/agent.md` (DEV-871's Queued sentence put into main's longer line). Both sides kept. The later two rebases were clean. Branch is now `87d878d83`
+    - On `be80991c6` (before DEV-864) all checks passed: lint, `test:agent` (2579 Rust tests, 1623 view tests), smoke (411)
+    - On `87d878d83`, `test:agent` failed in `dev626_resumed_t3_threads_test::worktree_run_runs_nothing_while_the_ticket_thread_runs_or_waits_for_an_answer`. Its `git commit` signs through opgate, and opgate isn't running: `opgate 0.24.0 stopping (terminated)` in its log, socket refused even outside the sandbox. DEV-871 doesn't touch that test. It fails alone too
+    - Filed DEV-900 (health): this test and `dev489_review_comments_test.rs` commit without `-c commit.gpgsign=false`
+    - I didn't restart opgate myself. The `.tasks` amend in the main checkout needs signing too
+    - Nothing landed on main and nothing was pushed
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+      reason: on 87d878d83
+    - command: npm run -s test:agent
+      result: failed
+      reason: 1 test on 87d878d83, opgate down; passed on be80991c6 (2579/2579)
+    - command: npm run -s smoke
+      result: not_run
+      reason: on 87d878d83 (stopped after test:agent); passed on be80991c6 (411/411)
+    next: Restart opgate, then rerun the merge
+- date: 2026-11-26T16:56:35.001851+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T16:01Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10eb79315e69bb050f3ef09b865df6903f423d6fa2c7100ad862ad363ae7c104
 description: '-'
@@ -107,3 +138,67 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T14:23:08.767159+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865"]}'
+    new: '{"related":["DEV-865","DEV-864"]}'
+- at: 2026-11-26T16:00:52.154914+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-864"]}'
+    new: '{"related":["DEV-865","DEV-864","DEV-900"]}'
+- at: 2026-11-26T16:01:01.531299+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T16:01:01.818626+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-865","DEV-864","DEV-900"]}'
+    new: '{"related":["DEV-865","DEV-864","DEV-900","DEV-862"]}'
+- at: 2026-11-26T16:56:04.242848+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-26T16:56:04.335549+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T16:56:04.464890+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-26T16:56:31.336690+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T16:56:31.640614+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-26T16:56:32.166169+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-26T16:56:35.001851+00:00
+  actor: claude
+  changes:
+  - field: comment_added

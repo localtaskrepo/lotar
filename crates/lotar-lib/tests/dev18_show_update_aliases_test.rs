@@ -55,3 +55,66 @@ fn help_is_available_for_the_new_spellings() {
         assert!(out.contains("lotar show"), "{command}: {out}");
     }
 }
+
+/// DEV-884: `--brief` cuts comments to one line and drops the history, and
+/// `--comment N` prints one in full, so agents don't read every comment.
+#[test]
+fn brief_cuts_comments_and_comment_prints_one_in_full() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    assert!(run(dir, &["add", "Brief task", "-p", "BR", "-D", "The description"]).0);
+    let long = "x".repeat(250);
+    assert!(run(dir, &["comment", "BR-1", "-m", "Outcome line\n\n- detail one\n- detail two"]).0);
+    assert!(run(dir, &["comment", "BR-1", "-m", &long]).0);
+    assert!(run(dir, &["comment", "BR-1", "-m", "Short", "--check", "npm test=passed"]).0);
+
+    let (ok, out) = run(dir, &["show", "BR-1", "--brief"]);
+    assert!(ok, "{out}");
+    assert!(out.contains("The description") && out.contains("Comments (3)"), "{out}");
+    assert!(out.contains("Outcome line…\n") && !out.contains("detail one"), "{out}");
+    assert!(out.contains(&format!("{}…\n", "x".repeat(200))) && !out.contains(&"x".repeat(201)), "{out}");
+    assert!(out.contains(": Short\n") && !out.contains("npm test"), "{out}");
+    assert!(out.trim_end().ends_with("One in full: lotar show BR-1 --comment <N>"), "{out}");
+
+    let (ok, out) = run(dir, &["--format", "json", "show", "BR-1", "--brief"]);
+    assert!(ok, "{out}");
+    let json: serde_json::Value = serde_json::from_str(out.trim()).expect(&out);
+    assert!(json.get("history").is_none(), "{out}");
+    assert_eq!(json["comments"][0]["text"], "Outcome line…");
+    assert!(json["comments"][2].get("report").is_none(), "{out}");
+    let (ok, out) = run(dir, &["--format", "json", "show", "BR-1"]);
+    assert!(ok && serde_json::from_str::<serde_json::Value>(out.trim()).expect(&out)["history"].is_array(), "{out}");
+
+    let (ok, out) = run(dir, &["show", "BR-1", "--comment", "1"]);
+    assert!(ok && out.starts_with("#1  ") && out.contains("    - detail two") && !out.contains("Brief task"), "{out}");
+    let (ok, out) = run(dir, &["show", "BR-1", "--comment", "3"]);
+    assert!(ok && out.contains("npm test"), "{out}");
+    let (ok, out) = run(dir, &["--format", "json", "show", "BR-1", "--comment", "2"]);
+    assert!(ok && serde_json::from_str::<serde_json::Value>(out.trim()).expect(&out)["text"] == long.as_str(), "{out}");
+
+    assert!(run(dir, &["comment", "BR-1", "--delete", "2"]).0);
+    for bad in ["0", "2", "4"] {
+        let (ok, out) = run(dir, &["show", "BR-1", "--comment", bad]);
+        assert!(!ok && out.contains(&format!("no comment #{bad}: comments are #1 to #3")), "{bad}: {out}");
+    }
+    let (ok, out) = run(dir, &["show", "BR-1", "--brief", "--comment", "1"]);
+    assert!(!ok && out.contains("cannot be used with"), "{out}");
+}
+
+/// DEV-884: the show command in the job instructions' LoTaR CLI block runs
+/// and prints the brief form.
+#[test]
+fn job_instructions_show_command_runs() {
+    let docs = std::fs::read_to_string(std::path::Path::new(env!("REPO_ROOT")).join("docs/help/agent-instructions.md")).unwrap();
+    let line = docs.lines().find(|line| line.starts_with("\"${{lotar.bin}}\"") && line.contains(" show ")).expect("a show command in the LoTaR CLI block");
+    let command = line.split('#').next().unwrap().replace("\"${{lotar.bin}}\"", "").replace("${{ticket.id}}", "JB-1");
+    let args: Vec<&str> = command.split_whitespace().collect();
+    assert!(args.contains(&"--brief"), "{line}");
+
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    assert!(run(dir, &["add", "Job task", "-p", "JB"]).0);
+    assert!(run(dir, &["comment", "JB-1", "-m", "First line\nSecond line"]).0);
+    let (ok, out) = run(dir, &args);
+    assert!(ok && out.contains("First line…") && !out.contains("Second line"), "{args:?}: {out}");
+}

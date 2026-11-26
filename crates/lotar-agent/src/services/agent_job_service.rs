@@ -7074,7 +7074,7 @@ mod tests {
 
         let builtin = template.expand(DEFAULT_AGENT_INSTRUCTIONS);
         assert!(!builtin.contains("${{"), "{builtin}");
-        assert!(builtin.contains("--format json show TPL-1"), "{builtin}");
+        assert!(builtin.contains("show TPL-1 --brief   # one comment in full: --comment <N>"), "{builtin}");
         assert!(builtin.contains("--project TPL"), "{builtin}");
         assert!(builtin.contains("to its reporter (Sam Example)"), "{builtin}");
 

@@ -1,11 +1,11 @@
 title: Test a_check_that_leaves_a_process_running_doesnt_hold_up_the_merge still fails on main, also alone
-status: Todo
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T04:52:05.701091+00:00
-modified: 2026-11-26T12:10:34.236029+00:00
+modified: 2026-11-26T16:57:17.055822+00:00
 relationships:
   related:
   - DEV-863
@@ -40,6 +40,9 @@ comments:
       result: not_run
       reason: the merge runs them (DEV-797)
     next: Review, then merge
+- date: 2026-11-26T16:57:17.055822+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T12:10Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1c77d12b46b9314a8da1ae6f7a5fbd0e70c94581544bece67b83c750b703b7a
 description: |-
@@ -83,3 +86,26 @@ history:
   - field: relationships
     old: '{"related":["DEV-863","DEV-885","DEV-784","DEV-862"]}'
     new: '{"related":["DEV-863","DEV-885","DEV-784","DEV-862","DEV-897"]}'
+- at: 2026-11-26T16:57:02.537544+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T16:57:02.939096+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-26T16:57:04.101821+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review'
+- at: 2026-11-26T16:57:17.055822+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: A release ticket's merge job still sets it Done before its tag is pushed when the checks pass
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T05:03:35.190384+00:00
-modified: 2026-11-26T14:01:26.766753+00:00
+modified: 2026-11-26T16:56:53.653321+00:00
 relationships:
   depends_on:
   - standards:STD-371
@@ -23,6 +23,9 @@ comments:
     - Planned fix, written into STD-371: "Merge agent lifecycle" skips `title: { matches: '^Release v' }`, and a new rule hands a merged release ticket to @fix (fresh session) to run release skill steps 3 to 8. Step 7 sets Done after the tag is on origin.
     - When STD-371 is done: copy the config into `.tasks/DEV/automation.yml` (lotar's copy is behind its source anyway, for example the small-diff rules from STD-362). Then add a test that runs `AutomationService::simulate` with `JobCompleted` against the real file, on a `Release v9.9.9` ticket and on another @merge ticket, and commit.
     - I wrote nothing to the branch: `git log main..HEAD` is empty.
+- date: 2026-11-26T16:56:53.653321+00:00
+  author: claude
+  text: 'Stalled since 2026-11-26T14:01Z with no lotar job: the live check restarted @fix in a new thread, its job never started, with the fix prompt (lotar rule "Stalled: restart the fix agent"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
 description: |-
@@ -67,6 +70,16 @@ history:
     old: health
     new: health, waits
 - at: 2026-11-26T14:01:26.766753+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T16:56:50.924500+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T16:56:53.653321+00:00
   actor: claude
   changes:
   - field: comment_added

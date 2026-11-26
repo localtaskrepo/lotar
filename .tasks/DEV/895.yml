@@ -1,11 +1,11 @@
 title: Job prompt's Comments section points agents at the full lotar show for all comments, beside the block's --brief
-status: Todo
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T07:11:26.742561+00:00
-modified: 2026-11-26T07:11:27.646375+00:00
+modified: 2026-11-26T16:53:03.845532+00:00
 relationships:
   related:
   - DEV-884
@@ -20,3 +20,19 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T16:51:45.491705+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-26T16:51:45.547296+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-26T16:53:03.845532+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

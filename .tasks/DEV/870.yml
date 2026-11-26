@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-25T11:03:31.428115+00:00
-modified: 2026-11-26T06:58:49.724259+00:00
+modified: 2026-11-26T16:53:09.550104+00:00
 relationships:
   related:
   - DEV-845
@@ -199,4 +199,23 @@ history:
     new: Reviewing
   - field: assignee
     old: '@fix'
+    new: '@review'
+- at: 2026-11-26T16:53:09.291798+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T16:53:09.386732+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+- at: 2026-11-26T16:53:09.550104+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
     new: '@review'
