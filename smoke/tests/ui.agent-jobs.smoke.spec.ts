@@ -304,7 +304,11 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     await withPage(`${server.url}/agents`, async (page) => {
                         await page.waitForSelector('.job-card', { timeout: 15_000 });
                         await page.getByRole('button', { name: 'Show logs', exact: true }).click();
-                        const toggle = page.getByRole('button', { name: 'Instructions', exact: true });
+                        // While the logs load, the card shows its own Instructions button; the loaded log replaces
+                        // it, closing a panel opened there. Wait for the log and use the button in its header.
+                        const header = page.locator('.job-log__header');
+                        await header.waitFor({ state: 'visible', timeout: 15_000 });
+                        const toggle = header.getByRole('button', { name: 'Instructions', exact: true });
                         expect(await toggle.getAttribute('aria-expanded')).toBe('false');
 
                         const loaded = page.waitForResponse(
@@ -317,11 +321,11 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         await settings.waitFor({ state: 'visible', timeout: 15_000 });
                         // The button sits in the log's header, the panel full width below it (DEV-769).
                         expect(await page.locator('.job-log__header .run-inputs__panel').count()).toBe(0);
-                        const header = await page.locator('.job-log__header').boundingBox();
+                        const headerBox = await header.boundingBox();
                         const panel = await page.locator('.job-log > .run-inputs__panel').boundingBox();
-                        expect(header && panel).toBeTruthy();
-                        expect(panel!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
-                        expect(Math.abs(panel!.width - header!.width)).toBeLessThan(2);
+                        expect(headerBox && panel).toBeTruthy();
+                        expect(panel!.y).toBeGreaterThanOrEqual(headerBox!.y + headerBox!.height);
+                        expect(Math.abs(panel!.width - headerBox!.width)).toBeLessThan(2);
                         const setting = (name: string) =>
                             settings
                                 .locator('tr')

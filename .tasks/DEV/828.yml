@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T07:19:10.376712+00:00
-modified: 2026-11-26T16:55:16.850945+00:00
+modified: 2026-11-26T18:09:35.707390+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -222,6 +222,12 @@ comments:
     - **Note:** a first run with `-p lotar-lib` failed with "lotar is missing" because this fresh worktree had no binary. The workspace run above passed, so the code is not at fault.
     - **Not run:** `npm run lint`, `npm test`, `npm run smoke` (the merge runs them). No UI changes, so no UI review was needed.
     - **Tickets filed:** none.
+- date: 2026-11-26T18:09:35.707390+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-828` onto `main` conflicts in `crates/lotar-lib/src/cli/handlers/task/show.rs`; lotar aborted the rebase, `agent/DEV-828` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A33a6bc3a78a0303d3d7625eb010c0842a8ef1bf9dbff50d41b0d49918f18932c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aafbac71bd2bc9fb1e0b5976aa7bedd053b97c6e5dbea51bb6bbe6d1a33c98f60
@@ -563,3 +569,7 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T18:09:35.707390+00:00
+  actor: automation
+  changes:
+  - field: comment_added

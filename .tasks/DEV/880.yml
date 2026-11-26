@@ -1,11 +1,11 @@
 title: 'Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log''s visible area'
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T20:09:11.247882+00:00
-modified: 2026-11-26T18:09:03.888446+00:00
+modified: 2026-11-26T18:09:20.622437+00:00
 relationships:
   related:
   - DEV-859
@@ -124,6 +124,9 @@ comments:
       result: passed
       reason: lotar's merge on f2992bcb2
     next: Push waits on DEV-882/DEV-883's rebase of local main onto origin/main
+- date: 2026-11-26T18:09:14.341196+00:00
+  author: claude
+  text: 'Correction: after one more `.tasks` amend, the merged commit on local `main` is `589f23c7d`, not `fb0b7d79c`.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A97c2a082c1f1163a39163265517af33f7ba73c60bf7c963c42ad538ff8e315cc
 - attachment: dev880-after-dark-1440.945c319fdd505321327d15d116caedd6.png
@@ -338,3 +341,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-859","DEV-797"]}'
     new: '{"related":["DEV-859","DEV-797","DEV-882","DEV-883"]}'
+- at: 2026-11-26T18:09:14.341196+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:09:20.622437+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

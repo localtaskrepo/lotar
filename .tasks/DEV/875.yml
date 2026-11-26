@@ -5,11 +5,13 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T19:53:56.034648+00:00
-modified: 2026-11-26T16:54:16.350803+00:00
+modified: 2026-11-26T18:17:21.138868+00:00
 relationships:
   related:
   - DEV-769
   - DEV-888
+  - DEV-882
+  - DEV-883
 comments:
 - date: 2026-11-26T01:18:53.374835+00:00
   author: claude
@@ -52,6 +54,63 @@ comments:
     - Reran: `npm ci` passed. `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'Instructions button'` passed 5 of 5 after `npm run -s build:smoke`. The first 3 tries failed before running because the worktree had no binary. `npx prettier --check` and `npx oxlint` on the file are clean.
     - Not rerun: the fix agent's 1.5 s delay repro (it needs a temporary edit). Instead, the cause was confirmed by reading the code.
     - Findings: none. Tickets filed: none.
+- date: 2026-11-26T18:16:37.850388+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    589f23c7d DEV-880 Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log's visible area
+    e709ce7e8 DEV-881 Status feed: a small standard endpoint with each instance's running jobs, queue and who it waits on
+    3d83a25ad DEV-797 Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time
+    70f1095a0 DEV-883 A bad value in the home config's agents block drops every agent profile, and config validate still passes
+    fd6d2b098 DEV-882 Record memory-gate holds and each job's queued time in the job records
+    ```.
+
+    - Rebased `agent/DEV-875` onto `main` (`589f23c7d210`): `2eb6dd135b7b`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `2eb6dd135b7b`
+    - Amended the pending `.tasks` changes into the merged commit: `402a7034e7eb`
+  report:
+    commits:
+    - hash: 2eb6dd135
+      what: DEV-875 Smoke 'shows the prompt and settings a finished job ran with behind its Instructions button' failed once in the full suite
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
+- date: 2026-11-26T18:17:20.783902+00:00
+  author: claude
+  text: |-
+    Merged into local `main` as `2c82507d8`, not pushed: local main is behind `origin/main`, and DEV-882's rebase onto it is still open.
+
+    - lotar's merge rebased the branch, ran the full checks (lint, `test:agent` and smoke all passed) and fast-forwarded main. I amended the pending `.tasks` change into the merged commit: `402a7034e` became `2c82507d8`.
+    - Not pushed: main is ahead by 6 and behind by 1 (`71791a991 DEV-804 Release v0.15.7` is on origin). The first unpushed commit, `fd6d2b098` (DEV-882), and DEV-883 are in Todo for `@fix`. The decision recorded on DEV-882 is to rebase local main onto `origin/main` and then push. That's their work, so I left main's history alone. When it's pushed, this commit goes with it.
+    - No trust needed: the merge changed no automation or config files.
+    - I reran the ticket's health check after the merge: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'Instructions button'` passed 3 of 3.
+  report:
+    commits:
+    - hash: 2c82507d8
+      what: DEV-875 smoke test waits for the loaded log header before clicking Instructions (on local main)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: lotar's merge, on 2eb6dd135
+    - command: npm run -s test:agent
+      result: passed
+      reason: lotar's merge, on 2eb6dd135
+    - command: npm run -s smoke
+      result: passed
+      reason: lotar's merge, on 2eb6dd135
+    - command: npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t 'Instructions button'
+      result: passed
+      reason: 3 of 3 after the merge
+    next: 'Push waits for DEV-882: its fix agent rebases local main onto origin/main (release 71791a991) and pushes'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa2d85a7e532ad07ff1783c51ac60fb06c0ad8feb5ce12117534dd7aa8b25650f
 description: 'Found: in DEV-769''s merge, `npm run -s smoke` on `bd4c626cb` failed this test in `smoke/tests/ui.agent-jobs.smoke.spec.ts` (already in the serial `wall-clock` group): `/api/jobs/inputs` answered ok, but `getByRole(''table'', { name: ''Settings'' })` never became visible (15 s). It passed 5 out of 5 alone and in 3 more full runs. Check: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts -t ''Instructions button''` repeated, and the full `npm run -s smoke`. Done: the cause is found (for example the log remounting and closing the panel, or an inputs response with no record yet) and the test waits on it, so it no longer fails under load.'
@@ -124,3 +183,17 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T18:16:37.850388+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:17:20.783902+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T18:17:21.138868+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-769","DEV-888"]}'
+    new: '{"related":["DEV-769","DEV-888","DEV-882","DEV-883"]}'
