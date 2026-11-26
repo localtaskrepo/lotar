@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T19:54:54.013521+00:00
-modified: 2026-11-26T16:53:50.993999+00:00
+modified: 2026-11-26T18:34:00.374593+00:00
 relationships:
   related:
   - DEV-777
@@ -63,6 +63,43 @@ comments:
     - **Ticket record:** the fix agent's `lotar task edit -D -` at 01:21Z replaced the description with a lone `-` (the DEV-842 bug, in the older lotar build that ran the job). The fix agent's "Done when" checklist was never saved. The lost text, to put back: "Found 2026-11-25: 205 unsettled T3 threads; 86 are older attempts on open tickets (DEV-810 15 threads, DEV-828 13, DEV-827..831 and DEV-777 about 12 each), 31 belong to Done tickets. Each retry or review job starts a new thread and never settles the previous one. Done when: starting a job settles the ticket's earlier job threads, closing a ticket settles all of them, and a test covers both. Owner chose to file this 2026-11-25."
     - Still open, as the fix agent said: threads no harnessmux session or job log names stay unsettled until DEV-810 lands. Whichever of DEV-810 and DEV-876 merges second has to rebase over `kept.rs`
     - Tickets filed: none
+- date: 2026-11-26T18:34:00.374593+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: `main` holds unpushed commits that aren't this merge's, so lotar didn't push:
+    ```
+    589f23c7d DEV-880 Job log search: no scrolling to the match, so a match deep in a long tool output stays below the log's visible area
+    e709ce7e8 DEV-881 Status feed: a small standard endpoint with each instance's running jobs, queue and who it waits on
+    3d83a25ad DEV-797 Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time
+    70f1095a0 DEV-883 A bad value in the home config's agents block drops every agent profile, and config validate still passes
+    fd6d2b098 DEV-882 Record memory-gate holds and each job's queued time in the job records
+    ```.
+
+    - Rebased `agent/DEV-876` onto `main` (`589f23c7d210`): `48d1ea7f54d4`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-876` onto `main` (`279d3423c426`): `0a1014a4a12c`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `0a1014a4a12c`
+    - Amended the pending `.tasks` changes into the merged commit: `20f4f6766380`
+  report:
+    commits:
+    - hash: 279d3423c
+      what: DEV-875 Smoke 'shows the prompt and settings a finished job ran with behind its Instructions button' failed once in the full suite
+    - hash: 0a1014a4a
+      what: 'DEV-876 T3 runner: settle a ticket''s older threads on a new attempt and all of them when the ticket closes'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9
 description: '-'
@@ -149,3 +186,7 @@ history:
   changes:
   - field: assignee
     new: '@merge'
+- at: 2026-11-26T18:34:00.374593+00:00
+  actor: automation
+  changes:
+  - field: comment_added

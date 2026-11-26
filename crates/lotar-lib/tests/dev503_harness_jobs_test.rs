@@ -900,6 +900,7 @@ case "$1 $2" in
       [ -f "$t/pending" ] && status=running
       [ -f "$dir/running-$id" ] && status=running
       [ -f "$dir/failed-$id" ] && status=failed
+      [ -f "$dir/listed-$id" ] && status=$(cat "$dir/listed-$id")
       [ -f "$t/settled" ] && settled=true
       printf '%s{"threadId":"%s","link":"https://t3.test/%s","status":"%s","latestRunId":"%s","settled":%s}' "$sep" "$id" "$id" "$status" "$(cat "$t/latest" 2>/dev/null)" "$settled"
       sep=,
@@ -1333,6 +1334,26 @@ fn a_helpneeded_jobs_thread_is_settled_once_the_ticket_is_done() {
     AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
     assert_eq!(settled_threads(root), vec!["thread-0"]);
     assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"), "the job's log says so");
+}
+
+/// DEV-876: a done ticket's threads are all settled, whatever their run's outcome, not only the completed ones.
+#[test]
+fn a_done_tickets_ended_threads_are_settled_whatever_their_outcome() {
+    for status in ["failed", "interrupted", "cancelled", "idle"] {
+        let (fixtures, _env) = t3_harness("");
+        let root = fixtures.get_temp_path();
+        std::fs::write(root.join("list-threads"), "").unwrap();
+        std::fs::write(root.join("failed-thread-0"), "").unwrap();
+        run_t3(&fixtures, "fix").failure();
+        std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+        assert!(settled_threads(root).is_empty(), "{status}: an open ticket keeps its only thread");
+        std::fs::write(root.join("listed-thread-0"), status).unwrap();
+        let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+        TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
+        AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+        assert_eq!(settled_threads(root), vec!["thread-0"], "{status}");
+        assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"), "{status}: the job's log says so");
+    }
 }
 
 /// DEV-754: a kept thread T3 Code refuses to settle is named by the link `t3 thread list` shows, not by its id.

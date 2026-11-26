@@ -3,7 +3,9 @@
 //! threads of failed or cancelled jobs, and of jobs that ended while the
 //! ticket waited for a person, stayed active for good. Such a thread is
 //! settled once its ticket is done, or once the thread of a later job on the
-//! ticket is settled: that job moved the ticket on.
+//! ticket is settled: that job moved the ticket on. A new job settles the
+//! threads of the ticket's earlier jobs, and a done ticket all of its
+//! threads, whatever their run's outcome (DEV-876).
 
 use super::{resumed, settle_session, ticket_done_state, workspace_root_of};
 use crate::config::types::AgentRunnerKind;
@@ -60,6 +62,13 @@ pub(super) fn threads(tasks_dir: &Path) -> BTreeMap<String, Vec<Thread>> {
     by_ticket
 }
 
+/// Whether a thread `t3 thread list` shows with `status` has no run going, so
+/// settling it stops nothing: completed, failed, interrupted, cancelled, idle
+/// (DEV-876).
+fn ended(status: &str) -> bool {
+    !matches!(status, "" | "running" | "waiting" | "queued" | "starting" | "preparing")
+}
+
 /// Settle the kept threads now, asking T3 Code for its threads: as a job ends.
 pub(super) fn settle_now(tasks_dir: &Path) {
     let threads = threads(tasks_dir);
@@ -73,11 +82,13 @@ pub(super) fn settle_now(tasks_dir: &Path) {
     }
 }
 
-/// Settle the failed threads of the ticket's earlier jobs as a new `t3` job
+/// Settle the ended threads of the ticket's earlier jobs as a new `t3` job
 /// starts on it, all but `own`, the thread the job continues; the notes for
-/// its log (DEV-836). T3 Code resumes a thread a usage limit failed at the
-/// limit's reset, also when a later job, such as the limited job's retry,
-/// took its work over; a settled thread it never resumes.
+/// its log. T3 Code resumes a thread a usage limit failed at the limit's
+/// reset, also when a later job, such as the limited job's retry, took its
+/// work over; a settled thread it never resumes (DEV-836). The new job is the
+/// ticket's attempt now, so no earlier one stays in the sidebar (DEV-876).
+/// A thread whose run still goes is left to the look ([`resumed::look`]).
 pub(super) fn settle_superseded(tasks_dir: &Path, ticket_id: &str, own: Option<&str>) -> Vec<String> {
     let Some(earlier) = threads(tasks_dir).remove(ticket_id) else { return Vec::new() };
     let earlier: Vec<Thread> = earlier.into_iter().filter(|thread| Some(thread.thread.as_str()) != own).collect();
@@ -88,34 +99,31 @@ pub(super) fn settle_superseded(tasks_dir: &Path, ticket_id: &str, own: Option<&
     let Some(listed) = resumed::list_threads(&program, &env, &cwd, tasks_dir) else { return Vec::new() };
     let mut notes = Vec::new();
     for thread in &earlier {
-        let Some(shown) = listed.get(&thread.thread).filter(|shown| !shown.settled && shown.status == "failed") else { continue };
+        let Some(shown) = listed.get(&thread.thread).filter(|shown| !shown.settled && ended(&shown.status)) else { continue };
         let link = shown.link.as_deref().unwrap_or(&thread.thread);
+        let (job, status) = (&thread.job_id, &shown.status);
         let note = match crate::services::t3_thread_api::settle_thread(&program, &env, &cwd, &thread.thread) {
-            Ok(()) => format!("Settled the T3 Code thread {link} of the job {}, which failed, so T3 Code doesn't resume it beside this job.", thread.job_id),
-            Err(err) => format!(
-                "Could not settle the T3 Code thread {link} of the job {}, which failed, so T3 Code may resume it beside this job: {err}",
-                thread.job_id
-            ),
+            Ok(()) => format!("Settled the T3 Code thread {link} of the earlier job {job} ({status}): this job is the ticket's attempt now."),
+            Err(err) => format!("Could not settle the T3 Code thread {link} of the earlier job {job} ({status}), so it stays in T3 Code's sidebar: {err}"),
         };
         notes.push(note);
     }
     notes
 }
 
-/// Settle each ticket's kept threads, those `listed` shows unsettled and
-/// completed: all of them on a done ticket, else those of jobs that ended
-/// before the job of a settled thread.
+/// Settle each ticket's kept threads, those `listed` shows unsettled: on a
+/// done ticket all whose run ended, whatever its outcome (DEV-876), else the
+/// completed ones of jobs that ended before the job of a settled thread.
 pub(super) fn settle(tasks_dir: &Path, threads: BTreeMap<String, Vec<Thread>>, listed: &HashMap<String, resumed::Listed>) {
     for (ticket_id, threads) in threads {
-        let kept = |thread: &&Thread| listed.get(&thread.thread).is_some_and(|shown| !shown.settled && shown.status == "completed");
-        if !threads.iter().any(|thread| kept(&thread)) {
+        let unsettled = |thread: &Thread| listed.get(&thread.thread).filter(|shown| !shown.settled).map(|shown| shown.status.as_str());
+        if !threads.iter().any(|thread| unsettled(thread).is_some_and(ended)) {
             continue;
         }
-        let upto = if ticket_done_state(tasks_dir, &ticket_id) == Some(true) {
-            threads.len()
-        } else {
-            threads.iter().rposition(|thread| listed.get(&thread.thread).is_some_and(|shown| shown.settled)).unwrap_or(0)
-        };
+        let done = ticket_done_state(tasks_dir, &ticket_id) == Some(true);
+        let kept = |thread: &&Thread| unsettled(thread).is_some_and(|status| if done { ended(status) } else { status == "completed" });
+        let upto =
+            if done { threads.len() } else { threads.iter().rposition(|thread| listed.get(&thread.thread).is_some_and(|shown| shown.settled)).unwrap_or(0) };
         let due: Vec<(&Thread, Option<&str>)> =
             threads[..upto].iter().filter(kept).map(|thread| (thread, listed.get(&thread.thread).and_then(|shown| shown.link.as_deref()))).collect();
         if !due.is_empty() {

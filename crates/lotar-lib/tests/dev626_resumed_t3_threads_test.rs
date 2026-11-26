@@ -2,7 +2,7 @@
 //! over as a job, whose end rules run once; a second running thread of the ticket gets a comment, and a thread that
 //! waits for an answer is left alone. A shell script stands in for T3's CLI.
 //! DEV-836: lotar stops a second running thread, and every thread of a Blocked ticket, and a new job settles the
-//! failed threads of the ticket's earlier jobs, through a fake of T3 Code's internal WebSocket API.
+//! failed threads of the ticket's earlier jobs (DEV-876: every ended one), through a fake of T3 Code's internal WebSocket API.
 #![cfg(unix)]
 
 use crate::common::TestFixtures;
@@ -482,23 +482,27 @@ fn every_thread_of_a_blocked_ticket_is_stopped_and_none_is_taken_over() {
 }
 
 /// DEV-836: a job's retry runs in a new thread; T3 Code would still resume the limited job's failed thread at the
-/// limit's reset, so the new job settles it.
+/// limit's reset, so the new job settles it. DEV-876: it settles every earlier thread whose run ended, whatever its
+/// outcome, and leaves one whose run still goes to the look.
 #[test]
-fn a_new_job_settles_the_failed_thread_of_an_earlier_job_on_the_ticket() {
+fn a_new_job_settles_the_ended_threads_of_the_earlier_jobs_on_the_ticket() {
     let harness = harness();
-    harness.run_job("fixer", "t1");
-    harness.run_job("fixer", "t2");
+    for thread in ["t1", "t2", "t3", "t4"] {
+        harness.run_job("fixer", thread);
+    }
     harness.serve_t3();
-    harness.list(&[("t1", "failed"), ("t2", "completed")]);
+    harness.list(&[("t1", "failed"), ("t2", "completed"), ("t3", "interrupted"), ("t4", "running")]);
 
-    harness.run_job("fixer", "t3");
+    harness.run_job("fixer", "t5");
 
-    assert_eq!(harness.commands(), ["thread.settle t1"], "only the failed thread is settled");
+    let settled: Vec<String> = harness.commands().into_iter().filter(|command| command.starts_with("thread.settle ")).collect();
+    assert_eq!(settled, ["thread.settle t1", "thread.settle t2", "thread.settle t3"], "the ended threads, oldest first; t4 still runs");
     let logs = harness.fixtures.tasks_root.join("@agent-logs");
-    let noted = std::fs::read_dir(&logs)
-        .unwrap()
-        .flatten()
-        .map(|entry| std::fs::read_to_string(entry.path()).unwrap_or_default())
-        .any(|log| log.lines().any(|line| line.contains("Settled the T3 Code thread") && line.contains(&link("t1"))));
-    assert!(noted, "the new job's log says which thread it settled");
+    let logs: String = std::fs::read_dir(&logs).unwrap().flatten().map(|entry| std::fs::read_to_string(entry.path()).unwrap_or_default()).collect();
+    for (thread, status) in [("t1", "failed"), ("t2", "completed"), ("t3", "interrupted")] {
+        let noted = logs
+            .lines()
+            .any(|line| line.contains(&format!("Settled the T3 Code thread {} of the earlier job ", link(thread))) && line.contains(&format!("({status})")));
+        assert!(noted, "the new job's log says it settled {thread}: {logs}");
+    }
 }
