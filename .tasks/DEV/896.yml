@@ -1,17 +1,21 @@
 title: 'A merge agent that lands a ticket in InProgress sends it to Reviewing: DEV-832 went back to review after it was on main'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T07:28:02.692146+00:00
-modified: 2026-11-27T02:12:01.163430+00:00
+modified: 2026-11-27T03:17:49.294710+00:00
 relationships:
   related:
   - DEV-832
   - DEV-801
   - DEV-883
   - DEV-886
+  - DEV-778
+  - DEV-782
+  - DEV-888
+  - DEV-919
 comments:
 - date: 2026-11-26T17:30:52.308456+00:00
   author: claude
@@ -152,14 +156,43 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-27T03:08:27.357471+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `12c765c9a` is on main and origin.
+
+    - **Why lotar's merge failed:** a stale build cache, not the work. The review had built its scratch copy (`/private/tmp/dev896-review-scratch`, since deleted) into this worktree's `target/`. The `lotar-agent` build-script run in `target/debug/build/lotar-agent/8a4c5a29e5c41e17` still set `LOTAR_DOCS_DIR` to that folder. I deleted that one cache folder, and the build passed.
+    - **Main moved 3 times during the merge** (DEV-888, DEV-778, DEV-782). Each rebase was clean. The full checks (`lint:agent`, `test:agent`, `smoke`) passed on `71c6090a3`, which is this branch on DEV-778. After DEV-782 (UI pills) I ran only the `dev605` tests on `e3629f9a9`, because a full run takes about as long as main moves. The branch adds only that one test file.
+    - **Main checkout:** the `.tasks` edits there were folded into the merged commit with `--amend`.
+    - **Trust:** not needed. The merge changes no rules or agent profiles.
+    - **Health check:** the ticket names no finding check, so none ran.
+    - **Follow-up idea:** review scratch copies shouldn't build into the ticket worktree's `target/`. Today that breaks the next merge's build.
+  report:
+    commits:
+    - hash: 12c765c9a
+      what: regression test only_the_merge_job_lands_a_merging_tickets_branch_and_ends_it_done (plus the main checkout's .tasks edits)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+      reason: on 71c6090a3
+    - command: npm run -s test:agent
+      result: passed
+      reason: on 71c6090a3, 2630 Rust + 1629 UI tests
+    - command: npm run -s smoke
+      result: passed
+      reason: on 71c6090a3, 413 tests
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev605/)'
+      result: passed
+      reason: on e3629f9a9, 23 tests
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62e6c6a30da835027e75d59a109fde65035449f33aff308ba9aef1a3a6a12815
+releases:
+- 13
 description: 'Found 2026-11-26 on DEV-832: merge failed → assignee @fix, tag merge-retried; the fix job ended and set status Merging → InProgress (02:41Z); lotar''s own merge then failed smoke, the merge agent landed `5d3223431` on main and origin (03:23Z), and its job''s end moved InProgress → Reviewing, @review. A review job then ran on work already on main (branch `agent/DEV-832` holds only a copy of `5d3223431` without the .tasks edit). Check: `lotar task timeline DEV-832` lines from 00:04Z to 07:25Z. Done when: a job that lands the branch on main ends the ticket at Done (or the step after merging), whatever status it ran in, with a test.'
 tags:
 - health
-- review-returned
-- job-paused
 history:
 - at: 2026-11-26T07:28:03.095980+00:00
   actor: claude
@@ -298,3 +331,33 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T03:08:27.357471+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:08:27.635076+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-832","DEV-801","DEV-883","DEV-886"]}'
+    new: '{"related":["DEV-832","DEV-801","DEV-883","DEV-886","DEV-778","DEV-782","DEV-888"]}'
+- at: 2026-11-27T03:08:36.428790+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-832","DEV-801","DEV-883","DEV-886","DEV-778","DEV-782","DEV-888"]}'
+    new: '{"related":["DEV-832","DEV-801","DEV-883","DEV-886","DEV-778","DEV-782","DEV-888","DEV-919"]}'
+- at: 2026-11-27T03:08:43.953745+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned, job-paused
+    new: health
+- at: 2026-11-27T03:17:49.294710+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

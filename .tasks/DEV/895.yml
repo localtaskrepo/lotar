@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T07:11:26.742561+00:00
-modified: 2026-11-26T23:38:22.446532+00:00
+modified: 2026-11-27T03:17:49.238626+00:00
 relationships:
   related:
   - DEV-884
@@ -77,6 +77,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1d5a203926b86a2ec80fe3f18002efc723142d9db0b434b8eb989bab16e71a29
+releases:
+- 13
 description: |-
   Found in the DEV-884 review: `crates/lotar-agent/src/services/agent_job_service.rs:1525` writes "All of them: `lotar show <ID>`" into the job prompt, while the LoTaR CLI block now names `show <ID> --brief` and `--comment <N>`. An agent that follows the Comments line reads every comment in full again.
 
@@ -159,3 +161,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-884"]}'
     new: '{"related":["DEV-884","DEV-877"]}'
+- at: 2026-11-27T03:17:49.238626+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

@@ -1,15 +1,26 @@
-title: Release v0.15.8
-status: Todo
+title: Release v0.16.0
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-26T17:48:57.525302+00:00
-modified: 2026-11-26T17:48:58.609873+00:00
+modified: 2026-11-27T03:18:00.768335+00:00
+relationships:
+  related:
+  - DEV-881
+  - DEV-905
+  - DEV-850
+comments:
+- date: 2026-11-27T03:18:00.478143+00:00
+  author: claude
+  text: 'Step 1: no ticket depends on this release. The 39 tickets with commits on main since v0.15.7 are in release 0.16.0 (record #13, renamed from 0.15.8; DEV-850 also stays in 0.15.7, where its first commit shipped); all are Done. Retitled to v0.16.0 for the minor bump the owner approved.'
 releases:
 - 13
 description: |-
-  Next lotar release, a patch bump to v0.15.8 unless the owner asks for a minor.
+  Next lotar release, a minor bump to v0.16.0: origin/main has 36 commits since v0.15.7, among them DEV-881 (the status feed) and DEV-905/906/907 (build-root fixes).
+
+  Owner's approval, 2026-11-26 about 19:00 PST: asked "Should I release harnessmux 0.5.0 and lotar 0.16.0, and ship the curator patch?", he answered "Yes go ahead".
 
   Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
 history:
@@ -18,3 +29,42 @@ history:
   changes:
   - field: releases
     new: '#13'
+- at: 2026-11-27T03:17:35.138036+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: Release v0.15.8
+    new: Release v0.16.0
+  - field: description
+    old: |-
+      Next lotar release, a patch bump to v0.15.8 unless the owner asks for a minor.
+
+      Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
+    new: |-
+      Next lotar release, a minor bump to v0.16.0: origin/main has 36 commits since v0.15.7, among them DEV-881 (the status feed) and DEV-905/906/907 (build-root fixes).
+
+      Owner's approval, 2026-11-26 about 19:00 PST: asked "Should I release harnessmux 0.5.0 and lotar 0.16.0, and ship the curator patch?", he answered "Yes go ahead".
+
+      Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
+- at: 2026-11-27T03:17:35.442557+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-881","DEV-905"]}'
+- at: 2026-11-27T03:17:35.800189+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T03:18:00.478143+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:18:00.768335+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-881","DEV-905"]}'
+    new: '{"related":["DEV-881","DEV-905","DEV-850"]}'

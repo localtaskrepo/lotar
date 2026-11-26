@@ -1,0 +1,28 @@
+title: A review's scratch worktree that builds into the ticket worktree's target/ breaks the next merge's lotar-agent build
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T03:08:35.727731+00:00
+modified: 2026-11-27T03:08:36.755919+00:00
+relationships:
+  related:
+  - DEV-896
+description: 'Found on DEV-896''s merge (2026-11-26): `npm run -s test:agent` failed twice. `include_str!` couldn''t read `/private/tmp/dev896-review-scratch/.../docs/help/agent-instructions.md`. The review had built a deleted scratch worktree into DEV-896''s `target/`. The build-script run `target/debug/build/lotar-agent/<hash>/run/stdout` kept `LOTAR_DOCS_DIR` pointing there, because `rerun-if-changed=../../docs/...` is relative and stays the same. Check: `grep -rl review-scratch target/debug/build/*/*/run/stdout` in a ticket worktree. Done when: a build in one checkout can''t reuse another checkout''s `LOTAR_DOCS_DIR`, for example `crates/lotar-agent/build.rs` and `crates/lotar-lib/build.rs` also rerun when `CARGO_MANIFEST_DIR` changes, with a test.'
+tags:
+- health
+custom_fields:
+  finding: merge:stale-build-script-output
+history:
+- at: 2026-11-27T03:08:36.429597+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-896"]}'
+- at: 2026-11-27T03:08:36.755919+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

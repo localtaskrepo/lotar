@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T20:59:10.921071+00:00
+modified: 2026-11-27T03:17:48.742083+00:00
 relationships:
   blocks:
   - DEV-893
@@ -159,6 +159,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5c0e14fefe77d3359acb346194b4cf06156d9ad0840605fb0ea326fa090959f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A151b04d5a78db33d1507c60d28a4268be5d6ab364078b51d97f68d775efd4e00
+releases:
+- 13
 description: 'Found (STD-360): in a home .lotar whose agents block sets stall_timeout_seconds: notanumber on one profile, lotar --format json config show lists no agent_profiles at all, and lotar config validate prints ''Global configuration is valid''. A one-character typo in one profile silently removes all of them, so no job starts. Check: HOME=<tmp> with that .lotar, run lotar config validate and lotar --format json config show. Done: validate names the profile and key and fails, and the other profiles still load (or the load fails loudly).'
 tags:
 - health
@@ -369,3 +371,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-828","DEV-866","DEV-886"]}'
     new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-828","DEV-866","DEV-886","DEV-905"]}'
+- at: 2026-11-27T03:17:48.742083+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

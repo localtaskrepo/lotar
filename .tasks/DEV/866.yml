@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T05:29:21.102795+00:00
-modified: 2026-11-26T20:06:38.677369+00:00
+modified: 2026-11-27T03:17:48.099923+00:00
 relationships:
   related:
   - DEV-789
@@ -165,6 +165,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af7c853bc72540dd8dd160e793ee215ee636fb7378dea9f82c7f46d1dfbc0eb6d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab01ace2febfeb2b4d0c8224b3a2de98d83376549136189cb8171d1b7baf76f44
+releases:
+- 13
 description: |-
   ## Found
 
@@ -324,3 +326,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-789","DEV-804","DEV-897","DEV-882","DEV-883"]}'
     new: '{"related":["DEV-789","DEV-804","DEV-897","DEV-882","DEV-883","DEV-886"]}'
+- at: 2026-11-27T03:17:48.099923+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

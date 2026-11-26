@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-27T01:10:19.700225+00:00
+modified: 2026-11-27T03:17:10.669053+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-33
@@ -83,6 +83,9 @@ comments:
 - date: 2026-11-27T01:10:19.700225+00:00
   author: claude
   text: 'Stalled since 2026-11-27T00:09Z with no lotar job: the live check restarted @fix, its prerequisites are done (lotar rule "Prerequisites done: continue the waiting ticket"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-27T03:17:10.669053+00:00
+  author: claude
+  text: 'harnessmux v0.5.0 is tagged (commit cca5d66, owner 2026-11-26 ~19:00 PST: "Yes go ahead"). It carries HARN-33 (t3 profile `environment`), HARN-34 and HARN-35; the CHANGELOG''s 0.4.1 entry became 0.5.0 because HARN-33 adds a feature and changes the Profile struct. The Release workflow (crates.io and binaries) started at 03:16Z. Bump harnessmux to 0.5.0 here once it''s on crates.io.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
@@ -380,6 +383,10 @@ history:
     old: job-paused, waits
     new: job-paused
 - at: 2026-11-27T01:10:19.700225+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:17:10.669053+00:00
   actor: claude
   changes:
   - field: comment_added

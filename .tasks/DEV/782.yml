@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-27T02:55:10.906746+00:00
+modified: 2026-11-27T03:17:47.402473+00:00
 relationships:
   depends_on:
   - DEV-765
@@ -26,6 +26,7 @@ relationships:
   - DEV-853
   - DEV-888
   - DEV-893
+  - DEV-896
 comments:
 - date: 2026-11-22T06:37:21.509101+00:00
   author: claude
@@ -482,6 +483,8 @@ references:
 - attachment: dev782-before-list-light-1920.e9fe30143a7f0a8a21bd86d84b212c67.webp
 - attachment: dev782-before-list-light-390.002ddb72dd969a55b57065d266eefadf.webp
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae9c6e246361c7416ada0074fa86a4a34bef80a95bce28d895b6a5f9654be1fa3
+releases:
+- 13
 description: |-
   Found while reviewing DEV-765.
 
@@ -1105,3 +1108,14 @@ history:
   - field: tags
     old: ui, agent, job-paused
     new: ui, agent
+- at: 2026-11-27T03:08:27.633213+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909","DEV-789","DEV-853","DEV-888","DEV-893"]}'
+    new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909","DEV-789","DEV-853","DEV-888","DEV-893","DEV-896"]}'
+- at: 2026-11-27T03:17:47.402473+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

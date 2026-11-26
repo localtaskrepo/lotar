@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T21:43:44.403743+00:00
-modified: 2026-11-27T00:04:23.949168+00:00
+modified: 2026-11-27T03:17:48.631088+00:00
 relationships:
   related:
   - DEV-797
@@ -16,6 +16,7 @@ relationships:
   - DEV-876
   - DEV-860
   - DEV-786
+  - DEV-903
 comments:
 - date: 2026-11-26T02:07:06.711209+00:00
   author: claude
@@ -105,6 +106,8 @@ comments:
     next: 'DEV-882/DEV-883 fix job: rebase main onto origin/main and push; that pushes e709ce7e8 too'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85ab6982e8b10a529998e720ae87709922febb25e5570efd75bed6f19ac4f22d
+releases:
+- 13
 description: |-
   Owner by voice 2026-11-25 13:40 PST (as the voice assistant relayed it): "Status overview: each lotar instance exposes a small standard status feed (running jobs, queue, waiting on whom) without knowing about other instances; a thin aggregator, starting as a page in the staff app, reads all the feeds and links into each instance's UI. No pluggable lotar UI for now." And: "File the lotar status feed endpoint as the first step."
 
@@ -210,3 +213,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-797","DEV-835","DEV-837","DEV-882","DEV-883","DEV-876","DEV-860"]}'
     new: '{"related":["DEV-797","DEV-835","DEV-837","DEV-882","DEV-883","DEV-876","DEV-860","DEV-786"]}'
+- at: 2026-11-27T03:17:35.442120+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-797","DEV-835","DEV-837","DEV-882","DEV-883","DEV-876","DEV-860","DEV-786"]}'
+    new: '{"related":["DEV-797","DEV-835","DEV-837","DEV-882","DEV-883","DEV-876","DEV-860","DEV-786","DEV-903"]}'
+- at: 2026-11-27T03:17:48.631088+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

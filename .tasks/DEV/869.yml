@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-27T01:11:13.333456+00:00
+modified: 2026-11-27T03:17:48.159241+00:00
 relationships:
   related:
   - DEV-847
@@ -136,6 +136,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A89f5e47dea5086fcd262030d8410b807f6b5bde2aa107868f6c68782c5ff9fd8
+releases:
+- 13
 description: |-
   Found while reviewing DEV-847: a rule with `run: {command: echo, args: [x]}` is listed as `runs {"command":"echo","args":["x"],"env":{},"cwd":null,"ignore_failure":false,"wait":true}`. `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` prints the serialized AutomationRunCommand with every default. Check: `lotar trust --status` in a repo with a structured run rule.
 
@@ -321,3 +323,8 @@ history:
   - field: tags
     old: job-paused
     new: ''
+- at: 2026-11-27T03:17:48.159241+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

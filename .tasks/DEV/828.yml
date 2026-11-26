@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T07:19:10.376712+00:00
-modified: 2026-11-26T19:37:27.525902+00:00
+modified: 2026-11-27T03:17:47.807709+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -274,6 +274,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A612fe8a46e05ce59bfef51e0cca7d5ccfe612b752039a4d4fd43857373f45aad
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad14b0684e914c8f624ed083a849b1c8ac1a6ee9d35ca64165b736b67c8086582
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad855fc669c08c54e229bb9b9ea2972a041b8f90a02ea7fda523824d92400cb4b
+releases:
+- 13
 description: |-
   Found in the DEV-809 review (2026-11-22).
 
@@ -619,3 +621,8 @@ history:
   - field: tags
     old: job-paused, fix-retried, retry-fix
     new: ''
+- at: 2026-11-27T03:17:47.807709+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

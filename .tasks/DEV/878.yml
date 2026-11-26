@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T20:00:38.684959+00:00
-modified: 2026-11-26T20:55:37.665726+00:00
+modified: 2026-11-27T03:17:48.446923+00:00
 relationships:
   depends_on:
   - DEV-852
@@ -86,6 +86,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3c730bbb7b1de4ce7ab9712e9d8588f04853f7bcbb2aaf3b61803817d42ba0f6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad67dcfc1511141da2aef79713adc8daaf01e68bd00130b47d7a3ce91fe74b2c9
+releases:
+- 13
 description: |-
   Found in the DEV-852 review.
 
@@ -211,3 +213,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-27T03:17:48.446923+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

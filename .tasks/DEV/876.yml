@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T19:54:54.013521+00:00
-modified: 2026-11-27T00:16:21.865994+00:00
+modified: 2026-11-27T03:17:48.388410+00:00
 relationships:
   related:
   - DEV-777
@@ -135,6 +135,8 @@ comments:
     next: Push main once the DEV-882 @fix job rebases local main onto origin/main
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f96aa73d18cbd5a1eb43c4c39cc3deb46ce56df300094dfa3774113b9e0fcd9
+releases:
+- 13
 description: '-'
 history:
 - at: 2026-11-25T19:54:54.341828+00:00
@@ -257,3 +259,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828","DEV-747","DEV-808","DEV-836","DEV-842","DEV-857","DEV-797","DEV-880","DEV-881","DEV-882","DEV-883","DEV-901","DEV-877"]}'
     new: '{"related":["DEV-777","DEV-810","DEV-827","DEV-828","DEV-747","DEV-808","DEV-836","DEV-842","DEV-857","DEV-797","DEV-880","DEV-881","DEV-882","DEV-883","DEV-901","DEV-877","DEV-917"]}'
+- at: 2026-11-27T03:17:48.388410+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

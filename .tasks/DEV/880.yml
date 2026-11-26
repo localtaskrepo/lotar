@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T20:09:11.247882+00:00
-modified: 2026-11-26T18:40:40.319880+00:00
+modified: 2026-11-27T03:17:48.573088+00:00
 relationships:
   related:
   - DEV-859
@@ -143,6 +143,8 @@ references:
 - attachment: dev880-before-light-1440.7165185e427fdd30330ddaa8c321bde2.png
 - attachment: dev880-before-light-1920.bf69d0a234788bb811ef0caa0b6425e3.png
 - attachment: dev880-before-light-390.a5e9e179a60a61dfd309c43cd4d39ee5.png
+releases:
+- 13
 description: |-
   Found in the DEV-859 review. A search opens the matching tool call and shows its whole output, but the log list scrolls internally. With a long output, for example 20 lines followed by 'npm notice' at 1440 px, the highlighted word sits below the visible part of the log, and the user has to scroll to find it.
 
@@ -365,3 +367,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-859","DEV-797","DEV-882","DEV-883","DEV-876"]}'
     new: '{"related":["DEV-859","DEV-797","DEV-882","DEV-883","DEV-876","DEV-888"]}'
+- at: 2026-11-27T03:17:48.573088+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

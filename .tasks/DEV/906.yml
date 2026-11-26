@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:25:16.556571+00:00
-modified: 2026-11-27T00:46:14.521972+00:00
+modified: 2026-11-27T03:17:49.432885+00:00
 relationships:
   related:
   - DEV-762
@@ -101,6 +101,8 @@ comments:
       reason: 18/18
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A201112dca23f251d4b5095e69820b4cf1300d02be05094b8089eb90a024f14bb
+releases:
+- 13
 description: |-
   Found by the DEV-905 job (2026-11-26): `file_reference_rejects_custom_configured_store_location` and `store_guard_fails_closed_on_invalid_configuration` fail with "Reference path escapes repository", also alone and without DEV-905's change.
 
@@ -207,3 +209,8 @@ history:
   - field: tags
     old: health, job-paused
     new: health
+- at: 2026-11-27T03:17:49.432885+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T18:53:10.893672+00:00
-modified: 2026-11-26T23:42:25.835876+00:00
+modified: 2026-11-27T03:17:49.368059+00:00
 relationships:
   related:
   - DEV-778
@@ -14,6 +14,7 @@ relationships:
   - DEV-907
   - DEV-883
   - DEV-843
+  - DEV-903
 comments:
 - date: 2026-11-26T19:25:26.201729+00:00
   author: claude
@@ -189,6 +190,8 @@ comments:
       reason: 412/412
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85f25e5a8f110969372450105671b218f10d8b75b5b58d56574d63c4cf888d5b
+releases:
+- 13
 description: |-
   Found by the LOCA-571 job (local, 2026-11-26): a `build_root` set in a repo's own `.tasks/config.yml` is silently ignored when `~/.lotar` has any `agent.worktree` section, because the home section replaces the whole section instead of merging key by key. The job's first test run ran without the build root and nothing said so.
 
@@ -296,3 +299,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-778","DEV-841","DEV-906","DEV-907","DEV-883"]}'
     new: '{"related":["DEV-778","DEV-841","DEV-906","DEV-907","DEV-883","DEV-843"]}'
+- at: 2026-11-27T03:17:35.442742+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-778","DEV-841","DEV-906","DEV-907","DEV-883","DEV-843"]}'
+    new: '{"related":["DEV-778","DEV-841","DEV-906","DEV-907","DEV-883","DEV-843","DEV-903"]}'
+- at: 2026-11-27T03:17:49.368059+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

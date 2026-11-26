@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T01:01:39.223004+00:00
-modified: 2026-11-26T23:42:25.835369+00:00
+modified: 2026-11-27T03:17:48.851517+00:00
 relationships:
   related:
   - DEV-865
@@ -145,6 +145,8 @@ comments:
     next: Push waits for the DEV-882/DEV-883 rebase of local main onto origin/main (owner-approved, queued for @fix)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8013082b72e0bfd4b9e6194ee238a6d9d376eecd3f849f16d034532dfc5bd182
+releases:
+- 13
 description: |-
   Found in the review of DEV-865.
 
@@ -327,3 +329,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883","DEV-878","DEV-860","DEV-786","DEV-840","DEV-904"]}'
     new: '{"related":["DEV-865","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-898","DEV-837","TEST-1","DEV-897","DEV-804","DEV-882","DEV-883","DEV-878","DEV-860","DEV-786","DEV-840","DEV-904","DEV-843"]}'
+- at: 2026-11-27T03:17:48.851517+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

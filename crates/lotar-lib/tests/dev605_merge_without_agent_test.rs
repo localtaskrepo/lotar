@@ -627,3 +627,98 @@ fn an_untrusted_repository_leaves_the_merge_to_the_agent() {
     assert!(!prompt.contains("LoTaR started this merge itself"), "{prompt}");
     assert!(!marker.exists(), "the untrusted check didn't run");
 }
+
+/// DEV-863: the ticket's finding keys, as `lotar add --finding ... --bundle`
+/// leaves them.
+fn set_findings(repo: &Repo, keys: &[&str]) {
+    let mut storage = repo.fixtures.create_storage();
+    let fields =
+        [(lotar::utils::custom_fields::FINDING_FIELD.to_string(), lotar::types::custom_value_from_json(&serde_json::json!(keys)))].into_iter().collect();
+    TaskService::update(&mut storage, TICKET, lotar::api_types::TaskUpdate { custom_fields: Some(fields), ..Default::default() }).expect("set findings");
+}
+
+/// A merge config whose `finding_check` appends `$LOTAR_FINDING` to `ran`
+/// and prints `listed`, as a health check prints what is still wrong.
+fn finding_check_config(ran: &Path, listed: &str) -> String {
+    format!("  merge:\n    checks: ['test -f feature.txt']\n    finding_check: 'echo \"$LOTAR_FINDING\" >> \"{}\"; echo \"{listed}\"'\n", ran.display())
+}
+
+fn finding_checks(report: &lotar::types::CommentReport) -> Vec<(&str, Option<&str>)> {
+    report.checks.iter().filter(|check| check.command.starts_with("echo")).map(|check| (check.result.as_str(), check.reason.as_deref())).collect()
+}
+
+/// DEV-863: a bundle's finding check runs once per key; none still listed
+/// lands without an agent.
+#[test]
+fn a_finding_check_that_lists_no_key_of_the_bundle_completes() {
+    let marker = tempfile::tempdir().expect("tempdir");
+    let ran = marker.path().join("ran");
+    let repo = Repo::new(&finding_check_config(&ran, "[c:z] another finding"));
+    set_findings(&repo, &["a:x", "b:y"]);
+    repo.commit_fix("feature.txt", "feature\n");
+
+    let (status, prompt) = repo.merge();
+
+    assert_eq!(status, "completed");
+    assert_eq!(prompt, None, "no agent started");
+    assert_eq!(fs::read_to_string(&ran).expect("the finding check ran"), "a:x\nb:y\n", "once per key, in order");
+    let comments = repo.comments();
+    let merged = comments.iter().find(|comment| comment.text.starts_with("Merged without an agent")).expect("the outcome comment");
+    assert!(merged.text.contains("no longer lists `[a:x]`") && merged.text.contains("no longer lists `[b:y]`"), "{}", merged.text);
+    assert_eq!(finding_checks(merged.report.as_ref().expect("a report")), vec![("passed", None), ("passed", None)]);
+}
+
+/// DEV-863: the check still lists the bundle's second key: the merge, landed
+/// already, hands off naming that key.
+#[test]
+fn a_finding_check_that_still_lists_the_second_key_hands_off_naming_it() {
+    let marker = tempfile::tempdir().expect("tempdir");
+    let ran = marker.path().join("ran");
+    let repo = Repo::new(&finding_check_config(&ran, "[b:y] still broken"));
+    set_findings(&repo, &["a:x", "b:y"]);
+    repo.commit_fix("feature.txt", "feature\n");
+
+    let (_, prompt) = repo.merge();
+
+    let prompt = prompt.expect("the merge agent ran");
+    assert!(prompt.contains("still lists `[b:y]`: [b:y] still broken"), "{prompt}");
+    assert!(!prompt.contains("still lists `[a:x]`"), "{prompt}");
+    assert!(repo.on_main("feature.txt"), "the check runs after landing");
+    assert_eq!(fs::read_to_string(&ran).expect("the finding check ran"), "a:x\nb:y\n");
+    let comments = repo.comments();
+    let hand_off = comments.iter().find(|comment| comment.text.starts_with("lotar's merge needs the merge agent")).expect("the hand-off comment");
+    assert_eq!(finding_checks(hand_off.report.as_ref().expect("a report")), vec![("passed", None), ("failed", Some("still lists [b:y]"))]);
+}
+
+/// DEV-863: a ticket without a finding key skips the finding check.
+#[test]
+fn a_ticket_without_a_finding_key_skips_the_finding_check() {
+    let marker = tempfile::tempdir().expect("tempdir");
+    let ran = marker.path().join("ran");
+    let repo = Repo::new(&finding_check_config(&ran, "[a:x] still broken"));
+    repo.commit_fix("feature.txt", "feature\n");
+
+    let (status, prompt) = repo.merge();
+
+    assert_eq!(status, "completed");
+    assert_eq!(prompt, None, "no agent started");
+    assert!(!ran.exists(), "the finding check didn't run");
+}
+
+/// DEV-863: without `finding_check` the keys aren't checked.
+#[test]
+fn without_a_finding_check_a_finding_ticket_lands() {
+    let repo = Repo::new("  merge:\n    checks: ['test -f feature.txt']\n");
+    set_findings(&repo, &["a:x", "b:y"]);
+    repo.commit_fix("feature.txt", "feature\n");
+
+    let (status, prompt) = repo.merge();
+
+    assert_eq!(status, "completed");
+    assert_eq!(prompt, None, "no agent started");
+    let comments = repo.comments();
+    let merged = comments.iter().find(|comment| comment.text.starts_with("Merged without an agent")).expect("the outcome comment");
+    assert!(!merged.text.contains("finding check"), "{}", merged.text);
+    let checks: Vec<_> = merged.report.as_ref().expect("a report").checks.iter().map(|check| check.command.as_str()).collect();
+    assert_eq!(checks, vec!["test -f feature.txt"]);
+}

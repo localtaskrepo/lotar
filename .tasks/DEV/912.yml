@@ -1,17 +1,18 @@
 title: A t3 job that hits Claude's 5-hour limit fails into retries and an owner question instead of pausing (local LOCA-631, 2026-11-26)
-status: Reviewing
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T23:29:18.207980+00:00
-modified: 2026-11-27T00:15:13.950807+00:00
+modified: 2026-11-27T03:14:07.401898+00:00
 relationships:
   related:
   - DEV-584
   - DEV-833
   - DEV-855
   - DEV-901
+  - DEV-920
 comments:
 - date: 2026-11-27T00:15:04.901603+00:00
   author: claude
@@ -37,6 +38,39 @@ comments:
       result: not_run
       reason: the merge runs the full suites (DEV-797)
     next: Review, then merge
+- date: 2026-11-27T03:13:58.767176+00:00
+  author: claude
+  text: |-
+    Review: passed. A taken-over T3 job now pauses on a usage limit; one minor follow-up filed as DEV-920.
+
+    - **Read:** `ad7f33724` (the only commit on `main..HEAD`, merges cleanly onto main), `resumed.rs` `adopt`, `usage_limit_pause`, `pause_queue` and `run_again_in_new_session` in `agent_job_service.rs`, DEV-584 and DEV-901.
+    - **Cause holds:** local `job-20261126T204940.803Z-13`'s log says "T3 Code runs the thread of the job job-20261126T204500.272Z-3 again … this job takes it over". `adopt` gave it `request: None`, so `usage_limit_pause` returned `None` and the job failed.
+    - **Fix:** `adopt` builds a request from the earlier job's `run_inputs` "User request" or falls back to `GO_ON`. The active-job record (`active_record_of`) now carries the request too, so a takeover by another process can also pause.
+    - **Test failed before:** with `resumed.rs` reverted in a scratch worktree, the new test fails with `left: "failed"`, `right: "paused"`, the same line as LOCA-631. With the fix it passes.
+    - **Done when:** both points are met. The fix is not tied to a repo or to how long the job ran. "No retry" here means no failure retry: the paused retry after the reset is DEV-584's design.
+    - **Minor, filed DEV-920:** a taken-over job writes no `run_inputs` line (job `-13` has 0, job `-3` has 1). A takeover of a takeover, such as LOCA-631's later `job-20261126T231028.491Z-28`, therefore gets the generic `GO_ON` prompt. It still pauses and continues the thread; only a retry in a new session loses the original request.
+    - No stray files. `git status` is clean after the checks.
+  report:
+    checks:
+    - command: npm ci
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration dev503 dev626 dev584 dev833
+      result: passed
+      reason: 81 tests
+    - command: cargo nextest run -p lotar-lib --test integration a_taken_over_t3_job_that_hits_a_usage_limit with resumed.rs reverted
+      result: failed
+      reason: expected before the fix, status failed not paused
+    - command: cargo nextest run -p lotar-agent usage_limit resumed adopt
+      result: passed
+      reason: 16 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it (DEV-797)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad43913606878248e7587ef76a76c59158e8af6e92648c892a41f3c30e985ef08
 description: |-
@@ -88,3 +122,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T03:13:31.016169+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-833","DEV-855","DEV-901"]}'
+    new: '{"related":["DEV-584","DEV-833","DEV-855","DEV-901","DEV-920"]}'
+- at: 2026-11-27T03:13:58.767176+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:14:07.401898+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T07:06:01.774631+00:00
-modified: 2026-11-27T02:55:03.738292+00:00
+modified: 2026-11-27T03:17:49.132368+00:00
 relationships:
   depends_on:
   - DEV-883
@@ -99,6 +99,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ac7687ed3b49ddb0c5fbe6482ac41b79bcec3ccb030425967d34b829990ff1b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3425182e8f3db8400d2baffa866734d4802b9b8d2c0b7747a749ef64b9ecb341
+releases:
+- 13
 description: 'Found (DEV-883 review): with a ~/.lotar whose agents.bad.stall_timeout_seconds is notanumber, `lotar config validate` prints `❌ Invalid home config (~/.lotar): …` and then `✅ Global configuration is valid` before failing with exit 1. The success line contradicts the error above it. Check: HOME=<tmp> with that .lotar, run lotar config validate. Done: no ''Global configuration is valid'' line when the home config fails to parse (crates/lotar-lib/src/cli/handlers/config/validate.rs:43-61).'
 tags:
 - health
@@ -227,3 +229,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-883"],"related":["DEV-883","DEV-888"]}'
     new: '{"depends_on":["DEV-883"],"related":["DEV-883","DEV-888","DEV-782"]}'
+- at: 2026-11-27T03:17:49.132368+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

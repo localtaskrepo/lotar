@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T04:56:14.463740+00:00
-modified: 2026-11-27T01:36:27.490788+00:00
+modified: 2026-11-27T03:17:49.021906+00:00
 relationships:
   depends_on:
   - DEV-864
@@ -116,6 +116,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6dadfbbb42e68dd68425b4eadeda1492dfe8a3eded7363266d1f74b0dcceaa52
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A48897fb147121a4d50f75c87d9eebd57bd4ff8712056ffd9740ef7c8479deb94
+releases:
+- 13
 description: |-
   Found in the review of DEV-864 (`78263b6a8`).
 
@@ -244,3 +246,8 @@ history:
   - field: tags
     old: job-paused
     new: ''
+- at: 2026-11-27T03:17:49.021906+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T23:49:30.471883+00:00
-modified: 2026-11-26T23:42:25.834346+00:00
+modified: 2026-11-27T03:17:48.043357+00:00
 relationships:
   related:
   - DEV-576
@@ -151,6 +151,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae97157ffb604bb7fcfc52baba1b3bbc0834c21f614f80ba1935c9098e6ebea9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5e4bb562ec08602a2f08f993f1d7a10ae175be4be5f116a4db5cf48d2e23d257
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7bf8c08e39f25d857ee5c2c4e1356f557ec06a92a17d3ad6149c61f6ce0f3c4a
+releases:
+- 13
 description: |-
   Found (STD-343): the triage answered STD-336's retry question with `lotar --tasks-dir ~/Development/standards/.tasks comment STD-336 --answer fix` at 2026-11-24 23:13Z. The option's set changed the assignee mallox -> @fix (timeline), but `lotar agent list-jobs` in standards shows no job between job-20261124T231242.639Z-51 (failed 23:12) and a manual restart at 23:46. Assigning an agent profile should start its job (DEV-576). A guess to check: `maybe_queue_agent_on_assignment` (crates/lotar-agent/src/services/automation_service.rs) only enqueues outside server mode and doesn't call `AgentQueueService::ensure_worker`, as `tell_agent` does; or the answer path skips it.
 
@@ -357,3 +359,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-576","DEV-886","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-822","DEV-797","DEV-881","DEV-887"]}'
     new: '{"related":["DEV-576","DEV-886","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-889","DEV-822","DEV-797","DEV-881","DEV-887","DEV-843"]}'
+- at: 2026-11-27T03:17:48.043357+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

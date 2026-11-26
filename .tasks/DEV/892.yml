@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T05:03:35.190384+00:00
-modified: 2026-11-27T01:23:35.579024+00:00
+modified: 2026-11-27T03:17:49.074590+00:00
 relationships:
   depends_on:
   - standards:STD-371
@@ -102,6 +102,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A854085c4248d6f5c9a16429c96ad2b629a5d948136b69a3e98de6af32a725cda
+releases:
+- 13
 description: |-
   Found by the DEV-793 review, 2026-11-25.
 
@@ -234,3 +236,8 @@ history:
   - field: tags
     old: health, job-paused
     new: health
+- at: 2026-11-27T03:17:49.074590+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

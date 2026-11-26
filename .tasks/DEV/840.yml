@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-27T00:40:37.135185+00:00
+modified: 2026-11-27T03:17:47.863646+00:00
 relationships:
   blocks:
   - DEV-782
@@ -228,6 +228,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A19b7e7df58faab0fb55f749b008fb42c2737c7944bdd9cf837a6bef8e8f8f402
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac4c03e545637a8a9598829eba9ffbbd9c225361ee2487eb73e4140bad00ac8dd
+releases:
+- 13
 description: |-
   Found: the DEV-816 merge check `npm run -s test:agent` (2026-11-23, at 2480/2480 passed, after waiting 5 min for the check lock) failed with `rust-test-runner: error: tests left 1 entries in the temp folder: .tmpGLFMn2`. A rerun on 2026-11-24 passed with nothing left. The `.tmp` + 6 chars name is the tempfile crate's default prefix, so a `tempfile::tempdir()`/`NamedTempFile` was probably dropped while a child process or thread still wrote into it, or was never dropped.
   Check: find the test that creates it, for example by running nextest under load with `--no-fail-fast` and listing the runner's temp folder per test.
@@ -504,3 +506,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804","DEV-835","DEV-837","DEV-862","DEV-882","DEV-887"]}'
     new: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804","DEV-835","DEV-837","DEV-862","DEV-882","DEV-887","DEV-801"]}'
+- at: 2026-11-27T03:17:47.863646+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

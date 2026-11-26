@@ -4,7 +4,7 @@ priority: Medium
 type: Research
 reporter: codex
 created: 2026-11-24T20:22:35.470403+00:00
-modified: 2026-11-27T01:48:06.862173+00:00
+modified: 2026-11-27T03:18:00.767588+00:00
 relationships:
   related:
   - DEV-849
@@ -15,6 +15,7 @@ relationships:
   - DEV-889
   - DEV-865
   - DEV-909
+  - DEV-903
 comments:
 - date: 2026-11-24T20:22:41.002771+00:00
   author: automation
@@ -227,6 +228,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1cd1fe090fc47d510c0b2189ed10002b47bfe1fa6100dd1f8d65280031089e13
 releases:
 - 12
+- 13
 description: |-
   Ravi asked on 2026-11-24 to use the LoTaR ticket timeline to review the full chain of work across T3 and headless harnessmux jobs. Keep ticket files small by storing references to transcripts and showing the original text in the UI when someone opens a job. Figure out what that should feel like on a phone and what the links can reliably resolve.
 
@@ -510,3 +512,15 @@ history:
   changes:
   - field: assignee
     old: mallox
+- at: 2026-11-27T03:17:54.185861+00:00
+  actor: claude
+  changes:
+  - field: releases
+    old: '#12'
+    new: '#12, #13'
+- at: 2026-11-27T03:18:00.767588+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887","DEV-889","DEV-865","DEV-909"]}'
+    new: '{"related":["DEV-849","DEV-791","DEV-774","DEV-860","DEV-887","DEV-889","DEV-865","DEV-909","DEV-903"]}'

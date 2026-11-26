@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T00:05:08.801449+00:00
-modified: 2026-11-27T02:37:35.199944+00:00
+modified: 2026-11-27T03:17:47.339568+00:00
 relationships:
   depends_on:
   - DEV-762
@@ -27,6 +27,7 @@ relationships:
   - DEV-816
   - DEV-840
   - DEV-905
+  - DEV-896
 comments:
 - date: 2026-11-22T03:35:49.249990+00:00
   author: claude
@@ -467,6 +468,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77b22e5750b413bdfd4e513d16df8cfde9cd0e03a337bf58d318be42634c22a3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab5851e8f0c77fca90658e4c6ea9819a74ebf85ddf1b2bf85d7f62a343f1d29b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7c90e0f762920911041befbda1b113271b1b1b744c81714c1d23e3b6f67d9a91
+releases:
+- 13
 description: |-
   Found in the DEV-762 review. `remove_worktree_dir` (crates/lotar-agent/src/services/agent_job_service.rs ~2816) finds the build root folder before the rename, but deletes it only after the trash folder is gone. A removal cut off in between, or a failed delete of that folder, leaves `<build_root>/<repo>/<ticket>` with no link pointing at it. The next removal sweeps leftover `.<name>.lotar-removed` folders but not the build root. `remove_build_output` (~3243) has the same gap for its parked `.<ticket>.lotar-cleanup-<job>` folders in the build root. Those builds then take quota on /Volumes/Builds until someone deletes them by hand.
 
@@ -1058,3 +1061,14 @@ history:
   - field: tags
     old: job-paused
     new: ''
+- at: 2026-11-27T03:08:27.631858+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-762","local:LOCA-601","DEV-840"],"blocks":["DEV-841"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774","DEV-782","DEV-785","DEV-802","DEV-816","DEV-840","DEV-905"]}'
+    new: '{"depends_on":["DEV-762","local:LOCA-601","DEV-840"],"blocks":["DEV-841"],"related":["DEV-762","DEV-832","DEV-834","DEV-833","DEV-810","DEV-841","DEV-774","DEV-782","DEV-785","DEV-802","DEV-816","DEV-840","DEV-905","DEV-896"]}'
+- at: 2026-11-27T03:17:47.339568+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-27T02:30:20.207874+00:00
+modified: 2026-11-27T03:17:47.586062+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -652,6 +652,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d8643c08edc7396a6f3fd47f68a4e48290caf4206e22da425c5db13864f37
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb541fcd6e15ba778ed8405c010783d3268361f87afb7447799721c914886f23
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A40ca7fcb4af355e63474a183d866ce2589b142cc19ed57fee0fe752758649bd8
+releases:
+- 13
 description: |-
   The agent templates lotar ships are far behind the setup our own repos run on, so someone who starts with `lotar init --template agent-pipeline` misses most of what we learned. The shipped templates run implement, test and merge, and send any failure back to the reporter. Ours adds a review on a second provider, one retry before a person is asked, the person's comment reaching the running agent, and tickets that wait Blocked until their prerequisites are done. Found by product development (2026-11-22). It came from the standards thread "Sharing Agent Setup With Teammates" (2026-11-21), where the owner wrote: "I was already mulling over a lotar template that includes our learnings for an easy project set up", and "I'm also thinking about other people that may want to use it, and keep using it the same as we are and improving it". It takes the standards Direction "a platform for other people" further. The thread holds the packaging question (plugins, copier, a shared repo); this ticket covers only what lotar itself ships.
 
@@ -1315,3 +1317,8 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916","DEV-861"]}'
     new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916","DEV-861","DEV-888"]}'
+- at: 2026-11-27T03:17:47.586062+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

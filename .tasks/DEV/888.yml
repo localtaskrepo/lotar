@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T01:18:52.353749+00:00
-modified: 2026-11-27T02:55:03.737652+00:00
+modified: 2026-11-27T03:17:48.907586+00:00
 relationships:
   related:
   - DEV-875
@@ -17,6 +17,7 @@ relationships:
   - DEV-893
   - DEV-894
   - DEV-782
+  - DEV-896
 comments:
 - date: 2026-11-26T06:15:21.322835+00:00
   author: claude
@@ -154,6 +155,8 @@ references:
 - attachment: DEV-888-after-dark-1440.60b249817649aa2d11b10f1ff570f175.png
 - attachment: DEV-888-after-dark-1920.3b7cbe94832cf298975ca5017d503fc6.png
 - attachment: DEV-888-after-dark-390.345c0a0b1fcc19bc650c1f1b0a564982.png
+releases:
+- 13
 description: 'Found: in DEV-875, while a job card''s logs load, `view/pages/AgentJobs.vue` shows a standalone `AgentRunInputs` with its own Instructions button; once the logs arrive it unmounts and `AgentJobLog` mounts with its panel closed, so a panel the user opened is gone. Check: delay `/api/jobs/logs` (page.route), click Instructions before the log shows, and the panel should stay open. Done: the open state carries over to the log''s header button (or the placeholder button is not offered while loading).'
 tags:
 - health
@@ -398,3 +401,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913","DEV-796","DEV-893","DEV-894"]}'
     new: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913","DEV-796","DEV-893","DEV-894","DEV-782"]}'
+- at: 2026-11-27T03:08:27.634489+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913","DEV-796","DEV-893","DEV-894","DEV-782"]}'
+    new: '{"related":["DEV-875","DEV-797","DEV-865","DEV-880","DEV-913","DEV-796","DEV-893","DEV-894","DEV-782","DEV-896"]}'
+- at: 2026-11-27T03:17:48.907586+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

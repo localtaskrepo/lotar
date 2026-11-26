@@ -4,7 +4,7 @@ priority: Low
 type: Bug
 reporter: claude
 created: 2026-11-23T04:27:34.695967+00:00
-modified: 2026-11-26T18:59:37.437368+00:00
+modified: 2026-11-27T03:17:47.751665+00:00
 relationships:
   related:
   - DEV-802
@@ -361,6 +361,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7a14eb294736299ddcfa1a4a685c83a62e6a240e9dccc5e2e91215857e91deab
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A82adc9f2c69d8345b461a52f391213e96b97bf88d19728c98d78c39fe0aa27a5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A57b5b78fa0f5ca3535da35b47c472f5e28b7449f95244be1abb3506c857d71c3
+releases:
+- 13
 description: |-
   Found: reviewing DEV-802, `checkout_tops` (`crates/lotar-core/src/utils/git.rs`, new in b7256c744) reads each `.git/worktrees/<name>/gitdir` line as a path and canonicalizes it against the process's cwd. Git 2.48+ writes it relative to that admin folder when a worktree is added with `--relative-paths` (or `worktree.useRelativePaths=true`), e.g. `../../../../wt/.git`, so that worktree is left out and its ticket IDs can be handed out again. Check: in a scratch repo, `git worktree add --relative-paths -b wt ../wt` and `git worktree add -b wt2 ../wt2`, then `lotar add` in wt and in wt2 (with LOTAR_TASKS_DIR unset): both got DEV-3. lotar's own agent worktrees use absolute paths, so jobs are not hit today. Done: a relative gitdir line resolves against the admin folder (as `metadata_directory` already does), and the DEV-802 test covers a --relative-paths worktree.
 
@@ -707,3 +709,8 @@ history:
   - field: tags
     old: health, fix-retried
     new: health
+- at: 2026-11-27T03:17:47.751665+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'
